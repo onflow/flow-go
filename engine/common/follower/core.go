@@ -58,14 +58,21 @@ func NewCore(log zerolog.Logger,
 	validator hotstuff.Validator,
 	sync module.BlockRequester,
 	tracer module.Tracer,
-	opts ...ComplianceOption) *Core {
+	opts ...ComplianceOption) (*Core, error) {
 	metricsCollector := metrics.NewNoopCollector()
 	onEquivocation := func(block, otherBlock *flow.Block) {}
+
+	finalizedBlock, err := state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not query finalized block: %w", err)
+	}
+
 	c := &Core{
 		log:                 log.With().Str("engine", "follower_core").Logger(),
 		mempoolMetrics:      mempoolMetrics,
 		state:               state,
 		pendingCache:        cache.NewCache(log, 1000, metricsCollector, onEquivocation),
+		pendingTree:         pending_tree.NewPendingTree(finalizedBlock),
 		follower:            follower,
 		validator:           validator,
 		sync:                sync,
@@ -79,11 +86,13 @@ func NewCore(log zerolog.Logger,
 		apply(c)
 	}
 
+	c.pendingCache.PruneUpToView(finalizedBlock.View)
+
 	c.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(c.processCoreSeqEvents).
 		Build()
 
-	return c
+	return c, nil
 }
 
 func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error {
@@ -177,8 +186,8 @@ func (c *Core) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready com
 }
 
 // OnFinalizedBlock updates local state of pendingCache tree using received finalized block.
-// Is NOT concurrency safe, has to be used by the same goroutine as processCertifiedBlocks.
-// OnFinalizedBlock and processCertifiedBlocks MUST be sequentially ordered.
+// Is NOT concurrency safe, has to be used by the same goroutine as extendCertifiedBlocks.
+// OnFinalizedBlock and extendCertifiedBlocks MUST be sequentially ordered.
 func (c *Core) OnFinalizedBlock(final *flow.Header) {
 	c.pendingCache.PruneUpToView(final.View)
 
@@ -190,12 +199,28 @@ func (c *Core) OnFinalizedBlock(final *flow.Header) {
 	}
 }
 
-// processCertifiedBlocks processes batch of certified blocks by applying them to tree of certified blocks.
-// As result of this operation we might extend protocol state.
-// Is NOT concurrency safe, has to be used by the same goroutine as OnFinalizedBlock.
-// OnFinalizedBlock and processCertifiedBlocks MUST be sequentially ordered.
+// processCertifiedBlocks process a batch of certified blocks by adding them to the tree of pending blocks.
+// As soon as tree returns a range of connected and certified blocks they will be added to the protocol state.
+// Is NOT concurrency safe, has to be used by internal goroutine.
+// No errors expected during normal operations.
 func (c *Core) processCertifiedBlocks(blocks CertifiedBlocks) error {
-	for _, certifiedBlock := range blocks {
+	connectedBlocks, err := c.pendingTree.AddBlocks(blocks)
+	if err != nil {
+		return fmt.Errorf("could not process batch of certified blocks: %w", err)
+	}
+	err = c.extendCertifiedBlocks(connectedBlocks)
+	if err != nil {
+		return fmt.Errorf("could not extend protocol state: %w", err)
+	}
+	return nil
+}
+
+// extendCertifiedBlocks processes a connected range of certified blocks by applying them to protocol state.
+// As result of this operation we might extend protocol state.
+// Is NOT concurrency safe, has to be used by internal goroutine.
+// No errors expected during normal operations.
+func (c *Core) extendCertifiedBlocks(connectedBlocks CertifiedBlocks) error {
+	for _, certifiedBlock := range connectedBlocks {
 		err := c.state.ExtendCertified(context.Background(), certifiedBlock.Block, certifiedBlock.QC)
 		if err != nil {
 			if state.IsOutdatedExtensionError(err) {
@@ -213,13 +238,13 @@ func (c *Core) processCertifiedBlocks(blocks CertifiedBlocks) error {
 }
 
 func (c *Core) processFinalizedBlock(finalized *flow.Header) error {
-	certifiedBlocks, err := c.pendingTree.FinalizeFork(finalized)
+	connectedBlocks, err := c.pendingTree.FinalizeFork(finalized)
 	if err != nil {
 		return fmt.Errorf("could not process finalized fork at view %d: %w", finalized.View, err)
 	}
-	err = c.processCertifiedBlocks(certifiedBlocks)
+	err = c.extendCertifiedBlocks(connectedBlocks)
 	if err != nil {
-		return fmt.Errorf("could not process certified blocks resolved during finalization: %w", err)
+		return fmt.Errorf("could not extend protocol state during finalization: %w", err)
 	}
 	return nil
 }

@@ -1,10 +1,18 @@
 package follower
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -30,7 +38,10 @@ type CoreSuite struct {
 	sync           *module.BlockRequester
 	validator      *hotstuff.Validator
 
-	core *Core
+	ctx    irrecoverable.SignalerContext
+	cancel context.CancelFunc
+	errs   <-chan error
+	core   *Core
 }
 
 func (s *CoreSuite) SetupTest() {
@@ -41,9 +52,13 @@ func (s *CoreSuite) SetupTest() {
 
 	s.originID = unittest.IdentifierFixture()
 	s.finalizedBlock = unittest.BlockHeaderFixture()
+	finalSnapshot := protocol.NewSnapshot(s.T())
+	finalSnapshot.On("Head").Return(func() *flow.Header { return s.finalizedBlock }, nil).Once()
+	s.state.On("Final").Return(finalSnapshot).Once()
 
 	metrics := metrics.NewNoopCollector()
-	s.core = NewCore(
+	var err error
+	s.core, err = NewCore(
 		unittest.Logger(),
 		metrics,
 		s.state,
@@ -51,11 +66,26 @@ func (s *CoreSuite) SetupTest() {
 		s.validator,
 		s.sync,
 		trace.NewNoopTracer())
+	require.NoError(s.T(), err)
 
-	s.core.OnFinalizedBlock(s.finalizedBlock)
+	s.ctx, s.cancel, s.errs = irrecoverable.WithSignallerAndCancel(context.Background())
+	s.core.Start(s.ctx)
+	unittest.RequireCloseBefore(s.T(), s.core.Ready(), time.Second, "core failed to start")
+}
+
+// TearDownTest stops the engine and checks there are no errors thrown to the SignallerContext.
+func (s *CoreSuite) TearDownTest() {
+	s.cancel()
+	unittest.RequireCloseBefore(s.T(), s.core.Done(), time.Second, "core failed to stop")
+	select {
+	case err := <-s.errs:
+		assert.NoError(s.T(), err)
+	default:
+	}
 }
 
 // TestProcessingSingleBlock tests processing a range with length 1, it must result in block being validated and added to cache.
+// If block is already in cache it should be no-op.
 func (s *CoreSuite) TestProcessingSingleBlock() {
 	block := unittest.BlockWithParentFixture(s.finalizedBlock)
 
@@ -65,6 +95,9 @@ func (s *CoreSuite) TestProcessingSingleBlock() {
 	err := s.core.OnBlockRange(s.originID, []*flow.Block{block})
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), s.core.pendingCache.Peek(block.ID()))
+
+	err = s.core.OnBlockRange(s.originID, []*flow.Block{block})
+	require.NoError(s.T(), err)
 }
 
 // TestAddFinalizedBlock tests that adding block below finalized height results in processing it, but since cache was pruned
@@ -79,4 +112,157 @@ func (s *CoreSuite) TestAddFinalizedBlock() {
 	err := s.core.OnBlockRange(s.originID, []*flow.Block{&block})
 	require.NoError(s.T(), err)
 	require.Nil(s.T(), s.core.pendingCache.Peek(block.ID()))
+}
+
+// TestProcessingRangeHappyPath tests processing range with length > 1, which will result in a chain of certified blocks
+// that have to be added to the protocol state once validated and added to pending cache and then pending tree.
+func (s *CoreSuite) TestProcessingRangeHappyPath() {
+	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
+
+	var wg sync.WaitGroup
+	wg.Add(len(blocks) - 1)
+	for i := 1; i < len(blocks); i++ {
+		s.state.On("ExtendCertified", mock.Anything, blocks[i-1], blocks[i].Header.QuorumCertificate()).Return(nil).Once()
+		s.follower.On("SubmitProposal", model.ProposalFromFlow(blocks[i-1].Header)).Run(func(args mock.Arguments) {
+			wg.Done()
+		}).Return().Once()
+	}
+	s.validator.On("ValidateProposal", model.ProposalFromFlow(blocks[len(blocks)-1].Header)).Return(nil).Once()
+
+	err := s.core.OnBlockRange(s.originID, blocks)
+	require.NoError(s.T(), err)
+
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, 500*time.Millisecond, "expect all blocks to be processed before timeout")
+}
+
+// TestProcessingNotOrderedBatch tests that submitting a batch which is not properly ordered(meaning the batch is not connected)
+// has to result in error.
+func (s *CoreSuite) TestProcessingNotOrderedBatch() {
+	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
+	blocks[2], blocks[3] = blocks[3], blocks[2]
+
+	s.validator.On("ValidateProposal", model.ProposalFromFlow(blocks[len(blocks)-1].Header)).Return(nil).Once()
+
+	err := s.core.OnBlockRange(s.originID, blocks)
+	require.Error(s.T(), err)
+}
+
+// TestProcessingInvalidBlock tests that processing a batch which ends with invalid block discards the whole batch
+func (s *CoreSuite) TestProcessingInvalidBlock() {
+	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
+
+	s.validator.On("ValidateProposal", model.ProposalFromFlow(blocks[len(blocks)-1].Header)).Return(model.InvalidBlockError{Err: fmt.Errorf("")}).Once()
+	err := s.core.OnBlockRange(s.originID, blocks)
+	require.NoError(s.T(), err, "sentinel error has to be handled internally")
+
+	exception := errors.New("validate-proposal-exception")
+	s.validator.On("ValidateProposal", model.ProposalFromFlow(blocks[len(blocks)-1].Header)).Return(exception).Once()
+	err = s.core.OnBlockRange(s.originID, blocks)
+	require.ErrorIs(s.T(), err, exception, "exception has to be propagated")
+}
+
+// TestProcessingBlocksAfterShutdown tests that submitting blocks after shutdown doesn't block producers.
+func (s *CoreSuite) TestProcessingBlocksAfterShutdown() {
+	s.cancel()
+	unittest.RequireCloseBefore(s.T(), s.core.Done(), time.Second, "core failed to stop")
+
+	// at this point workers are stopped and processing valid range of connected blocks won't be delivered
+	// to the protocol state
+
+	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
+	s.validator.On("ValidateProposal", model.ProposalFromFlow(blocks[len(blocks)-1].Header)).Return(nil).Once()
+
+	err := s.core.OnBlockRange(s.originID, blocks)
+	require.NoError(s.T(), err)
+}
+
+// TestProcessingConnectedRangesOutOfOrder tests that processing range of connected blocks [B1 <- ... <- BN+1] our of order
+// results in extending [B1 <- ... <- BN] in correct order.
+func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
+	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
+	midpoint := len(blocks) / 2
+	firstHalf, secondHalf := blocks[:midpoint], blocks[midpoint:]
+
+	s.validator.On("ValidateProposal", mock.Anything).Return(nil).Once()
+	err := s.core.OnBlockRange(s.originID, secondHalf)
+	require.NoError(s.T(), err)
+
+	var wg sync.WaitGroup
+	wg.Add(len(blocks) - 1)
+	s.follower.On("SubmitProposal", mock.Anything).Return().Run(func(args mock.Arguments) {
+		wg.Done()
+	}).Times(len(blocks) - 1)
+
+	lastSubmittedBlockID := flow.ZeroID
+	s.state.On("ExtendCertified", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		block := args.Get(1).(*flow.Block)
+		if lastSubmittedBlockID != flow.ZeroID {
+			if block.Header.ParentID != lastSubmittedBlockID {
+				s.Failf("blocks not sequential",
+					"blocks submitted to protocol state are not sequential at height %d", block.Header.Height)
+			}
+		}
+		lastSubmittedBlockID = block.ID()
+	}).Return(nil).Times(len(blocks) - 1)
+
+	s.validator.On("ValidateProposal", mock.Anything).Return(nil).Once()
+	err = s.core.OnBlockRange(s.originID, firstHalf)
+	require.NoError(s.T(), err)
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "expect to process all blocks before timeout")
+}
+
+// TestConcurrentAdd simulates multiple workers adding batches of connected blocks out of order.
+// We use next setup:
+// Number of workers - workers
+// Number of batches submitted by worker - batchesPerWorker
+// Number of blocks in each batch submitted by worker - blocksPerBatch
+// Each worker submits batchesPerWorker*blocksPerBatch blocks
+// In total we will submit workers*batchesPerWorker*blocksPerBatch
+// After submitting all blocks we expect that chain of blocks except last one will be added to the protocol state and
+// submitted for further processing to Hotstuff layer.
+func (s *CoreSuite) TestConcurrentAdd() {
+	workers := 5
+	batchesPerWorker := 1
+	blocksPerBatch := 1
+	blocksPerWorker := blocksPerBatch * batchesPerWorker
+	blocks := unittest.ChainFixtureFrom(workers*blocksPerWorker, s.finalizedBlock)
+	targetSubmittedBlockID := blocks[len(blocks)-2].ID()
+
+	s.validator.On("ValidateProposal", mock.Anything).Return(nil) // any proposal is valid
+	done := make(chan struct{})
+
+	s.follower.On("SubmitProposal", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		// ensure that proposals are submitted in-order
+		proposal := args.Get(0).(*model.Proposal)
+		if proposal.Block.BlockID == targetSubmittedBlockID {
+			close(done)
+		}
+	}).Return().Times(len(blocks) - 1) // all proposals have to be submitted
+	lastSubmittedBlockID := flow.ZeroID
+	s.state.On("ExtendCertified", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		block := args.Get(1).(*flow.Block)
+		if lastSubmittedBlockID != flow.ZeroID {
+			if block.Header.ParentID != lastSubmittedBlockID {
+				s.Failf("blocks not sequential",
+					"blocks submitted to protocol state are not sequential at height %d", block.Header.Height)
+			}
+		}
+		lastSubmittedBlockID = block.ID()
+	}).Return(nil).Times(len(blocks) - 1)
+
+	var wg sync.WaitGroup
+	wg.Add(workers)
+
+	for i := 0; i < workers; i++ {
+		go func(blocks []*flow.Block) {
+			defer wg.Done()
+			for batch := 0; batch < batchesPerWorker; batch++ {
+				err := s.core.OnBlockRange(s.originID, blocks[batch*blocksPerBatch:(batch+1)*blocksPerBatch])
+				require.NoError(s.T(), err)
+			}
+		}(blocks[i*blocksPerWorker : (i+1)*blocksPerWorker])
+	}
+
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*5000000, "should submit blocks before timeout")
+	unittest.AssertClosesBefore(s.T(), done, time.Millisecond*5000000000, "should process all blocks before timeout")
 }
