@@ -3,6 +3,9 @@ package network
 import (
 	"fmt"
 	"time"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 // Misbehavior is a type of misbehavior that can be reported by a node.
@@ -87,8 +90,24 @@ const (
 // threshold, the node is reported to be disallow-listed by the networking layer, i.e., existing connections to the
 // node are closed and the node is no longer allowed to connect till its penalty is decayed back to zero.
 type MisbehaviorReport struct {
-	reason  Misbehavior
-	penalty int
+	id      flow.Identifier // the ID of the misbehaving node
+	reason  Misbehavior     // the reason of the misbehavior
+	penalty int             // the penalty value of the misbehavior
+}
+
+// OriginId returns the ID of the misbehaving node.
+func (r MisbehaviorReport) OriginId() flow.Identifier {
+	return r.id
+}
+
+// Reason returns the reason of the misbehavior.
+func (r MisbehaviorReport) Reason() Misbehavior {
+	return r.reason
+}
+
+// Penalty returns the penalty value of the misbehavior.
+func (r MisbehaviorReport) Penalty() int {
+	return r.penalty
 }
 
 // MisbehaviorReportOpt is an option that can be used to configure a misbehavior report.
@@ -114,8 +133,9 @@ func WithPenaltyAmplification(v int) MisbehaviorReportOpt {
 // The returned error by this function indicates that the report is not created. In BFT setup, the returned error
 // should be treated as a fatal error.
 // The default penalty value is 0.01 * misbehaviorDisallowListingThreshold = -86.4
-func NewMisbehaviorReport(reason Misbehavior, opts ...MisbehaviorReportOpt) (*MisbehaviorReport, error) {
+func NewMisbehaviorReport(misbehavingId flow.Identifier, reason Misbehavior, opts ...MisbehaviorReportOpt) (*MisbehaviorReport, error) {
 	m := &MisbehaviorReport{
+		id:      misbehavingId,
 		reason:  reason,
 		penalty: defaultPenaltyValue,
 	}
@@ -138,4 +158,6 @@ type MisbehaviorReporter interface {
 	ReportMisbehavior(*MisbehaviorReport)
 }
 
-
+type MisbehaviorReportManager interface {
+	HandleReportedMisbehavior(channels.Channel, *MisbehaviorReport)
+}
