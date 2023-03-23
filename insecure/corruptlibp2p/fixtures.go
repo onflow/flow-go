@@ -105,7 +105,7 @@ func gossipSubMessageIdsFixture(count int) []string {
 
 // CorruptInspectorFunc wraps a normal RPC inspector with a corrupt inspector func by translating corrupt.RPC -> pubsubpb.RPC
 // before calling Inspect func.
-func CorruptInspectorFunc(inspector p2p.GossipSubAppSpecificRpcInspector) func(id peer.ID, rpc *corrupt.RPC) error {
+func CorruptInspectorFunc(inspector p2p.GossipSubRPCInspector) func(id peer.ID, rpc *corrupt.RPC) error {
 	return func(id peer.ID, rpc *corrupt.RPC) error {
 		return inspector.Inspect(id, CorruptRPCToPubSubRPC(rpc))
 	}

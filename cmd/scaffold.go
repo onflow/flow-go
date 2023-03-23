@@ -405,6 +405,9 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	})
 	fnb.Component("gossipsub inspector notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		// distributor is returned as a component to be started and stopped.
+		if fnb.GossipSubInspectorNotifDistributor == nil {
+			return nil, fmt.Errorf("gossipsub inspector notification distributor has not been set")
+		}
 		return fnb.GossipSubInspectorNotifDistributor, nil
 	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
@@ -994,6 +997,9 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 func (fnb *FlowNodeBuilder) InitIDProviders() {
 	fnb.Component("disallow list notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		// distributor is returned as a component to be started and stopped.
+		if fnb.NodeDisallowListDistributor == nil {
+			return nil, fmt.Errorf("disallow list notification distributor has not been set")
+		}
 		return fnb.NodeDisallowListDistributor, nil
 	})
 	fnb.Module("id providers", func(node *NodeConfig) error {
