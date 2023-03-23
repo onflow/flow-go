@@ -263,6 +263,6 @@ func (s *CoreSuite) TestConcurrentAdd() {
 		}(blocks[i*blocksPerWorker : (i+1)*blocksPerWorker])
 	}
 
-	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*5000000, "should submit blocks before timeout")
-	unittest.AssertClosesBefore(s.T(), done, time.Millisecond*5000000000, "should process all blocks before timeout")
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "should submit blocks before timeout")
+	unittest.AssertClosesBefore(s.T(), done, time.Millisecond*500, "should process all blocks before timeout")
 }
