@@ -21,87 +21,72 @@ func TestRandomIntegers(t *testing.T) {
 		n := 10 + mrand.Intn(100)
 		distribution := make([]float64, n)
 
-		t.Run("Uint", func(t *testing.T) {
-			// partition all outputs into `n` classes and compute the distribution
-			// over the partition. Each class has a width of `classWidth`
-			classWidth := math.MaxUint / uint(n)
+		// generic test function to run a basic statistic test on `randf` output.
+		// It partitions all outputs into `n` classes and compute the distribution
+		// over the partition. Each class has a width of `classWidth`
+		// It computes the frequency of outputs in the `n` classes and computes the
+		// standard deviation of frequencies. A small standard deviation is a necessary
+		// condition for a uniform distribution of `randf` (though is not a guarantee of
+		// uniformity)
+		basicDistributionTest := func(t *testing.T, classWidth uint64, randf func() (uint64, error)) {
 			// populate the distribution
 			for i := 0; i < sampleSize; i++ {
-				r, err := Uint()
+				r, err := randf()
 				require.NoError(t, err)
 				distribution[r/classWidth] += 1.0
 			}
 			stdev := stat.StdDev(distribution, nil)
 			mean := stat.Mean(distribution, nil)
 			assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
+		}
+
+		t.Run("Uint", func(t *testing.T) {
+			classWidth := math.MaxUint / uint(n)
+			uintf := func() (uint64, error) {
+				r, err := Uint()
+				return uint64(r), err
+			}
+			basicDistributionTest(t, uint64(classWidth), uintf)
 		})
 
 		t.Run("Uint64", func(t *testing.T) {
-			// partition all outputs into `n` classes and compute the distribution
-			// over the partition. Each class has a width of `classWidth`
 			classWidth := math.MaxUint64 / uint64(n)
-			// populate the distribution
-			for i := 0; i < sampleSize; i++ {
-				r, err := Uint64()
-				require.NoError(t, err)
-				distribution[r/classWidth] += 1.0
-			}
-			stdev := stat.StdDev(distribution, nil)
-			mean := stat.Mean(distribution, nil)
-			assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
+			basicDistributionTest(t, uint64(classWidth), Uint64)
 		})
 
 		t.Run("Uint32", func(t *testing.T) {
-			// partition all outputs into `n` classes and compute the distribution
-			// over the partition. Each class has a width of `classWidth`
 			classWidth := math.MaxUint32 / uint32(n)
-			// populate the distribution
-			for i := 0; i < sampleSize; i++ {
+			uintf := func() (uint64, error) {
 				r, err := Uint32()
-				require.NoError(t, err)
-				distribution[r/classWidth] += 1.0
+				return uint64(r), err
 			}
-			stdev := stat.StdDev(distribution, nil)
-			mean := stat.Mean(distribution, nil)
-			assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
+			basicDistributionTest(t, uint64(classWidth), uintf)
 		})
 
 		t.Run("Uintn", func(t *testing.T) {
-			// partition all outputs into `n` classes, each of width 1,
-			// and compute the distribution over the partition.
-			for i := 0; i < sampleSize; i++ {
+			uintf := func() (uint64, error) {
 				r, err := Uintn(uint(n))
-				require.NoError(t, err)
-				require.Less(t, r, uint(n))
-				distribution[r] += 1.0
+				return uint64(r), err
 			}
-			stdev := stat.StdDev(distribution, nil)
-			mean := stat.Mean(distribution, nil)
-			assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
+			// classWidth is 1 since `n` is small
+			basicDistributionTest(t, uint64(1), uintf)
 		})
 
 		t.Run("Uint64n", func(t *testing.T) {
-			for i := 0; i < sampleSize; i++ {
-				r, err := Uint64n(uint64(n))
-				require.NoError(t, err)
-				require.Less(t, r, uint64(n))
-				distribution[r] += 1.0
+			uintf := func() (uint64, error) {
+				return Uint64n(uint64(n))
 			}
-			stdev := stat.StdDev(distribution, nil)
-			mean := stat.Mean(distribution, nil)
-			assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
+			// classWidth is 1 since `n` is small
+			basicDistributionTest(t, uint64(1), uintf)
 		})
 
 		t.Run("Uint32n", func(t *testing.T) {
-			for i := 0; i < sampleSize; i++ {
+			uintf := func() (uint64, error) {
 				r, err := Uint32n(uint32(n))
-				require.NoError(t, err)
-				require.Less(t, r, uint32(n))
-				distribution[r] += 1.0
+				return uint64(r), err
 			}
-			stdev := stat.StdDev(distribution, nil)
-			mean := stat.Mean(distribution, nil)
-			assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
+			// classWidth is 1 since `n` is small
+			basicDistributionTest(t, uint64(1), uintf)
 		})
 	})
 
