@@ -4,6 +4,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network/p2p"
 )
@@ -34,7 +35,7 @@ func (c *ControlMsgMetricsInspector) Name() string {
 // NewControlMsgMetricsInspector returns a new *ControlMsgMetricsInspector
 func NewControlMsgMetricsInspector(metrics p2p.GossipSubControlMetricsObserver) *ControlMsgMetricsInspector {
 	return &ControlMsgMetricsInspector{
-		Component: component.NewComponentManagerBuilder().Build(),
+		Component: &module.NoopReadyDoneAware{},
 		metrics:   metrics,
 	}
 }

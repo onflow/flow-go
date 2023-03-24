@@ -34,6 +34,8 @@ type ReadyDoneAware interface {
 // immediately
 type NoopReadyDoneAware struct{}
 
+func (n *NoopReadyDoneAware) Start(irrecoverable.SignalerContext) {}
+
 func (n *NoopReadyDoneAware) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	defer close(ready)

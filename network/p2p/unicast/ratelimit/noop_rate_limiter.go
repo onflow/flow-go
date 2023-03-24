@@ -3,6 +3,7 @@ package ratelimit
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
@@ -22,7 +23,7 @@ func (n *NoopRateLimiter) Start(irrecoverable.SignalerContext) {}
 
 func NewNoopRateLimiter() *NoopRateLimiter {
 	return &NoopRateLimiter{
-		Component: component.NewComponentManagerBuilder().Build(),
+		Component: &module.NoopReadyDoneAware{},
 	}
 }
 
