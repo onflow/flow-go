@@ -79,9 +79,9 @@ func newCache(collector module.CacheMetrics, resourceName string, options ...fun
 	return &c
 }
 
-// Exists returns true if the key exists in the cache. It DOES NOT check
-// whether the key exists in the underlying data store.
-func (c *Cache) Exists(key any) bool {
+// IsCached returns true if the key exists in the cache.
+// It DOES NOT check whether the key exists in the underlying data store.
+func (c *Cache) IsCached(key any) bool {
 	exists := c.cache.Contains(key)
 	return exists
 }

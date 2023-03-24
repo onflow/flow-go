@@ -15,7 +15,7 @@ func TestCache_Exists(t *testing.T) {
 
 	t.Run("non-existent", func(t *testing.T) {
 		key := unittest.IdentifierFixture()
-		exists := cache.Exists(key)
+		exists := cache.IsCached(key)
 		assert.False(t, exists)
 	})
 
@@ -23,7 +23,7 @@ func TestCache_Exists(t *testing.T) {
 		key := unittest.IdentifierFixture()
 		cache.Insert(key, unittest.RandomBytes(128))
 
-		exists := cache.Exists(key)
+		exists := cache.IsCached(key)
 		assert.True(t, exists)
 	})
 
@@ -33,7 +33,7 @@ func TestCache_Exists(t *testing.T) {
 		cache.Insert(key, unittest.RandomBytes(128))
 		cache.Remove(key)
 
-		exists := cache.Exists(key)
+		exists := cache.IsCached(key)
 		assert.False(t, exists)
 	})
 }
