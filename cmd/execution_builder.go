@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"os"
 	"path"
 	"path/filepath"
@@ -61,7 +62,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
-	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -123,7 +123,6 @@ type ExecutionNode struct {
 	providerEngine          *exeprovider.Engine
 	checkerEng              *checker.Engine
 	syncCore                *chainsync.Core
-	pendingBlocks           *buffer.PendingBlocks // used in follower engine
 	syncEngine              *synchronization.Engine
 	followerCore            *hotstuff.FollowerLoop // follower hotstuff logic
 	followerEng             *followereng.Engine    // to sync blocks from consensus nodes
@@ -175,7 +174,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("execution metrics", exeNode.LoadExecutionMetrics).
 		Module("sync core", exeNode.LoadSyncCore).
 		Module("execution receipts storage", exeNode.LoadExecutionReceiptsStorage).
-		Module("pending block cache", exeNode.LoadPendingBlockCache).
+		Module("finalization distributor", exeNode.LoadFinalizationDistributor).
 		Module("authorization checking function", exeNode.LoadAuthorizationCheckingFunction).
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
@@ -266,8 +265,9 @@ func (exeNode *ExecutionNode) LoadExecutionReceiptsStorage(
 	return nil
 }
 
-func (exeNode *ExecutionNode) LoadPendingBlockCache(node *NodeConfig) error {
-	exeNode.pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
+func (exeNode *ExecutionNode) LoadFinalizationDistributor(node *NodeConfig) error {
+	exeNode.finalizationDistributor = pubsub.NewFinalizationDistributor()
+	exeNode.finalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
 	return nil
 }
 
@@ -851,7 +851,6 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 		return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 	}
 
-	exeNode.finalizationDistributor = pubsub.NewFinalizationDistributor()
 	exeNode.finalizationDistributor.AddConsumer(exeNode.checkerEng)
 
 	// creates a consensus follower with ingestEngine as the notifier
@@ -881,35 +880,41 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 	module.ReadyDoneAware,
 	error,
 ) {
-	// initialize cleaner for DB
-	cleaner := storage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-
 	packer := signature.NewConsensusSigDataPacker(exeNode.committee)
 	// initialize the verifier for the protocol consensus
 	verifier := verification.NewCombinedVerifier(exeNode.committee, packer)
 	validator := validator.New(exeNode.committee, verifier)
 
-	core := followereng.NewCore(node.Logger,
+	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+	if node.HeroCacheMetricsEnable {
+		heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
+	}
+
+	core, err := followereng.NewCore(
+		node.Logger,
 		node.Metrics.Mempool,
-		cleaner,
-		node.Storage.Headers,
-		node.Storage.Payloads,
+		heroCacheCollector,
+		exeNode.finalizationDistributor,
 		exeNode.followerState,
-		exeNode.pendingBlocks,
 		exeNode.followerCore,
 		validator,
 		exeNode.syncCore,
 		node.Tracer,
 		followereng.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create follower core: %w", err)
+	}
 
-	var err error
 	exeNode.followerEng, err = followereng.New(
 		node.Logger,
 		node.Network,
 		node.Me,
 		node.Metrics.Engine,
-		core)
+		node.Storage.Headers,
+		exeNode.finalizedHeader.Get(),
+		core,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower engine: %w", err)
 	}

@@ -47,7 +47,7 @@ func NewParticipant(
 	modules.TimeoutAggregator.PruneUpToView(finalized.View)
 
 	// recover the hotstuff state, mainly to recover all pending blocks in Forks
-	err := recovery.Participant(log, modules.Forks, modules.VoteAggregator, modules.Validator, finalized, pending)
+	err := recovery.Participant(log, modules.Forks, modules.VoteAggregator, modules.Validator, pending)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
 	}
