@@ -2,7 +2,6 @@ package translator_test
 
 import (
 	"crypto/rand"
-	"math"
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/peer"
