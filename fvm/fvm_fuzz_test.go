@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -33,7 +32,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 
 		tt := fuzzTransactionTypes[transactionType]
 
-		vmt.run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) {
+		vmt.run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View) {
 			// create the transaction
 			txBody := tt.createTxBody(t, tctx)
 			// set the computation limit
@@ -52,7 +51,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 			// set the interaction limit
 			ctx.MaxStateInteractionSize = interactionLimit
 			// run the transaction
-			tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+			tx := fvm.Transaction(txBody, 0)
 
 			require.NotPanics(t, func() {
 				err = vm.Run(ctx, tx, view)
@@ -251,7 +250,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 	).withContextOptions(
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
-	).bootstrapWith(func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *derived.DerivedBlockData) error {
+	).bootstrapWith(func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View) error {
 		// ==== Create an account ====
 		var txBody *flow.TransactionBody
 		privateKey, txBody = testutil.CreateAccountCreationTransaction(tb, chain)
@@ -261,7 +260,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 			return err
 		}
 
-		tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, view)
 
@@ -291,7 +290,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		)
 		require.NoError(tb, err)
 
-		tx = fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
+		tx = fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, view)
 		if err != nil {
