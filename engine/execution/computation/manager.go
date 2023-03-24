@@ -104,6 +104,8 @@ func New(
 		vm = fvm.NewVirtualMachine()
 	}
 
+	chainID := vmCtx.Chain.ChainID()
+
 	options := []fvm.Option{
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
@@ -111,6 +113,8 @@ func New(
 				runtime.Config{
 					TracingEnabled:        params.CadenceTracing,
 					AccountLinkingEnabled: true,
+					// Attachments are enabled everywhere except for Mainnet
+					AttachmentsEnabled: chainID != flow.Mainnet,
 				},
 			),
 		),
@@ -130,6 +134,7 @@ func New(
 		committer,
 		me,
 		executionDataProvider,
+		nil, // TODO(ramtin): update me with proper consumers
 	)
 
 	if err != nil {
