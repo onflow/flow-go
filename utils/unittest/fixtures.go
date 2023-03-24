@@ -51,6 +51,15 @@ const (
 	DefaultAddress           = "localhost:0"
 )
 
+// returns a deterministic math/rand PRG that can be used for deterministic randomness in tests only.
+// The PRG seed is logged in case the test iteration needs to be reproduced.
+func GetPRG(t *testing.T) *rand.Rand {
+	random := time.Now().UnixNano()
+	t.Logf("rng seed is %d", random)
+	rng := rand.New(rand.NewSource(random))
+	return rng
+}
+
 func IPPort(port string) string {
 	return net.JoinHostPort("localhost", port)
 }
@@ -428,7 +437,7 @@ func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
 
 func CidFixture() cid.Cid {
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, _ = rand.Read(data)
 	return blocks.NewBlock(data).Cid()
 }
 

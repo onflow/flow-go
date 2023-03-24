@@ -98,7 +98,10 @@ require (
 	pgregory.net/rapid v0.4.7
 )
 
-require github.com/slok/go-http-metrics v0.10.0
+require (
+	github.com/slok/go-http-metrics v0.10.0
+	gonum.org/v1/gonum v0.8.2
+)
 
 require (
 	cloud.google.com/go v0.105.0 // indirect
@@ -267,7 +270,6 @@ require (
 	golang.org/x/oauth2 v0.3.0 // indirect
 	golang.org/x/term v0.5.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
-	gonum.org/v1/gonum v0.8.2 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
