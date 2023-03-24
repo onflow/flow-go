@@ -420,6 +420,11 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 	p2ptest.LetNodesDiscoverEachOther(t, signalerCtx, []p2p.LibP2PNode{sender, receiver}, flow.IdentityList{&id1, &id2})
 
 	var allStreamsCreated sync.WaitGroup
+	// at this point both nodes have discovered each other and we can now create an
+	// arbitrary number of streams from sender -> receiver. This will force libp2p
+	// to create multiple streams concurrently and attempt to reuse the single pairwise
+	// connection. If more than one connection is established while creating the conccurent
+	// streams this indicates a bug in the libp2p PeerBaseLimitConnsInbound limit.
 	for i := 0; i < 20; i++ {
 		allStreamsCreated.Add(1)
 		go func() {
