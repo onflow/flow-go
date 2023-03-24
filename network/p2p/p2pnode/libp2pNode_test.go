@@ -385,8 +385,10 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 	require.Equal(t, expectedCreateStreamRetries, createStreamRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedCreateStreamRetries, createStreamRetries.Load()))
 }
 
-// TestCreateStream_InboundConnResourceLimit ensures that the setting the resource limit config for PeerDefaultLimits.ConnsInbound restricts the number of inbound
-// connections created from a peer to the configured value.
+// TestCreateStream_InboundConnResourceLimit ensures that the setting the resource limit config for
+// PeerDefaultLimits.ConnsInbound restricts the number of inbound connections created from a peer to the configured value.
+// NOTE: If this test becomes flaky, it indicates a violation of the single inbound connection guarantee.
+// In such cases the test should not be quarantined but requires immediate resolution.
 func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 	idProvider := mockmodule.NewIdentityProvider(t)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -423,18 +425,22 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 	// to create multiple streams concurrently and attempt to reuse the single pairwise
 	// connection. If more than one connection is established while creating the conccurent
 	// streams this indicates a bug in the libp2p PeerBaseLimitConnsInbound limit.
-	for i := 0; i < 20; i++ {
+	expectedNumOfStreams := int64(50)
+	streamsCreated := atomic.NewInt64(0)
+	for i := int64(0); i < expectedNumOfStreams; i++ {
 		allStreamsCreated.Add(1)
 		go func() {
 			defer allStreamsCreated.Done()
 			defaultProtocolID := protocols.FlowProtocolID(sporkID)
 			_, err := sender.Host().NewStream(ctx, receiver.Host().ID(), defaultProtocolID)
 			require.NoError(t, err)
+			streamsCreated.Inc()
 		}()
 	}
 
 	unittest.RequireReturnsBefore(t, allStreamsCreated.Wait, 2*time.Second, "could not create streams on time")
 	require.Len(t, receiver.Host().Network().ConnsToPeer(sender.Host().ID()), 1)
+	require.Equal(t, expectedNumOfStreams, streamsCreated.Load(), fmt.Sprintf("expected to create %d number of streams got %d", expectedNumOfStreams, streamsCreated.Load()))
 }
 
 // createStreams will attempt to create n number of streams concurrently between each combination of node pairs.
