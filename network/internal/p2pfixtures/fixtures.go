@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
@@ -149,7 +150,7 @@ func PeerIdFixture(t *testing.T) peer.ID {
 
 // generateNetworkingKey generates a Flow ECDSA key using the given seed
 func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
 }
