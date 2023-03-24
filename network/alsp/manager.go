@@ -25,7 +25,7 @@ func NewMisbehaviorReportManager(logger zerolog.Logger) *MisbehaviorReportManage
 
 // HandleReportedMisbehavior is called upon a new misbehavior is reported.
 // The current version is at the minimum viable product stage and only logs the reports.
-func (m MisbehaviorReportManager) HandleReportedMisbehavior(channel channels.Channel, report *network.MisbehaviorReport) {
+func (m MisbehaviorReportManager) HandleReportedMisbehavior(channel channels.Channel, report network.MisbehaviorReport) {
 	m.logger.Debug().
 		Str("channel", channel.String()).
 		Hex("misbehaving_id", logging.ID(report.OriginId())).
