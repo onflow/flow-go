@@ -323,7 +323,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not get allowed file descriptors: %w", err)
 		}
-		limits.PeerBaseLimit.ConnsInbound = builder.resourceManagerCfg.PeerBaseLimitConnsInbound //
+		limits.PeerBaseLimit.ConnsInbound = builder.resourceManagerCfg.PeerBaseLimitConnsInbound
 		l := limits.Scale(mem, fd)
 		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(l), rcmgr.WithMetrics(builder.metrics))
 		if err != nil {
