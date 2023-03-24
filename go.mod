@@ -52,12 +52,12 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.1
 	github.com/onflow/atree v0.5.0
-	github.com/onflow/cadence v0.36.0
+	github.com/onflow/cadence v0.37.0
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.12.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.12.1
-	github.com/onflow/flow-go-sdk v0.35.0
-	github.com/onflow/flow-go/crypto v0.24.6
+	github.com/onflow/flow-go-sdk v0.37.0
+	github.com/onflow/flow-go/crypto v0.24.7
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221202093946-932d1c70e288
 	github.com/onflow/go-bitswap v0.0.0-20221017184039-808c5791a8a8
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
@@ -98,7 +98,10 @@ require (
 	pgregory.net/rapid v0.4.7
 )
 
-require github.com/slok/go-http-metrics v0.10.0
+require (
+	github.com/slok/go-http-metrics v0.10.0
+	gonum.org/v1/gonum v0.8.2
+)
 
 require (
 	cloud.google.com/go v0.105.0 // indirect
@@ -267,7 +270,6 @@ require (
 	golang.org/x/oauth2 v0.3.0 // indirect
 	golang.org/x/term v0.5.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
-	gonum.org/v1/gonum v0.8.2 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
