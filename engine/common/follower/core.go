@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/rs/zerolog"
@@ -230,11 +231,14 @@ func (c *Core) OnFinalizedBlock(final *flow.Header) {
 // Is NOT concurrency safe, has to be used by internal goroutine.
 // No errors expected during normal operations.
 func (c *Core) processCertifiedBlocks(blocks CertifiedBlocks) error {
+	span, ctx := c.tracer.StartSpanFromContext(context.Background(), trace.FollowerProcessCertifiedBlocks)
+	defer span.End()
+
 	connectedBlocks, err := c.pendingTree.AddBlocks(blocks)
 	if err != nil {
 		return fmt.Errorf("could not process batch of certified blocks: %w", err)
 	}
-	err = c.extendCertifiedBlocks(connectedBlocks)
+	err = c.extendCertifiedBlocks(ctx, connectedBlocks)
 	if err != nil {
 		return fmt.Errorf("could not extend protocol state: %w", err)
 	}
@@ -245,9 +249,14 @@ func (c *Core) processCertifiedBlocks(blocks CertifiedBlocks) error {
 // As result of this operation we might extend protocol state.
 // Is NOT concurrency safe, has to be used by internal goroutine.
 // No errors expected during normal operations.
-func (c *Core) extendCertifiedBlocks(connectedBlocks CertifiedBlocks) error {
+func (c *Core) extendCertifiedBlocks(parentCtx context.Context, connectedBlocks CertifiedBlocks) error {
+	span, parentCtx := c.tracer.StartSpanFromContext(parentCtx, trace.FollowerExtendCertifiedBlocks)
+	defer span.End()
+
 	for _, certifiedBlock := range connectedBlocks {
-		err := c.state.ExtendCertified(context.Background(), certifiedBlock.Block, certifiedBlock.QC)
+		span, ctx := c.tracer.StartBlockSpan(parentCtx, certifiedBlock.ID(), trace.FollowerExtendCertified)
+		err := c.state.ExtendCertified(ctx, certifiedBlock.Block, certifiedBlock.QC)
+		span.End()
 		if err != nil {
 			if state.IsOutdatedExtensionError(err) {
 				continue
@@ -269,11 +278,14 @@ func (c *Core) extendCertifiedBlocks(connectedBlocks CertifiedBlocks) error {
 // Is NOT concurrency safe, has to be used by internal goroutine.
 // No errors expected during normal operations.
 func (c *Core) processFinalizedBlock(finalized *flow.Header) error {
+	span, ctx := c.tracer.StartSpanFromContext(context.Background(), trace.FollowerProcessFinalizedBlock)
+	defer span.End()
+
 	connectedBlocks, err := c.pendingTree.FinalizeFork(finalized)
 	if err != nil {
 		return fmt.Errorf("could not process finalized fork at view %d: %w", finalized.View, err)
 	}
-	err = c.extendCertifiedBlocks(connectedBlocks)
+	err = c.extendCertifiedBlocks(ctx, connectedBlocks)
 	if err != nil {
 		return fmt.Errorf("could not extend protocol state during finalization: %w", err)
 	}

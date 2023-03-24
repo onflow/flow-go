@@ -32,11 +32,10 @@ func WithChannel(channel channels.Channel) EngineOption {
 }
 
 // defaultBlockProcessingWorkers number of concurrent workers that process incoming blocks.
-// TODO: update this constant to use multiple workers when Core is ready.
-const defaultBlockProcessingWorkers = 1
+const defaultBlockProcessingWorkers = 4
 
-// defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
-const defaultBlockQueueCapacity = 10_000
+// defaultBlockQueueCapacity maximum capacity of inbound queue for batches of `messages.BlockProposal`
+const defaultBlockQueueCapacity = 1000
 
 type CertifiedBlocks []pending_tree.CertifiedBlock
 
