@@ -28,15 +28,18 @@ func TestFollowerCore(t *testing.T) {
 	suite.Run(t, new(CoreSuite))
 }
 
+// CoreSuite maintains minimal state for testing Core.
+// Performs startup & shutdown using `module.Startable` and `module.ReadyDoneAware` interfaces.
 type CoreSuite struct {
 	suite.Suite
 
-	originID       flow.Identifier
-	finalizedBlock *flow.Header
-	state          *protocol.FollowerState
-	follower       *module.HotStuffFollower
-	sync           *module.BlockRequester
-	validator      *hotstuff.Validator
+	originID             flow.Identifier
+	finalizedBlock       *flow.Header
+	state                *protocol.FollowerState
+	follower             *module.HotStuffFollower
+	sync                 *module.BlockRequester
+	validator            *hotstuff.Validator
+	finalizationConsumer *hotstuff.FinalizationConsumer
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -49,6 +52,7 @@ func (s *CoreSuite) SetupTest() {
 	s.follower = module.NewHotStuffFollower(s.T())
 	s.validator = hotstuff.NewValidator(s.T())
 	s.sync = module.NewBlockRequester(s.T())
+	s.finalizationConsumer = hotstuff.NewFinalizationConsumer(s.T())
 
 	s.originID = unittest.IdentifierFixture()
 	s.finalizedBlock = unittest.BlockHeaderFixture()
@@ -61,11 +65,14 @@ func (s *CoreSuite) SetupTest() {
 	s.core, err = NewCore(
 		unittest.Logger(),
 		metrics,
+		metrics,
+		s.finalizationConsumer,
 		s.state,
 		s.follower,
 		s.validator,
 		s.sync,
-		trace.NewNoopTracer())
+		trace.NewNoopTracer(),
+	)
 	require.NoError(s.T(), err)
 
 	s.ctx, s.cancel, s.errs = irrecoverable.WithSignallerAndCancel(context.Background())
@@ -211,6 +218,22 @@ func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "expect to process all blocks before timeout")
 }
 
+// TestDetectingProposalEquivocation tests that block equivocation is properly detected and reported to specific consumer.
+func (s *CoreSuite) TestDetectingProposalEquivocation() {
+	block := unittest.BlockWithParentFixture(s.finalizedBlock)
+	otherBlock := unittest.BlockWithParentFixture(s.finalizedBlock)
+	otherBlock.Header.View = block.Header.View
+
+	s.validator.On("ValidateProposal", mock.Anything).Return(nil).Times(2)
+	s.finalizationConsumer.On("OnDoubleProposeDetected", mock.Anything, mock.Anything).Return().Once()
+
+	err := s.core.OnBlockRange(s.originID, []*flow.Block{block})
+	require.NoError(s.T(), err)
+
+	err = s.core.OnBlockRange(s.originID, []*flow.Block{otherBlock})
+	require.NoError(s.T(), err)
+}
+
 // TestConcurrentAdd simulates multiple workers adding batches of connected blocks out of order.
 // We use next setup:
 // Number of workers - workers
@@ -227,6 +250,7 @@ func (s *CoreSuite) TestConcurrentAdd() {
 	blocksPerWorker := blocksPerBatch * batchesPerWorker
 	blocks := unittest.ChainFixtureFrom(workers*blocksPerWorker, s.finalizedBlock)
 	targetSubmittedBlockID := blocks[len(blocks)-2].ID()
+	require.Lessf(s.T(), len(blocks), defaultPendingBlocksCacheCapacity, "this test works under assumption that we operate under cache upper limit")
 
 	s.validator.On("ValidateProposal", mock.Anything).Return(nil) // any proposal is valid
 	done := make(chan struct{})

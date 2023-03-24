@@ -38,10 +38,6 @@ const defaultBlockProcessingWorkers = 1
 // defaultBlockQueueCapacity maximum capacity of inbound queue for `messages.BlockProposal`s
 const defaultBlockQueueCapacity = 10_000
 
-// defaultCertifiedBlocksChannelCapacity maximum capacity of buffered channel that is used to transfer
-// certified blocks between workers.
-const defaultCertifiedBlocksChannelCapacity = 100
-
 type CertifiedBlocks []pending_tree.CertifiedBlock
 
 // Engine is the highest level structure that consumes events from other components.

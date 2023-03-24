@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/rs/zerolog"
@@ -30,6 +29,17 @@ func WithComplianceOptions(opts ...compliance.Opt) ComplianceOption {
 		}
 	}
 }
+
+// defaultCertifiedBlocksChannelCapacity maximum capacity of buffered channel that is used to transfer
+// certified blocks to specific worker.
+const defaultCertifiedBlocksChannelCapacity = 100
+
+// defaultFinalizedBlocksChannelCapacity maximum capacity of buffered channel that is used to transfer
+// finalized blocks to specific worker.
+const defaultFinalizedBlocksChannelCapacity = 10
+
+// defaultPendingBlocksCacheCapacity maximum capacity of cache for pending blocks.
+const defaultPendingBlocksCacheCapacity = 1000
 
 // Core implements main processing logic for follower engine.
 // Generally is NOT concurrency safe but some functions can be used in concurrent setup.
@@ -51,16 +61,21 @@ type Core struct {
 
 var _ common.FollowerCore = (*Core)(nil)
 
+// NewCore creates new instance of Core.
+// No errors expected during normal operations.
 func NewCore(log zerolog.Logger,
 	mempoolMetrics module.MempoolMetrics,
+	heroCacheCollector module.HeroCacheMetrics,
+	finalizationConsumer hotstuff.FinalizationConsumer,
 	state protocol.FollowerState,
 	follower module.HotStuffFollower,
 	validator hotstuff.Validator,
 	sync module.BlockRequester,
 	tracer module.Tracer,
 	opts ...ComplianceOption) (*Core, error) {
-	metricsCollector := metrics.NewNoopCollector()
-	onEquivocation := func(block, otherBlock *flow.Block) {}
+	onEquivocation := func(block, otherBlock *flow.Block) {
+		finalizationConsumer.OnDoubleProposeDetected(model.BlockFromFlow(block.Header), model.BlockFromFlow(otherBlock.Header))
+	}
 
 	finalizedBlock, err := state.Final().Head()
 	if err != nil {
@@ -71,7 +86,7 @@ func NewCore(log zerolog.Logger,
 		log:                 log.With().Str("engine", "follower_core").Logger(),
 		mempoolMetrics:      mempoolMetrics,
 		state:               state,
-		pendingCache:        cache.NewCache(log, 1000, metricsCollector, onEquivocation),
+		pendingCache:        cache.NewCache(log, defaultPendingBlocksCacheCapacity, heroCacheCollector, onEquivocation),
 		pendingTree:         pending_tree.NewPendingTree(finalizedBlock),
 		follower:            follower,
 		validator:           validator,
@@ -79,13 +94,14 @@ func NewCore(log zerolog.Logger,
 		tracer:              tracer,
 		config:              compliance.DefaultConfig(),
 		certifiedBlocksChan: make(chan CertifiedBlocks, defaultCertifiedBlocksChannelCapacity),
-		finalizedBlocksChan: make(chan *flow.Header, 10),
+		finalizedBlocksChan: make(chan *flow.Header, defaultFinalizedBlocksChannelCapacity),
 	}
 
 	for _, apply := range opts {
 		apply(c)
 	}
 
+	// prune cache to latest finalized view
 	c.pendingCache.PruneUpToView(finalizedBlock.View)
 
 	c.ComponentManager = component.NewComponentManagerBuilder().
