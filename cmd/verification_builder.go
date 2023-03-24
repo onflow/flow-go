@@ -305,6 +305,15 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			return blockConsumer, nil
 		}).
+		Component("finalized snapshot", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
+			finalizedHeader, err = commonsync.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
+			if err != nil {
+				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
+			}
+
+			return finalizedHeader, nil
+		}).
 		Component("consensus committee", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
@@ -392,15 +401,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			}
 
 			return followerEng, nil
-		}).
-		Component("finalized snapshot", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			var err error
-			finalizedHeader, err = commonsync.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
-			if err != nil {
-				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-			}
-
-			return finalizedHeader, nil
 		}).
 		Component("sync engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := commonsync.New(

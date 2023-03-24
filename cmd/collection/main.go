@@ -250,6 +250,14 @@ func main() {
 
 			return validator, err
 		}).
+		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			finalizedHeader, err = consync.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
+			if err != nil {
+				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
+			}
+
+			return finalizedHeader, nil
+		}).
 		Component("consensus committee", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
@@ -329,14 +337,6 @@ func main() {
 			}
 
 			return followerEng, nil
-		}).
-		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			finalizedHeader, err = consync.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
-			if err != nil {
-				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-			}
-
-			return finalizedHeader, nil
 		}).
 		Component("main chain sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
