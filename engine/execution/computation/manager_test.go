@@ -60,7 +60,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, derived.NewEmptyDerivedBlockData(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 	require.NoError(t, err)
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -705,7 +705,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, derived.NewEmptyDerivedBlockData(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 	require.NoError(t, err)
 
 	// setup transactions
@@ -861,14 +861,12 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	vm := manager.vm
 	view := testutil.RootBootstrappedLedger(vm, ctx)
 
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
-
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	accounts, err := testutil.CreateAccounts(vm, view, derivedBlockData, privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
 	require.NoError(t, err)
 	account := accounts[0]
 	address := cadence.NewAddress(account)
