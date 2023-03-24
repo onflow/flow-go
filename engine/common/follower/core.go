@@ -199,12 +199,12 @@ func (c *Core) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready com
 		case <-doneSignal:
 			return
 		case finalized := <-c.finalizedBlocksChan:
-			err := c.processFinalizedBlock(finalized) // no errors expected during normal operations
+			err := c.processFinalizedBlock(ctx, finalized) // no errors expected during normal operations
 			if err != nil {
 				ctx.Throw(err)
 			}
 		case blocks := <-c.certifiedBlocksChan:
-			err := c.processCertifiedBlocks(blocks) // no errors expected during normal operations
+			err := c.processCertifiedBlocks(ctx, blocks) // no errors expected during normal operations
 			if err != nil {
 				ctx.Throw(err)
 			}
@@ -230,8 +230,8 @@ func (c *Core) OnFinalizedBlock(final *flow.Header) {
 // As soon as tree returns a range of connected and certified blocks they will be added to the protocol state.
 // Is NOT concurrency safe, has to be used by internal goroutine.
 // No errors expected during normal operations.
-func (c *Core) processCertifiedBlocks(blocks CertifiedBlocks) error {
-	span, ctx := c.tracer.StartSpanFromContext(context.Background(), trace.FollowerProcessCertifiedBlocks)
+func (c *Core) processCertifiedBlocks(ctx context.Context, blocks CertifiedBlocks) error {
+	span, ctx := c.tracer.StartSpanFromContext(ctx, trace.FollowerProcessCertifiedBlocks)
 	defer span.End()
 
 	connectedBlocks, err := c.pendingTree.AddBlocks(blocks)
@@ -277,8 +277,8 @@ func (c *Core) extendCertifiedBlocks(parentCtx context.Context, connectedBlocks 
 // protocol state, resulting in extending length of chain.
 // Is NOT concurrency safe, has to be used by internal goroutine.
 // No errors expected during normal operations.
-func (c *Core) processFinalizedBlock(finalized *flow.Header) error {
-	span, ctx := c.tracer.StartSpanFromContext(context.Background(), trace.FollowerProcessFinalizedBlock)
+func (c *Core) processFinalizedBlock(ctx context.Context, finalized *flow.Header) error {
+	span, ctx := c.tracer.StartSpanFromContext(ctx, trace.FollowerProcessFinalizedBlock)
 	defer span.End()
 
 	connectedBlocks, err := c.pendingTree.FinalizeFork(finalized)
