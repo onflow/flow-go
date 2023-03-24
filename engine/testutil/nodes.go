@@ -62,7 +62,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -546,8 +545,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	followerState, err := badgerstate.NewFollowerState(protoState.State, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
 	require.NoError(t, err)
 
-	pendingBlocks := buffer.NewPendingBlocks() // for following main chain consensus
-
 	dbDir := unittest.TempDir(t)
 
 	metricsCollector := &metrics.NoopCollector{}
@@ -689,31 +686,30 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	validator := new(mockhotstuff.Validator)
 	validator.On("ValidateProposal", mock.Anything).Return(nil)
 
-	// initialize cleaner for DB
-	cleaner := storage.NewCleaner(node.Log, node.PublicDB, node.Metrics, flow.DefaultValueLogGCFrequency)
+	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
+	require.NoError(t, err)
 
-	core := follower.NewCore(
+	core, err := follower.NewCore(
 		node.Log,
 		node.Metrics,
-		cleaner,
-		node.Headers,
-		node.Payloads,
+		node.Metrics,
+		finalizationDistributor,
 		followerState,
-		pendingBlocks,
 		followerCore,
 		validator,
 		syncCore,
-		node.Tracer)
+		node.Tracer,
+	)
+	require.NoError(t, err)
 	followerEng, err := follower.New(
 		node.Log,
 		node.Net,
 		node.Me,
 		node.Metrics,
+		node.Headers,
+		finalizedHeader.Get(),
 		core,
 	)
-	require.NoError(t, err)
-
-	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
 	require.NoError(t, err)
 
 	idCache, err := cache.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
