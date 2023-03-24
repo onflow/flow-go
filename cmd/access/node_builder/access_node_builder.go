@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,7 +41,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/common/follower"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -47,9 +48,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
-	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chainsync"
-	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
@@ -321,36 +320,39 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 
 func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuilder {
 	builder.Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// initialize cleaner for DB
-		cleaner := bstorage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-		conCache := buffer.NewPendingBlocks()
+		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if node.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
+		}
 
-		core := follower.NewCore(
+		core, err := followereng.NewCore(
 			node.Logger,
 			node.Metrics.Mempool,
-			cleaner,
-			node.Storage.Headers,
-			node.Storage.Payloads,
+			heroCacheCollector,
+			builder.FinalizationDistributor,
 			builder.FollowerState,
-			conCache,
 			builder.FollowerCore,
 			builder.Validator,
 			builder.SyncCore,
 			node.Tracer,
-			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
+			followereng.WithComplianceOptions(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create follower core: %w", err)
+		}
 
-		followerEng, err := follower.New(
+		builder.FollowerEng, err = followereng.New(
 			node.Logger,
 			node.Network,
 			node.Me,
 			node.Metrics.Engine,
+			node.Storage.Headers,
+			builder.Finalized,
 			core,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
-		builder.FollowerEng = followerEng
 
 		return builder.FollowerEng, nil
 	})
@@ -567,10 +569,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 }
 
 func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
+	dist := consensuspubsub.NewFinalizationDistributor()
+	dist.AddConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
 	return &FlowAccessNodeBuilder{
 		AccessNodeConfig:        DefaultAccessNodeConfig(),
 		FlowNodeBuilder:         nodeBuilder,
-		FinalizationDistributor: consensuspubsub.NewFinalizationDistributor(),
+		FinalizationDistributor: dist,
 	}
 }
 
