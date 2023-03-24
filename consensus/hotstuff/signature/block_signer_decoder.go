@@ -29,6 +29,7 @@ var _ hotstuff.BlockSignerDecoder = (*BlockSignerDecoder)(nil)
 // Expected Error returns during normal operations:
 //   - signature.InvalidSignerIndicesError if signer indices included in the header do
 //     not encode a valid subset of the consensus committee
+//   - state.ErrUnknownSnapshotReference if the input header is not a known incorporated block.
 func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error) {
 	// root block does not have signer indices
 	if header.ParentVoterIndices == nil && header.View == 0 {
@@ -46,7 +47,7 @@ func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.Identifi
 			members, err = b.IdentitiesByBlock(header.ParentID)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve identities for block %x with QC view %d for parent %x: %w",
-					header.ID(), header.ParentView, header.ParentID, err)
+					header.ID(), header.ParentView, header.ParentID, err) // state.ErrUnknownSnapshotReference or exception
 			}
 		} else {
 			return nil, fmt.Errorf("unexpected error retrieving identities for block %v: %w", header.ID(), err)
