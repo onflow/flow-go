@@ -336,17 +336,21 @@ func TestContract_ContractRemoval(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, contractUpdater.HasUpdates())
 
-		contractUpdateKeys, err := contractUpdater.Commit()
+		contractUpdates, err := contractUpdater.Commit()
 		require.NoError(t, err)
 		require.Equal(
 			t,
-			[]environment.ContractUpdateKey{
-				{
-					Address: flowAddress,
-					Name:    "TestContract",
+			environment.ContractUpdates{
+				Updates: []environment.ContractUpdateKey{},
+				Deploys: []environment.ContractUpdateKey{
+					{
+						Address: flowAddress,
+						Name:    "TestContract",
+					},
 				},
+				Deletions: []environment.ContractUpdateKey{},
 			},
-			contractUpdateKeys,
+			contractUpdates,
 		)
 
 		// update should work
@@ -394,11 +398,15 @@ func TestContract_ContractRemoval(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(
 			t,
-			[]environment.ContractUpdateKey{
-				{
-					Address: flowAddress,
-					Name:    "TestContract",
+			environment.ContractUpdates{
+				Updates: []environment.ContractUpdateKey{
+					{
+						Address: flowAddress,
+						Name:    "TestContract",
+					},
 				},
+				Deploys:   []environment.ContractUpdateKey{},
+				Deletions: []environment.ContractUpdateKey{},
 			},
 			contractUpdateKeys,
 		)
@@ -426,5 +434,21 @@ func TestContract_ContractRemoval(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, contractUpdater.HasUpdates())
 
+		contractUpdateKeys, err = contractUpdater.Commit()
+		require.NoError(t, err)
+		require.Equal(
+			t,
+			environment.ContractUpdates{
+				Updates: []environment.ContractUpdateKey{},
+				Deploys: []environment.ContractUpdateKey{},
+				Deletions: []environment.ContractUpdateKey{
+					{
+						Address: flowAddress,
+						Name:    "TestContract",
+					},
+				},
+			},
+			contractUpdateKeys,
+		)
 	})
 }
