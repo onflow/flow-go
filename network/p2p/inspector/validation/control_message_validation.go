@@ -183,7 +183,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 				Msg("failed to get inspect message request")
 			return fmt.Errorf("failed to get inspect message request: %w", err)
 		}
-		c.requestMsgInspection(req)
+		c.workerPool.Submit(req)
 	}
 
 	return nil
@@ -259,11 +259,6 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 		}
 	}
 	return nil
-}
-
-// requestMsgInspection queues up an inspect message request.
-func (c *ControlMsgValidationInspector) requestMsgInspection(req *InspectMsgRequest) {
-	c.workerPool.Submit(req)
 }
 
 // getCtrlMsgCount returns the amount of specified control message type in the rpc ControlMessage.
