@@ -100,7 +100,7 @@ func createPeerIDFromAlgo(t *testing.T, sa fcrypto.SigningAlgorithm) peer.ID {
 }
 
 func createSeed(t *testing.T) []byte {
-	seedLen := int(math.Max(fcrypto.KeyGenSeedMinLen, fcrypto.KeyGenSeedMinLen))
+	const seedLen = fcrypto.KeyGenSeedMinLen
 	seed := make([]byte, seedLen)
 	n, err := rand.Read(seed)
 	require.NoError(t, err)
