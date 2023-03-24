@@ -1,8 +1,9 @@
 package validation
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
-	"math/rand"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
@@ -32,7 +33,7 @@ const (
 // InspectMsgRequest represents a short digest of an RPC control message. It is used for further message inspection by component workers.
 type InspectMsgRequest struct {
 	// Nonce adds random value so that when msg req is stored on hero store a unique ID can be created from the struct fields.
-	Nonce uint64
+	Nonce string
 	// Peer sender of the message.
 	Peer peer.ID
 	// CtrlMsg the control message that will be inspected.
@@ -87,8 +88,13 @@ var _ component.Component = (*ControlMsgValidationInspector)(nil)
 var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
 
 // NewInspectMsgRequest returns a new *InspectMsgRequest.
-func NewInspectMsgRequest(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) *InspectMsgRequest {
-	return &InspectMsgRequest{Nonce: rand.Uint64(), Peer: from, validationConfig: validationConfig, ctrlMsg: ctrlMsg}
+func NewInspectMsgRequest(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) (*InspectMsgRequest, error) {
+	b := make([]byte, 1000)
+	_, err := rand.Read(b)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get inspect message request nonce: %w", err)
+	}
+	return &InspectMsgRequest{Nonce: base64.StdEncoding.EncodeToString(b), Peer: from, validationConfig: validationConfig, ctrlMsg: ctrlMsg}, nil
 }
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
@@ -168,7 +174,16 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 		}
 
 		// queue further async inspection
-		c.requestMsgInspection(NewInspectMsgRequest(from, validationConfig, control))
+		req, err := NewInspectMsgRequest(from, validationConfig, control)
+		if err != nil {
+			lg.Error().
+				Err(err).
+				Str("peer_id", from.String()).
+				Str("ctrl_msg_type", string(ctrlMsgType)).
+				Msg("failed to get inspect message request")
+			return fmt.Errorf("failed to get inspect message request: %w", err)
+		}
+		c.requestMsgInspection(req)
 	}
 
 	return nil
