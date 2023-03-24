@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 )
 
 // MisbehaviorReport is a report that is sent to the networking layer to penalize the misbehaving node.
@@ -16,10 +17,12 @@ import (
 // threshold, the node is reported to be disallow-listed by the networking layer, i.e., existing connections to the
 // node are closed and the node is no longer allowed to connect till its penalty is decayed back to zero.
 type MisbehaviorReport struct {
-	id      flow.Identifier // the ID of the misbehaving node
-	reason  Misbehavior     // the reason of the misbehavior
-	penalty int             // the penalty value of the misbehavior
+	id      flow.Identifier     // the ID of the misbehaving node
+	reason  network.Misbehavior // the reason of the misbehavior
+	penalty int                 // the penalty value of the misbehavior
 }
+
+var _ network.MisbehaviorReport = (*MisbehaviorReport)(nil)
 
 // MisbehaviorReportOpt is an option that can be used to configure a misbehavior report.
 type MisbehaviorReportOpt func(r *MisbehaviorReport) error
@@ -45,7 +48,7 @@ func (r MisbehaviorReport) OriginId() flow.Identifier {
 }
 
 // Reason returns the reason of the misbehavior.
-func (r MisbehaviorReport) Reason() Misbehavior {
+func (r MisbehaviorReport) Reason() network.Misbehavior {
 	return r.reason
 }
 
@@ -59,7 +62,7 @@ func (r MisbehaviorReport) Penalty() int {
 // The returned error by this function indicates that the report is not created. In BFT setup, the returned error
 // should be treated as a fatal error.
 // The default penalty value is 0.01 * misbehaviorDisallowListingThreshold = -86.4
-func NewMisbehaviorReport(misbehavingId flow.Identifier, reason Misbehavior, opts ...MisbehaviorReportOpt) (*MisbehaviorReport, error) {
+func NewMisbehaviorReport(misbehavingId flow.Identifier, reason network.Misbehavior, opts ...MisbehaviorReportOpt) (*MisbehaviorReport, error) {
 	m := &MisbehaviorReport{
 		id:      misbehavingId,
 		reason:  reason,
