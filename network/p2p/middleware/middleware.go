@@ -182,6 +182,9 @@ func NewMiddleware(
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			rateLimiter.Start(ctx)
+			<-rateLimiter.Ready()
+			ready()
+			<-rateLimiter.Done()
 		})
 	}
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
