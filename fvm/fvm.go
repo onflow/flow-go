@@ -38,9 +38,6 @@ type ProcedureOutput struct {
 
 	// Output only by script.
 	Value cadence.Value
-
-	// TODO(patrick): rm after updating emulator to use ComputationUsed
-	GasUsed uint64
 }
 
 func (output *ProcedureOutput) PopulateEnvironmentValues(
@@ -53,8 +50,6 @@ func (output *ProcedureOutput) PopulateEnvironmentValues(
 		return fmt.Errorf("error getting computation used: %w", err)
 	}
 	output.ComputationUsed = computationUsed
-	// TODO(patrick): rm after updating emulator to use ComputationUsed
-	output.GasUsed = computationUsed
 
 	memoryUsed, err := env.MemoryUsed()
 	if err != nil {

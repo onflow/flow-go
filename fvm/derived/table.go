@@ -10,9 +10,6 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/logical"
 )
 
-// TODO(patrick): rm once emulator is updated
-const EndOfBlockExecutionTime = logical.EndOfBlockExecutionTime
-
 // ValueComputer is used by DerivedDataTable's GetOrCompute to compute the
 // derived value when the value is not in DerivedDataTable (i.e., "cache miss").
 type ValueComputer[TKey any, TVal any] interface {

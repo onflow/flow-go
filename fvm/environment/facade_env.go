@@ -141,24 +141,6 @@ func newFacadeEnvironment(
 	return env
 }
 
-// TODO(patrick): remove once emulator is updated.
-func NewScriptEnvironment(
-	ctx context.Context,
-	tracer tracing.TracerSpan,
-	params EnvironmentParams,
-	nestedTxn state.NestedTransaction,
-	derivedTxn derived.DerivedTransactionCommitter,
-) *facadeEnvironment {
-	return NewScriptEnv(
-		ctx,
-		tracer,
-		params,
-		storage.SerialTransaction{
-			NestedTransaction:           nestedTxn,
-			DerivedTransactionCommitter: derivedTxn,
-		})
-}
-
 // This is mainly used by command line tools, the emulator, and cadence tools
 // testing.
 func NewScriptEnvironmentFromStorageSnapshot(
