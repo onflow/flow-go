@@ -400,9 +400,6 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 		t,
 		sporkID,
 		t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
-			return nil
-		})),
 		p2ptest.WithDefaultResourceManager(),
 		p2ptest.WithUnicastManagerFactoryFunc(uniMgrFactory),
 		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
@@ -412,9 +409,6 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 		sporkID,
 		t.Name(),
 		p2ptest.WithDefaultResourceManager(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
-			return nil
-		})),
 		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
 
 	idProvider.On("ByPeerID", sender.Host().ID()).Return(&id1, true).Maybe()
