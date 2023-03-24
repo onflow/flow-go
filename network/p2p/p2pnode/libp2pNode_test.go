@@ -417,16 +417,14 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{sender, receiver}, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{sender, receiver}, cancel, 100*time.Millisecond)
 
-	pInfo, err := utils.PeerAddressInfo(id2)
-	require.NoError(t, err)
-	sender.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
+	p2ptest.LetNodesDiscoverEachOther(t, signalerCtx, []p2p.LibP2PNode{sender, receiver}, flow.IdentityList{&id1, &id2})
 
 	var wg sync.WaitGroup
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err = sender.CreateStream(ctx, receiver.Host().ID())
+			_, err := sender.CreateStream(ctx, receiver.Host().ID())
 			require.NoError(t, err)
 		}()
 	}
