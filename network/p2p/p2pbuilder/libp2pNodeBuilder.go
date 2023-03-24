@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/tracer"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 
 	"github.com/onflow/flow-go/network/p2p/subscription"
@@ -39,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	gossipsubbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/gossipsub"
-	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
@@ -171,7 +171,6 @@ type LibP2PNodeBuilder struct {
 	peerManagerEnablePruning  bool
 	peerManagerUpdateInterval time.Duration
 	createNode                p2p.CreateNodeFunc
-	uniMgrFactory             p2p.UnicastManagerFactoryFunc
 	createStreamRetryInterval time.Duration
 	rateLimiterDistributor    p2p.UnicastRateLimiterDistributor
 	gossipSubTracer           p2p.PubSubTracer
@@ -192,23 +191,6 @@ func NewNodeBuilder(logger zerolog.Logger,
 		metrics:            metrics,
 		resourceManagerCfg: rCfg,
 		gossipSubBuilder:   gossipsubbuilder.NewGossipSubBuilder(logger, metrics),
-		uniMgrFactory:      defaultUnicastManagerFactory(),
-	}
-}
-
-func defaultUnicastManagerFactory() p2p.UnicastManagerFactoryFunc {
-	return func(logger zerolog.Logger,
-		streamFactory stream.Factory,
-		sporkId flow.Identifier,
-		createStreamRetryDelay time.Duration,
-		connStatus p2p.PeerConnections,
-		metrics module.UnicastManagerMetrics) p2p.UnicastManager {
-		return unicast.NewUnicastManager(logger,
-			streamFactory,
-			sporkId,
-			createStreamRetryDelay,
-			connStatus,
-			metrics)
 	}
 }
 
@@ -300,11 +282,6 @@ func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf p2p.GossipSubFactoryFun
 
 func (builder *LibP2PNodeBuilder) SetStreamCreationRetryInterval(createStreamRetryInterval time.Duration) p2p.NodeBuilder {
 	builder.createStreamRetryInterval = createStreamRetryInterval
-	return builder
-}
-
-func (builder *LibP2PNodeBuilder) SetUnicastManagerFactoryFunc(f p2p.UnicastManagerFactoryFunc) p2p.NodeBuilder {
-	builder.uniMgrFactory = f
 	return builder
 }
 
@@ -401,13 +378,13 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	node := builder.createNode(builder.logger, h, pCache, peerManager)
 
-	uniMgr := builder.uniMgrFactory(builder.logger,
+	unicastManager := unicast.NewUnicastManager(builder.logger,
 		stream.NewLibP2PStreamFactory(h),
 		builder.sporkID,
 		builder.createStreamRetryInterval,
 		node,
 		builder.metrics)
-	node.SetUnicastManager(uniMgr)
+	node.SetUnicastManager(unicastManager)
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {

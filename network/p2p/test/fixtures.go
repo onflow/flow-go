@@ -127,10 +127,6 @@ func NodeFixture(
 		builder.SetConnectionManager(parameters.ConnManager)
 	}
 
-	if parameters.UnicastManagerFactoryFunc != nil {
-		builder.SetUnicastManagerFactoryFunc(parameters.UnicastManagerFactoryFunc)
-	}
-
 	if parameters.PubSubTracer != nil {
 		builder.SetGossipSubTracer(parameters.PubSubTracer)
 	}
@@ -180,13 +176,6 @@ type NodeFixtureParameters struct {
 	PubSubTracer                     p2p.PubSubTracer
 	GossipSubPeerScoreTracerInterval time.Duration // intervals at which the peer score is updated and logged.
 	CreateStreamRetryDelay           time.Duration
-	UnicastManagerFactoryFunc        p2p.UnicastManagerFactoryFunc
-}
-
-func WithUnicastManagerFactoryFunc(f p2p.UnicastManagerFactoryFunc) NodeFixtureParameterOption {
-	return func(p *NodeFixtureParameters) {
-		p.UnicastManagerFactoryFunc = f
-	}
 }
 
 func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {

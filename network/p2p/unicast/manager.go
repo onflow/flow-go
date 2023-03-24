@@ -103,14 +103,6 @@ func (m *Manager) Register(protocol protocols.ProtocolName) error {
 	return nil
 }
 
-func (m *Manager) StreamFactory() stream.Factory {
-	return m.streamFactory
-}
-
-func (m *Manager) Protocols() []protocols.Protocol {
-	return m.protocols
-}
-
 // CreateStream tries establishing a libp2p stream to the remote peer id. It tries creating streams in the descending order of preference until
 // it either creates a successful stream or runs out of options. Creating stream on each protocol is tried at most `maxAttempts`, and then falls
 // back to the less preferred one.

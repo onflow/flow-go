@@ -13,11 +13,9 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
@@ -25,9 +23,6 @@ type LibP2PFactoryFunc func() (LibP2PNode, error)
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSubAdapterConfig) (PubSubAdapter, error)
 type CreateNodeFunc func(zerolog.Logger, host.Host, ProtocolPeerCache, PeerManager) LibP2PNode
 type GossipSubAdapterConfigFunc func(*BasePubSubAdapterConfig) PubSubAdapterConfig
-
-// UnicastManagerFactoryFunc factory func that can be used to override the default unicast manager
-type UnicastManagerFactoryFunc func(zerolog.Logger, stream.Factory, flow.Identifier, time.Duration, PeerConnections, module.UnicastManagerMetrics) UnicastManager
 
 // GossipSubBuilder provides a builder pattern for creating a GossipSub pubsub system.
 type GossipSubBuilder interface {
@@ -113,7 +108,6 @@ type NodeBuilder interface {
 	SetRateLimiterDistributor(UnicastRateLimiterDistributor) NodeBuilder
 	SetGossipSubTracer(PubSubTracer) NodeBuilder
 	SetGossipSubScoreTracerInterval(time.Duration) NodeBuilder
-	SetUnicastManagerFactoryFunc(UnicastManagerFactoryFunc) NodeBuilder
 	Build() (LibP2PNode, error)
 }
 

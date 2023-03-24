@@ -8,7 +8,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
-	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 )
 
 // UnicastManager manages libp2p stream negotiation and creation, which is utilized for unicast dispatches.
@@ -25,6 +24,4 @@ type UnicastManager interface {
 	// back to the less preferred one.
 	// All errors returned from this function can be considered benign.
 	CreateStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error)
-	StreamFactory() stream.Factory
-	Protocols() []protocols.Protocol
 }

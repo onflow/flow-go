@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -394,14 +395,11 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 
 	sporkID := unittest.IdentifierFixture()
 
-	uniMgrFactory := p2ptest.UnicastManagerFixtureFactory()
-
 	sender, id1 := p2ptest.NodeFixture(
 		t,
 		sporkID,
 		t.Name(),
 		p2ptest.WithDefaultResourceManager(),
-		p2ptest.WithUnicastManagerFactoryFunc(uniMgrFactory),
 		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
 
 	receiver, id2 := p2ptest.NodeFixture(
@@ -429,7 +427,8 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 		allStreamsCreated.Add(1)
 		go func() {
 			defer allStreamsCreated.Done()
-			_, err := sender.CreateStream(ctx, receiver.Host().ID())
+			defaultProtocolID := protocols.FlowProtocolID(sporkID)
+			_, err := sender.Host().NewStream(ctx, receiver.Host().ID(), defaultProtocolID)
 			require.NoError(t, err)
 		}()
 	}
