@@ -252,12 +252,12 @@ func (e *executionDataRequester) OnBlockFinalized(*model.Block) {
 	e.finalizationNotifier.Notify()
 }
 
-// AddOnExecutionDataFetchedConsumer adds a callback to be called when a new ExecutionData is received
+// AddOnExecutionDataReceivedConsumer adds a callback to be called when a new ExecutionData is received
 // Callback Implementations must:
 //   - be concurrency safe
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
-func (e *executionDataRequester) AddOnExecutionDataFetchedConsumer(fn state_synchronization.OnExecutionDataReceivedConsumer) {
+func (e *executionDataRequester) AddOnExecutionDataReceivedConsumer(fn state_synchronization.OnExecutionDataReceivedConsumer) {
 	e.consumerMu.Lock()
 	defer e.consumerMu.Unlock()
 

@@ -18,16 +18,10 @@ type Handler struct {
 	chain flow.Chain
 }
 
-// HandlerOption is used to hand over optional constructor parameters
-type HandlerOption func(*Handler)
-
-func NewHandler(api API, chain flow.Chain, options ...HandlerOption) *Handler {
+func NewHandler(api API, chain flow.Chain) *Handler {
 	h := &Handler{
 		api:   api,
 		chain: chain,
-	}
-	for _, opt := range options {
-		opt(h)
 	}
 	return h
 }
@@ -40,7 +34,7 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *access
 
 	execData, err := h.api.GetExecutionDataByBlockID(ctx, blockID)
 	if err != nil {
-		return nil, rpc.ConvertError(err)
+		return nil, rpc.ConvertError(err, "could no get execution data", codes.Internal)
 	}
 
 	message, err := convert.BlockExecutionDataToMessage(execData)
@@ -66,7 +60,7 @@ func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataR
 	for {
 		v, ok := <-sub.Channel()
 		if !ok {
-			return rpc.ConvertError(sub.Err())
+			return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
 		}
 
 		resp, ok := v.(*ExecutionDataResponse)
@@ -84,7 +78,7 @@ func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataR
 			BlockExecutionData: execData,
 		})
 		if err != nil {
-			return rpc.ConvertError(err)
+			return rpc.ConvertError(err, "could not send response", codes.Internal)
 		}
 	}
 }
@@ -110,7 +104,7 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 	for {
 		v, ok := <-sub.Channel()
 		if !ok {
-			return rpc.ConvertError(sub.Err())
+			return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
 		}
 
 		resp, ok := v.(*EventsResponse)
@@ -124,7 +118,7 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 			Events:      convert.EventsToMessages(resp.Events),
 		})
 		if err != nil {
-			return rpc.ConvertError(err)
+			return rpc.ConvertError(err, "could not send response", codes.Internal)
 		}
 	}
 }

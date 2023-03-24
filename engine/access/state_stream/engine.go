@@ -3,10 +3,8 @@ package state_stream
 import (
 	"fmt"
 	"net"
-	"sync"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	lru "github.com/hashicorp/golang-lru"
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -14,15 +12,15 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
+	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
-
-type LatestExecDataCache interface {
-	LastBlockID() flow.Identifier
-}
 
 // Config defines the configurable options for the ingress server.
 type Config struct {
@@ -44,8 +42,7 @@ type Engine struct {
 	handler *Handler
 
 	execDataBroadcaster *engine.Broadcaster
-	execDataCache       *lru.Cache
-	latestExecDataCache LatestExecDataCache
+	execDataCache       *herocache.Cache
 
 	stateStreamGrpcAddress net.Addr
 }
@@ -54,14 +51,15 @@ type Engine struct {
 func NewEng(
 	config Config,
 	execDataStore execution_data.ExecutionDataStore,
+	state protocol.State,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	log zerolog.Logger,
 	chainID flow.ChainID,
-	latestExecDataCache LatestExecDataCache,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, GetExecutionDataByBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, GetExecutionDataByBlockID->10
+	heroCacheMetrics module.HeroCacheMetrics,
 ) (*Engine, error) {
 	logger := log.With().Str("engine", "state_stream_rpc").Logger()
 
@@ -93,19 +91,24 @@ func NewEng(
 
 	server := grpc.NewServer(grpcOpts...)
 
-	execDataCache, err := lru.New(DefaultCacheSize)
-	if err != nil {
-		return nil, fmt.Errorf("could not create cache: %w", err)
-	}
+	execDataCache := herocache.NewCache(
+		DefaultCacheSize,
+		herocache.DefaultOversizeFactor,
+		heropool.LRUEjection,
+		logger,
+		heroCacheMetrics,
+	)
 
 	broadcaster := engine.NewBroadcaster()
 
-	backend, err := New(logger, headers, seals, results, execDataStore, execDataCache, broadcaster, latestExecDataCache)
+	backend, err := New(logger, state, headers, seals, results, execDataStore, execDataCache, broadcaster)
 	if err != nil {
 		return nil, fmt.Errorf("could not create state stream backend: %w", err)
 	}
 
 	handler := NewHandler(backend, chainID.Chain())
+
+	// TODO: latestExecDataCache must be seeded with the latest blockID with execution data
 
 	e := &Engine{
 		log:                 logger,
@@ -116,7 +119,6 @@ func NewEng(
 		handler:             handler,
 		execDataBroadcaster: broadcaster,
 		execDataCache:       execDataCache,
-		latestExecDataCache: latestExecDataCache,
 	}
 
 	e.ComponentManager = component.NewComponentManagerBuilder().
@@ -129,7 +131,7 @@ func NewEng(
 
 func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionData) {
 	e.log.Trace().Msgf("received execution data %v", executionData.BlockID)
-	_ = e.execDataCache.Add(executionData.BlockID, executionData)
+	_ = e.execDataCache.Add(executionData.BlockID, &cachedExecData{executionData})
 	e.execDataBroadcaster.Publish()
 	e.log.Trace().Msg("sent broadcast notification")
 }
@@ -158,23 +160,14 @@ func (e *Engine) serve(ctx irrecoverable.SignalerContext, ready component.ReadyF
 	e.server.GracefulStop()
 }
 
-type LatestEntityIDCache struct {
-	mu sync.RWMutex
-	id flow.Identifier
+type cachedExecData struct {
+	executionData *execution_data.BlockExecutionData
 }
 
-func NewLatestEntityIDCache() *LatestEntityIDCache {
-	return &LatestEntityIDCache{}
+func (c *cachedExecData) ID() flow.Identifier {
+	return c.executionData.BlockID
 }
 
-func (c *LatestEntityIDCache) Get() flow.Identifier {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.id
-}
-
-func (c *LatestEntityIDCache) Set(id flow.Identifier) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.id = id
+func (c *cachedExecData) Checksum() flow.Identifier {
+	return c.executionData.BlockID
 }

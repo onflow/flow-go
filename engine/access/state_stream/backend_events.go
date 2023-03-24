@@ -102,10 +102,7 @@ type EventsBackend struct {
 // and filter the events.
 
 func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) Subscription {
-	sub := &HeightBasedSubscription{
-		SubscriptionImpl: NewSubscription(),
-		getData:          b.getResponseFactory(filter),
-	}
+	sub := NewHeightBasedSubscription(b.getResponseFactory(filter))
 
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
 	if err != nil {

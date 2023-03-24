@@ -17,6 +17,6 @@ type ExecutionDataRequester interface {
 	// OnBlockFinalized accepts block finalization notifications from the FinalizationDistributor
 	OnBlockFinalized(*model.Block)
 
-	// AddOnExecutionDataFetchedConsumer adds a callback to be called when a new ExecutionData is received
-	AddOnExecutionDataFetchedConsumer(fn OnExecutionDataReceivedConsumer)
+	// AddOnExecutionDataReceivedConsumer adds a callback to be called when a new ExecutionData is received
+	AddOnExecutionDataReceivedConsumer(fn OnExecutionDataReceivedConsumer)
 }

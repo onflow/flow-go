@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -35,39 +39,39 @@ type StateStreamBackend struct {
 	ExecutionDataBackend
 	EventsBackend
 
-	log              zerolog.Logger
-	headers          storage.Headers
-	seals            storage.Seals
-	results          storage.ExecutionResults
-	execDataStore    execution_data.ExecutionDataStore
-	execDataCache    *lru.Cache
-	broadcaster      *engine.Broadcaster
-	sendTimeout      time.Duration
-	latestBlockCache LatestExecDataCache
+	log           zerolog.Logger
+	state         protocol.State
+	headers       storage.Headers
+	seals         storage.Seals
+	results       storage.ExecutionResults
+	execDataStore execution_data.ExecutionDataStore
+	execDataCache *herocache.Cache
+	broadcaster   *engine.Broadcaster
+	sendTimeout   time.Duration
 }
 
 func New(
 	log zerolog.Logger,
+	state protocol.State,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	execDataStore execution_data.ExecutionDataStore,
-	execDataCache *lru.Cache,
+	execDataCache *herocache.Cache,
 	broadcaster *engine.Broadcaster,
-	latestBlockCache LatestExecDataCache,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
 	b := &StateStreamBackend{
-		log:              logger,
-		headers:          headers,
-		seals:            seals,
-		results:          results,
-		execDataStore:    execDataStore,
-		execDataCache:    execDataCache,
-		broadcaster:      broadcaster,
-		sendTimeout:      DefaultSendTimeout,
-		latestBlockCache: latestBlockCache,
+		log:           logger,
+		state:         state,
+		headers:       headers,
+		seals:         seals,
+		results:       results,
+		execDataStore: execDataStore,
+		execDataCache: execDataCache,
+		broadcaster:   broadcaster,
+		sendTimeout:   DefaultSendTimeout,
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
@@ -92,9 +96,9 @@ func New(
 }
 
 func (b *StateStreamBackend) getExecutionData(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
-	if cached, ok := b.execDataCache.Get(blockID); ok {
-		return cached.(*execution_data.BlockExecutionData), nil
-	}
+	// if cached, ok := b.execDataCache.ByID(blockID); ok {
+	// 	return cached.(*cachedExecData).executionData, nil
+	// }
 
 	seal, err := b.seals.FinalizedSealForBlock(blockID)
 	if err != nil {
@@ -111,18 +115,24 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, blockID flow.
 		return nil, fmt.Errorf("could not get execution data: %w", err)
 	}
 
-	b.execDataCache.Add(blockID, blockExecData)
+	// b.execDataCache.Add(blockID, &cachedExecData{blockExecData})
 
 	return blockExecData, nil
 }
 
+// getStartHeight returns the start height to use when searching
+// The height is chosen using the following priority order:
+// 1. startBlockID
+// 2. startHeight
+// 3. the latest sealed block
+// If a block is provided and does not exist, an error is returned
 func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
 	// first, if a start block ID is provided, use that
 	// invalid or missing block IDs will result in an error
 	if startBlockID != flow.ZeroID {
 		header, err := b.headers.ByBlockID(startBlockID)
 		if err != nil {
-			return 0, fmt.Errorf("could not get header for block %v: %w", startBlockID, err)
+			return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for block %v: %w", startBlockID, err))
 		}
 		return header.Height, nil
 	}
@@ -132,18 +142,15 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 	if startHeight > 0 {
 		header, err := b.headers.ByHeight(startHeight)
 		if err != nil {
-			return 0, fmt.Errorf("could not get header for height %d: %w", startHeight, err)
+			return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for height %d: %w", startHeight, err))
 		}
 		return header.Height, nil
 	}
 
-	// finally, if no start block ID or height is provided, use the latest block
-	header, err := b.headers.ByBlockID(b.latestBlockCache.LastBlockID())
+	// if no start block was provided, use the latest sealed block
+	header, err := b.state.Sealed().Head()
 	if err != nil {
-		// this should never happen and would indicate there's an issue with the protocol state,
-		// but do not crash the node as a result of an external request.
-		return 0, fmt.Errorf("could not get header for latest block: %w", err)
+		return 0, status.Errorf(codes.Internal, "could not get latest sealed block: %v", err)
 	}
-
 	return header.Height, nil
 }

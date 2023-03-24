@@ -548,7 +548,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			)
 
 			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
-			builder.ExecutionDataRequester.AddOnExecutionDataFetchedConsumer(execDataDistributor.OnExecutionDataReceived)
+			builder.ExecutionDataRequester.AddOnExecutionDataReceivedConsumer(execDataDistributor.OnExecutionDataReceived)
 
 			return builder.ExecutionDataRequester, nil
 		})
@@ -561,17 +561,23 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				RpcMetricsEnabled:       builder.rpcMetricsEnabled,
 			}
 
+			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if builder.HeroCacheMetricsEnable {
+				heroCacheCollector = metrics.AccessNodeExecutionDataCacheMetrics(builder.MetricsRegisterer)
+			}
+
 			stateStreamEng, err := state_stream.NewEng(
 				conf,
 				builder.ExecutionDataStore,
+				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Results,
 				node.Logger,
 				node.RootChainID,
-				execDataDistributor,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
+				heroCacheCollector,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)

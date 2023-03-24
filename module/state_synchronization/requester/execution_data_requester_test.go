@@ -439,7 +439,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestHalts(edr state_synchr
 	fetchedExecutionData := cfg.FetchedExecutionData()
 
 	// collect all execution data notifications
-	edr.AddOnExecutionDataFetchedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
+	edr.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
 
 	edr.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), edr.Ready(), cfg.waitTimeout, "timed out waiting for requester to be ready")
@@ -466,7 +466,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestPauseResume(edr state_
 	fetchedExecutionData := cfg.FetchedExecutionData()
 
 	// collect all execution data notifications
-	edr.AddOnExecutionDataFetchedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
+	edr.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
 
 	edr.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), edr.Ready(), cfg.waitTimeout, "timed out waiting for requester to be ready")
@@ -504,7 +504,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr state_synchroniza
 	fetchedExecutionData := cfg.FetchedExecutionData()
 
 	// collect all execution data notifications
-	edr.AddOnExecutionDataFetchedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
+	edr.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
 
 	edr.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), edr.Ready(), cfg.waitTimeout, "timed out waiting for requester to be ready")

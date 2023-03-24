@@ -2,10 +2,13 @@ package state_stream
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
@@ -31,20 +34,27 @@ type ExecutionDataBackend struct {
 
 func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
 	executionData, err := b.getExecutionData(ctx, blockID)
+
+	// need custom not found handler due to blob not found error
+	if errors.Is(err, storage.ErrNotFound) || execution_data.IsBlobNotFoundError(err) {
+		return nil, status.Errorf(codes.NotFound, "could not find execution data: %v", err)
+	}
+
 	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
+		return nil, rpc.ConvertError(err, "could not get execution data", codes.Internal)
 	}
 
 	return executionData, nil
 }
 
 func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) Subscription {
-	sub := &HeightBasedSubscription{
-		SubscriptionImpl: NewSubscription(),
-		getData:          b.getResponse,
-	}
+	sub := NewHeightBasedSubscription(b.getResponse)
 
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
+	if st, ok := status.FromError(err); ok {
+		sub.Fail(status.Errorf(st.Code(), "could not get start height: %v", st.Message()))
+		return sub
+	}
 	if err != nil {
 		sub.Fail(fmt.Errorf("could not get start height: %w", err))
 		return sub
@@ -60,7 +70,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, start
 func (b *ExecutionDataBackend) getResponse(ctx context.Context, height uint64) (interface{}, error) {
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		return nil, fmt.Errorf("could not get block header: %w", err)
+		return nil, fmt.Errorf("could not get block header for height %d: %w", height, err)
 	}
 
 	executionData, err := b.getExecutionData(ctx, header.ID())

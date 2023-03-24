@@ -15,15 +15,6 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-// BlobSizeLimitExceededError is returned when a blob exceeds the maximum size allowed.
-type BlobSizeLimitExceededError struct {
-	cid cid.Cid
-}
-
-func (e *BlobSizeLimitExceededError) Error() string {
-	return fmt.Sprintf("blob %v exceeds maximum blob size", e.cid.String())
-}
-
 // Downloader is used to download execution data blobs from the network via a blob service.
 type Downloader interface {
 	module.ReadyDoneAware
