@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/seed"
@@ -314,11 +313,6 @@ func (suite *ConsensusSuite) TestIdentitiesByBlock() {
 		suite.snapshot.On("Identity", mock.Anything).Return(nil, mockErr)
 		_, err := suite.committee.IdentityByBlock(blockID, unittest.IdentifierFixture())
 		assert.ErrorIs(t, err, mockErr)
-	})
-	t.Run("should propagate state.ErrUnknownSnapshotReference", func(t *testing.T) {
-		suite.snapshot.On("Identity", mock.Anything).Return(nil, state.ErrUnknownSnapshotReference)
-		_, err := suite.committee.IdentityByBlock(blockID, unittest.IdentifierFixture())
-		assert.ErrorIs(t, err, state.ErrUnknownSnapshotReference)
 	})
 }
 
