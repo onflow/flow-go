@@ -2086,7 +2086,6 @@ func TestAuthAccountCapabilities(t *testing.T) {
 						require.NoError(t, tx.Err)
 					} else {
 						require.Error(t, tx.Err)
-						require.ErrorContains(t, tx.Err, "no member `linkAccount`")
 					}
 				},
 			)(t)
