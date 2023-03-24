@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"os"
 	"path/filepath"
 	"time"
@@ -355,6 +356,7 @@ func main() {
 		}).
 		Module("finalization distributor", func(node *cmd.NodeConfig) error {
 			finalizationDistributor = pubsub.NewFinalizationDistributor()
+			finalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
 			return nil
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {

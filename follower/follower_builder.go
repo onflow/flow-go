@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"strings"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -352,6 +353,7 @@ func FlowConsensusFollowerService(opts ...FollowerOption) *FollowerServiceBuilde
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
+	ret.FinalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(ret.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	ret.FlowNodeBuilder.SkipNwAddressBasedValidations = true
