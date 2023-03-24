@@ -471,7 +471,6 @@ func ensureSinglePairwiseConnection(t *testing.T, nodes []p2p.LibP2PNode) {
 			if this == other {
 				continue
 			}
-			fmt.Println(fmt.Sprintf("%s -> %s", this.Host().ID(), other.Host().ID()), this.Host().Network().ConnsToPeer(other.Host().ID()))
 			require.Len(t, this.Host().Network().ConnsToPeer(other.Host().ID()), 1)
 		}
 	}
