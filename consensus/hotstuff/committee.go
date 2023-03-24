@@ -64,13 +64,12 @@ type Replicas interface {
 	DKG(view uint64) (DKG, error)
 
 	// IdentitiesByEpoch returns a list of the legitimate HotStuff participants for the epoch
-	// given by the input view. The list of participants is filtered by the provided selector.
+	// given by the input view.
 	// The returned list of HotStuff participants:
 	//   - contains nodes that are allowed to submit votes or timeouts within the given epoch
 	//     (un-ejected, non-zero weight at the beginning of the epoch)
 	//   - is ordered in the canonical order
 	//   - contains no duplicates.
-	// The list of all legitimate HotStuff participants for the given epoch can be obtained by using `filter.Any`
 	//
 	// CAUTION: DO NOT use this method for validating block proposals.
 	// CAUTION: This method considers epochs outside of Previous, Current, Next, w.r.t. the
@@ -109,13 +108,11 @@ type DynamicCommittee interface {
 	Replicas
 
 	// IdentitiesByBlock returns a list of the legitimate HotStuff participants for the given block.
-	// The list of participants is filtered by the provided selector.
 	// The returned list of HotStuff participants:
 	//   - contains nodes that are allowed to submit proposals, votes, and timeouts
 	//     (un-ejected, non-zero weight at current block)
 	//   - is ordered in the canonical order
 	//   - contains no duplicates.
-	// The list of all legitimate HotStuff participants for the given epoch can be obtained by using `filter.Any`
 	//
 	// ERROR conditions:
 	//  - state.ErrUnknownSnapshotReference if the blockID is for an unknown block

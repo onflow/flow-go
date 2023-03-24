@@ -11,7 +11,7 @@ import (
 )
 
 // BlockSignerDecoder is a wrapper around the `hotstuff.DynamicCommittee`, which implements
-// the auxilluary logic for de-coding signer indices of a block (header) to full node IDs
+// the auxiliary logic for de-coding signer indices of a block (header) to full node IDs
 type BlockSignerDecoder struct {
 	hotstuff.DynamicCommittee
 }
