@@ -2099,3 +2099,61 @@ func TestAuthAccountCapabilities(t *testing.T) {
 		test(t, false)
 	})
 }
+
+func TestAttachments(t *testing.T) {
+	test := func(t *testing.T, attachmentsEnabled bool) {
+		newVMTest().
+			withBootstrapProcedureOptions().
+			withContextOptions(
+				fvm.WithReusableCadenceRuntimePool(
+					reusableRuntime.NewReusableCadenceRuntimePool(
+						1,
+						runtime.Config{
+							AttachmentsEnabled: attachmentsEnabled,
+						},
+					),
+				),
+			).
+			run(
+				func(
+					t *testing.T,
+					vm fvm.VM,
+					chain flow.Chain,
+					ctx fvm.Context,
+					view state.View,
+				) {
+
+					script := fvm.Script([]byte(`
+
+						pub resource R {}
+
+						pub attachment A for R {}
+
+						pub fun main() {
+							let r <- create R()
+							r[A]
+							destroy r
+						}
+					`))
+
+					err := vm.Run(ctx, script, view)
+					require.NoError(t, err)
+
+					if attachmentsEnabled {
+						require.NoError(t, script.Err)
+					} else {
+						require.Error(t, script.Err)
+						require.ErrorContains(t, script.Err, "attachments are not enabled")
+					}
+				},
+			)(t)
+	}
+
+	t.Run("attachments enabled", func(t *testing.T) {
+		test(t, true)
+	})
+
+	t.Run("attachments disabled", func(t *testing.T) {
+		test(t, false)
+	})
+}
