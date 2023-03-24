@@ -2,6 +2,11 @@ package follower
 
 import (
 	"context"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
+	storage "github.com/onflow/flow-go/storage/mock"
+	"sync"
 	"testing"
 	"time"
 
@@ -10,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	commonmock "github.com/onflow/flow-go/engine/common/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -23,11 +29,14 @@ func TestFollowerEngine(t *testing.T) {
 
 // EngineSuite wraps CoreSuite and stores additional state needed for Engine specific logic.
 type EngineSuite struct {
-	CoreSuite
+	suite.Suite
 
-	net *mocknetwork.Network
-	con *mocknetwork.Conduit
-	me  *module.Local
+	finalized *flow.Header
+	net       *mocknetwork.Network
+	con       *mocknetwork.Conduit
+	me        *module.Local
+	headers   *storage.Headers
+	core      *commonmock.FollowerCore
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -36,11 +45,15 @@ type EngineSuite struct {
 }
 
 func (s *EngineSuite) SetupTest() {
-	s.CoreSuite.SetupTest()
 
 	s.net = mocknetwork.NewNetwork(s.T())
 	s.con = mocknetwork.NewConduit(s.T())
 	s.me = module.NewLocal(s.T())
+	s.headers = storage.NewHeaders(s.T())
+
+	s.core = commonmock.NewFollowerCore(s.T())
+	s.core.On("Start", mock.Anything).Return().Once()
+	unittest.ReadyDoneify(s.core)
 
 	nodeID := unittest.IdentifierFixture()
 	s.me.On("NodeID").Return(nodeID).Maybe()
@@ -48,11 +61,14 @@ func (s *EngineSuite) SetupTest() {
 	s.net.On("Register", mock.Anything, mock.Anything).Return(s.con, nil)
 
 	metrics := metrics.NewNoopCollector()
+	s.finalized = unittest.BlockHeaderFixture()
 	eng, err := New(
 		unittest.Logger(),
 		s.net,
 		s.me,
 		metrics,
+		s.headers,
+		s.finalized,
 		s.core)
 	require.Nil(s.T(), err)
 
@@ -74,45 +90,101 @@ func (s *EngineSuite) TearDownTest() {
 	}
 }
 
-//
-//// TestProcessSyncedBlock checks if processing synced block using unsafe API results in error.
-//// All blocks from sync engine should be sent through dedicated compliance API.
-//func (s *EngineSuite) TestProcessSyncedBlock() {
-//	parent := unittest.BlockFixture()
-//	block := unittest.BlockFixture()
-//
-//	parent.Header.Height = 10
-//	block.Header.Height = 11
-//	block.Header.ParentID = parent.ID()
-//
-//	// not in cache
-//	s.cache.On("ByID", block.ID()).Return(flow.Slashable[*flow.Block]{}, false).Once()
-//	s.cache.On("ByID", block.Header.ParentID).Return(flow.Slashable[*flow.Block]{}, false).Once()
-//	s.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
-//
-//	done := make(chan struct{})
-//	hotstuffProposal := model.ProposalFromFlow(block.Header)
-//
-//	// the parent is the last finalized state
-//	s.snapshot.On("Head").Return(parent.Header, nil)
-//	// the block passes hotstuff validation
-//	s.validator.On("ValidateProposal", hotstuffProposal).Return(nil)
-//	// we should be able to extend the state with the block
-//	s.state.On("ExtendCertified", mock.Anything, &block, (*flow.QuorumCertificate)(nil)).Return(nil).Once()
-//	// we should be able to get the parent header by its ID
-//	s.headers.On("ByBlockID", block.Header.ParentID).Return(parent.Header, nil).Once()
-//	// we do not have any children cached
-//	s.cache.On("ByParentID", block.ID()).Return(nil, false)
-//	// the proposal should be forwarded to the follower
-//	s.follower.On("SubmitProposal", hotstuffProposal).Run(func(_ mock.Arguments) {
-//		close(done)
-//	}).Once()
-//
-//	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
-//		OriginID: unittest.IdentifierFixture(),
-//		Message:  []*messages.BlockProposal{messages.NewBlockProposal(&block)},
-//	})
-//	unittest.AssertClosesBefore(s.T(), done, time.Second)
-//}
+// TestProcessSyncedBlock checks if processing synced block using unsafe API results in error.
+// All blocks from sync engine should be sent through dedicated compliance API.
+func (s *EngineSuite) TestProcessSyncedBlock() {
+	block := unittest.BlockWithParentFixture(s.finalized)
 
-// TODO: add test for processing finalized block. Can't be implemented at this point since Core doesn't support it.
+	originID := unittest.IdentifierFixture()
+	done := make(chan struct{})
+	s.core.On("OnBlockRange", originID, []*flow.Block{block}).Return(nil).Run(func(_ mock.Arguments) {
+		close(done)
+	}).Once()
+
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
+		OriginID: originID,
+		Message:  flowBlocksToBlockProposals(block),
+	})
+	unittest.AssertClosesBefore(s.T(), done, time.Second)
+}
+
+// TestProcessBatchOfDisconnectedBlocks tests that processing a batch that consists of one connected range and individual blocks
+// results in submitting all of them.
+func (s *EngineSuite) TestProcessBatchOfDisconnectedBlocks() {
+	originID := unittest.IdentifierFixture()
+	blocks := unittest.ChainFixtureFrom(10, s.finalized)
+	// drop second block
+	blocks = append(blocks[0:1], blocks[2:]...)
+	// drop second from end block
+	blocks = append(blocks[:len(blocks)-2], blocks[len(blocks)-1])
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+	s.core.On("OnBlockRange", originID, blocks[0:1]).Run(func(_ mock.Arguments) {
+		wg.Done()
+	}).Return(nil).Once()
+	s.core.On("OnBlockRange", originID, blocks[1:len(blocks)-1]).Run(func(_ mock.Arguments) {
+		wg.Done()
+	}).Return(nil).Once()
+	s.core.On("OnBlockRange", originID, blocks[len(blocks)-1:]).Run(func(_ mock.Arguments) {
+		wg.Done()
+	}).Return(nil).Once()
+
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
+		OriginID: originID,
+		Message:  flowBlocksToBlockProposals(blocks...),
+	})
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "expect to return before timeout")
+}
+
+// TestProcessFinalizedBlock tests processing finalized block results in updating last finalized view and propagating it to
+// FollowerCore.
+// After submitting new finalized block, we check if new batches are filtered based on new finalized view.
+func (s *EngineSuite) TestProcessFinalizedBlock() {
+	newFinalizedBlock := unittest.BlockHeaderWithParentFixture(s.finalized)
+
+	done := make(chan struct{})
+	s.core.On("OnFinalizedBlock", newFinalizedBlock).Run(func(_ mock.Arguments) {
+		close(done)
+	}).Return(nil).Once()
+	s.headers.On("ByBlockID", newFinalizedBlock.ID()).Return(newFinalizedBlock, nil).Once()
+
+	s.engine.OnFinalizedBlock(model.BlockFromFlow(newFinalizedBlock))
+	unittest.RequireCloseBefore(s.T(), done, time.Millisecond*500, "expect to close before timeout")
+
+	// check if batch gets filtered out since it's lower than finalized view
+	done = make(chan struct{})
+	block := unittest.BlockWithParentFixture(s.finalized)
+	block.Header.View = newFinalizedBlock.View - 1 // use block view lower than new latest finalized view
+
+	// use metrics mock to track that we have indeed processed the message, and the batch was filtered out since it was
+	// lower than finalized height
+	metricsMock := module.NewEngineMetrics(s.T())
+	metricsMock.On("MessageReceived", mock.Anything, metrics.MessageSyncedBlocks).Return().Once()
+	metricsMock.On("MessageHandled", mock.Anything, metrics.MessageBlockProposal).Run(func(_ mock.Arguments) {
+		close(done)
+	}).Return().Once()
+	s.engine.engMetrics = metricsMock
+
+	s.engine.OnSyncedBlocks(flow.Slashable[[]*messages.BlockProposal]{
+		OriginID: unittest.IdentifierFixture(),
+		Message:  flowBlocksToBlockProposals(block),
+	})
+	unittest.RequireCloseBefore(s.T(), done, time.Millisecond*500, "expect to close before timeout")
+	// check if message wasn't buffered in internal channel
+	select {
+	case <-s.engine.pendingConnectedBlocksChan:
+		s.Fail("channel has to be empty at this stage")
+	default:
+
+	}
+}
+
+// flowBlocksToBlockProposals is a helper function to transform types.
+func flowBlocksToBlockProposals(blocks ...*flow.Block) []*messages.BlockProposal {
+	result := make([]*messages.BlockProposal, 0, len(blocks))
+	for _, block := range blocks {
+		result = append(result, messages.NewBlockProposal(block))
+	}
+	return result
+}

@@ -52,18 +52,18 @@ const defaultPendingConnectedBlocksChanCapacity = 100
 // Implements consensus.Compliance interface.
 type Engine struct {
 	*component.ComponentManager
-	log                    zerolog.Logger
-	me                     module.Local
-	engMetrics             module.EngineMetrics
-	con                    network.Conduit
-	channel                channels.Channel
-	headers                storage.Headers
-	pendingBlocks          *fifoqueue.FifoQueue        // queue for processing inbound blocks
-	pendingBlocksNotifier  engine.Notifier             // notifies that new blocks are ready to be processed
-	finalizedBlockTracker  *tracker.NewestBlockTracker // tracks the latest finalization block
-	finalizedBlockNotifier engine.Notifier             // notifies when the latest finalized block changes
-	pendingConnectedBlocks chan flow.Slashable[[]*flow.Block]
-	core                   common.FollowerCore // performs actual processing of incoming messages.
+	log                        zerolog.Logger
+	me                         module.Local
+	engMetrics                 module.EngineMetrics
+	con                        network.Conduit
+	channel                    channels.Channel
+	headers                    storage.Headers
+	pendingBlocks              *fifoqueue.FifoQueue        // queue for processing inbound blocks
+	pendingBlocksNotifier      engine.Notifier             // notifies that new blocks are ready to be processed
+	finalizedBlockTracker      *tracker.NewestBlockTracker // tracks the latest finalization block
+	finalizedBlockNotifier     engine.Notifier             // notifies when the latest finalized block changes
+	pendingConnectedBlocksChan chan flow.Slashable[[]*flow.Block]
+	core                       common.FollowerCore // performs actual processing of incoming messages.
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -74,6 +74,8 @@ func New(
 	net network.Network,
 	me module.Local,
 	engMetrics module.EngineMetrics,
+	headers storage.Headers,
+	finalized *flow.Header,
 	core common.FollowerCore,
 	opts ...EngineOption,
 ) (*Engine, error) {
@@ -84,15 +86,19 @@ func New(
 	}
 
 	e := &Engine{
-		log:                    log.With().Str("engine", "follower").Logger(),
-		me:                     me,
-		engMetrics:             engMetrics,
-		channel:                channels.ReceiveBlocks,
-		pendingBlocks:          pendingBlocks,
-		pendingBlocksNotifier:  engine.NewNotifier(),
-		pendingConnectedBlocks: make(chan flow.Slashable[[]*flow.Block], defaultPendingConnectedBlocksChanCapacity),
-		core:                   core,
+		log:                        log.With().Str("engine", "follower").Logger(),
+		me:                         me,
+		engMetrics:                 engMetrics,
+		channel:                    channels.ReceiveBlocks,
+		pendingBlocks:              pendingBlocks,
+		pendingBlocksNotifier:      engine.NewNotifier(),
+		pendingConnectedBlocksChan: make(chan flow.Slashable[[]*flow.Block], defaultPendingConnectedBlocksChanCapacity),
+		finalizedBlockTracker:      tracker.NewNewestBlockTracker(),
+		finalizedBlockNotifier:     engine.NewNotifier(),
+		headers:                    headers,
+		core:                       core,
 	}
+	e.finalizedBlockTracker.Track(model.BlockFromFlow(finalized))
 
 	for _, apply := range opts {
 		apply(e)
@@ -250,6 +256,7 @@ func (e *Engine) submitConnectedBatch(latestFinalizedView uint64, originID flow.
 	if len(blocks) < 1 {
 		return
 	}
+	// if latest block of batch is already finalized we can drop such input.
 	if blocks[len(blocks)-1].Header.View < latestFinalizedView {
 		return
 	}
@@ -259,7 +266,7 @@ func (e *Engine) submitConnectedBatch(latestFinalizedView uint64, originID flow.
 	}
 
 	select {
-	case e.pendingConnectedBlocks <- msg:
+	case e.pendingConnectedBlocksChan <- msg:
 	case <-e.ComponentManager.ShutdownSignal():
 	}
 }
@@ -271,7 +278,7 @@ func (e *Engine) processConnectedBatch(ctx irrecoverable.SignalerContext, ready 
 		select {
 		case <-ctx.Done():
 			return
-		case msg := <-e.pendingConnectedBlocks:
+		case msg := <-e.pendingConnectedBlocksChan:
 			err := e.core.OnBlockRange(msg.OriginID, msg.Message)
 			if err != nil {
 				ctx.Throw(err)
