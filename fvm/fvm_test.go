@@ -2025,78 +2025,210 @@ func TestInteractionLimit(t *testing.T) {
 }
 
 func TestAuthAccountCapabilities(t *testing.T) {
-	test := func(t *testing.T, allowAccountLinking bool) {
-		newVMTest().
-			withBootstrapProcedureOptions().
-			withContextOptions(
-				fvm.WithReusableCadenceRuntimePool(
-					reusableRuntime.NewReusableCadenceRuntimePool(
-						1,
-						runtime.Config{
-							AccountLinkingEnabled: true,
-						},
+
+	t.Parallel()
+
+	t.Run("transaction", func(t *testing.T) {
+
+		t.Parallel()
+
+		test := func(t *testing.T, allowAccountLinking bool) {
+			newVMTest().
+				withBootstrapProcedureOptions().
+				withContextOptions(
+					fvm.WithReusableCadenceRuntimePool(
+						reusableRuntime.NewReusableCadenceRuntimePool(
+							1,
+							runtime.Config{
+								AccountLinkingEnabled: true,
+							},
+						),
 					),
-				),
-			).
-			run(
-				func(
-					t *testing.T,
-					vm fvm.VM,
-					chain flow.Chain,
-					ctx fvm.Context,
-					view state.View,
-				) {
-					// Create an account private key.
-					privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
-					privateKey := privateKeys[0]
-					require.NoError(t, err)
-					// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-					accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
-					require.NoError(t, err)
-					account := accounts[0]
+				).
+				run(
+					func(
+						t *testing.T,
+						vm fvm.VM,
+						chain flow.Chain,
+						ctx fvm.Context,
+						view state.View,
+					) {
+						// Create an account private key.
+						privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+						privateKey := privateKeys[0]
+						require.NoError(t, err)
 
-					var pragma string
-					if allowAccountLinking {
-						pragma = "#allowAccountLinking"
-					}
-					code := fmt.Sprintf(
-						`
-						  %s
+						// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+						accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
+						require.NoError(t, err)
+						account := accounts[0]
 
-						  transaction {
-						      prepare(acct: AuthAccount) {
-						          acct.linkAccount(/private/foo)
-						      }
-						  }
-						`,
-						pragma,
-					)
-					txBody := flow.NewTransactionBody().
-						SetScript([]byte(code)).
-						AddAuthorizer(account).
-						SetPayer(chain.ServiceAddress()).
-						SetProposalKey(chain.ServiceAddress(), 0, 0)
-					_ = testutil.SignPayload(txBody, account, privateKey)
-					_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-					tx := fvm.Transaction(txBody, 0)
-					err = vm.Run(ctx, tx, view)
-					require.NoError(t, err)
+						var pragma string
+						if allowAccountLinking {
+							pragma = "#allowAccountLinking"
+						}
 
-					if allowAccountLinking {
-						require.NoError(t, tx.Err)
-					} else {
-						require.Error(t, tx.Err)
-					}
-				},
-			)(t)
-	}
+						code := fmt.Sprintf(
+							`
+							%s
+							transaction {
+								prepare(acct: AuthAccount) {
+									acct.linkAccount(/private/foo)
+								}
+							}
+							`,
+							pragma,
+						)
 
-	t.Run("account linking allowed", func(t *testing.T) {
-		test(t, true)
+						txBody := flow.NewTransactionBody().
+							SetScript([]byte(code)).
+							AddAuthorizer(account).
+							SetPayer(chain.ServiceAddress()).
+							SetProposalKey(chain.ServiceAddress(), 0, 0)
+
+						_ = testutil.SignPayload(txBody, account, privateKey)
+						_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+						tx := fvm.Transaction(txBody, 0)
+
+						err = vm.Run(ctx, tx, view)
+						require.NoError(t, err)
+						if allowAccountLinking {
+							require.NoError(t, tx.Err)
+						} else {
+							require.Error(t, tx.Err)
+						}
+					},
+				)(t)
+		}
+
+		t.Run("account linking allowed", func(t *testing.T) {
+			test(t, true)
+		})
+
+		t.Run("account linking disallowed", func(t *testing.T) {
+			test(t, false)
+		})
 	})
 
-	t.Run("account linking disallowed", func(t *testing.T) {
-		test(t, false)
+	t.Run("contract", func(t *testing.T) {
+
+		t.Parallel()
+
+		test := func(t *testing.T, allowAccountLinking bool) {
+			newVMTest().
+				withBootstrapProcedureOptions().
+				withContextOptions(
+					fvm.WithReusableCadenceRuntimePool(
+						reusableRuntime.NewReusableCadenceRuntimePool(
+							1,
+							runtime.Config{
+								AccountLinkingEnabled: true,
+							},
+						),
+					),
+					fvm.WithContractDeploymentRestricted(false),
+				).
+				run(
+					func(
+						t *testing.T,
+						vm fvm.VM,
+						chain flow.Chain,
+						ctx fvm.Context,
+						view state.View,
+					) {
+						// Create two private keys
+						privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
+						require.NoError(t, err)
+
+						// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+						accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
+						require.NoError(t, err)
+
+						// Deploy contract
+						contractCode := `
+							pub contract AccountLinker {
+								pub fun link(_ account: AuthAccount) {
+									account.linkAccount(/private/acct)
+								}
+							}
+						`
+
+						deployingContractScriptTemplate := `
+							transaction {
+								prepare(signer: AuthAccount) {
+									signer.contracts.add(
+										name: "AccountLinker",
+										code: "%s".decodeHex()
+									)
+								}
+							}
+						`
+
+						txBody := flow.NewTransactionBody().
+							SetScript([]byte(fmt.Sprintf(
+								deployingContractScriptTemplate,
+								hex.EncodeToString([]byte(contractCode)),
+							))).
+							SetPayer(chain.ServiceAddress()).
+							SetProposalKey(chain.ServiceAddress(), 0, 0).
+							AddAuthorizer(accounts[0])
+						_ = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+						_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+
+						tx := fvm.Transaction(txBody, 0)
+						err = vm.Run(ctx, tx, view)
+						require.NoError(t, err)
+						require.NoError(t, tx.Err)
+
+						// Use contract
+
+						var pragma string
+						if allowAccountLinking {
+							pragma = "#allowAccountLinking"
+						}
+
+						code := fmt.Sprintf(
+							`
+							%s
+							import AccountLinker from %s
+							transaction {
+								prepare(acct: AuthAccount) {
+									AccountLinker.link(acct)
+								}
+							}
+							`,
+							pragma,
+							accounts[0].HexWithPrefix(),
+						)
+
+						txBody = flow.NewTransactionBody().
+							SetScript([]byte(code)).
+							AddAuthorizer(accounts[1]).
+							SetPayer(chain.ServiceAddress()).
+							SetProposalKey(chain.ServiceAddress(), 0, 1)
+
+						_ = testutil.SignPayload(txBody, accounts[1], privateKeys[1])
+						_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+						tx = fvm.Transaction(txBody, 1)
+
+						err = vm.Run(ctx, tx, view)
+						require.NoError(t, err)
+						if allowAccountLinking {
+							require.NoError(t, tx.Err)
+						} else {
+							require.Error(t, tx.Err)
+						}
+					},
+				)(t)
+		}
+
+		t.Run("account linking allowed", func(t *testing.T) {
+			test(t, true)
+		})
+
+		t.Run("account linking disallowed", func(t *testing.T) {
+			test(t, false)
+		})
 	})
 }
 
