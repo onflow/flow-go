@@ -2122,7 +2122,6 @@ func TestAttachments(t *testing.T) {
 					chain flow.Chain,
 					ctx fvm.Context,
 					view state.View,
-					derivedBlockData *derived.DerivedBlockData,
 				) {
 
 					script := fvm.Script([]byte(`
