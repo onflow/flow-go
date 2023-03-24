@@ -2215,6 +2215,9 @@ func TestAuthAccountCapabilities(t *testing.T) {
 						require.NoError(t, err)
 						if allowAccountLinking {
 							require.NoError(t, tx.Err)
+
+							require.Len(t, tx.Events, 1)
+							require.Equal(t, flow.EventType("flow.AccountLinked"), tx.Events[0].Type)
 						} else {
 							require.Error(t, tx.Err)
 						}
