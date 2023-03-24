@@ -419,17 +419,17 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 
 	p2ptest.LetNodesDiscoverEachOther(t, signalerCtx, []p2p.LibP2PNode{sender, receiver}, flow.IdentityList{&id1, &id2})
 
-	var wg sync.WaitGroup
+	var allStreamsCreated sync.WaitGroup
 	for i := 0; i < 20; i++ {
-		wg.Add(1)
+		allStreamsCreated.Add(1)
 		go func() {
-			defer wg.Done()
+			defer allStreamsCreated.Done()
 			_, err := sender.CreateStream(ctx, receiver.Host().ID())
 			require.NoError(t, err)
 		}()
 	}
 
-	unittest.RequireReturnsBefore(t, wg.Wait, 2*time.Second, "could not create streams on time")
+	unittest.RequireReturnsBefore(t, allStreamsCreated.Wait, 2*time.Second, "could not create streams on time")
 	require.Len(t, receiver.Host().Network().ConnsToPeer(sender.Host().ID()), 1)
 }
 
