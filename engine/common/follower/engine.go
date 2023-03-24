@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/engine/common/follower/pending_tree"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -31,13 +30,14 @@ func WithChannel(channel channels.Channel) EngineOption {
 	}
 }
 
-// defaultBlockProcessingWorkers number of concurrent workers that process incoming blocks.
-const defaultBlockProcessingWorkers = 4
+// defaultBatchProcessingWorkers number of concurrent workers that process incoming blocks.
+const defaultBatchProcessingWorkers = 4
 
-// defaultBlockQueueCapacity maximum capacity of inbound queue for batches of `messages.BlockProposal`
-const defaultBlockQueueCapacity = 1000
+// defaultBlockQueueCapacity maximum capacity of inbound queue for batches of BlocksBatch.
+const defaultBlockQueueCapacity = 100
 
-type CertifiedBlocks []pending_tree.CertifiedBlock
+// defaultPendingConnectedBlocksChanCapacity capacity of buffered channel that is used to receive pending blocks that form a sequence.
+const defaultPendingConnectedBlocksChanCapacity = 100
 
 // Engine is the highest level structure that consumes events from other components.
 // It's an entry point to the follower engine which follows and maintains the local copy of the protocol state.
@@ -46,8 +46,8 @@ type CertifiedBlocks []pending_tree.CertifiedBlock
 // Follower engine is employed by all other node roles.
 // Engine is responsible for:
 // 1. Consuming events from external sources such as sync engine.
-// 2. Providing worker goroutines for concurrent processing of incoming blocks.
-// 3. Ordering events that is not safe to perform in concurrent environment.
+// 2. Splitting incoming batches in batches of connected blocks.
+// 3. Providing worker goroutines for concurrent processing of batches of connected blocks.
 // 4. Handling of finalization events.
 // Implements consensus.Compliance interface.
 type Engine struct {
@@ -62,7 +62,8 @@ type Engine struct {
 	pendingBlocksNotifier  engine.Notifier             // notifies that new blocks are ready to be processed
 	finalizedBlockTracker  *tracker.NewestBlockTracker // tracks the latest finalization block
 	finalizedBlockNotifier engine.Notifier             // notifies when the latest finalized block changes
-	core                   common.FollowerCore         // performs actual processing of incoming messages.
+	pendingConnectedBlocks chan flow.Slashable[[]*flow.Block]
+	core                   common.FollowerCore // performs actual processing of incoming messages.
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -83,13 +84,14 @@ func New(
 	}
 
 	e := &Engine{
-		log:                   log.With().Str("engine", "follower").Logger(),
-		me:                    me,
-		engMetrics:            engMetrics,
-		channel:               channels.ReceiveBlocks,
-		pendingBlocks:         pendingBlocks,
-		pendingBlocksNotifier: engine.NewNotifier(),
-		core:                  core,
+		log:                    log.With().Str("engine", "follower").Logger(),
+		me:                     me,
+		engMetrics:             engMetrics,
+		channel:                channels.ReceiveBlocks,
+		pendingBlocks:          pendingBlocks,
+		pendingBlocksNotifier:  engine.NewNotifier(),
+		pendingConnectedBlocks: make(chan flow.Slashable[[]*flow.Block], defaultPendingConnectedBlocksChanCapacity),
+		core:                   core,
 	}
 
 	for _, apply := range opts {
@@ -103,7 +105,8 @@ func New(
 	e.con = con
 
 	cmBuilder := component.NewComponentManagerBuilder().
-		AddWorker(e.finalizationProcessingLoop)
+		AddWorker(e.finalizationProcessingLoop).
+		AddWorker(e.processBlocksLoop)
 
 	cmBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		// start internal component
@@ -120,8 +123,8 @@ func New(
 		<-e.core.Done()
 	})
 
-	for i := 0; i < defaultBlockProcessingWorkers; i++ {
-		cmBuilder.AddWorker(e.processBlocksLoop)
+	for i := 0; i < defaultBatchProcessingWorkers; i++ {
+		cmBuilder.AddWorker(e.processConnectedBatch)
 	}
 	e.ComponentManager = cmBuilder.Build()
 
@@ -142,7 +145,6 @@ func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]
 	// The synchronization engine feeds the follower with batches of blocks. The field `Slashable.OriginID`
 	// states which node forwarded the batch to us. Each block contains its proposer and signature.
 
-	// queue proposal
 	if e.pendingBlocks.Push(blocks) {
 		e.pendingBlocksNotifier.Notify()
 	}
@@ -208,31 +210,30 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 		msg, ok := e.pendingBlocks.Pop()
 		if ok {
 			batch := msg.(flow.Slashable[[]*messages.BlockProposal])
-			blocks, err := e.validateAndFilterBatch(batch)
-			if err != nil {
-				return fmt.Errorf("could not validate batch: %w", err)
-			}
-
-			if len(blocks) < 1 {
+			if len(batch.Message) < 1 {
 				continue
 			}
+			blocks := make([]*flow.Block, 0, len(batch.Message))
+			for _, block := range batch.Message {
+				blocks = append(blocks, block.Block.ToInternal())
+			}
 
+			latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
+			submitConnectedBatch := func(blocks []*flow.Block) {
+				e.submitConnectedBatch(latestFinalizedView, batch.OriginID, blocks)
+			}
+
+			// extract sequences of connected blocks and schedule them for further processing
 			parentID := blocks[0].ID()
 			indexOfLastConnected := 0
 			for i := 1; i < len(blocks); i++ {
 				if blocks[i].Header.ParentID != parentID {
-					err = e.core.OnBlockRange(batch.OriginID, blocks[indexOfLastConnected:i])
-					if err != nil {
-						return fmt.Errorf("could not process batch: %w", err)
-					}
+					submitConnectedBatch(blocks[indexOfLastConnected:i])
 					indexOfLastConnected = i
 				}
+				parentID = blocks[i].Header.ID()
 			}
-
-			err = e.core.OnBlockRange(batch.OriginID, blocks[indexOfLastConnected:])
-			if err != nil {
-				return fmt.Errorf("could not process batch: %w", err)
-			}
+			submitConnectedBatch(blocks[indexOfLastConnected:])
 
 			e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 			continue
@@ -244,50 +245,39 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 	}
 }
 
-// validateAndFilterBatch
-func (e *Engine) validateAndFilterBatch(msg flow.Slashable[[]*messages.BlockProposal]) ([]*flow.Block, error) {
-	latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
-	filtered := make([]*flow.Block, 0, len(msg.Message))
-
-	for _, extBlock := range msg.Message {
-		block := extBlock.Block.ToInternal()
-		// skip blocks that are already finalized
-		if block.Header.View < latestFinalizedView {
-			continue
-		}
-
-		//hotstuffProposal := model.ProposalFromFlow(block.Header)
-		//// skip block if it's already in cache
-		//if b := e.core.pendingCache.Peek(hotstuffProposal.Block.BlockID); b != nil {
-		//	continue
-		//}
-		//
-		//err := e.core.validator.ValidateProposal(hotstuffProposal)
-		//if err != nil {
-		//	if model.IsInvalidBlockError(err) {
-		//		// TODO potential slashing
-		//		e.log.Err(err).Msgf("received invalid block proposal (potential slashing evidence)")
-		//		continue
-		//	}
-		//	if errors.Is(err, model.ErrViewForUnknownEpoch) {
-		//		// We have received a proposal, but we don't know the epoch its view is within.
-		//		// We know:
-		//		//  - the parent of this block is valid and inserted (ie. we knew the epoch for it)
-		//		//  - if we then see this for the child, one of two things must have happened:
-		//		//    1. the proposer malicious created the block for a view very far in the future (it's invalid)
-		//		//      -> in this case we can disregard the block
-		//		//    2. no blocks have been finalized the epoch commitment deadline, and the epoch end
-		//		//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
-		//		//      -> in this case, the network has encountered a critical failure
-		//		//  - we assume in general that Case 2 will not happen, therefore we can discard this proposal
-		//		e.log.Err(err).Msg("unable to validate proposal with view from unknown epoch")
-		//		continue
-		//	}
-		//	return nil, fmt.Errorf("unexpected error validating proposal: %w", err)
-		//}
-		filtered = append(filtered, block)
+// submitConnectedBatch checks if batch is still pending and submits it via channel for further processing by worker goroutines.
+func (e *Engine) submitConnectedBatch(latestFinalizedView uint64, originID flow.Identifier, blocks []*flow.Block) {
+	if len(blocks) < 1 {
+		return
 	}
-	return filtered, nil
+	if blocks[len(blocks)-1].Header.View < latestFinalizedView {
+		return
+	}
+	msg := flow.Slashable[[]*flow.Block]{
+		OriginID: originID,
+		Message:  blocks,
+	}
+
+	select {
+	case e.pendingConnectedBlocks <- msg:
+	case <-e.ComponentManager.ShutdownSignal():
+	}
+}
+
+// processConnectedBatch is a worker goroutine which concurrently consumes connected batches that will be processed by Core.
+func (e *Engine) processConnectedBatch(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg := <-e.pendingConnectedBlocks:
+			err := e.core.OnBlockRange(msg.OriginID, msg.Message)
+			if err != nil {
+				ctx.Throw(err)
+			}
+		}
+	}
 }
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events

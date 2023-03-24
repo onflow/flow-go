@@ -31,6 +31,8 @@ func WithComplianceOptions(opts ...compliance.Opt) ComplianceOption {
 	}
 }
 
+type CertifiedBlocks []pending_tree.CertifiedBlock
+
 // defaultCertifiedBlocksChannelCapacity maximum capacity of buffered channel that is used to transfer
 // certified blocks to specific worker.
 const defaultCertifiedBlocksChannelCapacity = 100
@@ -265,7 +267,6 @@ func (c *Core) extendCertifiedBlocks(parentCtx context.Context, connectedBlocks 
 		}
 
 		hotstuffProposal := model.ProposalFromFlow(certifiedBlock.Block.Header)
-
 		// submit the model to follower for processing
 		c.follower.SubmitProposal(hotstuffProposal)
 	}
