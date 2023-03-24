@@ -29,7 +29,7 @@ func NewFollower(log zerolog.Logger, committee hotstuff.DynamicCommittee, header
 	validator := validator.New(committee, verifier)
 
 	// recover the hotstuff state as a follower
-	err = recovery.Follower(log, forks, validator, finalized, pending)
+	err = recovery.Follower(log, forks, validator, pending)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff follower state: %w", err)
 	}
