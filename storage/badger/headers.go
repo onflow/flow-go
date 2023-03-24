@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -163,7 +164,8 @@ func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 	for _, blockID := range blockIDs {
 		header, err := h.ByBlockID(blockID)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve child (%x): %w", blockID, err)
+			// any error (including NotFound) is an exception because it implies the child index is corrupted
+			return nil, irrecoverable.NewExceptionf("could not retrieve child (%x): %w", blockID, err)
 		}
 		headers = append(headers, header)
 	}

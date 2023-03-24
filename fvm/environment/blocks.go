@@ -13,7 +13,7 @@ import (
 )
 
 type Blocks interface {
-	// ByHeight returns the block at the given height in the chain ending in `header` (or finalized
+	// ByHeightFrom returns the block at the given height in the chain ending in `header` (or finalized
 	// if `header` is nil). This enables querying un-finalized blocks by height with respect to the
 	// chain defined by the block we are executing.
 	ByHeightFrom(height uint64, header *flow.Header) (*flow.Header, error)
@@ -21,11 +21,11 @@ type Blocks interface {
 
 // BlocksFinder finds blocks and return block headers
 type BlocksFinder struct {
-	storage storage.Headers
+	storage storage.HeadersGetter
 }
 
 // NewBlockFinder constructs a new block finder
-func NewBlockFinder(storage storage.Headers) Blocks {
+func NewBlockFinder(storage storage.HeadersGetter) Blocks {
 	return &BlocksFinder{storage: storage}
 }
 
