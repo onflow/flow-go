@@ -96,12 +96,12 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			cnb.IdentityProvider,
 			cnb.Metrics.Network,
 			cnb.Resolver,
-			cnb.PeerScoringEnabled,
 			cnb.BaseConfig.NodeRole,
 			connGaterCfg,
 			// run peer manager with the specified interval and let it also prune connections
 			peerManagerCfg,
 			uniCfg,
+			cnb.GossipSubConfig,
 			cnb.TopicValidatorDisabled,
 			cnb.WithPubSubMessageSigning,
 			cnb.WithPubSubStrictSignatureVerification,

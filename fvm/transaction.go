@@ -2,8 +2,6 @@ package fvm
 
 import (
 	"github.com/onflow/flow-go/fvm/derived"
-	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -23,28 +21,19 @@ func NewTransaction(
 	txnBody *flow.TransactionBody,
 ) *TransactionProcedure {
 	return &TransactionProcedure{
-		ID:                     txnId,
-		Transaction:            txnBody,
-		InitialSnapshotTxIndex: txnIndex,
-		TxIndex:                txnIndex,
-		ComputationIntensities: make(meter.MeteredComputationIntensities),
+		ID:          txnId,
+		Transaction: txnBody,
+		TxIndex:     txnIndex,
 	}
 }
 
 type TransactionProcedure struct {
-	ID                     flow.Identifier
-	Transaction            *flow.TransactionBody
-	InitialSnapshotTxIndex uint32
-	TxIndex                uint32
+	ID          flow.Identifier
+	Transaction *flow.TransactionBody
+	TxIndex     uint32
 
-	Logs                   []string
-	Events                 flow.EventsList
-	ServiceEvents          flow.EventsList
-	ConvertedServiceEvents flow.ServiceEventList
-	ComputationUsed        uint64
-	ComputationIntensities meter.MeteredComputationIntensities
-	MemoryEstimate         uint64
-	Err                    errors.CodedError
+	// TODO(patrick): remove
+	ProcedureOutput
 }
 
 func (proc *TransactionProcedure) NewExecutor(
@@ -52,6 +41,10 @@ func (proc *TransactionProcedure) NewExecutor(
 	txnState storage.Transaction,
 ) ProcedureExecutor {
 	return newTransactionExecutor(ctx, proc, txnState)
+}
+
+func (proc *TransactionProcedure) SetOutput(output ProcedureOutput) {
+	proc.ProcedureOutput = output
 }
 
 func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {
@@ -92,10 +85,6 @@ func (proc *TransactionProcedure) ShouldDisableMemoryAndInteractionLimits(
 
 func (TransactionProcedure) Type() ProcedureType {
 	return TransactionProcedureType
-}
-
-func (proc *TransactionProcedure) InitialSnapshotTime() derived.LogicalTime {
-	return derived.LogicalTime(proc.InitialSnapshotTxIndex)
 }
 
 func (proc *TransactionProcedure) ExecutionTime() derived.LogicalTime {

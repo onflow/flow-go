@@ -9,10 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/network"
+
+	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/tracer"
+
 	addrutil "github.com/libp2p/go-addr-util"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -27,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/internal/testutils"
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
@@ -87,15 +91,23 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 	}
 }
 
-type nodeOpt func(p2pbuilder.NodeBuilder)
+type nodeOpt func(p2p.NodeBuilder)
 
 func WithSubscriptionFilter(filter pubsub.SubscriptionFilter) nodeOpt {
-	return func(builder p2pbuilder.NodeBuilder) {
+	return func(builder p2p.NodeBuilder) {
 		builder.SetSubscriptionFilter(filter)
 	}
 }
 
-func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateKey, sporkID flow.Identifier, logger zerolog.Logger, opts ...nodeOpt) p2p.LibP2PNode {
+func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identifier, logger zerolog.Logger, nodeIds flow.IdentityList, opts ...nodeOpt) p2p.LibP2PNode {
+	idProvider := id.NewFixedIdentityProvider(nodeIds)
+
+	meshTracer := tracer.NewGossipSubMeshTracer(
+		logger,
+		metrics.NewNoopCollector(),
+		idProvider,
+		p2pbuilder.DefaultGossipSubConfig().LocalMeshLogInterval)
+
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
 		metrics.NewNoopCollector(),
@@ -107,7 +119,9 @@ func CreateNode(t *testing.T, nodeID flow.Identifier, networkKey crypto.PrivateK
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
 		SetResourceManager(testutils.NewResourceManager(t)).
-		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay)
+		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
+		SetGossipSubTracer(meshTracer).
+		SetGossipSubScoreTracerInterval(p2pbuilder.DefaultGossipSubConfig().ScoreTracerInterval)
 
 	for _, opt := range opts {
 		opt(builder)

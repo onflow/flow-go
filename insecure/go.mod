@@ -10,7 +10,7 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.8.2
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/flow-go v0.29.8
-	github.com/onflow/flow-go/crypto v0.24.4
+	github.com/onflow/flow-go/crypto v0.24.6
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.1
@@ -44,7 +44,7 @@ require (
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.3.0 // indirect
-	github.com/btcsuite/btcd v0.22.1 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.2.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
@@ -179,7 +179,7 @@ require (
 	github.com/multiformats/go-multistream v0.3.3 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/onflow/atree v0.5.0 // indirect
-	github.com/onflow/cadence v0.36.0 // indirect
+	github.com/onflow/cadence v0.36.1-0.20230321154305-ba9bfc7b2551 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.12.1 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.12.1 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect

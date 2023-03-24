@@ -15,20 +15,18 @@ type ContractUpdater struct {
 }
 
 // Commit provides a mock function with given fields:
-func (_m *ContractUpdater) Commit() ([]environment.ContractUpdateKey, error) {
+func (_m *ContractUpdater) Commit() (environment.ContractUpdates, error) {
 	ret := _m.Called()
 
-	var r0 []environment.ContractUpdateKey
+	var r0 environment.ContractUpdates
 	var r1 error
-	if rf, ok := ret.Get(0).(func() ([]environment.ContractUpdateKey, error)); ok {
+	if rf, ok := ret.Get(0).(func() (environment.ContractUpdates, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() []environment.ContractUpdateKey); ok {
+	if rf, ok := ret.Get(0).(func() environment.ContractUpdates); ok {
 		r0 = rf()
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]environment.ContractUpdateKey)
-		}
+		r0 = ret.Get(0).(environment.ContractUpdates)
 	}
 
 	if rf, ok := ret.Get(1).(func() error); ok {
@@ -40,13 +38,13 @@ func (_m *ContractUpdater) Commit() ([]environment.ContractUpdateKey, error) {
 	return r0, r1
 }
 
-// RemoveAccountContractCode provides a mock function with given fields: address, name
-func (_m *ContractUpdater) RemoveAccountContractCode(address common.Address, name string) error {
-	ret := _m.Called(address, name)
+// RemoveAccountContractCode provides a mock function with given fields: location
+func (_m *ContractUpdater) RemoveAccountContractCode(location common.AddressLocation) error {
+	ret := _m.Called(location)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(common.Address, string) error); ok {
-		r0 = rf(address, name)
+	if rf, ok := ret.Get(0).(func(common.AddressLocation) error); ok {
+		r0 = rf(location)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -59,13 +57,13 @@ func (_m *ContractUpdater) Reset() {
 	_m.Called()
 }
 
-// UpdateAccountContractCode provides a mock function with given fields: address, name, code
-func (_m *ContractUpdater) UpdateAccountContractCode(address common.Address, name string, code []byte) error {
-	ret := _m.Called(address, name, code)
+// UpdateAccountContractCode provides a mock function with given fields: location, code
+func (_m *ContractUpdater) UpdateAccountContractCode(location common.AddressLocation, code []byte) error {
+	ret := _m.Called(location, code)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(common.Address, string, []byte) error); ok {
-		r0 = rf(address, name, code)
+	if rf, ok := ret.Get(0).(func(common.AddressLocation, []byte) error); ok {
+		r0 = rf(location, code)
 	} else {
 		r0 = ret.Error(0)
 	}

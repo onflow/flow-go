@@ -13,12 +13,12 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -65,11 +65,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	defer rwc.Close()
 	defer rwm.Close()
 
-	l := utils.NewSimpleViewFromPayloads(payload)
-	txnState := state.NewTransactionState(l, state.DefaultParameters())
-	gen := environment.NewAddressGenerator(txnState, r.Chain)
-
-	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
+	snapshot := NewStorageSnapshotFromPayload(payload)
 
 	workerCount := goRuntime.NumCPU() / 2
 	if workerCount == 0 {
@@ -83,7 +79,13 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	wg := &sync.WaitGroup{}
 	for i := 0; i < workerCount; i++ {
 		go func() {
-			adp := newAccountDataProcessor(r.Log, rwa, rwc, rwm, r.Chain, l)
+			adp := newAccountDataProcessor(
+				r.Log,
+				rwa,
+				rwc,
+				rwm,
+				r.Chain,
+				snapshot)
 			for indx := range addressIndexes {
 				adp.reportAccountData(indx)
 				wg.Done()
@@ -91,7 +93,14 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 		}()
 	}
 
+	txnState := state.NewTransactionState(
+		delta.NewDeltaView(snapshot),
+		state.DefaultParameters())
+	gen := environment.NewAddressGenerator(txnState, r.Chain)
 	addressCount := gen.AddressCount()
+
+	progress := progressbar.Default(int64(addressCount), "Processing:")
+
 	// produce jobs for workers to process
 	for i := uint64(1); i <= addressCount; i++ {
 		addressIndexes <- i
@@ -116,12 +125,12 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 }
 
 type balanceProcessor struct {
-	vm            fvm.VM
-	ctx           fvm.Context
-	view          state.View
-	env           environment.Environment
-	balanceScript []byte
-	momentsScript []byte
+	vm              fvm.VM
+	ctx             fvm.Context
+	storageSnapshot state.StorageSnapshot
+	env             environment.Environment
+	balanceScript   []byte
+	momentsScript   []byte
 
 	accounts environment.Accounts
 
@@ -132,7 +141,10 @@ type balanceProcessor struct {
 	fusdScript []byte
 }
 
-func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
+func NewBalanceReporter(
+	chain flow.Chain,
+	snapshot state.StorageSnapshot,
+) *balanceProcessor {
 	vm := fvm.NewVirtualMachine()
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	ctx := fvm.NewContext(
@@ -140,16 +152,15 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		fvm.WithMemoryAndInteractionLimitsDisabled(),
 		fvm.WithDerivedBlockData(derivedBlockData))
 
-	v := view.NewChild()
-
 	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(0, 0)
 	if err != nil {
 		panic(err)
 	}
 
+	view := delta.NewDeltaView(snapshot)
 	txnState := storage.SerialTransaction{
 		NestedTransaction: state.NewTransactionState(
-			v,
+			view,
 			state.DefaultParameters()),
 		DerivedTransactionCommitter: derivedTxnData,
 	}
@@ -163,16 +174,23 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		txnState)
 
 	return &balanceProcessor{
-		vm:       vm,
-		ctx:      ctx,
-		view:     v,
-		accounts: accounts,
-		env:      env,
+		vm:              vm,
+		ctx:             ctx,
+		storageSnapshot: snapshot,
+		accounts:        accounts,
+		env:             env,
 	}
 }
 
-func newAccountDataProcessor(logger zerolog.Logger, rwa ReportWriter, rwc ReportWriter, rwm ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
-	bp := NewBalanceReporter(chain, view)
+func newAccountDataProcessor(
+	logger zerolog.Logger,
+	rwa ReportWriter,
+	rwc ReportWriter,
+	rwm ReportWriter,
+	chain flow.Chain,
+	snapshot state.StorageSnapshot,
+) *balanceProcessor {
+	bp := NewBalanceReporter(chain, snapshot)
 
 	bp.logger = logger
 	bp.rwa = rwa
@@ -325,15 +343,15 @@ func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view)
+	_, output, err := c.vm.RunV2(c.ctx, script, c.storageSnapshot)
 	if err != nil {
 		return 0, false, err
 	}
 
 	var balance uint64
 	var hasVault bool
-	if script.Err == nil && script.Value != nil {
-		balance = script.Value.ToGoValue().(uint64)
+	if output.Err == nil && output.Value != nil {
+		balance = output.Value.ToGoValue().(uint64)
 		hasVault = true
 	} else {
 		hasVault = false
@@ -346,14 +364,14 @@ func (c *balanceProcessor) fusdBalance(address flow.Address) (uint64, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view)
+	_, output, err := c.vm.RunV2(c.ctx, script, c.storageSnapshot)
 	if err != nil {
 		return 0, err
 	}
 
 	var balance uint64
-	if script.Err == nil && script.Value != nil {
-		balance = script.Value.ToGoValue().(uint64)
+	if output.Err == nil && output.Value != nil {
+		balance = output.Value.ToGoValue().(uint64)
 	}
 	return balance, nil
 }
@@ -363,14 +381,14 @@ func (c *balanceProcessor) moments(address flow.Address) (int, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view)
+	_, output, err := c.vm.RunV2(c.ctx, script, c.storageSnapshot)
 	if err != nil {
 		return 0, err
 	}
 
 	var m int
-	if script.Err == nil && script.Value != nil {
-		m = script.Value.(cadence.Int).Int()
+	if output.Err == nil && output.Value != nil {
+		m = output.Value.(cadence.Int).Int()
 	}
 	return m, nil
 }

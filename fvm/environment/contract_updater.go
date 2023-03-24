@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -68,16 +67,15 @@ type ContractUpdater interface {
 	// Cadence's runtime API.  Note that the script variant will return
 	// OperationNotSupportedError.
 	UpdateAccountContractCode(
-		address common.Address,
-		name string,
+		location common.AddressLocation,
 		code []byte,
 	) error
 
 	// Cadence's runtime API.  Note that the script variant will return
 	// OperationNotSupportedError.
-	RemoveAccountContractCode(address common.Address, name string) error
+	RemoveAccountContractCode(location common.AddressLocation) error
 
-	Commit() ([]ContractUpdateKey, error)
+	Commit() (ContractUpdates, error)
 
 	Reset()
 }
@@ -98,33 +96,29 @@ func NewParseRestrictedContractUpdater(
 }
 
 func (updater ParseRestrictedContractUpdater) UpdateAccountContractCode(
-	address common.Address,
-	name string,
+	location common.AddressLocation,
 	code []byte,
 ) error {
-	return parseRestrict3Arg(
+	return parseRestrict2Arg(
 		updater.txnState,
 		trace.FVMEnvUpdateAccountContractCode,
 		updater.impl.UpdateAccountContractCode,
-		address,
-		name,
+		location,
 		code)
 }
 
 func (updater ParseRestrictedContractUpdater) RemoveAccountContractCode(
-	address common.Address,
-	name string,
+	location common.AddressLocation,
 ) error {
-	return parseRestrict2Arg(
+	return parseRestrict1Arg(
 		updater.txnState,
 		trace.FVMEnvRemoveAccountContractCode,
 		updater.impl.RemoveAccountContractCode,
-		address,
-		name)
+		location)
 }
 
 func (updater ParseRestrictedContractUpdater) Commit() (
-	[]ContractUpdateKey,
+	ContractUpdates,
 	error,
 ) {
 	return updater.impl.Commit()
@@ -137,22 +131,20 @@ func (updater ParseRestrictedContractUpdater) Reset() {
 type NoContractUpdater struct{}
 
 func (NoContractUpdater) UpdateAccountContractCode(
-	address common.Address,
-	name string,
-	code []byte,
+	_ common.AddressLocation,
+	_ []byte,
 ) error {
 	return errors.NewOperationNotSupportedError("UpdateAccountContractCode")
 }
 
 func (NoContractUpdater) RemoveAccountContractCode(
-	address common.Address,
-	name string,
+	_ common.AddressLocation,
 ) error {
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
 }
 
-func (NoContractUpdater) Commit() ([]ContractUpdateKey, error) {
-	return nil, nil
+func (NoContractUpdater) Commit() (ContractUpdates, error) {
+	return ContractUpdates{}, nil
 }
 
 func (NoContractUpdater) Reset() {
@@ -164,8 +156,6 @@ type ContractUpdaterStubs interface {
 	RestrictedRemovalEnabled() bool
 
 	GetAuthorizedAccounts(path cadence.Path) []flow.Address
-
-	UseContractAuditVoucher(address flow.Address, code []byte) (bool, error)
 }
 
 type contractUpdaterStubsImpl struct {
@@ -196,13 +186,13 @@ func (impl *contractUpdaterStubsImpl) getIsContractDeploymentRestricted() (
 	restricted bool,
 	defined bool,
 ) {
-	service := common.Address(impl.chain.ServiceAddress())
+	service := impl.chain.ServiceAddress()
 
 	runtime := impl.runtime.BorrowCadenceRuntime()
 	defer impl.runtime.ReturnCadenceRuntime(runtime)
 
 	value, err := runtime.ReadStored(
-		service,
+		common.MustBytesToAddress(service.Bytes()),
 		blueprints.IsContractDeploymentRestrictedPath)
 	if err != nil {
 		impl.logger.Logger().
@@ -247,7 +237,9 @@ func (impl *contractUpdaterStubsImpl) GetAuthorizedAccounts(
 	runtime := impl.runtime.BorrowCadenceRuntime()
 	defer impl.runtime.ReturnCadenceRuntime(runtime)
 
-	value, err := runtime.ReadStored(common.Address(service), path)
+	value, err := runtime.ReadStored(
+		common.MustBytesToAddress(service.Bytes()),
+		path)
 
 	const warningMsg = "failed to read contract authorized accounts from " +
 		"service account. using default behaviour instead."
@@ -256,24 +248,12 @@ func (impl *contractUpdaterStubsImpl) GetAuthorizedAccounts(
 		impl.logger.Logger().Warn().Msg(warningMsg)
 		return defaultAccounts
 	}
-	addresses, ok := utils.CadenceValueToAddressSlice(value)
+	addresses, ok := cadenceValueToAddressSlice(value)
 	if !ok {
 		impl.logger.Logger().Warn().Msg(warningMsg)
 		return defaultAccounts
 	}
 	return addresses
-}
-
-func (impl *contractUpdaterStubsImpl) UseContractAuditVoucher(
-	address flow.Address,
-	code []byte,
-) (
-	bool,
-	error,
-) {
-	return impl.systemContracts.UseContractAuditVoucher(
-		address,
-		string(code[:]))
 }
 
 type ContractUpdaterImpl struct {
@@ -337,8 +317,7 @@ func NewContractUpdater(
 }
 
 func (updater *ContractUpdaterImpl) UpdateAccountContractCode(
-	runtimeAddress common.Address,
-	name string,
+	location common.AddressLocation,
 	code []byte,
 ) error {
 	defer updater.tracer.StartChildSpan(
@@ -351,15 +330,11 @@ func (updater *ContractUpdaterImpl) UpdateAccountContractCode(
 		return fmt.Errorf("update account contract code failed: %w", err)
 	}
 
-	address := flow.ConvertAddress(runtimeAddress)
-	err = updater.accounts.CheckAccountNotFrozen(address)
-	if err != nil {
-		return fmt.Errorf("update account contract code failed: %w", err)
-	}
+	address := flow.ConvertAddress(location.Address)
 
 	err = updater.SetContract(
 		address,
-		name,
+		location.Name,
 		code,
 		updater.signingAccounts)
 	if err != nil {
@@ -370,8 +345,7 @@ func (updater *ContractUpdaterImpl) UpdateAccountContractCode(
 }
 
 func (updater *ContractUpdaterImpl) RemoveAccountContractCode(
-	runtimeAddress common.Address,
-	name string,
+	location common.AddressLocation,
 ) error {
 	defer updater.tracer.StartChildSpan(
 		trace.FVMEnvRemoveAccountContractCode).End()
@@ -383,15 +357,11 @@ func (updater *ContractUpdaterImpl) RemoveAccountContractCode(
 		return fmt.Errorf("remove account contract code failed: %w", err)
 	}
 
-	address := flow.ConvertAddress(runtimeAddress)
-	err = updater.accounts.CheckAccountNotFrozen(address)
-	if err != nil {
-		return fmt.Errorf("remove account contract code failed: %w", err)
-	}
+	address := flow.ConvertAddress(location.Address)
 
 	err = updater.RemoveContract(
 		address,
-		name,
+		location.Name,
 		updater.signingAccounts)
 	if err != nil {
 		return fmt.Errorf("remove account contract code failed: %w", err)
@@ -406,8 +376,7 @@ func (updater *ContractUpdaterImpl) SetContract(
 	code []byte,
 	signingAccounts []flow.Address,
 ) error {
-	// Initial contract deployments must be authorized by signing accounts,
-	// or there must be an audit voucher available.
+	// Initial contract deployments must be authorized by signing accounts.
 	//
 	// Contract updates are always allowed.
 	exists, err := updater.accounts.ContractExists(name, address)
@@ -416,23 +385,13 @@ func (updater *ContractUpdaterImpl) SetContract(
 	}
 
 	if !exists && !updater.isAuthorizedForDeployment(signingAccounts) {
-		// check if there's an audit voucher for the contract
-		voucherAvailable, err := updater.UseContractAuditVoucher(address, code)
-		if err != nil {
-			errInner := errors.NewOperationAuthorizationErrorf(
+		return fmt.Errorf(
+			"deploying contract failed: %w",
+			errors.NewOperationAuthorizationErrorf(
 				"SetContract",
-				"failed to check audit vouchers",
-			)
-			return fmt.Errorf("setting contract failed: %w - %s", errInner, err)
-		}
-		if !voucherAvailable {
-			return fmt.Errorf(
-				"deploying contract failed: %w",
-				errors.NewOperationAuthorizationErrorf(
-					"SetContract",
-					"deploying contracts requires authorization from specific "+
-						"accounts"))
-		}
+				"deploying contracts requires authorization from specific "+
+					"accounts"))
+
 	}
 
 	contractUpdateKey := ContractUpdateKey{
@@ -469,26 +428,49 @@ func (updater *ContractUpdaterImpl) RemoveContract(
 	return nil
 }
 
-func (updater *ContractUpdaterImpl) Commit() ([]ContractUpdateKey, error) {
-	updatedKeys, updateList := updater.updates()
+func (updater *ContractUpdaterImpl) Commit() (ContractUpdates, error) {
+	updateList := updater.updates()
 	updater.Reset()
+
+	contractUpdates := ContractUpdates{
+		Updates:   make([]ContractUpdateKey, 0, len(updateList)),
+		Deploys:   make([]ContractUpdateKey, 0, len(updateList)),
+		Deletions: make([]ContractUpdateKey, 0, len(updateList)),
+	}
 
 	var err error
 	for _, v := range updateList {
-		if len(v.Code) > 0 {
-			err = updater.accounts.SetContract(v.Name, v.Address, v.Code)
-			if err != nil {
-				return nil, err
-			}
-		} else {
+		var currentlyExists bool
+		currentlyExists, err = updater.accounts.ContractExists(v.Name, v.Address)
+		if err != nil {
+			return ContractUpdates{}, err
+		}
+		shouldDelete := len(v.Code) == 0
+
+		if shouldDelete {
+			// this is a removal
+			contractUpdates.Deletions = append(contractUpdates.Deletions, v.ContractUpdateKey)
 			err = updater.accounts.DeleteContract(v.Name, v.Address)
 			if err != nil {
-				return nil, err
+				return ContractUpdates{}, err
+			}
+		} else {
+			if !currentlyExists {
+				// this is a deployment
+				contractUpdates.Deploys = append(contractUpdates.Deploys, v.ContractUpdateKey)
+			} else {
+				// this is an update
+				contractUpdates.Updates = append(contractUpdates.Updates, v.ContractUpdateKey)
+			}
+
+			err = updater.accounts.SetContract(v.Name, v.Address, v.Code)
+			if err != nil {
+				return ContractUpdates{}, err
 			}
 		}
 	}
 
-	return updatedKeys, nil
+	return contractUpdates, nil
 }
 
 func (updater *ContractUpdaterImpl) Reset() {
@@ -499,12 +481,9 @@ func (updater *ContractUpdaterImpl) HasUpdates() bool {
 	return len(updater.draftUpdates) > 0
 }
 
-func (updater *ContractUpdaterImpl) updates() (
-	[]ContractUpdateKey,
-	[]ContractUpdate,
-) {
+func (updater *ContractUpdaterImpl) updates() []ContractUpdate {
 	if len(updater.draftUpdates) == 0 {
-		return nil, nil
+		return nil
 	}
 	keys := make([]ContractUpdateKey, 0, len(updater.draftUpdates))
 	updates := make([]ContractUpdate, 0, len(updater.draftUpdates))
@@ -514,7 +493,7 @@ func (updater *ContractUpdaterImpl) updates() (
 	}
 
 	sort.Sort(&sortableContractUpdates{keys: keys, updates: updates})
-	return keys, updates
+	return updates
 }
 
 func (updater *ContractUpdaterImpl) isAuthorizedForDeployment(
@@ -553,4 +532,24 @@ func (updater *ContractUpdaterImpl) isAuthorized(
 		}
 	}
 	return false
+}
+
+func cadenceValueToAddressSlice(value cadence.Value) (
+	[]flow.Address,
+	bool,
+) {
+	v, ok := value.(cadence.Array)
+	if !ok {
+		return nil, false
+	}
+
+	addresses := make([]flow.Address, 0, len(v.Values))
+	for _, value := range v.Values {
+		a, ok := value.(cadence.Address)
+		if !ok {
+			return nil, false
+		}
+		addresses = append(addresses, flow.ConvertAddress(a))
+	}
+	return addresses, true
 }

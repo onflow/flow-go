@@ -7,23 +7,18 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 type DerivedTransaction interface {
-	GetProgram(
+	GetOrComputeProgram(
+		txState state.NestedTransaction,
 		addressLocation common.AddressLocation,
+		programComputer ValueComputer[common.AddressLocation, *Program],
 	) (
 		*Program,
-		*state.State,
-		bool,
+		error,
 	)
-
-	SetProgram(
-		addressLocation common.AddressLocation,
-		program *Program,
-		state *state.State,
-	)
+	GetProgram(location common.AddressLocation) (*Program, bool)
 
 	GetMeterParamOverrides(
 		txnState state.NestedTransaction,
@@ -41,21 +36,6 @@ type DerivedTransactionCommitter interface {
 
 	Validate() error
 	Commit() error
-}
-
-// ProgramDependencies are the programs' addresses used by this program.
-type ProgramDependencies map[flow.Address]struct{}
-
-// AddDependency adds the address as a dependency.
-func (d ProgramDependencies) AddDependency(address flow.Address) {
-	d[address] = struct{}{}
-}
-
-// Merge merges current dependencies with other dependencies.
-func (d ProgramDependencies) Merge(other ProgramDependencies) {
-	for address := range other {
-		d[address] = struct{}{}
-	}
 }
 
 type Program struct {
@@ -192,22 +172,31 @@ func (block *DerivedBlockData) CachedPrograms() int {
 	return len(block.programs.items)
 }
 
-func (transaction *DerivedTransactionData) GetProgram(
+func (transaction *DerivedTransactionData) GetOrComputeProgram(
+	txState state.NestedTransaction,
 	addressLocation common.AddressLocation,
+	programComputer ValueComputer[common.AddressLocation, *Program],
 ) (
 	*Program,
-	*state.State,
-	bool,
+	error,
 ) {
-	return transaction.programs.Get(addressLocation)
+	return transaction.programs.GetOrCompute(
+		txState,
+		addressLocation,
+		programComputer)
 }
 
-func (transaction *DerivedTransactionData) SetProgram(
-	addressLocation common.AddressLocation,
-	program *Program,
-	state *state.State,
+// GetProgram returns the program for the given address location.
+// This does NOT apply reads/metering to any nested transaction.
+// Use with caution!
+func (transaction *DerivedTransactionData) GetProgram(
+	location common.AddressLocation,
+) (
+	*Program,
+	bool,
 ) {
-	transaction.programs.Set(addressLocation, program, state)
+	program, _, ok := transaction.programs.get(location)
+	return program, ok
 }
 
 func (transaction *DerivedTransactionData) AddInvalidator(

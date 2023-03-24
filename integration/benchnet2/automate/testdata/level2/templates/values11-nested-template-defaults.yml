@@ -29,7 +29,7 @@ access:
         - --log-tx-time-to-executed
         - --log-tx-time-to-finalized-executed
       env:{{template "env" .}}
-      image: gcr.io/flow-container-registry/access:{{$val.docker_tag}}
+      image: {{$val.docker_registry}}/access:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{- end}}{{end}}
 collection:
@@ -54,7 +54,7 @@ collection:
         - --insecure-access-api=false
         - --access-node-ids=*
       env:{{template "env" .}}
-      image: gcr.io/flow-container-registry/collection:{{$val.docker_tag}}
+      image: {{$val.docker_registry}}/collection:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{- end}}{{end}}
 consensus:
@@ -80,7 +80,7 @@ consensus:
         - --insecure-access-api=false
         - --access-node-ids=*
       env:{{template "env" .}}
-      image: gcr.io/flow-container-registry/consensus:{{$val.docker_tag}}
+      image: {{$val.docker_registry}}/consensus:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{- end}}{{end}}
 execution:
@@ -100,7 +100,7 @@ execution:
         - --cadence-tracing=false
         - --extensive-tracing=false
       env:{{template "env" .}}
-      image: gcr.io/flow-container-registry/execution:{{$val.docker_tag}}
+      image: {{$val.docker_registry}}/execution:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{- end}}{{end}}
 verification:
@@ -120,7 +120,7 @@ verification:
         - --loglevel=INFO
         - --chunk-alpha=1
       env:{{template "env" .}}
-      image: gcr.io/flow-container-registry/verification:{{$val.docker_tag}}
+      image: {{$val.docker_registry}}/verification:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
 
@@ -149,6 +149,8 @@ verification:
 {{define "defaults"}}
     imagePullPolicy: Always
     containerPorts:
+      - name: metrics
+        containerPort: 8080
       - name: ptp
         containerPort: 3569
       - name: grpc

@@ -524,10 +524,6 @@ func (updater *accountKeyUpdater) AddEncodedAccountKey(
 	}
 
 	address := flow.ConvertAddress(runtimeAddress)
-	err = updater.accounts.CheckAccountNotFrozen(address)
-	if err != nil {
-		return fmt.Errorf("add encoded account key failed: %w", err)
-	}
 
 	// TODO do a call to track the computation usage and memory usage
 	//
@@ -559,10 +555,6 @@ func (updater *accountKeyUpdater) RevokeEncodedAccountKey(
 	}
 
 	address := flow.ConvertAddress(runtimeAddress)
-	err = updater.accounts.CheckAccountNotFrozen(address)
-	if err != nil {
-		return nil, fmt.Errorf("revoke encoded account key failed: %w", err)
-	}
 
 	encodedKey, err := updater.removeAccountKey(address, index)
 	if err != nil {
