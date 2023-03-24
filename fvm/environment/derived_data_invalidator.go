@@ -18,8 +18,18 @@ type ContractUpdate struct {
 	Code []byte
 }
 
+type ContractUpdates struct {
+	Updates   []ContractUpdateKey
+	Deploys   []ContractUpdateKey
+	Deletions []ContractUpdateKey
+}
+
+func (u ContractUpdates) Any() bool {
+	return len(u.Updates) > 0 || len(u.Deploys) > 0 || len(u.Deletions) > 0
+}
+
 type DerivedDataInvalidator struct {
-	ContractUpdateKeys []ContractUpdateKey
+	ContractUpdates
 
 	MeterParamOverridesUpdated bool
 }
@@ -28,12 +38,12 @@ var _ derived.TransactionInvalidator = DerivedDataInvalidator{}
 
 // TODO(patrick): extract contractKeys from executionSnapshot
 func NewDerivedDataInvalidator(
-	contractKeys []ContractUpdateKey,
+	contractUpdates ContractUpdates,
 	serviceAddress flow.Address,
 	executionSnapshot *state.ExecutionSnapshot,
 ) DerivedDataInvalidator {
 	return DerivedDataInvalidator{
-		ContractUpdateKeys: contractKeys,
+		ContractUpdates: contractUpdates,
 		MeterParamOverridesUpdated: meterParamOverridesUpdated(
 			serviceAddress,
 			executionSnapshot),
@@ -87,7 +97,7 @@ type ProgramInvalidator struct {
 
 func (invalidator ProgramInvalidator) ShouldInvalidateEntries() bool {
 	return invalidator.MeterParamOverridesUpdated ||
-		len(invalidator.ContractUpdateKeys) > 0
+		invalidator.ContractUpdates.Any()
 }
 
 func (invalidator ProgramInvalidator) ShouldInvalidateEntry(
@@ -101,14 +111,34 @@ func (invalidator ProgramInvalidator) ShouldInvalidateEntry(
 	}
 
 	// invalidate all programs depending on any of the contracts that were
-	// updated.  A program has itself listed as a dependency, so that this
+	// updated. A program has itself listed as a dependency, so that this
 	// simpler.
-	for _, key := range invalidator.ContractUpdateKeys {
-		_, ok := program.Dependencies[key.Address]
+	for _, key := range invalidator.ContractUpdates.Updates {
+		loc := common.AddressLocation{
+			Address: common.MustBytesToAddress(key.Address.Bytes()),
+			Name:    key.Name,
+		}
+		ok := program.Dependencies.ContainsLocation(loc)
 		if ok {
 			return true
 		}
 	}
+
+	// In case a contract was deployed or removed from an address,
+	// we need to invalidate all programs depending on that address.
+	for _, key := range invalidator.ContractUpdates.Deploys {
+		ok := program.Dependencies.ContainsAddress(common.MustBytesToAddress(key.Address.Bytes()))
+		if ok {
+			return true
+		}
+	}
+	for _, key := range invalidator.ContractUpdates.Deletions {
+		ok := program.Dependencies.ContainsAddress(common.MustBytesToAddress(key.Address.Bytes()))
+		if ok {
+			return true
+		}
+	}
+
 	return false
 }
 
