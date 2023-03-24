@@ -44,8 +44,14 @@ import (
 )
 
 const (
-	defaultMemoryLimitRatio          = 0.2 // flow default
-	defaultFileDescriptorsRatio      = 0.5 // libp2p default
+	// defaultMemoryLimitRatio  flow default
+	defaultMemoryLimitRatio = 0.2
+	// defaultFileDescriptorsRatio libp2p default
+	defaultFileDescriptorsRatio = 0.5
+	// defaultPeerBaseLimitConnsInbound default value for libp2p PeerBaseLimitConnsInbound. This limit
+	// restricts the amount of inbound connections from a peer to 1, forcing libp2p to reuse the connection.
+	// Without this limit peers can end up in a state where there exists n number of connections per peer which
+	// can lead to resource exhaustion of the libp2p node.
 	defaultPeerBaseLimitConnsInbound = 1
 
 	// defaultPeerScoringEnabled is the default value for enabling peer scoring.
