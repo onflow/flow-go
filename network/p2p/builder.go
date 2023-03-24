@@ -27,12 +27,7 @@ type CreateNodeFunc func(zerolog.Logger, host.Host, ProtocolPeerCache, PeerManag
 type GossipSubAdapterConfigFunc func(*BasePubSubAdapterConfig) PubSubAdapterConfig
 
 // UnicastManagerFactoryFunc factory func that can be used to override the default unicast manager
-type UnicastManagerFactoryFunc func(logger zerolog.Logger,
-	streamFactory stream.Factory,
-	sporkId flow.Identifier,
-	createStreamRetryDelay time.Duration,
-	connStatus PeerConnections,
-	metrics module.UnicastManagerMetrics) UnicastManager
+type UnicastManagerFactoryFunc func(zerolog.Logger, stream.Factory, flow.Identifier, time.Duration, PeerConnections, module.UnicastManagerMetrics) UnicastManager
 
 // GossipSubBuilder provides a builder pattern for creating a GossipSub pubsub system.
 type GossipSubBuilder interface {
