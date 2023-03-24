@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/engine/verification/verifier"
@@ -77,9 +78,9 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	// Mocks the signature oracle of the engine
 	//
 	// generates signing and verification keys
-	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	n, err := rand.Read(seed)
-	require.Equal(suite.T(), n, crypto.KeyGenSeedMinLenBLSBLS12381)
+	require.Equal(suite.T(), n, crypto.KeyGenSeedMinLen)
 	require.NoError(suite.T(), err)
 
 	// creates private key of verification node

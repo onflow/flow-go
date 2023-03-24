@@ -20,6 +20,7 @@ type ComplianceCollector struct {
 	lastBlockFinalizedAt            time.Time
 	finalizedBlocksPerSecond        prometheus.Summary
 	committedEpochFinalView         prometheus.Gauge
+	lastEpochTransitionHeight       prometheus.Gauge
 	currentEpochCounter             prometheus.Gauge
 	currentEpochPhase               prometheus.Gauge
 	currentEpochFinalView           prometheus.Gauge
@@ -54,6 +55,13 @@ func NewComplianceCollector() *ComplianceCollector {
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the final view of the committed epoch with the greatest counter",
+		}),
+
+		lastEpochTransitionHeight: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "last_epoch_transition_height",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "the height of the most recent finalized epoch transition; in other words the height of the first block of the current epoch",
 		}),
 
 		currentEpochFinalView: promauto.NewGauge(prometheus.GaugeOpts{
@@ -185,6 +193,12 @@ func (cc *ComplianceCollector) BlockSealed(block *flow.Block) {
 
 func (cc *ComplianceCollector) CommittedEpochFinalView(view uint64) {
 	cc.committedEpochFinalView.Set(float64(view))
+}
+
+func (cc *ComplianceCollector) EpochTransitionHeight(height uint64) {
+	// An epoch transition comprises a block in epoch N followed by a block in epoch N+1.
+	// height here refers to the height of the first block in epoch N+1.
+	cc.lastEpochTransitionHeight.Set(float64(height))
 }
 
 func (cc *ComplianceCollector) CurrentEpochCounter(counter uint64) {
