@@ -117,13 +117,15 @@ type DynamicCommittee interface {
 	//   * contains no duplicates.
 	// The list of all legitimate HotStuff participants for the given epoch can be obtained by using `filter.Any`
 	//
-	// No errors are expected during normal operation.
+	// ERROR conditions:
+	//  * state.ErrUnknownSnapshotReference if the blockID is for an unknown block
 	IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error)
 
 	// IdentityByBlock returns the full Identity for specified HotStuff participant.
 	// The node must be a legitimate HotStuff participant with NON-ZERO WEIGHT at the specified block.
 	// ERROR conditions:
 	//  * model.InvalidSignerError if participantID does NOT correspond to an authorized HotStuff participant at the specified block.
+	//  * state.ErrUnknownSnapshotReference if the blockID is for an unknown block
 	IdentityByBlock(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error)
 }
 
@@ -135,8 +137,8 @@ type BlockSignerDecoder interface {
 	// consensus committee has reached agreement on validity of parent block. Consequently, the
 	// returned IdentifierList contains the consensus participants that signed the parent block.
 	// Expected Error returns during normal operations:
-	//   - signature.InvalidSignerIndicesError if signer indices included in the header do
-	//     not encode a valid subset of the consensus committee
+	//  * signature.InvalidSignerIndicesError if signer indices included in the header do
+	//    not encode a valid subset of the consensus committee
 	DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error)
 }
 

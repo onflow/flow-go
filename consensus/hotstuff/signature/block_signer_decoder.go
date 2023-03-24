@@ -41,6 +41,8 @@ func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.Identifi
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
 			// possibly, we request epoch which is far behind in the past, in this case we won't have it in cache.
 			// try asking by parent ID
+			// TODO: this assumes no identity table changes within epochs, must be changed for Dynamic Protocol State
+			//  See https://github.com/onflow/flow-go/issues/4085
 			members, err = b.IdentitiesByBlock(header.ParentID)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve identities for block %x with QC view %d for parent %x: %w",
