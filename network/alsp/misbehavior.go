@@ -4,7 +4,7 @@ import "github.com/onflow/flow-go/network"
 
 const (
 	// StaleMessage is a misbehavior that is reported when an engine receives a message that is deemed stale based on the
-	// local view of the engine.
+	// local view of the engine. The decision to consider a message stale is up to the engine.
 	StaleMessage network.Misbehavior = "misbehavior-stale-message"
 
 	// HeavyRequest is a misbehavior that is reported when an engine receives a request that takes an unreasonable amount
