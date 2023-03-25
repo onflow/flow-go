@@ -228,7 +228,8 @@ func GenerateNetworks(t *testing.T,
 	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
-	sms []network.SubscriptionManager) []network.Network {
+	sms []network.SubscriptionManager,
+	opts ...p2p.NetworkOptFunction) []network.Network {
 	count := len(ids)
 	nets := make([]network.Network, 0)
 
@@ -253,6 +254,7 @@ func GenerateNetworks(t *testing.T,
 			Metrics:             metrics.NewNoopCollector(),
 			IdentityProvider:    id.NewFixedIdentityProvider(ids),
 			ReceiveCache:        receiveCache,
+			Options:             opts,
 		})
 		require.NoError(t, err)
 
