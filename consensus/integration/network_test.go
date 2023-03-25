@@ -175,7 +175,7 @@ type Conduit struct {
 // ReportMisbehavior reports the misbehavior of a node on sending a message to the current node that appears valid
 // based on the networking layer but is considered invalid by the current node based on the Flow protocol.
 // This method is a no-op in the test helper implementation.
-func (c *Conduit) ReportMisbehavior(_ *network.MisbehaviorReport) {
+func (c *Conduit) ReportMisbehavior(_ network.MisbehaviorReport) {
 	// no-op
 }
 
