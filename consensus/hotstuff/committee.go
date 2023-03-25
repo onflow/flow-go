@@ -64,15 +64,16 @@ type Replicas interface {
 	DKG(view uint64) (DKG, error)
 
 	// IdentitiesByEpoch returns a list of the legitimate HotStuff participants for the epoch
-	// given by the input view. The list of participants is filtered by the provided selector.
+	// given by the input view.
 	// The returned list of HotStuff participants:
 	//   * contains nodes that are allowed to submit votes or timeouts within the given epoch
 	//     (un-ejected, non-zero weight at the beginning of the epoch)
 	//   * is ordered in the canonical order
 	//   * contains no duplicates.
-	// The list of all legitimate HotStuff participants for the given epoch can be obtained by using `filter.Any`
 	//
 	// CAUTION: DO NOT use this method for validating block proposals.
+	// CAUTION: This method considers epochs outside of Previous, Current, Next, w.r.t. the
+	// finalized block, to be unknown. https://github.com/onflow/flow-go/issues/4085
 	//
 	// Returns the following expected errors for invalid inputs:
 	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
@@ -82,6 +83,9 @@ type Replicas interface {
 
 	// IdentityByEpoch returns the full Identity for specified HotStuff participant.
 	// The node must be a legitimate HotStuff participant with NON-ZERO WEIGHT at the specified block.
+	// CAUTION: This method considers epochs outside of Previous, Current, Next, w.r.t. the
+	// finalized block, to be unknown. https://github.com/onflow/flow-go/issues/4085
+	//
 	// ERROR conditions:
 	//  * model.InvalidSignerError if participantID does NOT correspond to an authorized HotStuff participant at the specified block.
 	//
@@ -104,15 +108,13 @@ type DynamicCommittee interface {
 	Replicas
 
 	// IdentitiesByBlock returns a list of the legitimate HotStuff participants for the given block.
-	// The list of participants is filtered by the provided selector.
 	// The returned list of HotStuff participants:
 	//   * contains nodes that are allowed to submit proposals, votes, and timeouts
 	//     (un-ejected, non-zero weight at current block)
 	//   * is ordered in the canonical order
 	//   * contains no duplicates.
-	// The list of all legitimate HotStuff participants for the given epoch can be obtained by using `filter.Any`
 	//
-	// TODO - do we need this, if we are only checking a single proposer ID?
+	// No errors are expected during normal operation.
 	IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error)
 
 	// IdentityByBlock returns the full Identity for specified HotStuff participant.
@@ -130,7 +132,6 @@ type BlockSignerDecoder interface {
 	// consensus committee has reached agreement on validity of parent block. Consequently, the
 	// returned IdentifierList contains the consensus participants that signed the parent block.
 	// Expected Error returns during normal operations:
-	//   - model.ErrViewForUnknownEpoch if the given block's parent is within an unknown epoch
 	//   - signature.InvalidSignerIndicesError if signer indices included in the header do
 	//     not encode a valid subset of the consensus committee
 	DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error)

@@ -3,11 +3,13 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/crypto/hash"
+
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/model/flow/order"
 
 	"github.com/onflow/flow-go/crypto"
+
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,14 +29,14 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 	log.Debug().Msg("all node addresses are unique")
 
 	log.Debug().Msgf("will generate %v networking keys for nodes in config", nodes)
-	networkKeys, err := utils.GenerateNetworkingKeys(nodes, GenerateRandomSeeds(nodes, crypto.KeyGenSeedMinLenECDSAP256))
+	networkKeys, err := utils.GenerateNetworkingKeys(nodes, GenerateRandomSeeds(nodes, crypto.KeyGenSeedMinLen))
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate networking keys")
 	}
 	log.Info().Msgf("generated %v networking keys for nodes in config", nodes)
 
 	log.Debug().Msgf("will generate %v staking keys for nodes in config", nodes)
-	stakingKeys, err := utils.GenerateStakingKeys(nodes, GenerateRandomSeeds(nodes, crypto.KeyGenSeedMinLenBLSBLS12381))
+	stakingKeys, err := utils.GenerateStakingKeys(nodes, GenerateRandomSeeds(nodes, crypto.KeyGenSeedMinLen))
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate staking keys")
 	}

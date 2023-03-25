@@ -14,6 +14,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/state/protocol"
 
@@ -252,13 +253,13 @@ func (s *Suite) generateAccountKeys(role flow.Role) (
 	machineAccountKey crypto.PrivateKey,
 	machineAccountPubKey *sdk.AccountKey,
 ) {
-	operatorAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
+	operatorAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen)
 	networkingKey = unittest.NetworkingPrivKeyFixture()
 	stakingKey = unittest.StakingPrivKeyFixture()
 
 	// create a machine account
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
-		machineAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
+		machineAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen)
 
 		machineAccountPubKey = &sdk.AccountKey{
 			PublicKey: machineAccountKey.PublicKey(),
@@ -550,7 +551,7 @@ func (s *Suite) getLatestFinalizedHeader(ctx context.Context) *flow.Header {
 // This ensures a single transaction can be sealed by the network.
 func (s *Suite) submitSmokeTestTransaction(ctx context.Context) {
 	fullAccountKey := sdk.NewAccountKey().
-		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256).PublicKey()).
+		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen).PublicKey()).
 		SetHashAlgo(sdkcrypto.SHA2_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
