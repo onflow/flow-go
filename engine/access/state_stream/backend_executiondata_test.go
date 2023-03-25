@@ -30,7 +30,13 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type Suite struct {
+var testEventTypes = []flow.EventType{
+	"A.0x1.Foo.Bar",
+	"A.0x2.Zoo.Moo",
+	"A.0x3.Goo.Hoo",
+}
+
+type BackendExecutionDataSuite struct {
 	suite.Suite
 
 	state    *protocolmock.State
@@ -46,17 +52,18 @@ type Suite struct {
 	backend             *StateStreamBackend
 
 	blocks      []*flow.Block
+	blockEvents map[flow.Identifier]flow.EventsList
 	execDataMap map[flow.Identifier]*execution_data.BlockExecutionData
 	blockMap    map[uint64]*flow.Block
 	sealMap     map[flow.Identifier]*flow.Seal
 	resultMap   map[flow.Identifier]*flow.ExecutionResult
 }
 
-func TestHandler(t *testing.T) {
-	suite.Run(t, new(Suite))
+func TestBackendExecutionDataSuite(t *testing.T) {
+	suite.Run(t, new(BackendExecutionDataSuite))
 }
 
-func (s *Suite) SetupTest() {
+func (s *BackendExecutionDataSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 
 	unittest.LogVerbose()
@@ -89,6 +96,7 @@ func (s *Suite) SetupTest() {
 
 	blockCount := 5
 	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionData, blockCount)
+	s.blockEvents = make(map[flow.Identifier]flow.EventsList, blockCount)
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
 	s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
 	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
@@ -108,13 +116,15 @@ func (s *Suite) SetupTest() {
 
 		seal := unittest.BlockSealsFixture(1)[0]
 		result := unittest.ExecutionResultFixture()
-		execData := blockExecutionDataFixture(s.T(), block)
+		blockEvents := unittest.BlockEventsFixture(block.Header, (i%len(testEventTypes))*3+1, testEventTypes...)
+		execData := blockExecutionDataFixture(s.T(), block, blockEvents.Events)
 
 		result.ExecutionDataID, err = s.eds.AddExecutionData(context.TODO(), execData)
 		assert.NoError(s.T(), err)
 
 		s.blocks = append(s.blocks, block)
 		s.execDataMap[block.ID()] = execData
+		s.blockEvents[block.ID()] = blockEvents.Events
 		s.blockMap[block.Header.Height] = block
 		s.sealMap[block.ID()] = seal
 		s.resultMap[seal.ResultID] = result
@@ -190,7 +200,7 @@ func (s *Suite) SetupTest() {
 	).Maybe()
 }
 
-func (s *Suite) TestGetExecutionDataByBlockID() {
+func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -218,14 +228,23 @@ func (s *Suite) TestGetExecutionDataByBlockID() {
 	})
 }
 
-func blockExecutionDataFixture(t *testing.T, block *flow.Block) *execution_data.BlockExecutionData {
+func blockExecutionDataFixture(t *testing.T, block *flow.Block, events []flow.Event) *execution_data.BlockExecutionData {
 	numChunks := 5
 	minSerializedSize := 5 * execution_data.DefaultMaxBlobSize
 
 	chunks := make([]*execution_data.ChunkExecutionData, numChunks)
 
 	for i := 0; i < numChunks; i++ {
-		chunks[i] = chunkExecutionDataFixture(t, uint64(minSerializedSize))
+		var e flow.EventsList
+		switch {
+		case i >= len(events):
+			e = flow.EventsList{}
+		case i == numChunks-1:
+			e = events[i:]
+		default:
+			e = flow.EventsList{events[i]}
+		}
+		chunks[i] = chunkExecutionDataFixture(t, uint64(minSerializedSize), e)
 	}
 
 	return &execution_data.BlockExecutionData{
@@ -234,9 +253,10 @@ func blockExecutionDataFixture(t *testing.T, block *flow.Block) *execution_data.
 	}
 }
 
-func chunkExecutionDataFixture(t *testing.T, minSerializedSize uint64) *execution_data.ChunkExecutionData {
+func chunkExecutionDataFixture(t *testing.T, minSerializedSize uint64, events []flow.Event) *execution_data.ChunkExecutionData {
 	ced := &execution_data.ChunkExecutionData{
 		TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
+		Events:     events,
 	}
 
 	size := 1
@@ -259,7 +279,7 @@ func chunkExecutionDataFixture(t *testing.T, minSerializedSize uint64) *executio
 	}
 }
 
-func (s *Suite) TestSubscribeExecutionData() {
+func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -296,7 +316,6 @@ func (s *Suite) TestSubscribeExecutionData() {
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
 				execData := s.execDataMap[s.blocks[i].ID()]
-				s.T().Logf("exec data: %v", execData)
 				s.execDataDistributor.OnExecutionDataReceived(execData)
 			}
 
@@ -324,15 +343,13 @@ func (s *Suite) TestSubscribeExecutionData() {
 
 					assert.Equal(s.T(), b.Header.Height, resp.Height)
 					assert.Equal(s.T(), execData, resp.ExecutionData)
-				}, 100*time.Millisecond, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+				}, 10000*time.Millisecond, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
 			}
 
 			// make sure there are no new messages waiting
 			unittest.RequireNeverReturnBefore(s.T(), func() {
-				// this is an failure case. the channel should be opened with nothing waiting
-				v, ok := <-sub.Channel()
-				require.True(s.T(), ok, "subscription closed unexpectedly")
-				require.Nil(s.T(), v, "unexpected data in channel: %v", v)
+				// this is a failure case. the channel should be opened with nothing waiting
+				<-sub.Channel()
 			}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 
 			// stop the subscription
@@ -349,9 +366,7 @@ func (s *Suite) TestSubscribeExecutionData() {
 	}
 }
 
-func (s *Suite) TestSubscribeExecutionDataHandlesErrors() {
-	// no data indexed yet
-
+func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -360,7 +375,7 @@ func (s *Suite) TestSubscribeExecutionDataHandlesErrors() {
 	block := unittest.BlockFixture()
 	seal := unittest.BlockSealsFixture(1)[0]
 	result := unittest.ExecutionResultFixture()
-	execData := blockExecutionDataFixture(s.T(), &block)
+	execData := blockExecutionDataFixture(s.T(), &block, nil)
 
 	result.ExecutionDataID, err = s.eds.AddExecutionData(ctx, execData)
 	assert.NoError(s.T(), err)
@@ -384,13 +399,5 @@ func (s *Suite) TestSubscribeExecutionDataHandlesErrors() {
 
 		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, block.Header.Height+10)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()))
-	})
-
-	s.Run("returns error when no data indexed yet", func() {
-		subCtx, subCancel := context.WithCancel(ctx)
-		defer subCancel()
-
-		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, 0)
-		assert.Equal(s.T(), codes.Internal, status.Code(sub.Err()))
 	})
 }

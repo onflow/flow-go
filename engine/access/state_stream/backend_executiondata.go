@@ -51,11 +51,12 @@ func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, start
 	sub := NewHeightBasedSubscription(b.getResponse)
 
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
-	if st, ok := status.FromError(err); ok {
-		sub.Fail(status.Errorf(st.Code(), "could not get start height: %v", st.Message()))
-		return sub
-	}
 	if err != nil {
+		if st, ok := status.FromError(err); ok {
+			sub.Fail(status.Errorf(st.Code(), "could not get start height: %v", st.Message()))
+			return sub
+		}
+
 		sub.Fail(fmt.Errorf("could not get start height: %w", err))
 		return sub
 	}
