@@ -21,7 +21,7 @@ type MisbehaviorReporter interface {
 	// based on the networking layer but is considered invalid by the current node based on the Flow protocol.
 	// The misbehavior is reported to the networking layer to penalize the misbehaving node.
 	// Implementation must be thread-safe and non-blocking.
-	ReportMisbehavior(*MisbehaviorReport)
+	ReportMisbehavior(MisbehaviorReport)
 }
 
 // MisbehaviorReport abstracts the semantics of a misbehavior report.

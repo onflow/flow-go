@@ -27,7 +27,7 @@ func NewDefaultConduitFactory(logger zerolog.Logger) *DefaultConduitFactory {
 	d := &DefaultConduitFactory{
 		misbehaviorManager: alsp.NewMisbehaviorReportManager(logger),
 	}
-	
+
 	// worker added so conduit factory doesn't immediately shut down when it's started
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -119,7 +119,7 @@ func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Ident
 // based on the networking layer but is considered invalid by the current node based on the Flow protocol.
 // The misbehavior is reported to the networking layer to penalize the misbehaving node.
 // The implementation must be thread-safe and non-blocking.
-func (c *Conduit) ReportMisbehavior(report *network.MisbehaviorReport) {
+func (c *Conduit) ReportMisbehavior(report network.MisbehaviorReport) {
 	c.misbehaviorManager.HandleReportedMisbehavior(c.channel, report)
 }
 
