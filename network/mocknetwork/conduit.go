@@ -71,7 +71,7 @@ func (_m *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) erro
 }
 
 // ReportMisbehavior provides a mock function with given fields: _a0
-func (_m *Conduit) ReportMisbehavior(_a0 *network.MisbehaviorReport) {
+func (_m *Conduit) ReportMisbehavior(_a0 network.MisbehaviorReport) {
 	_m.Called(_a0)
 }
 

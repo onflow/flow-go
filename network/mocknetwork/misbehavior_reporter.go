@@ -13,7 +13,7 @@ type MisbehaviorReporter struct {
 }
 
 // ReportMisbehavior provides a mock function with given fields: _a0
-func (_m *MisbehaviorReporter) ReportMisbehavior(_a0 *network.MisbehaviorReport) {
+func (_m *MisbehaviorReporter) ReportMisbehavior(_a0 network.MisbehaviorReport) {
 	_m.Called(_a0)
 }
 
