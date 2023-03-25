@@ -46,6 +46,7 @@ type QCContractClient interface {
 }
 
 // EpochLookup enables looking up epochs by view.
+// CAUTION: EpochLookup should only be used for querying the previous, current, or next epoch.
 type EpochLookup interface {
 
 	// EpochForViewWithFallback returns the counter of the epoch that the input view belongs to.

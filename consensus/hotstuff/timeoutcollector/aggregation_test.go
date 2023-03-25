@@ -7,11 +7,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -40,7 +41,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	pks := make([]crypto.PublicKey, 0, signersNumber)
 	view := 10 + uint64(rand.Uint32())
 	for i := 0; i < signersNumber; i++ {
-		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenECDSAP256)
+		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen)
 		identity := unittest.IdentityFixture(unittest.WithStakingPubKey(sk.PublicKey()))
 		// id
 		ids = append(ids, identity)
@@ -70,7 +71,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 func TestNewTimeoutSignatureAggregator(t *testing.T) {
 	tag := "random_tag"
 
-	sk := unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
+	sk := unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen)
 	signer := unittest.IdentityFixture(unittest.WithStakingPubKey(sk.PublicKey()))
 	// wrong key type
 	_, err := NewTimeoutSignatureAggregator(0, flow.IdentityList{signer}, tag)
@@ -191,7 +192,7 @@ func TestTimeoutSignatureAggregator_Aggregate(t *testing.T) {
 		var err error
 		aggregator, ids, pks, sigs, signersInfo, msgs, hashers := createAggregationData(t, signersNum)
 		// replace sig with random one
-		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenECDSAP256)
+		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen)
 		sigs[0], err = sk.Sign([]byte("dummy"), hashers[0])
 		require.NoError(t, err)
 

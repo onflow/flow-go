@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -684,9 +685,9 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	// generates signing identity including staking key for signing
 	myIdentity := unittest.IdentityFixture()
-	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	n, err := rand.Read(seed)
-	require.Equal(t, n, crypto.KeyGenSeedMinLenBLSBLS12381)
+	require.Equal(t, n, crypto.KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(t, err)
