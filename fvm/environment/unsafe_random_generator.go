@@ -67,7 +67,11 @@ func NewUnsafeRandomGenerator(
 	return gen
 }
 
-// seed seeds the random number generator with the block header ID.
+// seed seeds the pseudo-random number generator using the block header ID
+// as an entropy source.
+// The seed function is currently called for each tranaction, the PRG is used
+// to provide all the randoms the transaction needs through UnsafeRandom.
+//
 // This allows lazy seeding of the random number generator,
 // since not a lot of transactions/scripts use it and the time it takes to seed it is not negligible.
 func (gen *unsafeRandomGenerator) seed() {
@@ -75,18 +79,27 @@ func (gen *unsafeRandomGenerator) seed() {
 		if gen.blockHeader == nil {
 			return
 		}
-		// Seed the random number generator with entropy created from the block
-		// header ID. The random number generator will be used by the
-		// UnsafeRandom function.
+		// The block header ID is currently used as the entropy source.
+		// This should evolve to become the beacon signature (safer entropy source than
+		// the block ID)
 		id := gen.blockHeader.ID()
-		// extract the entropy from `id` and expand it into the required seed
+		// extract the entropy from `id` and expand it into the required seed length.
+		// In this case, a KDF is used for 2 reasons:
+		//	- uniformize the entropy of the source (in this case an ID is a hash, so its entropy
+		//  	is already uniform, but using a KDF avoids making assumptions about the quality
+		// 		of the source. For instance, the beacon signature requires uniformizing when used
+		// 		as a source)
+		//  - variable-output length: whatever the length of the input source is, a KDK can expand it
+		//    into the length required by the PRG seed.
+		// Note that other promitives with the 2 properties above could also be used.
 		hkdf := hkdf.New(func() hash.Hash { return sha256.New() }, id[:], nil, nil)
 		seed := make([]byte, random.Chacha20SeedLen)
 		n, err := hkdf.Read(seed)
 		if n != len(seed) || err != nil {
 			return
 		}
-		// initialize a fresh CSPRNG with the seed (crypto-secure PRG)
+		// initialize a fresh crypto-secure PRG with the seed (here ChaCha20)
+		// This PRG provides all outputs of Cadence UnsafeRandom.
 		source, err := random.NewChacha20PRG(seed, []byte{})
 		if err != nil {
 			return
@@ -102,6 +115,7 @@ func (gen *unsafeRandomGenerator) seed() {
 func (gen *unsafeRandomGenerator) UnsafeRandom() (uint64, error) {
 	defer gen.tracer.StartExtensiveTracingChildSpan(trace.FVMEnvUnsafeRandom).End()
 
+	// The internal seeding is only done once.
 	gen.seed()
 
 	if gen.rng == nil {
