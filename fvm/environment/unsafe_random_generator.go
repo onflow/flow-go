@@ -3,6 +3,7 @@ package environment
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 	"hash"
 	"sync"
 
@@ -26,7 +27,7 @@ type unsafeRandomGenerator struct {
 
 	blockHeader *flow.Header
 
-	rng      random.Rand
+	prg      random.Rand
 	seedOnce sync.Once
 }
 
@@ -67,6 +68,29 @@ func NewUnsafeRandomGenerator(
 	return gen
 }
 
+// This function abstracts building the PRG seed from the entropy source `randomSource`.
+// It does not make assumptions about the quality of the source, nor about
+// its length (the source could be a fingerprint of entity, an ID of an entity,
+//
+//	a beacon signature..)
+//
+// It therefore uses a mechansim to extract the source entropy and expand it into
+// the required `seedLen` bytes (this can be a KDF, a MAC, a hash with extended-length output..)
+func seedFromEntropySource(randomSource []byte, seedLen int) ([]byte, error) {
+	// This implementation used HKDF,
+	// but other promitives with the 2 properties above could also be used.
+	hkdf := hkdf.New(func() hash.Hash { return sha256.New() }, randomSource, nil, nil)
+	seed := make([]byte, random.Chacha20SeedLen)
+	n, err := hkdf.Read(seed)
+	if n != len(seed) {
+		return nil, fmt.Errorf("extracting seed with HKDF failed, required %d bytes, got %d", random.Chacha20SeedLen, n)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("extracting seed with HKDF failed: %w", err)
+	}
+	return seed, nil
+}
+
 // seed seeds the pseudo-random number generator using the block header ID
 // as an entropy source.
 // The seed function is currently called for each tranaction, the PRG is used
@@ -79,37 +103,29 @@ func (gen *unsafeRandomGenerator) seed() {
 		if gen.blockHeader == nil {
 			return
 		}
+
 		// The block header ID is currently used as the entropy source.
 		// This should evolve to become the beacon signature (safer entropy source than
 		// the block ID)
-		id := gen.blockHeader.ID()
-		// extract the entropy from `id` and expand it into the required seed length.
-		// In this case, a KDF is used for 2 reasons:
-		//	- uniformize the entropy of the source (in this case an ID is a hash, so its entropy
-		//  	is already uniform, but using a KDF avoids making assumptions about the quality
-		// 		of the source. For instance, the beacon signature requires uniformizing when used
-		// 		as a source)
-		//  - variable-output length: whatever the length of the input source is, a KDK can expand it
-		//    into the length required by the PRG seed.
-		// Note that other promitives with the 2 properties above could also be used.
-		hkdf := hkdf.New(func() hash.Hash { return sha256.New() }, id[:], nil, nil)
-		seed := make([]byte, random.Chacha20SeedLen)
-		n, err := hkdf.Read(seed)
-		if n != len(seed) || err != nil {
-			return
-		}
-		// initialize a fresh crypto-secure PRG with the seed (here ChaCha20)
-		// This PRG provides all outputs of Cadence UnsafeRandom.
-		source, err := random.NewChacha20PRG(seed, []byte{})
+		// Extract the entropy from the source and expand it into the required seed length.
+		source := gen.blockHeader.ID()
+		seed, err := seedFromEntropySource(source[:], random.Chacha20SeedLen)
 		if err != nil {
 			return
 		}
-		gen.rng = source
+
+		// initialize a fresh crypto-secure PRG with the seed (here ChaCha20)
+		// This PRG provides all outputs of Cadence UnsafeRandom.
+		prg, err := random.NewChacha20PRG(seed, []byte{})
+		if err != nil {
+			return
+		}
+		gen.prg = prg
 	})
 }
 
 // UnsafeRandom returns a random uint64 using the underlying PRG (currently using a crypto-secure one).
-// this is not thread safe, due to the gen.rng instance currently used.
+// this is not thread safe, due to the gen.prg instance currently used.
 // Its also not thread safe because each thread needs to be deterministically seeded with a different seed.
 // This is Ok because a single transaction has a single UnsafeRandomGenerator and is run in a single thread.
 func (gen *unsafeRandomGenerator) UnsafeRandom() (uint64, error) {
@@ -118,11 +134,11 @@ func (gen *unsafeRandomGenerator) UnsafeRandom() (uint64, error) {
 	// The internal seeding is only done once.
 	gen.seed()
 
-	if gen.rng == nil {
+	if gen.prg == nil {
 		return 0, errors.NewOperationNotSupportedError("UnsafeRandom")
 	}
 
 	buf := make([]byte, 8)
-	gen.rng.Read(buf)
+	gen.prg.Read(buf)
 	return binary.LittleEndian.Uint64(buf), nil
 }
