@@ -203,30 +203,29 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 		},
 		Transactions: []*flow.TransactionBody{testTransactionBody},
 	}
-	expectedComputationResult := &execution.ComputationResult{
-		ExecutableBlock: &entity.ExecutableBlock{
-			Block:               testBlock,
-			CompleteCollections: expectedCompleteCollections,
-		},
-		BlockExecutionResults: &execution.BlockExecutionResults{
-			Events: []flow.EventsList{testEvents},
-			TransactionResults: []flow.TransactionResult{
-				testTransactionResult,
+
+	executableBlock := &entity.ExecutableBlock{
+		Block:               testBlock,
+		CompleteCollections: expectedCompleteCollections,
+	}
+
+	expectedComputationResult := execution.NewEmptyComputationResult(executableBlock)
+	col := expectedComputationResult.CollectionExecutionResultAt(0)
+	col.AppendTransactionResults(
+		testEvents,
+		nil,
+		nil,
+		testTransactionResult,
+	)
+
+	expectedComputationResult.CollectionAttestationResultAt(0).UpdateEndStateCommitment(testStateCommit)
+	expectedComputationResult.BlockExecutionData = &execution_data.BlockExecutionData{
+		BlockID: testBlockID,
+		ChunkExecutionDatas: []*execution_data.ChunkExecutionData{{
+			TrieUpdate: &ledger.TrieUpdate{
+				RootHash: testTrieUpdateRootHash,
 			},
-		},
-		BlockAttestationResults: &execution.BlockAttestationResults{
-			EndState: testStateCommit,
-			BlockExecutionData: &execution_data.BlockExecutionData{
-				BlockID: testBlockID,
-				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-					&execution_data.ChunkExecutionData{
-						TrieUpdate: &ledger.TrieUpdate{
-							RootHash: testTrieUpdateRootHash,
-						},
-					},
-				},
-			},
-		},
+		}},
 	}
 
 	assert.DeepEqual(
@@ -292,9 +291,9 @@ func createTestBadgerRetryableUploaderWrapper(asyncUploader *AsyncUploader) *Bad
 
 // createTestComputationResult() creates ComputationResult with valid ExecutableBlock ID
 func createTestComputationResult() *execution.ComputationResult {
-	testComputationResult := &execution.ComputationResult{}
 	blockA := unittest.BlockHeaderFixture()
-	blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
-	testComputationResult.ExecutableBlock = blockB
+	start := unittest.StateCommitmentFixture()
+	blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA, &start)
+	testComputationResult := execution.NewEmptyComputationResult(blockB)
 	return testComputationResult
 }
