@@ -34,8 +34,6 @@ type ReadyDoneAware interface {
 // immediately
 type NoopReadyDoneAware struct{}
 
-func (n *NoopReadyDoneAware) Start(irrecoverable.SignalerContext) {}
-
 func (n *NoopReadyDoneAware) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	defer close(ready)
@@ -47,6 +45,13 @@ func (n *NoopReadyDoneAware) Done() <-chan struct{} {
 	defer close(done)
 	return done
 }
+
+// NoopComponent noop struct that implements the component.Component interface.
+type NoopComponent struct {
+	*NoopReadyDoneAware
+}
+
+func (n *NoopComponent) Start(_ irrecoverable.SignalerContext) {}
 
 // ProxiedReadyDoneAware is a ReadyDoneAware implementation that proxies the ReadyDoneAware interface
 // from another implementation. This allows for usecases where the Ready/Done methods are needed before

@@ -23,7 +23,7 @@ func (n *NoopRateLimiter) Start(irrecoverable.SignalerContext) {}
 
 func NewNoopRateLimiter() *NoopRateLimiter {
 	return &NoopRateLimiter{
-		Component: &module.NoopReadyDoneAware{},
+		Component: &module.NoopComponent{},
 	}
 }
 
