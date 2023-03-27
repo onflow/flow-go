@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
@@ -39,8 +38,8 @@ func TestKeyListSignature(t *testing.T) {
 	}
 
 	signatureAlgorithms := []signatureAlgorithm{
-		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256},
-		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
+		{"ECDSA_P256", crypto.KeyGenSeedMinLen, crypto.ECDSAP256},
+		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLen, crypto.ECDSASecp256k1},
 	}
 
 	type hashAlgorithm struct {
@@ -164,7 +163,6 @@ func TestKeyListSignature(t *testing.T) {
 					chain flow.Chain,
 					ctx fvm.Context,
 					view state.View,
-					derivedBlockData *derived.DerivedBlockData,
 				) {
 					privateKey, publicKey := createKey()
 					signableMessage, message := createMessage("foo")
@@ -261,7 +259,6 @@ func TestKeyListSignature(t *testing.T) {
 					chain flow.Chain,
 					ctx fvm.Context,
 					view state.View,
-					derivedBlockData *derived.DerivedBlockData,
 				) {
 					privateKeyA, publicKeyA := createKey()
 					privateKeyB, publicKeyB := createKey()
@@ -353,7 +350,7 @@ func TestKeyListSignature(t *testing.T) {
 
 	testForHash(signatureAlgorithm{
 		"BLS_BLS12_381",
-		crypto.KeyGenSeedMinLenBLSBLS12381,
+		crypto.KeyGenSeedMinLen,
 		crypto.BLSBLS12381,
 	}, hashAlgorithm{
 		"KMAC128_BLS_BLS12_381",
@@ -374,9 +371,9 @@ func TestBLSMultiSignature(t *testing.T) {
 	}
 
 	signatureAlgorithms := []signatureAlgorithm{
-		{"BLS_BLS12_381", crypto.KeyGenSeedMinLenBLSBLS12381, crypto.BLSBLS12381},
-		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256},
-		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
+		{"BLS_BLS12_381", crypto.KeyGenSeedMinLen, crypto.BLSBLS12381},
+		{"ECDSA_P256", crypto.KeyGenSeedMinLen, crypto.ECDSAP256},
+		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLen, crypto.ECDSASecp256k1},
 	}
 	BLSSignatureAlgorithm := signatureAlgorithms[0]
 
@@ -398,7 +395,6 @@ func TestBLSMultiSignature(t *testing.T) {
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
-				derivedBlockData *derived.DerivedBlockData,
 			) {
 
 				code := func(signatureAlgorithm signatureAlgorithm) []byte {
@@ -510,7 +506,6 @@ func TestBLSMultiSignature(t *testing.T) {
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
-				derivedBlockData *derived.DerivedBlockData,
 			) {
 
 				code := []byte(
@@ -634,7 +629,6 @@ func TestBLSMultiSignature(t *testing.T) {
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
-				derivedBlockData *derived.DerivedBlockData,
 			) {
 
 				code := func(signatureAlgorithm signatureAlgorithm) []byte {
@@ -759,7 +753,6 @@ func TestBLSMultiSignature(t *testing.T) {
 				chain flow.Chain,
 				ctx fvm.Context,
 				view state.View,
-				derivedBlockData *derived.DerivedBlockData,
 			) {
 
 				message, cadenceMessage := createMessage("random_message")

@@ -7,9 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	"github.com/onflow/flow-go/crypto"
 )
 
 var (
@@ -35,7 +36,7 @@ func init() {
 		&flagNetworkSeed,
 		"seed",
 		[]byte{},
-		fmt.Sprintf("hex encoded networking seed (min %d bytes)", crypto.KeyGenSeedMinLenECDSASecp256k1))
+		fmt.Sprintf("hex encoded networking seed (min %d bytes)", crypto.KeyGenSeedMinLen))
 }
 
 // observerNetworkKeyRun generate a network key and writes it to the provided file path.
@@ -43,7 +44,7 @@ func observerNetworkKeyRun(_ *cobra.Command, _ []string) {
 
 	// generate seed if not specified via flag
 	if len(flagNetworkSeed) == 0 {
-		flagNetworkSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSASecp256k1)
+		flagNetworkSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLen)
 	}
 
 	// if the file already exists, exit
