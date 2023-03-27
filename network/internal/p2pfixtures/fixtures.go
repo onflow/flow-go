@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 
 	addrutil "github.com/libp2p/go-addr-util"
@@ -35,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -109,6 +111,9 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		idProvider,
 		p2pbuilder.DefaultGossipSubConfig().LocalMeshLogInterval)
 
+	defaultRPCValidationInpectorCfg := p2pbuilder.DefaultRPCValidationConfig()
+	rpcInspectorNotifDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(logger)
+
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
 		metrics.NewNoopCollector(),
@@ -122,7 +127,8 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		SetResourceManager(testutils.NewResourceManager(t)).
 		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
 		SetGossipSubTracer(meshTracer).
-		SetGossipSubScoreTracerInterval(p2pbuilder.DefaultGossipSubConfig().ScoreTracerInterval)
+		SetGossipSubScoreTracerInterval(p2pbuilder.DefaultGossipSubConfig().ScoreTracerInterval).
+		SetGossipSubValidationInspector(validation.NewControlMsgValidationInspector(logger, sporkID, defaultRPCValidationInpectorCfg, rpcInspectorNotifDistributor))
 
 	for _, opt := range opts {
 		opt(builder)

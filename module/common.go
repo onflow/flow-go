@@ -46,6 +46,13 @@ func (n *NoopReadyDoneAware) Done() <-chan struct{} {
 	return done
 }
 
+// NoopComponent noop struct that implements the component.Component interface.
+type NoopComponent struct {
+	*NoopReadyDoneAware
+}
+
+func (n *NoopComponent) Start(_ irrecoverable.SignalerContext) {}
+
 // ProxiedReadyDoneAware is a ReadyDoneAware implementation that proxies the ReadyDoneAware interface
 // from another implementation. This allows for usecases where the Ready/Done methods are needed before
 // the proxied object is initialized.

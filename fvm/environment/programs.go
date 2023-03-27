@@ -94,7 +94,12 @@ func (programs *Programs) getOrLoadAddressProgram(
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
 
-	if programs.dependencyStack.top().ContainsLocation(location) {
+	top, err := programs.dependencyStack.top()
+	if err != nil {
+		return nil, err
+	}
+
+	if top.ContainsLocation(location) {
 		// this dependency has already been seen in the current stack/scope
 		// this means that it is safe to just fetch it and not reapply
 		// state/metering changes
@@ -106,7 +111,10 @@ func (programs *Programs) getOrLoadAddressProgram(
 				fmt.Errorf("expected program missing"+
 					" in cache for location: %s", location))
 		}
-		programs.dependencyStack.add(program.Dependencies)
+		err := programs.dependencyStack.add(program.Dependencies)
+		if err != nil {
+			return nil, err
+		}
 		programs.cacheHit()
 
 		return program.Program, nil
@@ -125,7 +133,10 @@ func (programs *Programs) getOrLoadAddressProgram(
 	// Add dependencies to the stack.
 	// This is only really needed if loader was not called,
 	// but there is no harm in doing it always.
-	programs.dependencyStack.add(program.Dependencies)
+	err = programs.dependencyStack.add(program.Dependencies)
+	if err != nil {
+		return nil, err
+	}
 
 	if loader.Called() {
 		programs.cacheMiss()
@@ -347,14 +358,16 @@ func (s *dependencyStack) push(loc common.Location) {
 }
 
 // add adds dependencies to the current dependency tracker
-func (s *dependencyStack) add(dependencies derived.ProgramDependencies) {
+func (s *dependencyStack) add(dependencies derived.ProgramDependencies) error {
 	l := len(s.trackers)
 	if l == 0 {
 		// This cannot happen, as the root of the stack is always present.
-		panic("Dependency stack unexpectedly empty")
+		return errors.NewDerivedDataCacheImplementationFailure(
+			fmt.Errorf("dependency stack unexpectedly empty while calling add"))
 	}
 
 	s.trackers[l-1].dependencies.Merge(dependencies)
+	return nil
 }
 
 // pop the last dependencies on the stack and return them.
@@ -381,12 +394,13 @@ func (s *dependencyStack) pop() (common.Location, derived.ProgramDependencies, e
 }
 
 // top returns the last dependencies on the stack without pop-ing them.
-func (s *dependencyStack) top() derived.ProgramDependencies {
+func (s *dependencyStack) top() (derived.ProgramDependencies, error) {
 	l := len(s.trackers)
 	if l == 0 {
 		// This cannot happen, as the root of the stack is always present.
-		panic("Dependency stack unexpectedly empty")
+		return derived.ProgramDependencies{}, errors.NewDerivedDataCacheImplementationFailure(
+			fmt.Errorf("dependency stack unexpectedly empty while calling top"))
 	}
 
-	return s.trackers[len(s.trackers)-1].dependencies
+	return s.trackers[len(s.trackers)-1].dependencies, nil
 }
