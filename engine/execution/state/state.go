@@ -297,7 +297,7 @@ func (s *state) SaveExecutionResults(
 	// but it's the closest thing to atomicity we could have
 	batch := badgerstorage.NewBatch(s.db)
 
-	for _, chunkDataPack := range result.ChunkDataPacks {
+	for _, chunkDataPack := range result.AllChunkDataPacks() {
 		err := s.chunkDataPacks.BatchStore(chunkDataPack, batch)
 		if err != nil {
 			return fmt.Errorf("cannot store chunk data pack: %w", err)
@@ -309,12 +309,12 @@ func (s *state) SaveExecutionResults(
 		}
 	}
 
-	err := s.commits.BatchStore(blockID, result.EndState, batch)
+	err := s.commits.BatchStore(blockID, result.InterimEndState(), batch)
 	if err != nil {
 		return fmt.Errorf("cannot store state commitment: %w", err)
 	}
 
-	err = s.events.BatchStore(blockID, result.Events, batch)
+	err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store events: %w", err)
 	}
@@ -326,7 +326,7 @@ func (s *state) SaveExecutionResults(
 
 	err = s.transactionResults.BatchStore(
 		blockID,
-		result.TransactionResults,
+		result.AllTransactionResults(),
 		batch)
 	if err != nil {
 		return fmt.Errorf("cannot store transaction result: %w", err)
