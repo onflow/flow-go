@@ -2,12 +2,13 @@ package wal
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/rs/zerolog"
-	"os"
 )
 
 type LeafNode struct {
