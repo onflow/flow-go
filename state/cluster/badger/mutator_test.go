@@ -165,7 +165,7 @@ func TestMutator(t *testing.T) {
 	suite.Run(t, new(MutatorSuite))
 }
 
-func (suite *MutatorSuite) TestBootstrap_InvalidNumber() {
+func (suite *MutatorSuite) TestBootstrap_InvalidHeight() {
 	suite.genesis.Header.Height = 1
 
 	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
@@ -248,7 +248,7 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
-func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
+func (suite *MutatorSuite) TestExtend_InvalidBlockHeight() {
 	block := suite.Block()
 	// change the block height
 	block.Header.Height = block.Header.Height - 1
@@ -384,6 +384,24 @@ func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromClusterChain() {
 	block.SetPayload(model.EmptyPayload(suite.genesis.ID()))
 	err := suite.state.Extend(&block)
 	suite.Assert().Error(err)
+}
+
+// TestExtend_WithReferenceBlockFromDifferentEpoch tests extending the cluster state
+// using a reference block in a different epoch than the cluster's epoch.
+func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromDifferentEpoch() {
+	// build and complete the current epoch, then use a reference block from next epoch
+	eb := unittest.NewEpochBuilder(suite.T(), suite.protoState)
+	eb.BuildEpoch().CompleteEpoch()
+	heights, ok := eb.EpochHeights(1)
+	require.True(suite.T(), ok)
+	nextEpochHeader, err := suite.protoState.AtHeight(heights.FinalHeight() + 1).Head()
+	require.NoError(suite.T(), err)
+
+	block := suite.Block()
+	block.SetPayload(model.EmptyPayload(nextEpochHeader.ID()))
+	err = suite.state.Extend(&block)
+	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
