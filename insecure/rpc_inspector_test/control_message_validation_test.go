@@ -89,7 +89,8 @@ func TestInspect_SafetyThreshold(t *testing.T) {
 	// prepare to spam - generate control messages
 	ctlMsgs := spammer.GenerateCtlMessages(int(controlMessageCount),
 		corruptlibp2p.WithGraft(messageCount, channels.PushBlocks.String()),
-		corruptlibp2p.WithPrune(messageCount, channels.PushBlocks.String()))
+		corruptlibp2p.WithGraft(messageCount, channels.PushBlocks.String()),
+		corruptlibp2p.WithIHave(messageCount, 1000, channels.PushBlocks.String()))
 
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, ctlMsgs)
@@ -130,8 +131,9 @@ func TestInspect_DiscardThreshold(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvalidControlMessageNotification)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			require.True(t, validation.IsErrDiscardThreshold(notification.Err))
 			require.Equal(t, uint64(messageCount), notification.Count)
+			
+			require.True(t, validation.IsErrDiscardThreshold(notification.Err))
 			require.True(t, notification.MsgType == p2p.CtrlMsgGraft || notification.MsgType == p2p.CtrlMsgPrune)
 			if count.Load() == 2 {
 				close(done)

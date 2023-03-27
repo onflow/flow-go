@@ -287,10 +287,14 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 	case !req.validationConfig.RateLimiter.Allow(req.Peer, int(count)): // check if Peer RPC messages are rate limited
 		validationErr = NewRateLimitedControlMsgErr(req.validationConfig.ControlMsg)
 	case count > req.validationConfig.SafetyThreshold: // check if Peer RPC messages Count greater than safety threshold further inspect each message individually
-		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg, 0)
+		sampleSize := uint(0)
+		if req.validationConfig.ControlMsg == p2p.CtrlMsgIHave {
+			sampleSize = uint(len(req.ctrlMsg.GetIhave()))
+		}
+		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg, sampleSize)
 	default:
 		lg.Trace().
-			Uint64("upper_threshold", req.validationConfig.DiscardThreshold).
+			Uint64("discard_threshold", req.validationConfig.DiscardThreshold).
 			Uint64("safety_threshold", req.validationConfig.SafetyThreshold).
 			Msg(fmt.Sprintf("control message %s inspection passed %d is below configured safety threshold", req.validationConfig.ControlMsg, count))
 		return nil

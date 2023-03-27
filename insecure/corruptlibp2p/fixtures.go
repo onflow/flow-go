@@ -29,11 +29,10 @@ func GossipSubCtrlFixture(opts ...GossipSubCtrlOption) *pubsubpb.ControlMessage 
 }
 
 // WithIHave adds iHave control messages of the given size and number to the control message.
-func WithIHave(msgCount int, msgSize int) GossipSubCtrlOption {
+func WithIHave(msgCount, msgSize int, topicId string) GossipSubCtrlOption {
 	return func(msg *pubsubpb.ControlMessage) {
 		iHaves := make([]*pubsubpb.ControlIHave, msgCount)
 		for i := 0; i < msgCount; i++ {
-			topicId := GossipSubTopicIdFixture()
 			iHaves[i] = &pubsubpb.ControlIHave{
 				TopicID:    &topicId,
 				MessageIDs: gossipSubMessageIdsFixture(msgSize),
@@ -44,7 +43,7 @@ func WithIHave(msgCount int, msgSize int) GossipSubCtrlOption {
 }
 
 // WithIWant adds iWant control messages of the given size and number to the control message.
-func WithIWant(msgCount int, msgSize int) GossipSubCtrlOption {
+func WithIWant(msgCount, msgSize int) GossipSubCtrlOption {
 	return func(msg *pubsubpb.ControlMessage) {
 		iWants := make([]*pubsubpb.ControlIWant, msgCount)
 		for i := 0; i < msgCount; i++ {
