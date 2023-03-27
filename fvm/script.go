@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/hash"
 )
@@ -21,12 +20,9 @@ type ScriptProcedure struct {
 	Script         []byte
 	Arguments      [][]byte
 	RequestContext context.Context
-	Value          cadence.Value
-	Logs           []string
-	Events         []flow.Event
-	GasUsed        uint64
-	MemoryEstimate uint64
-	Err            errors.CodedError
+
+	// TODO(patrick): remove
+	ProcedureOutput
 }
 
 func Script(code []byte) *ScriptProcedure {
@@ -80,6 +76,10 @@ func (proc *ScriptProcedure) NewExecutor(
 	return newScriptExecutor(ctx, proc, txnState)
 }
 
+func (proc *ScriptProcedure) SetOutput(output ProcedureOutput) {
+	proc.ProcedureOutput = output
+}
+
 func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
 	computationLimit := ctx.ComputationLimit
 	// if ctx.ComputationLimit is also zero, fallback to the default computation limit
@@ -108,12 +108,8 @@ func (ScriptProcedure) Type() ProcedureType {
 	return ScriptProcedureType
 }
 
-func (proc *ScriptProcedure) InitialSnapshotTime() derived.LogicalTime {
-	return derived.EndOfBlockExecutionTime
-}
-
-func (proc *ScriptProcedure) ExecutionTime() derived.LogicalTime {
-	return derived.EndOfBlockExecutionTime
+func (proc *ScriptProcedure) ExecutionTime() logical.Time {
+	return logical.EndOfBlockExecutionTime
 }
 
 type scriptExecutor struct {
@@ -122,6 +118,8 @@ type scriptExecutor struct {
 	txnState storage.Transaction
 
 	env environment.Environment
+
+	output ProcedureOutput
 }
 
 func newScriptExecutor(
@@ -145,6 +143,10 @@ func (executor *scriptExecutor) Cleanup() {
 	// Do nothing.
 }
 
+func (executor *scriptExecutor) Output() ProcedureOutput {
+	return executor.output
+}
+
 func (executor *scriptExecutor) Preprocess() error {
 	// Do nothing.
 	return nil
@@ -164,7 +166,7 @@ func (executor *scriptExecutor) Execute() error {
 		return failure
 	}
 	if txError != nil {
-		executor.proc.Err = txError
+		executor.output.Err = txError
 	}
 
 	return nil
@@ -199,21 +201,11 @@ func (executor *scriptExecutor) execute() error {
 		return err
 	}
 
-	executor.proc.Value = value
-	executor.proc.Logs = executor.env.Logs()
-	executor.proc.Events = executor.env.Events()
-
-	computationUsed, err := executor.env.ComputationUsed()
+	executor.output.Value = value
+	err = executor.output.PopulateEnvironmentValues(executor.env)
 	if err != nil {
-		return fmt.Errorf("error getting computation used: %w", err)
+		return err
 	}
-	executor.proc.GasUsed = computationUsed
-
-	memoryUsed, err := executor.env.MemoryUsed()
-	if err != nil {
-		return fmt.Errorf("error getting memory used: %w", err)
-	}
-	executor.proc.MemoryEstimate = memoryUsed
 
 	_, err = executor.txnState.CommitNestedTransaction(txnId)
 	return err

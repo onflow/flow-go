@@ -64,6 +64,7 @@ func (suite *Suite) SetupTest() {
 	header := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
 	params.On("Root").Return(header, nil)
+	params.On("SporkRootBlockHeight").Return(header.Height, nil)
 	suite.state.On("Params").Return(params).Maybe()
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
@@ -162,7 +163,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
@@ -224,7 +225,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 
 		// building 2 epochs allows us to take a snapshot at a point in time where
@@ -295,7 +296,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
@@ -358,7 +359,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
@@ -433,7 +434,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state).BuildEpoch().CompleteEpoch()
 
 		// get heights of each phase in built epochs
@@ -672,7 +673,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	head := unittest.BlockHeaderFixture()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Head").Return(head, nil)
+	suite.snapshot.On("Head").Return(head, nil).Maybe()
 
 	ctx := context.Background()
 	block := unittest.BlockFixture()
@@ -1168,7 +1169,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		Once()
 
 	suite.blocks.
-		On("ByID", header.ID()).
+		On("ByHeight", header.Height).
 		Return(&expected, nil)
 
 	backend := New(

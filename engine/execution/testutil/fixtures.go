@@ -13,10 +13,10 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
@@ -169,7 +169,7 @@ func GenerateAccountPrivateKeys(numberOfPrivateKeys int) ([]flow.AccountPrivateK
 
 // GenerateAccountPrivateKey generates a private key.
 func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	_, err := rand.Read(seed)
 	if err != nil {
 		return flow.AccountPrivateKey{}, err
@@ -190,17 +190,15 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 func CreateAccounts(
 	vm fvm.VM,
 	view state.View,
-	derivedBlockData *derived.DerivedBlockData,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
-	return CreateAccountsWithSimpleAddresses(vm, view, derivedBlockData, privateKeys, chain)
+	return CreateAccountsWithSimpleAddresses(vm, view, privateKeys, chain)
 }
 
 func CreateAccountsWithSimpleAddresses(
 	vm fvm.VM,
 	view state.View,
-	derivedBlockData *derived.DerivedBlockData,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
@@ -208,7 +206,6 @@ func CreateAccountsWithSimpleAddresses(
 		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-		fvm.WithDerivedBlockData(derivedBlockData),
 	)
 
 	var accounts []flow.Address
@@ -251,9 +248,7 @@ func CreateAccountsWithSimpleAddresses(
 			AddArgument(encCadPublicKey).
 			AddAuthorizer(serviceAddress)
 
-		tx := fvm.Transaction(
-			txBody,
-			derivedBlockData.NextTxIndexForTestingOnly())
+		tx := fvm.Transaction(txBody, 0)
 		err := vm.Run(ctx, tx, view)
 		if err != nil {
 			return nil, err

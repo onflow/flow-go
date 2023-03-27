@@ -17,9 +17,10 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
-	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
@@ -49,6 +50,15 @@ const (
 	DefaultSeedFixtureLength = 64
 	DefaultAddress           = "localhost:0"
 )
+
+// returns a deterministic math/rand PRG that can be used for deterministic randomness in tests only.
+// The PRG seed is logged in case the test iteration needs to be reproduced.
+func GetPRG(t *testing.T) *rand.Rand {
+	random := time.Now().UnixNano()
+	t.Logf("rng seed is %d", random)
+	rng := rand.New(rand.NewSource(random))
+	return rng
+}
 
 func IPPort(port string) string {
 	return net.JoinHostPort("localhost", port)
@@ -124,7 +134,7 @@ func ProposalKeyFixture() flow.ProposalKey {
 
 // AccountKeyDefaultFixture returns a randomly generated ECDSA/SHA3 account key.
 func AccountKeyDefaultFixture() (*flow.AccountPrivateKey, error) {
-	return AccountKeyFixture(crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256, hash.SHA3_256)
+	return AccountKeyFixture(crypto.KeyGenSeedMinLen, crypto.ECDSAP256, hash.SHA3_256)
 }
 
 // AccountKeyFixture returns a randomly generated account key.
@@ -221,7 +231,7 @@ func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockPropos
 }
 
 // AsSlashable returns the input message T, wrapped as a flow.Slashable instance with a random origin ID.
-func AsSlashable[T any](msg *T) flow.Slashable[T] {
+func AsSlashable[T any](msg T) flow.Slashable[T] {
 	slashable := flow.Slashable[T]{
 		OriginID: IdentifierFixture(),
 		Message:  msg,
@@ -427,7 +437,7 @@ func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
 
 func CidFixture() cid.Cid {
 	data := make([]byte, 1024)
-	rand.Read(data)
+	_, _ = rand.Read(data)
 	return blocks.NewBlock(data).Cid()
 }
 
@@ -1704,6 +1714,15 @@ func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.Quoru
 	return &qc
 }
 
+// CertifyBlock returns a quorum certificate for the given block header
+func CertifyBlock(header *flow.Header) *flow.QuorumCertificate {
+	qc := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+		qc.View = header.View
+		qc.BlockID = header.ID()
+	})
+	return qc
+}
+
 func QuorumCertificatesFixtures(n uint, opts ...func(*flow.QuorumCertificate)) []*flow.QuorumCertificate {
 	qcs := make([]*flow.QuorumCertificate, 0, n)
 	for i := 0; i < int(n); i++ {
@@ -2077,17 +2096,17 @@ func PrivateKeyFixtureByIdentifier(algo crypto.SigningAlgorithm, seedLength int,
 }
 
 func StakingPrivKeyByIdentifier(id flow.Identifier) crypto.PrivateKey {
-	return PrivateKeyFixtureByIdentifier(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381, id)
+	return PrivateKeyFixtureByIdentifier(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen, id)
 }
 
 // NetworkingPrivKeyFixture returns random ECDSAP256 private key
 func NetworkingPrivKeyFixture() crypto.PrivateKey {
-	return PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
+	return PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen)
 }
 
 // StakingPrivKeyFixture returns a random BLS12381 private keyf
 func StakingPrivKeyFixture() crypto.PrivateKey {
-	return PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381)
+	return PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen)
 }
 
 func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {

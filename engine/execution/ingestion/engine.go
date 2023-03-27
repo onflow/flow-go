@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
-	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -57,11 +56,6 @@ type Engine struct {
 	maxCollectionHeight    uint64
 	tracer                 module.Tracer
 	extensiveLogging       bool
-	syncThreshold          int                 // the threshold for how many sealed unexecuted blocks to trigger state syncing.
-	syncFilter             flow.IdentityFilter // specify the filter to sync state from
-	syncConduit            network.Conduit     // sending state syncing requests
-	syncDeltas             mempool.Deltas      // storing the synced state deltas
-	syncFast               bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	executionDataPruner    *pruner.Pruner
 	uploader               *uploader.Manager
@@ -85,10 +79,6 @@ func New(
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	extLog bool,
-	syncFilter flow.IdentityFilter,
-	syncDeltas mempool.Deltas,
-	syncThreshold int,
-	syncFast bool,
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pruner *pruner.Pruner,
 	uploader *uploader.Manager,
@@ -117,23 +107,11 @@ func New(
 		maxCollectionHeight:    0,
 		tracer:                 tracer,
 		extensiveLogging:       extLog,
-		syncFilter:             syncFilter,
-		syncThreshold:          syncThreshold,
-		syncDeltas:             syncDeltas,
-		syncFast:               syncFast,
 		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
 		executionDataPruner:    pruner,
 		uploader:               uploader,
 		stopControl:            stopControl,
 	}
-
-	// move to state syncing engine
-	syncConduit, err := net.Register(channels.SyncExecution, &eng)
-	if err != nil {
-		return nil, fmt.Errorf("could not register execution blockSync engine: %w", err)
-	}
-
-	eng.syncConduit = syncConduit
 
 	return &eng, nil
 }
@@ -424,7 +402,7 @@ func (e *Engine) reloadBlock(
 // have passed consensus validation) received from the consensus nodes
 // NOTE: BlockProcessable might be called multiple times for the same block.
 // NOTE: Ready calls reloadUnexecutedBlocks during initialization, which handles dropped protocol events.
-func (e *Engine) BlockProcessable(b *flow.Header) {
+func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 
 	// skip if stopControl tells to skip
 	if !e.stopControl.blockProcessable(b) {
@@ -527,14 +505,6 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 	}
 
 	firstUnexecutedHeight := queue.Head.Item.Height()
-	// disable state syncing for now
-	// if checkStateSync {
-	// 	// whenever the queue grows, we need to check whether the state sync should be
-	// 	// triggered.
-	// 	e.unit.Launch(func() {
-	// 		e.checkStateSyncStart(firstUnexecutedHeight)
-	// 	})
-	// }
 
 	// check if a block is executable.
 	// a block is executable if the following conditions are all true
@@ -691,10 +661,6 @@ func (e *Engine) executeBlock(
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
 
-	e.metrics.ExecutionBlockExecuted(
-		time.Since(startedAt),
-		computationResult.BlockStats())
-
 	for computationKind, intensity := range computationResult.ComputationIntensities {
 		e.metrics.ExecutionBlockExecutionEffortVectorComponent(computationKind.String(), intensity)
 	}
@@ -823,28 +789,6 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	if eb.Executing {
 		return false
 	}
-
-	// if the eb has parent statecommitment, and we have the delta for this block
-	// then apply the delta
-	// note the block ID is the delta's ID
-	// delta, found := e.syncDeltas.ByBlockID(eb.Block.ID())
-	// if found {
-	// 	// double check before applying the state delta
-	// 	if bytes.Equal(eb.StartState, delta.ExecutableBlock.StartState) {
-	// 		e.unit.Launch(func() {
-	// 			e.applyStateDelta(delta)
-	// 		})
-	// 		return true
-	// 	}
-	//
-	// 	// if state delta is invalid, remove the delta and log error
-	// 	e.log.Error().
-	// 		Hex("block_start_state", eb.StartState).
-	// 		Hex("delta_start_state", delta.ExecutableBlock.StartState).
-	// 		Msg("can not apply the state delta, the start state does not match")
-	//
-	// 	e.syncDeltas.Remove(eb.Block.ID())
-	// }
 
 	// if don't have the delta, then check if everything is ready for executing
 	// the block
@@ -1018,23 +962,6 @@ func (e *Engine) matchAndFindMissingCollections(
 	executableBlock *entity.ExecutableBlock,
 	collectionsBackdata *stdmap.BlockByCollectionBackdata,
 ) ([]*flow.CollectionGuarantee, error) {
-	// if the state syncing is on, it will fetch deltas for sealed and
-	// unexecuted blocks. However, for any new blocks, we are still fetching
-	// collections for them, which is not necessary, because the state deltas
-	// will include the collection.
-	// Fetching those collections will introduce load to collection nodes,
-	// and handling them would increase memory usage and network bandwidth.
-	// Therefore, we introduced this "sync-fast" mode.
-	// The sync-fast mode can be turned on by the `sync-fast=true` flag.
-	// When it's turned on, it will skip fetching collections, and will
-	// rely on the state syncing to catch up.
-	// if e.syncFast {
-	// 	isSyncing := e.isSyncingState()
-	// 	if isSyncing {
-	// 		return nil
-	// 	}
-	// }
-
 	missingCollections := make([]*flow.CollectionGuarantee, 0, len(executableBlock.Block.Payload.Guarantees))
 
 	for _, guarantee := range executableBlock.Block.Payload.Guarantees {
@@ -1160,7 +1087,7 @@ func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow
 
 	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
 
-	return e.computationManager.GetAccount(addr, block, blockSnapshot)
+	return e.computationManager.GetAccount(ctx, addr, block, blockSnapshot)
 }
 
 // save the execution result of a block

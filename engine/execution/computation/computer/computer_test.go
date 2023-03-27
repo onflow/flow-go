@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
@@ -39,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -63,7 +63,7 @@ type fakeCommitter struct {
 }
 
 func (committer *fakeCommitter) CommitView(
-	view state.View,
+	view *state.ExecutionSnapshot,
 	startState flow.StateCommitment,
 ) (
 	flow.StateCommitment,
@@ -101,24 +101,22 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithDerivedBlockData(derived.NewEmptyDerivedBlockData()),
 		)
 
-		vm := new(computermock.VirtualMachine)
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-			Return(nil).
-			Run(func(args mock.Arguments) {
-				ctx := args[0].(fvm.Context)
-				tx := args[1].(*fvm.TransactionProcedure)
-
-				tx.Events = generateEvents(1, tx.TxIndex)
-
-				getSetAProgram(t, ctx.DerivedBlockData)
-			}).
-			Times(2 + 1) // 2 txs in collection + system chunk
+		vm := &testVM{
+			t:                    t,
+			eventsPerTransaction: 1,
+		}
 
 		committer := &fakeCommitter{
 			callCount: 0,
 		}
 
 		exemetrics := new(modulemock.ExecutionMetrics)
+		exemetrics.On("ExecutionBlockExecuted",
+			mock.Anything,  // duration
+			mock.Anything). // stats
+			Return(nil).
+			Times(1)
+
 		exemetrics.On("ExecutionCollectionExecuted",
 			mock.Anything,  // duration
 			mock.Anything). // stats
@@ -169,7 +167,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			zerolog.Nop(),
 			committer,
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -270,14 +269,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NotNil(t, chunkExecutionData2.TrieUpdate)
 		assert.Equal(t, byte(2), chunkExecutionData2.TrieUpdate.RootHash[0])
 
-		vm.AssertExpectations(t)
+		assert.Equal(t, 3, vm.callCount)
 	})
 
 	t.Run("empty block still computes system chunk", func(t *testing.T) {
 
 		execCtx := fvm.NewContext()
 
-		vm := new(computermock.VirtualMachine)
+		vm := new(fvmmock.VM)
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
@@ -299,15 +298,19 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			zerolog.Nop(),
 			committer,
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		// create an empty block
 		block := generateBlock(0, 0, rag)
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-			Return(nil).
+		vm.On("RunV2", mock.Anything, mock.Anything, mock.Anything).
+			Return(
+				&state.ExecutionSnapshot{},
+				fvm.ProcedureOutput{},
+				nil).
 			Once() // just system chunk
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
@@ -389,7 +392,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			zerolog.Nop(),
 			comm,
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		// create an empty block
@@ -416,7 +420,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("multiple collections", func(t *testing.T) {
 		execCtx := fvm.NewContext()
 
-		vm := new(computermock.VirtualMachine)
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
@@ -430,6 +433,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
+		eventsPerTransaction := 2
+		vm := &testVM{
+			t:                    t,
+			eventsPerTransaction: eventsPerTransaction,
+			err: fvmErrors.NewInvalidAddressErrorf(
+				flow.EmptyAddress,
+				"no payer address provided"),
+		}
+
 		exe, err := computer.NewBlockComputer(
 			vm,
 			execCtx,
@@ -438,12 +450,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			zerolog.Nop(),
 			committer,
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		collectionCount := 2
 		transactionsPerCollection := 2
-		eventsPerTransaction := 2
 		eventsPerCollection := eventsPerTransaction * transactionsPerCollection
 		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 // +1 for system chunk
 		// totalEventCount := eventsPerTransaction * totalTransactionCount
@@ -451,19 +463,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
-
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) {
-				tx := args[1].(*fvm.TransactionProcedure)
-
-				tx.Err = fvmErrors.NewInvalidAddressErrorf(
-					flow.EmptyAddress,
-					"no payer address provided")
-				// create dummy events
-				tx.Events = generateEvents(eventsPerTransaction, tx.TxIndex)
-			}).
-			Return(nil).
-			Times(totalTransactionCount)
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
 			Return(nil, nil, nil, nil).
@@ -520,7 +519,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		assertEventHashesMatch(t, collectionCount+1, result)
 
-		vm.AssertExpectations(t)
+		assert.Equal(t, totalTransactionCount, vm.callCount)
 	})
 
 	t.Run("service events are emitted", func(t *testing.T) {
@@ -624,7 +623,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			zerolog.Nop(),
 			committer.NewNoopViewCommitter(),
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(
@@ -665,7 +665,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				_, err := r.Interface.GetAndSetProgram(
+				_, err := r.Interface.GetOrLoadProgram(
 					contractLocation,
 					func() (*interpreter.Program, error) {
 						return contractProgram, nil
@@ -710,7 +710,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			zerolog.Nop(),
 			committer.NewNoopViewCommitter(),
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		const collectionCount = 2
@@ -760,7 +761,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				executionCalls++
 
 				// NOTE: set a program and revert all transactions but the system chunk transaction
-				_, err := r.Interface.GetAndSetProgram(
+				_, err := r.Interface.GetOrLoadProgram(
 					contractLocation,
 					func() (*interpreter.Program, error) {
 						return contractProgram, nil
@@ -811,7 +812,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			zerolog.Nop(),
 			committer.NewNoopViewCommitter(),
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		block := generateBlock(collectionCount, transactionCount, rag)
@@ -1005,9 +1007,6 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 	view := delta.NewDeltaView(ledger)
 	accounts := environment.NewAccounts(testutils.NewSimpleTransaction(view))
 
-	// account creation, signing of transaction and bootstrapping ledger should not be required for this test
-	// as freeze check should happen before a transaction signature is checked
-	// but we currently discard all the touches if it fails and any point
 	err = accounts.Create([]flow.AccountPublicKey{key.PublicKey(1000)}, address)
 	require.NoError(t, err)
 
@@ -1036,7 +1035,8 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 		zerolog.Nop(),
 		committer.NewNoopViewCommitter(),
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(t, err)
 
 	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {
@@ -1086,6 +1086,12 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	expectedCachedPrograms := 0
 
 	metrics := new(modulemock.ExecutionMetrics)
+	metrics.On("ExecutionBlockExecuted",
+		mock.Anything,  // duration
+		mock.Anything). // stats
+		Return(nil).
+		Times(1)
+
 	metrics.On("ExecutionCollectionExecuted",
 		mock.Anything,  // duration
 		mock.Anything). // stats
@@ -1141,7 +1147,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		zerolog.Nop(),
 		committer,
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(t, err)
 
 	// create empty block, it will have system collection attached while executing
@@ -1160,23 +1167,6 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	assert.Len(t, result.TransactionResults, 1)
 
 	assert.Empty(t, result.TransactionResults[0].ErrorMessage)
-
-	stats := result.CollectionStats(0)
-	// ignore computation and memory used
-	stats.ComputationUsed = 0
-	stats.MemoryUsed = 0
-
-	assert.Equal(
-		t,
-		module.ExecutionResultStats{
-			EventCounts:                     expectedNumberOfEvents,
-			EventSize:                       expectedEventSize,
-			NumberOfRegistersTouched:        66,
-			NumberOfBytesWrittenToRegisters: 4214,
-			NumberOfCollections:             1,
-			NumberOfTransactions:            1,
-		},
-		stats)
 
 	committer.AssertExpectations(t)
 }
@@ -1243,6 +1233,58 @@ func generateCollection(transactionCount int, addressGenerator flow.AddressGener
 	}
 }
 
+type testVM struct {
+	t                    *testing.T
+	eventsPerTransaction int
+
+	callCount int
+	err       fvmErrors.CodedError
+}
+
+func (vm *testVM) RunV2(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storageSnapshot state.StorageSnapshot,
+) (
+	*state.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
+	vm.callCount += 1
+
+	txn := proc.(*fvm.TransactionProcedure)
+
+	derivedTxnData, err := ctx.DerivedBlockData.NewDerivedTransactionData(
+		txn.ExecutionTime(),
+		txn.ExecutionTime())
+	require.NoError(vm.t, err)
+
+	getSetAProgram(vm.t, storageSnapshot, derivedTxnData)
+
+	snapshot := &state.ExecutionSnapshot{}
+	output := fvm.ProcedureOutput{
+		Events: generateEvents(vm.eventsPerTransaction, txn.TxIndex),
+		Err:    vm.err,
+	}
+
+	return snapshot, output, nil
+}
+
+func (testVM) Run(_ fvm.Context, _ fvm.Procedure, _ state.View) error {
+	panic("not implemented")
+}
+
+func (testVM) GetAccount(
+	_ fvm.Context,
+	_ flow.Address,
+	_ state.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
+	panic("not implemented")
+}
+
 func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 	events := make([]flow.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
@@ -1253,29 +1295,45 @@ func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 	return events
 }
 
-func getSetAProgram(t *testing.T, derivedBlockData *derived.DerivedBlockData) {
+func getSetAProgram(
+	t *testing.T,
+	storageSnapshot state.StorageSnapshot,
+	derivedTxnData derived.DerivedTransactionCommitter,
+) {
 
-	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(
-		0,
-		0)
-	require.NoError(t, err)
+	txnState := state.NewTransactionState(
+		delta.NewDeltaView(storageSnapshot),
+		state.DefaultParameters())
 
 	loc := common.AddressLocation{
 		Name:    "SomeContract",
 		Address: common.MustBytesToAddress([]byte{0x1}),
 	}
-	_, _, got := derivedTxnData.GetProgram(
+	_, err := derivedTxnData.GetOrComputeProgram(
+		txnState,
 		loc,
+		&programLoader{
+			load: func() (*derived.Program, error) {
+				return &derived.Program{}, nil
+			},
+		},
 	)
-	if got {
-		return
-	}
+	require.NoError(t, err)
 
-	derivedTxnData.SetProgram(
-		loc,
-		&derived.Program{},
-		&state.State{},
-	)
 	err = derivedTxnData.Commit()
 	require.NoError(t, err)
+}
+
+type programLoader struct {
+	load func() (*derived.Program, error)
+}
+
+func (p *programLoader) Compute(
+	_ state.NestedTransaction,
+	_ common.AddressLocation,
+) (
+	*derived.Program,
+	error,
+) {
+	return p.load()
 }

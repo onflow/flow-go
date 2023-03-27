@@ -5,7 +5,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -59,6 +58,18 @@ func ReceiptRequestsQueueMetricFactory(registrar prometheus.Registerer) *HeroCac
 
 func CollectionRequestsQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceCollection, ResourceCollection, registrar)
+}
+
+func DisallowListNotificationQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDisallowListNotificationQueue, registrar)
+}
+
+func GossipSubRPCInspectorQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcInspectorQueue, registrar)
+}
+
+func RpcInspectorNotificationQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcInspectorNotificationQueue, registrar)
 }
 
 func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer, epoch uint64) *HeroCacheCollector {
@@ -261,7 +272,7 @@ func (h *HeroCacheCollector) OnKeyRemoved(size uint32) {
 // OnEntityEjectionDueToFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
 // This normally happens -- and is expected -- when the cache is full.
 // Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-func (h *HeroCacheCollector) OnEntityEjectionDueToFullCapacity(flow.Entity) {
+func (h *HeroCacheCollector) OnEntityEjectionDueToFullCapacity() {
 	h.countKeyEjectionDueToFullCapacity.Inc()
 }
 

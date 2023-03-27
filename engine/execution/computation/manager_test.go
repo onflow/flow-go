@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
+	"github.com/onflow/flow-go/engine/execution/computation/query"
 	state2 "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
@@ -32,7 +33,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -59,7 +59,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, derived.NewEmptyDerivedBlockData(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 	require.NoError(t, err)
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -138,7 +138,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		zerolog.Nop(),
 		committer.NewNoopViewCommitter(),
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -146,9 +147,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	engine := &Manager{
 		blockComputer:    blockComputer,
-		me:               me,
 		derivedChainData: derivedChainData,
-		tracer:           trace.NewNoopTracer(),
 	}
 
 	view := delta.NewDeltaView(ledger)
@@ -163,10 +162,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	require.NotEmpty(t, blockView.(*delta.View).Delta())
 	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
-	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
-	stats := returnedComputationResult.BlockStats()
-	assert.True(t, stats.ComputationUsed > 0)
-	assert.True(t, stats.MemoryUsed > 0)
+	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].UpdatedRegisters())
 }
 
 func TestComputeBlock_Uploader(t *testing.T) {
@@ -205,9 +201,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 
 	manager := &Manager{
 		blockComputer:    blockComputer,
-		me:               me,
 		derivedChainData: derivedChainData,
-		tracer:           trace.NewNoopTracer(),
 	}
 
 	view := delta.NewDeltaView(
@@ -269,9 +263,8 @@ func TestExecuteScript(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       scriptLogThreshold,
-			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+			QueryConfig:          query.NewDefaultConfig(),
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
 	)
 	require.NoError(t, err)
@@ -334,9 +327,8 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       scriptLogThreshold,
-			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+			QueryConfig:          query.NewDefaultConfig(),
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
 	)
 	require.NoError(t, err)
@@ -380,9 +372,8 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       scriptLogThreshold,
-			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+			QueryConfig:          query.NewDefaultConfig(),
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &PanickingVM{}
 			},
@@ -431,9 +422,11 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       1 * time.Millisecond,
-			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+			QueryConfig: query.QueryConfig{
+				LogTimeThreshold:   1 * time.Millisecond,
+				ExecutionTimeLimit: query.DefaultExecutionTimeLimit,
+			},
+			DerivedDataCacheSize: 10,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 2 * time.Millisecond}
 			},
@@ -482,9 +475,11 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       1 * time.Second,
-			ScriptExecutionTimeLimit: DefaultScriptExecutionTimeLimit,
+			QueryConfig: query.QueryConfig{
+				LogTimeThreshold:   1 * time.Second,
+				ExecutionTimeLimit: query.DefaultExecutionTimeLimit,
+			},
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 0}
 			},
@@ -506,14 +501,26 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 
 type PanickingVM struct{}
 
+func (p *PanickingVM) RunV2(
+	f fvm.Context,
+	procedure fvm.Procedure,
+	storageSnapshot state.StorageSnapshot,
+) (
+	*state.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
+	panic("panic, but expected with sentinel for test: Verunsicherung ")
+}
+
 func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
 
 func (p *PanickingVM) GetAccount(
-	f fvm.Context,
+	ctx fvm.Context,
 	address flow.Address,
-	view state.View,
+	storageSnapshot state.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -523,6 +530,22 @@ func (p *PanickingVM) GetAccount(
 
 type LongRunningVM struct {
 	duration time.Duration
+}
+
+func (l *LongRunningVM) RunV2(
+	f fvm.Context,
+	procedure fvm.Procedure,
+	storageSnapshot state.StorageSnapshot,
+) (
+	*state.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
+	time.Sleep(l.duration)
+
+	snapshot := &state.ExecutionSnapshot{}
+	output := fvm.ProcedureOutput{}
+	return snapshot, output, nil
 }
 
 func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {
@@ -536,9 +559,9 @@ func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.V
 }
 
 func (l *LongRunningVM) GetAccount(
-	f fvm.Context,
+	ctx fvm.Context,
 	address flow.Address,
-	view state.View,
+	storageSnapshot state.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -576,9 +599,11 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		nil,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       DefaultScriptLogThreshold,
-			ScriptExecutionTimeLimit: timeout,
+			QueryConfig: query.QueryConfig{
+				LogTimeThreshold:   query.DefaultLogTimeThreshold,
+				ExecutionTimeLimit: timeout,
+			},
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
 	)
 
@@ -620,9 +645,11 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		nil,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       DefaultScriptLogThreshold,
-			ScriptExecutionTimeLimit: timeout,
+			QueryConfig: query.QueryConfig{
+				LogTimeThreshold:   query.DefaultLogTimeThreshold,
+				ExecutionTimeLimit: timeout,
+			},
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
 	)
 
@@ -677,7 +704,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, derived.NewEmptyDerivedBlockData(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 	require.NoError(t, err)
 
 	// setup transactions
@@ -750,6 +777,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -758,9 +786,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 
 	engine := &Manager{
 		blockComputer:    blockComputer,
-		me:               me,
 		derivedChainData: derivedChainData,
-		tracer:           trace.NewNoopTracer(),
 	}
 
 	view := delta.NewDeltaView(ledger)
@@ -824,22 +850,22 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		nil,
 		ComputationConfig{
-			DerivedDataCacheSize:     derived.DefaultDerivedDataCacheSize,
-			ScriptLogThreshold:       DefaultScriptLogThreshold,
-			ScriptExecutionTimeLimit: timeout,
+			QueryConfig: query.QueryConfig{
+				LogTimeThreshold:   query.DefaultLogTimeThreshold,
+				ExecutionTimeLimit: timeout,
+			},
+			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
 		},
 	)
 	vm := manager.vm
 	view := testutil.RootBootstrappedLedger(vm, ctx)
-
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	accounts, err := testutil.CreateAccounts(vm, view, derivedBlockData, privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
 	require.NoError(t, err)
 	account := accounts[0]
 	address := cadence.NewAddress(account)
@@ -862,12 +888,9 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
 	require.NoError(t, err)
 
-	txnState := testutils.NewSimpleTransaction(view)
-	env := environment.NewScriptEnv(
-		context.Background(),
-		ctx.TracerSpan,
+	env := environment.NewScriptEnvironmentFromStorageSnapshot(
 		ctx.EnvironmentParams,
-		txnState)
+		view)
 
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)

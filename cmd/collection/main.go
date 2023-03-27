@@ -74,7 +74,7 @@ func main() {
 		startupTime                       time.Time
 
 		mainConsensusCommittee  *committees.Consensus
-		followerState           protocol.MutableState
+		followerState           protocol.FollowerState
 		ingestConf              = ingest.DefaultConfig()
 		rpcConf                 rpc.Config
 		clusterComplianceConfig modulecompliance.Config
@@ -397,7 +397,10 @@ func main() {
 				collectionRequestQueue,
 				collectionProviderWorkers,
 				channels.ProvideCollections,
-				filter.HasRole(flow.RoleAccess, flow.RoleExecution),
+				filter.And(
+					filter.HasWeight(true),
+					filter.HasRole(flow.RoleAccess, flow.RoleExecution),
+				),
 				retrieve,
 			)
 		}).

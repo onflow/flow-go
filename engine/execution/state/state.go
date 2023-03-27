@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -146,7 +147,8 @@ type LedgerStorageSnapshot struct {
 	ledger     ledger.Ledger
 	commitment flow.StateCommitment
 
-	readCache map[flow.RegisterID]flow.RegisterValue
+	mutex     sync.RWMutex
+	readCache map[flow.RegisterID]flow.RegisterValue // Guarded by mutex.
 }
 
 func NewLedgerStorageSnapshot(
@@ -160,16 +162,25 @@ func NewLedgerStorageSnapshot(
 	}
 }
 
-func (storage *LedgerStorageSnapshot) Get(
+func (storage *LedgerStorageSnapshot) getFromCache(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	bool,
+) {
+	storage.mutex.RLock()
+	defer storage.mutex.RUnlock()
+
+	value, ok := storage.readCache[id]
+	return value, ok
+}
+
+func (storage *LedgerStorageSnapshot) getFromLedger(
 	id flow.RegisterID,
 ) (
 	flow.RegisterValue,
 	error,
 ) {
-	if value, ok := storage.readCache[id]; ok {
-		return value, nil
-	}
-
 	query, err := makeSingleValueQuery(storage.commitment, id)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create ledger query: %w", err)
@@ -184,14 +195,29 @@ func (storage *LedgerStorageSnapshot) Get(
 			err)
 	}
 
-	// Prevent caching of value with len zero
-	if len(value) == 0 {
-		return nil, nil
+	return value, nil
+}
+
+func (storage *LedgerStorageSnapshot) Get(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+) {
+	value, ok := storage.getFromCache(id)
+	if ok {
+		return value, nil
 	}
 
-	// don't cache value with len zero
-	storage.readCache[id] = value
+	value, err := storage.getFromLedger(id)
+	if err != nil {
+		return nil, err
+	}
 
+	storage.mutex.Lock()
+	defer storage.mutex.Unlock()
+
+	storage.readCache[id] = value
 	return value, nil
 }
 

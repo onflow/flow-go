@@ -51,13 +51,6 @@ func (reader *ContractReader) GetAccountContractNames(
 
 	address := flow.ConvertAddress(runtimeAddress)
 
-	freezeError := reader.accounts.CheckAccountNotFrozen(address)
-	if freezeError != nil {
-		return nil, fmt.Errorf(
-			"get account contract names failed: %w",
-			freezeError)
-	}
-
 	return reader.accounts.GetContractNames(address)
 }
 
@@ -95,13 +88,6 @@ func (reader *ContractReader) ResolveLocation(
 	// then fetch all identifiers at this address
 	if len(identifiers) == 0 {
 		address := flow.ConvertAddress(addressLocation.Address)
-
-		err := reader.accounts.CheckAccountNotFrozen(address)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"resolving location's account frozen check failed: %w",
-				err)
-		}
 
 		contractNames, err := reader.accounts.GetContractNames(address)
 		if err != nil {
@@ -141,8 +127,7 @@ func (reader *ContractReader) ResolveLocation(
 }
 
 func (reader *ContractReader) getCode(
-	address flow.Address,
-	contractName string,
+	location common.AddressLocation,
 ) (
 	[]byte,
 	error,
@@ -154,12 +139,7 @@ func (reader *ContractReader) getCode(
 		return nil, fmt.Errorf("get code failed: %w", err)
 	}
 
-	err = reader.accounts.CheckAccountNotFrozen(address)
-	if err != nil {
-		return nil, fmt.Errorf("get code failed: %w", err)
-	}
-
-	add, err := reader.accounts.GetContract(contractName, address)
+	add, err := reader.accounts.GetContract(location.Name, flow.ConvertAddress(location.Address))
 	if err != nil {
 		return nil, fmt.Errorf("get code failed: %w", err)
 	}
@@ -180,14 +160,11 @@ func (reader *ContractReader) GetCode(
 			"expecting an AddressLocation, but other location types are passed")
 	}
 
-	return reader.getCode(
-		flow.ConvertAddress(contractLocation.Address),
-		contractLocation.Name)
+	return reader.getCode(contractLocation)
 }
 
 func (reader *ContractReader) GetAccountContractCode(
-	runtimeAddress common.Address,
-	name string,
+	location common.AddressLocation,
 ) (
 	[]byte,
 	error,
@@ -202,9 +179,7 @@ func (reader *ContractReader) GetAccountContractCode(
 		return nil, fmt.Errorf("get account contract code failed: %w", err)
 	}
 
-	code, err := reader.getCode(
-		flow.ConvertAddress(runtimeAddress),
-		name)
+	code, err := reader.getCode(location)
 	if err != nil {
 		return nil, fmt.Errorf("get account contract code failed: %w", err)
 	}

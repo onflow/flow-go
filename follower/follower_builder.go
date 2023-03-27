@@ -50,8 +50,9 @@ import (
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
-	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
@@ -106,7 +107,7 @@ type FollowerServiceBuilder struct {
 
 	// components
 	LibP2PNode              p2p.LibP2PNode
-	FollowerState           protocol.MutableState
+	FollowerState           protocol.FollowerState
 	SyncCore                *synchronization.Core
 	FinalizationDistributor *pubsub.FinalizationDistributor
 	FinalizedHeader         *synceng.FinalizedHeaderCache
@@ -465,18 +466,19 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
-		// The following wrapper allows to black-list byzantine nodes via an admin command:
-		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		builder.NodeBlockListDistributor = cache.NewNodeBlockListDistributor()
-		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeBlockListDistributor)
+		builder.NodeDisallowListDistributor = cmd.BuildDisallowListNotificationDisseminator(builder.DisallowListNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
+
+		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
+		// the wrapper overrides the 'Ejected' flag of the disallow-listed nodes to true
+		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeDisallowListDistributor)
 		if err != nil {
-			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
+			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
 		}
 
 		// use the default identifier provider
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
 			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
-				pids := builder.LibP2PNode.GetPeersForProtocol(unicast.FlowProtocolID(builder.SporkID))
+				pids := builder.LibP2PNode.GetPeersForProtocol(protocols.FlowProtocolID(builder.SporkID))
 				result := make(flow.IdentifierList, 0, len(pids))
 
 				for _, pid := range pids {
@@ -498,6 +500,11 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 		}
 
 		return nil
+	})
+
+	builder.Component("disallow list notification distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		// distributor is returned as a component to be started and stopped.
+		return builder.NodeDisallowListDistributor, nil
 	})
 }
 
@@ -561,7 +568,7 @@ func (builder *FollowerServiceBuilder) validateParams() error {
 //   - No connection manager
 //   - No peer manager
 //   - Default libp2p pubsub options
-func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
+func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		var pis []peer.AddrInfo
 
@@ -573,6 +580,19 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			}
 
 			pis = append(pis, pi)
+		}
+
+		meshTracer := tracer.NewGossipSubMeshTracer(
+			builder.Logger,
+			builder.Metrics.Network,
+			builder.IdentityProvider,
+			builder.GossipSubConfig.LocalMeshLogInterval)
+
+		builder.GossipSubInspectorNotifDistributor = cmd.BuildGossipsubRPCValidationInspectorNotificationDisseminator(builder.GossipSubRPCInspectorNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
+		heroStoreOpts := cmd.BuildGossipsubRPCValidationInspectorHeroStoreOpts(builder.GossipSubRPCInspectorCacheSize, builder.MetricsRegisterer, builder.MetricsEnabled)
+		rpcValidationInspector, err := p2pbuilder.BuildGossipSubRPCValidationInspector(builder.Logger, builder.SporkID, builder.GossipSubRPCValidationConfigs, builder.GossipSubInspectorNotifDistributor, heroStoreOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gossipsub rpc validation inspector: %w", err)
 		}
 
 		node, err := p2pbuilder.NewNodeBuilder(
@@ -588,13 +608,17 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 				),
 			).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return p2pdht.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID),
+				return p2pdht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID),
 					builder.Logger,
 					builder.Metrics.Network,
 					p2pdht.AsClient(),
 					dht.BootstrapPeers(pis...),
 				)
 			}).
+			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
+			SetGossipSubTracer(meshTracer).
+			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
+			SetGossipSubValidationInspector(rpcValidationInspector).
 			Build()
 
 		if err != nil {
@@ -719,7 +743,7 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		middleware.WithMessageValidators(validators...),
 		// use default identifier provider
 	)
-	builder.NodeBlockListDistributor.AddConsumer(mw)
+	builder.NodeDisallowListDistributor.AddConsumer(mw)
 	builder.Middleware = mw
 	return builder.Middleware
 }

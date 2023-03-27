@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 )
@@ -239,6 +240,10 @@ func (b *BootstrapProcedure) NewExecutor(
 	return newBootstrapExecutor(b.BootstrapParams, ctx, txnState)
 }
 
+func (BootstrapProcedure) SetOutput(output ProcedureOutput) {
+	// do nothing
+}
+
 func (proc *BootstrapProcedure) ComputationLimit(_ Context) uint64 {
 	return math.MaxUint64
 }
@@ -255,11 +260,7 @@ func (BootstrapProcedure) Type() ProcedureType {
 	return BootstrapProcedureType
 }
 
-func (proc *BootstrapProcedure) InitialSnapshotTime() derived.LogicalTime {
-	return 0
-}
-
-func (proc *BootstrapProcedure) ExecutionTime() derived.LogicalTime {
+func (proc *BootstrapProcedure) ExecutionTime() logical.Time {
 	return 0
 }
 
@@ -290,6 +291,10 @@ func (b *bootstrapExecutor) Cleanup() {
 	// Do nothing.
 }
 
+func (b *bootstrapExecutor) Output() ProcedureOutput {
+	return ProcedureOutput{}
+}
+
 func (b *bootstrapExecutor) Preprocess() error {
 	// Do nothing.
 	return nil
@@ -306,7 +311,6 @@ func (b *bootstrapExecutor) Execute() error {
 
 	service := b.createServiceAccount()
 
-	b.deployContractAuditVouchers(service)
 	fungibleToken := b.deployFungibleToken()
 	flowToken := b.deployFlowToken(service, fungibleToken)
 	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
@@ -450,22 +454,6 @@ func (b *bootstrapExecutor) deployStorageFees(service, fungibleToken, flowToken 
 	)
 	panicOnMetaInvokeErrf("failed to deploy storage fees contract: %s", txError, err)
 	return service
-}
-
-// deployContractAuditVouchers deploys audit vouchers contract to the service account
-func (b *bootstrapExecutor) deployContractAuditVouchers(service flow.Address) {
-	contract := contracts.FlowContractAudits()
-
-	txError, err := b.invokeMetaTransaction(
-		b.ctx,
-		Transaction(
-			blueprints.DeployContractTransaction(
-				service,
-				contract,
-				"FlowContractAudits"),
-			0),
-	)
-	panicOnMetaInvokeErrf("failed to deploy contract audit vouchers contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) createMinter(service, flowToken flow.Address) {
@@ -909,6 +897,7 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 		NestedTransaction:           b.txnState,
 		DerivedTransactionCommitter: prog,
 	}
+
 	err = Run(tx.NewExecutor(ctx, txn))
 
 	return tx.Err, err

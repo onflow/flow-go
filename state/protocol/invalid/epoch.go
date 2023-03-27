@@ -89,6 +89,14 @@ func (u *Epoch) RandomSource() ([]byte, error) {
 	return nil, u.err
 }
 
+func (u *Epoch) FirstHeight() (uint64, error) {
+	return 0, u.err
+}
+
+func (u *Epoch) FinalHeight() (uint64, error) {
+	return 0, u.err
+}
+
 // Epochs is an epoch query for an invalid snapshot.
 type Epochs struct {
 	err error

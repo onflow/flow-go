@@ -49,7 +49,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/rpc"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -112,7 +111,7 @@ type ExecutionNode struct {
 
 	collector               module.ExecutionMetrics
 	executionState          state.ExecutionState
-	followerState           protocol.MutableState
+	followerState           protocol.FollowerState
 	committee               hotstuff.DynamicCommittee
 	ledgerStorage           *ledger.Ledger
 	events                  *storage.Events
@@ -124,7 +123,6 @@ type ExecutionNode struct {
 	checkerEng              *checker.Engine
 	syncCore                *chainsync.Core
 	pendingBlocks           *buffer.PendingBlocks // used in follower engine
-	deltas                  *ingestion.Deltas
 	syncEngine              *synchronization.Engine
 	followerCore            *hotstuff.FollowerLoop // follower hotstuff logic
 	followerEng             *followereng.Engine    // to sync blocks from consensus nodes
@@ -177,7 +175,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("sync core", exeNode.LoadSyncCore).
 		Module("execution receipts storage", exeNode.LoadExecutionReceiptsStorage).
 		Module("pending block cache", exeNode.LoadPendingBlockCache).
-		Module("state exeNode.deltas mempool", exeNode.LoadDeltasMempool).
 		Module("authorization checking function", exeNode.LoadAuthorizationCheckingFunction).
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
@@ -569,12 +566,6 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	return exeNode.providerEngine, nil
 }
 
-func (exeNode *ExecutionNode) LoadDeltasMempool(node *NodeConfig) error {
-	var err error
-	exeNode.deltas, err = ingestion.NewDeltas(exeNode.exeConf.stateDeltasLimit)
-	return err
-}
-
 func (exeNode *ExecutionNode) LoadAuthorizationCheckingFunction(
 	node *NodeConfig,
 ) error {
@@ -789,15 +780,6 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		return nil, fmt.Errorf("could not create requester engine: %w", err)
 	}
 
-	preferredExeFilter := filter.Any
-	preferredExeNodeID, err := flow.HexStringToIdentifier(exeNode.exeConf.preferredExeNodeIDStr)
-	if err == nil {
-		node.Logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
-		preferredExeFilter = filter.HasNodeID(preferredExeNodeID)
-	} else if exeNode.exeConf.preferredExeNodeIDStr != "" {
-		node.Logger.Debug().Str("prefered_exe_node_id_string", exeNode.exeConf.preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
-	}
-
 	exeNode.ingestionEng, err = ingestion.New(
 		node.Logger,
 		node.Network,
@@ -815,10 +797,6 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.collector,
 		node.Tracer,
 		exeNode.exeConf.extensiveLog,
-		preferredExeFilter,
-		exeNode.deltas,
-		exeNode.exeConf.syncThreshold,
-		exeNode.exeConf.syncFast,
 		exeNode.checkAuthorizedAtBlock,
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploader,
@@ -972,7 +950,10 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 		receiptRequestQueue,
 		exeNode.exeConf.receiptRequestWorkers,
 		channels.ProvideReceiptsByBlockID,
-		filter.HasRole(flow.RoleConsensus),
+		filter.And(
+			filter.HasWeight(true),
+			filter.HasRole(flow.RoleConsensus),
+		),
 		retrieve,
 	)
 	return eng, err
@@ -1104,18 +1085,18 @@ func getContractEpochCounter(
 	script := fvm.Script(scriptCode)
 
 	// execute the script
-	err = vm.Run(vmCtx, script, delta.NewDeltaView(snapshot))
+	_, output, err := vm.RunV2(vmCtx, script, snapshot)
 	if err != nil {
 		return 0, fmt.Errorf("could not read epoch counter, internal error while executing script: %w", err)
 	}
-	if script.Err != nil {
-		return 0, fmt.Errorf("could not read epoch counter, script error: %w", script.Err)
+	if output.Err != nil {
+		return 0, fmt.Errorf("could not read epoch counter, script error: %w", output.Err)
 	}
-	if script.Value == nil {
+	if output.Value == nil {
 		return 0, fmt.Errorf("could not read epoch counter, script returned no value")
 	}
 
-	epochCounter := script.Value.ToGoValue().(uint64)
+	epochCounter := output.Value.ToGoValue().(uint64)
 	return epochCounter, nil
 }
 

@@ -32,6 +32,7 @@ const (
 	codeExecutedBlock           = 23 // latest executed block with max height
 	codeRootHeight              = 24 // the height of the highest block contained in the root snapshot
 	codeLastCompleteBlockHeight = 25 // the height of the last block for which all collections were received
+	codeEpochFirstHeight        = 26 // the height of the first block in a given epoch
 
 	// codes for single entity storage
 	// 31 was used for identities before epochs

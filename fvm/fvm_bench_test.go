@@ -222,7 +222,8 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		logger,
 		ledgerCommitter,
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(tb, err)
 
 	snapshot := exeState.NewLedgerStorageSnapshot(ledger, initialCommit)
