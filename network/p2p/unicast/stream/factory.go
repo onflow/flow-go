@@ -1,4 +1,4 @@
-package unicast
+package stream
 
 import (
 	"context"
@@ -18,9 +18,9 @@ const (
 	protocolNotSupportedStr      = "protocol not supported"
 )
 
-// StreamFactory is a wrapper around libp2p host.Host to provide abstraction and encapsulation for unicast stream manager so that
+// Factory is a wrapper around libp2p host.Host to provide abstraction and encapsulation for unicast stream manager so that
 // it can create libp2p streams with finer granularity.
-type StreamFactory interface {
+type Factory interface {
 	SetStreamHandler(protocol.ID, network.StreamHandler)
 	DialAddress(peer.ID) []multiaddr.Multiaddr
 	ClearBackoff(peer.ID)
@@ -38,7 +38,7 @@ type LibP2PStreamFactory struct {
 	host host.Host
 }
 
-func NewLibP2PStreamFactory(h host.Host) StreamFactory {
+func NewLibP2PStreamFactory(h host.Host) Factory {
 	return &LibP2PStreamFactory{host: h}
 }
 

@@ -100,6 +100,7 @@ func (cache *epochRangeCache) add(epoch epochRange) error {
 }
 
 // EpochLookup implements the EpochLookup interface using protocol state to match views to epochs.
+// CAUTION: EpochLookup should only be used for querying the previous, current, or next epoch.
 type EpochLookup struct {
 	state                    protocol.State
 	mu                       sync.RWMutex

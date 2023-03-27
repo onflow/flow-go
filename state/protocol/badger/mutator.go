@@ -797,6 +797,8 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 	events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, block) })
 	// set current epoch counter corresponding to new epoch
 	metrics = append(metrics, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
+	// denote the most recent epoch transition height
+	metrics = append(metrics, func() { m.metrics.EpochTransitionHeight(block.Height) })
 	// set epoch phase - since we are starting a new epoch we begin in the staking phase
 	metrics = append(metrics, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
 	// set current epoch view values
