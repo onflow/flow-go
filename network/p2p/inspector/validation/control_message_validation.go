@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	mrand "math/rand"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
@@ -198,19 +199,18 @@ func (c *ControlMsgValidationInspector) Name() string {
 	return rpcInspectorComponentName
 }
 
-// blockingPreprocessingRpc generic pre-processing func that ensures the RPC control message count does not exceed the configured discard threshold.
+// blockingPreprocessingRpc generic pre-processing validation func that ensures the RPC control message count does not exceed the configured discard threshold.
 func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
+	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
+		Uint64("ctrl_msg_count", count).
 		Str("peer_id", from.String()).
 		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
-
-	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	// if Count greater than discard threshold drop message and penalize
 	if count > validationConfig.DiscardThreshold {
 		discardThresholdErr := NewDiscardThresholdErr(validationConfig.ControlMsg, count, validationConfig.DiscardThreshold)
 		lg.Warn().
 			Err(discardThresholdErr).
-			Uint64("ctrl_msg_count", count).
 			Uint64("upper_threshold", discardThresholdErr.discardThreshold).
 			Bool(logging.KeySuspicious, true).
 			Msg("rejecting rpc control message")
@@ -228,6 +228,38 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 	return nil
 }
 
+// blockingPreprocessingIHaveRpc iHave pre-processing validation func that performs some pre-validation of iHave RPC control messages.
+// If the iHave RPC control message count exceeds the configured discard threshold we perform synchronous topic validation on a subset
+// of the iHave control messages. This is due to the fact that the number of iHave messages a node can send does not have an upper bound
+// thus we cannot discard the entire RPC if the count exceeds the configured discard threshold.
+func (c *ControlMsgValidationInspector) blockingPreprocessingIHaveRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
+	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
+	lg := c.logger.With().
+		Uint64("ctrl_msg_count", count).
+		Str("peer_id", from.String()).
+		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
+	// if count greater than discard threshold perform synchronous topic validation on random subset of the iHave messages
+	if count > validationConfig.DiscardThreshold {
+		sampleSize := int(count)
+		err := c.validateTopics(validationConfig.ControlMsg, controlMessage, sampleSize)
+		if err != nil {
+			lg.Warn().
+				Err(err).
+				Bool(logging.KeySuspicious, true).
+				Msg("ihave topic validation pre-processing failed rejecting rpc control message")
+			err = c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, err))
+			if err != nil {
+				lg.Error().
+					Err(err).
+					Bool(logging.KeySuspicious, true).
+					Msg("failed to distribute invalid control message notification")
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // processInspectMsgReq func used by component workers to perform further inspection of control messages that will check if the messages are rate limited
 // and ensure all topic IDS are valid when the amount of messages is above the configured safety threshold.
 func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequest) error {
@@ -241,7 +273,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 	case !req.validationConfig.RateLimiter.Allow(req.Peer, int(count)): // check if Peer RPC messages are rate limited
 		validationErr = NewRateLimitedControlMsgErr(req.validationConfig.ControlMsg)
 	case count > req.validationConfig.SafetyThreshold: // check if Peer RPC messages Count greater than safety threshold further inspect each message individually
-		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg)
+		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg, 0)
 	default:
 		lg.Trace().
 			Uint64("upper_threshold", req.validationConfig.DiscardThreshold).
@@ -272,14 +304,18 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 		return uint64(len(ctrlMsg.GetGraft()))
 	case p2p.CtrlMsgPrune:
 		return uint64(len(ctrlMsg.GetPrune()))
+	case p2p.CtrlMsgIHave:
+		return uint64(len(ctrlMsg.GetIhave()))
 	default:
 		return 0
 	}
 }
 
 // validateTopics ensures all topics in the specified control message are valid flow topic/channel and no duplicate topics exist.
+// A sampleSize is only used when validating the topics of iHave control messages types because the number of iHave messages that
+// can exist in a single RPC is unbounded.
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
+func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage, sampleSize int) error {
 	seen := make(map[channels.Topic]struct{})
 	validateTopic := func(topic channels.Topic) error {
 		if _, ok := seen[topic]; ok {
@@ -309,8 +345,28 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 				return err
 			}
 		}
+	case p2p.CtrlMsgIHave:
+		iHaves := ctrlMsg.GetIhave()
+		sampleIndices := c.randomSampleIndices(len(iHaves), sampleSize)
+		for _, index := range sampleIndices {
+			topic := channels.Topic(iHaves[index].GetTopicID())
+			err := validateTopic(topic)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
+}
+
+// randomSampleIndices returns a slice of random integers of size sampleSize, the random integers
+// will be in the range of [0, maxInt).
+func (c *ControlMsgValidationInspector) randomSampleIndices(maxInt, sampleSize int) []int {
+	indices := make([]int, sampleSize)
+	for i := 0; i < sampleSize; i++ {
+		indices[i] = mrand.Intn(maxInt)
+	}
+	return indices
 }
 
 // validateTopic the topic is a valid flow topic/channel.
