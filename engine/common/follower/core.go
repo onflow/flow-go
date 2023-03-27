@@ -216,9 +216,9 @@ func (c *Core) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready com
 	}
 }
 
-// OnFinalizedBlock updates local state of pendingCache tree using received finalized block.
-// Is NOT concurrency safe, has to be used by the same goroutine as extendCertifiedBlocks.
-// OnFinalizedBlock and extendCertifiedBlocks MUST be sequentially ordered.
+// OnFinalizedBlock updates local state of pendingCache tree using received finalized block and queues finalized block
+// to be processed by internal goroutine.
+// This function is safe to use in concurrent environment.
 func (c *Core) OnFinalizedBlock(final *flow.Header) {
 	c.pendingCache.PruneUpToView(final.View)
 
