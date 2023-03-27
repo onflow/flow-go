@@ -149,7 +149,6 @@ func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation
 		validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
 		validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
 	})
-
 	return &validation.ControlMsgValidationInspectorConfig{
 		NumberOfWorkers:     validation.DefaultNumberOfWorkers,
 		InspectMsgStoreOpts: opts,

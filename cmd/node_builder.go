@@ -313,6 +313,11 @@ func DefaultBaseConfig() *BaseConfig {
 					validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
 					validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
 				},
+				IHaveLimits: map[string]int{
+					validation.DiscardThresholdMapKey: validation.DefaultIHaveDiscardThreshold,
+					validation.SafetyThresholdMapKey:  validation.DefaultIHaveSafetyThreshold,
+					validation.RateLimitMapKey:        validation.DefaultIHaveRateLimit,
+				},
 			},
 			DNSCacheTTL:                                dns.DefaultTimeToLive,
 			LibP2PResourceManagerConfig:                p2pbuilder.DefaultResourceManagerConfig(),

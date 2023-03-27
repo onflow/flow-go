@@ -51,6 +51,8 @@ type ControlMsgValidationInspectorConfig struct {
 	GraftValidationCfg *CtrlMsgValidationConfig
 	// PruneValidationCfg validation configuration for PRUNE control messages.
 	PruneValidationCfg *CtrlMsgValidationConfig
+	// IHaveValidationCfg validation configuration for IHAVE control messages.
+	IHaveValidationCfg *CtrlMsgValidationConfig
 }
 
 // getCtrlMsgValidationConfig returns the CtrlMsgValidationConfig for the specified p2p.ControlMessageType.
@@ -60,6 +62,8 @@ func (conf *ControlMsgValidationInspectorConfig) getCtrlMsgValidationConfig(cont
 		return conf.GraftValidationCfg, true
 	case p2p.CtrlMsgPrune:
 		return conf.PruneValidationCfg, true
+	case p2p.CtrlMsgIHave:
+		return conf.IHaveValidationCfg, true
 	default:
 		return nil, false
 	}
@@ -67,7 +71,7 @@ func (conf *ControlMsgValidationInspectorConfig) getCtrlMsgValidationConfig(cont
 
 // allCtrlMsgValidationConfig returns all control message validation configs in a list.
 func (conf *ControlMsgValidationInspectorConfig) allCtrlMsgValidationConfig() CtrlMsgValidationConfigs {
-	return CtrlMsgValidationConfigs{conf.GraftValidationCfg, conf.PruneValidationCfg}
+	return CtrlMsgValidationConfigs{conf.GraftValidationCfg, conf.PruneValidationCfg, conf.IHaveValidationCfg}
 }
 
 // ControlMsgValidationInspector RPC message inspector that inspects control messages and performs some validation on them,
@@ -194,7 +198,7 @@ func (c *ControlMsgValidationInspector) Name() string {
 	return rpcInspectorComponentName
 }
 
-// blockingPreprocessingRpc ensures the RPC control message count does not exceed the configured discard threshold.
+// blockingPreprocessingRpc generic pre-processing func that ensures the RPC control message count does not exceed the configured discard threshold.
 func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
 	lg := c.logger.With().
 		Str("peer_id", from.String()).

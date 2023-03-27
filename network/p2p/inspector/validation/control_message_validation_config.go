@@ -36,6 +36,17 @@ const (
 	// Currently, the default rate limit is equal to the discard threshold amount.
 	// This will result in a rate limit of 30 prunes/sec.
 	DefaultPruneRateLimit = DefaultPruneDiscardThreshold
+
+	// DefaultIHaveDiscardThreshold upper bound for ihave messages, RPC control messages with a count
+	// above the discard threshold are automatically discarded.
+	DefaultIHaveDiscardThreshold = 30
+	// DefaultIHaveSafetyThreshold a lower bound for ihave messages, RPC control messages with a message count
+	// lower than the safety threshold bypass validation.
+	DefaultIHaveSafetyThreshold = .5 * DefaultPruneDiscardThreshold
+	// DefaultIHaveRateLimit the rate limit for ihave control messages.
+	// Currently, the default rate limit is equal to the discard threshold amount.
+	// This will result in a rate limit of 30 prunes/sec.
+	DefaultIHaveRateLimit = DefaultPruneDiscardThreshold
 )
 
 // CtrlMsgValidationLimits limits used to construct control message validation configuration.

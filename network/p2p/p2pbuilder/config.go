@@ -38,4 +38,6 @@ type GossipSubRPCValidationConfigs struct {
 	GraftLimits map[string]int
 	// PruneLimits PRUNE control message validation limits.
 	PruneLimits map[string]int
+	// IHaveLimits IHAVE control message validation limits.
+	IHaveLimits map[string]int
 }
