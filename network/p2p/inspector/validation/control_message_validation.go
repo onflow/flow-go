@@ -89,7 +89,7 @@ var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
 
 // NewInspectMsgRequest returns a new *InspectMsgRequest.
 func NewInspectMsgRequest(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) (*InspectMsgRequest, error) {
-	b := make([]byte, 1000)
+	b := make([]byte, 128)
 	_, err := rand.Read(b)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get inspect message request nonce: %w", err)
