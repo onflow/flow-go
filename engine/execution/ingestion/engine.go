@@ -648,11 +648,12 @@ func (e *Engine) executeBlock(
 		}
 	}
 
+	finalEndState := computationResult.InterimEndState()
 	lg.Info().
 		Hex("parent_block", executableBlock.Block.Header.ParentID[:]).
 		Int("collections", len(executableBlock.Block.Payload.Guarantees)).
 		Hex("start_state", executableBlock.StartState[:]).
-		Hex("final_state", computationResult.EndState[:]).
+		Hex("final_state", finalEndState[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
@@ -665,7 +666,7 @@ func (e *Engine) executeBlock(
 		e.metrics.ExecutionBlockExecutionEffortVectorComponent(computationKind.String(), intensity)
 	}
 
-	err = e.onBlockExecuted(executableBlock, computationResult.EndState)
+	err = e.onBlockExecuted(executableBlock, finalEndState)
 	if err != nil {
 		lg.Err(err).Msg("failed in process block's children")
 	}
@@ -1115,10 +1116,11 @@ func (e *Engine) saveExecutionResults(
 		return fmt.Errorf("cannot persist execution state: %w", err)
 	}
 
+	finalEndState := result.InterimEndState()
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Hex("start_state", result.ExecutableBlock.StartState[:]).
-		Hex("final_state", result.EndState[:]).
+		Hex("final_state", finalEndState[:]).
 		Msg("saved computation results")
 
 	return nil
