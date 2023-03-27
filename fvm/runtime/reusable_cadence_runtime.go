@@ -16,6 +16,7 @@ type Environment interface {
 type ReusableCadenceRuntime struct {
 	runtime.Runtime
 	runtime.Environment
+	*runtime.CoverageReport
 
 	fvmEnv Environment
 }
@@ -44,8 +45,9 @@ func (reusable *ReusableCadenceRuntime) ReadStored(
 		address,
 		path,
 		runtime.Context{
-			Interface:   reusable.fvmEnv,
-			Environment: reusable.Environment,
+			Interface:      reusable.fvmEnv,
+			Environment:    reusable.Environment,
+			CoverageReport: reusable.CoverageReport,
 		},
 	)
 }
@@ -65,8 +67,9 @@ func (reusable *ReusableCadenceRuntime) InvokeContractFunction(
 		arguments,
 		argumentTypes,
 		runtime.Context{
-			Interface:   reusable.fvmEnv,
-			Environment: reusable.Environment,
+			Interface:      reusable.fvmEnv,
+			Environment:    reusable.Environment,
+			CoverageReport: reusable.CoverageReport,
 		},
 	)
 }
@@ -78,9 +81,10 @@ func (reusable *ReusableCadenceRuntime) NewTransactionExecutor(
 	return reusable.Runtime.NewTransactionExecutor(
 		script,
 		runtime.Context{
-			Interface:   reusable.fvmEnv,
-			Location:    location,
-			Environment: reusable.Environment,
+			Interface:      reusable.fvmEnv,
+			Location:       location,
+			Environment:    reusable.Environment,
+			CoverageReport: reusable.CoverageReport,
 		},
 	)
 }
@@ -95,8 +99,9 @@ func (reusable *ReusableCadenceRuntime) ExecuteScript(
 	return reusable.Runtime.ExecuteScript(
 		script,
 		runtime.Context{
-			Interface: reusable.fvmEnv,
-			Location:  location,
+			Interface:      reusable.fvmEnv,
+			Location:       location,
+			CoverageReport: reusable.CoverageReport,
 		},
 	)
 }
@@ -114,6 +119,10 @@ type ReusableCadenceRuntimePool struct {
 	//
 	// Note that this is primarily used for testing.
 	newCustomRuntime CadenceRuntimeConstructor
+
+	// This function enables the injection of CoverageReport from outside
+	// the pool, making it easier to swap objects on demand.
+	CoverageReport func() *runtime.CoverageReport
 }
 
 func newReusableCadenceRuntimePool(
@@ -178,18 +187,38 @@ func (pool ReusableCadenceRuntimePool) Borrow(
 		)
 	}
 
-	reusable.SetFvmEnvironment(fvmEnv)
+	pool.setupRuntimeOnBorrow(reusable, fvmEnv)
 	return reusable
 }
 
 func (pool ReusableCadenceRuntimePool) Return(
 	reusable *ReusableCadenceRuntime,
 ) {
-	reusable.SetFvmEnvironment(nil)
+	pool.cleanupRuntimeOnReturn(reusable)
 	select {
 	case pool.pool <- reusable:
 		// Do nothing.
 	default:
 		// Do nothing.  Discard the overflow entry.
 	}
+}
+
+func (pool ReusableCadenceRuntimePool) setupRuntimeOnBorrow(
+	reusable *ReusableCadenceRuntime,
+	fvmEnv Environment,
+) {
+	if pool.CoverageReport != nil {
+		// pool.CoverageReport is a function, that returns a coverage report.
+		// Whoever provides it can decide if they want to create a new one
+		// or reuse an existing one.
+		reusable.CoverageReport = pool.CoverageReport()
+	}
+	reusable.SetFvmEnvironment(fvmEnv)
+}
+
+func (pool ReusableCadenceRuntimePool) cleanupRuntimeOnReturn(
+	reusable *ReusableCadenceRuntime,
+) {
+	reusable.CoverageReport = nil
+	reusable.SetFvmEnvironment(nil)
 }

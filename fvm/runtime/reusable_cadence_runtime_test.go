@@ -77,3 +77,37 @@ func TestReusableCadenceRuntimePoolSharing(t *testing.T) {
 
 	require.Same(t, entry, entry2)
 }
+
+func TestReusableCadenceRuntimePoolWithoutCoverageReport(t *testing.T) {
+	pool := NewReusableCadenceRuntimePool(0, runtime.Config{
+		CoverageReportingEnabled: false,
+	})
+	require.Nil(t, pool.CoverageReport)
+
+	entry := pool.Borrow(nil)
+	require.NotNil(t, entry)
+	require.Nil(t, entry.CoverageReport)
+
+	pool.Return(entry)
+	require.Nil(t, entry.CoverageReport)
+}
+
+func TestReusableCadenceRuntimePoolWithCoverageReport(t *testing.T) {
+	pool := NewReusableCadenceRuntimePool(0, runtime.Config{
+		CoverageReportingEnabled: true,
+	})
+	coverageReport := runtime.NewCoverageReport()
+	pool.CoverageReport = func() *runtime.CoverageReport {
+		return coverageReport
+	}
+	require.NotNil(t, pool.CoverageReport)
+
+	entry := pool.Borrow(nil)
+	require.NotNil(t, entry)
+	require.NotNil(t, entry.CoverageReport)
+
+	require.Same(t, coverageReport, entry.CoverageReport)
+
+	pool.Return(entry)
+	require.Nil(t, entry.CoverageReport)
+}
