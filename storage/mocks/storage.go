@@ -189,7 +189,7 @@ func (m *MockHeaders) EXPECT() *MockHeadersMockRecorder {
 	return m.recorder
 }
 
-// BlockIDByHeight mocks base method
+// BlockIDByHeight mocks base method.
 func (m *MockHeaders) BlockIDByHeight(arg0 uint64) (flow.Identifier, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BlockIDByHeight", arg0)
@@ -249,7 +249,7 @@ func (mr *MockHeadersMockRecorder) ByParentID(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByParentID", reflect.TypeOf((*MockHeaders)(nil).ByParentID), arg0)
 }
 
-// Store mocks base method
+// Store mocks base method.
 func (m *MockHeaders) Store(arg0 *flow.Header) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Store", arg0)
