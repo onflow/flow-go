@@ -443,20 +443,18 @@ func (_m *Environment) Events() flow.EventsList {
 }
 
 // FlushPendingUpdates provides a mock function with given fields:
-func (_m *Environment) FlushPendingUpdates() ([]environment.ContractUpdateKey, error) {
+func (_m *Environment) FlushPendingUpdates() (environment.ContractUpdates, error) {
 	ret := _m.Called()
 
-	var r0 []environment.ContractUpdateKey
+	var r0 environment.ContractUpdates
 	var r1 error
-	if rf, ok := ret.Get(0).(func() ([]environment.ContractUpdateKey, error)); ok {
+	if rf, ok := ret.Get(0).(func() (environment.ContractUpdates, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() []environment.ContractUpdateKey); ok {
+	if rf, ok := ret.Get(0).(func() environment.ContractUpdates); ok {
 		r0 = rf()
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]environment.ContractUpdateKey)
-		}
+		r0 = ret.Get(0).(environment.ContractUpdates)
 	}
 
 	if rf, ok := ret.Get(1).(func() error); ok {

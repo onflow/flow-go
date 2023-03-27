@@ -47,7 +47,6 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	accounts, err := testutil.CreateAccounts(
 		vm,
 		ledger,
-		derived.NewEmptyDerivedBlockData(),
 		privateKeys,
 		chain)
 	require.NoError(t, err)
@@ -214,7 +213,6 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	accounts, err := testutil.CreateAccounts(
 		vm,
 		ledger,
-		derived.NewEmptyDerivedBlockData(),
 		privateKeys,
 		chain)
 	require.NoError(t, err)
