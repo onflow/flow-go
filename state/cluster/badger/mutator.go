@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"github.com/dgraph-io/badger/v2"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -14,24 +15,73 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/fork"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
+
+type EpochBoundsChecker struct {
+	firstView, finalView uint64
+	firstHeight          uint64
+	finalHeight          atomic.Uint64
+}
+
+type referenceEpochBounds struct {
+	firstView   uint64
+	finalView   uint64
+	firstHeight uint64
+	finalHeight *uint64
+}
+
+func newReferenceEpochBounds(epoch protocol.Epoch) (*referenceEpochBounds, error) {
+	firstView, err := epoch.FirstView()
+	if err != nil {
+		return nil, err
+	}
+	finalView, err := epoch.FinalView()
+	if err != nil {
+		return nil, err
+	}
+	firstHeight, err := epoch.FirstHeight()
+	if err != nil {
+		return nil, err
+	}
+	bounds := &referenceEpochBounds{
+		firstView:   firstView,
+		finalView:   finalView,
+		firstHeight: firstHeight,
+	}
+
+	finalHeight, err := epoch.FinalHeight()
+	if err != nil {
+		if errors.Is(err, protocol.ErrEpochTransitionNotFinalized) {
+			return bounds, nil
+		}
+		return nil, err
+	}
+
+	*bounds.finalHeight = finalHeight
+	return bounds, nil
+}
 
 type MutableState struct {
 	*State
 	tracer   module.Tracer
 	headers  storage.Headers
 	payloads storage.ClusterPayloads
+	refEpoch referenceEpochBounds
+	epoch    protocol.Epoch
 }
 
-func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads) (*MutableState, error) {
+// need [views], [heights], epoch counter (to lookup final height)
+func NewMutableState(state *State, epoch protocol.Epoch, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads) (*MutableState, error) {
 	mutableState := &MutableState{
 		State:    state,
 		tracer:   tracer,
 		headers:  headers,
 		payloads: payloads,
+		epoch:    epoch,
 	}
 	return mutableState, nil
 }
