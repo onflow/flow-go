@@ -371,7 +371,7 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 		// no errors.  This is to be inline with the Cadence runtime. Otherwise
 		// Cadence runtime cannot distinguish between a 'key not found error'
 		// vs other internal errors.
-		if errors.IsAccountAccountPublicKeyNotFoundError(err) {
+		if errors.IsAccountPublicKeyNotFoundError(err) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("revoking account key failed: %w", err)
