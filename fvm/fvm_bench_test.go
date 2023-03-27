@@ -90,7 +90,7 @@ func (account *TestBenchAccount) DeployContract(b *testing.B, blockExec TestBenc
 	require.NoError(b, err)
 
 	computationResult := blockExec.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
-	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
+	require.Empty(b, computationResult.AllTransactionResults()[0].ErrorMessage)
 }
 
 func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestBenchBlockExecutor, list []string) {
@@ -127,7 +127,7 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 	require.NoError(b, err)
 
 	computationResult := blockExec.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
-	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
+	require.Empty(b, computationResult.AllTransactionResults()[0].ErrorMessage)
 }
 
 // BasicBlockExecutor executes blocks in sequence and applies all changes (not fork aware)
@@ -267,7 +267,7 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 		derivedBlockData)
 	require.NoError(tb, err)
 
-	b.activeStateCommitment = computationResult.EndState
+	b.activeStateCommitment = computationResult.InterimEndState()
 
 	return computationResult
 }
@@ -297,21 +297,19 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 		require.NoError(tb, err)
 
 		computationResult := b.ExecuteCollections(tb, [][]*flow.TransactionBody{{txBody}})
-		require.Empty(tb, computationResult.TransactionResults[0].ErrorMessage)
+		require.Empty(tb, computationResult.AllTransactionResults()[0].ErrorMessage)
 
 		var addr flow.Address
 
-		for _, eventList := range computationResult.Events {
-			for _, event := range eventList {
-				if event.Type == flow.EventAccountCreated {
-					data, err := jsoncdc.Decode(nil, event.Payload)
-					if err != nil {
-						tb.Fatal("setup account failed, error decoding events")
-					}
-					addr = flow.ConvertAddress(
-						data.(cadence.Event).Fields[0].(cadence.Address))
-					break
+		for _, event := range computationResult.AllEvents() {
+			if event.Type == flow.EventAccountCreated {
+				data, err := jsoncdc.Decode(nil, event.Payload)
+				if err != nil {
+					tb.Fatal("setup account failed, error decoding events")
 				}
+				addr = flow.ConvertAddress(
+					data.(cadence.Event).Fields[0].(cadence.Address))
+				break
 			}
 		}
 		if addr == flow.EmptyAddress {
@@ -444,10 +442,10 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			computationResult := blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
 			totalInteractionUsed := uint64(0)
 			totalComputationUsed := uint64(0)
-			for j := 0; j < transactionsPerBlock; j++ {
-				require.Empty(b, computationResult.TransactionResults[j].ErrorMessage)
-				totalInteractionUsed += logE.InteractionUsed[computationResult.TransactionResults[j].ID().String()]
-				totalComputationUsed += computationResult.TransactionResults[j].ComputationUsed
+			for _, txRes := range computationResult.AllTransactionResults() {
+				require.Empty(b, txRes.ErrorMessage)
+				totalInteractionUsed += logE.InteractionUsed[txRes.ID().String()]
+				totalComputationUsed += txRes.ComputationUsed
 			}
 			b.ReportMetric(float64(totalInteractionUsed/uint64(transactionsPerBlock)), "interactions")
 			b.ReportMetric(float64(totalComputationUsed/uint64(transactionsPerBlock)), "computation")
@@ -689,8 +687,8 @@ func BenchRunNFTBatchTransfer(b *testing.B,
 		}
 
 		computationResult = blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
-		for j := 0; j < transactionsPerBlock; j++ {
-			require.Empty(b, computationResult.TransactionResults[j].ErrorMessage)
+		for _, txRes := range computationResult.AllTransactionResults() {
+			require.Empty(b, txRes.ErrorMessage)
 		}
 	}
 }
@@ -730,7 +728,7 @@ func setupReceiver(b *testing.B, be TestBenchBlockExecutor, nftAccount, batchNFT
 	require.NoError(b, err)
 
 	computationResult := be.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
-	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
+	require.Empty(b, computationResult.AllTransactionResults()[0].ErrorMessage)
 }
 
 func mintNFTs(b *testing.B, be TestBenchBlockExecutor, batchNFTAccount *TestBenchAccount, size int) {
@@ -766,7 +764,7 @@ func mintNFTs(b *testing.B, be TestBenchBlockExecutor, batchNFTAccount *TestBenc
 	require.NoError(b, err)
 
 	computationResult := be.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
-	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
+	require.Empty(b, computationResult.AllTransactionResults()[0].ErrorMessage)
 }
 
 func fundAccounts(b *testing.B, be TestBenchBlockExecutor, value cadence.UFix64, accounts ...flow.Address) {
@@ -783,7 +781,7 @@ func fundAccounts(b *testing.B, be TestBenchBlockExecutor, value cadence.UFix64,
 		require.NoError(b, err)
 
 		computationResult := be.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
-		require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
+		require.Empty(b, computationResult.AllTransactionResults()[0].ErrorMessage)
 	}
 }
 
