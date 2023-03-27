@@ -27,14 +27,17 @@ validate:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
 	# multiple execution nodes are required to prevent seals being generated in case of execution forking.
 	$(error Number of Execution nodes should be no less than 2)
-else ifeq ($(strip $(PROJECT_NAME)),)
-	$(eval PROJECT_NAME=$(COMMIT_SHA))
 else ifeq ($(strip $(VALID_CONSENSUS)), 1)
 	$(error Number of Consensus nodes should be no less than 2)
 else ifeq ($(strip $(VALID_COLLECTION)), 1)
 	$(error Number of Collection nodes should be no less than 6)
 else ifeq ($(strip $(NAMESPACE)),)
-	$(error Namespace cannot be empty)
+	$(error NAMESPACE cannot be empty)
+endif
+
+init:
+ifeq ($(strip $(PROJECT_NAME)),)
+	$(eval PROJECT_NAME=$(COMMIT_SHA))
 endif
 
 # assumes there is a checked out version of flow-go in a "flow-go" sub-folder at this level so that the bootstrap executable
@@ -57,13 +60,13 @@ gen-helm-l2:
 # runs bootstrap to generate all node info
 # runs level 1 automation to read bootstrap data and generate data input for level 2
 # runs level 2 automation to generate values.yml based on template and data values from previous step
-gen-helm-values: validate gen-bootstrap gen-helm-l1 gen-helm-l2
+gen-helm-values: validate init gen-bootstrap gen-helm-l1 gen-helm-l2
 
 # main target for deployment
-deploy-all: validate gen-helm-values k8s-secrets-create helm-deploy
+deploy-all: validate init gen-helm-values k8s-secrets-create helm-deploy
 
 # main target for cleaning up a deployment
-clean-all: validate k8s-delete k8s-delete-secrets clean-bootstrap clean-gen-helm clean-flow
+clean-all: validate init k8s-delete k8s-delete-secrets clean-bootstrap clean-gen-helm clean-flow
 
 clean-bootstrap:
 	rm -rf ./bootstrap
@@ -88,8 +91,8 @@ k8s-delete-secrets:
 k8s-expose-locally: validate
 	kubectl port-forward service/access1-${PROJECT_NAME} 9000:9000 --namespace ${NAMESPACE}
 
-k8s-pod-health:
-	kubectl get pods
+k8s-pod-health: validate
+	kubectl get pods --namespace ${NAMESPACE}
 
 k8s-test-network-accessibility:
 	flow blocks get latest --host localhost:9000
