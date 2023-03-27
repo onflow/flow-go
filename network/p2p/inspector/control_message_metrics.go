@@ -35,7 +35,7 @@ func (c *ControlMsgMetricsInspector) Name() string {
 // NewControlMsgMetricsInspector returns a new *ControlMsgMetricsInspector
 func NewControlMsgMetricsInspector(metrics p2p.GossipSubControlMetricsObserver) *ControlMsgMetricsInspector {
 	return &ControlMsgMetricsInspector{
-		Component: &module.NoopReadyDoneAware{},
+		Component: &module.NoopComponent{},
 		metrics:   metrics,
 	}
 }
