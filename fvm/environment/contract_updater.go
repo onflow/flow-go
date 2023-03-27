@@ -33,7 +33,7 @@ func DefaultContractUpdaterParams() ContractUpdaterParams {
 }
 
 type sortableContractUpdates struct {
-	keys    []ContractUpdateKey
+	keys    []common.AddressLocation
 	updates []ContractUpdate
 }
 
@@ -262,7 +262,7 @@ type ContractUpdaterImpl struct {
 	accounts        Accounts
 	signingAccounts []flow.Address
 
-	draftUpdates map[ContractUpdateKey]ContractUpdate
+	draftUpdates map[common.AddressLocation]ContractUpdate
 
 	ContractUpdaterStubs
 }
@@ -330,11 +330,8 @@ func (updater *ContractUpdaterImpl) UpdateAccountContractCode(
 		return fmt.Errorf("update account contract code failed: %w", err)
 	}
 
-	address := flow.ConvertAddress(location.Address)
-
 	err = updater.SetContract(
-		address,
-		location.Name,
+		location,
 		code,
 		updater.signingAccounts)
 	if err != nil {
@@ -357,11 +354,8 @@ func (updater *ContractUpdaterImpl) RemoveAccountContractCode(
 		return fmt.Errorf("remove account contract code failed: %w", err)
 	}
 
-	address := flow.ConvertAddress(location.Address)
-
 	err = updater.RemoveContract(
-		address,
-		location.Name,
+		location,
 		updater.signingAccounts)
 	if err != nil {
 		return fmt.Errorf("remove account contract code failed: %w", err)
@@ -371,15 +365,14 @@ func (updater *ContractUpdaterImpl) RemoveAccountContractCode(
 }
 
 func (updater *ContractUpdaterImpl) SetContract(
-	address flow.Address,
-	name string,
+	location common.AddressLocation,
 	code []byte,
 	signingAccounts []flow.Address,
 ) error {
 	// Initial contract deployments must be authorized by signing accounts.
 	//
 	// Contract updates are always allowed.
-	exists, err := updater.accounts.ContractExists(name, address)
+	exists, err := updater.accounts.ContractExists(location.Name, flow.ConvertAddress(location.Address))
 	if err != nil {
 		return err
 	}
@@ -394,22 +387,16 @@ func (updater *ContractUpdaterImpl) SetContract(
 
 	}
 
-	contractUpdateKey := ContractUpdateKey{
-		Address: address,
-		Name:    name,
-	}
-
-	updater.draftUpdates[contractUpdateKey] = ContractUpdate{
-		ContractUpdateKey: contractUpdateKey,
-		Code:              code,
+	updater.draftUpdates[location] = ContractUpdate{
+		Location: location,
+		Code:     code,
 	}
 
 	return nil
 }
 
 func (updater *ContractUpdaterImpl) RemoveContract(
-	address flow.Address,
-	name string,
+	location common.AddressLocation,
 	signingAccounts []flow.Address,
 ) (err error) {
 	// check if authorized
@@ -421,9 +408,8 @@ func (updater *ContractUpdaterImpl) RemoveContract(
 					"accounts"))
 	}
 
-	uk := ContractUpdateKey{Address: address, Name: name}
-	u := ContractUpdate{ContractUpdateKey: uk}
-	updater.draftUpdates[uk] = u
+	u := ContractUpdate{Location: location}
+	updater.draftUpdates[location] = u
 
 	return nil
 }
@@ -433,15 +419,15 @@ func (updater *ContractUpdaterImpl) Commit() (ContractUpdates, error) {
 	updater.Reset()
 
 	contractUpdates := ContractUpdates{
-		Updates:   make([]ContractUpdateKey, 0, len(updateList)),
-		Deploys:   make([]ContractUpdateKey, 0, len(updateList)),
-		Deletions: make([]ContractUpdateKey, 0, len(updateList)),
+		Updates:   make([]common.AddressLocation, 0, len(updateList)),
+		Deploys:   make([]common.AddressLocation, 0, len(updateList)),
+		Deletions: make([]common.AddressLocation, 0, len(updateList)),
 	}
 
 	var err error
 	for _, v := range updateList {
 		var currentlyExists bool
-		currentlyExists, err = updater.accounts.ContractExists(v.Name, v.Address)
+		currentlyExists, err = updater.accounts.ContractExists(v.Location.Name, flow.ConvertAddress(v.Location.Address))
 		if err != nil {
 			return ContractUpdates{}, err
 		}
@@ -449,21 +435,21 @@ func (updater *ContractUpdaterImpl) Commit() (ContractUpdates, error) {
 
 		if shouldDelete {
 			// this is a removal
-			contractUpdates.Deletions = append(contractUpdates.Deletions, v.ContractUpdateKey)
-			err = updater.accounts.DeleteContract(v.Name, v.Address)
+			contractUpdates.Deletions = append(contractUpdates.Deletions, v.Location)
+			err = updater.accounts.DeleteContract(v.Location.Name, flow.ConvertAddress(v.Location.Address))
 			if err != nil {
 				return ContractUpdates{}, err
 			}
 		} else {
 			if !currentlyExists {
 				// this is a deployment
-				contractUpdates.Deploys = append(contractUpdates.Deploys, v.ContractUpdateKey)
+				contractUpdates.Deploys = append(contractUpdates.Deploys, v.Location)
 			} else {
 				// this is an update
-				contractUpdates.Updates = append(contractUpdates.Updates, v.ContractUpdateKey)
+				contractUpdates.Updates = append(contractUpdates.Updates, v.Location)
 			}
 
-			err = updater.accounts.SetContract(v.Name, v.Address, v.Code)
+			err = updater.accounts.SetContract(v.Location.Name, flow.ConvertAddress(v.Location.Address), v.Code)
 			if err != nil {
 				return ContractUpdates{}, err
 			}
@@ -474,7 +460,7 @@ func (updater *ContractUpdaterImpl) Commit() (ContractUpdates, error) {
 }
 
 func (updater *ContractUpdaterImpl) Reset() {
-	updater.draftUpdates = make(map[ContractUpdateKey]ContractUpdate)
+	updater.draftUpdates = make(map[common.AddressLocation]ContractUpdate)
 }
 
 func (updater *ContractUpdaterImpl) HasUpdates() bool {
@@ -485,7 +471,7 @@ func (updater *ContractUpdaterImpl) updates() []ContractUpdate {
 	if len(updater.draftUpdates) == 0 {
 		return nil
 	}
-	keys := make([]ContractUpdateKey, 0, len(updater.draftUpdates))
+	keys := make([]common.AddressLocation, 0, len(updater.draftUpdates))
 	updates := make([]ContractUpdate, 0, len(updater.draftUpdates))
 	for key, update := range updater.draftUpdates {
 		keys = append(keys, key)
