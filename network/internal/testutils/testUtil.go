@@ -369,16 +369,36 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	return engs
 }
 
-// StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel
-func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.Network, duration time.Duration) {
+// StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel.
+// Arguments:
+// - ctx: the irrecoverable context to use for starting the nodes and networks.
+// - t: the test object.
+// - nodes: the libp2p nodes to start.
+// - nets: the networks to start.
+// - timeout: the timeout to use for waiting for the nodes and networks to start.
+//
+// This function fails the test if the nodes or networks do not start within the given timeout.
+func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.Network, timeout time.Duration) {
+	StartNetworks(ctx, t, nets, timeout)
+
+	// start up nodes and Peer managers
+	StartNodes(ctx, t, nodes, timeout)
+}
+
+// StartNetworks starts the provided networks using the provided irrecoverable context
+// Arguments:
+// - ctx: the irrecoverable context to use for starting the networks.
+// - t: the test object.
+// - nets: the networks to start.
+// - duration: the timeout to use for waiting for the networks to start.
+//
+// This function fails the test if the networks do not start within the given timeout.
+func StartNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nets []network.Network, duration time.Duration) {
 	// start up networks (this will implicitly start middlewares)
 	for _, net := range nets {
 		net.Start(ctx)
 		unittest.RequireComponentsReadyBefore(t, duration, net)
 	}
-
-	// start up nodes and Peer managers
-	StartNodes(ctx, t, nodes, duration)
 }
 
 // StartNodes starts the provided nodes and their peer managers using the provided irrecoverable context
