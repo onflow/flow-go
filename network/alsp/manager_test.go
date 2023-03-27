@@ -2,6 +2,7 @@ package alsp_test
 
 import (
 	"context"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -75,4 +77,48 @@ func TestHandleReportedMisbehavior(t *testing.T) {
 	}
 
 	unittest.RequireReturnsBefore(t, allReportsManaged.Wait, 100*time.Millisecond, "did not receive all reports")
+}
+
+// The TestReportCreation tests the creation of misbehavior reports using the alsp.NewMisbehaviorReport function.
+// The function tests the creation of both valid and invalid misbehavior reports by setting different penalty amplification values.
+func TestReportCreation(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+
+	// creates a valid misbehavior report (i.e., amplification between 1 and 100)
+	report, err := alsp.NewMisbehaviorReport(
+		unittest.IdentifierFixture(),
+		testutils.MisbehaviorTypeFixture(t),
+		alsp.WithPenaltyAmplification(10))
+	require.NoError(t, err)
+	require.NotNil(t, report)
+
+	// creates a valid misbehavior report with default amplification.
+	report, err = alsp.NewMisbehaviorReport(
+		unittest.IdentifierFixture(),
+		testutils.MisbehaviorTypeFixture(t))
+	require.NoError(t, err)
+	require.NotNil(t, report)
+
+	// creates an in valid misbehavior report (i.e., amplification greater than 100 and less than 1)
+	report, err = alsp.NewMisbehaviorReport(
+		unittest.IdentifierFixture(),
+		testutils.MisbehaviorTypeFixture(t),
+		alsp.WithPenaltyAmplification(rand.Intn(100)-101))
+	require.Error(t, err)
+	require.Nil(t, report)
+
+	report, err = alsp.NewMisbehaviorReport(
+		unittest.IdentifierFixture(),
+		testutils.MisbehaviorTypeFixture(t),
+		alsp.WithPenaltyAmplification(rand.Int()+101))
+	require.Error(t, err)
+	require.Nil(t, report)
+
+	// 0 is not a valid amplification
+	report, err = alsp.NewMisbehaviorReport(
+		unittest.IdentifierFixture(),
+		testutils.MisbehaviorTypeFixture(t),
+		alsp.WithPenaltyAmplification(0))
+	require.Error(t, err)
+	require.Nil(t, report)
 }
