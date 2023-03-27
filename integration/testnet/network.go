@@ -1392,24 +1392,14 @@ func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
 	nConsensusNodes := len(consensusNodes)
 
-	// run the core dkg algorithm
 	dkgSeed, err := getSeed()
 	if err != nil {
 		return dkgmod.DKGData{}, err
 	}
 
-	dkg, err := dkg.RandomBeaconKG(nConsensusNodes, dkgSeed)
+	dkg, err := dkg.RunFastKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return dkgmod.DKGData{}, err
-	}
-
-	// sanity check
-	if nConsensusNodes != len(dkg.PrivKeyShares) {
-		return dkgmod.DKGData{}, fmt.Errorf(
-			"consensus node count does not match DKG participant count: nodes=%d, participants=%d",
-			nConsensusNodes,
-			len(dkg.PrivKeyShares),
-		)
 	}
 
 	return dkg, nil
