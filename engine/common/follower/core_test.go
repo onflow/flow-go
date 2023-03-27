@@ -245,8 +245,8 @@ func (s *CoreSuite) TestDetectingProposalEquivocation() {
 // submitted for further processing to Hotstuff layer.
 func (s *CoreSuite) TestConcurrentAdd() {
 	workers := 5
-	batchesPerWorker := 1
-	blocksPerBatch := 1
+	batchesPerWorker := 10
+	blocksPerBatch := 10
 	blocksPerWorker := blocksPerBatch * batchesPerWorker
 	blocks := unittest.ChainFixtureFrom(workers*blocksPerWorker, s.finalizedBlock)
 	targetSubmittedBlockID := blocks[len(blocks)-2].ID()

@@ -116,7 +116,6 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
 
-	// TODO: this is a temporary if statement since follower engine doesn't deliver QCs yet. Once the implementation is complete
 	// there are no cases where certifyingQC can be nil.
 	if certifyingQC != nil {
 		blockID := candidate.ID()
