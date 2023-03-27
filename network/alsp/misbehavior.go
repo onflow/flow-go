@@ -20,3 +20,12 @@ const (
 	// engine. The decision to consider a message unsolicited is up to the engine.
 	UnsolicitedMessage network.Misbehavior = "misbehavior-unsolicited-message"
 )
+
+func AllMisbehaviorTypes() []network.Misbehavior {
+	return []network.Misbehavior{
+		StaleMessage,
+		HeavyRequest,
+		RedundantMessage,
+		UnsolicitedMessage,
+	}
+}
