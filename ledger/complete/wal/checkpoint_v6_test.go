@@ -284,12 +284,8 @@ func TestWriteAndReadCheckpointV6LeafEmptyTrie(t *testing.T) {
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
 		resultChan, err := OpenAndReadLeafNodesFromCheckpointV6(dir, fileName, &logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
-		for readResult := range resultChan {
-			// only dummy node returned for empty root
-			require.NoError(t, readResult.Err)
-			require.Nil(t, readResult.LeafNode.Path)
-			require.Nil(t, readResult.LeafNode.Payload)
-			require.Nil(t, readResult.LeafNode.Hash)
+		for _ := range resultChan {
+			require.Fail(t, "should not return any nodes")
 		}
 	})
 }
@@ -302,9 +298,15 @@ func TestWriteAndReadCheckpointV6LeafSimpleTrie(t *testing.T) {
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
 		resultChan, err := OpenAndReadLeafNodesFromCheckpointV6(dir, fileName, &logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+		resultPayloads := make([]ledger.Payload, 0)
 		for readResult := range resultChan {
 			require.NoError(t, readResult.Err, "no errors in read results")
+			// avoid dummy payload from empty trie
+			if readResult.LeafNode.Payload != nil {
+				resultPayloads = append(resultPayloads, *readResult.LeafNode.Payload)
+			}
 		}
+		require.EqualValues(t, tries[1].AllPayloads(), resultPayloads)
 	})
 }
 
@@ -465,6 +467,7 @@ func TestAllPartFileExist(t *testing.T) {
 	})
 }
 
+// verify that if a part file is missing then os.ErrNotExist should return
 func TestAllPartFileExistLeafReader(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		for i := 0; i < 17; i++ {
