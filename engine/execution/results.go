@@ -154,15 +154,6 @@ func (ar *BlockAttestationResults) AppendCollectionAttestationResult(
 	ar.ChunkExecutionDatas = append(ar.ChunkExecutionDatas, chunkExecutionDatas)
 }
 
-// InterimEndState returns the most recent end state
-// if no attestation appended yet, it returns start state of block
-func (ar *BlockAttestationResults) InterimEndState() flow.StateCommitment {
-	if len(ar.collectionAttestationResults) == 0 {
-		return *ar.StartState
-	}
-	return ar.collectionAttestationResults[len(ar.collectionAttestationResults)-1].endStateCommit
-}
-
 func (ar *BlockAttestationResults) AllChunks() []*flow.Chunk {
 	chunks := make([]*flow.Chunk, len(ar.collectionAttestationResults))
 	for i := 0; i < len(ar.collectionAttestationResults); i++ {
