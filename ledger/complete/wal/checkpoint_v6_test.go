@@ -284,7 +284,7 @@ func TestWriteAndReadCheckpointV6LeafEmptyTrie(t *testing.T) {
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
 		resultChan, err := OpenAndReadLeafNodesFromCheckpointV6(dir, fileName, &logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
-		for _ := range resultChan {
+		for range resultChan {
 			require.Fail(t, "should not return any nodes")
 		}
 	})
