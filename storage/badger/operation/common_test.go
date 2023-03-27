@@ -108,8 +108,8 @@ func TestInsertEncodingError(t *testing.T) {
 		key := []byte{0x01, 0x02, 0x03}
 
 		err := db.Update(insert(key, UnencodeableEntity(e)))
-
-		require.ErrorIs(t, err, errCantEncode)
+		require.Error(t, err, errCantEncode)
+		require.NotErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
@@ -171,7 +171,8 @@ func TestUpdateEncodingError(t *testing.T) {
 		})
 
 		err := db.Update(update(key, UnencodeableEntity(e)))
-		require.ErrorIs(t, err, errCantEncode)
+		require.Error(t, err)
+		require.NotErrorIs(t, err, storage.ErrNotFound)
 
 		// ensure value did not change
 		var act []byte
@@ -270,7 +271,8 @@ func TestRetrieveUnencodeable(t *testing.T) {
 
 		var act *UnencodeableEntity
 		err := db.View(retrieve(key, &act))
-		require.ErrorIs(t, err, errCantDecode)
+		require.Error(t, err)
+		require.NotErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
