@@ -225,9 +225,21 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 				blocks = append(blocks, block.Block.ToInternal())
 			}
 
+			firstBlock := blocks[0].Header
+			lastBlock := blocks[len(blocks)-1].Header
+			log := e.log.With().
+				Hex("origin_id", batch.OriginID[:]).
+				Str("chain_id", lastBlock.ChainID.String()).
+				Uint64("first_block_height", firstBlock.Height).
+				Uint64("first_block_view", firstBlock.View).
+				Uint64("last_block_height", lastBlock.Height).
+				Uint64("last_block_view", lastBlock.View).
+				Int("range_length", len(blocks)).
+				Logger()
+
 			latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
 			submitConnectedBatch := func(blocks []*flow.Block) {
-				e.submitConnectedBatch(latestFinalizedView, batch.OriginID, blocks)
+				e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks)
 			}
 
 			// extract sequences of connected blocks and schedule them for further processing
@@ -253,21 +265,23 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 }
 
 // submitConnectedBatch checks if batch is still pending and submits it via channel for further processing by worker goroutines.
-func (e *Engine) submitConnectedBatch(latestFinalizedView uint64, originID flow.Identifier, blocks []*flow.Block) {
+func (e *Engine) submitConnectedBatch(log zerolog.Logger, latestFinalizedView uint64, originID flow.Identifier, blocks []*flow.Block) {
 	if len(blocks) < 1 {
 		return
 	}
 	// if latest block of batch is already finalized we can drop such input.
-	if blocks[len(blocks)-1].Header.View < latestFinalizedView {
+	lastBlock := blocks[len(blocks)-1].Header
+	if lastBlock.View < latestFinalizedView {
+		log.Debug().Msgf("dropping range [%d, %d] below finalized view %d", blocks[0].Header.View, lastBlock.View, latestFinalizedView)
 		return
 	}
-	msg := flow.Slashable[[]*flow.Block]{
-		OriginID: originID,
-		Message:  blocks,
-	}
+	log.Debug().Msgf("submitting sub-range [%d, %d] for further processing", blocks[0].Header.View, lastBlock.View)
 
 	select {
-	case e.pendingConnectedBlocksChan <- msg:
+	case e.pendingConnectedBlocksChan <- flow.Slashable[[]*flow.Block]{
+		OriginID: originID,
+		Message:  blocks,
+	}:
 	case <-e.ComponentManager.ShutdownSignal():
 	}
 }
