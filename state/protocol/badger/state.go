@@ -644,7 +644,7 @@ func (state *State) AtHeight(height uint64) protocol.Snapshot {
 func (state *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 	exists, err := state.headers.Exists(blockID)
 	if err != nil {
-		return invalid.NewSnapshotf("could not check existence of reference block")
+		return invalid.NewSnapshotf("could not check existence of reference block: %w", err)
 	}
 	if !exists {
 		return invalid.NewSnapshotf("unknown block %x: %w", blockID, statepkg.ErrUnknownSnapshotReference)
