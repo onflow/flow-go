@@ -138,11 +138,10 @@ func (collector *resultCollector) commitCollection(
 		return fmt.Errorf("commit view failed: %w", err)
 	}
 
-	execColRes := collector.result.CollectionExecutionResult(collection.collectionIndex)
-
+	execColRes := collector.result.CollectionExecutionResultAt(collection.collectionIndex)
 	execColRes.UpdateExecutionSnapshot(collectionExecutionSnapshot)
 
-	events := execColRes.EmittedEvents()
+	events := execColRes.Events()
 	eventsHash, err := flow.EventsMerkleRootHash(events)
 	if err != nil {
 		return fmt.Errorf("hash events failed: %w", err)
@@ -156,7 +155,6 @@ func (collector *resultCollector) commitCollection(
 	}
 
 	collector.result.AppendCollectionAttestationResult(
-		execColRes,
 		startState,
 		endState,
 		proof,
@@ -200,7 +198,7 @@ func (collector *resultCollector) commitCollection(
 	}
 
 	for _, consumer := range collector.consumers {
-		err = consumer.OnExecutedCollection(collector.result.CollectionExecutionResult(collection.collectionIndex))
+		err = consumer.OnExecutedCollection(collector.result.CollectionExecutionResultAt(collection.collectionIndex))
 		if err != nil {
 			return fmt.Errorf("consumer failed: %w", err)
 		}
@@ -223,12 +221,14 @@ func (collector *resultCollector) processTransactionResult(
 		txnResult.ErrorMessage = txn.Err.Error()
 	}
 
-	collector.result.CollectionExecutionResult(txn.collectionIndex).AppendTransactionResults(
-		txn.Events,
-		txn.ServiceEvents,
-		txn.ConvertedServiceEvents,
-		txnResult,
-	)
+	collector.result.
+		CollectionExecutionResultAt(txn.collectionIndex).
+		AppendTransactionResults(
+			txn.Events,
+			txn.ServiceEvents,
+			txn.ConvertedServiceEvents,
+			txnResult,
+		)
 
 	for computationKind, intensity := range txn.ComputationIntensities {
 		collector.result.ComputationIntensities[computationKind] += intensity
