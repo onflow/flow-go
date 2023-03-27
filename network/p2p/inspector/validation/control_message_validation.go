@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	mrand "math/rand"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
@@ -20,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
+	flowrand "github.com/onflow/flow-go/utils/rand"
 )
 
 const (
@@ -167,15 +167,30 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 			continue
 		}
 
-		// mandatory blocking pre-processing of RPC to check discard threshold.
-		err := c.blockingPreprocessingRpc(from, validationConfig, control)
-		if err != nil {
-			lg.Error().
-				Err(err).
-				Str("peer_id", from.String()).
-				Str("ctrl_msg_type", string(ctrlMsgType)).
-				Msg("could not pre-process rpc, aborting")
-			return fmt.Errorf("could not pre-process rpc, aborting: %w", err)
+		switch {
+		case ctrlMsgType == p2p.CtrlMsgGraft || ctrlMsgType == p2p.CtrlMsgPrune:
+			// normal pre-processing
+			err := c.blockingPreprocessingRpc(from, validationConfig, control)
+			if err != nil {
+				lg.Error().
+					Err(err).
+					Str("peer_id", from.String()).
+					Str("ctrl_msg_type", string(ctrlMsgType)).
+					Msg("could not pre-process rpc, aborting")
+				return fmt.Errorf("could not pre-process rpc, aborting: %w", err)
+			}
+		case ctrlMsgType == p2p.CtrlMsgIHave:
+			// iHave specific pre-processing
+			sampleSize := uint(len(control.GetIhave()))
+			err := c.blockingPreprocessingIHaveRpc(from, validationConfig, control, sampleSize)
+			if err != nil {
+				lg.Error().
+					Err(err).
+					Str("peer_id", from.String()).
+					Str("ctrl_msg_type", string(ctrlMsgType)).
+					Msg("could not pre-process rpc, aborting")
+				return fmt.Errorf("could not pre-process rpc, aborting: %w", err)
+			}
 		}
 
 		// queue further async inspection
@@ -232,7 +247,7 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 // If the iHave RPC control message count exceeds the configured discard threshold we perform synchronous topic validation on a subset
 // of the iHave control messages. This is due to the fact that the number of iHave messages a node can send does not have an upper bound
 // thus we cannot discard the entire RPC if the count exceeds the configured discard threshold.
-func (c *ControlMsgValidationInspector) blockingPreprocessingIHaveRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
+func (c *ControlMsgValidationInspector) blockingPreprocessingIHaveRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
 		Uint64("ctrl_msg_count", count).
@@ -240,7 +255,6 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingIHaveRpc(from peer.
 		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
 	// if count greater than discard threshold perform synchronous topic validation on random subset of the iHave messages
 	if count > validationConfig.DiscardThreshold {
-		sampleSize := int(count)
 		err := c.validateTopics(validationConfig.ControlMsg, controlMessage, sampleSize)
 		if err != nil {
 			lg.Warn().
@@ -315,7 +329,7 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 // A sampleSize is only used when validating the topics of iHave control messages types because the number of iHave messages that
 // can exist in a single RPC is unbounded.
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage, sampleSize int) error {
+func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage, sampleSize uint) error {
 	seen := make(map[channels.Topic]struct{})
 	validateTopic := func(topic channels.Topic) error {
 		if _, ok := seen[topic]; ok {
@@ -346,27 +360,23 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 			}
 		}
 	case p2p.CtrlMsgIHave:
+		// for iHave control message topic validation we only validate a random subset of the messages
 		iHaves := ctrlMsg.GetIhave()
-		sampleIndices := c.randomSampleIndices(len(iHaves), sampleSize)
-		for _, index := range sampleIndices {
-			topic := channels.Topic(iHaves[index].GetTopicID())
-			err := validateTopic(topic)
+		err := flowrand.Samples(uint(len(iHaves)), sampleSize, func(i, j uint) {
+			iHaves[i], iHaves[j] = iHaves[j], iHaves[i]
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get random sample of ihave control messages")
+		}
+		for i := uint(0); i < sampleSize; i++ {
+			topic := channels.Topic(iHaves[i].GetTopicID())
+			err = validateTopic(topic)
 			if err != nil {
 				return err
 			}
 		}
 	}
 	return nil
-}
-
-// randomSampleIndices returns a slice of random integers of size sampleSize, the random integers
-// will be in the range of [0, maxInt).
-func (c *ControlMsgValidationInspector) randomSampleIndices(maxInt, sampleSize int) []int {
-	indices := make([]int, sampleSize)
-	for i := 0; i < sampleSize; i++ {
-		indices[i] = mrand.Intn(maxInt)
-	}
-	return indices
 }
 
 // validateTopic the topic is a valid flow topic/channel.

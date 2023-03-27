@@ -168,11 +168,17 @@ func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation
 		validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
 		validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
 	})
+	iHaveCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgIHave, validation.CtrlMsgValidationLimits{
+		validation.DiscardThresholdMapKey: validation.DefaultIHaveDiscardThreshold,
+		validation.SafetyThresholdMapKey:  validation.DefaultIHaveSafetyThreshold,
+		validation.RateLimitMapKey:        validation.DefaultIHaveRateLimit,
+	})
 	return &validation.ControlMsgValidationInspectorConfig{
 		NumberOfWorkers:     validation.DefaultNumberOfWorkers,
 		InspectMsgStoreOpts: opts,
 		GraftValidationCfg:  graftCfg,
 		PruneValidationCfg:  pruneCfg,
+		IHaveValidationCfg:  iHaveCfg,
 	}
 }
 
@@ -627,13 +633,17 @@ func gossipSubRPCValidationInspectorConfig(validationConfigs *GossipSubRPCValida
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
 	}
-
+	iHaveValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgIHave, validationConfigs.PruneLimits)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
+	}
 	// setup gossip sub RPC control message inspector config
 	controlMsgRPCInspectorCfg := &validation.ControlMsgValidationInspectorConfig{
 		NumberOfWorkers:     validationConfigs.NumberOfWorkers,
 		InspectMsgStoreOpts: opts,
 		GraftValidationCfg:  graftValidationCfg,
 		PruneValidationCfg:  pruneValidationCfg,
+		IHaveValidationCfg:  iHaveValidationCfg,
 	}
 	return controlMsgRPCInspectorCfg, nil
 }
