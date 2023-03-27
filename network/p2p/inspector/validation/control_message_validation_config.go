@@ -14,6 +14,10 @@ const (
 	SafetyThresholdMapKey = "safetythreshold"
 	// RateLimitMapKey key used to set the rate limit config limit.
 	RateLimitMapKey = "ratelimit"
+	// IHaveSyncInspectSampleSizeDivisorMapKey key used to set iHave synchronous inspection sample size divisor.
+	IHaveSyncInspectSampleSizeDivisorMapKey = "ihaveSyncInspectSampleSizeDivisor"
+	// IHaveAsyncInspectSampleSizeDivisorMapKey key used to set iHave asynchronous inspection sample size divisor.
+	IHaveAsyncInspectSampleSizeDivisorMapKey = "ihaveAsyncInspectSampleSizeDivisor"
 
 	// DefaultGraftDiscardThreshold upper bound for graft messages, RPC control messages with a count
 	// above the discard threshold are automatically discarded.
@@ -39,7 +43,7 @@ const (
 
 	// DefaultIHaveDiscardThreshold upper bound for ihave messages, RPC control messages with a count
 	// above the discard threshold are automatically discarded.
-	DefaultIHaveDiscardThreshold = 30
+	DefaultIHaveDiscardThreshold = 100
 	// DefaultIHaveSafetyThreshold a lower bound for ihave messages, RPC control messages with a message count
 	// lower than the safety threshold bypass validation.
 	DefaultIHaveSafetyThreshold = .5 * DefaultPruneDiscardThreshold
@@ -47,6 +51,12 @@ const (
 	// Currently, the default rate limit is equal to the discard threshold amount.
 	// This will result in a rate limit of 30 prunes/sec.
 	DefaultIHaveRateLimit = DefaultPruneDiscardThreshold
+	// DefaultIHaveSyncInspectSampleSizeDivisor the default divisor used to get a sample of the ihave control messages for synchronous pre-processing.
+	// When the total number of ihave's is greater than the configured discard threshold. The sample will be the total number of ihave's / 4 or 25%.
+	DefaultIHaveSyncInspectSampleSizeDivisor = 4
+	// DefaultIHaveAsyncInspectSampleSizeDivisor the default divisor used to get a sample of the ihave control messages for asynchronous processing.
+	// The sample will be the total number of ihave's / 10 or 10%.
+	DefaultIHaveAsyncInspectSampleSizeDivisor = 10
 )
 
 // CtrlMsgValidationLimits limits used to construct control message validation configuration.
@@ -62,6 +72,14 @@ func (c CtrlMsgValidationLimits) SafetyThreshold() uint64 {
 
 func (c CtrlMsgValidationLimits) RateLimit() int {
 	return c[RateLimitMapKey]
+}
+
+func (c CtrlMsgValidationLimits) IHaveSyncInspectSampleSizeMultiplier() int {
+	return c[IHaveSyncInspectSampleSizeDivisorMapKey]
+}
+
+func (c CtrlMsgValidationLimits) IHaveAsyncInspectSampleSizeMultiplier() int {
+	return c[IHaveAsyncInspectSampleSizeDivisorMapKey]
 }
 
 // CtrlMsgValidationConfigs list of *CtrlMsgValidationConfig
