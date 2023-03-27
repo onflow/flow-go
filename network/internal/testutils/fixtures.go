@@ -3,6 +3,7 @@ package testutils
 import (
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -12,8 +13,14 @@ import (
 )
 
 // MisbehaviorReportFixture generates a random misbehavior report.
-// This is used in tests to generate random misbehavior reports. It fails the test if it cannot generate a valid report.
+// Args:
+//   - t: the test object.
+//
+// This is used in tests to generate random misbehavior reports.
+// It fails the test if it cannot generate a valid report.
 func MisbehaviorReportFixture(t *testing.T) network.MisbehaviorReport {
+	rand.Seed(time.Now().UnixNano())
+
 	// pick a random misbehavior type
 	misbehaviorType := alsp.AllMisbehaviorTypes()[rand.Int()%len(alsp.AllMisbehaviorTypes())]
 
@@ -26,7 +33,11 @@ func MisbehaviorReportFixture(t *testing.T) network.MisbehaviorReport {
 	return report
 }
 
-// MisbehaviorReportsFixture generates a slice of random misbehavior reports. It fails the test if it cannot generate a valid report.
+// MisbehaviorReportsFixture generates a slice of random misbehavior reports.
+// Args:
+//   - t: the test object.
+//
+// It fails the test if it cannot generate a valid report.
 // This is used in tests to generate random misbehavior reports.
 func MisbehaviorReportsFixture(t *testing.T, count int) []network.MisbehaviorReport {
 	reports := make([]network.MisbehaviorReport, 0, count)
@@ -35,4 +46,11 @@ func MisbehaviorReportsFixture(t *testing.T, count int) []network.MisbehaviorRep
 	}
 
 	return reports
+}
+
+// MisbehaviorTypeFixture generates a random misbehavior type.
+// Args:
+//   - t: the test object (used to emphasize that this is a test helper).
+func MisbehaviorTypeFixture(_ *testing.T) network.Misbehavior {
+	return alsp.AllMisbehaviorTypes()[rand.Int()%len(alsp.AllMisbehaviorTypes())]
 }
