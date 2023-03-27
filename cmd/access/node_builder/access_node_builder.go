@@ -1078,13 +1078,6 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			builder.IdentityProvider,
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
-		builder.GossipSubInspectorNotifDistributor = cmd.BuildGossipsubRPCValidationInspectorNotificationDisseminator(builder.GossipSubRPCInspectorNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
-		heroStoreOpts := cmd.BuildGossipsubRPCValidationInspectorHeroStoreOpts(builder.GossipSubRPCInspectorCacheSize, builder.MetricsRegisterer, builder.MetricsEnabled)
-		rpcValidationInspector, err := p2pbuilder.BuildGossipSubRPCValidationInspector(builder.Logger, builder.SporkID, builder.GossipSubRPCValidationConfigs, builder.GossipSubInspectorNotifDistributor, heroStoreOpts...)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc validation inspector: %w", err)
-		}
-
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(
 			builder.Logger,
 			networkMetrics,
@@ -1114,7 +1107,6 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
 			SetGossipSubTracer(meshTracer).
 			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
-			SetGossipSubValidationInspector(rpcValidationInspector).
 			Build()
 
 		if err != nil {

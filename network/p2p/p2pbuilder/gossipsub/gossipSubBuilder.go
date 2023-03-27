@@ -214,7 +214,11 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 
 	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(g.metrics, g.logger)
 	metricsInspector := inspector.NewControlMsgMetricsInspector(gossipSubMetrics)
-	gossipSubConfigs.WithAppSpecificRpcInspectors(metricsInspector, g.rpcValidationInspector)
+	inspectors := []p2p.GossipSubRPCInspector{metricsInspector}
+	if g.rpcValidationInspector != nil {
+		inspectors = append(inspectors, g.rpcValidationInspector)
+	}
+	gossipSubConfigs.WithAppSpecificRpcInspectors(inspectors...)
 
 	if g.gossipSubTracer != nil {
 		gossipSubConfigs.WithTracer(g.gossipSubTracer)
