@@ -20,6 +20,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestHandleReportedMisbehavior tests the handling of reported misbehavior by the network.
+//
+// The test sets up a mock MisbehaviorReportManager and a conduitFactory with this manager.
+// It generates a single node network with the conduitFactory and starts it.
+// It then uses a mock engine to register a channel with the network.
+// It prepares a set of misbehavior reports and reports them to the conduit on the test channel.
+// The test ensures that the MisbehaviorReportManager receives and handles all reported misbehavior
+// without any duplicate reports and within a specified time.
 func TestHandleReportedMisbehavior(t *testing.T) {
 	misbehaviorReportManger := mocknetwork.NewMisbehaviorReportManager(t)
 	conduitFactory := conduit.NewDefaultConduitFactory(unittest.Logger(), conduit.WithMisbehaviorManager(misbehaviorReportManger))
