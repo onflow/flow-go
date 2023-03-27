@@ -293,14 +293,9 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 			Msg("chunk data pack query takes longer than expected timeout")
 	}
 
-	_, err = e.ensureAuthorized(request.RequesterId)
-	if err != nil {
-		lg.Error().
-			Err(err).
-			Msg("could not verify authorization of identity of chunk data pack request")
-		return
-	}
-
+	// TODO(ramtin): we might add a future logic to do extra checks on the source of request
+	// currently networking layer does validate the requester is a valid node operator
+	// staked and not ejected.
 	e.deliverChunkDataResponse(chunkDataPack, request.RequesterId)
 }
 
@@ -344,23 +339,6 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 			Logger()
 	}
 	lg.Info().Msg("chunk data pack request successfully replied")
-}
-
-func (e *Engine) ensureAuthorized(originID flow.Identifier) (*flow.Identity, error) {
-	origin, err := e.state.Final().Identity(originID)
-	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
-	}
-
-	// only verifier nodes are allowed to request chunk data packs
-	if origin.Role != flow.RoleVerification {
-		return nil, engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
-	}
-
-	if origin.Weight == 0 {
-		return nil, engine.NewInvalidInputErrorf("node %s has zero weight requesting chunk data pack", originID)
-	}
-	return origin, nil
 }
 
 func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
