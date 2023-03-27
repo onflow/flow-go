@@ -23,9 +23,24 @@ type DefaultConduitFactory struct {
 	misbehaviorManager network.MisbehaviorReportManager
 }
 
-func NewDefaultConduitFactory(logger zerolog.Logger) *DefaultConduitFactory {
+// DefaultConduitFactoryOpt is a function that applies an option to the DefaultConduitFactory.
+type DefaultConduitFactoryOpt func(*DefaultConduitFactory)
+
+// WithMisbehaviorManager overrides the misbehavior manager for the conduit factory.
+func WithMisbehaviorManager(misbehaviorManager network.MisbehaviorReportManager) DefaultConduitFactoryOpt {
+	return func(d *DefaultConduitFactory) {
+		d.misbehaviorManager = misbehaviorManager
+	}
+}
+
+// NewDefaultConduitFactory creates a new DefaultConduitFactory, this is the default conduit factory used by the node.
+func NewDefaultConduitFactory(logger zerolog.Logger, opts ...DefaultConduitFactoryOpt) *DefaultConduitFactory {
 	d := &DefaultConduitFactory{
 		misbehaviorManager: alsp.NewMisbehaviorReportManager(logger),
+	}
+
+	for _, apply := range opts {
+		apply(d)
 	}
 
 	// worker added so conduit factory doesn't immediately shut down when it's started
