@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // GossipSubControlMessageMetrics is a metrics and observability wrapper component for the incoming RPCs to a
@@ -14,6 +15,8 @@ type GossipSubControlMessageMetrics struct {
 	metrics module.GossipSubRouterMetrics
 	logger  zerolog.Logger
 }
+
+var _ p2p.GossipSubControlMetricsObserver = (*GossipSubControlMessageMetrics)(nil)
 
 func NewGossipSubControlMessageMetrics(metrics module.GossipSubRouterMetrics, logger zerolog.Logger) *GossipSubControlMessageMetrics {
 	return &GossipSubControlMessageMetrics{
