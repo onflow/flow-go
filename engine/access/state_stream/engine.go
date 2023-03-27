@@ -106,17 +106,13 @@ func NewEng(
 		return nil, fmt.Errorf("could not create state stream backend: %w", err)
 	}
 
-	handler := NewHandler(backend, chainID.Chain())
-
-	// TODO: latestExecDataCache must be seeded with the latest blockID with execution data
-
 	e := &Engine{
 		log:                 logger,
 		backend:             backend,
 		server:              server,
 		chain:               chainID.Chain(),
 		config:              config,
-		handler:             handler,
+		handler:             NewHandler(backend, chainID.Chain()),
 		execDataBroadcaster: broadcaster,
 		execDataCache:       execDataCache,
 	}
@@ -124,14 +120,15 @@ func NewEng(
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.serve).
 		Build()
+
 	access.RegisterExecutionDataAPIServer(e.server, e.handler)
 
 	return e, nil
 }
 
-func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionData) {
+func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) {
 	e.log.Trace().Msgf("received execution data %v", executionData.BlockID)
-	_ = e.execDataCache.Add(executionData.BlockID, &cachedExecData{executionData})
+	_ = e.execDataCache.Add(executionData.BlockID, executionData)
 	e.execDataBroadcaster.Publish()
 	e.log.Trace().Msg("sent broadcast notification")
 }
@@ -158,16 +155,4 @@ func (e *Engine) serve(ctx irrecoverable.SignalerContext, ready component.ReadyF
 
 	<-ctx.Done()
 	e.server.GracefulStop()
-}
-
-type cachedExecData struct {
-	executionData *execution_data.BlockExecutionData
-}
-
-func (c *cachedExecData) ID() flow.Identifier {
-	return c.executionData.BlockID
-}
-
-func (c *cachedExecData) Checksum() flow.Identifier {
-	return c.executionData.BlockID
 }

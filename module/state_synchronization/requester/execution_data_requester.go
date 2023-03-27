@@ -447,7 +447,7 @@ func (e *executionDataRequester) processNotificationJob(ctx irrecoverable.Signal
 	jobComplete()
 }
 
-func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerContext, height uint64, executionData *execution_data.BlockExecutionData) {
+func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerContext, height uint64, executionData *execution_data.BlockExecutionDataEntity) {
 	e.log.Debug().Msgf("notifying for block %d", height)
 
 	// send notifications
@@ -456,7 +456,7 @@ func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerC
 	e.metrics.NotificationSent(height)
 }
 
-func (e *executionDataRequester) notifyConsumers(executionData *execution_data.BlockExecutionData) {
+func (e *executionDataRequester) notifyConsumers(executionData *execution_data.BlockExecutionDataEntity) {
 	e.consumerMu.RLock()
 	defer e.consumerMu.RUnlock()
 

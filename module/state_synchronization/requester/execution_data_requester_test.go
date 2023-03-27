@@ -522,14 +522,14 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr state_synchroniza
 	return fetchedExecutionData
 }
 
-func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(cfg *fetchTestRun, done func(), fetchedExecutionData map[flow.Identifier]*execution_data.BlockExecutionData) func(ed *execution_data.BlockExecutionData) {
-	return func(ed *execution_data.BlockExecutionData) {
+func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(cfg *fetchTestRun, done func(), fetchedExecutionData map[flow.Identifier]*execution_data.BlockExecutionData) func(ed *execution_data.BlockExecutionDataEntity) {
+	return func(ed *execution_data.BlockExecutionDataEntity) {
 		if _, has := fetchedExecutionData[ed.BlockID]; has {
 			suite.T().Errorf("duplicate execution data for block %s", ed.BlockID)
 			return
 		}
 
-		fetchedExecutionData[ed.BlockID] = ed
+		fetchedExecutionData[ed.BlockID] = ed.BlockExecutionData
 		suite.T().Logf("notified of execution data for block %v height %d (%d/%d)", ed.BlockID, cfg.blocksByID[ed.BlockID].Header.Height, len(fetchedExecutionData), cfg.sealedCount)
 
 		if cfg.IsLastSeal(ed.BlockID) {

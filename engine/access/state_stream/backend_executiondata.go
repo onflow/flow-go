@@ -44,7 +44,7 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, bl
 		return nil, rpc.ConvertError(err, "could not get execution data", codes.Internal)
 	}
 
-	return executionData, nil
+	return executionData.BlockExecutionData, nil
 }
 
 func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) Subscription {
@@ -81,6 +81,6 @@ func (b *ExecutionDataBackend) getResponse(ctx context.Context, height uint64) (
 
 	return &ExecutionDataResponse{
 		Height:        header.Height,
-		ExecutionData: executionData,
+		ExecutionData: executionData.BlockExecutionData,
 	}, nil
 }

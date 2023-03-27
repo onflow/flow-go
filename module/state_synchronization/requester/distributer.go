@@ -40,7 +40,7 @@ func (p *ExecutionDataDistributor) AddOnExecutionDataReceivedConsumer(consumer s
 }
 
 // OnExecutionDataReceived is called when new execution data is received
-func (p *ExecutionDataDistributor) OnExecutionDataReceived(executionData *execution_data.BlockExecutionData) {
+func (p *ExecutionDataDistributor) OnExecutionDataReceived(executionData *execution_data.BlockExecutionDataEntity) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 

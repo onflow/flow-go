@@ -23,6 +23,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
+	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -49,11 +52,12 @@ type BackendExecutionDataSuite struct {
 	eds                 execution_data.ExecutionDataStore
 	broadcaster         *engine.Broadcaster
 	execDataDistributor *requester.ExecutionDataDistributor
+	execDataCache       *herocache.Cache
 	backend             *StateStreamBackend
 
 	blocks      []*flow.Block
 	blockEvents map[flow.Identifier]flow.EventsList
-	execDataMap map[flow.Identifier]*execution_data.BlockExecutionData
+	execDataMap map[flow.Identifier]*execution_data.BlockExecutionDataEntity
 	blockMap    map[uint64]*flow.Block
 	sealMap     map[flow.Identifier]*flow.Seal
 	resultMap   map[flow.Identifier]*flow.ExecutionResult
@@ -81,6 +85,14 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.broadcaster = engine.NewBroadcaster()
 	s.execDataDistributor = requester.NewExecutionDataDistributor()
 
+	s.execDataCache = herocache.NewCache(
+		DefaultCacheSize,
+		herocache.DefaultOversizeFactor,
+		heropool.LRUEjection,
+		logger,
+		metrics.NewNoopCollector(),
+	)
+
 	var err error
 	s.backend, err = New(
 		logger,
@@ -89,13 +101,13 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.seals,
 		s.results,
 		s.eds,
-		nil,
+		s.execDataCache,
 		s.broadcaster,
 	)
 	require.NoError(s.T(), err)
 
 	blockCount := 5
-	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionData, blockCount)
+	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionDataEntity, blockCount)
 	s.blockEvents = make(map[flow.Identifier]flow.EventsList, blockCount)
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
 	s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
@@ -123,7 +135,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		assert.NoError(s.T(), err)
 
 		s.blocks = append(s.blocks, block)
-		s.execDataMap[block.ID()] = execData
+		s.execDataMap[block.ID()] = execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
 		s.blockEvents[block.ID()] = blockEvents.Events
 		s.blockMap[block.Header.Height] = block
 		s.sealMap[block.ID()] = seal
@@ -211,13 +223,15 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 
 	var err error
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
-		result.ExecutionDataID, err = s.eds.AddExecutionData(ctx, execData)
+		result.ExecutionDataID, err = s.eds.AddExecutionData(ctx, execData.BlockExecutionData)
 		require.NoError(s.T(), err)
 
 		res, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID())
-		assert.Equal(s.T(), execData, res)
+		assert.Equal(s.T(), execData.BlockExecutionData, res)
 		assert.NoError(s.T(), err)
 	})
+
+	s.execDataCache.Clear()
 
 	s.Run("missing exec data for TestGetExecutionDataByBlockID failure", func() {
 		result.ExecutionDataID = unittest.IdentifierFixture()
@@ -311,6 +325,9 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
+			// make sure we're starting with a fresh cache
+			s.execDataCache.Clear()
+
 			s.T().Logf("len(s.execDataMap) %d", len(s.execDataMap))
 
 			for i := 0; i <= test.highestBackfill; i++ {
@@ -342,7 +359,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 					require.True(s.T(), ok, "unexpected response type: %T", v)
 
 					assert.Equal(s.T(), b.Header.Height, resp.Height)
-					assert.Equal(s.T(), execData, resp.ExecutionData)
+					assert.Equal(s.T(), execData.BlockExecutionData, resp.ExecutionData)
 				}, 10000*time.Millisecond, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
 			}
 
@@ -380,7 +397,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 	result.ExecutionDataID, err = s.eds.AddExecutionData(ctx, execData)
 	assert.NoError(s.T(), err)
 
-	s.execDataMap[block.ID()] = execData
+	s.execDataMap[block.ID()] = execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
 	s.blockMap[block.Header.Height] = &block
 	s.sealMap[block.ID()] = seal
 	s.resultMap[seal.ResultID] = result
@@ -392,6 +409,9 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 		sub := s.backend.SubscribeExecutionData(subCtx, unittest.IdentifierFixture(), 0)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()))
 	})
+
+	// make sure we're starting with a fresh cache
+	s.execDataCache.Clear()
 
 	s.Run("returns error for unindexed start height", func() {
 		subCtx, subCancel := context.WithCancel(ctx)

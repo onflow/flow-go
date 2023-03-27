@@ -7,7 +7,7 @@ import (
 )
 
 // OnExecutionDataReceivedConsumer is a callback that is called ExecutionData is received for a new block
-type OnExecutionDataReceivedConsumer func(*execution_data.BlockExecutionData)
+type OnExecutionDataReceivedConsumer func(*execution_data.BlockExecutionDataEntity)
 
 // ExecutionDataRequester is a component that syncs ExecutionData from the network, and exposes
 // a callback that is called when a new ExecutionData is received

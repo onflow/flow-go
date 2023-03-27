@@ -16,6 +16,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -26,7 +27,7 @@ const (
 	DefaultSendTimeout = 30 * time.Second
 )
 
-type GetExecutionDataFunc func(context.Context, flow.Identifier) (*execution_data.BlockExecutionData, error)
+type GetExecutionDataFunc func(context.Context, flow.Identifier) (*execution_data.BlockExecutionDataEntity, error)
 type GetStartHeightFunc func(flow.Identifier, uint64) (uint64, error)
 
 type API interface {
@@ -95,10 +96,16 @@ func New(
 	return b, nil
 }
 
-func (b *StateStreamBackend) getExecutionData(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
-	// if cached, ok := b.execDataCache.ByID(blockID); ok {
-	// 	return cached.(*cachedExecData).executionData, nil
-	// }
+func (b *StateStreamBackend) getExecutionData(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionDataEntity, error) {
+	if cached, ok := b.execDataCache.ByID(blockID); ok {
+		b.log.Trace().
+			Hex("block_id", logging.ID(blockID)).
+			Msg("execution data cache hit")
+		return cached.(*execution_data.BlockExecutionDataEntity), nil
+	}
+	b.log.Trace().
+		Hex("block_id", logging.ID(blockID)).
+		Msg("execution data cache miss")
 
 	seal, err := b.seals.FinalizedSealForBlock(blockID)
 	if err != nil {
@@ -110,12 +117,14 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, blockID flow.
 		return nil, fmt.Errorf("could not get execution result: %w", err)
 	}
 
-	blockExecData, err := b.execDataStore.GetExecutionData(ctx, result.ExecutionDataID)
+	execData, err := b.execDataStore.GetExecutionData(ctx, result.ExecutionDataID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data: %w", err)
 	}
 
-	// b.execDataCache.Add(blockID, &cachedExecData{blockExecData})
+	blockExecData := execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
+
+	b.execDataCache.Add(blockID, blockExecData)
 
 	return blockExecData, nil
 }
