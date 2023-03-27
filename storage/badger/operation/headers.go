@@ -49,11 +49,6 @@ func LookupCollectionBlock(collID flow.Identifier, blockID *flow.Identifier) fun
 	return retrieve(makePrefix(codeCollectionBlock, collID), blockID)
 }
 
-// LookupBlockIDByChunkID looks up a block by a collection within that block.
-func LookupBlockIDByChunkID(chunkID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
-}
-
 // FindHeaders iterates through all headers, calling `filter` on each, and adding
 // them to the `found` slice if `filter` returned true
 func FindHeaders(filter func(header *flow.Header) bool, found *[]flow.Header) func(*badger.Txn) error {
