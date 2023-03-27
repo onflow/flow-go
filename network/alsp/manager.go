@@ -22,7 +22,7 @@ var _ network.MisbehaviorReportManager = (*MisbehaviorReportManager)(nil)
 // NewMisbehaviorReportManager creates a new instance of the MisbehaviorReportManager.
 func NewMisbehaviorReportManager(logger zerolog.Logger) *MisbehaviorReportManager {
 	return &MisbehaviorReportManager{
-		logger: logger.With().Str("module", "missbehavior_report_manager").Logger(),
+		logger: logger.With().Str("module", "misbehavior_report_manager").Logger(),
 	}
 }
 
