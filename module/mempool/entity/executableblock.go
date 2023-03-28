@@ -98,11 +98,7 @@ func (b *ExecutableBlock) CompleteCollectionAt(index int) *CompleteCollection {
 // CollectionAt returns a collection at the given index,
 // if index out of range, nil will be returned
 func (b *ExecutableBlock) CollectionAt(index int) *flow.Collection {
-	if index < 0 || index >= len(b.Block.Payload.Guarantees) {
-		return nil
-	}
-	// this should not happen but in case
-	cc := b.CompleteCollections[b.Block.Payload.Guarantees[index].ID()]
+	cc := b.CompleteCollectionAt(index)
 	if cc == nil {
 		return nil
 	}
