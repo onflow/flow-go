@@ -12,7 +12,7 @@ import (
 // based on the networking layer but is considered invalid by the current node based on the Flow protocol.
 //
 // A MisbehaviorReport consists of a reason and a penalty. The reason is a string that describes the misbehavior.
-// The penalty is a value that is deducted from the overall penalty of the misbehaving node. The penalty is
+// The penalty is a value that is deducted from the overall score of the misbehaving node. The score is
 // decayed at each decay interval. If the overall penalty of the misbehaving node drops below the disallow-listing
 // threshold, the node is reported to be disallow-listed by the networking layer, i.e., existing connections to the
 // node are closed and the node is no longer allowed to connect till its penalty is decayed back to zero.
