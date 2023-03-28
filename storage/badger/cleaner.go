@@ -3,8 +3,6 @@
 package badger
 
 import (
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"math/rand"
 	"time"
 
@@ -12,6 +10,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 // Cleaner uses component.ComponentManager to implement module.Startable and module.ReadyDoneAware
