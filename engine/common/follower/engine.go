@@ -59,8 +59,8 @@ type Engine struct {
 	con                        network.Conduit
 	channel                    channels.Channel
 	headers                    storage.Headers
-	pendingBlocks              *fifoqueue.FifoQueue        // queue for processing inbound blocks
-	pendingBlocksNotifier      engine.Notifier             // notifies that new blocks are ready to be processed
+	pendingBlocks              *fifoqueue.FifoQueue        // queue for processing inbound batches of blocks
+	pendingBlocksNotifier      engine.Notifier             // notifies that new batches are ready to be processed
 	finalizedBlockTracker      *tracker.NewestBlockTracker // tracks the latest finalization block
 	finalizedBlockNotifier     engine.Notifier             // notifies when the latest finalized block changes
 	pendingConnectedBlocksChan chan flow.Slashable[[]*flow.Block]
@@ -243,6 +243,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 			}
 
 			// extract sequences of connected blocks and schedule them for further processing
+			// we assume the sender has already ordered blocks into connected ranges if possible
 			parentID := blocks[0].ID()
 			indexOfLastConnected := 0
 			for i := 1; i < len(blocks); i++ {
@@ -275,7 +276,7 @@ func (e *Engine) submitConnectedBatch(log zerolog.Logger, latestFinalizedView ui
 		log.Debug().Msgf("dropping range [%d, %d] below finalized view %d", blocks[0].Header.View, lastBlock.View, latestFinalizedView)
 		return
 	}
-	log.Debug().Msgf("submitting sub-range [%d, %d] for further processing", blocks[0].Header.View, lastBlock.View)
+	log.Debug().Msgf("submitting sub-range with views [%d, %d] for further processing", blocks[0].Header.View, lastBlock.View)
 
 	select {
 	case e.pendingConnectedBlocksChan <- flow.Slashable[[]*flow.Block]{
