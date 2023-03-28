@@ -19,7 +19,6 @@ import (
 // This is used in tests to generate random misbehavior reports.
 // It fails the test if it cannot generate a valid report.
 func MisbehaviorReportFixture(t *testing.T) network.MisbehaviorReport {
-	rand.Seed(time.Now().UnixNano())
 
 	// pick a random misbehavior type
 	misbehaviorType := alsp.AllMisbehaviorTypes()[rand.Int()%len(alsp.AllMisbehaviorTypes())]
