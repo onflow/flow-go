@@ -3,7 +3,7 @@ package random
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
+	mrand "math/rand"
 	"testing"
 	"time"
 
@@ -82,10 +82,11 @@ func TestChacha20Compliance(t *testing.T) {
 	})
 }
 
-func seedMathRand(t *testing.T) {
-	r := time.Now().UnixNano()
-	rand.Seed(r)
-	t.Logf("math rand seed is %d", r)
+func getPRG(t *testing.T) *mrand.Rand {
+	random := time.Now().UnixNano()
+	t.Logf("rng seed is %d", random)
+	rng := mrand.New(mrand.NewSource(random))
+	return rng
 }
 
 // The tests are targeting the PRG implementations in the package.
@@ -95,12 +96,14 @@ func seedMathRand(t *testing.T) {
 // Simple unit testing of Uint using a very basic randomness test.
 // It doesn't evaluate randomness of the output and doesn't perform advanced statistical tests.
 func TestUint(t *testing.T) {
-	seedMathRand(t)
+	rand := getPRG(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	_, _ = rand.Read(seed)
+	_, err := rand.Read(seed)
+	require.NoError(t, err)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	rand.Read(customizer)
+	_, err = rand.Read(customizer)
+	require.NoError(t, err)
 
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
@@ -133,12 +136,14 @@ func TestUint(t *testing.T) {
 //
 // SubPermutation tests cover Permutation as well.
 func TestSubPermutation(t *testing.T) {
-	seedMathRand(t)
+	rand := getPRG(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	_, _ = rand.Read(seed)
+	_, err := rand.Read(seed)
+	require.NoError(t, err)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	rand.Read(customizer)
+	_, err = rand.Read(customizer)
+	require.NoError(t, err)
 
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
@@ -216,12 +221,14 @@ func TestSubPermutation(t *testing.T) {
 // Simple unit testing of Shuffle using a very basic randomness test.
 // It doesn't evaluate randomness of the output and doesn't perform advanced statistical tests.
 func TestShuffle(t *testing.T) {
-	seedMathRand(t)
+	rand := getPRG(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	_, _ = rand.Read(seed)
+	_, err := rand.Read(seed)
+	require.NoError(t, err)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	rand.Read(customizer)
+	_, err = rand.Read(customizer)
+	require.NoError(t, err)
 
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
@@ -299,12 +306,14 @@ func TestShuffle(t *testing.T) {
 }
 
 func TestSamples(t *testing.T) {
-	seedMathRand(t)
+	rand := getPRG(t)
 
 	seed := make([]byte, Chacha20SeedLen)
-	_, _ = rand.Read(seed)
+	_, err := rand.Read(seed)
+	require.NoError(t, err)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	rand.Read(customizer)
+	_, err = rand.Read(customizer)
+	require.NoError(t, err)
 
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
@@ -390,13 +399,15 @@ func TestSamples(t *testing.T) {
 // TestStateRestore tests the serilaization and deserialization functions
 // Store and Restore
 func TestStateRestore(t *testing.T) {
-	seedMathRand(t)
+	rand := getPRG(t)
 
 	// generate a seed
 	seed := make([]byte, Chacha20SeedLen)
-	_, _ = rand.Read(seed)
+	_, err := rand.Read(seed)
+	require.NoError(t, err)
 	customizer := make([]byte, Chacha20CustomizerMaxLen)
-	rand.Read(customizer)
+	_, err = rand.Read(customizer)
+	require.NoError(t, err)
 	t.Logf("seed is %x, customizer is %x\n", seed, customizer)
 
 	// create an rng
