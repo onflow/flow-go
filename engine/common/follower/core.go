@@ -115,14 +115,14 @@ func NewCore(log zerolog.Logger,
 	return c, nil
 }
 
-// OnBlockRange processes a batches of connected blocks. The input batch has to be sequentially ordered forming a chain.
+// OnBlockRange processes a range of connected blocks. The input list must be sequentially ordered forming a chain.
 // Submitting batch with invalid order results in error, such batch will be discarded and exception will be returned.
 // Effectively, this function validates incoming batch, adds it to cache of pending blocks and possibly schedules blocks for further
 // processing if they were certified.
 // This function is safe to use in concurrent environment.
 // Caution: this function might block if internally too many certified blocks are queued in the channel `certifiedBlocksChan`.
 // Expected errors during normal operations:
-//   - ErrDisconnectedBatch
+//   - cache.ErrDisconnectedBatch
 func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error {
 	if len(batch) < 1 {
 		return nil
@@ -187,7 +187,7 @@ func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error
 
 	certifiedBatch, certifyingQC, err := c.pendingCache.AddBlocks(batch)
 	if err != nil {
-		return fmt.Errorf("could not add a range of pending blocks: %w", err)
+		return fmt.Errorf("could not add a range of pending blocks: %w", err) // ErrDisconnectedBatch or exception
 	}
 	log.Debug().Msgf("caching block range resulted in %d certified blocks (possibly including additional cached blocks)", len(certifiedBatch))
 
@@ -206,7 +206,7 @@ func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error
 
 // processCoreSeqEvents processes events that need to be dispatched on dedicated core's goroutine.
 // Here we process events that need to be sequentially ordered(processing certified blocks and new finalized blocks).
-// Is NOT concurrency safe, has to be used by internal goroutine.
+// Is NOT concurrency safe, has to be used by only one internal worker goroutine.
 func (c *Core) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -281,7 +281,7 @@ func (c *Core) extendCertifiedBlocks(parentCtx context.Context, connectedBlocks 
 		}
 
 		hotstuffProposal := model.ProposalFromFlow(certifiedBlock.Block.Header)
-		// submit the model to follower for processing
+		// submit the model to follower for async processing
 		c.follower.SubmitProposal(hotstuffProposal)
 	}
 	return nil
