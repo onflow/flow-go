@@ -1,27 +1,31 @@
 package state_stream
 
 import (
-	"strings"
+	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// EventFilter represents a filter applied to events for a given subscription
 type EventFilter struct {
 	hasFilters bool
 	EventTypes map[flow.EventType]struct{}
 	Addresses  map[string]struct{}
 	Contracts  map[string]struct{}
+	EventNames map[string]struct{}
 }
 
 func NewEventFilter(
 	eventTypes []string,
 	addresses []string,
 	contracts []string,
+	eventNames []string,
 ) EventFilter {
 	f := EventFilter{
 		EventTypes: make(map[flow.EventType]struct{}, len(eventTypes)),
 		Addresses:  make(map[string]struct{}, len(addresses)),
 		Contracts:  make(map[string]struct{}, len(contracts)),
+		EventNames: make(map[string]struct{}, len(eventNames)),
 	}
 	for _, eventType := range eventTypes {
 		f.EventTypes[flow.EventType(eventType)] = struct{}{}
@@ -32,10 +36,15 @@ func NewEventFilter(
 	for _, contract := range contracts {
 		f.Contracts[contract] = struct{}{}
 	}
-	f.hasFilters = len(f.EventTypes) > 0 || len(f.Addresses) > 0 || len(f.Contracts) > 0
+	for _, eventName := range eventNames {
+		f.EventNames[eventName] = struct{}{}
+	}
+	f.hasFilters = len(f.EventTypes) > 0 || len(f.Addresses) > 0 || len(f.Contracts) > 0 || len(f.EventNames) > 0
 	return f
 }
 
+// Filter applies the all filters on the provided list of events, and returns a list of events that
+// match
 func (f *EventFilter) Filter(events flow.EventsList) flow.EventsList {
 	var filteredEvents flow.EventsList
 	for _, event := range events {
@@ -46,7 +55,9 @@ func (f *EventFilter) Filter(events flow.EventsList) flow.EventsList {
 	return filteredEvents
 }
 
+// Match applies all filters to a specific event, and returns true if the event matches
 func (f *EventFilter) Match(event flow.Event) bool {
+	// No filters means all events match
 	if !f.hasFilters {
 		return true
 	}
@@ -55,22 +66,23 @@ func (f *EventFilter) Match(event flow.Event) bool {
 		return true
 	}
 
-	parts := strings.Split(string(event.Type), ".")
-
-	// There are 2 valid EventType formats:
-	// * flow.[EventName]
-	// * A.[Address].[Contract].[EventName]
-	if len(parts) != 2 && len(parts) != 4 {
+	parsed, err := ParseEvent(event.Type)
+	if err != nil {
+		// TODO: log this error
+		fmt.Errorf("error parsing event type: %v\n", err)
 		return false
 	}
 
-	contract := parts[len(parts)-2]
-	if _, ok := f.Contracts[contract]; ok {
+	if _, ok := f.EventNames[parsed.Name]; ok {
 		return true
 	}
 
-	if len(parts) > 2 {
-		_, ok := f.Addresses[parts[1]]
+	if _, ok := f.Contracts[parsed.Contract]; ok {
+		return true
+	}
+
+	if parsed.Type == AccountEventType {
+		_, ok := f.Addresses[parsed.Address]
 		return ok
 	}
 

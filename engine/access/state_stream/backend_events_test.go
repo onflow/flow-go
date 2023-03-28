@@ -76,12 +76,12 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 
 		t2 := test
 		t2.name = fmt.Sprintf("%s - some events", test.name)
-		t2.filters = NewEventFilter([]string{string(testEventTypes[0])}, nil, nil)
+		t2.filters = NewEventFilter([]string{string(testEventTypes[0])}, nil, nil, nil)
 		tests = append(tests, t2)
 
 		t3 := test
 		t3.name = fmt.Sprintf("%s - no events", test.name)
-		t3.filters = NewEventFilter([]string{"A.0x1.NonExistent.Event"}, nil, nil)
+		t3.filters = NewEventFilter([]string{"A.0x1.NonExistent.Event"}, nil, nil, nil)
 		tests = append(tests, t3)
 	}
 
@@ -127,7 +127,7 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 					assert.Equal(s.T(), b.Header.ID(), resp.BlockID)
 					assert.Equal(s.T(), b.Header.Height, resp.Height)
 					assert.Equal(s.T(), expectedEvents, resp.Events)
-				}, 10000*time.Millisecond, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+				}, 100*time.Millisecond, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
 			}
 
 			// make sure there are no new messages waiting

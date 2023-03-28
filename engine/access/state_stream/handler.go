@@ -99,7 +99,7 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 	filter := EventFilter{}
 	if request.GetFilter() != nil {
 		reqFilter := request.GetFilter()
-		filter = NewEventFilter(reqFilter.GetEventType(), reqFilter.GetAddress(), reqFilter.GetContract())
+		filter = NewEventFilter(reqFilter.GetEventType(), reqFilter.GetAddress(), reqFilter.GetContract(), []string{})
 	}
 
 	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)

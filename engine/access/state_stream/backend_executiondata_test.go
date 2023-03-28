@@ -114,6 +114,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
 	s.blocks = make([]*flow.Block, 0, blockCount)
 
+	// generate blockCount consecutive blocks with associated seal, result and execution data
 	firstBlock := unittest.BlockFixture()
 	parent := firstBlock.Header
 	for i := 0; i < blockCount; i++ {
@@ -360,7 +361,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 
 					assert.Equal(s.T(), b.Header.Height, resp.Height)
 					assert.Equal(s.T(), execData.BlockExecutionData, resp.ExecutionData)
-				}, 10000*time.Millisecond, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+				}, 100*time.Millisecond, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
 			}
 
 			// make sure there are no new messages waiting
