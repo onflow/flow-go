@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -26,14 +28,7 @@ func (s *BackendEventsSuite) SetupTest() {
 	s.BackendExecutionDataSuite.SetupTest()
 }
 
-// test involves loading exec data and extracting events
-// need N blocks with a set of M events
-// Need to test:
-// * no results
-// * all results
-// * partial results
-// For each, thest using the same 3 cases as exec data streaming
-
+// TestSubscribeEvents tests the SubscribeEvents method happy path
 func (s *BackendEventsSuite) TestSubscribeEvents() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -67,6 +62,7 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 		},
 	}
 
+	// create variations for each of the base test
 	tests := make([]testType, 0, len(baseTests)*3)
 	for _, test := range baseTests {
 		t1 := test
@@ -89,6 +85,8 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 		s.Run(test.name, func() {
 			s.T().Logf("len(s.execDataMap) %d", len(s.execDataMap))
 
+			// add "backfill" block - blocks that are already in the database before the test starts
+			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
 				execData := s.execDataMap[s.blocks[i].ID()]
@@ -103,7 +101,8 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 				execData := s.execDataMap[b.ID()]
 				s.T().Logf("checking block %d %v", i, b.ID())
 
-				// simulate new exec data received
+				// simulate new exec data received.
+				// exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
 					s.execDataDistributor.OnExecutionDataReceived(execData)
 					s.broadcaster.Publish()
@@ -130,9 +129,8 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 				}, 100*time.Millisecond, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
 			}
 
-			// make sure there are no new messages waiting
+			// make sure there are no new messages waiting. the channel should be opened with nothing waiting
 			unittest.RequireNeverReturnBefore(s.T(), func() {
-				// this is a failure case. the channel should be opened with nothing waiting
 				<-sub.Channel()
 			}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 
@@ -148,4 +146,28 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 			}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 		})
 	}
+}
+
+func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s.Run("returns error for unindexed start blockID", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeEvents(subCtx, unittest.IdentifierFixture(), 0, EventFilter{})
+		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "exepected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	// make sure we're starting with a fresh cache
+	s.execDataCache.Clear()
+
+	s.Run("returns error for unindexed start height", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height+10, EventFilter{})
+		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "exepected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
 }

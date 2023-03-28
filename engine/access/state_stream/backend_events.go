@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -33,6 +34,11 @@ func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Id
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
 	if err != nil {
 		sub := NewSubscription()
+		if st, ok := status.FromError(err); ok {
+			sub.Fail(status.Errorf(st.Code(), "could not get start height: %s", st.Message()))
+			return sub
+		}
+
 		sub.Fail(fmt.Errorf("could not get start height: %w", err))
 		return sub
 	}

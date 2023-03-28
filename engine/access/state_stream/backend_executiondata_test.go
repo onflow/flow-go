@@ -70,7 +70,6 @@ func TestBackendExecutionDataSuite(t *testing.T) {
 func (s *BackendExecutionDataSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 
-	unittest.LogVerbose()
 	logger := unittest.Logger()
 
 	s.state = protocolmock.NewState(s.T())
@@ -284,7 +283,8 @@ func chunkExecutionDataFixture(t *testing.T, minSerializedSize uint64, events []
 		}
 
 		v := make([]byte, size)
-		_, _ = rand.Read(v)
+		_, err := rand.Read(v)
+		require.NoError(t, err)
 
 		k, err := ced.TrieUpdate.Payloads[0].Key()
 		require.NoError(t, err)
@@ -331,6 +331,8 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 
 			s.T().Logf("len(s.execDataMap) %d", len(s.execDataMap))
 
+			// add "backfill" block - blocks that are already in the database before the test starts
+			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
 				execData := s.execDataMap[s.blocks[i].ID()]
@@ -345,7 +347,8 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 				execData := s.execDataMap[b.ID()]
 				s.T().Logf("checking block %d %v", i, b.ID())
 
-				// simulate new exec data received
+				// simulate new exec data received.
+				// exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
 					s.execDataDistributor.OnExecutionDataReceived(execData)
 					s.broadcaster.Publish()
@@ -364,9 +367,8 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 				}, 100*time.Millisecond, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
 			}
 
-			// make sure there are no new messages waiting
+			// make sure there are no new messages waiting. the channel should be opened with nothing waiting
 			unittest.RequireNeverReturnBefore(s.T(), func() {
-				// this is a failure case. the channel should be opened with nothing waiting
 				<-sub.Channel()
 			}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 
@@ -388,21 +390,6 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var err error
-
-	block := unittest.BlockFixture()
-	seal := unittest.BlockSealsFixture(1)[0]
-	result := unittest.ExecutionResultFixture()
-	execData := blockExecutionDataFixture(s.T(), &block, nil)
-
-	result.ExecutionDataID, err = s.eds.AddExecutionData(ctx, execData)
-	assert.NoError(s.T(), err)
-
-	s.execDataMap[block.ID()] = execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
-	s.blockMap[block.Header.Height] = &block
-	s.sealMap[block.ID()] = seal
-	s.resultMap[seal.ResultID] = result
-
 	s.Run("returns error for unindexed start blockID", func() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
@@ -418,7 +405,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, block.Header.Height+10)
+		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height+10)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()))
 	})
 }
