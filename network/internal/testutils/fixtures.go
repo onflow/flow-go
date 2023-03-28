@@ -3,7 +3,6 @@ package testutils
 import (
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -51,5 +50,5 @@ func MisbehaviorReportsFixture(t *testing.T, count int) []network.MisbehaviorRep
 // Args:
 //   - t: the test object (used to emphasize that this is a test helper).
 func MisbehaviorTypeFixture(_ *testing.T) network.Misbehavior {
-	return alsp.AllMisbehaviorTypes()[rand.Int(len(alsp.AllMisbehaviorTypes()))]
+	return alsp.AllMisbehaviorTypes()[rand.Intn(len(alsp.AllMisbehaviorTypes()))]
 }
