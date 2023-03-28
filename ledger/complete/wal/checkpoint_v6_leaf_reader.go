@@ -72,7 +72,9 @@ func OpenAndReadLeafNodesFromCheckpointV6(dir string, fileName string, logger *z
 
 func readCheckpointSubTrieLeafNodes(leafNodesCh chan<- LeafNodeResult, dir string, fileName string, index int, checksum uint32, logger *zerolog.Logger) {
 	err := processCheckpointSubTrie(dir, fileName, index, checksum, logger,
-		func(reader *Crc32Reader, scratch []byte, nodesCount uint64) error {
+		func(reader *Crc32Reader, nodesCount uint64) error {
+			scratch := make([]byte, 1024*4) // must not be less than 1024
+
 			logging := logProgress(fmt.Sprintf("reading %v-th sub trie roots", index), int(nodesCount), logger)
 			dummyChild := &node.Node{}
 			for i := uint64(1); i <= nodesCount; i++ {

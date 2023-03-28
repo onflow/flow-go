@@ -331,7 +331,9 @@ func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint
 ) {
 	var nodes []*node.Node
 	err := processCheckpointSubTrie(dir, fileName, index, checksum, logger,
-		func(reader *Crc32Reader, scratch []byte, nodesCount uint64) error {
+		func(reader *Crc32Reader, nodesCount uint64) error {
+			scratch := make([]byte, 1024*4) // must not be less than 1024
+
 			nodes = make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
 			logging := logProgress(fmt.Sprintf("reading %v-th sub trie roots", index), int(nodesCount), logger)
 			for i := uint64(1); i <= nodesCount; i++ {
@@ -371,7 +373,7 @@ func processCheckpointSubTrie(
 	index int,
 	checksum uint32,
 	logger *zerolog.Logger,
-	processNode func(*Crc32Reader, []byte, uint64) error,
+	processNode func(*Crc32Reader, uint64) error,
 ) (
 	errToReturn error,
 ) {
@@ -425,12 +427,12 @@ func processCheckpointSubTrie(
 
 	// read file part index and verify
 
-	scratch := make([]byte, 1024*4) // must not be less than 1024
-	err = processNode(reader, scratch, nodesCount)
+	err = processNode(reader, nodesCount)
 	if err != nil {
 		return err
 	}
 
+	scratch := make([]byte, 1024)
 	// read footer and discard, since we only care about checksum
 	_, err = io.ReadFull(reader, scratch[:encNodeCountSize])
 	if err != nil {
