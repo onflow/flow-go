@@ -3,7 +3,7 @@
 The Application Layer Spam Prevention (ALSP) is a module that provides a mechanism to prevent the malicious nodes from 
 spamming the Flow nodes at the application layer (i.e., the engines). ASLP is not a multi-party protocol, i.e., 
 it does not require the nodes to exchange any messages with each other for the purpose of spam prevention. Rather, it is 
-a local mechanism that is implemented by each node to protect itself from malicious nodes. AlSP is not meant to replace 
+a local mechanism that is implemented by each node to protect itself from malicious nodes. ALSP is not meant to replace 
 the existing spam prevention mechanisms at the network layer (e.g., the Libp2p and GossipSub). 
 Rather, it is meant to complement the existing mechanisms by providing an additional layer of protection.
 ALSP is concerned with the spamming of the application layer through messages that appear valid to the networking layer and hence
