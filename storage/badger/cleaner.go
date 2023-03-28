@@ -15,7 +15,12 @@ import (
 )
 
 // Cleaner uses component.ComponentManager to implement module.Startable and module.ReadyDoneAware
-// to run an internal goroutine which run badger value log garbage collection on timely basis.
+// to run an internal goroutine which run badger value log garbage collection at a semi-regular interval.
+// The Cleaner exists for 2 reasons:
+//   - Run GC frequently enough that each GC is relatively inexpensive
+//   - Avoid GC being synchronized across all nodes. Since in the happy path, all nodes have very similar 
+//     database load patterns, without intervention they are likely to schedule GC at the same time, which 
+//     can cause temporary consensus halts.
 type Cleaner struct {
 	*component.ComponentManager
 	log      zerolog.Logger
@@ -57,6 +62,7 @@ func NewCleaner(log zerolog.Logger, db *badger.DB, metrics module.CleanerMetrics
 func (c *Cleaner) gcWorkerRoutine(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 	ticker := time.NewTicker(c.nextWaitDuration())
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -71,8 +77,8 @@ func (c *Cleaner) gcWorkerRoutine(ctx irrecoverable.SignalerContext, ready compo
 }
 
 // nextWaitDuration calculates next duration for Cleaner to wait before attempting to run GC.
-// We add 20% jitter into the interval, so that we don't risk nodes syncing
-// up on their GC calls over time.
+// We add 20% jitter into the interval, so that we don't risk nodes syncing their GC calls over time.
+// Therefore GC is run every X seconds, where X is uniformly sampled from [interval, interval*1.2]
 func (c *Cleaner) nextWaitDuration() time.Duration {
 	return time.Duration(c.interval.Milliseconds() + rand.Int63n(c.interval.Milliseconds()/5))
 }
