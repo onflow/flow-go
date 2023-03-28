@@ -1,8 +1,6 @@
 package state_stream
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -31,6 +29,8 @@ func NewEventFilter(
 		f.EventTypes[flow.EventType(eventType)] = struct{}{}
 	}
 	for _, address := range addresses {
+		// convert to flow.Address to ensure it's in the correct format, but use the string value
+		// for matching to avoid an address conversion for every event
 		f.Addresses[flow.HexToAddress(address).String()] = struct{}{}
 	}
 	for _, contract := range contracts {
@@ -69,7 +69,6 @@ func (f *EventFilter) Match(event flow.Event) bool {
 	parsed, err := ParseEvent(event.Type)
 	if err != nil {
 		// TODO: log this error
-		fmt.Errorf("error parsing event type: %v\n", err)
 		return false
 	}
 

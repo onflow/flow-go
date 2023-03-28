@@ -58,7 +58,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.12.1
 	github.com/onflow/flow-go-sdk v0.40.0
 	github.com/onflow/flow-go/crypto v0.24.7
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230324220548-aa6c2e87a204
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230328203044-15818faa2723
 	github.com/onflow/go-bitswap v0.0.0-20221017184039-808c5791a8a8
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
