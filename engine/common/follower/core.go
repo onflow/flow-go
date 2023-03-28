@@ -24,15 +24,6 @@ import (
 
 type ComplianceOption func(*Core)
 
-// WithComplianceOptions sets options for the core's compliance config
-func WithComplianceOptions(opts ...compliance.Opt) ComplianceOption {
-	return func(c *Core) {
-		for _, apply := range opts {
-			apply(&c.config)
-		}
-	}
-}
-
 type CertifiedBlocks []pending_tree.CertifiedBlock
 
 // defaultCertifiedBlocksChannelCapacity maximum capacity of buffered channel that is used to transfer
@@ -77,9 +68,15 @@ func NewCore(log zerolog.Logger,
 	validator hotstuff.Validator,
 	sync module.BlockRequester,
 	tracer module.Tracer,
-	opts ...ComplianceOption) (*Core, error) {
+	opts ...compliance.Opt,
+) (*Core, error) {
 	onEquivocation := func(block, otherBlock *flow.Block) {
 		finalizationConsumer.OnDoubleProposeDetected(model.BlockFromFlow(block.Header), model.BlockFromFlow(otherBlock.Header))
+	}
+
+	config := compliance.DefaultConfig()
+	for _, apply := range opts {
+		apply(&config)
 	}
 
 	finalizedBlock, err := state.Final().Head()
@@ -97,13 +94,9 @@ func NewCore(log zerolog.Logger,
 		validator:           validator,
 		sync:                sync,
 		tracer:              tracer,
-		config:              compliance.DefaultConfig(),
+		config:              config,
 		certifiedBlocksChan: make(chan CertifiedBlocks, defaultCertifiedBlocksChannelCapacity),
 		finalizedBlocksChan: make(chan *flow.Header, defaultFinalizedBlocksChannelCapacity),
-	}
-
-	for _, apply := range opts {
-		apply(c)
 	}
 
 	// prune cache to latest finalized view

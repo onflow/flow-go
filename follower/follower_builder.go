@@ -244,7 +244,7 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 			builder.Validator,
 			builder.SyncCore,
 			node.Tracer,
-			followereng.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
+			compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower core: %w", err)
