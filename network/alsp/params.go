@@ -3,7 +3,7 @@ package alsp
 // To give a summary with the default value:
 //  1. The penalty of each misbehavior is 0.01 * misbehaviorDisallowListingThreshold = -86.4
 //  2. The penalty of each misbehavior is decayed by a decay value at each decay interval. The default decay value is 1000.
-//     This means that by default if a node misbehaves 1000 times in a second, it gets disallow-listed, and takes 86.4 seconds to recover.
+//     This means that by default if a node misbehaves 100 times in a second, it gets disallow-listed, and takes 86.4 seconds to recover.
 //     We emphasize on the default penalty value can be amplified by the engine that reports the misbehavior.
 //  3. Each time a node is disallow-listed, its decay speed is decreased by 90%. This means that if a node is disallow-listed
 //     for the first time, it takes 86.4 seconds to recover. If the node is disallow-listed for the second time, its decay
