@@ -82,7 +82,6 @@ func TestHandleReportedMisbehavior(t *testing.T) {
 // The TestReportCreation tests the creation of misbehavior reports using the alsp.NewMisbehaviorReport function.
 // The function tests the creation of both valid and invalid misbehavior reports by setting different penalty amplification values.
 func TestReportCreation(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
 
 	// creates a valid misbehavior report (i.e., amplification between 1 and 100)
 	report, err := alsp.NewMisbehaviorReport(
