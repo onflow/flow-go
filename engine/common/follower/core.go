@@ -22,8 +22,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-type ComplianceOption func(*Core)
-
 type CertifiedBlocks []pending_tree.CertifiedBlock
 
 // defaultCertifiedBlocksChannelCapacity maximum capacity of buffered channel that is used to transfer
