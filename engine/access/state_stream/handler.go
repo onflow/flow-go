@@ -60,7 +60,10 @@ func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataR
 	for {
 		v, ok := <-sub.Channel()
 		if !ok {
-			return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
+			if sub.Err() != nil {
+				return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
+			}
+			return nil
 		}
 
 		resp, ok := v.(*ExecutionDataResponse)
@@ -104,7 +107,10 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 	for {
 		v, ok := <-sub.Channel()
 		if !ok {
-			return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
+			if sub.Err() != nil {
+				return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
+			}
+			return nil
 		}
 
 		resp, ok := v.(*EventsResponse)

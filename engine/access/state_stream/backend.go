@@ -114,12 +114,12 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, blockID flow.
 
 	result, err := b.results.ByID(seal.ResultID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get execution result: %w", err)
+		return nil, fmt.Errorf("could not get execution result (id: %s): %w", seal.ResultID, err)
 	}
 
 	execData, err := b.execDataStore.GetExecutionData(ctx, result.ExecutionDataID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get execution data: %w", err)
+		return nil, fmt.Errorf("could not get execution data (id: %s): %w", result.ExecutionDataID, err)
 	}
 
 	blockExecData := execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)

@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 type EventsResponse struct {
@@ -29,15 +30,14 @@ type EventsBackend struct {
 }
 
 func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) Subscription {
-	sub := NewHeightBasedSubscription(b.getResponseFactory(filter))
-
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
 	if err != nil {
+		sub := NewSubscription()
 		sub.Fail(fmt.Errorf("could not get start height: %w", err))
 		return sub
 	}
 
-	sub.nextHeight = nextHeight
+	sub := NewHeightBasedSubscription(nextHeight, b.getResponseFactory(filter))
 
 	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, sub).Stream(ctx)
 
@@ -48,12 +48,12 @@ func (b EventsBackend) getResponseFactory(filter EventFilter) GetDataByHeightFun
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		header, err := b.headers.ByHeight(height)
 		if err != nil {
-			return nil, fmt.Errorf("could not get block header: %w", err)
+			return nil, fmt.Errorf("could not get block header for height %d: %w", height, err)
 		}
 
 		executionData, err := b.getExecutionData(ctx, header.ID())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not get execution data for block %s: %w", header.ID(), err)
 		}
 
 		events := []flow.Event{}
@@ -61,7 +61,10 @@ func (b EventsBackend) getResponseFactory(filter EventFilter) GetDataByHeightFun
 			events = append(events, filter.Filter(chunkExecutionData.Events)...)
 		}
 
-		b.log.Debug().Msgf("sending %d events", len(events))
+		b.log.Trace().
+			Hex("block_id", logging.ID(header.ID())).
+			Uint64("height", header.Height).
+			Msgf("sending %d events", len(events))
 
 		return &EventsResponse{
 			BlockID: header.ID(),

@@ -2,6 +2,8 @@ package state_stream
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,6 +37,9 @@ type SubscriptionImpl struct {
 
 	// err is the error that caused the subscription to fail
 	err error
+
+	// once is used to ensure that the channel is only closed once
+	once sync.Once
 }
 
 func NewSubscription() *SubscriptionImpl {
@@ -63,12 +68,14 @@ func (sub *SubscriptionImpl) Err() error {
 // Fail registers an error and closes the subscription channel
 func (sub *SubscriptionImpl) Fail(err error) {
 	sub.err = err
-	close(sub.ch)
+	sub.Close()
 }
 
 // Close is called when a subscription ends gracefully, and closes the subscription channel
 func (sub *SubscriptionImpl) Close() {
-	close(sub.ch)
+	sub.once.Do(func() {
+		close(sub.ch)
+	})
 }
 
 // Send sends a value to the subscription channel or returns an error
@@ -97,9 +104,10 @@ type HeightBasedSubscription struct {
 	getData    GetDataByHeightFunc
 }
 
-func NewHeightBasedSubscription(getData GetDataByHeightFunc) *HeightBasedSubscription {
+func NewHeightBasedSubscription(firstHeight uint64, getData GetDataByHeightFunc) *HeightBasedSubscription {
 	return &HeightBasedSubscription{
 		SubscriptionImpl: NewSubscription(),
+		nextHeight:       firstHeight,
 		getData:          getData,
 	}
 }
@@ -108,7 +116,7 @@ func NewHeightBasedSubscription(getData GetDataByHeightFunc) *HeightBasedSubscri
 func (s *HeightBasedSubscription) Next(ctx context.Context) (interface{}, error) {
 	v, err := s.getData(ctx, s.nextHeight)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get data for height %d: %w", s.nextHeight, err)
 	}
 	s.nextHeight++
 	return v, nil

@@ -8,9 +8,9 @@ import (
 
 type EventFilter struct {
 	hasFilters bool
-	EventTypes map[flow.EventType]bool
-	Addresses  map[string]bool
-	Contracts  map[string]bool
+	EventTypes map[flow.EventType]struct{}
+	Addresses  map[string]struct{}
+	Contracts  map[string]struct{}
 }
 
 func NewEventFilter(
@@ -19,18 +19,18 @@ func NewEventFilter(
 	contracts []string,
 ) EventFilter {
 	f := EventFilter{
-		EventTypes: make(map[flow.EventType]bool, len(eventTypes)),
-		Addresses:  make(map[string]bool, len(addresses)),
-		Contracts:  make(map[string]bool, len(contracts)),
+		EventTypes: make(map[flow.EventType]struct{}, len(eventTypes)),
+		Addresses:  make(map[string]struct{}, len(addresses)),
+		Contracts:  make(map[string]struct{}, len(contracts)),
 	}
 	for _, eventType := range eventTypes {
-		f.EventTypes[flow.EventType(eventType)] = true
+		f.EventTypes[flow.EventType(eventType)] = struct{}{}
 	}
 	for _, address := range addresses {
-		f.Addresses[flow.HexToAddress(address).String()] = true
+		f.Addresses[flow.HexToAddress(address).String()] = struct{}{}
 	}
 	for _, contract := range contracts {
-		f.Contracts[contract] = true
+		f.Contracts[contract] = struct{}{}
 	}
 	f.hasFilters = len(f.EventTypes) > 0 || len(f.Addresses) > 0 || len(f.Contracts) > 0
 	return f
@@ -51,25 +51,27 @@ func (f *EventFilter) Match(event flow.Event) bool {
 		return true
 	}
 
-	if f.EventTypes[event.Type] {
+	if _, ok := f.EventTypes[event.Type]; ok {
 		return true
 	}
 
 	parts := strings.Split(string(event.Type), ".")
 
-	if len(parts) < 2 {
-		// TODO: log the error
+	// There are 2 valid EventType formats:
+	// * flow.[EventName]
+	// * A.[Address].[Contract].[EventName]
+	if len(parts) != 2 && len(parts) != 4 {
 		return false
 	}
 
-	// name := parts[len(parts)-1]
 	contract := parts[len(parts)-2]
-	if f.Contracts[contract] {
+	if _, ok := f.Contracts[contract]; ok {
 		return true
 	}
 
-	if len(parts) > 2 && f.Addresses[parts[1]] {
-		return true
+	if len(parts) > 2 {
+		_, ok := f.Addresses[parts[1]]
+		return ok
 	}
 
 	return false

@@ -68,6 +68,7 @@ func (s *Streamer) Stream(ctx context.Context) {
 		err := s.sendAllAvailable(ctx)
 
 		if err != nil {
+			s.log.Err(err).Msg("error sending response")
 			s.sub.Fail(err)
 			return
 		}
@@ -79,25 +80,20 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 	for {
 		response, err := s.sub.Next(ctx)
 
-		lg := s.log.With().Logger()
-		if ssub, ok := s.sub.(*HeightBasedSubscription); ok {
-			lg = lg.With().Uint64("next_height", ssub.nextHeight).Logger()
-		} else {
-			lg.Debug().Msgf("height not found for sub %T", s.sub)
-		}
-
-		if errors.Is(err, storage.ErrNotFound) || execution_data.IsBlobNotFoundError(err) {
-			// no more available
-			lg.Err(err).Msg("not found")
-			return nil
-		}
 		if err != nil {
-			lg.Err(err).Msg("error sending response")
+			if errors.Is(err, storage.ErrNotFound) || execution_data.IsBlobNotFoundError(err) {
+				// no more available
+				return nil
+			}
+
 			return fmt.Errorf("could not get response: %w", err)
 		}
 
-		// TODO: add label that indicates the response's height/block/id
-		lg.Debug().Msg("sending response")
+		if ssub, ok := s.sub.(*HeightBasedSubscription); ok {
+			s.log.Trace().
+				Uint64("next_height", ssub.nextHeight).
+				Msg("sending response")
+		}
 
 		err = s.sub.Send(ctx, response, s.sendTimeout)
 		if err != nil {
