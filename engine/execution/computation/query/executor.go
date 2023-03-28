@@ -225,7 +225,7 @@ func (e *QueryExecutor) GetAccount(
 	account, err := e.vm.GetAccount(
 		blockCtx,
 		address,
-		delta.NewDeltaView(snapshot))
+		snapshot)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to get account (%s) at block (%s): %w",

@@ -4,7 +4,6 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -51,11 +50,11 @@ func (d *RemoteDebugger) RunTransaction(
 		d.ctx,
 		fvm.WithBlockHeader(d.ctx.BlockHeader))
 	tx := fvm.Transaction(txBody, 0)
-	err := d.vm.Run(blockCtx, tx, delta.NewDeltaView(snapshot))
+	_, output, err := d.vm.RunV2(blockCtx, tx, snapshot)
 	if err != nil {
 		return nil, err
 	}
-	return tx.Err, nil
+	return output.Err, nil
 }
 
 // RunTransaction runs the transaction and tries to collect the registers at
@@ -80,7 +79,7 @@ func (d *RemoteDebugger) RunTransactionAtBlockID(
 		snapshot.Cache = newFileRegisterCache(regCachePath)
 	}
 	tx := fvm.Transaction(txBody, 0)
-	err := d.vm.Run(blockCtx, tx, delta.NewDeltaView(snapshot))
+	_, output, err := d.vm.RunV2(blockCtx, tx, snapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +87,7 @@ func (d *RemoteDebugger) RunTransactionAtBlockID(
 	if err != nil {
 		return nil, err
 	}
-	return tx.Err, nil
+	return output.Err, nil
 }
 
 func (d *RemoteDebugger) RunScript(
@@ -106,11 +105,11 @@ func (d *RemoteDebugger) RunScript(
 		d.ctx,
 		fvm.WithBlockHeader(d.ctx.BlockHeader))
 	script := fvm.Script(code).WithArguments(arguments...)
-	err := d.vm.Run(scriptCtx, script, delta.NewDeltaView(snapshot))
+	_, output, err := d.vm.RunV2(scriptCtx, script, snapshot)
 	if err != nil {
 		return nil, nil, err
 	}
-	return script.Value, script.Err, nil
+	return output.Value, output.Err, nil
 }
 
 func (d *RemoteDebugger) RunScriptAtBlockID(
@@ -129,9 +128,9 @@ func (d *RemoteDebugger) RunScriptAtBlockID(
 		d.ctx,
 		fvm.WithBlockHeader(d.ctx.BlockHeader))
 	script := fvm.Script(code).WithArguments(arguments...)
-	err := d.vm.Run(scriptCtx, script, delta.NewDeltaView(snapshot))
+	_, output, err := d.vm.RunV2(scriptCtx, script, snapshot)
 	if err != nil {
 		return nil, nil, err
 	}
-	return script.Value, script.Err, nil
+	return output.Value, output.Err, nil
 }

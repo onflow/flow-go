@@ -41,8 +41,8 @@ func NewAccountPublicKeyNotFoundError(
 		keyIndex)
 }
 
-// IsAccountAccountPublicKeyNotFoundError returns true if error has this type
-func IsAccountAccountPublicKeyNotFoundError(err error) bool {
+// IsAccountPublicKeyNotFoundError returns true if error has this type
+func IsAccountPublicKeyNotFoundError(err error) bool {
 	return HasErrorCode(err, ErrCodeAccountPublicKeyNotFoundError)
 }
 

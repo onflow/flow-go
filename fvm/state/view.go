@@ -68,6 +68,16 @@ func (snapshot *ExecutionSnapshot) UpdatedRegisterIDs() []flow.RegisterID {
 	return ids
 }
 
+// ReadRegisterIDs returns a list of register ids that were read.
+// The returned ids are unsorted
+func (snapshot *ExecutionSnapshot) ReadRegisterIDs() []flow.RegisterID {
+	ret := make([]flow.RegisterID, 0, len(snapshot.ReadSet))
+	for k := range snapshot.ReadSet {
+		ret = append(ret, k)
+	}
+	return ret
+}
+
 // AllRegisterIDs returns all register ids that were read / write by this
 // view. The returned ids are unsorted.
 func (snapshot *ExecutionSnapshot) AllRegisterIDs() []flow.RegisterID {

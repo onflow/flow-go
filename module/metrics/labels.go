@@ -85,6 +85,7 @@ const (
 	ResourceNetworkingDnsTxtCache                   = "networking_dns_txt_cache"           // networking layer
 	ResourceNetworkingDisallowListNotificationQueue = "networking_disallow_list_notification_queue"
 	ResourceNetworkingRpcInspectorNotificationQueue = "networking_rpc_inspector_notification_queue"
+	ResourceNetworkingRpcInspectorQueue             = "networking_rpc_inspector_queue"
 
 	ResourceFollowerPendingBlocksCache = "follower_pending_block_cache"      // follower engine
 	ResourceClusterBlockProposalQueue  = "cluster_compliance_proposal_queue" // collection node, compliance engine

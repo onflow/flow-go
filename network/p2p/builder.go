@@ -63,6 +63,10 @@ type GossipSubBuilder interface {
 	// If the routing system has already been set, a fatal error is logged.
 	SetRoutingSystem(routing.Routing)
 
+	// SetGossipSubValidationInspector sets the rpc validation inspector.
+	// If the rpc validation inspector has already been set, a fatal error is logged.
+	SetGossipSubValidationInspector(inspector GossipSubRPCInspector)
+
 	// Build creates a new GossipSub pubsub system.
 	// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
 	//
@@ -108,6 +112,7 @@ type NodeBuilder interface {
 	SetRateLimiterDistributor(UnicastRateLimiterDistributor) NodeBuilder
 	SetGossipSubTracer(PubSubTracer) NodeBuilder
 	SetGossipSubScoreTracerInterval(time.Duration) NodeBuilder
+	SetGossipSubValidationInspector(GossipSubRPCInspector) NodeBuilder
 	Build() (LibP2PNode, error)
 }
 
