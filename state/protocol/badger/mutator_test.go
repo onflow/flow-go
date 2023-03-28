@@ -5,6 +5,7 @@ package badger_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -1838,6 +1839,10 @@ func TestHeaderExtendValid(t *testing.T) {
 		finalCommit, err := state.Final().Commit()
 		require.NoError(t, err)
 		require.Equal(t, seal.FinalState, finalCommit)
+
+		err = state.ExtendCertified(context.Background(), extend, unittest.CertifyBlock(extend.Header))
+		fmt.Println(err)
+		require.Error(t, err)
 	})
 }
 
