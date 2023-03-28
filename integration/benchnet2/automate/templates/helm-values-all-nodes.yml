@@ -48,8 +48,6 @@ collection:
       args:{{template "args" .}}
         - --loglevel=INFO
         - --block-rate-delay=950ms
-        - --hotstuff-timeout=2.15s
-        - --hotstuff-min-timeout=2.15s
         - --ingress-addr=0.0.0.0:9000
         - --insecure-access-api=false
         - --access-node-ids=*
@@ -73,8 +71,6 @@ consensus:
       args:{{template "args" .}}
         - --loglevel=DEBUG
         - --block-rate-delay=800ms
-        - --hotstuff-timeout=2s
-        - --hotstuff-min-timeout=2s
         - --chunk-alpha=1
         - --emergency-sealing-active=false
         - --insecure-access-api=false
