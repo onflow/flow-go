@@ -1,0 +1,190 @@
+---
+name: Create Benchnet Network
+
+on:
+  workflow_dispatch:
+    inputs:
+      # Allows for the ref to be altered for testing automation changes
+      automation_ref:
+        type: string
+        description: 'flow-go ref to use for automation to use for bootstrapping and deployment'
+        required: false
+        default: master
+
+      # Allows for the public or private repo to be used for deployment automation
+      automation_repo:
+        required: true
+        type: choice
+        description: Choose the repo to use the public or private repo for automation
+        options:
+          - onflow/flow-go
+          - dapperlabs/flow-go
+    
+      ref_to_build_and_deploy:
+        type: string
+        description: 'flow-go ref to build and deploy. Provide tag, branch, or commit'
+        required: true
+
+      repo_to_use_for_build:
+        required: true
+        type: choice
+        description: Choose the repo to use the public or private repo for builds
+        options:
+          - onflow/flow-go
+          - dapperlabs/flow-go
+
+      skip_builds:
+        required: true
+        type: boolean
+        description: skip builds
+
+env:
+  GCP_PROJECT: "dl-flow-benchnet-automation"
+  REPO: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet
+  SERVICE_ACCOUNT_KEY: ${{ secrets.STAGING_DEPLOYER_SERVICE_ACCOUNT_KEY }}
+  CLUSTER_NAME: "us-west1-application"
+  REGION: us-west1
+jobs:
+  commitSha:
+    name: Retrieve Commit
+    runs-on:
+      # build on CI runner VMs
+      - self-hosted
+      - flow-bn2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          repository: ${{ inputs.repo_to_use_for_build }}
+          ref: ${{ inputs.ref_to_build_and_deploy }}
+
+      - name: Add Short Commit
+        id: getCommitSha
+        run: |
+          echo "shortCommit=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Print Outputs
+        run: |
+          echo ${{ steps.getCommitSha.outputs.shortCommit }}
+    outputs:
+      commitSha: ${{ steps.getCommitSha.outputs.shortCommit }}
+
+  build:
+    if: ${{ ! inputs.skip_builds }}
+    name: Build services
+    needs: commitSha
+    strategy:
+      fail-fast: false
+      matrix:
+        role: 
+          - access
+          - collection
+          - consensus
+          - execution
+          - verification
+    runs-on:
+      # build on CI runner VMs
+      - self-hosted
+      - flow-bn2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          repository: ${{ inputs.repo_to_use_for_build }}
+          ref: ${{ inputs.ref_to_build_and_deploy }}
+
+      - name: Configure gcloud
+        uses: google-github-actions/setup-gcloud@v0.2.1
+        with:
+          version: "349.0.0"
+          project_id: ${{ env.GCP_PROJECT }}
+          service_account_key: ${{ env.SERVICE_ACCOUNT_KEY }}
+          export_default_credentials: true
+
+      - name: Authenticate docker with gcloud
+        run: |
+          gcloud auth configure-docker us-west1-docker.pkg.dev
+
+      - name: Build Image
+        run: |
+          make docker-build-${{ matrix.role }} CONTAINER_REGISTRY=${{ env.REPO }} SHORT_COMMIT=${{needs.commitSha.outputs.commitSha}}
+  
+      - name: Push Image
+        run: |
+          make docker-push-${{ matrix.role }} CONTAINER_REGISTRY=${{ env.REPO }}
+
+  deploy:
+    name: Deploy Network
+    needs:
+      - commitSha
+      - build
+    if: always() 
+    runs-on:
+      - self-hosted
+      - flow-bn2
+    env:
+      ARGS: NAMESPACE=benchnet ACCESS=1 COLLECTION=6 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 COMMIT_SHA=${{ needs.commitSha.outputs.commitSha }} PROJECT_NAME=${{ needs.commitSha.outputs.commitSha }} FLOW_GO_TAG=${{ needs.commitSha.outputs.commitSha }}
+    steps:
+      - name: Fail if commit sha for build/deploy is Unavailable
+        if: ${{ needs.commitSha.outputs.commitSha == '' }}
+        run: exit 1
+
+      - name: Run Bootstrap in Container
+        run: |
+           docker run -v ${GITHUB_WORKSPACE}:/app ubuntu /bin/bash -c "rm -rf /app/*"
+
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.19'
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          repository: ${{ inputs.automation_repo }}
+          ref: ${{ inputs.automation_ref }}
+
+      - name: Configure gcloud
+        uses: google-github-actions/setup-gcloud@v0.2.1
+        with:
+          version: "349.0.0"
+          project_id: ${{ env.GCP_PROJECT }}
+          service_account_key: ${{ env.SERVICE_ACCOUNT_KEY }}
+          export_default_credentials: true
+
+      - name: Create env.KUBECONFIG
+        uses: dapperlabs-platform/get-gke-credentials@enable-application-default-credentials
+        env:
+          GCLOUD_PROJECT: ${{ env.GCP_PROJECT }}
+        with:
+          cluster_name: ${{ env.CLUSTER_NAME }}
+          location: ${{ env.REGION }}
+          use_internal_ip: false
+
+      - name: Build Bootstrap Container
+        run: |
+          docker build -t bootstrap -f ./cmd/Dockerfile .
+      
+      - name: Run Bootstrap in Container
+        run: |
+          docker run -v ${GITHUB_WORKSPACE}:/app -i bootstrap /bin/bash -c "cd /app/integration/benchnet2 && make ${{ env.ARGS }} FLOW_GO_TAG=${{ inputs.ref_to_build_and_deploy }} gen-helm-values && chown -R 1001 /app || chown -R 1001 /app"
+
+      - name: Create Bootstrap Secrets
+        working-directory: integration/benchnet2/
+        run: make k8s-secrets-create ${{ env.ARGS }} FLOW_GO_TAG=${{ needs.commitSha.outputs.commitSha }}
+        
+      - name: Deploy Helm Chart
+        working-directory: integration/benchnet2/
+        run: make helm-deploy ${{ env.ARGS }} FLOW_GO_TAG=${{ needs.commitSha.outputs.commitSha }}
+
+      - name: Benchnet2 Deployment Summary
+        run: |
+          SUMMARY=$'# Benchnet2 Deployment Summary\n## Your Deployment SHA is ${{ needs.commitSha.outputs.commitSha }}'
+          echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
+
+      - name: Clean directory
+        run: |
+           docker run -v ${GITHUB_WORKSPACE}:/app ubuntu /bin/bash -c "rm -rf /app/*"
