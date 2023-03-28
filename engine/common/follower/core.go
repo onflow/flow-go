@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -121,7 +120,7 @@ func NewCore(log zerolog.Logger,
 // Effectively, this function validates incoming batch, adds it to cache of pending blocks and possibly schedules blocks for further
 // processing if they were certified.
 // This function is safe to use in concurrent environment.
-// Caution: this function might block if internally too many certified blocks are queued in the channel `certifiedBlocksChan`. 
+// Caution: this function might block if internally too many certified blocks are queued in the channel `certifiedBlocksChan`.
 // Expected errors during normal operations:
 //   - ErrDisconnectedBatch
 func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error {
@@ -147,16 +146,16 @@ func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error
 
 	if c.pendingCache.Peek(hotstuffProposal.Block.BlockID) == nil {
 		log.Debug().Msg("block not found in cache, performing validation")
-		// Caution: we are _not_ verifying the proposal's full validity here. Instead, we need to check 
-		// the following two critical properties: 
-		// 1. The block has been signed by the legitimate primary for the view. This is important in case 
-		//    there are multiple blocks for the view. We need to differentiate the following byzantine cases: 
+		// Caution: we are _not_ verifying the proposal's full validity here. Instead, we need to check
+		// the following two critical properties:
+		// 1. The block has been signed by the legitimate primary for the view. This is important in case
+		//    there are multiple blocks for the view. We need to differentiate the following byzantine cases:
 		//     (i) Some other consensus node that is _not_ primary is trying to publish a block.
 		//         This would result in the validation below failing with and `InvalidBlockError`.
 		//    (ii) The legitimate primary for the view is equivocating. In this case, the validity check
-		//         below would pass. Though, the `PendingTree` would eventually notice this, when we connect 
-		//         the equivocating blocks to the latest finalized block.  
-		// 2. The QC within the block is valid. A valid QC proves validity of all ancestors. 
+		//         below would pass. Though, the `PendingTree` would eventually notice this, when we connect
+		//         the equivocating blocks to the latest finalized block.
+		// 2. The QC within the block is valid. A valid QC proves validity of all ancestors.
 		err := c.validator.ValidateProposal(hotstuffProposal)
 		if err != nil {
 			if model.IsInvalidBlockError(err) {
@@ -233,8 +232,8 @@ func (c *Core) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready com
 // OnFinalizedBlock updates local state of pendingCache tree using received finalized block and queues finalized block
 // to be processed by internal goroutine.
 // This function is safe to use in concurrent environment.
-// CAUTION: this function blocks and is therefore not compliant with the `FinalizationConsumer.OnFinalizedBlock` 
-// interface. This function should only be executed within the a worker routine.  
+// CAUTION: this function blocks and is therefore not compliant with the `FinalizationConsumer.OnFinalizedBlock`
+// interface. This function should only be executed within the a worker routine.
 func (c *Core) OnFinalizedBlock(final *flow.Header) {
 	c.pendingCache.PruneUpToView(final.View)
 
@@ -278,9 +277,6 @@ func (c *Core) extendCertifiedBlocks(parentCtx context.Context, connectedBlocks 
 		err := c.state.ExtendCertified(ctx, certifiedBlock.Block, certifiedBlock.QC)
 		span.End()
 		if err != nil {
-			if state.IsOutdatedExtensionError(err) {
-				continue
-			}
 			return fmt.Errorf("could not extend protocol state with certified block: %w", err)
 		}
 

@@ -51,8 +51,7 @@ type FollowerState interface {
 	// has been certified, and it's safe to add it to the protocol state.
 	// QC cannot be nil and must certify candidate block (candidate.View == qc.View && candidate.BlockID == qc.BlockID)
 	// The `candidate` block and its QC _must be valid_ (otherwise, the state will be corrupted).
-	// Expected errors during normal operations:
-	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+	// No errors are expected during normal operations.
 	ExtendCertified(ctx context.Context, candidate *flow.Block, qc *flow.QuorumCertificate) error
 
 	// Finalize finalizes the block with the given hash.
