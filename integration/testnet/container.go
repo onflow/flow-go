@@ -9,26 +9,24 @@ import (
 	"testing"
 	"time"
 
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkclient "github.com/onflow/flow-go-sdk/access/grpc"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine/ghost/client"
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/flow"
-
+	"github.com/dapperlabs/testingdock"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/go-connections/nat"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/dapperlabs/testingdock"
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkclient "github.com/onflow/flow-go-sdk/access/grpc"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/crypto"
+	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	state "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -151,18 +149,14 @@ type Container struct {
 // Addr returns the host-accessible listening address of the container for the
 // given port name. Panics if the port does not exist.
 func (c *Container) Addr(portName string) string {
-	port, ok := c.Ports[portName]
-	if !ok {
-		panic("could not find port " + portName)
-	}
-	return fmt.Sprintf(":%s", port)
+	return fmt.Sprintf(":%s", c.Port(portName))
 }
 
 // Port returns the host-accessible port of the container for the given port name
 func (c *Container) Port(name string) string {
 	port, ok := c.Ports[name]
 	if !ok {
-		panic("unregistered port " + name)
+		panic(fmt.Sprintf("port %s is not registered for %s", name, c.Config.ContainerName))
 	}
 	return port
 }
@@ -466,12 +460,12 @@ func (c *Container) TestnetClient() (*Client, error) {
 	return NewClient(c.Addr(GRPCPort), chain)
 }
 
-func (c *Container) GhostClient() (*client.GhostClient, error) {
+func (c *Container) GhostClient() (*ghostclient.GhostClient, error) {
 	if !c.Config.Ghost {
 		return nil, fmt.Errorf("container is not a ghost node")
 	}
 
-	return client.NewGhostClient(c.Addr(GRPCPort))
+	return ghostclient.NewGhostClient(c.Addr(GRPCPort))
 }
 
 func (c *Container) SDKClient() (*sdkclient.Client, error) {

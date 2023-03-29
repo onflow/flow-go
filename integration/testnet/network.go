@@ -14,11 +14,6 @@ import (
 	"testing"
 	"time"
 
-	cmd2 "github.com/onflow/flow-go/cmd/bootstrap/cmd"
-	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
-	"github.com/onflow/flow-go/insecure/cmd"
-	"github.com/onflow/flow-go/network/p2p/translator"
-
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -29,12 +24,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go-sdk/crypto"
-	crypto2 "github.com/onflow/flow-go/crypto"
 
+	cmd2 "github.com/onflow/flow-go/cmd/bootstrap/cmd"
+	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	crypto2 "github.com/onflow/flow-go/crypto"
 	consensus_follower "github.com/onflow/flow-go/follower"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/insecure/cmd"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/cluster"
 	dkgmod "github.com/onflow/flow-go/model/dkg"
@@ -46,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
