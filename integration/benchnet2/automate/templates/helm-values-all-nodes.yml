@@ -88,7 +88,10 @@ execution:
     resources:
       requests:
         cpu: "200m"
-        memory: "512Mi"
+        memory: "1024Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
     storage: 10G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("execution")}}
