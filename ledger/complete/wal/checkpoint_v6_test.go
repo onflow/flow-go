@@ -321,6 +321,7 @@ func TestWriteAndReadCheckpointV6LeafMultipleTries(t *testing.T) {
 		for readResult := range resultChan {
 			require.NoError(t, readResult.Err, "no errors in read results")
 		}
+		require.EqualValues(t, tries[1].AllPayloads(), resultPayloads)
 	})
 }
 
