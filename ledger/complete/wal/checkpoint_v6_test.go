@@ -318,8 +318,10 @@ func TestWriteAndReadCheckpointV6LeafMultipleTries(t *testing.T) {
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
 		resultChan, err := OpenAndReadLeafNodesFromCheckpointV6(dir, fileName, &logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+		resultPayloads := make([]ledger.Payload, 0)
 		for readResult := range resultChan {
 			require.NoError(t, readResult.Err, "no errors in read results")
+			resultPayloads = append(resultPayloads, *readResult.LeafNode.Payload)
 		}
 		require.EqualValues(t, tries[1].AllPayloads(), resultPayloads)
 	})
