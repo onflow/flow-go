@@ -32,23 +32,19 @@ type Suite struct {
 }
 
 func (s *Suite) Ghost() *client.GhostClient {
-	ghost := s.net.ContainerByID(s.ghostID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := s.net.ContainerByID(s.ghostID).GhostClient()
 	require.NoError(s.T(), err, "could not get ghost client")
 	return client
 }
 
 func (s *Suite) AccessClient() *testnet.Client {
-	chain := s.net.Root().Header.ChainID.Chain()
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
+	client, err := s.net.ContainerByName("access_1").TestnetClient()
 	require.NoError(s.T(), err, "could not get access client")
 	return client
 }
 
 func (s *Suite) ExecutionClient() *testnet.Client {
-	execNode := s.net.ContainerByID(s.exe1ID)
-	chain := s.net.Root().Header.ChainID.Chain()
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", execNode.Ports[testnet.ExeNodeAPIPort]), chain)
+	client, err := s.net.ContainerByID(s.exe1ID).TestnetClient()
 	require.NoError(s.T(), err, "could not get execution client")
 	return client
 }
@@ -79,7 +75,7 @@ func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, d
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST",
-		fmt.Sprintf("http://localhost:%s/admin/run_command", enContainer.Ports[testnet.ExeNodeAdminPort]),
+		fmt.Sprintf("http://localhost:%s/admin/run_command", enContainer.Port(testnet.AdminPort)),
 		bytes.NewBuffer(marshal),
 	)
 	if err != nil {
@@ -104,11 +100,11 @@ func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, d
 }
 
 func (s *Suite) AccessPort() string {
-	return s.net.AccessPorts[testnet.AccessNodeAPIPort]
+	return s.net.ContainerByName("access_1").Port(testnet.GRPCPort)
 }
 
 func (s *Suite) MetricsPort() string {
-	return s.net.AccessPorts[testnet.ExeNodeMetricsPort]
+	return s.net.ContainerByName("execution_1").Port(testnet.GRPCPort)
 }
 
 func (s *Suite) SetupTest() {

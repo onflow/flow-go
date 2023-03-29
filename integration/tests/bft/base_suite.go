@@ -2,7 +2,6 @@ package bft
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -34,18 +33,16 @@ type BaseSuite struct {
 
 // Ghost returns a client to interact with the Ghost node on testnet.
 func (b *BaseSuite) Ghost() *client.GhostClient {
-	ghost := b.Net.ContainerByID(b.GhostID)
-	cli, err := lib.GetGhostClient(ghost)
+	client, err := b.Net.ContainerByID(b.GhostID).GhostClient()
 	require.NoError(b.T(), err, "could not get ghost client")
-	return cli
+	return client
 }
 
 // AccessClient returns a client to interact with the access node api on testnet.
 func (b *BaseSuite) AccessClient() *testnet.Client {
-	chain := b.Net.Root().Header.ChainID.Chain()
-	cli, err := testnet.NewClient(fmt.Sprintf(":%s", b.Net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
+	client, err := b.Net.ContainerByName("access_1").TestnetClient()
 	require.NoError(b.T(), err, "could not get access client")
-	return cli
+	return client
 }
 
 // SetupSuite sets up node configs to run a bare minimum Flow network to function correctly.

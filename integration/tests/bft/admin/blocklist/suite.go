@@ -56,7 +56,7 @@ func (s *Suite) SetupSuite() {
 
 // blockNode submit request to our EN admin server to block sender VN.
 func (s *Suite) blockNode(nodeID flow.Identifier) {
-	url := fmt.Sprintf("http://0.0.0.0:%s/admin/run_command", s.Net.AdminPortsByNodeID[s.receiverEN])
+	url := fmt.Sprintf("http://0.0.0.0:%s/admin/run_command", s.Net.ContainerByID(s.receiverEN).Port(testnet.AdminPort))
 	body := fmt.Sprintf(`{"commandName": "set-config", "data": {"network-id-provider-blocklist": ["%s"]}}`, nodeID.String())
 	reqBody := bytes.NewBuffer([]byte(body))
 	resp, err := http.Post(url, "application/json", reqBody)

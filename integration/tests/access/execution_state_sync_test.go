@@ -65,8 +65,7 @@ func (s *ExecutionStateSyncSuite) TearDownTest() {
 }
 
 func (s *ExecutionStateSyncSuite) Ghost() *client.GhostClient {
-	ghost := s.net.ContainerByID(s.ghostID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := s.net.ContainerByID(s.ghostID).GhostClient()
 	require.NoError(s.T(), err, "could not get ghost client")
 	return client
 }

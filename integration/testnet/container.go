@@ -6,12 +6,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"testing"
 	"time"
 
 	sdk "github.com/onflow/flow-go-sdk"
+	sdkclient "github.com/onflow/flow-go-sdk/access/grpc"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 
@@ -54,6 +59,7 @@ type ContainerConfig struct {
 	AdditionalFlags       []string
 	Debug                 bool
 	SupportsUnstakedNodes bool
+	EnableMetricsServer   bool
 }
 
 func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, machineAccountAddr sdk.Address, machineAccountKey encodable.MachineAccountPrivKey, role flow.Role) error {
@@ -110,6 +116,7 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 		AdditionalFlags:       conf.AdditionalFlags,
 		Debug:                 conf.Debug,
 		SupportsUnstakedNodes: conf.SupportsUnstakedNodes,
+		EnableMetricsServer:   conf.EnableMetricsServer,
 		Corrupted:             conf.Corrupted,
 	}
 
@@ -149,6 +156,25 @@ func (c *Container) Addr(portName string) string {
 		panic("could not find port " + portName)
 	}
 	return fmt.Sprintf(":%s", port)
+}
+
+// Port returns the host-accessible port of the container for the given port name
+func (c *Container) Port(name string) string {
+	port, ok := c.Ports[name]
+	if !ok {
+		panic("unregistered port " + name)
+	}
+	return port
+}
+
+// exposePort generates a random host port for the provided container port, configures the bind,
+// and adds it to the Ports list.
+func (c *Container) exposePort(t *testing.T, portName, containerPort string) string {
+	hostPort := testingdock.RandomPort(t)
+	c.bindPort(hostPort, containerPort)
+	c.Ports[portName] = hostPort
+
+	return hostPort
 }
 
 // bindPort exposes the given container port and binds it to the given host port.
@@ -433,4 +459,21 @@ func (c *Container) waitForCondition(ctx context.Context, condition func(*types.
 			continue
 		}
 	}
+}
+
+func (c *Container) TestnetClient() (*Client, error) {
+	chain := c.net.Root().Header.ChainID.Chain()
+	return NewClient(c.Addr(GRPCPort), chain)
+}
+
+func (c *Container) GhostClient() (*client.GhostClient, error) {
+	if !c.Config.Ghost {
+		return nil, fmt.Errorf("container is not a ghost node")
+	}
+
+	return client.NewGhostClient(c.Addr(GRPCPort))
+}
+
+func (c *Container) SDKClient() (*sdkclient.Client, error) {
+	return sdkclient.NewClient(c.Addr(GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
 }

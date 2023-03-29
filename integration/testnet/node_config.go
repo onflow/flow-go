@@ -26,6 +26,7 @@ type NodeConfig struct {
 	Ghost                 bool
 	AdditionalFlags       []string
 	Debug                 bool
+	EnableMetricsServer   bool
 	SupportsUnstakedNodes bool // only applicable to Access node
 }
 
