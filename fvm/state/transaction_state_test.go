@@ -196,7 +196,7 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 
 	val := createByteArray(2)
 
-	cachedState := state.NewState(
+	cachedState := state.NewExecutionState(
 		delta.NewDeltaView(nil),
 		state.DefaultParameters(),
 	)

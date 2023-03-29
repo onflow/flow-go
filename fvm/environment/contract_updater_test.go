@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -57,8 +58,9 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 
 	// set contract no need for signing accounts
 	err = contractUpdater.SetContract(
-		address,
-		"testContract",
+		common.AddressLocation{
+			Name:    "testContract",
+			Address: common.MustBytesToAddress(address.Bytes())},
 		[]byte("ABC"),
 		nil)
 	require.NoError(t, err)
@@ -78,8 +80,9 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 
 	// rollback
 	err = contractUpdater.SetContract(
-		address,
-		"testContract2",
+		common.AddressLocation{
+			Name:    "testContract2",
+			Address: common.MustBytesToAddress(address.Bytes())},
 		[]byte("ABC"),
 		nil)
 	require.NoError(t, err)
@@ -99,7 +102,9 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	require.Equal(t, cont, []byte("ABC"))
 
 	// remove
-	err = contractUpdater.RemoveContract(address, "testContract", nil)
+	err = contractUpdater.RemoveContract(common.AddressLocation{
+		Name:    "testContract",
+		Address: common.MustBytesToAddress(address.Bytes())}, nil)
 	require.NoError(t, err)
 
 	// contract still there because no commit yet
@@ -153,8 +158,9 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		contractUpdater := makeUpdater()
 
 		err = contractUpdater.SetContract(
-			authAdd,
-			"testContract1",
+			common.AddressLocation{
+				Name:    "testContract1",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
 			[]byte("ABC"),
 			[]flow.Address{unAuth})
 		require.Error(t, err)
@@ -165,8 +171,9 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		contractUpdater := makeUpdater()
 
 		err = contractUpdater.SetContract(
-			authAdd,
-			"testContract1",
+			common.AddressLocation{
+				Name:    "testContract1",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
 			[]byte("ABC"),
 			[]flow.Address{authRemove})
 		require.Error(t, err)
@@ -177,8 +184,9 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		contractUpdater := makeUpdater()
 
 		err = contractUpdater.SetContract(
-			authAdd,
-			"testContract2",
+			common.AddressLocation{
+				Name:    "testContract2",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
 			[]byte("ABC"),
 			[]flow.Address{authAdd})
 		require.NoError(t, err)
@@ -189,8 +197,9 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		contractUpdater := makeUpdater()
 
 		err = contractUpdater.SetContract(
-			authAdd,
-			"testContract2",
+			common.AddressLocation{
+				Name:    "testContract2",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
 			[]byte("ABC"),
 			[]flow.Address{authBoth})
 		require.NoError(t, err)
@@ -201,8 +210,9 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		contractUpdater := makeUpdater()
 
 		err = contractUpdater.SetContract(
-			authAdd,
-			"testContract1",
+			common.AddressLocation{
+				Name:    "testContract1",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
 			[]byte("ABC"),
 			[]flow.Address{authAdd})
 		require.NoError(t, err)
@@ -210,8 +220,9 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		require.NoError(t, err)
 
 		err = contractUpdater.RemoveContract(
-			unAuth,
-			"testContract2",
+			common.AddressLocation{
+				Name:    "testContract2",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
 			[]flow.Address{unAuth})
 		require.Error(t, err)
 		require.False(t, contractUpdater.HasUpdates())
@@ -221,8 +232,9 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		contractUpdater := makeUpdater()
 
 		err = contractUpdater.SetContract(
-			authAdd,
-			"testContract1",
+			common.AddressLocation{
+				Name:    "testContract1",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
 			[]byte("ABC"),
 			[]flow.Address{authAdd})
 		require.NoError(t, err)
@@ -230,8 +242,9 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		require.NoError(t, err)
 
 		err = contractUpdater.RemoveContract(
-			authRemove,
-			"testContract2",
+			common.AddressLocation{
+				Name:    "testContract2",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
 			[]flow.Address{authRemove})
 		require.NoError(t, err)
 		require.True(t, contractUpdater.HasUpdates())
@@ -241,8 +254,9 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		contractUpdater := makeUpdater()
 
 		err = contractUpdater.SetContract(
-			authAdd,
-			"testContract1",
+			common.AddressLocation{
+				Name:    "testContract1",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
 			[]byte("ABC"),
 			[]flow.Address{authAdd})
 		require.NoError(t, err)
@@ -250,8 +264,9 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		require.NoError(t, err)
 
 		err = contractUpdater.RemoveContract(
-			authAdd,
-			"testContract2",
+			common.AddressLocation{
+				Name:    "testContract2",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
 			[]flow.Address{authAdd})
 		require.Error(t, err)
 		require.False(t, contractUpdater.HasUpdates())
@@ -261,8 +276,9 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		contractUpdater := makeUpdater()
 
 		err = contractUpdater.SetContract(
-			authAdd,
-			"testContract1",
+			common.AddressLocation{
+				Name:    "testContract1",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
 			[]byte("ABC"),
 			[]flow.Address{authAdd})
 		require.NoError(t, err)
@@ -270,8 +286,9 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 		require.NoError(t, err)
 
 		err = contractUpdater.RemoveContract(
-			authBoth,
-			"testContract2",
+			common.AddressLocation{
+				Name:    "testContract2",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
 			[]flow.Address{authBoth})
 		require.NoError(t, err)
 		require.True(t, contractUpdater.HasUpdates())
@@ -296,13 +313,25 @@ func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 	address1 := flow.HexToAddress("0000000000000001")
 	address2 := flow.HexToAddress("0000000000000002")
 
-	err := contractUpdater.SetContract(address2, "A", []byte("ABC"), nil)
+	err := contractUpdater.SetContract(
+		common.AddressLocation{
+			Name:    "A",
+			Address: common.MustBytesToAddress(address2.Bytes())},
+		[]byte("ABC"), nil)
 	require.NoError(t, err)
 
-	err = contractUpdater.SetContract(address1, "B", []byte("ABC"), nil)
+	err = contractUpdater.SetContract(
+		common.AddressLocation{
+			Name:    "B",
+			Address: common.MustBytesToAddress(address1.Bytes())},
+		[]byte("ABC"), nil)
 	require.NoError(t, err)
 
-	err = contractUpdater.SetContract(address1, "A", []byte("ABC"), nil)
+	err = contractUpdater.SetContract(
+		common.AddressLocation{
+			Name:    "A",
+			Address: common.MustBytesToAddress(address1.Bytes())},
+		[]byte("ABC"), nil)
 	require.NoError(t, err)
 
 	_, err = contractUpdater.Commit()
@@ -324,10 +353,13 @@ func TestContract_ContractRemoval(t *testing.T) {
 				removalEnabled: true,
 			})
 
+		location := common.AddressLocation{
+			Name:    "TestContract",
+			Address: common.MustBytesToAddress(flowAddress.Bytes())}
+
 		// deploy contract with voucher
 		err = contractUpdater.SetContract(
-			flowAddress,
-			"TestContract",
+			location,
 			[]byte("pub contract TestContract {}"),
 			[]flow.Address{
 				flowAddress,
@@ -341,22 +373,18 @@ func TestContract_ContractRemoval(t *testing.T) {
 		require.Equal(
 			t,
 			environment.ContractUpdates{
-				Updates: []environment.ContractUpdateKey{},
-				Deploys: []environment.ContractUpdateKey{
-					{
-						Address: flowAddress,
-						Name:    "TestContract",
-					},
+				Updates: []common.AddressLocation{},
+				Deploys: []common.AddressLocation{
+					location,
 				},
-				Deletions: []environment.ContractUpdateKey{},
+				Deletions: []common.AddressLocation{},
 			},
 			contractUpdates,
 		)
 
 		// update should work
 		err = contractUpdater.SetContract(
-			flowAddress,
-			"TestContract",
+			location,
 			[]byte("pub contract TestContract {}"),
 			[]flow.Address{
 				flowAddress,
@@ -367,8 +395,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 
 		// try remove contract should fail
 		err = contractUpdater.RemoveContract(
-			flowAddress,
-			"TestContract",
+			location,
 			[]flow.Address{
 				flowAddress,
 			},
@@ -382,10 +409,13 @@ func TestContract_ContractRemoval(t *testing.T) {
 			accounts,
 			testContractUpdaterStubs{})
 
+		location := common.AddressLocation{
+			Name:    "TestContract",
+			Address: common.MustBytesToAddress(flowAddress.Bytes())}
+
 		// deploy contract with voucher
 		err = contractUpdater.SetContract(
-			flowAddress,
-			"TestContract",
+			location,
 			[]byte("pub contract TestContract {}"),
 			[]flow.Address{
 				flowAddress,
@@ -399,22 +429,18 @@ func TestContract_ContractRemoval(t *testing.T) {
 		require.Equal(
 			t,
 			environment.ContractUpdates{
-				Updates: []environment.ContractUpdateKey{
-					{
-						Address: flowAddress,
-						Name:    "TestContract",
-					},
+				Updates: []common.AddressLocation{
+					location,
 				},
-				Deploys:   []environment.ContractUpdateKey{},
-				Deletions: []environment.ContractUpdateKey{},
+				Deploys:   []common.AddressLocation{},
+				Deletions: []common.AddressLocation{},
 			},
 			contractUpdateKeys,
 		)
 
 		// update should work
 		err = contractUpdater.SetContract(
-			flowAddress,
-			"TestContract",
+			location,
 			[]byte("pub contract TestContract {}"),
 			[]flow.Address{
 				flowAddress,
@@ -425,8 +451,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 
 		// try remove contract should fail
 		err = contractUpdater.RemoveContract(
-			flowAddress,
-			"TestContract",
+			location,
 			[]flow.Address{
 				flowAddress,
 			},
@@ -439,13 +464,10 @@ func TestContract_ContractRemoval(t *testing.T) {
 		require.Equal(
 			t,
 			environment.ContractUpdates{
-				Updates: []environment.ContractUpdateKey{},
-				Deploys: []environment.ContractUpdateKey{},
-				Deletions: []environment.ContractUpdateKey{
-					{
-						Address: flowAddress,
-						Name:    "TestContract",
-					},
+				Updates: []common.AddressLocation{},
+				Deploys: []common.AddressLocation{},
+				Deletions: []common.AddressLocation{
+					location,
 				},
 			},
 			contractUpdateKeys,
