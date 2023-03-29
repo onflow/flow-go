@@ -689,7 +689,24 @@ func main() {
 			proposals := buffer.NewPendingBlocks()
 
 			logger := createLogger(node.Logger, node.RootChainID)
-			complianceCore, err := compliance.NewCore(logger, node.Metrics.Engine, node.Metrics.Mempool, mainMetrics, node.Metrics.Compliance, node.Tracer, node.Storage.Headers, node.Storage.Payloads, mutableState, proposals, syncCore, hotstuffModules.Validator, hot, hotstuffModules.VoteAggregator, hotstuffModules.TimeoutAggregator, modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold))
+			complianceCore, err := compliance.NewCore(
+				logger,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				mainMetrics,
+				node.Metrics.Compliance,
+				node.Tracer,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				mutableState,
+				proposals,
+				syncCore,
+				hotstuffModules.Validator,
+				hot,
+				hotstuffModules.VoteAggregator,
+				hotstuffModules.TimeoutAggregator,
+				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
 			}

@@ -18,11 +18,11 @@ import (
 // to run an internal goroutine which run badger value log garbage collection at a semi-regular interval.
 // The Cleaner exists for 2 reasons:
 //   - Run GC frequently enough that each GC is relatively inexpensive
-//   - Avoid GC being synchronized across all nodes. Since in the happy path, all nodes have very similar 
-//     database load patterns, without intervention they are likely to schedule GC at the same time, which 
+//   - Avoid GC being synchronized across all nodes. Since in the happy path, all nodes have very similar
+//     database load patterns, without intervention they are likely to schedule GC at the same time, which
 //     can cause temporary consensus halts.
 type Cleaner struct {
-	*component.ComponentManager
+	component.Component
 	log      zerolog.Logger
 	db       *badger.DB
 	metrics  module.CleanerMetrics
@@ -47,14 +47,16 @@ func NewCleaner(log zerolog.Logger, db *badger.DB, metrics module.CleanerMetrics
 		interval: interval,
 	}
 
-	cmBuilder := component.NewComponentManagerBuilder()
-
 	// Disable if passed in 0 as interval
-	if c.interval > 0 {
-		cmBuilder.AddWorker(c.gcWorkerRoutine)
+	if c.interval == 0 {
+		c.Component = &module.NoopComponent{}
+		return c
 	}
 
-	c.ComponentManager = cmBuilder.Build()
+	c.Component = component.NewComponentManagerBuilder().
+		AddWorker(c.gcWorkerRoutine).
+		Build()
+
 	return c
 }
 
