@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
@@ -37,6 +38,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/network/p2p/distributor"
+	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/subscription"
@@ -401,10 +404,10 @@ func StopComponents[R module.ReadyDoneAware](t *testing.T, rda []R, duration tim
 	unittest.RequireComponentsDoneBefore(t, duration, comps...)
 }
 
-type nodeBuilderOption func(p2pbuilder.NodeBuilder)
+type nodeBuilderOption func(p2p.NodeBuilder)
 
 func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, pc.ID(protocols.FlowDHTProtocolIDPrefix+prefix), zerolog.Nop(), metrics.NewNoopCollector(), dhtOpts...)
 		})
@@ -412,25 +415,25 @@ func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 }
 
 func withPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetPeerManagerOptions(connectionPruning, updateInterval)
 	}
 }
 
 func withRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetRateLimiterDistributor(distributor)
 	}
 }
 
 func withConnectionGater(connectionGater connmgr.ConnectionGater) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetConnectionGater(connectionGater)
 	}
 }
 
 func withUnicastManagerOpts(delay time.Duration) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetStreamCreationRetryInterval(delay)
 	}
 }
@@ -447,6 +450,9 @@ func generateLibP2PNode(t *testing.T,
 	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, connection.DefaultConnManagerConfig())
 	require.NoError(t, err)
 
+	defaultRPCValidationInpectorCfg := p2pbuilder.DefaultRPCValidationConfig()
+	rpcInspectorNotifDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(logger)
+
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
 		metrics.NewNoopCollector(),
@@ -456,7 +462,8 @@ func generateLibP2PNode(t *testing.T,
 		p2pbuilder.DefaultResourceManagerConfig()).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t)).
-		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay)
+		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
+		SetGossipSubValidationInspector(validation.NewControlMsgValidationInspector(logger, sporkID, defaultRPCValidationInpectorCfg, rpcInspectorNotifDistributor))
 
 	for _, opt := range opts {
 		opt(builder)
@@ -478,7 +485,7 @@ func OptionalSleep(send ConduitSendWrapperFunc) {
 
 // generateNetworkingKey generates a Flow ECDSA key using the given seed
 func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
 }
@@ -543,7 +550,6 @@ func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.
 		idProvider,
 		connection.WithOnInterceptPeerDialFilters(filters),
 		connection.WithOnInterceptSecuredFilters(filters))
-
 }
 
 // IsRateLimitedPeerFilter returns a p2p.PeerFilter that will return an error if the peer is rate limited.

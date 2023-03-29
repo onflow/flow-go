@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 
 	"github.com/dgraph-io/badger/v2"
@@ -27,11 +28,10 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
+	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -185,35 +185,40 @@ type NetworkConfig struct {
 	// that are not part of protocol state should be trimmed
 	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
 	NetworkConnectionPruning bool
-
-	// PeerScoringEnabled enables peer scoring on pubsub
-	PeerScoringEnabled bool
+	GossipSubConfig          *p2pbuilder.GossipSubConfig
 	// PreferredUnicastProtocols list of unicast protocols in preferred order
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
-	// UnicastRateLimitDryRun will disable connection disconnects and gating when unicast rate limiters are configured
-	UnicastRateLimitDryRun bool
-	//UnicastRateLimitLockoutDuration the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node
-	// after being rate limited.
-	UnicastRateLimitLockoutDuration time.Duration
-	// UnicastMessageRateLimit amount of unicast messages that can be sent by a peer per second.
-	UnicastMessageRateLimit int
-	// UnicastBandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
-	UnicastBandwidthRateLimit int
-	// UnicastBandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
-	UnicastBandwidthBurstLimit int
-	// PeerUpdateInterval interval used by the libp2p node peer manager component to periodically request peer updates.
-	PeerUpdateInterval time.Duration
-	// UnicastMessageTimeout how long a unicast transmission can take to complete.
-	UnicastMessageTimeout time.Duration
+
+	PeerUpdateInterval          time.Duration
+	UnicastMessageTimeout       time.Duration
+	DNSCacheTTL                 time.Duration
+	LibP2PResourceManagerConfig *p2pbuilder.ResourceManagerConfig
+	ConnectionManagerConfig     *connection.ManagerConfig
 	// UnicastCreateStreamRetryDelay initial delay used in the exponential backoff for create stream retries
 	UnicastCreateStreamRetryDelay time.Duration
-	// DNSCacheTTL time to live for DNS cache
-	DNSCacheTTL time.Duration
-	// LibP2PResourceManagerConfig configuration for p2pbuilder.ResourceManagerConfig
-	LibP2PResourceManagerConfig *p2pbuilder.ResourceManagerConfig
-	// ConnectionManagerConfig configuration for connection.ManagerConfig=
-	ConnectionManagerConfig *connection.ManagerConfig
+	// size of the queue for notifications about new peers in the disallow list.
+	DisallowListNotificationCacheSize uint32
+	// size of the queue for notifications about gossipsub RPC inspections.
+	GossipSubRPCInspectorNotificationCacheSize uint32
+	GossipSubRPCInspectorCacheSize             uint32
+	UnicastRateLimitersConfig                  *UnicastRateLimitersConfig
+	GossipSubRPCValidationConfigs              *p2pbuilder.GossipSubRPCValidationConfigs
+}
+
+// UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
+type UnicastRateLimitersConfig struct {
+	// DryRun setting this to true will disable connection disconnects and gating when unicast rate limiters are configured
+	DryRun bool
+	// LockoutDuration the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node
+	// after being rate limited.
+	LockoutDuration time.Duration
+	// MessageRateLimit amount of unicast messages that can be sent by a peer per second.
+	MessageRateLimit int
+	// BandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
+	BandwidthRateLimit int
+	// BandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
+	BandwidthBurstLimit int
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -269,8 +274,10 @@ type NodeConfig struct {
 
 	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
-	// NodeBlockListDistributor notifies consumers of updates to the node block list
-	NodeBlockListDistributor *cache.NodeBlockListDistributor
+	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
+	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
+	// GossipSubInspectorNotifDistributor notifies consumers when an invalid RPC message is encountered.
+	GossipSubInspectorNotifDistributor p2p.GossipSubInspectorNotificationDistributor
 }
 
 func DefaultBaseConfig() *BaseConfig {
@@ -287,18 +294,34 @@ func DefaultBaseConfig() *BaseConfig {
 			PeerUpdateInterval:              connection.DefaultPeerUpdateInterval,
 			UnicastMessageTimeout:           middleware.DefaultUnicastTimeout,
 			NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
-			// By default we let networking layer trim connections to all nodes that
-			// are no longer part of protocol state.
-			NetworkConnectionPruning:        connection.ConnectionPruningEnabled,
-			PeerScoringEnabled:              scoring.DefaultPeerScoringEnabled,
-			UnicastMessageRateLimit:         0,
-			UnicastBandwidthRateLimit:       0,
-			UnicastBandwidthBurstLimit:      middleware.LargeMsgMaxUnicastMsgSize,
-			UnicastRateLimitLockoutDuration: 10,
-			UnicastRateLimitDryRun:          true,
-			DNSCacheTTL:                     dns.DefaultTimeToLive,
-			LibP2PResourceManagerConfig:     p2pbuilder.DefaultResourceManagerConfig(),
-			ConnectionManagerConfig:         connection.DefaultConnManagerConfig(),
+			UnicastRateLimitersConfig: &UnicastRateLimitersConfig{
+				DryRun:              true,
+				LockoutDuration:     10,
+				MessageRateLimit:    0,
+				BandwidthRateLimit:  0,
+				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
+			},
+			GossipSubRPCValidationConfigs: &p2pbuilder.GossipSubRPCValidationConfigs{
+				NumberOfWorkers: validation.DefaultNumberOfWorkers,
+				GraftLimits: map[string]int{
+					validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
+					validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
+					validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
+				},
+				PruneLimits: map[string]int{
+					validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
+					validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
+					validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
+				},
+			},
+			DNSCacheTTL:                                dns.DefaultTimeToLive,
+			LibP2PResourceManagerConfig:                p2pbuilder.DefaultResourceManagerConfig(),
+			ConnectionManagerConfig:                    connection.DefaultConnManagerConfig(),
+			NetworkConnectionPruning:                   connection.ConnectionPruningEnabled,
+			GossipSubConfig:                            p2pbuilder.DefaultGossipSubConfig(),
+			GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
+			GossipSubRPCInspectorCacheSize:             validation.DefaultControlMsgValidationInspectorQueueCacheSize,
+			DisallowListNotificationCacheSize:          distributor.DefaultDisallowListNotificationQueueCacheSize,
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,

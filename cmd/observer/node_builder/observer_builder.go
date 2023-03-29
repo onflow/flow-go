@@ -65,6 +65,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -726,12 +727,13 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
+		builder.NodeDisallowListDistributor = cmd.BuildDisallowListNotificationDisseminator(builder.DisallowListNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
+
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
-		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		builder.NodeBlockListDistributor = cache.NewNodeBlockListDistributor()
-		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeBlockListDistributor)
+		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
+		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeDisallowListDistributor)
 		if err != nil {
-			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
+			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
 		}
 
 		// use the default identifier provider
@@ -759,6 +761,11 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 		}
 
 		return nil
+	})
+
+	builder.Component("disallow list notification distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		// distributor is returned as a component to be started and stopped.
+		return builder.NodeDisallowListDistributor, nil
 	})
 }
 
@@ -831,7 +838,7 @@ func (builder *ObserverServiceBuilder) validateParams() error {
 // * No connection manager
 // * No peer manager
 // * Default libp2p pubsub options
-func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
+func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		var pis []peer.AddrInfo
 
@@ -843,6 +850,19 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			}
 
 			pis = append(pis, pi)
+		}
+
+		meshTracer := tracer.NewGossipSubMeshTracer(
+			builder.Logger,
+			builder.Metrics.Network,
+			builder.IdentityProvider,
+			builder.GossipSubConfig.LocalMeshLogInterval)
+
+		builder.GossipSubInspectorNotifDistributor = cmd.BuildGossipsubRPCValidationInspectorNotificationDisseminator(builder.GossipSubRPCInspectorNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
+		heroStoreOpts := cmd.BuildGossipsubRPCValidationInspectorHeroStoreOpts(builder.GossipSubRPCInspectorCacheSize, builder.MetricsRegisterer, builder.MetricsEnabled)
+		rpcValidationInspector, err := p2pbuilder.BuildGossipSubRPCValidationInspector(builder.Logger, builder.SporkID, builder.GossipSubRPCValidationConfigs, builder.GossipSubInspectorNotifDistributor, heroStoreOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gossipsub rpc validation inspector: %w", err)
 		}
 
 		node, err := p2pbuilder.NewNodeBuilder(
@@ -866,6 +886,9 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 				)
 			}).
 			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
+			SetGossipSubTracer(meshTracer).
+			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
+			SetGossipSubValidationInspector(rpcValidationInspector).
 			Build()
 
 		if err != nil {
@@ -1049,7 +1072,7 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		slashingViolationsConsumer,
 		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)
-	builder.NodeBlockListDistributor.AddConsumer(mw)
+	builder.NodeDisallowListDistributor.AddConsumer(mw)
 	builder.Middleware = mw
 	return builder.Middleware
 }

@@ -6,9 +6,11 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/tracing"
 )
 
@@ -38,7 +40,6 @@ type facadeEnvironment struct {
 	UUIDGenerator
 
 	AccountCreator
-	AccountFreezer
 
 	AccountKeyReader
 	AccountKeyUpdater
@@ -110,7 +111,6 @@ func newFacadeEnvironment(
 			txnState),
 
 		AccountCreator: NoAccountCreator{},
-		AccountFreezer: NoAccountFreezer{},
 
 		AccountKeyReader: NewAccountKeyReader(
 			tracer,
@@ -157,6 +157,34 @@ func NewScriptEnvironment(
 			NestedTransaction:           nestedTxn,
 			DerivedTransactionCommitter: derivedTxn,
 		})
+}
+
+// This is mainly used by command line tools, the emulator, and cadence tools
+// testing.
+func NewScriptEnvironmentFromStorageSnapshot(
+	params EnvironmentParams,
+	storageSnapshot state.StorageSnapshot,
+) *facadeEnvironment {
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	derivedTxn, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
+		logical.EndOfBlockExecutionTime,
+		logical.EndOfBlockExecutionTime)
+	if err != nil {
+		panic(err)
+	}
+
+	txn := storage.SerialTransaction{
+		NestedTransaction: state.NewTransactionState(
+			delta.NewDeltaView(storageSnapshot),
+			state.DefaultParameters()),
+		DerivedTransactionCommitter: derivedTxn,
+	}
+
+	return NewScriptEnv(
+		context.Background(),
+		tracing.NewTracerSpan(),
+		params,
+		txn)
 }
 
 func NewScriptEnv(
@@ -209,10 +237,6 @@ func NewTransactionEnvironment(
 		env.Meter,
 		params.MetricsReporter,
 		env.SystemContracts)
-	env.AccountFreezer = NewAccountFreezer(
-		params.Chain.ServiceAddress(),
-		env.accounts,
-		env.TransactionInfo)
 	env.ContractUpdater = NewContractUpdater(
 		tracer,
 		env.Meter,
@@ -247,9 +271,6 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.AccountCreator = NewParseRestrictedAccountCreator(
 		env.txnState,
 		env.AccountCreator)
-	env.AccountFreezer = NewParseRestrictedAccountFreezer(
-		env.txnState,
-		env.AccountFreezer)
 	env.AccountInfo = NewParseRestrictedAccountInfo(
 		env.txnState,
 		env.AccountInfo)
@@ -286,21 +307,16 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 }
 
 func (env *facadeEnvironment) FlushPendingUpdates() (
-	derived.TransactionInvalidator,
+	ContractUpdates,
 	error,
 ) {
-	contractKeys, err := env.ContractUpdater.Commit()
-	if err != nil {
-		return nil, err
-	}
-
-	return NewDerivedDataInvalidator(contractKeys, env), nil
+	return env.ContractUpdater.Commit()
 }
 
 func (env *facadeEnvironment) Reset() {
 	env.ContractUpdater.Reset()
 	env.EventEmitter.Reset()
-	env.AccountFreezer.Reset()
+	env.Programs.Reset()
 }
 
 // Miscellaneous cadence runtime.Interface API.

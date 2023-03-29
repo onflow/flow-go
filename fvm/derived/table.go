@@ -7,7 +7,11 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 )
+
+// TODO(patrick): rm once emulator is updated
+const EndOfBlockExecutionTime = logical.EndOfBlockExecutionTime
 
 // ValueComputer is used by DerivedDataTable's GetOrCompute to compute the
 // derived value when the value is not in DerivedDataTable (i.e., "cache miss").
@@ -16,8 +20,8 @@ type ValueComputer[TKey any, TVal any] interface {
 }
 
 type invalidatableEntry[TVal any] struct {
-	Value TVal         // immutable after initialization.
-	State *state.State // immutable after initialization.
+	Value             TVal                     // immutable after initialization.
+	ExecutionSnapshot *state.ExecutionSnapshot // immutable after initialization.
 
 	isInvalid bool // Guarded by DerivedDataTable' lock.
 }
@@ -43,7 +47,7 @@ type DerivedDataTable[TKey comparable, TVal any] struct {
 	lock  sync.RWMutex
 	items map[TKey]*invalidatableEntry[TVal]
 
-	latestCommitExecutionTime LogicalTime
+	latestCommitExecutionTime logical.Time
 
 	invalidators chainedTableInvalidators[TKey, TVal] // Guarded by lock.
 }
@@ -53,10 +57,10 @@ type TableTransaction[TKey comparable, TVal any] struct {
 
 	// The start time when the snapshot first becomes readable (i.e., the
 	// "snapshotTime - 1"'s transaction committed the snapshot view).
-	snapshotTime LogicalTime
+	snapshotTime logical.Time
 
 	// The transaction (or script)'s execution start time (aka TxIndex).
-	executionTime LogicalTime
+	executionTime logical.Time
 
 	// toValidateTime is used to amortize cost of repeated Validate calls.
 	// Each Validate call will only validate the time range
@@ -66,7 +70,7 @@ type TableTransaction[TKey comparable, TVal any] struct {
 	// Note that since newly derived values are computed based on snapshotTime's
 	// view, each time a newly derived value is added to the transaction,
 	// toValidateTime is reset back to snapshotTime.
-	toValidateTime LogicalTime
+	toValidateTime logical.Time
 
 	readSet  map[TKey]*invalidatableEntry[TVal]
 	writeSet map[TKey]*invalidatableEntry[TVal]
@@ -77,7 +81,7 @@ type TableTransaction[TKey comparable, TVal any] struct {
 }
 
 func newEmptyTable[TKey comparable, TVal any](
-	latestCommit LogicalTime,
+	latestCommit logical.Time,
 ) *DerivedDataTable[TKey, TVal] {
 	return &DerivedDataTable[TKey, TVal]{
 		items:                     map[TKey]*invalidatableEntry[TVal]{},
@@ -87,7 +91,7 @@ func newEmptyTable[TKey comparable, TVal any](
 }
 
 func NewEmptyTable[TKey comparable, TVal any]() *DerivedDataTable[TKey, TVal] {
-	return newEmptyTable[TKey, TVal](ParentBlockTime)
+	return newEmptyTable[TKey, TVal](logical.ParentBlockTime)
 }
 
 // This variant is needed by the chunk verifier, which does not start at the
@@ -98,7 +102,7 @@ func NewEmptyTableWithOffset[
 ](
 	offset uint32,
 ) *DerivedDataTable[TKey, TVal] {
-	return newEmptyTable[TKey, TVal](LogicalTime(offset) - 1)
+	return newEmptyTable[TKey, TVal](logical.Time(offset) - 1)
 }
 
 func (table *DerivedDataTable[TKey, TVal]) NewChildTable() *DerivedDataTable[TKey, TVal] {
@@ -114,15 +118,15 @@ func (table *DerivedDataTable[TKey, TVal]) NewChildTable() *DerivedDataTable[TKe
 		// entry may be valid in the parent table, but invalid in the child
 		// table.
 		items[key] = &invalidatableEntry[TVal]{
-			Value:     entry.Value,
-			State:     entry.State,
-			isInvalid: false,
+			Value:             entry.Value,
+			ExecutionSnapshot: entry.ExecutionSnapshot,
+			isInvalid:         false,
 		}
 	}
 
 	return &DerivedDataTable[TKey, TVal]{
 		items:                     items,
-		latestCommitExecutionTime: ParentBlockTime,
+		latestCommitExecutionTime: logical.ParentBlockTime,
 		invalidators:              nil,
 	}
 }
@@ -131,7 +135,7 @@ func (table *DerivedDataTable[TKey, TVal]) NextTxIndexForTestingOnly() uint32 {
 	return uint32(table.LatestCommitExecutionTimeForTestingOnly()) + 1
 }
 
-func (table *DerivedDataTable[TKey, TVal]) LatestCommitExecutionTimeForTestingOnly() LogicalTime {
+func (table *DerivedDataTable[TKey, TVal]) LatestCommitExecutionTimeForTestingOnly() logical.Time {
 	table.lock.RLock()
 	defer table.lock.RUnlock()
 
@@ -202,7 +206,11 @@ func (table *DerivedDataTable[TKey, TVal]) unsafeValidate(
 		txn.toValidateTime)
 	if applicable.ShouldInvalidateEntries() {
 		for key, entry := range txn.writeSet {
-			if applicable.ShouldInvalidateEntry(key, entry.Value, entry.State) {
+			if applicable.ShouldInvalidateEntry(
+				key,
+				entry.Value,
+				entry.ExecutionSnapshot) {
+
 				return newRetryableError(
 					"invalid TableTransactions. outdated write set")
 			}
@@ -231,7 +239,7 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 
 	if table.latestCommitExecutionTime+1 < txn.snapshotTime &&
 		(!txn.isSnapshotReadTransaction ||
-			txn.snapshotTime != EndOfBlockExecutionTime) {
+			txn.snapshotTime != logical.EndOfBlockExecutionTime) {
 
 		return newNotRetryableError(
 			"invalid TableTransaction: missing commit range [%v, %v)",
@@ -263,7 +271,7 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 			if txn.invalidators.ShouldInvalidateEntry(
 				key,
 				entry.Value,
-				entry.State) {
+				entry.ExecutionSnapshot) {
 
 				entry.isInvalid = true
 				delete(table.items, key)
@@ -286,9 +294,9 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 }
 
 func (table *DerivedDataTable[TKey, TVal]) newTableTransaction(
-	upperBoundExecutionTime LogicalTime,
-	snapshotTime LogicalTime,
-	executionTime LogicalTime,
+	upperBoundExecutionTime logical.Time,
+	snapshotTime logical.Time,
+	executionTime logical.Time,
 	isSnapshotReadTransaction bool,
 ) (
 	*TableTransaction[TKey, TVal],
@@ -319,75 +327,90 @@ func (table *DerivedDataTable[TKey, TVal]) newTableTransaction(
 }
 
 func (table *DerivedDataTable[TKey, TVal]) NewSnapshotReadTableTransaction(
-	snapshotTime LogicalTime,
-	executionTime LogicalTime,
+	snapshotTime logical.Time,
+	executionTime logical.Time,
 ) (
 	*TableTransaction[TKey, TVal],
 	error,
 ) {
 	return table.newTableTransaction(
-		LargestSnapshotReadTransactionExecutionTime,
+		logical.LargestSnapshotReadTransactionExecutionTime,
 		snapshotTime,
 		executionTime,
 		true)
 }
 
 func (table *DerivedDataTable[TKey, TVal]) NewTableTransaction(
-	snapshotTime LogicalTime,
-	executionTime LogicalTime,
+	snapshotTime logical.Time,
+	executionTime logical.Time,
 ) (
 	*TableTransaction[TKey, TVal],
 	error,
 ) {
 	return table.newTableTransaction(
-		LargestNormalTransactionExecutionTime,
+		logical.LargestNormalTransactionExecutionTime,
 		snapshotTime,
 		executionTime,
 		false)
 }
 
 // Note: use GetOrCompute instead of Get/Set whenever possible.
-func (txn *TableTransaction[TKey, TVal]) Get(key TKey) (
+func (txn *TableTransaction[TKey, TVal]) get(key TKey) (
 	TVal,
-	*state.State,
+	*state.ExecutionSnapshot,
 	bool,
 ) {
 
 	writeEntry, ok := txn.writeSet[key]
 	if ok {
-		return writeEntry.Value, writeEntry.State, true
+		return writeEntry.Value, writeEntry.ExecutionSnapshot, true
 	}
 
 	readEntry := txn.readSet[key]
 	if readEntry != nil {
-		return readEntry.Value, readEntry.State, true
+		return readEntry.Value, readEntry.ExecutionSnapshot, true
 	}
 
 	readEntry = txn.table.get(key)
 	if readEntry != nil {
 		txn.readSet[key] = readEntry
-		return readEntry.Value, readEntry.State, true
+		return readEntry.Value, readEntry.ExecutionSnapshot, true
 	}
 
 	var defaultValue TVal
 	return defaultValue, nil, false
 }
 
-// Note: use GetOrCompute instead of Get/Set whenever possible.
-func (txn *TableTransaction[TKey, TVal]) Set(
+func (txn *TableTransaction[TKey, TVal]) GetForTestingOnly(key TKey) (
+	TVal,
+	*state.ExecutionSnapshot,
+	bool,
+) {
+	return txn.get(key)
+}
+
+func (txn *TableTransaction[TKey, TVal]) set(
 	key TKey,
 	value TVal,
-	state *state.State,
+	snapshot *state.ExecutionSnapshot,
 ) {
 	txn.writeSet[key] = &invalidatableEntry[TVal]{
-		Value:     value,
-		State:     state,
-		isInvalid: false,
+		Value:             value,
+		ExecutionSnapshot: snapshot,
+		isInvalid:         false,
 	}
 
 	// Since value is derived from snapshot's view.  We need to reset the
 	// toValidateTime back to snapshot time to re-validate the entry.
 	txn.toValidateTime = txn.snapshotTime
+}
+
+func (txn *TableTransaction[TKey, TVal]) SetForTestingOnly(
+	key TKey,
+	value TVal,
+	snapshot *state.ExecutionSnapshot,
+) {
+	txn.set(key, value, snapshot)
 }
 
 // GetOrCompute returns the key's value.  If a pre-computed value is available,
@@ -407,7 +430,7 @@ func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
 ) {
 	var defaultVal TVal
 
-	val, state, ok := txn.Get(key)
+	val, state, ok := txn.get(key)
 	if ok {
 		err := txnState.AttachAndCommitNestedTransaction(state)
 		if err != nil {
@@ -438,7 +461,7 @@ func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
 		return defaultVal, fmt.Errorf("failed to derive value: %w", err)
 	}
 
-	txn.Set(key, val, committedState)
+	txn.set(key, val, committedState)
 
 	return val, nil
 }
@@ -466,6 +489,6 @@ func (txn *TableTransaction[TKey, TVal]) Commit() RetryableError {
 	return txn.table.commit(txn)
 }
 
-func (txn *TableTransaction[TKey, TVal]) ToValidateTimeForTestingOnly() LogicalTime {
+func (txn *TableTransaction[TKey, TVal]) ToValidateTimeForTestingOnly() logical.Time {
 	return txn.toValidateTime
 }

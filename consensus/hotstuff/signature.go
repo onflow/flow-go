@@ -80,12 +80,24 @@ type WeightedSignatureAggregator interface {
 	TotalWeight() uint64
 
 	// Aggregate aggregates the signatures and returns the aggregated signature.
-	// The function performs a final verification and errors if the aggregated
-	// signature is not valid. This is required for the function safety since
-	// `TrustedAdd` allows adding invalid signatures.
-	// Expected errors during normal operations:
-	//  - model.InsufficientSignaturesError if no signatures have been added yet
-	//  - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
+	// The function performs a final verification and errors if the aggregated signature is invalid. This is
+	// required for the function safety since `TrustedAdd` allows adding invalid signatures.
+	// The function errors with:
+	//   - model.InsufficientSignaturesError if no signatures have been added yet
+	//   - model.InvalidSignatureIncludedError if:
+	//     -- some signature(s), included via TrustedAdd, fail to deserialize (regardless of the aggregated public key)
+	//     -- or all signatures deserialize correctly but some signature(s), included via TrustedAdd, are
+	//       invalid (while aggregated public key is valid)
+	//   - model.InvalidAggregatedKeyError if all signatures deserialize correctly but the signer's
+	//     staking public keys sum up to an invalid key (BLS identity public key).
+	//     Any aggregated signature would fail the cryptographic verification under the identity public
+	//     key and therefore such signature is considered invalid. Such scenario can only happen if
+	//     staking public keys of signers were forged to add up to the identity public key.
+	//     Under the assumption that all staking key PoPs are valid, this error case can only
+	//     happen if all signers are malicious and colluding. If there is at least one honest signer,
+	//     there is a negligible probability that the aggregated key is identity.
+	//
+	// The function is thread-safe.
 	Aggregate() (flow.IdentifierList, []byte, error)
 }
 

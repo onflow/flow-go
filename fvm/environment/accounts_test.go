@@ -24,7 +24,7 @@ func TestAccounts_Create(t *testing.T) {
 		require.NoError(t, err)
 
 		// account status
-		require.Equal(t, len(txnState.AllRegisterIDs()), 1)
+		require.Equal(t, len(txnState.Finalize().AllRegisterIDs()), 1)
 	})
 
 	t.Run("Fails if account exists", func(t *testing.T) {
@@ -74,7 +74,7 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 			require.NoError(t, err)
 
 			_, err = accounts.GetPublicKey(address, 0)
-			require.True(t, errors.IsAccountAccountPublicKeyNotFoundError(err))
+			require.True(t, errors.IsAccountPublicKeyNotFoundError(err))
 		}
 	})
 }

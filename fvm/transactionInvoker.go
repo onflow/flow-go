@@ -69,7 +69,7 @@ type transactionExecutor struct {
 	errs *errors.ErrorsCollector
 
 	nestedTxnId state.NestedTransactionId
-	pausedState *state.State
+	pausedState *state.ExecutionState
 
 	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
 	txnBodyExecutor runtime.Executor
@@ -369,6 +369,12 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
+	var bodyTxnId state.NestedTransactionId
+	bodyTxnId, err = executor.txnState.BeginNestedTransaction()
+	if err != nil {
+		return
+	}
+
 	err = executor.txnBodyExecutor.Execute()
 	if err != nil {
 		err = fmt.Errorf("transaction execute failed: %w", err)
@@ -377,7 +383,8 @@ func (executor *transactionExecutor) normalExecution() (
 
 	// Before checking storage limits, we must apply all pending changes
 	// that may modify storage usage.
-	invalidator, err = executor.env.FlushPendingUpdates()
+	var contractUpdates environment.ContractUpdates
+	contractUpdates, err = executor.env.FlushPendingUpdates()
 	if err != nil {
 		err = fmt.Errorf(
 			"transaction invocation failed to flush pending changes from "+
@@ -385,6 +392,17 @@ func (executor *transactionExecutor) normalExecution() (
 			err)
 		return
 	}
+
+	var bodySnapshot *state.ExecutionSnapshot
+	bodySnapshot, err = executor.txnState.CommitNestedTransaction(bodyTxnId)
+	if err != nil {
+		return
+	}
+
+	invalidator = environment.NewDerivedDataInvalidator(
+		contractUpdates,
+		executor.ctx.Chain.ServiceAddress(),
+		bodySnapshot)
 
 	// Check if all account storage limits are ok
 	//
@@ -398,7 +416,7 @@ func (executor *transactionExecutor) normalExecution() (
 	executor.txnState.RunWithAllLimitsDisabled(func() {
 		err = executor.CheckStorageLimits(
 			executor.env,
-			executor.txnState,
+			bodySnapshot,
 			executor.proc.Transaction.Payer,
 			maxTxFees)
 	})
@@ -464,7 +482,7 @@ func (executor *transactionExecutor) commit(
 		return err
 	}
 
-	// Based on various (e.g., contract and frozen account) updates, we decide
+	// Based on various (e.g., contract) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do
 	// the same as a successful transaction without any updates.
 	executor.txnState.AddInvalidator(invalidator)

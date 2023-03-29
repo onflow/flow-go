@@ -86,6 +86,8 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			UpdateInterval:    cnb.PeerUpdateInterval,
 		}
 
+		cnb.GossipSubInspectorNotifDistributor = cmd.BuildGossipsubRPCValidationInspectorNotificationDisseminator(cnb.GossipSubRPCInspectorNotificationCacheSize, cnb.MetricsRegisterer, cnb.Logger, cnb.MetricsEnabled)
+
 		// create default libp2p factory if corrupt node should enable the topic validator
 		libP2PNodeFactory := corruptlibp2p.NewCorruptLibP2PNodeFactory(
 			cnb.Logger,
@@ -96,12 +98,12 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			cnb.IdentityProvider,
 			cnb.Metrics.Network,
 			cnb.Resolver,
-			cnb.PeerScoringEnabled,
 			cnb.BaseConfig.NodeRole,
 			connGaterCfg,
 			// run peer manager with the specified interval and let it also prune connections
 			peerManagerCfg,
 			uniCfg,
+			cnb.GossipSubConfig,
 			cnb.TopicValidatorDisabled,
 			cnb.WithPubSubMessageSigning,
 			cnb.WithPubSubStrictSignatureVerification,

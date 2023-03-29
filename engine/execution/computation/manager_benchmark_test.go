@@ -51,7 +51,6 @@ func createAccounts(b *testing.B, vm fvm.VM, ledger state.View, num int) *testAc
 	addresses, err := testutil.CreateAccounts(
 		vm,
 		ledger,
-		derived.NewEmptyDerivedBlockData(),
 		privateKeys,
 		chain)
 	require.NoError(b, err)
@@ -104,16 +103,17 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	vm := fvm.NewVirtualMachine()
 
-	chain := flow.Emulator.Chain()
+	const chainID = flow.Emulator
 	execCtx := fvm.NewContext(
-		fvm.WithChain(chain),
+		fvm.WithChain(chainID.Chain()),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithTracer(tracer),
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
-				runtime.Config{})),
+				runtime.Config{},
+			)),
 	)
 	ledger := testutil.RootBootstrappedLedger(
 		vm,
@@ -128,6 +128,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -151,7 +152,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 		zerolog.Nop(),
 		committer.NewNoopViewCommitter(),
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(b, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(
@@ -160,8 +162,6 @@ func BenchmarkComputeBlock(b *testing.B) {
 
 	engine := &Manager{
 		blockComputer:    blockComputer,
-		tracer:           tracer,
-		me:               me,
 		derivedChainData: derivedChainData,
 	}
 
@@ -195,6 +195,11 @@ func BenchmarkComputeBlock(b *testing.B) {
 				ledger)
 			elapsed += time.Since(start)
 			b.StopTimer()
+
+			for _, snapshot := range res.StateSnapshots {
+				err := ledger.Merge(snapshot)
+				require.NoError(b, err)
+			}
 
 			require.NoError(b, err)
 			for j, r := range res.TransactionResults {

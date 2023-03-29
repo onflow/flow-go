@@ -1,5 +1,6 @@
 # The short Git commit hash
 SHORT_COMMIT := $(shell git rev-parse --short HEAD)
+BRANCH_NAME:=$(shell git rev-parse --abbrev-ref HEAD | tr '/' '-')
 # The Git commit hash
 COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
@@ -8,6 +9,9 @@ VERSION := $(shell git describe --tags --abbrev=2 --match "v*" --match "secure-c
 # By default, this will run all tests in all packages, but we have a way to override this in CI so that we can
 # dynamically split up CI jobs into smaller jobs that can be run in parallel
 GO_TEST_PACKAGES := ./...
+
+FLOW_GO_TAG := v0.28.15
+
 
 # Image tag: if image tag is not set, set it with version (or short commit if empty)
 ifeq (${IMAGE_TAG},)
@@ -32,6 +36,7 @@ GOARCH := $(shell go env GOARCH)
 
 # The location of the k8s YAML files
 K8S_YAMLS_LOCATION_STAGING=./k8s/staging
+
 
 # docker container registry
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
@@ -63,8 +68,8 @@ unittest-main:
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    go install github.com/vektra/mockery/v2@v2.13.1; \
-    go install github.com/golang/mock/mockgen@v1.3.1;
+    go install github.com/vektra/mockery/v2@v2.21.4; \
+    go install github.com/golang/mock/mockgen@v1.6.0;
 
 .PHONY: install-tools
 install-tools: crypto_setup_gopath check-go-version install-mock-generators
@@ -156,8 +161,11 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir=engine/execution/computation/computer --case=underscore --output="./engine/execution/computation/computer/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/execution/state --case=underscore --output="./engine/execution/state/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/collection --case=underscore --output="./engine/collection/mock" --outpkg="mock"
+	mockery --name '.*' --dir=engine/common/follower/cache --case=underscore --output="./engine/common/follower/cache/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/consensus --case=underscore --output="./engine/consensus/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/consensus/approvals --case=underscore --output="./engine/consensus/approvals/mock" --outpkg="mock"
+	rm -rf ./fvm/mock
+	mockery --name '.*' --dir=fvm --case=underscore --output="./fvm/mock" --outpkg="mock"
 	rm -rf ./fvm/environment/mock
 	mockery --name '.*' --dir=fvm/environment --case=underscore --output="./fvm/environment/mock" --outpkg="mock"
 	mockery --name '.*' --dir=ledger --case=underscore --output="./ledger/mock" --outpkg="mock"
@@ -245,12 +253,12 @@ docker-ci-integration:
 docker-build-collection:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/collection:latest" -t "$(CONTAINER_REGISTRY)/collection:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/collection:latest" -t "$(CONTAINER_REGISTRY)/collection:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/collection:$(FLOW_GO_TAG)" .
 
 .PHONY: docker-build-collection-without-netgo
 docker-build-collection-without-netgo:
 	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
-		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" -t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_NO_NETGO)" .
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" -t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_NO_NETGO)"  .
 
 .PHONY: docker-build-collection-debug
 docker-build-collection-debug:
@@ -261,7 +269,7 @@ docker-build-collection-debug:
 docker-build-consensus:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/consensus:latest" -t "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/consensus:latest" -t "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/consensus:$(FLOW_GO_TAG)" .
 
 .PHONY: docker-build-consensus-without-netgo
 docker-build-consensus-without-netgo:
@@ -277,7 +285,7 @@ docker-build-consensus-debug:
 docker-build-execution:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/execution:latest" -t "$(CONTAINER_REGISTRY)/execution:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/execution:latest" -t "$(CONTAINER_REGISTRY)/execution:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/execution:$(FLOW_GO_TAG)" .
 
 .PHONY: docker-build-execution-without-netgo
 docker-build-execution-without-netgo:
@@ -303,7 +311,7 @@ docker-build-execution-corrupt:
 docker-build-verification:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/verification:latest" -t "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/verification:latest" -t "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/verification:$(FLOW_GO_TAG)" .
 
 .PHONY: docker-build-verification-without-netgo
 docker-build-verification-without-netgo:
@@ -329,7 +337,7 @@ docker-build-verification-corrupt:
 docker-build-access:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/access:latest" -t "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/access:latest" -t "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/access:$(FLOW_GO_TAG)" .
 
 .PHONY: docker-build-access-without-netgo
 docker-build-access-without-netgo:
@@ -416,6 +424,7 @@ docker-build-benchnet: docker-build-flow docker-build-loader
 docker-push-collection:
 	docker push "$(CONTAINER_REGISTRY)/collection:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/collection:$(FLOW_GO_TAG)"
 
 .PHONY: docker-push-collection-without-netgo
 docker-push-collection-without-netgo:
@@ -429,6 +438,7 @@ docker-push-collection-latest: docker-push-collection
 docker-push-consensus:
 	docker push "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/consensus:$(FLOW_GO_TAG)"
 
 .PHONY: docker-push-consensus-without-netgo
 docker-push-consensus-without-netgo:
@@ -442,6 +452,13 @@ docker-push-consensus-latest: docker-push-consensus
 docker-push-execution:
 	docker push "$(CONTAINER_REGISTRY)/execution:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/execution:$(FLOW_GO_TAG)"
+
+.PHONY: docker-push-execution-corrupt
+docker-push-execution-corrupt:
+	docker push "$(CONTAINER_REGISTRY)/execution-corrupted:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)"
+
 
 .PHONY: docker-push-execution-without-netgo
 docker-push-execution-without-netgo:
@@ -455,6 +472,12 @@ docker-push-execution-latest: docker-push-execution
 docker-push-verification:
 	docker push "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/verification:$(FLOW_GO_TAG)"
+
+.PHONY: docker-push-verification-corrupt
+docker-push-verification-corrupt:
+	docker push "$(CONTAINER_REGISTRY)/verification-corrupted:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)"
 
 .PHONY: docker-push-verification-without-netgo
 docker-push-verification-without-netgo:
@@ -468,6 +491,12 @@ docker-push-verification-latest: docker-push-verification
 docker-push-access:
 	docker push "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/access:$(FLOW_GO_TAG)"
+
+.PHONY: docker-push-access-corrupt
+docker-push-access-corrupt:
+	docker push "$(CONTAINER_REGISTRY)/access-corrupted:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/access-corrupted:$(IMAGE_TAG)"
 
 .PHONY: docker-push-access-without-netgo
 docker-push-access-without-netgo:
@@ -476,6 +505,7 @@ docker-push-access-without-netgo:
 .PHONY: docker-push-access-latest
 docker-push-access-latest: docker-push-access
 	docker push "$(CONTAINER_REGISTRY)/access:latest"
+	
 
 .PHONY: docker-push-observer
 docker-push-observer:
@@ -516,6 +546,9 @@ docker-push-flow-without-netgo: docker-push-collection-without-netgo docker-push
 
 .PHONY: docker-push-flow-latest
 docker-push-flow-latest: docker-push-collection-latest docker-push-consensus-latest docker-push-execution-latest docker-push-verification-latest docker-push-access-latest docker-push-observer-latest
+
+.PHONY: docker-push-flow-corrupt
+docker-push-flow-corrupt: docker-push-access-corrupt docker-push-execution-corrupt docker-push-verification-corrupt
 
 .PHONY: docker-push-benchnet
 docker-push-benchnet: docker-push-flow docker-push-loader

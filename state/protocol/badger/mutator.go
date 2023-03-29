@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
@@ -770,12 +771,12 @@ func (m *FollowerState) isFirstBlockOfEpoch(block *flow.Header, currentEpochSetu
 	currentEpochFirstView := currentEpochSetup.FirstView
 	// sanity check: B.View >= W
 	if block.View < currentEpochFirstView {
-		return false, fmt.Errorf("[unexpected] data inconsistency: block (id=%x, view=%d) is below its epoch first view %d", block.ID(), block.View, currentEpochFirstView)
+		return false, irrecoverable.NewExceptionf("data inconsistency: block (id=%x, view=%d) is below its epoch first view %d", block.ID(), block.View, currentEpochFirstView)
 	}
 
 	parent, err := m.headers.ByBlockID(block.ParentID)
 	if err != nil {
-		return false, fmt.Errorf("[unexpected] could not retrieve parent (id=%s): %v", block.ParentID, err)
+		return false, irrecoverable.NewExceptionf("could not retrieve parent (id=%s): %w", block.ParentID, err)
 	}
 
 	return parent.View < currentEpochFirstView, nil
@@ -796,6 +797,8 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 	events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, block) })
 	// set current epoch counter corresponding to new epoch
 	metrics = append(metrics, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
+	// denote the most recent epoch transition height
+	metrics = append(metrics, func() { m.metrics.EpochTransitionHeight(block.Height) })
 	// set epoch phase - since we are starting a new epoch we begin in the staking phase
 	metrics = append(metrics, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
 	// set current epoch view values
@@ -1047,7 +1050,7 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 				extendingSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
 					if errors.Is(err, storage.ErrNotFound) {
-						return nil, fmt.Errorf("unexpected failure to retrieve EpochSetup (id=%x) stored in EpochStatus for block %x: %w",
+						return nil, irrecoverable.NewExceptionf("could not retrieve EpochSetup (id=%x) stored in EpochStatus for block %x: %w",
 							epochStatus.NextEpoch.SetupID, blockID, err)
 					}
 					return nil, fmt.Errorf("unexpected error retrieving next epoch setup: %w", err)

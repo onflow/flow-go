@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
@@ -70,18 +69,16 @@ type Environment interface {
 	// AccountInfo
 	GetAccount(address flow.Address) (*flow.Account, error)
 
-	AccountFreezer
-
 	// FlushPendingUpdates flushes pending updates from the stateful environment
 	// modules (i.e., ContractUpdater) to the state transaction, and return
-	// corresponding modified sets invalidator.
+	// the updated contract keys.
 	FlushPendingUpdates() (
-		derived.TransactionInvalidator,
+		ContractUpdates,
 		error,
 	)
 
 	// Reset resets all stateful environment modules (e.g., ContractUpdater,
-	// EventEmitter, AccountFreezer) to initial state.
+	// EventEmitter) to initial state.
 	Reset()
 }
 

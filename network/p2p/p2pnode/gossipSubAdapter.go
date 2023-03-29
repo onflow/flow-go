@@ -9,6 +9,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -16,6 +18,7 @@ import (
 // GossipSubAdapter is a wrapper around the libp2p GossipSub implementation
 // that implements the PubSubAdapter interface for the Flow network.
 type GossipSubAdapter struct {
+	component.Component
 	gossipSub *pubsub.PubSub
 	logger    zerolog.Logger
 }
@@ -32,10 +35,55 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 	if err != nil {
 		return nil, err
 	}
-	return &GossipSubAdapter{
+
+	builder := component.NewComponentManagerBuilder()
+
+	a := &GossipSubAdapter{
 		gossipSub: gossipSub,
 		logger:    logger,
-	}, nil
+	}
+
+	if scoreTracer := gossipSubConfig.ScoreTracer(); scoreTracer != nil {
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			a.logger.Debug().Str("component", "gossipsub_score_tracer").Msg("starting score tracer")
+			scoreTracer.Start(ctx)
+			a.logger.Debug().Str("component", "gossipsub_score_tracer").Msg("score tracer started")
+
+			<-scoreTracer.Done()
+			a.logger.Debug().Str("component", "gossipsub_score_tracer").Msg("score tracer stopped")
+		})
+	}
+
+	if tracer := gossipSubConfig.PubSubTracer(); tracer != nil {
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			a.logger.Debug().Str("component", "gossipsub_tracer").Msg("starting tracer")
+			tracer.Start(ctx)
+			a.logger.Debug().Str("component", "gossipsub_tracer").Msg("tracer started")
+
+			<-tracer.Done()
+			a.logger.Debug().Str("component", "gossipsub_tracer").Msg("tracer stopped")
+		})
+	}
+
+	for _, inspector := range gossipSubConfig.RPCInspectors() {
+		rpcInspector := inspector
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			componentName := rpcInspector.Name()
+			a.logger.Debug().Str("component", componentName).Msg("starting rpc inspector")
+			rpcInspector.Start(ctx)
+			a.logger.Debug().Str("component", componentName).Msg("rpc inspector started")
+
+			<-rpcInspector.Done()
+			a.logger.Debug().Str("component", componentName).Msg("rpc inspector stopped")
+		})
+	}
+
+	a.Component = builder.Build()
+
+	return a, nil
 }
 
 func (g *GossipSubAdapter) RegisterTopicValidator(topic string, topicValidator p2p.TopicValidatorFunc) error {

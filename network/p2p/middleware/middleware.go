@@ -65,8 +65,8 @@ const (
 )
 
 var (
-	_ network.Middleware        = (*Middleware)(nil)
-	_ p2p.NodeBlockListConsumer = (*Middleware)(nil)
+	_ network.Middleware                   = (*Middleware)(nil)
+	_ p2p.DisallowListNotificationConsumer = (*Middleware)(nil)
 
 	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
 	// the middleware receives a message via unicast but does not have a corresponding subscription for
@@ -176,32 +176,37 @@ func NewMiddleware(
 		opt(mw)
 	}
 
-	cm := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// TODO: refactor to avoid storing ctx altogether
-			mw.ctx = ctx
-
-			if err := mw.start(ctx); err != nil {
-				ctx.Throw(err)
-			}
-
+	builder := component.NewComponentManagerBuilder()
+	for _, limiter := range mw.unicastRateLimiters.Limiters() {
+		rateLimiter := limiter
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
+			rateLimiter.Start(ctx)
+			<-rateLimiter.Ready()
+			ready()
+			<-rateLimiter.Done()
+		})
+	}
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		// TODO: refactor to avoid storing ctx altogether
+		mw.ctx = ctx
 
-			<-ctx.Done()
-			mw.log.Info().Str("component", "middleware").Msg("stopping subroutines")
+		if err := mw.start(ctx); err != nil {
+			ctx.Throw(err)
+		}
 
-			// wait for the readConnection and readSubscription routines to stop
-			mw.wg.Wait()
+		ready()
 
-			mw.log.Info().Str("component", "middleware").Msg("stopped subroutines")
+		<-ctx.Done()
+		mw.log.Info().Str("component", "middleware").Msg("stopping subroutines")
 
-			// clean up rate limiter resources
-			mw.unicastRateLimiters.Stop()
-			mw.log.Info().Str("component", "middleware").Msg("cleaned up unicast rate limiter resources")
+		// wait for the readConnection and readSubscription routines to stop
+		mw.wg.Wait()
 
-		}).Build()
+		mw.log.Info().Str("component", "middleware").Msg("stopped subroutines")
+	})
 
-	mw.Component = cm
+	mw.Component = builder.Build()
 	return mw
 }
 
@@ -311,9 +316,6 @@ func (m *Middleware) start(ctx context.Context) error {
 
 	m.libP2PNode.WithPeersProvider(m.topologyPeers)
 
-	// starting rate limiters kicks off cleanup loop
-	m.unicastRateLimiters.Start()
-
 	return nil
 }
 
@@ -346,9 +348,10 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 	return peerIDs
 }
 
-// OnNodeBlockListUpdate removes all peers in the blocklist from the underlying libp2pnode.
-func (m *Middleware) OnNodeBlockListUpdate(blockList flow.IdentifierList) {
-	for _, pid := range m.peerIDs(blockList) {
+// OnDisallowListNotification is called when a new disallow list update notification is distributed.
+// It disconnects from all peers in the disallow list.
+func (m *Middleware) OnDisallowListNotification(notification *p2p.DisallowListUpdateNotification) {
+	for _, pid := range m.peerIDs(notification.DisallowList) {
 		err := m.libP2PNode.RemovePeer(pid)
 		if err != nil {
 			m.log.Error().Err(err).Str("peer_id", pid.String()).Msg("failed to disconnect from blocklisted peer")

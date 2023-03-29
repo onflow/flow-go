@@ -1,8 +1,8 @@
 package fvm
 
 import (
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -21,18 +21,16 @@ func NewTransaction(
 	txnBody *flow.TransactionBody,
 ) *TransactionProcedure {
 	return &TransactionProcedure{
-		ID:                     txnId,
-		Transaction:            txnBody,
-		InitialSnapshotTxIndex: txnIndex,
-		TxIndex:                txnIndex,
+		ID:          txnId,
+		Transaction: txnBody,
+		TxIndex:     txnIndex,
 	}
 }
 
 type TransactionProcedure struct {
-	ID                     flow.Identifier
-	Transaction            *flow.TransactionBody
-	InitialSnapshotTxIndex uint32
-	TxIndex                uint32
+	ID          flow.Identifier
+	Transaction *flow.TransactionBody
+	TxIndex     uint32
 
 	// TODO(patrick): remove
 	ProcedureOutput
@@ -89,10 +87,6 @@ func (TransactionProcedure) Type() ProcedureType {
 	return TransactionProcedureType
 }
 
-func (proc *TransactionProcedure) InitialSnapshotTime() derived.LogicalTime {
-	return derived.LogicalTime(proc.InitialSnapshotTxIndex)
-}
-
-func (proc *TransactionProcedure) ExecutionTime() derived.LogicalTime {
-	return derived.LogicalTime(proc.TxIndex)
+func (proc *TransactionProcedure) ExecutionTime() logical.Time {
+	return logical.Time(proc.TxIndex)
 }

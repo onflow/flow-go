@@ -288,7 +288,8 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			log,
 			committer,
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
@@ -337,10 +338,8 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			derivedBlockData)
 		require.NoError(t, err)
 
-		for i := range computationResult.StateCommitments {
-			spockSecrets = append(
-				spockSecrets,
-				computationResult.StateSnapshots[i].SpockSecret)
+		for _, snapshot := range computationResult.StateSnapshots {
+			spockSecrets = append(spockSecrets, snapshot.SpockSecret)
 		}
 
 		chunkDataPacks = computationResult.ChunkDataPacks
