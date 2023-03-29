@@ -73,7 +73,7 @@ type Environment interface {
 	// modules (i.e., ContractUpdater) to the state transaction, and return
 	// the updated contract keys.
 	FlushPendingUpdates() (
-		[]ContractUpdateKey,
+		ContractUpdates,
 		error,
 	)
 

@@ -443,20 +443,18 @@ func (_m *Environment) Events() flow.EventsList {
 }
 
 // FlushPendingUpdates provides a mock function with given fields:
-func (_m *Environment) FlushPendingUpdates() ([]environment.ContractUpdateKey, error) {
+func (_m *Environment) FlushPendingUpdates() (environment.ContractUpdates, error) {
 	ret := _m.Called()
 
-	var r0 []environment.ContractUpdateKey
+	var r0 environment.ContractUpdates
 	var r1 error
-	if rf, ok := ret.Get(0).(func() ([]environment.ContractUpdateKey, error)); ok {
+	if rf, ok := ret.Get(0).(func() (environment.ContractUpdates, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() []environment.ContractUpdateKey); ok {
+	if rf, ok := ret.Get(0).(func() environment.ContractUpdates); ok {
 		r0 = rf()
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]environment.ContractUpdateKey)
-		}
+		r0 = ret.Get(0).(environment.ContractUpdates)
 	}
 
 	if rf, ok := ret.Get(1).(func() error); ok {
@@ -566,25 +564,25 @@ func (_m *Environment) GetAccountBalance(address common.Address) (uint64, error)
 	return r0, r1
 }
 
-// GetAccountContractCode provides a mock function with given fields: address, name
-func (_m *Environment) GetAccountContractCode(address common.Address, name string) ([]byte, error) {
-	ret := _m.Called(address, name)
+// GetAccountContractCode provides a mock function with given fields: location
+func (_m *Environment) GetAccountContractCode(location common.AddressLocation) ([]byte, error) {
+	ret := _m.Called(location)
 
 	var r0 []byte
 	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Address, string) ([]byte, error)); ok {
-		return rf(address, name)
+	if rf, ok := ret.Get(0).(func(common.AddressLocation) ([]byte, error)); ok {
+		return rf(location)
 	}
-	if rf, ok := ret.Get(0).(func(common.Address, string) []byte); ok {
-		r0 = rf(address, name)
+	if rf, ok := ret.Get(0).(func(common.AddressLocation) []byte); ok {
+		r0 = rf(location)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(common.Address, string) error); ok {
-		r1 = rf(address, name)
+	if rf, ok := ret.Get(1).(func(common.AddressLocation) error); ok {
+		r1 = rf(location)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1076,13 +1074,13 @@ func (_m *Environment) RecordTrace(operation string, location common.Location, d
 	_m.Called(operation, location, duration, attrs)
 }
 
-// RemoveAccountContractCode provides a mock function with given fields: address, name
-func (_m *Environment) RemoveAccountContractCode(address common.Address, name string) error {
-	ret := _m.Called(address, name)
+// RemoveAccountContractCode provides a mock function with given fields: location
+func (_m *Environment) RemoveAccountContractCode(location common.AddressLocation) error {
+	ret := _m.Called(location)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(common.Address, string) error); ok {
-		r0 = rf(address, name)
+	if rf, ok := ret.Get(0).(func(common.AddressLocation) error); ok {
+		r0 = rf(location)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1321,13 +1319,13 @@ func (_m *Environment) UnsafeRandom() (uint64, error) {
 	return r0, r1
 }
 
-// UpdateAccountContractCode provides a mock function with given fields: address, name, code
-func (_m *Environment) UpdateAccountContractCode(address common.Address, name string, code []byte) error {
-	ret := _m.Called(address, name, code)
+// UpdateAccountContractCode provides a mock function with given fields: location, code
+func (_m *Environment) UpdateAccountContractCode(location common.AddressLocation, code []byte) error {
+	ret := _m.Called(location, code)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(common.Address, string, []byte) error); ok {
-		r0 = rf(address, name, code)
+	if rf, ok := ret.Get(0).(func(common.AddressLocation, []byte) error); ok {
+		r0 = rf(location, code)
 	} else {
 		r0 = ret.Error(0)
 	}

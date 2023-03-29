@@ -849,6 +849,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// expect epoch transition once we finalize block 9
 		consumer.On("EpochTransition", epoch2Setup.Counter, block9.Header).Once()
+		metrics.On("EpochTransitionHeight", block9.Header.Height).Once()
 		metrics.On("CurrentEpochCounter", epoch2Setup.Counter).Once()
 		metrics.On("CurrentEpochPhase", flow.EpochPhaseStaking).Once()
 		metrics.On("CurrentEpochFinalView", epoch2Setup.FinalView).Once()
@@ -2107,6 +2108,11 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 
 		// now the guarantee has invalid signer indices: the checksum should have 4 bytes, but it only has 1
 		payload.Guarantees[0].SignerIndices = []byte{byte(1)}
+
+		// create new block that has invalid collection guarantee
+		block = unittest.BlockWithParentFixture(head)
+		block.SetPayload(payload)
+
 		err = state.Extend(context.Background(), block)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.ErrorIs(t, err, signature.ErrInvalidChecksum)
@@ -2287,6 +2293,39 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		err = fullState.Extend(context.Background(), extend)
 		assert.Error(t, err, "a proposal with invalid timestamp has to be rejected")
 		assert.True(t, st.IsInvalidExtensionError(err), "if timestamp is invalid it should return invalid block error")
+	})
+}
+
+// TestProtocolStateIdempotent tests that both participant and follower states correctly process adding same block twice
+// where second extend doesn't result in an error and effectively is no-op.
+func TestProtocolStateIdempotent(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+	t.Run("follower", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
+			block := unittest.BlockWithParentFixture(head)
+			err := state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+			require.NoError(t, err)
+
+			// same operation should be no-op
+			err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+			require.NoError(t, err)
+		})
+	})
+	t.Run("participant", func(t *testing.T) {
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+			block := unittest.BlockWithParentFixture(head)
+			err := state.Extend(context.Background(), block)
+			require.NoError(t, err)
+
+			// same operation should be no-op
+			err = state.Extend(context.Background(), block)
+			require.NoError(t, err)
+
+			err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+			require.NoError(t, err)
+		})
 	})
 }
 

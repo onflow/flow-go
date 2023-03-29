@@ -50,7 +50,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/rpc"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -900,7 +899,7 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		validator,
 		exeNode.syncCore,
 		node.Tracer,
-		followereng.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
+		compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower core: %w", err)
@@ -1094,18 +1093,18 @@ func getContractEpochCounter(
 	script := fvm.Script(scriptCode)
 
 	// execute the script
-	err = vm.Run(vmCtx, script, delta.NewDeltaView(snapshot))
+	_, output, err := vm.RunV2(vmCtx, script, snapshot)
 	if err != nil {
 		return 0, fmt.Errorf("could not read epoch counter, internal error while executing script: %w", err)
 	}
-	if script.Err != nil {
-		return 0, fmt.Errorf("could not read epoch counter, script error: %w", script.Err)
+	if output.Err != nil {
+		return 0, fmt.Errorf("could not read epoch counter, script error: %w", output.Err)
 	}
-	if script.Value == nil {
+	if output.Value == nil {
 		return 0, fmt.Errorf("could not read epoch counter, script returned no value")
 	}
 
-	epochCounter := script.Value.ToGoValue().(uint64)
+	epochCounter := output.Value.ToGoValue().(uint64)
 	return epochCounter, nil
 }
 

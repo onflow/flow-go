@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	crypto2 "github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
@@ -692,7 +693,7 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	func() {
 		// make the observer private key for named observer
 		// only used for localnet, not for use with production
-		networkSeed := cmd2.GenerateRandomSeed(crypto2.KeyGenSeedMinLenECDSASecp256k1)
+		networkSeed := cmd2.GenerateRandomSeed(crypto2.KeyGenSeedMinLen)
 		networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
 		if err != nil {
 			panic(err)

@@ -75,10 +75,10 @@ func TestSpam_IHave(t *testing.T) {
 	})
 
 	// prepare to spam - generate iHAVE control messages
-	iHaveSentCtlMsgs := gsrSpammer.GenerateIHaveCtlMessages(t, messagesToSpam, 5)
+	iHaveSentCtlMsgs := gsrSpammer.GenerateCtlMessages(messagesToSpam, corruptlibp2p.WithIHave(messagesToSpam, 5))
 
 	// start spamming the victim peer
-	gsrSpammer.SpamIHave(t, victimNode, iHaveSentCtlMsgs)
+	gsrSpammer.SpamControlMessage(t, victimNode, iHaveSentCtlMsgs)
 
 	// check that victim received all spam messages
 	unittest.RequireReturnsBefore(t, allSpamIHavesReceived.Wait, 1*time.Second, "victim did not receive all spam messages")

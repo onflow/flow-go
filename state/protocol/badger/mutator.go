@@ -116,6 +116,12 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 	defer span.End()
 
 	blockID := candidate.ID()
+	// check if candidate block has been already processed
+	processed, err := m.checkBlockAlreadyProcessed(blockID)
+	if err != nil || processed {
+		return err
+	}
+
 	// sanity check if certifyingQC actually certifies candidate block
 	if certifyingQC.View != candidate.Header.View {
 		return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", candidate.Header.View, certifyingQC.View)
@@ -125,7 +131,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 	}
 
 	// check if the block header is a valid extension of parent block
-	err := m.headerExtend(candidate)
+	err = m.headerExtend(candidate)
 	if err != nil {
 		// since we have a QC for this block, it cannot be an invalid extension
 		return fmt.Errorf("unexpected invalid block (id=%x) with certifying qc (id=%x): %s",
@@ -156,8 +162,14 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
 
+	// check if candidate block has been already processed
+	processed, err := m.checkBlockAlreadyProcessed(candidate.ID())
+	if err != nil || processed {
+		return err
+	}
+
 	// check if the block header is a valid extension of parent block
-	err := m.headerExtend(candidate)
+	err = m.headerExtend(candidate)
 	if err != nil {
 		return fmt.Errorf("header not compliant with chain state: %w", err)
 	}
@@ -242,6 +254,23 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 	}
 
 	return nil
+}
+
+// checkBlockAlreadyProcessed checks if block with given blockID has been added to the protocol state.
+// Returns:
+// * (true, nil) - block has been already processed.
+// * (false, nil) - block has not been processed.
+// * (false, error) - unknown error when trying to query protocol state.
+// No errors are expected during normal operation.
+func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (bool, error) {
+	_, err := m.headers.ByBlockID(blockID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return false, nil
+		}
+		return false, fmt.Errorf("could not check if candidate block (%x) has been already processed: %w", blockID, err)
+	}
+	return true, nil
 }
 
 // checkOutdatedExtension checks whether candidate block is
@@ -800,6 +829,8 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 	events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, block) })
 	// set current epoch counter corresponding to new epoch
 	metrics = append(metrics, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
+	// denote the most recent epoch transition height
+	metrics = append(metrics, func() { m.metrics.EpochTransitionHeight(block.Height) })
 	// set epoch phase - since we are starting a new epoch we begin in the staking phase
 	metrics = append(metrics, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
 	// set current epoch view values

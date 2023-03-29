@@ -15,6 +15,7 @@ import (
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine/common/follower/cache"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -151,7 +152,7 @@ func (s *CoreSuite) TestProcessingNotOrderedBatch() {
 	s.validator.On("ValidateProposal", model.ProposalFromFlow(blocks[len(blocks)-1].Header)).Return(nil).Once()
 
 	err := s.core.OnBlockRange(s.originID, blocks)
-	require.Error(s.T(), err)
+	require.ErrorIs(s.T(), err, cache.ErrDisconnectedBatch)
 }
 
 // TestProcessingInvalidBlock tests that processing a batch which ends with invalid block discards the whole batch

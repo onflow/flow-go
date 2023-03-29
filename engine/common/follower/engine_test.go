@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -90,8 +91,7 @@ func (s *EngineSuite) TearDownTest() {
 	}
 }
 
-// TestProcessSyncedBlock checks if processing synced block using unsafe API results in error.
-// All blocks from sync engine should be sent through dedicated compliance API.
+// TestProcessSyncedBlock checks that processing single synced block results in call to FollowerCore.
 func (s *EngineSuite) TestProcessSyncedBlock() {
 	block := unittest.BlockWithParentFixture(s.finalized)
 
@@ -105,6 +105,22 @@ func (s *EngineSuite) TestProcessSyncedBlock() {
 		OriginID: originID,
 		Message:  flowBlocksToBlockProposals(block),
 	})
+	unittest.AssertClosesBefore(s.T(), done, time.Second)
+}
+
+// TestProcessGossipedBlock check that processing single gossiped block results in call to FollowerCore.
+func (s *EngineSuite) TestProcessGossipedBlock() {
+	block := unittest.BlockWithParentFixture(s.finalized)
+
+	originID := unittest.IdentifierFixture()
+	done := make(chan struct{})
+	s.core.On("OnBlockRange", originID, []*flow.Block{block}).Return(nil).Run(func(_ mock.Arguments) {
+		close(done)
+	}).Once()
+
+	err := s.engine.Process(channels.ReceiveBlocks, originID, messages.NewBlockProposal(block))
+	require.NoError(s.T(), err)
+
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
 
