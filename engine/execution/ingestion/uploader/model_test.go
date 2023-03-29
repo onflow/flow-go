@@ -36,7 +36,7 @@ func Test_ComputationResultToBlockDataConversion(t *testing.T) {
 
 	assert.Equal(t, len(expectedTrieUpdates), len(blockData.TrieUpdates))
 
-	assert.Equal(t, cr.InterimEndState(), blockData.FinalStateCommitment)
+	assert.Equal(t, cr.CurrentEndState(), blockData.FinalStateCommitment)
 }
 
 func generateComputationResult(

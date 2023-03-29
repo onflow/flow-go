@@ -48,7 +48,7 @@ func ComputationResultToBlockData(computationResult *execution.ComputationResult
 		TxResults:            txResults,
 		Events:               events,
 		TrieUpdates:          trieUpdates,
-		FinalStateCommitment: computationResult.InterimEndState(),
+		FinalStateCommitment: computationResult.CurrentEndState(),
 	}
 }
 

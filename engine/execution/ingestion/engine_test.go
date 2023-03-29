@@ -295,7 +295,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 		func(args mock.Arguments) {
 			result := args[1].(*execution.ComputationResult)
 			blockID := result.ExecutableBlock.Block.Header.ID()
-			commit := result.InterimEndState()
+			commit := result.CurrentEndState()
 
 			ctx.mu.Lock()
 			commits[blockID] = commit

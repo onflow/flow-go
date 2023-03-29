@@ -205,7 +205,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		expectedChunk1EndState := incStateCommitment(*block.StartState)
 		expectedChunk2EndState := incStateCommitment(expectedChunk1EndState)
 
-		assert.Equal(t, expectedChunk2EndState, result.InterimEndState())
+		assert.Equal(t, expectedChunk2EndState, result.CurrentEndState())
 
 		assertEventHashesMatch(t, 1+1, result)
 

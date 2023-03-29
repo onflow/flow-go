@@ -309,7 +309,7 @@ func (s *state) SaveExecutionResults(
 		}
 	}
 
-	err := s.commits.BatchStore(blockID, result.InterimEndState(), batch)
+	err := s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
 	if err != nil {
 		return fmt.Errorf("cannot store state commitment: %w", err)
 	}

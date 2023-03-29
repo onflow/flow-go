@@ -648,7 +648,7 @@ func (e *Engine) executeBlock(
 		}
 	}
 
-	finalEndState := computationResult.InterimEndState()
+	finalEndState := computationResult.CurrentEndState()
 	lg.Info().
 		Hex("parent_block", executableBlock.Block.Header.ParentID[:]).
 		Int("collections", len(executableBlock.Block.Payload.Guarantees)).
@@ -1116,7 +1116,7 @@ func (e *Engine) saveExecutionResults(
 		return fmt.Errorf("cannot persist execution state: %w", err)
 	}
 
-	finalEndState := result.InterimEndState()
+	finalEndState := result.CurrentEndState()
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Hex("start_state", result.ExecutableBlock.StartState[:]).

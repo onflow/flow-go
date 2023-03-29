@@ -130,7 +130,7 @@ func (collector *resultCollector) commitCollection(
 		collector.blockSpan,
 		trace.EXECommitDelta).End()
 
-	startState := collector.result.InterimEndState()
+	startState := collector.result.CurrentEndState()
 	endState, proof, trieUpdate, err := collector.committer.CommitView(
 		collectionExecutionSnapshot,
 		startState)

@@ -267,7 +267,7 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 		derivedBlockData)
 	require.NoError(tb, err)
 
-	b.activeStateCommitment = computationResult.InterimEndState()
+	b.activeStateCommitment = computationResult.CurrentEndState()
 
 	return computationResult
 }

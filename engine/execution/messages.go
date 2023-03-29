@@ -23,10 +23,10 @@ func NewEmptyComputationResult(
 	}
 }
 
-// InterimEndState returns the most recent end state
+// CurrentEndState returns the most recent end state
 // if no attestation appended yet, it returns start state of block
 // TODO(ramtin): we probably don't need this long term as part of this method
-func (cr *ComputationResult) InterimEndState() flow.StateCommitment {
+func (cr *ComputationResult) CurrentEndState() flow.StateCommitment {
 	if len(cr.collectionAttestationResults) == 0 {
 		return *cr.StartState
 	}
