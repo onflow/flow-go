@@ -7,7 +7,7 @@ on:
       # Allows for the ref to be altered for testing automation changes
       automation_ref:
         type: string
-        description: 'flow-go ref to use for automation to use for bootstrapping and deployment'
+        description: 'flow-go branch, commit, or tag to use for automation to use for bootstrapping and deployment'
         required: false
         default: master
 
@@ -20,10 +20,12 @@ on:
           - onflow/flow-go
           - dapperlabs/flow-go
     
-      network_sha:
+      # The network_id is the unique identifier for the network.
+      # This ID is used to clean up and delete all 
+      network_id:
         type: string
         required: true
-        description: Input the SHA for the deployment to be deleted
+        description: Input the network ID for the deployment to be deleted
 
 env:
   GCP_PROJECT: "dl-flow-benchnet-automation"
@@ -41,7 +43,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           repository: ${{ inputs.automation_repo }}
           ref: ${{ inputs.automation_ref }}
 
@@ -62,6 +64,6 @@ jobs:
           location: ${{ env.REGION }}
           use_internal_ip: false
 
-      - name: Delete Network
+      - name: Delete Network using provided Network ID
         working-directory: integration/benchnet2/
-        run: make clean-all NAMESPACE=benchnet COMMIT_SHA=${{ inputs.network_sha }} PROJECT_NAME=${{ inputs.network_sha }}
+        run: make clean-all NAMESPACE=benchnet NETWORK_ID=${{ inputs.network_id }}
