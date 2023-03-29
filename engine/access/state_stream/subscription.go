@@ -9,6 +9,11 @@ import (
 	"github.com/google/uuid"
 )
 
+// DefaultSendBufferSize is the default buffer size for the subscription's send channel.
+// The size is chosen to balance memory overhead from each subscription with performance when
+// streaming existing data.
+const DefaultSendBufferSize = 10
+
 // GetDataByHeightFunc is a callback used by subscriptions to retrieve data for a given height.
 // Expected errors:
 // - storage.ErrNotFound
@@ -45,7 +50,7 @@ type SubscriptionImpl struct {
 func NewSubscription() *SubscriptionImpl {
 	return &SubscriptionImpl{
 		id: uuid.New().String(),
-		ch: make(chan interface{}),
+		ch: make(chan interface{}, DefaultSendBufferSize),
 	}
 }
 
