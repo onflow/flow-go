@@ -1,0 +1,235 @@
+---
+name: Create Benchnet Network
+
+on:
+  workflow_dispatch:
+    inputs:
+
+      # The network_id is the unique identifier for the network.
+      # This ID will be used for Docker image tags, the HELM release, and labels/logs
+      network_id:
+        required: true
+        type: string
+        description: ID for network. Must be unique, have only alphabet characters, and be 10 or fewer characters in length.
+
+      # Allows for the ref to be altered for testing automation changes
+      automation_ref:
+        type: string
+        description: 'flow-go branch, tag, or commit to use for automation to use for bootstrapping and deployment'
+        required: false
+        default: master
+
+      # Allows for the public or private repo to be used for deployment automation
+      automation_repo:
+        required: true
+        type: choice
+        description: Choose the repo to use the public or private repo for automation
+        options:
+          - onflow/flow-go
+          - dapperlabs/flow-go
+    
+      ref_to_build_and_deploy:
+        type: string
+        description: 'flow-go tag, branch, or commit to build and deploy'
+        required: true
+
+      repo_to_use_for_build:
+        required: true
+        type: choice
+        description: Choose the repo to use the public or private repo for builds
+        options:
+          # We currently only support the public repo as we are running the bootstrap command in a container which downloads the codebase
+          - onflow/flow-go
+
+      # This flag allows us to skip builds for network ids that have been previously built
+      skip_builds:
+        required: true
+        type: boolean
+        description: Skip builds. ONLY use when images have been previously built and deployed to private registry.
+
+env:
+  GCP_PROJECT: "dl-flow-benchnet-automation"
+  REPO: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet
+  SERVICE_ACCOUNT_KEY: ${{ secrets.STAGING_DEPLOYER_SERVICE_ACCOUNT_KEY }}
+  CLUSTER_NAME: "us-west1-application"
+  REGION: us-west1
+jobs:
+  networkId:
+    name: Retrieve Network ID
+    runs-on:
+      # build on CI runner VMs
+      - self-hosted
+      - flow-bn2
+    steps:
+      - name: Set Network ID
+        id: getNetworkId
+        # Set Network ID to input provided 
+        run: |
+          if [[ ${{ inputs.network_id }} =~ ^[a-z]{1,10}$ ]]; then echo "networkId=${{ inputs.network_id }}" >> $GITHUB_OUTPUT; else echo "network_id does not meet criteria."; exit 1; fi;
+
+      - name: Print Network ID
+        run: |
+          echo ${{ steps.getNetworkId.outputs.networkId }}
+
+      # This step is required to authenticate with the cluster and use HELM
+      - name: Configure gcloud
+        uses: google-github-actions/setup-gcloud@v0.2.1
+        with:
+          version: "349.0.0"
+          project_id: ${{ env.GCP_PROJECT }}
+          service_account_key: ${{ env.SERVICE_ACCOUNT_KEY }}
+          export_default_credentials: true
+
+      # This step is required to authenticate with the cluster and use HELM
+      - name: Create env.KUBECONFIG
+        uses: dapperlabs-platform/get-gke-credentials@enable-application-default-credentials
+        env:
+          GCLOUD_PROJECT: ${{ env.GCP_PROJECT }}
+        with:
+          cluster_name: ${{ env.CLUSTER_NAME }}
+          location: ${{ env.REGION }}
+          use_internal_ip: false
+
+      # Currently, we do NOT support multiple networks running the same commit.
+      # This is due to the fact that the Network ID is the unique ID for the network and is generated using the commit hash.
+      # To prevent overwriting existing configuration, we check for the status of an existing release and will fail if a release with the Network ID exists.
+      - name: Check for Existing Release with Network ID
+        run: |
+          if helm --namespace benchnet status ${{ steps.getNetworkId.outputs.networkId }}; then echo "Network ID ${{ steps.getNetworkId.outputs.networkId }} is already being used. Please use a different tag, branch, or commit"; exit 1; else echo "New Network ID being used. Creating New Network"; fi
+
+    outputs:
+      networkId: ${{ steps.getNetworkId.outputs.networkId }}
+
+  build:
+    name: Build Container Images
+    needs: networkId
+    # Build will not run if skip_builds input is provided
+    if: ${{ ! inputs.skip_builds }}
+    strategy:
+      fail-fast: false
+      matrix:
+        role: 
+          - access
+          - collection
+          - consensus
+          - execution
+          - verification
+    runs-on:
+      # build on CI runner VMs
+      - self-hosted
+      - flow-bn2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          repository: ${{ inputs.repo_to_use_for_build }}
+          ref: ${{ inputs.ref_to_build_and_deploy }}
+
+      - name: Configure gcloud
+        uses: google-github-actions/setup-gcloud@v0.2.1
+        with:
+          version: "349.0.0"
+          project_id: ${{ env.GCP_PROJECT }}
+          service_account_key: ${{ env.SERVICE_ACCOUNT_KEY }}
+          export_default_credentials: true
+
+      - name: Authenticate docker with gcloud
+        run: |
+          gcloud auth configure-docker us-west1-docker.pkg.dev
+
+      - name: Build Container Image
+        # The SHORT_COMMIT and CONTAINER_REGISTRY variabls are overwritten so that the tag and docker repository is defined at runtime rather than in the Makefile
+        run: |
+          make docker-build-${{ matrix.role }} CONTAINER_REGISTRY=${{ env.REPO }} SHORT_COMMIT=${{needs.networkId.outputs.networkId}}
+  
+      - name: Push Container Image
+        # The SHORT_COMMIT and CONTAINER_REGISTRY variabls are overwritten so that the tag and docker repository is defined at runtime rather than in the Makefile
+        run: |
+          make docker-push-${{ matrix.role }} CONTAINER_REGISTRY=${{ env.REPO }} SHORT_COMMIT=${{needs.networkId.outputs.networkId}}
+
+      - name: Clean working directory to reduce files filling disk
+        if: always()
+        uses: dapperlabs/actions/clean-workspace@v0.0.6
+
+  deploy:
+    name: Deploy Network
+    needs:
+      - networkId
+      - build
+    if: always()
+    runs-on:
+      - self-hosted
+      - flow-bn2
+    env:
+      ARGS: NAMESPACE=benchnet ACCESS=1 COLLECTION=6 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 NETWORK_ID=${{ needs.networkId.outputs.networkId }} OWNER=${{ github.actor }}
+    steps:
+
+      - name: Fail if Network ID was unable to be retrieved or was not unique
+        if: ${{ contains(needs.*.result, 'failure') }}
+        run: exit 1
+  
+      - name: Fail if Network ID is empty
+        if: ${{ needs.networkId.outputs.networkId == '' }}
+        run: exit 1
+
+      # There are times where file ownership in the workpace can cause issues.
+      # As we run containers as root, if the files are not removed by root or chowned, the following git checkout will fail
+      - name: Run Clean Up to ensure file ownerhip is configured correctly
+        run: |
+           docker run -v ${GITHUB_WORKSPACE}:/app ubuntu /bin/bash -c "rm -rf /app/*"
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          repository: ${{ inputs.automation_repo }}
+          ref: ${{ inputs.automation_ref }}
+
+      - name: Configure gcloud
+        uses: google-github-actions/setup-gcloud@v0.2.1
+        with:
+          version: "349.0.0"
+          project_id: ${{ env.GCP_PROJECT }}
+          service_account_key: ${{ env.SERVICE_ACCOUNT_KEY }}
+          export_default_credentials: true
+
+      - name: Create env.KUBECONFIG
+        uses: dapperlabs-platform/get-gke-credentials@enable-application-default-credentials
+        env:
+          GCLOUD_PROJECT: ${{ env.GCP_PROJECT }}
+        with:
+          cluster_name: ${{ env.CLUSTER_NAME }}
+          location: ${{ env.REGION }}
+          use_internal_ip: false
+
+      - name: Build Bootstrap Container
+        # We build the bootstrap container to make use of the tools and environment inside the container.
+        # Rather than installing these on the self-hosted runner, we leverage a container that we control
+        # This allows us to install tools inside the image without concern of permissions on the host
+        run: |
+          docker build -t bootstrap -f ./cmd/Dockerfile .
+      
+      - name: Run Bootstrap in Container
+        # When running the container, the container is run as root. This allows us to install what we need and not worry about permissions.
+        # As a result, files that are written to disk are owned by root.
+        # As a final step
+        run: |
+          docker run -v ${GITHUB_WORKSPACE}:/app -i bootstrap /bin/bash -c "cd /app/integration/benchnet2 && make ${{ env.ARGS }} REF_FOR_BOOTSTRAP=${{ inputs.ref_to_build_and_deploy }} gen-helm-values && chown -R 1001 /app || chown -R 1001 /app"
+
+      - name: Create Bootstrap Secrets
+        working-directory: integration/benchnet2/
+        run: make k8s-secrets-create ${{ env.ARGS }}
+        
+      - name: Deploy Helm Chart
+        working-directory: integration/benchnet2/
+        run: make helm-deploy ${{ env.ARGS }}
+
+      - name: Benchnet2 Deployment Summary
+        run: |
+          SUMMARY=$'# Benchnet2 Deployment Summary\n## Your Network ID is ${{ needs.networkId.outputs.networkId }}\n This Network was built on the repo ${{ inputs.repo_to_use_for_build }} with ref ${{ inputs.ref_to_build_and_deploy }} '
+          echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
+
+      - name: Clean working directory to reduce files filling disk
+        if: always()
+        uses: dapperlabs/actions/clean-workspace@v0.0.6
