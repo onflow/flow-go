@@ -63,11 +63,25 @@ func (v *PendingBlockVertex) Parent() (flow.Identifier, uint64) {
 // As soon as a valid fork of certified blocks descending from the latest finalized block is observed,
 // we pass this information to caller. Internally, the mempool utilizes the LevelledForest.
 // PendingTree is NOT safe to use in concurrent environment.
-// NOTE: PendingTree relies on notion of `CertifiedBlock` which is a valid block accompanied by a certifying QC (proving block validity).
-// This works well for consensus follower as it is designed to work with certified blocks. To use this structure for consensus
-// participant we can abstract out CertifiedBlock or replace it with a generic argument that satisfies some contract(returns View, Height, BlockID).
-// With this change this structure can be used by consensus participant for tracking connection to the finalized state even without
-// having QC but relying on payload validation.
+// Note:
+//   - The ability to skip ahead is irrelevant for staked nodes, which continuously follows the chain.
+//     However, light clients don't necessarily follow the chain block by block. Assume a light client
+//     that knows the EpochCommit event, i.e. the consensus committee authorized to certify blocks. A
+//     staked node can easily ship a proof of finalization for a block within that epoch to such a
+//     light client. This would be much cheaper for the light client than downloading the headers for
+//     all blocks in the epoch.
+//   - The pending tree supports skipping ahead, as this is a more general and simpler algorithm.
+//     Removing the ability to skip ahead would restrict the PendingTree's its domain of potential
+//     applications _and_ would require additional code and additional tests making it more complex.
+//
+// Outlook:
+//   - At the moment, PendingTree relies on notion of a `Certified Block` which is a valid block accompanied
+//     by a certifying QC (proving block validity). This works well for consensus follower, as it is designed
+//     to work with certified blocks.
+//   - In the future, we could use the PendingTree also for consensus participants. Therefore, we would need
+//     to abstract out CertifiedBlock or replace it with a generic argument that satisfies some contract
+//     (returns View, Height, BlockID). Then, consensus participants could use the Pending Tree without
+//     QCs and instead fully validate inbound blocks (incl. payloads) to guarantee block validity.
 type PendingTree struct {
 	forest          *forest.LevelledForest
 	lastFinalizedID flow.Identifier
@@ -81,20 +95,22 @@ func NewPendingTree(finalized *flow.Header) *PendingTree {
 	}
 }
 
-// AddBlocks accepts a batch of certified blocks, adds them to the tree of pending blocks and finds blocks connected to the finalized state.
-// This function performs processing of incoming certified blocks, implementation is split into a few different sections
-// but tries to be optimal in terms of performance to avoid doing extra work as much as possible.
-// This function proceeds as follows:
-//  1. Sorts incoming batch by height. Since blocks can be submitted in random order we need to find blocks with
-//     the lowest height since they are candidates for being connected to the finalized state.
-//  2. Filters out blocks that are already finalized.
-//  3. Deduplicates incoming blocks. We don't store additional vertices in tree if we have that block already stored.
-//  4. Checks for exceeding byzantine threshold. Only one certified block per view is allowed.
-//  5. Finally, blocks with the lowest height from incoming batch that connect to the finalized state we will
-//     mark all descendants as connected, collect them and return as result of invocation.
+// AddBlocks accepts a batch of certified blocks, adds them to the tree of pending blocks and finds blocks connected to
+// the finalized state.
 //
-// This function is designed to perform resolution of connected blocks(resolved block is the one that connects to the finalized state)
-// using incoming batch. Each block that was connected to the finalized state is reported once.
+// Details:
+// Adding blocks might result in additional blocks now being connected to the latest finalized block. The returned
+// slice contains:
+//  1. the subset of `certifiedBlocks` that are connect to the finalized block
+//     (excluding any blocks whose view is smaller or equal to the finalized block)
+//  2. additionally, all of the _connected_ descendants of the blocks from step 1.
+//
+// PendingTree treats its input as a potentially repetitive stream of information: repeated inputs are already
+// consistent with the current state. While repetitive inputs might cause repetitive outputs, the implementation
+// has some general heuristics to avoid extra work:
+//   - It drops blocks whose view is smaller or equal to the finalized block
+//   - It deduplicates incoming blocks. We don't store additional vertices in tree if we have that block already stored.
+//
 // Expected errors during normal operations:
 //   - model.ByzantineThresholdExceededError - detected two certified blocks at the same view
 //
@@ -157,7 +173,7 @@ func (t *PendingTree) connectsToFinalizedBlock(block CertifiedBlock) bool {
 // inputs might cause repetitive outputs.
 // When a block is finalized we don't care for any blocks below it, since they were already finalized.
 // Finalizing a block might causes the pending PendingTree to detect _additional_ blocks as now
-// being connected to the latest finalized block. This happens of some connecting blocks are missing
+// being connected to the latest finalized block. This happens if some connecting blocks are missing
 // and then a block higher than the missing blocks is finalized.
 // In the following example, B is the last finalized block known to the PendingTree
 //
@@ -167,8 +183,18 @@ func (t *PendingTree) connectsToFinalizedBlock(block CertifiedBlock) bool {
 // by '←-?-?-?--' have not been received by our PendingTree. Therefore, we still consider X,Y,Z
 // as disconnected. If the PendingTree tree is now informed that X is finalized, it can fast-
 // forward to the respective state, as it anyway would prune all the blocks below X.
+// Note:
+//   - The ability to skip ahead is irrelevant for staked nodes, which continuously follows the chain.
+//     However, light clients don't necessarily follow the chain block by block. Assume a light client
+//     that knows the EpochCommit event, i.e. the consensus committee authorized to certify blocks. A
+//     staked node can easily ship a proof of finalization for a block within that epoch to such a
+//     light client. This would be much cheaper for the light client than downloading the headers for
+//     all blocks in the epoch.
+//   - The pending tree supports skipping ahead, as this is a more general and simpler algorithm.
+//     Removing the ability to skip ahead would restrict the PendingTree's its domain of potential
+//     applications _and_ would require additional code and additional tests making it more complex.
 //
-// If the PendingTree detect additional blocks as descending from the latest finalized block, it
+// If the PendingTree detects additional blocks as descending from the latest finalized block, it
 // returns these blocks. Returned blocks are ordered such that parents appear before their children.
 //
 // No errors are expected during normal operation.
