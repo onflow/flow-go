@@ -81,6 +81,10 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics.AssertExpectations(t)
 
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
+
+		// check that validating root snapshot QCs passes after db is opened
+		err = bprotocol.IsValidRootSnapshotQCs(state.Final())
+		require.NoError(t, err)
 	})
 }
 
