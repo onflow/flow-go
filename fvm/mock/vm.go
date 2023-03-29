@@ -17,15 +17,15 @@ type VM struct {
 }
 
 // GetAccount provides a mock function with given fields: _a0, _a1, _a2
-func (_m *VM) GetAccount(_a0 fvm.Context, _a1 flow.Address, _a2 state.View) (*flow.Account, error) {
+func (_m *VM) GetAccount(_a0 fvm.Context, _a1 flow.Address, _a2 state.StorageSnapshot) (*flow.Account, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 *flow.Account
 	var r1 error
-	if rf, ok := ret.Get(0).(func(fvm.Context, flow.Address, state.View) (*flow.Account, error)); ok {
+	if rf, ok := ret.Get(0).(func(fvm.Context, flow.Address, state.StorageSnapshot) (*flow.Account, error)); ok {
 		return rf(_a0, _a1, _a2)
 	}
-	if rf, ok := ret.Get(0).(func(fvm.Context, flow.Address, state.View) *flow.Account); ok {
+	if rf, ok := ret.Get(0).(func(fvm.Context, flow.Address, state.StorageSnapshot) *flow.Account); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
@@ -33,7 +33,7 @@ func (_m *VM) GetAccount(_a0 fvm.Context, _a1 flow.Address, _a2 state.View) (*fl
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(fvm.Context, flow.Address, state.View) error); ok {
+	if rf, ok := ret.Get(1).(func(fvm.Context, flow.Address, state.StorageSnapshot) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
 		r1 = ret.Error(1)

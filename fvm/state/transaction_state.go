@@ -11,10 +11,10 @@ import (
 
 // Opaque identifier used for Restarting nested transactions
 type NestedTransactionId struct {
-	state *State
+	state *ExecutionState
 }
 
-func (id NestedTransactionId) StateForTestingOnly() *State {
+func (id NestedTransactionId) StateForTestingOnly() *ExecutionState {
 	return id.state
 }
 
@@ -135,13 +135,13 @@ type NestedTransaction interface {
 	PauseNestedTransaction(
 		expectedId NestedTransactionId,
 	) (
-		*State,
+		*ExecutionState,
 		error,
 	)
 
 	// ResumeNestedTransaction attaches the paused nested transaction (state)
 	// to the current transaction.
-	ResumeNestedTransaction(pausedState *State)
+	ResumeNestedTransaction(pausedState *ExecutionState)
 
 	// AttachAndCommitNestedTransaction commits the changes from the cached
 	// nested transaction execution snapshot to the current (nested)
@@ -163,7 +163,7 @@ type NestedTransaction interface {
 }
 
 type nestedTransactionStackFrame struct {
-	state *State
+	state *ExecutionState
 
 	// When nil, the subtransaction will have unrestricted access to the runtime
 	// environment.  When non-nil, the subtransaction will only have access to
@@ -185,7 +185,7 @@ func NewTransactionState(
 	startView View,
 	params StateParameters,
 ) NestedTransaction {
-	startState := NewState(startView, params)
+	startState := NewExecutionState(startView, params)
 	return &transactionState{
 		nestedTransactions: []nestedTransactionStackFrame{
 			nestedTransactionStackFrame{
@@ -200,7 +200,7 @@ func (s *transactionState) current() nestedTransactionStackFrame {
 	return s.nestedTransactions[s.NumNestedTransactions()]
 }
 
-func (s *transactionState) currentState() *State {
+func (s *transactionState) currentState() *ExecutionState {
 	return s.current().state
 }
 
@@ -277,7 +277,7 @@ func (s *transactionState) BeginParseRestrictedNestedTransaction(
 }
 
 func (s *transactionState) push(
-	child *State,
+	child *ExecutionState,
 	location *common.AddressLocation,
 ) {
 	s.nestedTransactions = append(
@@ -289,7 +289,7 @@ func (s *transactionState) push(
 	)
 }
 
-func (s *transactionState) pop(op string) (*State, error) {
+func (s *transactionState) pop(op string) (*ExecutionState, error) {
 	if len(s.nestedTransactions) < 2 {
 		return nil, fmt.Errorf("cannot %s the main transaction", op)
 	}
@@ -362,7 +362,7 @@ func (s *transactionState) CommitParseRestrictedNestedTransaction(
 func (s *transactionState) PauseNestedTransaction(
 	expectedId NestedTransactionId,
 ) (
-	*State,
+	*ExecutionState,
 	error,
 ) {
 	if !s.IsCurrent(expectedId) {
@@ -379,7 +379,7 @@ func (s *transactionState) PauseNestedTransaction(
 	return s.pop("pause")
 }
 
-func (s *transactionState) ResumeNestedTransaction(pausedState *State) {
+func (s *transactionState) ResumeNestedTransaction(pausedState *ExecutionState) {
 	s.push(pausedState, nil)
 }
 

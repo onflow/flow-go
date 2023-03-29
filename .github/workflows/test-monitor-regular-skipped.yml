@@ -76,6 +76,8 @@ jobs:
         command: ./tools/test_monitor/run-tests.sh
       env:
         JSON_OUTPUT: true
+    - name: Print test results
+      run: cat test-output
     - name: Process test results
       run: cat test-output | go run tools/test_monitor/level1/process_summary1_results.go
       env:

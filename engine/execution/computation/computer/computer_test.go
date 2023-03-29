@@ -101,24 +101,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithDerivedBlockData(derived.NewEmptyDerivedBlockData()),
 		)
 
-		vm := new(fvmmock.VM)
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-			Return(nil).
-			Run(func(args mock.Arguments) {
-				ctx := args[0].(fvm.Context)
-				tx := args[1].(*fvm.TransactionProcedure)
-				view := args[2].(state.View)
-
-				tx.Events = generateEvents(1, tx.TxIndex)
-
-				derivedTxnData, err := ctx.DerivedBlockData.NewDerivedTransactionData(
-					tx.ExecutionTime(),
-					tx.ExecutionTime())
-				require.NoError(t, err)
-
-				getSetAProgram(t, view, derivedTxnData)
-			}).
-			Times(2 + 1) // 2 txs in collection + system chunk
+		vm := &testVM{
+			t:                    t,
+			eventsPerTransaction: 1,
+		}
 
 		committer := &fakeCommitter{
 			callCount: 0,
@@ -181,7 +167,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			zerolog.Nop(),
 			committer,
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -282,7 +269,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NotNil(t, chunkExecutionData2.TrieUpdate)
 		assert.Equal(t, byte(2), chunkExecutionData2.TrieUpdate.RootHash[0])
 
-		vm.AssertExpectations(t)
+		assert.Equal(t, 3, vm.callCount)
 	})
 
 	t.Run("empty block still computes system chunk", func(t *testing.T) {
@@ -311,15 +298,19 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			zerolog.Nop(),
 			committer,
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		// create an empty block
 		block := generateBlock(0, 0, rag)
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-			Return(nil).
+		vm.On("RunV2", mock.Anything, mock.Anything, mock.Anything).
+			Return(
+				&state.ExecutionSnapshot{},
+				fvm.ProcedureOutput{},
+				nil).
 			Once() // just system chunk
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
@@ -401,7 +392,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			zerolog.Nop(),
 			comm,
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		// create an empty block
@@ -428,7 +420,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("multiple collections", func(t *testing.T) {
 		execCtx := fvm.NewContext()
 
-		vm := new(fvmmock.VM)
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
@@ -442,6 +433,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
+		eventsPerTransaction := 2
+		vm := &testVM{
+			t:                    t,
+			eventsPerTransaction: eventsPerTransaction,
+			err: fvmErrors.NewInvalidAddressErrorf(
+				flow.EmptyAddress,
+				"no payer address provided"),
+		}
+
 		exe, err := computer.NewBlockComputer(
 			vm,
 			execCtx,
@@ -450,12 +450,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			zerolog.Nop(),
 			committer,
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		collectionCount := 2
 		transactionsPerCollection := 2
-		eventsPerTransaction := 2
 		eventsPerCollection := eventsPerTransaction * transactionsPerCollection
 		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 // +1 for system chunk
 		// totalEventCount := eventsPerTransaction * totalTransactionCount
@@ -463,19 +463,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
-
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) {
-				tx := args[1].(*fvm.TransactionProcedure)
-
-				tx.Err = fvmErrors.NewInvalidAddressErrorf(
-					flow.EmptyAddress,
-					"no payer address provided")
-				// create dummy events
-				tx.Events = generateEvents(eventsPerTransaction, tx.TxIndex)
-			}).
-			Return(nil).
-			Times(totalTransactionCount)
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
 			Return(nil, nil, nil, nil).
@@ -532,7 +519,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		assertEventHashesMatch(t, collectionCount+1, result)
 
-		vm.AssertExpectations(t)
+		assert.Equal(t, totalTransactionCount, vm.callCount)
 	})
 
 	t.Run("service events are emitted", func(t *testing.T) {
@@ -636,7 +623,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			zerolog.Nop(),
 			committer.NewNoopViewCommitter(),
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		result, err := exe.ExecuteBlock(
@@ -722,7 +710,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			zerolog.Nop(),
 			committer.NewNoopViewCommitter(),
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		const collectionCount = 2
@@ -823,7 +812,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			zerolog.Nop(),
 			committer.NewNoopViewCommitter(),
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		block := generateBlock(collectionCount, transactionCount, rag)
@@ -1045,7 +1035,8 @@ func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
 		zerolog.Nop(),
 		committer.NewNoopViewCommitter(),
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(t, err)
 
 	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {
@@ -1156,7 +1147,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		zerolog.Nop(),
 		committer,
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(t, err)
 
 	// create empty block, it will have system collection attached while executing
@@ -1241,6 +1233,58 @@ func generateCollection(transactionCount int, addressGenerator flow.AddressGener
 	}
 }
 
+type testVM struct {
+	t                    *testing.T
+	eventsPerTransaction int
+
+	callCount int
+	err       fvmErrors.CodedError
+}
+
+func (vm *testVM) RunV2(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storageSnapshot state.StorageSnapshot,
+) (
+	*state.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
+	vm.callCount += 1
+
+	txn := proc.(*fvm.TransactionProcedure)
+
+	derivedTxnData, err := ctx.DerivedBlockData.NewDerivedTransactionData(
+		txn.ExecutionTime(),
+		txn.ExecutionTime())
+	require.NoError(vm.t, err)
+
+	getSetAProgram(vm.t, storageSnapshot, derivedTxnData)
+
+	snapshot := &state.ExecutionSnapshot{}
+	output := fvm.ProcedureOutput{
+		Events: generateEvents(vm.eventsPerTransaction, txn.TxIndex),
+		Err:    vm.err,
+	}
+
+	return snapshot, output, nil
+}
+
+func (testVM) Run(_ fvm.Context, _ fvm.Procedure, _ state.View) error {
+	panic("not implemented")
+}
+
+func (testVM) GetAccount(
+	_ fvm.Context,
+	_ flow.Address,
+	_ state.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
+	panic("not implemented")
+}
+
 func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 	events := make([]flow.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
@@ -1251,16 +1295,22 @@ func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 	return events
 }
 
-func getSetAProgram(t *testing.T, view state.View, derivedTxnData derived.DerivedTransactionCommitter) {
+func getSetAProgram(
+	t *testing.T,
+	storageSnapshot state.StorageSnapshot,
+	derivedTxnData derived.DerivedTransactionCommitter,
+) {
 
-	txState := state.NewTransactionState(view, state.DefaultParameters())
+	txnState := state.NewTransactionState(
+		delta.NewDeltaView(storageSnapshot),
+		state.DefaultParameters())
 
 	loc := common.AddressLocation{
 		Name:    "SomeContract",
 		Address: common.MustBytesToAddress([]byte{0x1}),
 	}
 	_, err := derivedTxnData.GetOrComputeProgram(
-		txState,
+		txnState,
 		loc,
 		&programLoader{
 			load: func() (*derived.Program, error) {

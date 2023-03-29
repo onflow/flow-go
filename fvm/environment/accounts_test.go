@@ -74,7 +74,7 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 			require.NoError(t, err)
 
 			_, err = accounts.GetPublicKey(address, 0)
-			require.True(t, errors.IsAccountAccountPublicKeyNotFoundError(err))
+			require.True(t, errors.IsAccountPublicKeyNotFoundError(err))
 		}
 	})
 }

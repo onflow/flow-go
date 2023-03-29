@@ -84,6 +84,17 @@ func NewPayerBalanceCheckFailure(
 		payer)
 }
 
+// NewDerivedDataCacheImplementationFailure indicate an implementation error in
+// the derived data cache.
+func NewDerivedDataCacheImplementationFailure(
+	err error,
+) CodedError {
+	return WrapCodedError(
+		FailureCodeDerivedDataCacheImplementationFailure,
+		err,
+		"implementation error in derived data cache")
+}
+
 // NewComputationLimitExceededError constructs a new CodedError which indicates
 // that computation has exceeded its limit.
 func NewComputationLimitExceededError(limit uint64) CodedError {
