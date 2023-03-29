@@ -344,7 +344,7 @@ func TestInspect_InvalidTopicID(t *testing.T) {
 	inspectorConfig.IHaveValidationCfg.DiscardThreshold = 50
 	inspectorConfig.IHaveValidationCfg.IHaveAsyncInspectSampleSizePercentage = .5
 	inspectorConfig.IHaveValidationCfg.IHaveInspectionMaxSampleSize = 100
-	ihaveMessageCount := 40
+	ihaveMessageCount := 100
 
 	inspectorConfig.NumberOfWorkers = 1
 

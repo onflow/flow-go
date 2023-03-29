@@ -182,7 +182,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 			}
 		case ctrlMsgType == p2p.CtrlMsgIHave:
 			// iHave specific pre-processing
-			sampleSize := c.iHaveSampleSize(validationConfig, len(control.GetIhave()), validationConfig.IHaveSyncInspectSampleSizePercentage)
+			sampleSize := c.iHaveSampleSize(len(control.GetIhave()), validationConfig.IHaveInspectionMaxSampleSize, validationConfig.IHaveSyncInspectSampleSizePercentage)
 			err := c.blockingPreprocessingSampleRpc(from, validationConfig, control, sampleSize)
 			if err != nil {
 				lg.Error().
@@ -288,7 +288,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 		validationErr = NewRateLimitedControlMsgErr(req.validationConfig.ControlMsg)
 	case count > req.validationConfig.SafetyThreshold && req.validationConfig.ControlMsg == p2p.CtrlMsgIHave:
 		// we only perform async inspection on a sample size of iHave messages
-		sampleSize := c.iHaveSampleSize(req.validationConfig, len(req.ctrlMsg.GetIhave()), req.validationConfig.IHaveAsyncInspectSampleSizePercentage)
+		sampleSize := c.iHaveSampleSize(len(req.ctrlMsg.GetIhave()), req.validationConfig.IHaveInspectionMaxSampleSize, req.validationConfig.IHaveAsyncInspectSampleSizePercentage)
 		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg, sampleSize)
 	case count > req.validationConfig.SafetyThreshold:
 		// check if Peer RPC messages Count greater than safety threshold further inspect each message individually
@@ -396,10 +396,10 @@ func (c *ControlMsgValidationInspector) validateTopic(topic channels.Topic) erro
 
 // iHaveSampleSize calculates a sample size for ihave inspection based on the provided configuration number of ihave messages n.
 // The max sample size is returned if the calculated sample size is greater than the configured max sample size.
-func (c *ControlMsgValidationInspector) iHaveSampleSize(config *CtrlMsgValidationConfig, n int, percentage float64) uint {
+func (c *ControlMsgValidationInspector) iHaveSampleSize(n int, maxSampleSize, percentage float64) uint {
 	sampleSize := float64(n) * percentage
-	if sampleSize > config.IHaveInspectionMaxSampleSize {
-		sampleSize = config.IHaveInspectionMaxSampleSize
+	if sampleSize > maxSampleSize {
+		sampleSize = maxSampleSize
 	}
 	return uint(math.Ceil(sampleSize))
 }
