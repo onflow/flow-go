@@ -28,7 +28,6 @@ spec:
         prometheus.io/port: "8080"
       labels:
         app: {{ $k }}
-        branch: {{ $.Values.branch }}
         nodeType: collection
         service: flow
         project: {{ $.Values.commit }}
