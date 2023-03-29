@@ -25,7 +25,7 @@ git pull public-flow-go master
 git push origin master-sync
 
 # create PR to merge from master-sync => master-private branch
-gh pr create --base master-private --title "[Sync] public **flow-go/master** => **master-private**" --body "Automated PR that merges updates from https://github.com/onflow/flow-go **master** branch into https://github.com/dapperlabs/flow-go **master-private** branch."
+gh pr create --base master-private --title "[Sync] public \`flow-go/master\` => \`master-private\`" --body "Automated PR that merges updates from https://github.com/onflow/flow-go \`master\` branch into https://github.com/dapperlabs/flow-go \`master-private\` branch."
 
 # create PR to merge from master-sync => to master-public branch
-gh pr create --base master-public --title "[Sync] public **flow-go/master** => **master-public**" --body "Automated PR that merges updates from https://github.com/onflow/flow-go **master** branch into https://github.com/dapperlabs/flow-go **master-public** branch."
+gh pr create --base master-public --title "[Sync] public \`flow-go/master\` => \`master-public\`" --body "Automated PR that merges updates from https://github.com/onflow/flow-go \`master\` branch into https://github.com/dapperlabs/flow-go \`master-public\` branch."
