@@ -35,7 +35,7 @@ func WithIHave(msgCount, msgSize int, topicId string) GossipSubCtrlOption {
 		for i := 0; i < msgCount; i++ {
 			iHaves[i] = &pubsubpb.ControlIHave{
 				TopicID:    &topicId,
-				MessageIDs: gossipSubMessageIdsFixture(msgSize),
+				MessageIDs: GossipSubMessageIdsFixture(msgSize),
 			}
 		}
 		msg.Ihave = iHaves
@@ -48,7 +48,7 @@ func WithIWant(msgCount, msgSize int) GossipSubCtrlOption {
 		iWants := make([]*pubsubpb.ControlIWant, msgCount)
 		for i := 0; i < msgCount; i++ {
 			iWants[i] = &pubsubpb.ControlIWant{
-				MessageIDs: gossipSubMessageIdsFixture(msgSize),
+				MessageIDs: GossipSubMessageIdsFixture(msgSize),
 			}
 		}
 		msg.Iwant = iWants
@@ -93,8 +93,8 @@ func GossipSubTopicIdFixture() string {
 	return unittest.GenerateRandomStringWithLen(topicIDFixtureLen)
 }
 
-// gossipSubMessageIdsFixture returns a slice of random gossipSub message IDs of the given size.
-func gossipSubMessageIdsFixture(count int) []string {
+// GossipSubMessageIdsFixture returns a slice of random gossipSub message IDs of the given size.
+func GossipSubMessageIdsFixture(count int) []string {
 	msgIds := make([]string, count)
 	for i := 0; i < count; i++ {
 		msgIds[i] = gossipSubMessageIdFixture()

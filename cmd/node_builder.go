@@ -313,12 +313,15 @@ func DefaultBaseConfig() *BaseConfig {
 					validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
 					validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
 				},
-				IHaveLimits: map[string]int{
-					validation.DiscardThresholdMapKey:                   validation.DefaultIHaveDiscardThreshold,
-					validation.SafetyThresholdMapKey:                    validation.DefaultIHaveSafetyThreshold,
-					validation.RateLimitMapKey:                          validation.DefaultIHaveRateLimit,
-					validation.IHaveSyncInspectSampleSizeDivisorMapKey:  validation.DefaultIHaveSyncInspectSampleSizeDivisor,
-					validation.IHaveAsyncInspectSampleSizeDivisorMapKey: validation.DefaultIHaveAsyncInspectSampleSizeDivisor,
+				IHaveLimitsConfig: &p2pbuilder.GossipSubCtrlMsgIhaveLimitsConfig{
+					IHaveLimits: map[string]int{
+						validation.DiscardThresholdMapKey: validation.DefaultIHaveDiscardThreshold,
+						validation.SafetyThresholdMapKey:  validation.DefaultIHaveSafetyThreshold,
+						validation.RateLimitMapKey:        validation.DefaultIHaveRateLimit,
+					},
+					IHaveSyncInspectSampleSizePercentage:  validation.DefaultIHaveSyncInspectSampleSizePercentage,
+					IHaveAsyncInspectSampleSizePercentage: validation.DefaultIHaveAsyncInspectSampleSizePercentage,
+					IHaveInspectionMaxSampleSize:          validation.DefaultIHaveInspectionMaxSampleSize,
 				},
 			},
 			DNSCacheTTL:                                dns.DefaultTimeToLive,

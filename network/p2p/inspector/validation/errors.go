@@ -80,17 +80,21 @@ func IsErrRateLimitedControlMsg(err error) bool {
 
 // ErrInvalidTopic error wrapper that indicates an error when checking if a Topic is a valid Flow Topic.
 type ErrInvalidTopic struct {
+	// topic the invalid topic.
 	topic channels.Topic
-	err   error
+	// sampleSize the total amount of topics to be inspected before error is encountered.
+	sampleSize uint
+	// err the validation error
+	err error
 }
 
 func (e ErrInvalidTopic) Error() string {
-	return fmt.Errorf("invalid topic %s: %w", e.topic, e.err).Error()
+	return fmt.Errorf("invalid topic %s out of %d total topics sampled: %w", e.topic, e.sampleSize, e.err).Error()
 }
 
 // NewInvalidTopicErr returns a new ErrMalformedTopic
-func NewInvalidTopicErr(topic channels.Topic, err error) ErrInvalidTopic {
-	return ErrInvalidTopic{topic: topic, err: err}
+func NewInvalidTopicErr(topic channels.Topic, sampleSize uint, err error) ErrInvalidTopic {
+	return ErrInvalidTopic{topic: topic, sampleSize: sampleSize, err: err}
 }
 
 // IsErrInvalidTopic returns true if an error is ErrInvalidTopic

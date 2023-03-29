@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"math"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
@@ -181,8 +182,8 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 			}
 		case ctrlMsgType == p2p.CtrlMsgIHave:
 			// iHave specific pre-processing
-			sampleSize := uint(len(control.GetIhave()))
-			err := c.blockingPreprocessingIHaveRpc(from, validationConfig, control, sampleSize)
+			sampleSize := c.iHaveSampleSize(validationConfig, len(control.GetIhave()), validationConfig.IHaveSyncInspectSampleSizePercentage)
+			err := c.blockingPreprocessingSampleRpc(from, validationConfig, control, sampleSize)
 			if err != nil {
 				lg.Error().
 					Err(err).
@@ -243,11 +244,10 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 	return nil
 }
 
-// blockingPreprocessingIHaveRpc iHave pre-processing validation func that performs some pre-validation of iHave RPC control messages.
-// If the iHave RPC control message count exceeds the configured discard threshold we perform synchronous topic validation on a subset
-// of the iHave control messages. This is due to the fact that the number of iHave messages a node can send does not have an upper bound
-// thus we cannot discard the entire RPC if the count exceeds the configured discard threshold.
-func (c *ControlMsgValidationInspector) blockingPreprocessingIHaveRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
+// blockingPreprocessingSampleRpc blocking pre-processing validation func that performs some pre-validation of RPC control messages.
+// If the RPC control message count exceeds the configured discard threshold we perform synchronous topic validation on a subset
+// of the control messages. This is used for control message types that do not have an upper bound on the amount of messages a node can send.
+func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
 		Uint64("ctrl_msg_count", count).
@@ -286,12 +286,13 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 	switch {
 	case !req.validationConfig.RateLimiter.Allow(req.Peer, int(count)): // check if Peer RPC messages are rate limited
 		validationErr = NewRateLimitedControlMsgErr(req.validationConfig.ControlMsg)
-	case count > req.validationConfig.SafetyThreshold: // check if Peer RPC messages Count greater than safety threshold further inspect each message individually
-		sampleSize := uint(0)
-		if req.validationConfig.ControlMsg == p2p.CtrlMsgIHave {
-			sampleSize = uint(len(req.ctrlMsg.GetIhave()))
-		}
+	case count > req.validationConfig.SafetyThreshold && req.validationConfig.ControlMsg == p2p.CtrlMsgIHave:
+		// we only perform async inspection on a sample size of iHave messages
+		sampleSize := c.iHaveSampleSize(req.validationConfig, len(req.ctrlMsg.GetIhave()), req.validationConfig.IHaveAsyncInspectSampleSizePercentage)
 		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg, sampleSize)
+	case count > req.validationConfig.SafetyThreshold:
+		// check if Peer RPC messages Count greater than safety threshold further inspect each message individually
+		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg, 0)
 	default:
 		lg.Trace().
 			Uint64("discard_threshold", req.validationConfig.DiscardThreshold).
@@ -342,7 +343,7 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 		seen[topic] = struct{}{}
 		err := c.validateTopic(topic)
 		if err != nil {
-			return err
+			return NewInvalidTopicErr(topic, sampleSize, err)
 		}
 		return nil
 	}
@@ -370,7 +371,7 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 			iHaves[i], iHaves[j] = iHaves[j], iHaves[i]
 		})
 		if err != nil {
-			return fmt.Errorf("failed to get random sample of ihave control messages")
+			return fmt.Errorf("failed to get random sample of ihave control messages: %w", err)
 		}
 		for i := uint(0); i < sampleSize; i++ {
 			topic := channels.Topic(iHaves[i].GetTopicID())
@@ -388,7 +389,17 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 func (c *ControlMsgValidationInspector) validateTopic(topic channels.Topic) error {
 	err := channels.IsValidFlowTopic(topic, c.sporkID)
 	if err != nil {
-		return NewInvalidTopicErr(topic, err)
+		return err
 	}
 	return nil
+}
+
+// iHaveSampleSize calculates a sample size for ihave inspection based on the provided configuration number of ihave messages n.
+// The max sample size is returned if the calculated sample size is greater than the configured max sample size.
+func (c *ControlMsgValidationInspector) iHaveSampleSize(config *CtrlMsgValidationConfig, n int, percentage float64) uint {
+	sampleSize := float64(n) * percentage
+	if sampleSize > config.IHaveInspectionMaxSampleSize {
+		sampleSize = config.IHaveInspectionMaxSampleSize
+	}
+	return uint(math.Ceil(sampleSize))
 }

@@ -168,13 +168,17 @@ func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation
 		validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
 		validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
 	})
+
+	iHaveOpts := []validation.CtrlMsgValidationConfigOption{
+		validation.WithIHaveSyncInspectSampleSizePercentage(validation.DefaultIHaveSyncInspectSampleSizePercentage),
+		validation.WithIHaveAsyncInspectSampleSizePercentage(validation.DefaultIHaveAsyncInspectSampleSizePercentage),
+		validation.WithIHaveInspectionMaxSampleSize(validation.DefaultIHaveInspectionMaxSampleSize),
+	}
 	iHaveCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgIHave, validation.CtrlMsgValidationLimits{
-		validation.DiscardThresholdMapKey:                   validation.DefaultIHaveDiscardThreshold,
-		validation.SafetyThresholdMapKey:                    validation.DefaultIHaveSafetyThreshold,
-		validation.RateLimitMapKey:                          validation.DefaultIHaveRateLimit,
-		validation.IHaveSyncInspectSampleSizeDivisorMapKey:  validation.DefaultIHaveSyncInspectSampleSizeDivisor,
-		validation.IHaveAsyncInspectSampleSizeDivisorMapKey: validation.DefaultIHaveAsyncInspectSampleSizeDivisor,
-	})
+		validation.DiscardThresholdMapKey: validation.DefaultIHaveDiscardThreshold,
+		validation.SafetyThresholdMapKey:  validation.DefaultIHaveSafetyThreshold,
+		validation.RateLimitMapKey:        validation.DefaultIHaveRateLimit,
+	}, iHaveOpts...)
 	return &validation.ControlMsgValidationInspectorConfig{
 		NumberOfWorkers:     validation.DefaultNumberOfWorkers,
 		InspectMsgStoreOpts: opts,
@@ -635,7 +639,8 @@ func gossipSubRPCValidationInspectorConfig(validationConfigs *GossipSubRPCValida
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
 	}
-	iHaveValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgIHave, validationConfigs.IHaveLimits)
+
+	iHaveValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgIHave, validationConfigs.IHaveLimitsConfig.IHaveLimits, validationConfigs.IHaveLimitsConfig.IhaveConfigurationOpts()...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
 	}
