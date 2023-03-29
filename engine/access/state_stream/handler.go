@@ -98,13 +98,18 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 
 	filter := EventFilter{}
 	if request.GetFilter() != nil {
+		var err error
 		reqFilter := request.GetFilter()
-		filter = NewEventFilter(
+		filter, err = NewEventFilter(
+			h.chain,
 			reqFilter.GetEventType(),
 			reqFilter.GetAddress(),
 			reqFilter.GetContract(),
 			reqFilter.GetEventName(),
 		)
+		if err != nil {
+			return status.Errorf(codes.InvalidArgument, "could not convert event filter: %v", err)
+		}
 	}
 
 	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)

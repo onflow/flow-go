@@ -20,21 +20,23 @@ func TestParseEvent(t *testing.T) {
 			name:      "flow event",
 			eventType: "flow.AccountCreated",
 			expected: state_stream.ParsedEvent{
-				Type:      state_stream.ProtocolEventType,
-				EventType: "flow.AccountCreated",
-				Contract:  "flow",
-				Name:      "AccountCreated",
+				Type:         state_stream.ProtocolEventType,
+				EventType:    "flow.AccountCreated",
+				Contract:     "flow",
+				ContractName: "flow",
+				Name:         "AccountCreated",
 			},
 		},
 		{
 			name:      "account event",
 			eventType: "A.0000000000000001.Contract1.EventA",
 			expected: state_stream.ParsedEvent{
-				Type:      state_stream.AccountEventType,
-				EventType: "A.0000000000000001.Contract1.EventA",
-				Address:   "0000000000000001",
-				Contract:  "Contract1",
-				Name:      "EventA",
+				Type:         state_stream.AccountEventType,
+				EventType:    "A.0000000000000001.Contract1.EventA",
+				Address:      "0000000000000001",
+				Contract:     "A.0000000000000001.Contract1",
+				ContractName: "Contract1",
+				Name:         "EventA",
 			},
 		},
 	}
@@ -44,11 +46,11 @@ func TestParseEvent(t *testing.T) {
 			event, err := state_stream.ParseEvent(test.eventType)
 			require.NoError(t, err)
 
-			assert.Equal(t, test.expected.Type, event.Type, "event Type does not match")
-			assert.Equal(t, test.expected.EventType, event.EventType, "event EventType does not match")
-			assert.Equal(t, test.expected.Address, event.Address, "event Address does not match")
-			assert.Equal(t, test.expected.Contract, event.Contract, "event Contract does not match")
-			assert.Equal(t, test.expected.Name, event.Name, "event Name does not match")
+			assert.Equal(t, test.expected.Type, event.Type)
+			assert.Equal(t, test.expected.EventType, event.EventType)
+			assert.Equal(t, test.expected.Address, event.Address)
+			assert.Equal(t, test.expected.Contract, event.Contract)
+			assert.Equal(t, test.expected.Name, event.Name)
 		})
 	}
 }

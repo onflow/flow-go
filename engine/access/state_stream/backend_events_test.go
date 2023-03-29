@@ -33,6 +33,8 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	var err error
+
 	type testType struct {
 		name            string
 		highestBackfill int
@@ -62,6 +64,9 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 		},
 	}
 
+	// supports simple address comparisions for testing
+	chain := flow.MonotonicEmulator.Chain()
+
 	// create variations for each of the base test
 	tests := make([]testType, 0, len(baseTests)*3)
 	for _, test := range baseTests {
@@ -72,12 +77,14 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 
 		t2 := test
 		t2.name = fmt.Sprintf("%s - some events", test.name)
-		t2.filters = NewEventFilter([]string{string(testEventTypes[0])}, nil, nil, nil)
+		t2.filters, err = NewEventFilter(chain, []string{string(testEventTypes[0])}, nil, nil, nil)
+		require.NoError(s.T(), err)
 		tests = append(tests, t2)
 
 		t3 := test
 		t3.name = fmt.Sprintf("%s - no events", test.name)
-		t3.filters = NewEventFilter([]string{"A.0x1.NonExistent.Event"}, nil, nil, nil)
+		t3.filters, err = NewEventFilter(chain, []string{"A.0x1.NonExistent.Event"}, nil, nil, nil)
+		require.NoError(s.T(), err)
 		tests = append(tests, t3)
 	}
 

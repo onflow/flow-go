@@ -15,11 +15,12 @@ const (
 )
 
 type ParsedEvent struct {
-	Type      ParsedEventType
-	EventType flow.EventType
-	Address   string
-	Contract  string
-	Name      string
+	Type         ParsedEventType
+	EventType    flow.EventType
+	Address      string
+	Contract     string
+	ContractName string
+	Name         string
 }
 
 // ParseEvent parses an event type into its parts. There are 2 valid EventType formats:
@@ -33,21 +34,23 @@ func ParseEvent(eventType flow.EventType) (*ParsedEvent, error) {
 	case "flow":
 		if len(parts) == 2 {
 			return &ParsedEvent{
-				Type:      ProtocolEventType,
-				EventType: eventType,
-				Contract:  parts[0],
-				Name:      parts[1],
+				Type:         ProtocolEventType,
+				EventType:    eventType,
+				Contract:     parts[0],
+				ContractName: parts[0],
+				Name:         parts[1],
 			}, nil
 		}
 
 	case "A":
 		if len(parts) == 4 {
 			return &ParsedEvent{
-				Type:      AccountEventType,
-				EventType: eventType,
-				Address:   parts[1],
-				Contract:  parts[2],
-				Name:      parts[3],
+				Type:         AccountEventType,
+				EventType:    eventType,
+				Address:      parts[1],
+				Contract:     fmt.Sprintf("%s.%s.%s", parts[0], parts[1], parts[2]),
+				ContractName: parts[2],
+				Name:         parts[3],
 			}, nil
 		}
 	}
