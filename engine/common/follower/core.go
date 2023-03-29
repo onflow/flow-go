@@ -258,7 +258,7 @@ func (c *Core) processCertifiedBlocks(ctx context.Context, blocks CertifiedBlock
 	// Step 1: add blocks to our PendingTree of certified blocks
 	pendingTreeSpan, _ := c.tracer.StartSpanFromContext(ctx, trace.FollowerExtendPendingTree)
 	connectedBlocks, err := c.pendingTree.AddBlocks(blocks)
-	defer pendingTreeSpan.End()
+	pendingTreeSpan.End()
 	if err != nil {
 		return fmt.Errorf("could not process batch of certified blocks: %w", err)
 	}
@@ -282,7 +282,7 @@ func (c *Core) processCertifiedBlocks(ctx context.Context, blocks CertifiedBlock
 // Is NOT concurrency safe: should be executed by _single dedicated_ goroutine.
 // No errors expected during normal operations.
 func (c *Core) processFinalizedBlock(ctx context.Context, finalized *flow.Header) error {
-	span, ctx := c.tracer.StartSpanFromContext(ctx, trace.FollowerProcessFinalizedBlock)
+	span, _ := c.tracer.StartSpanFromContext(ctx, trace.FollowerProcessFinalizedBlock)
 	defer span.End()
 
 	connectedBlocks, err := c.pendingTree.FinalizeFork(finalized)
