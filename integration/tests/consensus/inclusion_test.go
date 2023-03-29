@@ -46,9 +46,6 @@ func (is *InclusionSuite) SetupTest() {
 	is.log = unittest.LoggerForTest(is.Suite.T(), zerolog.InfoLevel)
 	is.log.Info().Msgf("================> SetupTest")
 
-	// seed random generator
-	rand.Seed(time.Now().UnixNano())
-
 	// to collect node confiis...
 	var nodeConfigs []testnet.NodeConfig
 
