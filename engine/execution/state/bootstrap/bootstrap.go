@@ -36,10 +36,9 @@ func (b *Bootstrapper) BootstrapLedger(
 	chain flow.Chain,
 	opts ...fvm.BootstrapProcedureOption,
 ) (flow.StateCommitment, error) {
-	view := delta.NewDeltaView(
-		state.NewLedgerStorageSnapshot(
-			ledger,
-			flow.StateCommitment(ledger.InitialState())))
+	storageSnapshot := state.NewLedgerStorageSnapshot(
+		ledger,
+		flow.StateCommitment(ledger.InitialState()))
 
 	vm := fvm.NewVirtualMachine()
 
@@ -54,12 +53,15 @@ func (b *Bootstrapper) BootstrapLedger(
 		opts...,
 	)
 
-	err := vm.Run(ctx, bootstrap, view)
+	executionSnapshot, _, err := vm.RunV2(ctx, bootstrap, storageSnapshot)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
 
-	newStateCommitment, _, err := state.CommitDelta(ledger, view.Delta(), flow.StateCommitment(ledger.InitialState()))
+	newStateCommitment, _, err := state.CommitDelta(
+		ledger,
+		executionSnapshot,
+		flow.StateCommitment(ledger.InitialState()))
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}

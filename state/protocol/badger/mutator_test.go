@@ -849,6 +849,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// expect epoch transition once we finalize block 9
 		consumer.On("EpochTransition", epoch2Setup.Counter, block9.Header).Once()
+		metrics.On("EpochTransitionHeight", block9.Header.Height).Once()
 		metrics.On("CurrentEpochCounter", epoch2Setup.Counter).Once()
 		metrics.On("CurrentEpochPhase", flow.EpochPhaseStaking).Once()
 		metrics.On("CurrentEpochFinalView", epoch2Setup.FinalView).Once()
@@ -1940,16 +1941,17 @@ func TestExtendBlockProcessable(t *testing.T) {
 	})
 }
 
-func TestHeaderExtendBlockNotConnected(t *testing.T) {
+// TestFollowerHeaderExtendBlockNotConnected tests adding orphan block to the finalized state
+// add 2 blocks, where:
+// first block is added and then finalized;
+// second block is a sibling to the finalized block
+// The Follower should accept this block since tracking of orphan blocks is implemented by another component.
+func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
-		// add 2 blocks, where:
-		// first block is added and then finalized;
-		// second block is a sibling to the finalized block
-		// The Follower should reject this block as an outdated chain extension
 		block1 := unittest.BlockWithParentFixture(head)
 		err = state.ExtendCertified(context.Background(), block1, unittest.CertifyBlock(block1.Header))
 		require.NoError(t, err)
@@ -1960,6 +1962,36 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 		// create a fork at view/height 1 and try to connect it to root
 		block2 := unittest.BlockWithParentFixture(head)
 		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
+		require.NoError(t, err)
+
+		// verify seal not indexed
+		var sealID flow.Identifier
+		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
+		require.NoError(t, err)
+	})
+}
+
+// TestParticipantHeaderExtendBlockNotConnected tests adding orphan block to the finalized state
+// add 2 blocks, where:
+// first block is added and then finalized;
+// second block is a sibling to the finalized block
+// The Participant should reject this block as an outdated chain extension
+func TestParticipantHeaderExtendBlockNotConnected(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+
+		block1 := unittest.BlockWithParentFixture(head)
+		err = state.Extend(context.Background(), block1)
+		require.NoError(t, err)
+
+		err = state.Finalize(context.Background(), block1.ID())
+		require.NoError(t, err)
+
+		// create a fork at view/height 1 and try to connect it to root
+		block2 := unittest.BlockWithParentFixture(head)
+		err = state.Extend(context.Background(), block2)
 		require.True(t, st.IsOutdatedExtensionError(err), err)
 
 		// verify seal not indexed

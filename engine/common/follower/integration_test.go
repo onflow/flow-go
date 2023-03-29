@@ -133,7 +133,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		flowBlocks := unittest.ChainFixtureFrom(workers*blocksPerWorker, rootHeader)
 		require.Greaterf(t, len(flowBlocks), defaultPendingBlocksCacheCapacity, "this test assumes that we operate with more blocks than cache's upper limit")
 
-		// fix block views, so we generate blocks as it's a happy path
+		// ensure sequential block views - that way we can easily know which block will be finalized after the test
 		for i, block := range flowBlocks {
 			block.Header.View = block.Header.Height
 			if i > 0 {

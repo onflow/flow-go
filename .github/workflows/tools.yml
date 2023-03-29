@@ -1,14 +1,15 @@
+# This workflow is used to build and upload the node bootstrapping tools
 name: Build Tools
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tagged commit to build tools against'
+        description: 'Tag/commit'
         required: true
         type: string
       promote:
-        description: 'Should this build be promoted to the official boot-tools?'
+        description: 'Promote to official boot-tools?'
         required: false
         type: boolean
 

@@ -39,7 +39,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	// create keys and signatures
 	keys := make([]crypto.PublicKey, 0, signersNumber)
 	sigs := make([]crypto.Signature, 0, signersNumber)
-	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	for i := 0; i < signersNumber; i++ {
 		_, err := rand.Read(seed)
 		require.NoError(t, err)
@@ -65,7 +65,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 		_, err := NewSignatureAggregatorSameMessage(msg, tag, []crypto.PublicKey{})
 		assert.Error(t, err)
 		// wrong key types
-		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+		seed := make([]byte, crypto.KeyGenSeedMinLen)
 		_, err = rand.Read(seed)
 		require.NoError(t, err)
 		sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
@@ -421,7 +421,7 @@ func TestKeyAggregator(t *testing.T) {
 	// create keys
 	indices := make([]int, 0, signersNum)
 	keys := make([]crypto.PublicKey, 0, signersNum)
-	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	for i := 0; i < signersNum; i++ {
 		indices = append(indices, i)
 		_, err := rand.Read(seed)
@@ -436,7 +436,7 @@ func TestKeyAggregator(t *testing.T) {
 	// constructor edge cases
 	t.Run("constructor", func(t *testing.T) {
 		// wrong key types
-		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+		seed := make([]byte, crypto.KeyGenSeedMinLen)
 		_, err = rand.Read(seed)
 		require.NoError(t, err)
 		sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)

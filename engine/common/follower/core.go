@@ -18,15 +18,16 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// CertifiedBlocks is a connected list of certified blocks, in ascending height order.
 type CertifiedBlocks []pending_tree.CertifiedBlock
 
-// defaultCertifiedBlocksChannelCapacity maximum capacity of buffered channel that is used to transfer
+// defaultCertifiedRangeChannelCapacity maximum capacity of buffered channel that is used to transfer ranges of
 // certified blocks to specific worker.
-const defaultCertifiedBlocksChannelCapacity = 100
+// Channel buffers ranges which consist of multiple blocks, so the real capacity of channel is larger
+const defaultCertifiedRangeChannelCapacity = 20
 
 // defaultFinalizedBlocksChannelCapacity maximum capacity of buffered channel that is used to transfer
 // finalized blocks to specific worker.
@@ -49,7 +50,7 @@ type Core struct {
 	follower            module.HotStuffFollower
 	validator           hotstuff.Validator
 	sync                module.BlockRequester
-	certifiedBlocksChan chan CertifiedBlocks // delivers batches of certified blocks to main core worker
+	certifiedRangesChan chan CertifiedBlocks // delivers ranges of certified blocks to main core worker
 	finalizedBlocksChan chan *flow.Header    // delivers finalized blocks to main core worker.
 }
 
@@ -93,7 +94,7 @@ func NewCore(log zerolog.Logger,
 		sync:                sync,
 		tracer:              tracer,
 		config:              config,
-		certifiedBlocksChan: make(chan CertifiedBlocks, defaultCertifiedBlocksChannelCapacity),
+		certifiedRangesChan: make(chan CertifiedBlocks, defaultCertifiedRangeChannelCapacity),
 		finalizedBlocksChan: make(chan *flow.Header, defaultFinalizedBlocksChannelCapacity),
 	}
 
@@ -107,14 +108,14 @@ func NewCore(log zerolog.Logger,
 	return c, nil
 }
 
-// OnBlockRange processes a batches of connected blocks. The input batch has to be sequentially ordered forming a chain.
-// Submitting a batch with invalid order results in error, such batch will be discarded and exception will be returned.
-// Effectively, this function validates incoming batch, adds it to the internal cache of pending blocks and possibly
-// schedules blocks for further processing if they were certified.
+// OnBlockRange processes a range of connected blocks. The input list must be sequentially ordered forming a chain.
+// Submitting batch with invalid order results in error, such batch will be discarded and exception will be returned.
+// Effectively, this function validates incoming batch, adds it to cache of pending blocks and possibly schedules blocks for further
+// processing if they were certified.
 // This function is safe to use in concurrent environment.
-// Caution: this function might block if internally too many certified blocks are queued in the channel `certifiedBlocksChan`.
+// Caution: this function might block if internally too many certified blocks are queued in the channel `certifiedRangesChan`.
 // Expected errors during normal operations:
-//   - ErrDisconnectedBatch
+//   - cache.ErrDisconnectedBatch
 func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error {
 	if len(batch) < 1 {
 		return nil
@@ -179,19 +180,18 @@ func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error
 
 	certifiedBatch, certifyingQC, err := c.pendingCache.AddBlocks(batch)
 	if err != nil {
-		return fmt.Errorf("could not add a range of pending blocks: %w", err)
+		return fmt.Errorf("could not add a range of pending blocks: %w", err) // ErrDisconnectedBatch or exception
 	}
-
-	log.Debug().Msgf("processing range resulted in %d certified blocks", len(certifiedBatch))
+	log.Debug().Msgf("caching block range resulted in %d certified blocks (possibly including additional cached blocks)", len(certifiedBatch))
 
 	if len(certifiedBatch) < 1 {
 		return nil
 	}
 
-	// in-case we have already stopped our worker we use a select statement to avoid
+	// in case we have already stopped our worker, we use a select statement to avoid
 	// blocking since there is no active consumer for this channel
 	select {
-	case c.certifiedBlocksChan <- rangeToCertifiedBlocks(certifiedBatch, certifyingQC):
+	case c.certifiedRangesChan <- rangeToCertifiedBlocks(certifiedBatch, certifyingQC):
 	case <-c.ComponentManager.ShutdownSignal():
 	}
 	return nil
@@ -199,7 +199,7 @@ func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error
 
 // processCoreSeqEvents processes events that need to be dispatched on dedicated core's goroutine.
 // Here we process events that need to be sequentially ordered(processing certified blocks and new finalized blocks).
-// Is NOT concurrency safe, has to be used by internal goroutine.
+// Is NOT concurrency safe, has to be used by only one internal worker goroutine.
 func (c *Core) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -213,7 +213,7 @@ func (c *Core) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready com
 			if err != nil {
 				ctx.Throw(err)
 			}
-		case blocks := <-c.certifiedBlocksChan:
+		case blocks := <-c.certifiedRangesChan:
 			err := c.processCertifiedBlocks(ctx, blocks) // no errors expected during normal operations
 			if err != nil {
 				ctx.Throw(err)
@@ -270,14 +270,11 @@ func (c *Core) extendCertifiedBlocks(parentCtx context.Context, connectedBlocks 
 		err := c.state.ExtendCertified(ctx, certifiedBlock.Block, certifiedBlock.QC)
 		span.End()
 		if err != nil {
-			if state.IsOutdatedExtensionError(err) {
-				continue
-			}
 			return fmt.Errorf("could not extend protocol state with certified block: %w", err)
 		}
 
 		hotstuffProposal := model.ProposalFromFlow(certifiedBlock.Block.Header)
-		// submit the model to follower for processing
+		// submit the model to follower for async processing
 		c.follower.SubmitProposal(hotstuffProposal)
 	}
 	return nil

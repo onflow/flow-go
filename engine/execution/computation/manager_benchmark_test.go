@@ -51,7 +51,6 @@ func createAccounts(b *testing.B, vm fvm.VM, ledger state.View, num int) *testAc
 	addresses, err := testutil.CreateAccounts(
 		vm,
 		ledger,
-		derived.NewEmptyDerivedBlockData(),
 		privateKeys,
 		chain)
 	require.NoError(b, err)
@@ -153,7 +152,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 		zerolog.Nop(),
 		committer.NewNoopViewCommitter(),
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(b, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(

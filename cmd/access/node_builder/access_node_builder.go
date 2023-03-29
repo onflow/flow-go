@@ -52,7 +52,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
@@ -67,7 +66,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/subscription"
@@ -708,12 +706,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
-		heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(builder.DisallowListNotificationCacheSize)}
-		if builder.HeroCacheMetricsEnable {
-			collector := metrics.DisallowListNotificationQueueMetricFactory(builder.MetricsRegisterer)
-			heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
-		}
-		builder.NodeDisallowListDistributor = distributor.DefaultDisallowListNotificationDistributor(builder.Logger, heroStoreOpts...)
+		builder.NodeDisallowListDistributor = cmd.BuildDisallowListNotificationDisseminator(builder.DisallowListNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
 
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true

@@ -26,6 +26,7 @@ import (
 //	https://github.com/dapperlabs/flow-go/issues/6575
 type LibP2PNode interface {
 	module.ReadyDoneAware
+	Subscriptions
 	// PeerConnections connection status information per peer.
 	PeerConnections
 	// PeerScore exposes the peer score API.
@@ -76,6 +77,10 @@ type LibP2PNode interface {
 	// SetComponentManager sets the component manager for the node.
 	// SetComponentManager may be called at most once.
 	SetComponentManager(cm *component.ComponentManager)
+}
+
+// Subscriptions set of funcs related to current subscription info of a node.
+type Subscriptions interface {
 	// HasSubscription returns true if the node currently has an active subscription to the topic.
 	HasSubscription(topic channels.Topic) bool
 	// SetUnicastManager sets the unicast manager for the node.

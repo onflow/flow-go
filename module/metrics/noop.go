@@ -86,6 +86,7 @@ func (nc *NoopCollector) SealedHeight(height uint64)                            
 func (nc *NoopCollector) BlockFinalized(*flow.Block)                                             {}
 func (nc *NoopCollector) BlockSealed(*flow.Block)                                                {}
 func (nc *NoopCollector) CommittedEpochFinalView(view uint64)                                    {}
+func (nc *NoopCollector) EpochTransitionHeight(height uint64)                                    {}
 func (nc *NoopCollector) CurrentEpochCounter(counter uint64)                                     {}
 func (nc *NoopCollector) CurrentEpochPhase(phase flow.EpochPhase)                                {}
 func (nc *NoopCollector) CurrentEpochFinalView(view uint64)                                      {}
