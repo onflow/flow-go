@@ -9,7 +9,7 @@ metadata:
     app: {{ $k }}
     nodeType: access
     service: flow
-    networkId: {{ $.Values.networkId }} # Prefixing the project name as label
+    networkId: {{ $.Values.networkId }}
 
 spec:
   serviceName: {{ $k }}
