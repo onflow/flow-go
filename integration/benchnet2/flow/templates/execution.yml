@@ -23,6 +23,10 @@ spec:
 
   template:
     metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8080"
       labels:
         app: {{ $k }}
         branch: {{ $.Values.branch }}
