@@ -1,7 +1,6 @@
 package reporters
 
 import (
-	"context"
 	"fmt"
 	goRuntime "runtime"
 	"sync"
@@ -15,10 +14,8 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -125,14 +122,12 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 }
 
 type balanceProcessor struct {
-	vm            fvm.VM
-	ctx           fvm.Context
-	view          state.View
-	env           environment.Environment
-	balanceScript []byte
-	momentsScript []byte
-
-	accounts environment.Accounts
+	vm              fvm.VM
+	ctx             fvm.Context
+	storageSnapshot state.StorageSnapshot
+	env             environment.Environment
+	balanceScript   []byte
+	momentsScript   []byte
 
 	rwa        ReportWriter
 	rwc        ReportWriter
@@ -146,39 +141,19 @@ func NewBalanceReporter(
 	snapshot state.StorageSnapshot,
 ) *balanceProcessor {
 	vm := fvm.NewVirtualMachine()
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
-		fvm.WithMemoryAndInteractionLimitsDisabled(),
-		fvm.WithDerivedBlockData(derivedBlockData))
+		fvm.WithMemoryAndInteractionLimitsDisabled())
 
-	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(0, 0)
-	if err != nil {
-		panic(err)
-	}
-
-	view := delta.NewDeltaView(snapshot)
-	txnState := storage.SerialTransaction{
-		NestedTransaction: state.NewTransactionState(
-			view,
-			state.DefaultParameters()),
-		DerivedTransactionCommitter: derivedTxnData,
-	}
-
-	accounts := environment.NewAccounts(txnState)
-
-	env := environment.NewScriptEnv(
-		context.Background(),
-		ctx.TracerSpan,
+	env := environment.NewScriptEnvironmentFromStorageSnapshot(
 		ctx.EnvironmentParams,
-		txnState)
+		snapshot)
 
 	return &balanceProcessor{
-		vm:       vm,
-		ctx:      ctx,
-		view:     view,
-		accounts: accounts,
-		env:      env,
+		vm:              vm,
+		ctx:             ctx,
+		storageSnapshot: snapshot,
+		env:             env,
 	}
 }
 
@@ -243,7 +218,9 @@ func (c *balanceProcessor) reportAccountData(indx uint64) {
 		return
 	}
 
-	u, err := c.storageUsed(address)
+	runtimeAddress := common.MustBytesToAddress(address.Bytes())
+
+	u, err := c.env.GetStorageUsed(runtimeAddress)
 	if err != nil {
 		c.logger.
 			Err(err).
@@ -317,7 +294,7 @@ func (c *balanceProcessor) reportAccountData(indx uint64) {
 		IsDapper:       dapper,
 	})
 
-	contracts, err := c.accounts.GetContractNames(address)
+	contracts, err := c.env.GetAccountContractNames(runtimeAddress)
 	if err != nil {
 		c.logger.
 			Err(err).
@@ -343,15 +320,15 @@ func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view)
+	_, output, err := c.vm.RunV2(c.ctx, script, c.storageSnapshot)
 	if err != nil {
 		return 0, false, err
 	}
 
 	var balance uint64
 	var hasVault bool
-	if script.Err == nil && script.Value != nil {
-		balance = script.Value.ToGoValue().(uint64)
+	if output.Err == nil && output.Value != nil {
+		balance = output.Value.ToGoValue().(uint64)
 		hasVault = true
 	} else {
 		hasVault = false
@@ -364,14 +341,14 @@ func (c *balanceProcessor) fusdBalance(address flow.Address) (uint64, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view)
+	_, output, err := c.vm.RunV2(c.ctx, script, c.storageSnapshot)
 	if err != nil {
 		return 0, err
 	}
 
 	var balance uint64
-	if script.Err == nil && script.Value != nil {
-		balance = script.Value.ToGoValue().(uint64)
+	if output.Err == nil && output.Value != nil {
+		balance = output.Value.ToGoValue().(uint64)
 	}
 	return balance, nil
 }
@@ -381,20 +358,16 @@ func (c *balanceProcessor) moments(address flow.Address) (int, error) {
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
-	err := c.vm.Run(c.ctx, script, c.view)
+	_, output, err := c.vm.RunV2(c.ctx, script, c.storageSnapshot)
 	if err != nil {
 		return 0, err
 	}
 
 	var m int
-	if script.Err == nil && script.Value != nil {
-		m = script.Value.(cadence.Int).Int()
+	if output.Err == nil && output.Value != nil {
+		m = output.Value.(cadence.Int).Int()
 	}
 	return m, nil
-}
-
-func (c *balanceProcessor) storageUsed(address flow.Address) (uint64, error) {
-	return c.accounts.GetStorageUsed(address)
 }
 
 func (c *balanceProcessor) isDapper(address flow.Address) (bool, error) {

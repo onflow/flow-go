@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -103,7 +104,7 @@ type Procedure interface {
 
 	// For transactions, the execution time is TxIndex.  For scripts, the
 	// execution time is EndOfBlockExecutionTime.
-	ExecutionTime() derived.LogicalTime
+	ExecutionTime() logical.Time
 
 	// TODO(patrick): deprecated this.
 	SetOutput(output ProcedureOutput)
@@ -122,7 +123,7 @@ type VM interface {
 	)
 
 	Run(Context, Procedure, state.View) error
-	GetAccount(Context, flow.Address, state.View) (*flow.Account, error)
+	GetAccount(Context, flow.Address, state.StorageSnapshot) (*flow.Account, error)
 }
 
 var _ VM = (*VirtualMachine)(nil)
@@ -235,13 +236,14 @@ func (vm *VirtualMachine) Run(
 func (vm *VirtualMachine) GetAccount(
 	ctx Context,
 	address flow.Address,
-	v state.View,
+	storageSnapshot state.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
 ) {
 	nestedTxn := state.NewTransactionState(
-		v,
+		// TODO(patrick): initialize view inside TransactionState
+		delta.NewDeltaView(storageSnapshot),
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
@@ -255,8 +257,8 @@ func (vm *VirtualMachine) GetAccount(
 	}
 
 	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
-		derived.EndOfBlockExecutionTime,
-		derived.EndOfBlockExecutionTime)
+		logical.EndOfBlockExecutionTime,
+		logical.EndOfBlockExecutionTime)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error creating derived transaction data for GetAccount: %w",

@@ -176,32 +176,37 @@ func NewMiddleware(
 		opt(mw)
 	}
 
-	cm := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// TODO: refactor to avoid storing ctx altogether
-			mw.ctx = ctx
-
-			if err := mw.start(ctx); err != nil {
-				ctx.Throw(err)
-			}
-
+	builder := component.NewComponentManagerBuilder()
+	for _, limiter := range mw.unicastRateLimiters.Limiters() {
+		rateLimiter := limiter
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
+			rateLimiter.Start(ctx)
+			<-rateLimiter.Ready()
+			ready()
+			<-rateLimiter.Done()
+		})
+	}
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		// TODO: refactor to avoid storing ctx altogether
+		mw.ctx = ctx
 
-			<-ctx.Done()
-			mw.log.Info().Str("component", "middleware").Msg("stopping subroutines")
+		if err := mw.start(ctx); err != nil {
+			ctx.Throw(err)
+		}
 
-			// wait for the readConnection and readSubscription routines to stop
-			mw.wg.Wait()
+		ready()
 
-			mw.log.Info().Str("component", "middleware").Msg("stopped subroutines")
+		<-ctx.Done()
+		mw.log.Info().Str("component", "middleware").Msg("stopping subroutines")
 
-			// clean up rate limiter resources
-			mw.unicastRateLimiters.Stop()
-			mw.log.Info().Str("component", "middleware").Msg("cleaned up unicast rate limiter resources")
+		// wait for the readConnection and readSubscription routines to stop
+		mw.wg.Wait()
 
-		}).Build()
+		mw.log.Info().Str("component", "middleware").Msg("stopped subroutines")
+	})
 
-	mw.Component = cm
+	mw.Component = builder.Build()
 	return mw
 }
 
@@ -310,9 +315,6 @@ func (m *Middleware) start(ctx context.Context) error {
 	m.UpdateNodeAddresses()
 
 	m.libP2PNode.WithPeersProvider(m.topologyPeers)
-
-	// starting rate limiters kicks off cleanup loop
-	m.unicastRateLimiters.Start()
 
 	return nil
 }

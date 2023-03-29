@@ -288,7 +288,8 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			log,
 			committer,
 			me,
-			prov)
+			prov,
+			nil)
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
