@@ -64,14 +64,14 @@ func (v *PendingBlockVertex) Parent() (flow.Identifier, uint64) {
 // we pass this information to caller. Internally, the mempool utilizes the LevelledForest.
 // PendingTree is NOT safe to use in concurrent environment.
 // Note:
-//   - The ability to skip ahead is irrelevant for staked nodes, which continuously follows the chain.
+//   - The ability to skip ahead is irrelevant for staked nodes, which continuously follow the chain.
 //     However, light clients don't necessarily follow the chain block by block. Assume a light client
 //     that knows the EpochCommit event, i.e. the consensus committee authorized to certify blocks. A
 //     staked node can easily ship a proof of finalization for a block within that epoch to such a
 //     light client. This would be much cheaper for the light client than downloading the headers for
 //     all blocks in the epoch.
 //   - The pending tree supports skipping ahead, as this is a more general and simpler algorithm.
-//     Removing the ability to skip ahead would restrict the PendingTree's its domain of potential
+//     Removing the ability to skip ahead would restrict the PendingTree's domain of potential
 //     applications _and_ would require additional code and additional tests making it more complex.
 //
 // Outlook:
@@ -101,7 +101,7 @@ func NewPendingTree(finalized *flow.Header) *PendingTree {
 // Details:
 // Adding blocks might result in additional blocks now being connected to the latest finalized block. The returned
 // slice contains:
-//  1. the subset of `certifiedBlocks` that are connect to the finalized block
+//  1. the subset of `certifiedBlocks` that are newly connected to the finalized block
 //     (excluding any blocks whose view is smaller or equal to the finalized block)
 //  2. additionally, all of the _connected_ descendants of the blocks from step 1.
 //
