@@ -158,18 +158,15 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
-    branch: {{ $.Values.branch }}
+    networkId: {{ $.Values.networkId }}
     nodeType: access
+    owner: {{ $.Values.owner }}
     service: flow
-    project: {{ $.Values.commit }}
-  {{- with $.Values.ingress.annotations }}
   annotations:
     kubernetes.io/ingress.class: nginx
-  {{- toYaml . | nindent 4 }}
-  {{- end }}
 spec:
   rules:
-    - host: access.benchnet.onflow.org
+    - host: {{ $k }}-{{ $.Values.networkId }}.benchnet.onflow.org
       http: 
         paths: 
           - backend: 
@@ -177,14 +174,13 @@ spec:
                 name: {{ $k }}
                 port: 
                   number: 9000
-            path: /
-            pathType: Prefix
-  {{- with $.Values.ingress.rules }}
-  {{- toYaml . | nindent 6 }}
-  {{- end }}
-  tls:
-  {{- with $.Values.ingress.tls }}
-  {{- toYaml . | nindent 6 }}
-  {{- end }}
+    - host: rest-{{ $k }}-{{ $.Values.networkId }}.benchnet.onflow.org
+      http: 
+        paths: 
+          - backend: 
+              service:
+                name: {{ $k }}
+                port: 
+                  number: 8070
 {{- end }}
 {{- end }}
