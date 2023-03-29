@@ -146,3 +146,42 @@ spec:
     app: {{ $k }}
   type: NodePort
 {{- end }}
+{{- range $k, $v := $.Values.access.nodes }}
+---
+{{- if $.Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $k }}
+  labels:
+    app: {{ $k }}
+    branch: {{ $.Values.branch }}
+    nodeType: access
+    service: flow
+    project: {{ $.Values.commit }}
+  {{- with $.Values.ingress.annotations }}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  rules:
+    - host: access.benchnet.onflow.org
+      http: 
+        paths: 
+          - backend: 
+              service:
+                name: {{ $k }}
+                port: 
+                  number: 9000
+            path: /
+            pathType: Prefix
+  {{- with $.Values.ingress.rules }}
+  {{- toYaml . | nindent 6 }}
+  {{- end }}
+  tls:
+  {{- with $.Values.ingress.tls }}
+  {{- toYaml . | nindent 6 }}
+  {{- end }}
+{{- end }}
+{{- end }}

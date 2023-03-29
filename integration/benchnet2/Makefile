@@ -79,7 +79,7 @@ k8s-secrets-create:
 	bash ./create-secrets.sh ${PROJECT_NAME} ${NAMESPACE}
 
 helm-deploy:
-	helm upgrade --install -f ./values.yml ${PROJECT_NAME} ./flow --set commit="${PROJECT_NAME}" --debug --namespace ${NAMESPACE}
+	helm upgrade --install -f ./values.yml ${PROJECT_NAME} ./flow --set commit="${PROJECT_NAME}" --set ingress.enabled="true"  --debug --namespace ${NAMESPACE}
 
 k8s-delete:
 	helm delete ${PROJECT_NAME} --namespace ${NAMESPACE}
