@@ -21,17 +21,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-type ComplianceOption func(*Core)
-
-// WithComplianceOptions sets options for the core's compliance config
-func WithComplianceOptions(opts ...compliance.Opt) ComplianceOption {
-	return func(c *Core) {
-		for _, apply := range opts {
-			apply(&c.config)
-		}
-	}
-}
-
 // CertifiedBlocks is a connected list of certified blocks, in ascending height order.
 type CertifiedBlocks []pending_tree.CertifiedBlock
 
@@ -78,9 +67,15 @@ func NewCore(log zerolog.Logger,
 	validator hotstuff.Validator,
 	sync module.BlockRequester,
 	tracer module.Tracer,
-	opts ...ComplianceOption) (*Core, error) {
+	opts ...compliance.Opt,
+) (*Core, error) {
 	onEquivocation := func(block, otherBlock *flow.Block) {
 		finalizationConsumer.OnDoubleProposeDetected(model.BlockFromFlow(block.Header), model.BlockFromFlow(otherBlock.Header))
+	}
+
+	config := compliance.DefaultConfig()
+	for _, apply := range opts {
+		apply(&config)
 	}
 
 	finalizedBlock, err := state.Final().Head()
@@ -98,13 +93,9 @@ func NewCore(log zerolog.Logger,
 		validator:           validator,
 		sync:                sync,
 		tracer:              tracer,
-		config:              compliance.DefaultConfig(),
+		config:              config,
 		certifiedRangesChan: make(chan CertifiedBlocks, defaultCertifiedRangeChannelCapacity),
 		finalizedBlocksChan: make(chan *flow.Header, defaultFinalizedBlocksChannelCapacity),
-	}
-
-	for _, apply := range opts {
-		apply(c)
 	}
 
 	// prune cache to latest finalized view
@@ -118,11 +109,11 @@ func NewCore(log zerolog.Logger,
 }
 
 // OnBlockRange processes a range of connected blocks. The input list must be sequentially ordered forming a chain.
-// Submitting batch with invalid order results in error, such batch will be discarded and exception will be returned.
-// Effectively, this function validates incoming batch, adds it to cache of pending blocks and possibly schedules blocks for further
-// processing if they were certified.
-// This function is safe to use in concurrent environment.
-// Caution: this function might block if internally too many certified blocks are queued in the channel `certifiedRangesChan`.
+// Effectively, this method validates the incoming batch, adds it to cache of pending blocks and possibly schedules
+// blocks for further processing if they were certified. Submitting a batch with invalid causes an
+// `ErrDisconnectedBatch` error and the batch is dropped (no-op).
+// This method is safe to use in concurrent environment.
+// Caution: method might block if internally too many certified blocks are queued in the channel `certifiedRangesChan`.
 // Expected errors during normal operations:
 //   - cache.ErrDisconnectedBatch
 func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error {
@@ -148,12 +139,12 @@ func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error
 
 	if c.pendingCache.Peek(hotstuffProposal.Block.BlockID) == nil {
 		log.Debug().Msg("block not found in cache, performing validation")
-		// Caution: we are _not_ verifying the proposal's full validity here. Instead, we need to check
+		// Caution: we are _not_ checking the proposal's full validity here. Instead, we need to check
 		// the following two critical properties:
 		// 1. The block has been signed by the legitimate primary for the view. This is important in case
 		//    there are multiple blocks for the view. We need to differentiate the following byzantine cases:
 		//     (i) Some other consensus node that is _not_ primary is trying to publish a block.
-		//         This would result in the validation below failing with and `InvalidBlockError`.
+		//         This would result in the validation below failing with an `InvalidBlockError`.
 		//    (ii) The legitimate primary for the view is equivocating. In this case, the validity check
 		//         below would pass. Though, the `PendingTree` would eventually notice this, when we connect
 		//         the equivocating blocks to the latest finalized block.
@@ -208,7 +199,7 @@ func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error
 
 // processCoreSeqEvents processes events that need to be dispatched on dedicated core's goroutine.
 // Here we process events that need to be sequentially ordered(processing certified blocks and new finalized blocks).
-// Is NOT concurrency safe, has to be used by only one internal worker goroutine.
+// Is NOT concurrency safe: should be executed by _single dedicated_ goroutine.
 func (c *Core) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -247,52 +238,48 @@ func (c *Core) OnFinalizedBlock(final *flow.Header) {
 	}
 }
 
-// processCertifiedBlocks process a batch of certified blocks by adding them to the tree of pending blocks.
-// As soon as tree returns a range of connected and certified blocks they will be added to the protocol state.
-// Is NOT concurrency safe, has to be used by internal goroutine.
+// processCertifiedBlocks processes the batch of certified blocks:
+//  1. We add the certified blocks to the PendingTree. This might causes the pending PendingTree to detect
+//     additional blocks as now being connected to the latest finalized block. Specifically, the PendingTree
+//     returns the list `connectedBlocks`, which contains the subset of `blocks` that are connect to the
+//     finalized block plus all of their connected descendants. The list `connectedBlocks` is in 'parent first'
+//     order, i.e. a block is listed before any of its descendants. The PendingTree guarantees that all
+//     ancestors are listed, _unless_ the ancestor is the finalized block or the ancestor has been returned
+//     by a previous call to `PendingTree.AddBlocks`.
+//  2. We extend the protocol state with the connected certified blocks from step 1.
+//  3. We submit the connected certified blocks from step 1 to the consensus follower.
+//
+// Is NOT concurrency safe: should be executed by _single dedicated_ goroutine.
 // No errors expected during normal operations.
 func (c *Core) processCertifiedBlocks(ctx context.Context, blocks CertifiedBlocks) error {
 	span, ctx := c.tracer.StartSpanFromContext(ctx, trace.FollowerProcessCertifiedBlocks)
 	defer span.End()
 
+	// Step 1: add blocks to our PendingTree of certified blocks
+	pendingTreeSpan, _ := c.tracer.StartSpanFromContext(ctx, trace.FollowerExtendPendingTree)
 	connectedBlocks, err := c.pendingTree.AddBlocks(blocks)
+	defer pendingTreeSpan.End()
 	if err != nil {
 		return fmt.Errorf("could not process batch of certified blocks: %w", err)
 	}
-	err = c.extendCertifiedBlocks(ctx, connectedBlocks)
-	if err != nil {
-		return fmt.Errorf("could not extend protocol state: %w", err)
-	}
-	return nil
-}
 
-// extendCertifiedBlocks processes a connected range of certified blocks by applying them to protocol state.
-// As result of this operation we might extend protocol state.
-// Is NOT concurrency safe, has to be used by internal goroutine.
-// No errors expected during normal operations.
-func (c *Core) extendCertifiedBlocks(parentCtx context.Context, connectedBlocks CertifiedBlocks) error {
-	span, parentCtx := c.tracer.StartSpanFromContext(parentCtx, trace.FollowerExtendCertifiedBlocks)
-	defer span.End()
-
+	// Step 2 & 3: extend protocol state with connected certified blocks and forward them to consensus follower
 	for _, certifiedBlock := range connectedBlocks {
-		span, ctx := c.tracer.StartBlockSpan(parentCtx, certifiedBlock.ID(), trace.FollowerExtendCertified)
-		err := c.state.ExtendCertified(ctx, certifiedBlock.Block, certifiedBlock.QC)
-		span.End()
+		s, _ := c.tracer.StartBlockSpan(ctx, certifiedBlock.ID(), trace.FollowerExtendCertified)
+		err = c.state.ExtendCertified(ctx, certifiedBlock.Block, certifiedBlock.QC)
+		s.End()
 		if err != nil {
 			return fmt.Errorf("could not extend protocol state with certified block: %w", err)
 		}
 
 		hotstuffProposal := model.ProposalFromFlow(certifiedBlock.Block.Header)
-		// submit the model to follower for async processing
-		c.follower.SubmitProposal(hotstuffProposal)
+		c.follower.SubmitProposal(hotstuffProposal) // submit the model to follower for async processing
 	}
 	return nil
 }
 
-// processFinalizedBlock processes new finalized block by applying to the PendingTree.
-// Potentially PendingTree can resolve blocks that previously were not connected. Those blocks will be applied to the
-// protocol state, resulting in extending length of chain.
-// Is NOT concurrency safe, has to be used by internal goroutine.
+// processFinalizedBlock informs the PendingTree about finalization of the given block.
+// Is NOT concurrency safe: should be executed by _single dedicated_ goroutine.
 // No errors expected during normal operations.
 func (c *Core) processFinalizedBlock(ctx context.Context, finalized *flow.Header) error {
 	span, ctx := c.tracer.StartSpanFromContext(ctx, trace.FollowerProcessFinalizedBlock)
@@ -302,9 +289,15 @@ func (c *Core) processFinalizedBlock(ctx context.Context, finalized *flow.Header
 	if err != nil {
 		return fmt.Errorf("could not process finalized fork at view %d: %w", finalized.View, err)
 	}
-	err = c.extendCertifiedBlocks(ctx, connectedBlocks)
-	if err != nil {
-		return fmt.Errorf("could not extend protocol state during finalization: %w", err)
+	// The pending tree allows to skip ahead, which makes the algorithm more general and simplifies its implementation.
+	// However, here we are implementing the consensus follower, which cannot skip ahead. This is because the consensus
+	// follower locally determines finality and therefore must ingest every block. In other words: ever block that is
+	// later finalized must have been connected before. Otherwise, the block would never have been forwarded to the
+	// HotStuff follower and no finalization notification would have been triggered.
+	// Therefore, from the perspective of the consensus follower, receiving a _non-empty_ `connectedBlocks` is a
+	// symptom of internal state corruption or a bug.
+	if len(connectedBlocks) > 0 {
+		return fmt.Errorf("finalizing block %v caused the PendingTree to connect additional blocks, which is a symptom of internal state corruption or a bug", finalized.ID())
 	}
 	return nil
 }
