@@ -101,8 +101,10 @@ func NewPendingTree(finalized *flow.Header) *PendingTree {
 // Details:
 // Adding blocks might result in additional blocks now being connected to the latest finalized block. The returned
 // slice contains:
-//  1. the subset of `certifiedBlocks` that are newly connected to the finalized block
-//     (excluding any blocks whose view is smaller or equal to the finalized block)
+//  1. the subset of `certifiedBlocks` that are connected to the finalized block
+//     - excluding any blocks whose view is smaller or equal to the finalized block
+//     - if a block `B ∈ certifiedBlocks` is already known to the PendingTree and connected,
+//     `B` and all its connected descendants will be in the returned list
 //  2. additionally, all of the _connected_ descendants of the blocks from step 1.
 //
 // PendingTree treats its input as a potentially repetitive stream of information: repeated inputs are already
