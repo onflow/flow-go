@@ -1,6 +1,8 @@
 package tracer
 
 import (
+	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -167,25 +169,28 @@ func (t *GossipSubMeshTracer) logPeers() {
 	defer t.topicMeshMu.RUnlock()
 	for topic := range t.topicMeshMap {
 		shouldWarn := false // whether we should warn about the mesh state
-		lg := t.logger.With().Dur("heartbeat_interval", t.loggerInterval).Str("topic", topic).Logger()
+
+		topicPeers := zerolog.Dict()
+
+		peerIndex := -1 // index to keep track of peer info in different logging dictionaries.
 		for p := range t.topicMeshMap[topic] {
+			peerIndex++
 			id, exists := t.idProvider.ByPeerID(p)
+
 			if !exists {
 				shouldWarn = true
-				lg = lg.With().
-					Str("peer_id", p.String()).
-					Str("flow_id", "unknown").
-					Str("role", "unknown").
-					Logger()
+				topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=unknown, role=unknown", p.String()))
 				continue
 			}
 
-			lg = lg.With().
-				Str("peer_id", p.String()).
-				Hex("flow_id", logging.ID(id.NodeID)).
-				Str("role", id.Role.String()).
-				Logger()
+			topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=%x, role=%s", p.String(), id.NodeID, id.Role.String()))
 		}
+
+		lg := t.logger.With().
+			Dur("heartbeat_interval", t.loggerInterval).
+			Str("topic", topic).
+			Dict("topic_mesh", topicPeers).
+			Logger()
 
 		if shouldWarn {
 			lg.Warn().
