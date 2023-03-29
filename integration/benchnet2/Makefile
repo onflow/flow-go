@@ -1,15 +1,3 @@
-# eventually, DOCKER_TAG will use the git commit hash
-# this isn't working fully yet so fow now we will specify the explicit Git tag to use as the Docker tag
-#DOCKER_TAG := $(shell git rev-parse --short HEAD)
-FLOW_GO_TAG := v0.28.15
-BRANCH_NAME:=$(shell git rev-parse --abbrev-ref HEAD | tr '/' '-')
-DOCKER_TAG := $(FLOW_GO_TAG)
-COMMIT_SHA:=$(shell git rev-parse --short=9 HEAD)
-
-ifeq ($(strip $(FLOW_GO_TAG)),)
-	$(eval FLOW_GO_TAG=$(BRANCH_NAME))
-endif
-
 # default value of the Docker base registry URL which can be overriden when invoking the Makefile
 DOCKER_REGISTRY := us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet
 
@@ -27,6 +15,8 @@ validate:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
 	# multiple execution nodes are required to prevent seals being generated in case of execution forking.
 	$(error Number of Execution nodes should be no less than 2)
+else ifeq ($(strip $(NETWORK_ID)),)
+	$(error NETWORK_ID cannot be empty)
 else ifeq ($(strip $(VALID_CONSENSUS)), 1)
 	$(error Number of Consensus nodes should be no less than 2)
 else ifeq ($(strip $(VALID_COLLECTION)), 1)
@@ -44,7 +34,7 @@ endif
 # for the checked out version will be run in the sub folder but the bootstrap folder will be created here (outside of the checked out flow-go in the sub folder)
 gen-bootstrap: clone-flow
 	cd flow-go && make crypto_setup_gopath
-	cd flow-go/cmd/bootstrap && go run -tags relic . genconfig --address-format "%s%d-${PROJECT_NAME}.${NAMESPACE}:3569" --access $(ACCESS) --collection $(COLLECTION) --consensus $(CONSENSUS) --execution $(EXECUTION) --verification $(VERIFICATION) --weight 100 -o ./ --config ../../../bootstrap/conf/node-config.json
+	cd flow-go/cmd/bootstrap && go run -tags relic . genconfig --address-format "%s%d-${NETWORK_ID}.${NAMESPACE}:3569" --access $(ACCESS) --collection $(COLLECTION) --consensus $(CONSENSUS) --execution $(EXECUTION) --verification $(VERIFICATION) --weight 100 -o ./ --config ../../../bootstrap/conf/node-config.json
 	cd flow-go/cmd/bootstrap && go run -tags relic . keygen --machine-account --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/keys
 	echo {} > ./bootstrap/conf/partner-stakes.json
 	mkdir ./bootstrap/partner-nodes
@@ -52,7 +42,7 @@ gen-bootstrap: clone-flow
 	cd flow-go/cmd/bootstrap && go run -tags relic . finalize --root-commit 0000000000000000000000000000000000000000000000000000000000000000 --service-account-public-key-json "{\"PublicKey\":\"R7MTEDdLclRLrj2MI1hcp4ucgRTpR15PCHAWLM5nks6Y3H7+PGkfZTP2di2jbITooWO4DD1yqaBSAVK8iQ6i0A==\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}" --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/ --partner-dir ../../../bootstrap/partner-nodes --partner-weights ../../../bootstrap/conf/partner-stakes.json --collection-clusters 1 --epoch-counter 0 --epoch-length 30000 --epoch-staking-phase-length 20000 --epoch-dkg-phase-length 2000 --genesis-token-supply="1000000000.0" --protocol-version=0 --internal-priv-dir ../../../bootstrap/keys/private-root-information --dkg-data ../../../bootstrap/private-root-information/root-dkg-data.priv.json --root-block ../../../bootstrap/public-root-information/root-block.json --root-block-votes-dir ../../../bootstrap/public-root-information/root-block-votes/ --epoch-commit-safety-threshold=1000
 
 gen-helm-l1:
-	go run automate/cmd/level1/bootstrap.go --data bootstrap/public-root-information/root-protocol-state-snapshot.json --dockerTag $(DOCKER_TAG) --dockerRegistry $(DOCKER_REGISTRY)
+	go run automate/cmd/level1/bootstrap.go --data bootstrap/public-root-information/root-protocol-state-snapshot.json --dockerTag $(NETWORK_ID) --dockerRegistry $(DOCKER_REGISTRY)
 
 gen-helm-l2:
 	go run automate/cmd/level2/template.go --data template-data.json --template automate/templates/helm-values-all-nodes.yml --outPath="./values.yml"
@@ -77,20 +67,20 @@ clean-gen-helm:
 	rm -f template-data.json
 
 k8s-secrets-create:
-	bash ./create-secrets.sh ${PROJECT_NAME} ${NAMESPACE}
+	bash ./create-secrets.sh ${NETWORK_ID} ${NAMESPACE}
 
 helm-deploy:
-	helm upgrade --install -f ./values.yml ${PROJECT_NAME} ./flow --set commit="${PROJECT_NAME}" --debug --namespace ${NAMESPACE}
+	helm upgrade --install -f ./values.yml ${NETWORK_ID} ./flow --set networkId="${NETWORK_ID}" --debug --namespace ${NAMESPACE}
 
 k8s-delete:
-	helm delete ${PROJECT_NAME} --namespace ${NAMESPACE}
-	kubectl delete pvc -l project=${PROJECT_NAME} --namespace ${NAMESPACE}
+	helm delete ${NETWORK_ID} --namespace ${NAMESPACE}
+	kubectl delete pvc -l networkId=${NETWORK_ID} --namespace ${NAMESPACE}
 
 k8s-delete-secrets:
-	kubectl delete secrets -l project=${PROJECT_NAME} --namespace ${NAMESPACE}
+	kubectl delete secrets -l networkId=${NETWORK_ID} --namespace ${NAMESPACE}
 
 k8s-expose-locally: validate
-	kubectl port-forward service/access1-${PROJECT_NAME} 9000:9000 --namespace ${NAMESPACE}
+	kubectl port-forward service/access1-${NETWORK_ID} 9000:9000 --namespace ${NAMESPACE}
 
 k8s-pod-health: validate
 	kubectl get pods --namespace ${NAMESPACE}
@@ -101,7 +91,7 @@ k8s-test-network-accessibility:
 
 clone-flow: clean-flow 
 	# this cloned repo will be used for generating bootstrap info specific to that tag / version
-	git clone --depth 1 --branch $(FLOW_GO_TAG) https://github.com/onflow/flow-go.git --single-branch
+	git clone --depth 1 --branch $(REF_FOR_BOOTSTRAP) https://github.com/onflow/flow-go.git --single-branch
 	
 clean-flow:
 	rm -rf flow-go

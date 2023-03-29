@@ -9,7 +9,7 @@ metadata:
     app: {{ $k }}
     nodeType: verification
     service: flow
-    project: {{ $.Values.commit }}
+    networkId: {{ $.Values.networkId }}
 
 spec:
   serviceName: {{ $k }}
@@ -19,7 +19,7 @@ spec:
       app: {{ $k }}
       nodeType: verification
       service: flow
-      project: {{ $.Values.commit }}
+      networkId: {{ $.Values.networkId }}
 
   template:
     metadata:
@@ -31,7 +31,7 @@ spec:
         app: {{ $k }}
         nodeType: verification
         service: flow
-        project: {{ $.Values.commit }}
+        networkId: {{ $.Values.networkId }}
     spec:
       containers:
         - name: {{ $k }}
@@ -95,29 +95,29 @@ spec:
 
         - name: node-info-priv-json
           secret: 
-            secretName: {{ $.Values.commit }}.{{ $v.nodeId }}.node-info.priv.json
+            secretName: {{ $.Values.networkId }}.{{ $v.nodeId }}.node-info.priv.json
 
         - name: node-info-pub-json
           secret: 
-            secretName: {{ $.Values.commit }}.node-infos.pub.json
+            secretName: {{ $.Values.networkId }}.node-infos.pub.json
 
         - name: root-block-json
           secret: 
-            secretName: {{ $.Values.commit }}.root-block.json
+            secretName: {{ $.Values.networkId }}.root-block.json
 
         - name: root-protocol-state-snapshot-json
           secret: 
-            secretName: {{ $.Values.commit }}.root-protocol-state-snapshot.json
+            secretName: {{ $.Values.networkId }}.root-protocol-state-snapshot.json
 
         - name: secretsdb-key
           secret: 
-            secretName: {{ $.Values.commit }}.{{ $v.nodeId }}.secretsdb-key
+            secretName: {{ $.Values.networkId }}.{{ $v.nodeId }}.secretsdb-key
 
   volumeClaimTemplates:
     - metadata:
         name: data
         labels:
-          project: {{ $.Values.commit }}
+          networkId: {{ $.Values.networkId }}
       spec:
         accessModes: ["ReadWriteOnce"]
         resources:
@@ -137,7 +137,7 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
-    project: {{ $.Values.commit }}
+    networkId: {{ $.Values.networkId }}
 spec:
   {{ if $v.servicePorts }}
   ports: {{ $v.servicePorts | toYaml | nindent 12 }}
