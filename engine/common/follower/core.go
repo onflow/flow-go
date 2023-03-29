@@ -109,11 +109,11 @@ func NewCore(log zerolog.Logger,
 }
 
 // OnBlockRange processes a range of connected blocks. The input list must be sequentially ordered forming a chain.
-// Submitting batch with invalid order results in error, such batch will be discarded and exception will be returned.
-// Effectively, this function validates incoming batch, adds it to cache of pending blocks and possibly schedules blocks for further
-// processing if they were certified.
-// This function is safe to use in concurrent environment.
-// Caution: this function might block if internally too many certified blocks are queued in the channel `certifiedRangesChan`.
+// Effectively, this method validates the incoming batch, adds it to cache of pending blocks and possibly schedules
+// blocks for further processing if they were certified. Submitting a batch with invalid causes an
+// `ErrDisconnectedBatch` error and the batch is dropped (no-op).
+// This method is safe to use in concurrent environment.
+// Caution: method might block if internally too many certified blocks are queued in the channel `certifiedRangesChan`.
 // Expected errors during normal operations:
 //   - cache.ErrDisconnectedBatch
 func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error {
@@ -139,12 +139,12 @@ func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error
 
 	if c.pendingCache.Peek(hotstuffProposal.Block.BlockID) == nil {
 		log.Debug().Msg("block not found in cache, performing validation")
-		// Caution: we are _not_ verifying the proposal's full validity here. Instead, we need to check
+		// Caution: we are _not_ checking the proposal's full validity here. Instead, we need to check
 		// the following two critical properties:
 		// 1. The block has been signed by the legitimate primary for the view. This is important in case
 		//    there are multiple blocks for the view. We need to differentiate the following byzantine cases:
 		//     (i) Some other consensus node that is _not_ primary is trying to publish a block.
-		//         This would result in the validation below failing with and `InvalidBlockError`.
+		//         This would result in the validation below failing with an `InvalidBlockError`.
 		//    (ii) The legitimate primary for the view is equivocating. In this case, the validity check
 		//         below would pass. Though, the `PendingTree` would eventually notice this, when we connect
 		//         the equivocating blocks to the latest finalized block.
