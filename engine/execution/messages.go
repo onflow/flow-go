@@ -16,7 +16,7 @@ func NewEmptyComputationResult(
 	block *entity.ExecutableBlock,
 ) *ComputationResult {
 	ber := NewPopulatedBlockExecutionResult(block)
-	aer := NewEmptyBlockAttestationResults(ber)
+	aer := NewEmptyBlockAttestationResult(ber)
 	return &ComputationResult{
 		BlockExecutionResult:   ber,
 		BlockAttestationResult: aer,

@@ -333,7 +333,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		require.NotNil(t, derivedChainData.Get(block111.ID()))
 
 		events := res.AllEvents()
-		require.Equal(t, res.BlockExecutionResults.Size(), 2)
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
 		hasValidEventValue(t, events[0], block111ExpectedValue)
@@ -357,7 +357,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		require.NotNil(t, derivedChainData.Get(block1111.ID()))
 
 		events := res.AllEvents()
-		require.Equal(t, res.BlockExecutionResults.Size(), 2)
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
 		hasValidEventValue(t, events[0], block1111ExpectedValue)
@@ -383,7 +383,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		require.NotNil(t, derivedChainData.Get(block112.ID()))
 
 		events := res.AllEvents()
-		require.Equal(t, res.BlockExecutionResults.Size(), 2)
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
 		hasValidEventValue(t, events[0], block112ExpectedValue)
@@ -407,7 +407,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		require.NotNil(t, derivedChainData.Get(block1121.ID()))
 
 		events := res.AllEvents()
-		require.Equal(t, res.BlockExecutionResults.Size(), 2)
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
 		hasValidEventValue(t, events[0], block1121ExpectedValue)
@@ -430,7 +430,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		require.NotNil(t, derivedChainData.Get(block12.ID()))
 
 		events := res.AllEvents()
-		require.Equal(t, res.BlockExecutionResults.Size(), 2)
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		assert.EqualValues(t, "flow.AccountContractAdded", events[0].Type)
 	})
@@ -450,7 +450,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		require.NotNil(t, derivedChainData.Get(block121.ID()))
 
 		events := res.AllEvents()
-		require.Equal(t, res.BlockExecutionResults.Size(), 2)
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
 		hasValidEventValue(t, events[0], block121ExpectedValue)
@@ -474,7 +474,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		require.Equal(t, derivedChainData.Get(block121.ID()), derivedChainData.Get(block1211.ID()))
 
 		events := res.AllEvents()
-		require.Equal(t, res.BlockExecutionResults.Size(), 2)
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
 		hasValidEventValue(t, events[0], block1211ExpectedValue)

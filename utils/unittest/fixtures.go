@@ -2282,8 +2282,8 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 		{IdentifierFixture()},
 	}, &startState)
 
-	blockExecResults := execution.NewPopulatedBlockExecutionResults(executableBlock)
-	blockExecResults.CollectionExecutionResultAt(0).AppendTransactionResults(
+	blockExecResult := execution.NewPopulatedBlockExecutionResult(executableBlock)
+	blockExecResult.CollectionExecutionResultAt(0).AppendTransactionResults(
 		flow.EventsList{
 			EventFixture("what", 0, 0, IdentifierFixture(), 2),
 			EventFixture("ever", 0, 1, IdentifierFixture(), 22),
@@ -2297,7 +2297,7 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 			MemoryUsed:      101,
 		},
 	)
-	blockExecResults.CollectionExecutionResultAt(1).AppendTransactionResults(
+	blockExecResult.CollectionExecutionResultAt(1).AppendTransactionResults(
 		flow.EventsList{
 			EventFixture("what", 2, 0, IdentifierFixture(), 2),
 			EventFixture("ever", 2, 1, IdentifierFixture(), 22),
@@ -2315,8 +2315,8 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	)
 
 	return &execution.ComputationResult{
-		BlockExecutionResults: blockExecResults,
-		BlockAttestationResults: &execution.BlockAttestationResults{
+		BlockExecutionResult: blockExecResult,
+		BlockAttestationResult: &execution.BlockAttestationResult{
 			BlockExecutionData: &execution_data.BlockExecutionData{
 				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
 					{TrieUpdate: trieUpdate1},

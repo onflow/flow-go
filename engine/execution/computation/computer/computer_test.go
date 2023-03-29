@@ -496,7 +496,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NoError(t, err)
 
 		// chunk count should match collection count
-		assert.Equal(t, result.BlockExecutionResults.Size(), collectionCount+1) // system chunk
+		assert.Equal(t, result.BlockExecutionResult.Size(), collectionCount+1) // system chunk
 
 		// all events should have been collected
 		for i := 0; i < collectionCount; i++ {
@@ -654,7 +654,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 
 		// make sure event index sequence are valid
-		for i := 0; i < result.BlockExecutionResults.Size(); i++ {
+		for i := 0; i < result.BlockExecutionResult.Size(); i++ {
 			collectionResult := result.CollectionExecutionResultAt(i)
 			unittest.EnsureEventsIndexSeq(t, collectionResult.Events(), execCtx.Chain.ChainID())
 		}
@@ -858,8 +858,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 }
 
 func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execution.ComputationResult) {
-	execResSize := result.BlockExecutionResults.Size()
-	attestResSize := result.BlockAttestationResults.Size()
+	execResSize := result.BlockExecutionResult.Size()
+	attestResSize := result.BlockAttestationResult.Size()
 	require.Equal(t, execResSize, expectedNoOfChunks)
 	require.Equal(t, execResSize, attestResSize)
 

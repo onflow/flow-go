@@ -792,7 +792,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	spockHasher := utils.NewSPOCKHasher()
 
-	for i := 0; i < computationResult.BlockExecutionResults.Size(); i++ {
+	for i := 0; i < computationResult.BlockExecutionResult.Size(); i++ {
 		res := computationResult.CollectionExecutionResultAt(i)
 		snapshot := res.ExecutionSnapshot()
 		valid, err := crypto.SPOCKVerifyAgainstData(

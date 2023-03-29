@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
-// BlockExecutionResults captures artifacts of execution of block collections
+// BlockExecutionResult captures artifacts of execution of block collections
 type BlockExecutionResult struct {
 	*entity.ExecutableBlock
 
@@ -98,7 +98,7 @@ func (er *BlockExecutionResult) AllConvertedServiceEvents() flow.ServiceEventLis
 	return res
 }
 
-// BlockAttestationResults holds collection attestation results
+// BlockAttestationResult holds collection attestation results
 type BlockAttestationResult struct {
 	*BlockExecutionResult
 
@@ -111,7 +111,7 @@ type BlockAttestationResult struct {
 	*execution_data.BlockExecutionData
 }
 
-func NewEmptyBlockAttestationResults(
+func NewEmptyBlockAttestationResult(
 	blockExecutionResult *BlockExecutionResult,
 ) *BlockAttestationResult {
 	colSize := blockExecutionResult.Size()
