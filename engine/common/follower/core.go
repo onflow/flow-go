@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/follower/pending_tree"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/trace"
@@ -42,7 +41,6 @@ type Core struct {
 	*component.ComponentManager
 	log                 zerolog.Logger
 	mempoolMetrics      module.MempoolMetrics
-	config              compliance.Config
 	tracer              module.Tracer
 	pendingCache        *cache.Cache
 	pendingTree         *pending_tree.PendingTree
@@ -67,15 +65,9 @@ func NewCore(log zerolog.Logger,
 	validator hotstuff.Validator,
 	sync module.BlockRequester,
 	tracer module.Tracer,
-	opts ...compliance.Opt,
 ) (*Core, error) {
 	onEquivocation := func(block, otherBlock *flow.Block) {
 		finalizationConsumer.OnDoubleProposeDetected(model.BlockFromFlow(block.Header), model.BlockFromFlow(otherBlock.Header))
-	}
-
-	config := compliance.DefaultConfig()
-	for _, apply := range opts {
-		apply(&config)
 	}
 
 	finalizedBlock, err := state.Final().Head()
@@ -93,7 +85,6 @@ func NewCore(log zerolog.Logger,
 		validator:           validator,
 		sync:                sync,
 		tracer:              tracer,
-		config:              config,
 		certifiedRangesChan: make(chan CertifiedBlocks, defaultCertifiedRangeChannelCapacity),
 		finalizedBlocksChan: make(chan *flow.Header, defaultFinalizedBlocksChannelCapacity),
 	}
