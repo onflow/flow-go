@@ -7,7 +7,6 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
-    branch: {{ $.Values.branch }}
     nodeType: verification
     service: flow
     project: {{ $.Values.commit }}
