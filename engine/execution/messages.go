@@ -6,8 +6,8 @@ import (
 )
 
 type ComputationResult struct {
-	*BlockExecutionResults
-	*BlockAttestationResults
+	*BlockExecutionResult
+	*BlockAttestationResult
 
 	*flow.ExecutionReceipt
 }
@@ -15,11 +15,11 @@ type ComputationResult struct {
 func NewEmptyComputationResult(
 	block *entity.ExecutableBlock,
 ) *ComputationResult {
-	ber := NewPopulatedBlockExecutionResults(block)
+	ber := NewPopulatedBlockExecutionResult(block)
 	aer := NewEmptyBlockAttestationResults(ber)
 	return &ComputationResult{
-		BlockExecutionResults:   ber,
-		BlockAttestationResults: aer,
+		BlockExecutionResult:   ber,
+		BlockAttestationResult: aer,
 	}
 }
 
