@@ -7,9 +7,10 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
-    nodeType: execution
-    service: flow
     networkId: {{ $.Values.networkId }}
+    nodeType: execution
+    owner: {{ $.Values.owner }}
+    service: flow
 
 spec:
   serviceName: {{ $k }}
@@ -144,6 +145,7 @@ metadata:
   labels:
     app: {{ $k }}
     networkId: {{ $.Values.networkId }}
+    owner: {{ $.Values.owner }}
 spec:
   {{ if $v.servicePorts }}
   ports: {{ $v.servicePorts | toYaml | nindent 12 }}

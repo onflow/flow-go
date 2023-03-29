@@ -29,9 +29,10 @@ spec:
         prometheus.io/port: "8080"
       labels:
         app: {{ $k }}
-        nodeType: verification
-        service: flow
         networkId: {{ $.Values.networkId }}
+        nodeType: verification
+        owner: {{ $.Values.owner }}
+        service: flow
     spec:
       containers:
         - name: {{ $k }}
@@ -138,6 +139,7 @@ metadata:
   labels:
     app: {{ $k }}
     networkId: {{ $.Values.networkId }}
+    owner: {{ $.Values.owner }}
 spec:
   {{ if $v.servicePorts }}
   ports: {{ $v.servicePorts | toYaml | nindent 12 }}

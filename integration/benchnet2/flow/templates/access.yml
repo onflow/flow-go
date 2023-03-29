@@ -7,9 +7,10 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
-    nodeType: access
-    service: flow
     networkId: {{ $.Values.networkId }}
+    nodeType: access
+    owner: {{ $.Values.owner }}
+    service: flow
 
 spec:
   serviceName: {{ $k }}
@@ -31,7 +32,7 @@ spec:
         app: {{ $k }}
         nodeType: access
         service: flow
-        networdId: {{ $.Values.networkId }}
+        networkId: {{ $.Values.networkId }}
     spec:
       containers:
         - name: {{ $k }}
