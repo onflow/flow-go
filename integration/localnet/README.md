@@ -88,6 +88,13 @@ The network needs to be stopped between each consecutive run to clear the chain 
 make stop
 ```
 
+## Build Localnet images
+
+To build images for Localnet, run this command.
+```shell
+make build-flow
+```
+
 ## Logs
 
 You can view log output from all nodes:
