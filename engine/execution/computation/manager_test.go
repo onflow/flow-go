@@ -33,7 +33,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -889,12 +888,9 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
 	require.NoError(t, err)
 
-	txnState := testutils.NewSimpleTransaction(view)
-	env := environment.NewScriptEnv(
-		context.Background(),
-		ctx.TracerSpan,
+	env := environment.NewScriptEnvironmentFromStorageSnapshot(
 		ctx.EnvironmentParams,
-		txnState)
+		view)
 
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)
