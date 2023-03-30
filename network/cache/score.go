@@ -21,8 +21,23 @@ import (
 // Note that neither the GossipSub Score nor its application specific Score part are shared with the other peers.
 // Rather it is solely used by the current peer to select the peers to which it will connect on a topic mesh.
 type AppScoreCache struct {
-	c *stdmap.Backend
+	c             *stdmap.Backend
+	preprocessFns []ReadPreprocessorFunc
 }
+
+// ReadPreprocessorFunc is a function that is called by the cache upon reading an entry from the cache and before returning it.
+// It is used to perform any necessary pre-processing on the entry before returning it.
+// The effect of the pre-processing is that the entry is updated in the cache.
+// If there are multiple pre-processors, they are called in the order they are added to the cache.
+// Args:
+//
+//	record: the entry to be pre-processed.
+//	lastUpdated: the last time the entry was updated.
+//
+// Returns:
+//
+//	AppScoreRecord: the pre-processed entry.
+type ReadPreprocessorFunc func(record AppScoreRecord, lastUpdated time.Time) AppScoreRecord
 
 // NewAppScoreCache returns a new HeroCache-based application specific Score cache.
 // Args:
@@ -34,7 +49,7 @@ type AppScoreCache struct {
 // Returns:
 //
 //	*AppScoreCache: the newly created cache with a HeroCache-based backend.
-func NewAppScoreCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *AppScoreCache {
+func NewAppScoreCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics, prFns ...ReadPreprocessorFunc) *AppScoreCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
 		// we should not evict any entry from the cache,
@@ -44,7 +59,8 @@ func NewAppScoreCache(sizeLimit uint32, logger zerolog.Logger, collector module.
 		logger.With().Str("mempool", "gossipsub-app-Score-cache").Logger(),
 		collector)
 	return &AppScoreCache{
-		c: stdmap.NewBackend(stdmap.WithBackData(backData)),
+		c:             stdmap.NewBackend(stdmap.WithBackData(backData)),
+		preprocessFns: prFns,
 	}
 }
 
@@ -107,11 +123,14 @@ func (a *AppScoreCache) Get(peerID peer.ID) (*AppScoreRecord, error, bool) {
 
 	record, updated := a.c.Adjust(entityId, func(entry flow.Entity) flow.Entity {
 		e := entry.(appScoreRecordEntity)
-		if e.Score < 0 {
-			e.Score = 0
+
+		currentRecord := e.AppScoreRecord
+		for _, apply := range a.preprocessFns {
+			e.AppScoreRecord = apply(e.AppScoreRecord, e.lastUpdated)
 		}
-		e.Score = DecayScore(e.Score, e.Decay, time.Now())
-		e.LastUpdated = time.Now()
+		if e.AppScoreRecord != currentRecord {
+			e.lastUpdated = time.Now()
+		}
 		return e
 	})
 	if !updated {
@@ -120,10 +139,6 @@ func (a *AppScoreCache) Get(peerID peer.ID) (*AppScoreRecord, error, bool) {
 
 	r := record.(appScoreRecordEntity).AppScoreRecord
 	return &r, nil, true
-}
-
-func DecayScore(score float64, decay float64, lastUpdated time.Time) float64 {
-	return score * decay * time.Since(lastUpdated).Seconds()
 }
 
 // AppScoreRecord represents the application specific Score of a peer in the GossipSub protocol.
@@ -143,14 +158,14 @@ type AppScoreRecord struct {
 	Decay float64
 	// Score is the application specific Score of the peer.
 	Score float64
-	// LastUpdated is the time at which the entry was last updated.
-	LastUpdated time.Time
 }
 
-// AppScoreRecord represents an entry for the AppScoreCache
+// AppScoreRecord represents an entry for the AppScoreCache.
 // It stores the application specific Score of a peer in the GossipSub protocol.
 type appScoreRecordEntity struct {
 	entityId flow.Identifier // the ID of the entry (used to identify the entry in the cache).
+	// lastUpdated is the time at which the entry was last updated.
+	lastUpdated time.Time
 	AppScoreRecord
 }
 
