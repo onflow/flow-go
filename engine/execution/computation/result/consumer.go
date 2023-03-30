@@ -22,16 +22,9 @@ type ExecutableCollection interface {
 
 // ExecutedCollection holds results of a collection execution
 type ExecutedCollection interface {
-	ExecutableCollection
 
-	// RegisterUpdates returns all registers that were updated during collection execution
-	UpdatedRegisters() flow.RegisterEntries
-
-	// ReadRegisterIDs returns all registers that has been read during collection execution
-	ReadRegisterIDs() flow.RegisterIDs
-
-	// EmittedEvents returns a list of all the events emitted during collection execution
-	EmittedEvents() flow.EventsList
+	// Events returns a list of all the events emitted during collection execution
+	Events() flow.EventsList
 
 	// ServiceEventList returns a list of only service events emitted during this collection
 	ServiceEventList() flow.EventsList
@@ -42,21 +35,14 @@ type ExecutedCollection interface {
 	// TransactionResults returns a list of transaction results
 	TransactionResults() flow.TransactionResults
 
-	// SpockData returns the spock data that is collected during collection execution
-	SpockData() []byte
-
-	// TotalComputationUsed returns the total computation used
-	TotalComputationUsed() uint
-
-	// TODO(ramtin): replace me with other methods
-	// temp method before changing the committer to be dependent on a different interface
+	// ExecutionSnapshot returns the execution snapshot
 	ExecutionSnapshot() *state.ExecutionSnapshot
 }
 
 // ExecutedCollectionConsumer consumes ExecutedCollections
 type ExecutedCollectionConsumer interface {
 	module.ReadyDoneAware
-	OnExecutedCollection(ec ExecutedCollection) error
+	OnExecutedCollection(res ExecutedCollection) error
 }
 
 // AttestedCollection holds results of a collection attestation

@@ -67,7 +67,6 @@ type resultCollector struct {
 	result    *execution.ComputationResult
 	consumers []result.ExecutedCollectionConsumer
 
-	chunks          []*flow.Chunk
 	spockSignatures []crypto.Signature
 
 	blockStartTime time.Time
@@ -108,7 +107,6 @@ func newResultCollector(
 		parentBlockExecutionResultID: parentBlockExecutionResultID,
 		result:                       execution.NewEmptyComputationResult(block),
 		consumers:                    consumers,
-		chunks:                       make([]*flow.Chunk, 0, numCollections),
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
 		blockStartTime:               now,
 		currentCollectionStartTime:   now,
@@ -132,7 +130,7 @@ func (collector *resultCollector) commitCollection(
 		collector.blockSpan,
 		trace.EXECommitDelta).End()
 
-	startState := collector.result.EndState
+	startState := collector.result.InterimEndState()
 	endState, proof, trieUpdate, err := collector.committer.CommitView(
 		collectionExecutionSnapshot,
 		startState)
@@ -140,64 +138,33 @@ func (collector *resultCollector) commitCollection(
 		return fmt.Errorf("commit view failed: %w", err)
 	}
 
-	events := collector.result.Events[collection.collectionIndex]
+	execColRes := collector.result.CollectionExecutionResultAt(collection.collectionIndex)
+	execColRes.UpdateExecutionSnapshot(collectionExecutionSnapshot)
+
+	events := execColRes.Events()
 	eventsHash, err := flow.EventsMerkleRootHash(events)
 	if err != nil {
 		return fmt.Errorf("hash events failed: %w", err)
 	}
 
-	collector.result.EventsHashes = append(
-		collector.result.EventsHashes,
-		eventsHash)
-
-	chunk := flow.NewChunk(
-		collection.blockId,
-		collection.collectionIndex,
-		startState,
-		len(collection.Transactions),
-		eventsHash,
-		endState)
-	collector.chunks = append(collector.chunks, chunk)
-
-	collectionStruct := collection.Collection()
-
-	// Note: There's some inconsistency in how chunk execution data and
-	// chunk data pack populate their collection fields when the collection
-	// is the system collection.
-	executionCollection := &collectionStruct
-	dataPackCollection := executionCollection
-	if collection.isSystemTransaction {
-		dataPackCollection = nil
+	col := collection.Collection()
+	chunkExecData := &execution_data.ChunkExecutionData{
+		Collection: &col,
+		Events:     events,
+		TrieUpdate: trieUpdate,
 	}
 
-	collector.result.ChunkDataPacks = append(
-		collector.result.ChunkDataPacks,
-		flow.NewChunkDataPack(
-			chunk.ID(),
-			startState,
-			proof,
-			dataPackCollection))
-
-	collector.result.ChunkExecutionDatas = append(
-		collector.result.ChunkExecutionDatas,
-		&execution_data.ChunkExecutionData{
-			Collection: executionCollection,
-			Events:     collector.result.Events[collection.collectionIndex],
-			TrieUpdate: trieUpdate,
-		})
+	collector.result.AppendCollectionAttestationResult(
+		startState,
+		endState,
+		proof,
+		eventsHash,
+		chunkExecData,
+	)
 
 	collector.metrics.ExecutionChunkDataPackGenerated(
 		len(proof),
 		len(collection.Transactions))
-
-	collector.result.EndState = endState
-
-	collector.result.TransactionResultIndex = append(
-		collector.result.TransactionResultIndex,
-		len(collector.result.TransactionResults))
-	collector.result.StateSnapshots = append(
-		collector.result.StateSnapshots,
-		collectionExecutionSnapshot)
 
 	spock, err := collector.signer.SignFunc(
 		collectionExecutionSnapshot.SpockSecret,
@@ -231,7 +198,7 @@ func (collector *resultCollector) commitCollection(
 	}
 
 	for _, consumer := range collector.consumers {
-		err = consumer.OnExecutedCollection(collector.result.CollectionExecutionResult(collection.collectionIndex))
+		err = consumer.OnExecutedCollection(collector.result.CollectionExecutionResultAt(collection.collectionIndex))
 		if err != nil {
 			return fmt.Errorf("consumer failed: %w", err)
 		}
@@ -245,18 +212,6 @@ func (collector *resultCollector) processTransactionResult(
 	txnExecutionSnapshot *state.ExecutionSnapshot,
 ) error {
 
-	collector.result.Events[txn.collectionIndex] = append(
-		collector.result.Events[txn.collectionIndex],
-		txn.Events...)
-
-	collector.result.ServiceEvents[txn.collectionIndex] = append(
-		collector.result.ServiceEvents[txn.collectionIndex],
-		txn.ServiceEvents...)
-
-	collector.result.ConvertedServiceEvents[txn.collectionIndex] = append(
-		collector.result.ConvertedServiceEvents[txn.collectionIndex],
-		txn.ConvertedServiceEvents...)
-
 	txnResult := flow.TransactionResult{
 		TransactionID:   txn.ID,
 		ComputationUsed: txn.ComputationUsed,
@@ -266,9 +221,14 @@ func (collector *resultCollector) processTransactionResult(
 		txnResult.ErrorMessage = txn.Err.Error()
 	}
 
-	collector.result.TransactionResults = append(
-		collector.result.TransactionResults,
-		txnResult)
+	collector.result.
+		CollectionExecutionResultAt(txn.collectionIndex).
+		AppendTransactionResults(
+			txn.Events,
+			txn.ServiceEvents,
+			txn.ConvertedServiceEvents,
+			txnResult,
+		)
 
 	for computationKind, intensity := range txn.ComputationIntensities {
 		collector.result.ComputationIntensities[computationKind] += intensity
@@ -355,7 +315,7 @@ func (collector *resultCollector) Finalize(
 	executionResult := flow.NewExecutionResult(
 		collector.parentBlockExecutionResultID,
 		collector.result.ExecutableBlock.ID(),
-		collector.chunks,
+		collector.result.AllChunks(),
 		collector.result.AllConvertedServiceEvents(),
 		executionDataID)
 
