@@ -45,6 +45,9 @@ type SubscriptionImpl struct {
 
 	// once is used to ensure that the channel is only closed once
 	once sync.Once
+
+	// closed tracks whether or not the subscription has been closed
+	closed bool
 }
 
 func NewSubscription() *SubscriptionImpl {
@@ -80,6 +83,7 @@ func (sub *SubscriptionImpl) Fail(err error) {
 func (sub *SubscriptionImpl) Close() {
 	sub.once.Do(func() {
 		close(sub.ch)
+		sub.closed = true
 	})
 }
 
@@ -88,6 +92,10 @@ func (sub *SubscriptionImpl) Close() {
 // - context.DeadlineExceeded if send timed out
 // - context.Canceled if the client disconnected
 func (sub *SubscriptionImpl) Send(ctx context.Context, v interface{}, timeout time.Duration) error {
+	if sub.closed {
+		return fmt.Errorf("subscription closed")
+	}
+
 	waitCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 

@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Config defines the configurable options for the ingress server.
@@ -127,10 +128,12 @@ func NewEng(
 }
 
 func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) {
-	e.log.Trace().Msgf("received execution data %v", executionData.BlockID)
+	e.log.Trace().
+		Hex("block_id", logging.ID(executionData.BlockID)).
+		Msg("received execution data")
+
 	_ = e.execDataCache.Add(executionData.BlockID, executionData)
 	e.execDataBroadcaster.Publish()
-	e.log.Trace().Msg("sent broadcast notification")
 }
 
 // serve starts the gRPC server.

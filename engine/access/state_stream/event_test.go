@@ -57,6 +57,7 @@ func TestParseEvent(t *testing.T) {
 
 func TestParseEvent_Invalid(t *testing.T) {
 	eventTypes := []flow.EventType{
+		"",                                 // not enough parts
 		"invalid",                          // not enough parts
 		"invalid.event",                    // invalid first part
 		"B.0000000000000001.invalid.event", // invalid first part

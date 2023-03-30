@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var eventTypes = map[flow.EventType]bool{
@@ -73,6 +74,25 @@ func TestContructor(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFilter(t *testing.T) {
+	chain := flow.MonotonicEmulator.Chain()
+
+	filter, err := state_stream.NewEventFilter(chain, []string{"flow.AccountCreated", "A.0000000000000001.Contract1.EventA"}, nil, nil)
+	assert.NoError(t, err)
+
+	events := flow.EventsList{
+		unittest.EventFixture("A.0000000000000001.Contract1.EventA", 0, 0, unittest.IdentifierFixture(), 0),
+		unittest.EventFixture("A.0000000000000001.Contract2.EventA", 0, 0, unittest.IdentifierFixture(), 0),
+		unittest.EventFixture("flow.AccountCreated", 0, 0, unittest.IdentifierFixture(), 0),
+	}
+
+	matched := filter.Filter(events)
+
+	assert.Len(t, matched, 2)
+	assert.Equal(t, events[0], matched[0])
+	assert.Equal(t, events[2], matched[1])
 }
 
 func TestMatch(t *testing.T) {

@@ -48,7 +48,7 @@ func ParseEvent(eventType flow.EventType) (*ParsedEvent, error) {
 				Type:         AccountEventType,
 				EventType:    eventType,
 				Address:      parts[1],
-				Contract:     fmt.Sprintf("%s.%s.%s", parts[0], parts[1], parts[2]),
+				Contract:     fmt.Sprintf("A.%s.%s", parts[1], parts[2]),
 				ContractName: parts[2],
 				Name:         parts[3],
 			}, nil
