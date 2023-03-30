@@ -31,14 +31,16 @@ func nodeToLeaf(leaf *node.Node) *LeafNode {
 	}
 }
 
-func OpenAndReadLeafNodesFromCheckpointV6(dir string, fileName string, logger *zerolog.Logger) (
-	allLeafNodesCh <-chan LeafNodeResult, errToReturn error) {
+// OpenAndReadLeafNodesFromCheckpointV6 takes a channel for pushing the leaf nodes that are read from
+// the given checkpoint file specified by dir and fileName.
+// It returns when finish reading the checkpoint file and the input channel can be closed.
+func OpenAndReadLeafNodesFromCheckpointV6(allLeafNodesCh chan<- LeafNodeResult, dir string, fileName string, logger *zerolog.Logger) (errToReturn error) {
 
 	filepath := filePathCheckpointHeader(dir, fileName)
 
 	f, err := os.Open(filepath)
 	if err != nil {
-		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
+		return fmt.Errorf("could not open file %v: %w", filepath, err)
 	}
 	defer func(file *os.File) {
 		errToReturn = closeAndMergeError(file, errToReturn)
@@ -46,29 +48,22 @@ func OpenAndReadLeafNodesFromCheckpointV6(dir string, fileName string, logger *z
 
 	subtrieChecksums, _, err := readCheckpointHeader(filepath, logger)
 	if err != nil {
-		return nil, fmt.Errorf("could not read header: %w", err)
+		return fmt.Errorf("could not read header: %w", err)
 	}
 
 	// ensure all checkpoint part file exists, might return os.ErrNotExist error
 	// if a file is missing
 	err = allPartFileExist(dir, fileName, len(subtrieChecksums))
 	if err != nil {
-		return nil, fmt.Errorf("fail to check all checkpoint part file exist: %w", err)
+		return fmt.Errorf("fail to check all checkpoint part file exist: %w", err)
 	}
-
-	bufSize := 1000
-	leafNodesCh := make(chan LeafNodeResult, bufSize)
-	allLeafNodesCh = leafNodesCh
-	defer func() {
-		close(leafNodesCh)
-	}()
 
 	// push leaf nodes to allLeafNodesCh
 	for i, checksum := range subtrieChecksums {
-		readCheckpointSubTrieLeafNodes(leafNodesCh, dir, fileName, i, checksum, logger)
+		readCheckpointSubTrieLeafNodes(allLeafNodesCh, dir, fileName, i, checksum, logger)
 	}
 
-	return allLeafNodesCh, nil
+	return nil
 }
 
 func readCheckpointSubTrieLeafNodes(leafNodesCh chan<- LeafNodeResult, dir string, fileName string, index int, checksum uint32, logger *zerolog.Logger) {
