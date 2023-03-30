@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 func InsertHeader(headerID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
@@ -49,7 +50,7 @@ func IndexBlockIDByChunkID(chunkID, blockID flow.Identifier) func(*badger.Txn) e
 }
 
 // BatchIndexBlockByChunkID indexes blockID by chunkID into a batch
-func BatchIndexBlockByChunkID(blockID, chunkID flow.Identifier) func(batch *badger.WriteBatch) error {
+func BatchIndexBlockByChunkID(blockID, chunkID flow.Identifier) func(batch storage.WriteBatch) error {
 	return batchWrite(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
 }
 
@@ -71,7 +72,7 @@ func RemoveBlockIDByChunkID(chunkID flow.Identifier) func(*badger.Txn) error {
 // BatchRemoveBlockIDByChunkID removes chunkID-to-blockID index entries keyed by a chunkID in a provided batch.
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func BatchRemoveBlockIDByChunkID(chunkID flow.Identifier) func(batch *badger.WriteBatch) error {
+func BatchRemoveBlockIDByChunkID(chunkID flow.Identifier) func(batch storage.WriteBatch) error {
 	return batchRemove(makePrefix(codeIndexBlockByChunkID, chunkID))
 }
 
