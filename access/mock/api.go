@@ -567,25 +567,25 @@ func (_m *API) GetTransaction(ctx context.Context, id flow.Identifier) (*flow.Tr
 	return r0, r1
 }
 
-// GetTransactionResult provides a mock function with given fields: ctx, id
-func (_m *API) GetTransactionResult(ctx context.Context, id flow.Identifier) (*access.TransactionResult, error) {
-	ret := _m.Called(ctx, id)
+// GetTransactionResult provides a mock function with given fields: ctx, id, blockID, collectionID
+func (_m *API) GetTransactionResult(ctx context.Context, id flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier) (*access.TransactionResult, error) {
+	ret := _m.Called(ctx, id, blockID, collectionID)
 
 	var r0 *access.TransactionResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (*access.TransactionResult, error)); ok {
-		return rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, flow.Identifier) (*access.TransactionResult, error)); ok {
+		return rf(ctx, id, blockID, collectionID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *access.TransactionResult); ok {
-		r0 = rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, flow.Identifier) *access.TransactionResult); ok {
+		r0 = rf(ctx, id, blockID, collectionID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*access.TransactionResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
-		r1 = rf(ctx, id)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, flow.Identifier, flow.Identifier) error); ok {
+		r1 = rf(ctx, id, blockID, collectionID)
 	} else {
 		r1 = ret.Error(1)
 	}

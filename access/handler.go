@@ -216,7 +216,17 @@ func (h *Handler) GetTransactionResult(
 		return nil, err
 	}
 
-	result, err := h.api.GetTransactionResult(ctx, id)
+	blockId, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, err
+	}
+
+	collectionId, err := convert.TransactionID(req.GetCollectionId())
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := h.api.GetTransactionResult(ctx, id, blockId, collectionId)
 	if err != nil {
 		return nil, err
 	}
