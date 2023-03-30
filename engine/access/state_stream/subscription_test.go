@@ -7,10 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestSubscription tests that the subscription forwards the data correctly and in order

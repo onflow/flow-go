@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestPublish(t *testing.T) {
