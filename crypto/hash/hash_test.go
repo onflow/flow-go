@@ -257,7 +257,8 @@ func TestKeccak(t *testing.T) {
 func BenchmarkComputeHash(b *testing.B) {
 
 	m := make([]byte, 32)
-	_, _ = rand.Read(m)
+	_, err := rand.Read(m)
+	require.NoError(b, err)
 
 	b.Run("SHA2_256", func(b *testing.B) {
 		b.ResetTimer()

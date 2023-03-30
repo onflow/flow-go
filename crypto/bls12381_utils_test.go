@@ -51,7 +51,8 @@ func TestPRGseeding(t *testing.T) {
 func BenchmarkScalarMultG1G2(b *testing.B) {
 	blsInstance.reInit()
 	seed := make([]byte, securityBits/8)
-	_, _ = crand.Read(seed)
+	_, err := crand.Read(seed)
+	require.NoError(b, err)
 	_ = seedRelic(seed)
 	var expo scalar
 	randZr(&expo)
@@ -139,7 +140,8 @@ func TestSubgroupCheck(t *testing.T) {
 	blsInstance.reInit()
 	// seed Relic PRG
 	seed := make([]byte, securityBits/8)
-	_, _ = crand.Read(seed)
+	_, err := crand.Read(seed)
+	require.NoError(t, err)
 	_ = seedRelic(seed)
 
 	t.Run("G1", func(t *testing.T) {

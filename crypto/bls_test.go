@@ -769,7 +769,8 @@ func alterSignature(s Signature) {
 func BenchmarkBatchVerify(b *testing.B) {
 	// random message
 	input := make([]byte, 100)
-	_, _ = crand.Read(input)
+	_, err := crand.Read(input)
+	require.NoError(b, err)
 	// hasher
 	kmac := NewExpandMsgXOFKMAC128("bench tag")
 	sigsNum := 100
