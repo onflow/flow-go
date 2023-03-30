@@ -10,7 +10,7 @@ on:
       network_id:
         required: true
         type: string
-        description: ID for network. Must be unique, have only alphabet characters, and be 10 or fewer characters in length.
+        description: ID for network. Must be unique, have only alphanumerirc characters, and be 10 or fewer characters in length.
 
       # Allows for the ref to be altered for testing automation changes
       automation_ref:
@@ -65,7 +65,7 @@ jobs:
         id: getNetworkId
         # Set Network ID to input provided 
         run: |
-          if [[ ${{ inputs.network_id }} =~ ^[a-z]{1,10}$ ]]; then echo "networkId=${{ inputs.network_id }}" >> $GITHUB_OUTPUT; else echo "network_id does not meet criteria."; exit 1; fi;
+          if [[ ${{ inputs.network_id }} =~ ^[a-z,1-9]{1,10}$ ]]; then echo "networkId=${{ inputs.network_id }}" >> $GITHUB_OUTPUT; else echo "network_id does not meet criteria."; exit 1; fi;
 
       - name: Print Network ID
         run: |
@@ -213,7 +213,7 @@ jobs:
       - name: Run Bootstrap in Container
         # When running the container, the container is run as root. This allows us to install what we need and not worry about permissions.
         # As a result, files that are written to disk are owned by root.
-        # As a final step
+        # As a final step, we need to chown the files to the 1001 user which is the runner user for the host
         run: |
           docker run -v ${GITHUB_WORKSPACE}:/app -i bootstrap /bin/bash -c "cd /app/integration/benchnet2 && make ${{ env.ARGS }} REF_FOR_BOOTSTRAP=${{ inputs.ref_to_build_and_deploy }} gen-helm-values && chown -R 1001 /app || chown -R 1001 /app"
 
