@@ -31,11 +31,22 @@ type PeerManagerConfig struct {
 	UpdateInterval time.Duration
 }
 
-// GossipSubRPCValidationConfigs validation limits used for gossipsub RPC control message inspection.
-type GossipSubRPCValidationConfigs struct {
+// GossipSubRPCValidationInspectorConfigs validation limits used for gossipsub RPC control message inspection.
+type GossipSubRPCValidationInspectorConfigs struct {
+	// NumberOfWorkers number of worker pool workers.
 	NumberOfWorkers int
+	// CacheSize size of the queue used by worker pool for the control message validation inspector.
+	CacheSize uint32
 	// GraftLimits GRAFT control message validation limits.
 	GraftLimits map[string]int
 	// PruneLimits PRUNE control message validation limits.
 	PruneLimits map[string]int
+}
+
+// GossipSubRPCMetricsInspectorConfigs rpc metrics observer inspector configuration.
+type GossipSubRPCMetricsInspectorConfigs struct {
+	// NumberOfWorkers number of worker pool workers.
+	NumberOfWorkers int
+	// CacheSize size of the queue used by worker pool for the control message metrics inspector.
+	CacheSize uint32
 }

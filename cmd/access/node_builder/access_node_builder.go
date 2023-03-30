@@ -1011,7 +1011,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 		}).
 		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
-			libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey, builder.PublicNetworkConfig.BindAddress, builder.PublicNetworkConfig.Metrics)
+			libP2PFactory := builder.initPublicLibP2PFactory(builder.NodeConfig.NetworkKey, builder.PublicNetworkConfig.BindAddress, builder.PublicNetworkConfig.Metrics)
 
 			var err error
 			libp2pNode, err = libP2PFactory()
@@ -1057,7 +1057,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 		})
 }
 
-// initLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
+// initPublicLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
 // The LibP2P host is created with the following options:
 //   - DHT as server
@@ -1065,7 +1065,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 //   - The passed in private key as the libp2p key
 //   - No connection gater
 //   - Default Flow libp2p pubsub options
-func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey, bindAddress string, networkMetrics module.LibP2PMetrics) p2p.LibP2PFactoryFunc {
+func (builder *FlowAccessNodeBuilder) initPublicLibP2PFactory(networkKey crypto.PrivateKey, bindAddress string, networkMetrics module.LibP2PMetrics) p2p.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		connManager, err := connection.NewConnManager(builder.Logger, networkMetrics, builder.ConnectionManagerConfig)
 		if err != nil {
@@ -1077,6 +1077,20 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			networkMetrics,
 			builder.IdentityProvider,
 			builder.GossipSubConfig.LocalMeshLogInterval)
+
+		// setup RPC inspectors
+		rpcInspectors, err := cmd.BuildGossipSubRPCInspectors(
+			builder.Logger,
+			builder.SporkID,
+			builder.GossipSubRPCInspectorsConfig,
+			builder.GossipSubInspectorNotifDistributor,
+			builder.Metrics.Network,
+			builder.MetricsRegisterer,
+			builder.MetricsEnabled,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors: %w", err)
+		}
 
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(
 			builder.Logger,
@@ -1107,6 +1121,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Privat
 			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
 			SetGossipSubTracer(meshTracer).
 			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
+			SetGossipSubRPCInspectors(rpcInspectors...).
 			Build()
 
 		if err != nil {

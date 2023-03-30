@@ -76,6 +76,7 @@ func DefaultGossipSubConfig() *GossipSubConfig {
 		PeerScoring:          defaultPeerScoringEnabled,
 		LocalMeshLogInterval: defaultMeshTracerLoggingInterval,
 		ScoreTracerInterval:  defaultGossipSubScoreTracerInterval,
+		RPCInspectors:        make([]p2p.GossipSubRPCInspector, 0),
 	}
 }
 
@@ -103,7 +104,6 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
 	uniCfg *UnicastConfig,
-	rpcValidationInspector p2p.GossipSubRPCInspector,
 ) p2p.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		builder, err := DefaultNodeBuilder(log,
@@ -118,8 +118,7 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 			peerManagerCfg,
 			gossipCfg,
 			rCfg,
-			uniCfg,
-			rpcValidationInspector)
+			uniCfg)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create node builder: %w", err)
@@ -146,6 +145,8 @@ type GossipSubConfig struct {
 	ScoreTracerInterval time.Duration
 	// PeerScoring is whether to enable GossipSub peer scoring.
 	PeerScoring bool
+	// RPCInspectors gossipsub RPC control message inspectors
+	RPCInspectors []p2p.GossipSubRPCInspector
 }
 
 func DefaultResourceManagerConfig() *ResourceManagerConfig {
@@ -313,8 +314,8 @@ func (builder *LibP2PNodeBuilder) SetGossipSubScoreTracerInterval(interval time.
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubValidationInspector(inspector p2p.GossipSubRPCInspector) p2p.NodeBuilder {
-	builder.gossipSubBuilder.SetGossipSubValidationInspector(inspector)
+func (builder *LibP2PNodeBuilder) SetGossipSubRPCInspectors(inspectors ...p2p.GossipSubRPCInspector) p2p.NodeBuilder {
+	builder.gossipSubBuilder.SetGossipSubRPCInspectors(inspectors...)
 	return builder
 }
 
@@ -555,8 +556,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	peerManagerCfg *PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
-	uniCfg *UnicastConfig,
-	rpcValidationInspector p2p.GossipSubRPCInspector) (p2p.NodeBuilder, error) {
+	uniCfg *UnicastConfig) (p2p.NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(log, metrics, connection.DefaultConnManagerConfig())
 	if err != nil {
@@ -583,7 +583,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
 		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor).
-		SetGossipSubValidationInspector(rpcValidationInspector)
+		SetGossipSubRPCInspectors(gossipCfg.RPCInspectors...)
 
 	if gossipCfg.PeerScoring {
 		// currently, we only enable peer scoring with default parameters. So, we set the score parameters to nil.
@@ -605,7 +605,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 // BuildGossipSubRPCValidationInspector helper that sets up the gossipsub RPC validation inspector.
 func BuildGossipSubRPCValidationInspector(logger zerolog.Logger,
 	sporkId flow.Identifier,
-	validationConfigs *GossipSubRPCValidationConfigs,
+	validationConfigs *GossipSubRPCValidationInspectorConfigs,
 	distributor p2p.GossipSubInspectorNotificationDistributor,
 	heroStoreOpts ...queue.HeroStoreConfigOption,
 ) (*validation.ControlMsgValidationInspector, error) {
@@ -618,7 +618,7 @@ func BuildGossipSubRPCValidationInspector(logger zerolog.Logger,
 }
 
 // gossipSubRPCValidationInspectorConfig returns a new inspector.ControlMsgValidationInspectorConfig using configuration provided by the node builder.
-func gossipSubRPCValidationInspectorConfig(validationConfigs *GossipSubRPCValidationConfigs, opts ...queue.HeroStoreConfigOption) (*validation.ControlMsgValidationInspectorConfig, error) {
+func gossipSubRPCValidationInspectorConfig(validationConfigs *GossipSubRPCValidationInspectorConfigs, opts ...queue.HeroStoreConfigOption) (*validation.ControlMsgValidationInspectorConfig, error) {
 	// setup rpc validation configuration for each control message type
 	graftValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, validationConfigs.GraftLimits)
 	if err != nil {

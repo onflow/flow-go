@@ -1,8 +1,6 @@
 package validation
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -18,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/inspector/internal"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -89,12 +88,11 @@ var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
 
 // NewInspectMsgRequest returns a new *InspectMsgRequest.
 func NewInspectMsgRequest(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) (*InspectMsgRequest, error) {
-	b := make([]byte, 16)
-	_, err := rand.Read(b)
+	nonce, err := internal.Nonce()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get inspect message request nonce: %w", err)
 	}
-	return &InspectMsgRequest{Nonce: base64.StdEncoding.EncodeToString(b), Peer: from, validationConfig: validationConfig, ctrlMsg: ctrlMsg}, nil
+	return &InspectMsgRequest{Nonce: nonce, Peer: from, validationConfig: validationConfig, ctrlMsg: ctrlMsg}, nil
 }
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector

@@ -6,9 +6,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onflow/flow-go/network/p2p/distributor"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,9 +26,12 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/dns"
+	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -185,7 +185,10 @@ type NetworkConfig struct {
 	// that are not part of protocol state should be trimmed
 	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
 	NetworkConnectionPruning bool
-	GossipSubConfig          *p2pbuilder.GossipSubConfig
+	// GossipSubConfig core gossipsub configuration.
+	GossipSubConfig *p2pbuilder.GossipSubConfig
+	// GossipSubRPCInspectorsConfig configuration for all gossipsub RPC control message inspectors.
+	GossipSubRPCInspectorsConfig *GossipSubRPCInspectorsConfig
 	// PreferredUnicastProtocols list of unicast protocols in preferred order
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
@@ -199,11 +202,18 @@ type NetworkConfig struct {
 	UnicastCreateStreamRetryDelay time.Duration
 	// size of the queue for notifications about new peers in the disallow list.
 	DisallowListNotificationCacheSize uint32
-	// size of the queue for notifications about gossipsub RPC inspections.
+	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
+	UnicastRateLimitersConfig *UnicastRateLimitersConfig
+}
+
+// GossipSubRPCInspectorsConfig encompasses configuration related to gossipsub RPC message inspectors.
+type GossipSubRPCInspectorsConfig struct {
+	// GossipSubRPCInspectorNotificationCacheSize size of the queue for notifications about invalid RPC messages.
 	GossipSubRPCInspectorNotificationCacheSize uint32
-	GossipSubRPCInspectorCacheSize             uint32
-	UnicastRateLimitersConfig                  *UnicastRateLimitersConfig
-	GossipSubRPCValidationConfigs              *p2pbuilder.GossipSubRPCValidationConfigs
+	// ValidationInspectorConfigs control message validation inspector validation configuration and limits.
+	ValidationInspectorConfigs *p2pbuilder.GossipSubRPCValidationInspectorConfigs
+	// MetricsInspectorConfigs control message metrics inspector configuration.
+	MetricsInspectorConfigs *p2pbuilder.GossipSubRPCMetricsInspectorConfigs
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
@@ -301,27 +311,33 @@ func DefaultBaseConfig() *BaseConfig {
 				BandwidthRateLimit:  0,
 				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
 			},
-			GossipSubRPCValidationConfigs: &p2pbuilder.GossipSubRPCValidationConfigs{
-				NumberOfWorkers: validation.DefaultNumberOfWorkers,
-				GraftLimits: map[string]int{
-					validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
-					validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
-					validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
+			GossipSubConfig: p2pbuilder.DefaultGossipSubConfig(),
+			GossipSubRPCInspectorsConfig: &GossipSubRPCInspectorsConfig{
+				GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
+				ValidationInspectorConfigs: &p2pbuilder.GossipSubRPCValidationInspectorConfigs{
+					NumberOfWorkers: validation.DefaultNumberOfWorkers,
+					CacheSize:       validation.DefaultControlMsgValidationInspectorQueueCacheSize,
+					GraftLimits: map[string]int{
+						validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
+						validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
+						validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
+					},
+					PruneLimits: map[string]int{
+						validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
+						validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
+						validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
+					},
 				},
-				PruneLimits: map[string]int{
-					validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
-					validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
-					validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
+				MetricsInspectorConfigs: &p2pbuilder.GossipSubRPCMetricsInspectorConfigs{
+					NumberOfWorkers: inspector.DefaultControlMsgMetricsInspectorNumberOfWorkers,
+					CacheSize:       inspector.DefaultControlMsgMetricsInspectorQueueCacheSize,
 				},
 			},
-			DNSCacheTTL:                                dns.DefaultTimeToLive,
-			LibP2PResourceManagerConfig:                p2pbuilder.DefaultResourceManagerConfig(),
-			ConnectionManagerConfig:                    connection.DefaultConnManagerConfig(),
-			NetworkConnectionPruning:                   connection.ConnectionPruningEnabled,
-			GossipSubConfig:                            p2pbuilder.DefaultGossipSubConfig(),
-			GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
-			GossipSubRPCInspectorCacheSize:             validation.DefaultControlMsgValidationInspectorQueueCacheSize,
-			DisallowListNotificationCacheSize:          distributor.DefaultDisallowListNotificationQueueCacheSize,
+			DNSCacheTTL:                       dns.DefaultTimeToLive,
+			LibP2PResourceManagerConfig:       p2pbuilder.DefaultResourceManagerConfig(),
+			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),
+			NetworkConnectionPruning:          connection.ConnectionPruningEnabled,
+			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
