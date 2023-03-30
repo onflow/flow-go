@@ -89,7 +89,8 @@ k8s-test-network-accessibility:
 
 clone-flow: clean-flow 
 	# this cloned repo will be used for generating bootstrap info specific to that tag / version
-	git clone --depth 1 --branch $(REF_FOR_BOOTSTRAP) https://github.com/onflow/flow-go.git --single-branch
+	git clone https://github.com/onflow/flow-go.git
+	git checkout $(REF_FOR_BOOTSTRAP)
 	
 clean-flow:
 	rm -rf flow-go
