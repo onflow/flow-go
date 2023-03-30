@@ -34,8 +34,11 @@ func WithChannel(channel channels.Channel) EngineOption {
 // defaultBatchProcessingWorkers number of concurrent workers that process incoming blocks.
 const defaultBatchProcessingWorkers = 4
 
-// defaultBlockQueueCapacity maximum capacity of inbound queue for batches of BlocksBatch.
-const defaultBlockQueueCapacity = 100
+// defaultPendingBlockQueueCapacity maximum capacity of inbound queue for blocks directly received from other nodes.
+const defaultPendingBlockQueueCapacity = 10
+
+// defaultSyncedBlockQueueCapacity maximum capacity of inbound queue for batches of synced blocks.
+const defaultSyncedBlockQueueCapacity = 100
 
 // defaultPendingConnectedBlocksChanCapacity capacity of buffered channel that is used to receive pending blocks that form a sequence.
 const defaultPendingConnectedBlocksChanCapacity = 100
@@ -59,8 +62,9 @@ type Engine struct {
 	con                        network.Conduit
 	channel                    channels.Channel
 	headers                    storage.Headers
-	pendingBlocks              *fifoqueue.FifoQueue        // queue for processing inbound batches of blocks
-	pendingBlocksNotifier      engine.Notifier             // notifies that new batches are ready to be processed
+	pendingBlocks              *fifoqueue.FifoQueue        // queue for processing inbound blocks
+	syncedBlocks               *fifoqueue.FifoQueue        // queue for processing inbound batches of blocks
+	blocksAvailableNotifier    engine.Notifier             // notifies that new blocks are ready to be processed
 	finalizedBlockTracker      *tracker.NewestBlockTracker // tracks the latest finalization block
 	finalizedBlockNotifier     engine.Notifier             // notifies when the latest finalized block changes
 	pendingConnectedBlocksChan chan flow.Slashable[[]*flow.Block]
@@ -80,8 +84,13 @@ func New(
 	core common.FollowerCore,
 	opts ...EngineOption,
 ) (*Engine, error) {
-	// FIFO queue for block proposals
-	pendingBlocks, err := fifoqueue.NewFifoQueue(defaultBlockQueueCapacity)
+	// FIFO queue for inbound block proposals
+	pendingBlocks, err := fifoqueue.NewFifoQueue(defaultPendingBlockQueueCapacity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for inbound blocks: %w", err)
+	}
+	// FIFO queue for synced blocks
+	syncedBlocks, err := fifoqueue.NewFifoQueue(defaultSyncedBlockQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound blocks: %w", err)
 	}
@@ -92,7 +101,8 @@ func New(
 		engMetrics:                 engMetrics,
 		channel:                    channels.ReceiveBlocks,
 		pendingBlocks:              pendingBlocks,
-		pendingBlocksNotifier:      engine.NewNotifier(),
+		syncedBlocks:               syncedBlocks,
+		blocksAvailableNotifier:    engine.NewNotifier(),
 		pendingConnectedBlocksChan: make(chan flow.Slashable[[]*flow.Block], defaultPendingConnectedBlocksChanCapacity),
 		finalizedBlockTracker:      tracker.NewNewestBlockTracker(),
 		finalizedBlockNotifier:     engine.NewNotifier(),
@@ -141,13 +151,9 @@ func New(
 // OnBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
 func (e *Engine) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
-	proposalAsList := flow.Slashable[[]*messages.BlockProposal]{
-		OriginID: proposal.OriginID,
-		Message:  []*messages.BlockProposal{proposal.Message},
-	}
 	// queue proposal
-	if e.pendingBlocks.Push(proposalAsList) {
-		e.pendingBlocksNotifier.Notify()
+	if e.pendingBlocks.Push(proposal) {
+		e.blocksAvailableNotifier.Notify()
 	}
 }
 
@@ -157,8 +163,8 @@ func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]
 	// The synchronization engine feeds the follower with batches of blocks. The field `Slashable.OriginID`
 	// states which node forwarded the batch to us. Each block contains its proposer and signature.
 
-	if e.pendingBlocks.Push(blocks) {
-		e.pendingBlocksNotifier.Notify()
+	if e.syncedBlocks.Push(blocks) {
+		e.blocksAvailableNotifier.Notify()
 	}
 }
 
@@ -194,7 +200,7 @@ func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready comp
 	ready()
 
 	doneSignal := ctx.Done()
-	newPendingBlockSignal := e.pendingBlocksNotifier.Channel()
+	newPendingBlockSignal := e.blocksAvailableNotifier.Channel()
 	for {
 		select {
 		case <-doneSignal:
@@ -221,8 +227,23 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 		}
 
 		msg, ok := e.pendingBlocks.Pop()
+		if ok {
+			blockMsg := msg.(flow.Slashable[*messages.BlockProposal])
+			block := blockMsg.Message.Block.ToInternal()
+			log := e.log.With().
+				Hex("origin_id", blockMsg.OriginID[:]).
+				Str("chain_id", block.Header.ChainID.String()).
+				Uint64("view", block.Header.View).
+				Uint64("height", block.Header.Height).
+				Logger()
+			latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
+			e.submitConnectedBatch(log, latestFinalizedView, blockMsg.OriginID, []*flow.Block{block})
+			continue
+		}
+
+		msg, ok = e.syncedBlocks.Pop()
 		if !ok {
-			// when there are no more messages in the queue, back to the processBlocksLoop to wait
+			// when there are no more messages in the queue, back to the processQueuedBlocks to wait
 			// for the next incoming message to arrive.
 			return nil
 		}
@@ -263,8 +284,6 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 		e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:])
 
 		e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
-		continue
-
 	}
 }
 

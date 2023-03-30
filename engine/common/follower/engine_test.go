@@ -124,6 +124,24 @@ func (s *EngineSuite) TestProcessGossipedBlock() {
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
 
+// TestProcessBlockFromComplianceInterface check that processing single gossiped block using compliance interface results in call to FollowerCore.
+func (s *EngineSuite) TestProcessBlockFromComplianceInterface() {
+	block := unittest.BlockWithParentFixture(s.finalized)
+
+	originID := unittest.IdentifierFixture()
+	done := make(chan struct{})
+	s.core.On("OnBlockRange", originID, []*flow.Block{block}).Return(nil).Run(func(_ mock.Arguments) {
+		close(done)
+	}).Once()
+
+	s.engine.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		OriginID: originID,
+		Message:  messages.NewBlockProposal(block),
+	})
+
+	unittest.AssertClosesBefore(s.T(), done, time.Second)
+}
+
 // TestProcessBatchOfDisconnectedBlocks tests that processing a batch that consists of one connected range and individual blocks
 // results in submitting all of them.
 func (s *EngineSuite) TestProcessBatchOfDisconnectedBlocks() {
