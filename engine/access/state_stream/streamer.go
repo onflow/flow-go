@@ -50,7 +50,8 @@ func (s *Streamer) Stream(ctx context.Context) {
 	s.log.Debug().Msg("starting streaming")
 	defer s.log.Debug().Msg("finished streaming")
 
-	notifier := s.broadcaster.Subscribe()
+	notifier := engine.NewNotifier()
+	s.broadcaster.Subscribe(notifier)
 
 	// always check the first time. This ensures that streaming continues to work even if the
 	// execution sync is not functioning (e.g. on a past spork network, or during an temporary outage)

@@ -10,7 +10,7 @@ type BlockExecutionDataEntity struct {
 	*BlockExecutionData
 
 	// id holds the cached BlockExecutionData ID. The ID generation process is expensive, so this
-	// entity interface exclusively uses a per-calculated value.
+	// entity interface exclusively uses a pre-calculated value.
 	id flow.Identifier
 }
 

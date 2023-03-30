@@ -25,6 +25,8 @@ var eventTypes = map[flow.EventType]bool{
 }
 
 func TestContructor(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		eventTypes []string
@@ -77,6 +79,8 @@ func TestContructor(t *testing.T) {
 }
 
 func TestFilter(t *testing.T) {
+	t.Parallel()
+
 	chain := flow.MonotonicEmulator.Chain()
 
 	filter, err := state_stream.NewEventFilter(chain, []string{"flow.AccountCreated", "A.0000000000000001.Contract1.EventA"}, nil, nil)
@@ -96,6 +100,8 @@ func TestFilter(t *testing.T) {
 }
 
 func TestMatch(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		eventTypes []string

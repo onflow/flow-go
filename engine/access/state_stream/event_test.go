@@ -11,6 +11,8 @@ import (
 )
 
 func TestParseEvent(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		eventType flow.EventType
@@ -56,6 +58,8 @@ func TestParseEvent(t *testing.T) {
 }
 
 func TestParseEvent_Invalid(t *testing.T) {
+	t.Parallel()
+
 	eventTypes := []flow.EventType{
 		"",                                 // not enough parts
 		"invalid",                          // not enough parts

@@ -15,6 +15,8 @@ import (
 
 // TestSubscription tests that the subscription forwards the data correctly and in order
 func TestSubscription_SendReceive(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	sub := state_stream.NewSubscription()
@@ -57,6 +59,8 @@ func TestSubscription_SendReceive(t *testing.T) {
 
 // TestSubscription_Failures tests closing and failing subscriptions behaves as expected
 func TestSubscription_Failures(t *testing.T) {
+	t.Parallel()
+
 	testErr := fmt.Errorf("test error")
 
 	// make sure closing a subscription twice does not cause a panic
@@ -92,6 +96,8 @@ func TestSubscription_Failures(t *testing.T) {
 // TestHeightBasedSubscription tests that the height based subscription tracks heights correctly
 // and forwards the error correctly
 func TestHeightBasedSubscription(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	start := uint64(3)
