@@ -184,6 +184,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, mes
 }
 
 // processBlocksLoop processes available blocks as they are queued.
+// Implements `component.ComponentWorker` signature.
 func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -215,7 +216,11 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 		}
 
 		msg, ok := e.pendingBlocks.Pop()
-		if ok {
+		if !ok {
+			// when there are no more messages in the queue, back to the processBlocksLoop to wait
+			// for the next incoming message to arrive.
+			return nil
+		}
 			batch := msg.(flow.Slashable[[]*messages.BlockProposal])
 			if len(batch.Message) < 1 {
 				continue
