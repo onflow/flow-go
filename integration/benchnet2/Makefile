@@ -107,7 +107,6 @@ clone-flow: clean-flow
 clean-flow:
 	rm -rf flow-go
 
-.PHONY: install-nginx
 install-nginx:
 	helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 	helm repo update
