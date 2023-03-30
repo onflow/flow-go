@@ -138,12 +138,17 @@ func New(
 	return e, nil
 }
 
-// OnBlockProposal logs an error and drops the proposal. This is because the follower ingests new
-// blocks directly from the networking layer (channel `channels.ReceiveBlocks` by default), which
-// delivers its messages by calling the generic `Process` method. Receiving block proposal as
-// from another internal component is likely an implementation bug.
-func (e *Engine) OnBlockProposal(_ flow.Slashable[*messages.BlockProposal]) {
-	e.log.Error().Msg("received unexpected block proposal via internal method")
+// OnBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
+func (e *Engine) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
+	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
+	proposalAsList := flow.Slashable[[]*messages.BlockProposal]{
+		OriginID: proposal.OriginID,
+		Message:  []*messages.BlockProposal{proposal.Message},
+	}
+	// queue proposal
+	if e.pendingBlocks.Push(proposalAsList) {
+		e.pendingBlocksNotifier.Notify()
+	}
 }
 
 // OnSyncedBlocks consumes incoming blocks by pushing into queue and notifying worker.
@@ -173,7 +178,7 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
 	case *messages.BlockProposal:
-		e.onBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		e.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
 			OriginID: originID,
 			Message:  msg,
 		})
@@ -221,52 +226,45 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 			// for the next incoming message to arrive.
 			return nil
 		}
-			batch := msg.(flow.Slashable[[]*messages.BlockProposal])
-			if len(batch.Message) < 1 {
-				continue
-			}
-			blocks := make([]*flow.Block, 0, len(batch.Message))
-			for _, block := range batch.Message {
-				blocks = append(blocks, block.Block.ToInternal())
-			}
 
-			firstBlock := blocks[0].Header
-			lastBlock := blocks[len(blocks)-1].Header
-			log := e.log.With().
-				Hex("origin_id", batch.OriginID[:]).
-				Str("chain_id", lastBlock.ChainID.String()).
-				Uint64("first_block_height", firstBlock.Height).
-				Uint64("first_block_view", firstBlock.View).
-				Uint64("last_block_height", lastBlock.Height).
-				Uint64("last_block_view", lastBlock.View).
-				Int("range_length", len(blocks)).
-				Logger()
-
-			latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
-			submitConnectedBatch := func(blocks []*flow.Block) {
-				e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks)
-			}
-
-			// extract sequences of connected blocks and schedule them for further processing
-			// we assume the sender has already ordered blocks into connected ranges if possible
-			parentID := blocks[0].ID()
-			indexOfLastConnected := 0
-			for i := 1; i < len(blocks); i++ {
-				if blocks[i].Header.ParentID != parentID {
-					submitConnectedBatch(blocks[indexOfLastConnected:i])
-					indexOfLastConnected = i
-				}
-				parentID = blocks[i].Header.ID()
-			}
-			submitConnectedBatch(blocks[indexOfLastConnected:])
-
-			e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
+		batch := msg.(flow.Slashable[[]*messages.BlockProposal])
+		if len(batch.Message) < 1 {
 			continue
 		}
+		blocks := make([]*flow.Block, 0, len(batch.Message))
+		for _, block := range batch.Message {
+			blocks = append(blocks, block.Block.ToInternal())
+		}
 
-		// when there are no more messages in the queue, back to the processBlocksLoop to wait
-		// for the next incoming message to arrive.
-		return nil
+		firstBlock := blocks[0].Header
+		lastBlock := blocks[len(blocks)-1].Header
+		log := e.log.With().
+			Hex("origin_id", batch.OriginID[:]).
+			Str("chain_id", lastBlock.ChainID.String()).
+			Uint64("first_block_height", firstBlock.Height).
+			Uint64("first_block_view", firstBlock.View).
+			Uint64("last_block_height", lastBlock.Height).
+			Uint64("last_block_view", lastBlock.View).
+			Int("range_length", len(blocks)).
+			Logger()
+
+		// extract sequences of connected blocks and schedule them for further processing
+		// we assume the sender has already ordered blocks into connected ranges if possible
+		latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
+		parentID := blocks[0].ID()
+		indexOfLastConnected := 0
+		for i, block := range blocks {
+			if block.Header.ParentID != parentID {
+				e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:i])
+				indexOfLastConnected = i
+			}
+			parentID = block.Header.ID()
+		}
+		e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:])
+
+		e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
+		continue
+
 	}
 }
 
@@ -308,7 +306,8 @@ func (e *Engine) processConnectedBatch(ctx irrecoverable.SignalerContext, ready 
 	}
 }
 
-// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
+// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events.
+// Implements `component.ComponentWorker` signature.
 func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -326,18 +325,5 @@ func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, r
 			}
 			e.core.OnFinalizedBlock(finalHeader)
 		}
-	}
-}
-
-// onBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
-func (e *Engine) onBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
-	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
-	proposalAsList := flow.Slashable[[]*messages.BlockProposal]{
-		OriginID: proposal.OriginID,
-		Message:  []*messages.BlockProposal{proposal.Message},
-	}
-	// queue proposal
-	if e.pendingBlocks.Push(proposalAsList) {
-		e.pendingBlocksNotifier.Notify()
 	}
 }

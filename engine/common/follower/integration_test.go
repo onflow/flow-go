@@ -36,7 +36,7 @@ import (
 // TestFollowerHappyPath tests Engine integrated with real modules, mocked modules are used only for functionality which is static
 // or implemented by our test case. Tests that syncing batches of blocks from other participants results in extending protocol state.
 // After processing all available blocks we check if chain has correct height and finalized block.
-// We use next setup:
+// We use the following setup:
 // Number of workers - workers
 // Number of batches submitted by worker - batchesPerWorker
 // Number of blocks in each batch submitted by worker - blocksPerBatch

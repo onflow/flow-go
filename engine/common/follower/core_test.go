@@ -128,7 +128,8 @@ func (s *CoreSuite) TestAddFinalizedBlock() {
 //  2. added to the pending cache
 //  3. added to the pending tree
 //  4. added to the protocol state
-// Finally, the certified blocks should be forwarded to the HotStuff follower. 
+//
+// Finally, the certified blocks should be forwarded to the HotStuff follower.
 func (s *CoreSuite) TestProcessingRangeHappyPath() {
 	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
 
@@ -202,9 +203,11 @@ func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
 
 	var wg sync.WaitGroup
 	wg.Add(len(blocks) - 1)
-	s.follower.On("SubmitProposal", mock.Anything).Return().Run(func(args mock.Arguments) {
-		wg.Done()
-	}).Times(len(blocks) - 1)
+	for _, block := range blocks[:len(blocks)-1] {
+		s.follower.On("SubmitProposal", model.ProposalFromFlow(block.Header)).Return().Run(func(args mock.Arguments) {
+			wg.Done()
+		}).Once()
+	}
 
 	lastSubmittedBlockID := flow.ZeroID
 	s.state.On("ExtendCertified", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -241,12 +244,13 @@ func (s *CoreSuite) TestDetectingProposalEquivocation() {
 }
 
 // TestConcurrentAdd simulates multiple workers adding batches of connected blocks out of order.
-// We use next setup:
+// We use the following setup:
 // Number of workers - workers
 //   - Number of workers - workers
 //   - Number of batches submitted by worker - batchesPerWorker
 //   - Number of blocks in each batch submitted by worker - blocksPerBatch
 //   - Each worker submits batchesPerWorker*blocksPerBatch blocks
+//
 // In total we will submit workers*batchesPerWorker*blocksPerBatch
 // After submitting all blocks we expect that chain of blocks except last one will be added to the protocol state and
 // submitted for further processing to Hotstuff layer.
