@@ -17,7 +17,7 @@ const (
 	// If the overall penalty of this node drops below this threshold, the node is reported to be disallow-listed by
 	// the networking layer, i.e., existing connections to the node are closed and the node is no longer allowed to connect till
 	// its penalty is decayed back to zero.
-	misbehaviorDisallowListingThreshold = -86400
+	misbehaviorDisallowListingThreshold = -24 * 60 * 60 // maximum block-list period is 1 day
 
 	// defaultPenaltyValue is the default penalty value for misbehaving nodes.
 	// By default, each reported infringement will be penalized by this value. However, the penalty can be amplified
