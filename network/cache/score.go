@@ -99,14 +99,31 @@ func (a *AppScoreCache) Update(record AppScoreRecord) error {
 //   - the application specific Score of the peer.
 //   - the Decay factor of the application specific Score of the peer.
 //   - true if the application specific Score of the peer is found in the cache, false otherwise.
-func (a *AppScoreCache) Get(peerID peer.ID) (*AppScoreRecord, bool) {
+func (a *AppScoreCache) Get(peerID peer.ID) (*AppScoreRecord, error, bool) {
 	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the entry.
-	entry, exists := a.c.ByID(entityId)
-	if !exists {
-		return nil, false
+	if !a.c.Has(entityId) {
+		return nil, nil, false
 	}
-	appScoreCacheEntry := entry.(appScoreRecordEntity)
-	return &appScoreCacheEntry.AppScoreRecord, true
+
+	record, updated := a.c.Adjust(entityId, func(entry flow.Entity) flow.Entity {
+		e := entry.(appScoreRecordEntity)
+		if e.Score < 0 {
+			e.Score = 0
+		}
+		e.Score = DecayScore(e.Score, e.Decay, time.Now())
+		e.LastUpdated = time.Now()
+		return e
+	})
+	if !updated {
+		return nil, fmt.Errorf("could not decay cache entry for peer %s", peerID), false
+	}
+
+	r := record.(appScoreRecordEntity).AppScoreRecord
+	return &r, nil, true
+}
+
+func DecayScore(score float64, decay float64, lastUpdated time.Time) float64 {
+	return score * decay * time.Since(lastUpdated).Seconds()
 }
 
 // AppScoreRecord represents the application specific Score of a peer in the GossipSub protocol.
