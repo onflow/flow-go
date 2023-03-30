@@ -199,6 +199,7 @@ func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error
 
 // processCoreSeqEvents processes events that need to be dispatched on dedicated core's goroutine.
 // Here we process events that need to be sequentially ordered(processing certified blocks and new finalized blocks).
+// Implements `component.ComponentWorker` signature.
 // Is NOT concurrency safe: should be executed by _single dedicated_ goroutine.
 func (c *Core) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()

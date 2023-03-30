@@ -122,8 +122,13 @@ func (s *CoreSuite) TestAddFinalizedBlock() {
 	require.Nil(s.T(), s.core.pendingCache.Peek(block.ID()))
 }
 
-// TestProcessingRangeHappyPath tests processing range with length > 1, which will result in a chain of certified blocks
-// that have to be added to the protocol state once validated and added to pending cache and then pending tree.
+// TestProcessingRangeHappyPath tests processing range of blocks with length > 1, which should result
+// in a chain of certified blocks that have been
+//  1. validated
+//  2. added to the pending cache
+//  3. added to the pending tree
+//  4. added to the protocol state
+// Finally, the certified blocks should be forwarded to the HotStuff follower. 
 func (s *CoreSuite) TestProcessingRangeHappyPath() {
 	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
 
@@ -238,9 +243,10 @@ func (s *CoreSuite) TestDetectingProposalEquivocation() {
 // TestConcurrentAdd simulates multiple workers adding batches of connected blocks out of order.
 // We use next setup:
 // Number of workers - workers
-// Number of batches submitted by worker - batchesPerWorker
-// Number of blocks in each batch submitted by worker - blocksPerBatch
-// Each worker submits batchesPerWorker*blocksPerBatch blocks
+//   - Number of workers - workers
+//   - Number of batches submitted by worker - batchesPerWorker
+//   - Number of blocks in each batch submitted by worker - blocksPerBatch
+//   - Each worker submits batchesPerWorker*blocksPerBatch blocks
 // In total we will submit workers*batchesPerWorker*blocksPerBatch
 // After submitting all blocks we expect that chain of blocks except last one will be added to the protocol state and
 // submitted for further processing to Hotstuff layer.
