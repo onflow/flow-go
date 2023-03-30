@@ -375,9 +375,6 @@ func TestRandomProofs(t *testing.T) {
 		withForest(t, pathByteSize, experimentRep+1, func(t *testing.T, f *mtrie.Forest) {
 
 			// generate some random paths and payloads
-			seed := time.Now().UnixNano()
-			rand.Seed(seed)
-			t.Logf("rand seed is %x", seed)
 			numberOfPaths := rand.Intn(256) + 1
 			paths := testutils.RandomPaths(numberOfPaths)
 			payloads := testutils.RandomPayloads(numberOfPaths, minPayloadSize, maxPayloadSize)
