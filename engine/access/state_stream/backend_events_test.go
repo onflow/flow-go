@@ -77,13 +77,13 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 
 		t2 := test
 		t2.name = fmt.Sprintf("%s - some events", test.name)
-		t2.filters, err = NewEventFilter(chain, []string{string(testEventTypes[0])}, nil, nil, nil)
+		t2.filters, err = NewEventFilter(chain, []string{string(testEventTypes[0])}, nil, nil)
 		require.NoError(s.T(), err)
 		tests = append(tests, t2)
 
 		t3 := test
 		t3.name = fmt.Sprintf("%s - no events", test.name)
-		t3.filters, err = NewEventFilter(chain, []string{"A.0x1.NonExistent.Event"}, nil, nil, nil)
+		t3.filters, err = NewEventFilter(chain, []string{"A.0x1.NonExistent.Event"}, nil, nil)
 		require.NoError(s.T(), err)
 		tests = append(tests, t3)
 	}

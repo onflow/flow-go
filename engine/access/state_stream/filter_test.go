@@ -29,7 +29,6 @@ func TestContructor(t *testing.T) {
 		eventTypes []string
 		addresses  []string
 		contracts  []string
-		eventNames []string
 		err        bool
 	}{
 		{
@@ -40,7 +39,6 @@ func TestContructor(t *testing.T) {
 			eventTypes: []string{"flow.AccountCreated", "A.0000000000000001.Contract1.EventA"},
 			addresses:  []string{"0000000000000001", "0000000000000002"},
 			contracts:  []string{"A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
-			eventNames: []string{"EventA", "EventB"},
 		},
 		{
 			name:       "invalid event type",
@@ -57,18 +55,13 @@ func TestContructor(t *testing.T) {
 			contracts: []string{"invalid.contract"},
 			err:       true,
 		},
-		{
-			name:       "invalid event name",
-			eventNames: []string{"invalid.event"},
-			err:        true,
-		},
 	}
 
 	chain := flow.MonotonicEmulator.Chain()
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			filter, err := state_stream.NewEventFilter(chain, test.eventTypes, test.addresses, test.contracts, test.eventNames)
+			filter, err := state_stream.NewEventFilter(chain, test.eventTypes, test.addresses, test.contracts)
 			if test.err {
 				assert.Error(t, err)
 				assert.Equal(t, filter, state_stream.EventFilter{})
@@ -77,7 +70,6 @@ func TestContructor(t *testing.T) {
 				assert.Len(t, filter.EventTypes, len(test.eventTypes))
 				assert.Len(t, filter.Addresses, len(test.addresses))
 				assert.Len(t, filter.Contracts, len(test.contracts))
-				assert.Len(t, filter.EventNames, len(test.eventNames))
 			}
 		})
 	}
@@ -89,7 +81,6 @@ func TestMatch(t *testing.T) {
 		eventTypes []string
 		addresses  []string
 		contracts  []string
-		eventNames []string
 		matches    map[flow.EventType]bool
 	}{
 		{
@@ -126,23 +117,10 @@ func TestMatch(t *testing.T) {
 			},
 		},
 		{
-			name:       "eventname filter",
-			eventNames: []string{"EventA", "EventC"},
-			matches: map[flow.EventType]bool{
-				"A.0000000000000001.Contract1.EventA": true,
-				"A.0000000000000001.Contract2.EventA": true,
-				"A.0000000000000001.Contract3.EventA": true,
-				"A.0000000000000002.Contract1.EventA": true,
-				"A.0000000000000002.Contract4.EventC": true,
-				"A.0000000000000003.Contract5.EventA": true,
-			},
-		},
-		{
 			name:       "multiple filters",
 			eventTypes: []string{"A.0000000000000001.Contract1.EventA"},
 			addresses:  []string{"0000000000000002"},
 			contracts:  []string{"flow", "A.0000000000000001.Contract1", "A.0000000000000001.Contract2"},
-			eventNames: []string{"EventD"},
 			matches: map[flow.EventType]bool{
 				"flow.AccountCreated":                 true,
 				"flow.AccountKeyAdded":                true,
@@ -151,7 +129,6 @@ func TestMatch(t *testing.T) {
 				"A.0000000000000001.Contract2.EventA": true,
 				"A.0000000000000002.Contract1.EventA": true,
 				"A.0000000000000002.Contract4.EventC": true,
-				"A.0000000000000003.Contract5.EventD": true,
 			},
 		},
 	}
@@ -166,7 +143,7 @@ func TestMatch(t *testing.T) {
 			for _, address := range test.addresses {
 				t.Log(flow.HexToAddress(address))
 			}
-			filter, err := state_stream.NewEventFilter(flow.MonotonicEmulator.Chain(), test.eventTypes, test.addresses, test.contracts, test.eventNames)
+			filter, err := state_stream.NewEventFilter(flow.MonotonicEmulator.Chain(), test.eventTypes, test.addresses, test.contracts)
 			assert.NoError(t, err)
 			for _, event := range events {
 				assert.Equal(t, test.matches[event.Type], filter.Match(event), "event type: %s", event.Type)

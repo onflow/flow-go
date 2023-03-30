@@ -13,7 +13,6 @@ type EventFilter struct {
 	EventTypes map[flow.EventType]struct{}
 	Addresses  map[string]struct{}
 	Contracts  map[string]struct{}
-	EventNames map[string]struct{}
 }
 
 func NewEventFilter(
@@ -21,13 +20,11 @@ func NewEventFilter(
 	eventTypes []string,
 	addresses []string,
 	contracts []string,
-	eventNames []string,
 ) (EventFilter, error) {
 	f := EventFilter{
 		EventTypes: make(map[flow.EventType]struct{}, len(eventTypes)),
 		Addresses:  make(map[string]struct{}, len(addresses)),
 		Contracts:  make(map[string]struct{}, len(contracts)),
-		EventNames: make(map[string]struct{}, len(eventNames)),
 	}
 
 	// Check all of the filters to ensure they are correctly formatted. This helps avoid searching
@@ -56,13 +53,7 @@ func NewEventFilter(
 		f.Contracts[contract] = struct{}{}
 	}
 
-	for _, eventName := range eventNames {
-		if err := validateEventName(eventName); err != nil {
-			return EventFilter{}, err
-		}
-		f.EventNames[eventName] = struct{}{}
-	}
-	f.hasFilters = len(f.EventTypes) > 0 || len(f.Addresses) > 0 || len(f.Contracts) > 0 || len(f.EventNames) > 0
+	f.hasFilters = len(f.EventTypes) > 0 || len(f.Addresses) > 0 || len(f.Contracts) > 0
 	return f, nil
 }
 
@@ -93,10 +84,6 @@ func (f *EventFilter) Match(event flow.Event) bool {
 	if err != nil {
 		// TODO: log this error
 		return false
-	}
-
-	if _, ok := f.EventNames[parsed.Name]; ok {
-		return true
 	}
 
 	if _, ok := f.Contracts[parsed.Contract]; ok {
@@ -137,15 +124,6 @@ func validateContract(contract string) error {
 	parts := strings.Split(contract, ".")
 	if len(parts) != 3 || parts[0] != "A" {
 		return fmt.Errorf("invalid contract: %s", contract)
-	}
-	return nil
-}
-
-// validateEventName ensures that the event name is in the correct format
-func validateEventName(eventName string) error {
-	parts := strings.Split(eventName, ".")
-	if len(parts) > 1 {
-		return fmt.Errorf("invalid event name: %s", eventName)
 	}
 	return nil
 }

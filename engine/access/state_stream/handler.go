@@ -105,7 +105,6 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 			reqFilter.GetEventType(),
 			reqFilter.GetAddress(),
 			reqFilter.GetContract(),
-			reqFilter.GetEventName(),
 		)
 		if err != nil {
 			return status.Errorf(codes.InvalidArgument, "could not convert event filter: %v", err)
