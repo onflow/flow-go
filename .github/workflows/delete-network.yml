@@ -4,6 +4,14 @@ name: Delete Benchnet Network
 on:
   workflow_dispatch:
     inputs:
+    
+      # The network_id is the unique identifier for the network.
+      # This ID is used to clean up and delete all 
+      network_id:
+        type: string
+        required: true
+        description: Input the network ID for the deployment to be deleted
+
       # Allows for the ref to be altered for testing automation changes
       automation_ref:
         type: string
@@ -19,13 +27,6 @@ on:
         options:
           - onflow/flow-go
           - dapperlabs/flow-go
-    
-      # The network_id is the unique identifier for the network.
-      # This ID is used to clean up and delete all 
-      network_id:
-        type: string
-        required: true
-        description: Input the network ID for the deployment to be deleted
 
 env:
   GCP_PROJECT: "dl-flow-benchnet-automation"
