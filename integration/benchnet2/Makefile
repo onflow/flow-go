@@ -5,6 +5,8 @@ FLOW_GO_TAG := v0.28.15
 BRANCH_NAME:=$(shell git rev-parse --abbrev-ref HEAD | tr '/' '-')
 DOCKER_TAG := $(FLOW_GO_TAG)
 COMMIT_SHA:=$(shell git rev-parse --short=9 HEAD)
+RELEASE_NAME := ingress-nginx
+CHART_VERSION := 4.1.11
 
 ifeq ($(strip $(FLOW_GO_TAG)),)
 	$(eval FLOW_GO_TAG=$(BRANCH_NAME))
@@ -104,3 +106,12 @@ clone-flow: clean-flow
 	
 clean-flow:
 	rm -rf flow-go
+
+.PHONY: install-nginx
+install-nginx:
+	helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+	helm repo update
+	helm upgrade --install $(RELEASE_NAME) ingress-nginx/ingress-nginx \
+		--version=$(CHART_VERSION) \
+		--namespace=$(NAMESPACE) \
+		--set controller.metrics.enabled=true 
