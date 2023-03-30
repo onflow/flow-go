@@ -164,8 +164,9 @@ metadata:
     service: flow
   annotations:
     kubernetes.io/ingress.class: nginx
-    nginx.org/proxy-buffering: "true"
+    nginx.org/proxy-buffering: on
     nginx.org/proxy-buffer-size: 32k
+    nginx.org/backend-protocol: GRPC
 spec:
   rules:
     - host: {{ $k }}-{{ $.Values.networkId }}.benchnet.onflow.org
