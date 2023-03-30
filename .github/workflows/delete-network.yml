@@ -67,4 +67,4 @@ jobs:
 
       - name: Delete Network using provided Network ID
         working-directory: integration/benchnet2/
-        run: make clean-all NAMESPACE=benchnet NETWORK_ID=${{ inputs.network_id }}
+        run: make remote-clean-all NAMESPACE=benchnet NETWORK_ID=${{ inputs.network_id }}
