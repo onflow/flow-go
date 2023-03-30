@@ -1,0 +1,524 @@
+
+defaults: {}
+
+access:
+  defaults:
+    imagePullPolicy: Always
+    containerPorts:
+      - name: metrics
+        containerPort: 8080
+      - name: ptp
+        containerPort: 3569
+      - name: grpc
+        containerPort: 9000
+      - name: secure-grpc
+        containerPort: 9001
+      - name: admin
+        containerPort: 9002
+    env: []
+    servicePorts:
+      - name: ptp
+        protocol: TCP
+        port: 3569
+        targetPort: ptp
+      - name: grpc
+        protocol: TCP
+        port: 9000
+        targetPort: grpc
+      - name: secure-grpc
+        protocol: TCP
+        port: 9001
+        targetPort: secure-grpc
+      - name: admin
+        protocol: TCP
+        port: 9002
+        targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "128Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
+    storage: 1G
+  nodes:
+    access1-sptesting:
+      args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --bind=0.0.0.0:3569
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid=c031fc6a2eb01169a15c6a5f0b3bc450c31c395897d838a031bb09622ac7e689
+        - --loglevel=INFO
+        - --rpc-addr=0.0.0.0:9000
+        - --secure-rpc-addr=0.0.0.0:9001
+        - --http-addr=0.0.0.0:8000
+        - --collection-ingress-port=9000
+        - --supports-observer=true
+        - --public-network-address=0.0.0.0:1234
+        - --log-tx-time-to-finalized
+        - --log-tx-time-to-executed
+        - --log-tx-time-to-finalized-executed
+      env:
+        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+          value: http://tempo:4317
+        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
+          value: "true"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: network=benchnet2,role=access,num=access1-sptesting-sptesting
+      image: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet/access:sptesting
+      nodeId: c031fc6a2eb01169a15c6a5f0b3bc450c31c395897d838a031bb09622ac7e689
+collection:
+  defaults:
+    imagePullPolicy: Always
+    containerPorts:
+      - name: metrics
+        containerPort: 8080
+      - name: ptp
+        containerPort: 3569
+      - name: grpc
+        containerPort: 9000
+      - name: secure-grpc
+        containerPort: 9001
+      - name: admin
+        containerPort: 9002
+    env: []
+    servicePorts:
+      - name: ptp
+        protocol: TCP
+        port: 3569
+        targetPort: ptp
+      - name: grpc
+        protocol: TCP
+        port: 9000
+        targetPort: grpc
+      - name: secure-grpc
+        protocol: TCP
+        port: 9001
+        targetPort: secure-grpc
+      - name: admin
+        protocol: TCP
+        port: 9002
+        targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "128Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
+    storage: 1G
+  nodes:
+    collection2-sptesting:
+      args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --bind=0.0.0.0:3569
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid=416c65782048656e74736368656c008f4089b94d4debcfd35cf1e39c0a940cb5
+        - --loglevel=INFO
+        - --block-rate-delay=950ms
+        - --ingress-addr=0.0.0.0:9000
+        - --insecure-access-api=false
+        - --access-node-ids=*
+      env:
+        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+          value: http://tempo:4317
+        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
+          value: "true"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: network=benchnet2,role=collection,num=collection2-sptesting-sptesting
+      image: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet/collection:sptesting
+      nodeId: 416c65782048656e74736368656c008f4089b94d4debcfd35cf1e39c0a940cb5
+    collection3-sptesting:
+      args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --bind=0.0.0.0:3569
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid=416e647265772042757269616e0085edad3fd7a18831bce7452181274fe6835f
+        - --loglevel=INFO
+        - --block-rate-delay=950ms
+        - --ingress-addr=0.0.0.0:9000
+        - --insecure-access-api=false
+        - --access-node-ids=*
+      env:
+        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+          value: http://tempo:4317
+        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
+          value: "true"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: network=benchnet2,role=collection,num=collection3-sptesting-sptesting
+      image: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet/collection:sptesting
+      nodeId: 416e647265772042757269616e0085edad3fd7a18831bce7452181274fe6835f
+    collection4-sptesting:
+      args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --bind=0.0.0.0:3569
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid=4261737469616e204d756c6c657200b3ebf0753b093750059757116ec6eed384
+        - --loglevel=INFO
+        - --block-rate-delay=950ms
+        - --ingress-addr=0.0.0.0:9000
+        - --insecure-access-api=false
+        - --access-node-ids=*
+      env:
+        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+          value: http://tempo:4317
+        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
+          value: "true"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: network=benchnet2,role=collection,num=collection4-sptesting-sptesting
+      image: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet/collection:sptesting
+      nodeId: 4261737469616e204d756c6c657200b3ebf0753b093750059757116ec6eed384
+    collection5-sptesting:
+      args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --bind=0.0.0.0:3569
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid=42656e6a616d696e2056616e204d6574657200fde73634162c6b9c29c7a834e2
+        - --loglevel=INFO
+        - --block-rate-delay=950ms
+        - --ingress-addr=0.0.0.0:9000
+        - --insecure-access-api=false
+        - --access-node-ids=*
+      env:
+        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+          value: http://tempo:4317
+        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
+          value: "true"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: network=benchnet2,role=collection,num=collection5-sptesting-sptesting
+      image: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet/collection:sptesting
+      nodeId: 42656e6a616d696e2056616e204d6574657200fde73634162c6b9c29c7a834e2
+    collection6-sptesting:
+      args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --bind=0.0.0.0:3569
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid=436173657920417272696e67746f6e0030b201cc08610d1b1c4636dd930c36ca
+        - --loglevel=INFO
+        - --block-rate-delay=950ms
+        - --ingress-addr=0.0.0.0:9000
+        - --insecure-access-api=false
+        - --access-node-ids=*
+      env:
+        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+          value: http://tempo:4317
+        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
+          value: "true"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: network=benchnet2,role=collection,num=collection6-sptesting-sptesting
+      image: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet/collection:sptesting
+      nodeId: 436173657920417272696e67746f6e0030b201cc08610d1b1c4636dd930c36ca
+    collection1-sptesting:
+      args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --bind=0.0.0.0:3569
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid=f191c645a5eb7123b2828233513478d1fc792209d85210c608920ee6d4a1a887
+        - --loglevel=INFO
+        - --block-rate-delay=950ms
+        - --ingress-addr=0.0.0.0:9000
+        - --insecure-access-api=false
+        - --access-node-ids=*
+      env:
+        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+          value: http://tempo:4317
+        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
+          value: "true"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: network=benchnet2,role=collection,num=collection1-sptesting-sptesting
+      image: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet/collection:sptesting
+      nodeId: f191c645a5eb7123b2828233513478d1fc792209d85210c608920ee6d4a1a887
+consensus:
+  defaults:
+    imagePullPolicy: Always
+    containerPorts:
+      - name: metrics
+        containerPort: 8080
+      - name: ptp
+        containerPort: 3569
+      - name: grpc
+        containerPort: 9000
+      - name: secure-grpc
+        containerPort: 9001
+      - name: admin
+        containerPort: 9002
+    env: []
+    servicePorts:
+      - name: ptp
+        protocol: TCP
+        port: 3569
+        targetPort: ptp
+      - name: grpc
+        protocol: TCP
+        port: 9000
+        targetPort: grpc
+      - name: secure-grpc
+        protocol: TCP
+        port: 9001
+        targetPort: secure-grpc
+      - name: admin
+        protocol: TCP
+        port: 9002
+        targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "128Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
+    storage: 1G
+  nodes:
+    consensus1-sptesting:
+      args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --bind=0.0.0.0:3569
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid=44696574657220536869726c6579004133500e213a6a68978f519c7e478bea64
+        - --loglevel=DEBUG
+        - --block-rate-delay=800ms
+        - --chunk-alpha=1
+        - --emergency-sealing-active=false
+        - --insecure-access-api=false
+        - --access-node-ids=*
+      env:
+        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+          value: http://tempo:4317
+        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
+          value: "true"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: network=benchnet2,role=consensus,num=consensus1-sptesting-sptesting
+      image: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet/consensus:sptesting
+      nodeId: 44696574657220536869726c6579004133500e213a6a68978f519c7e478bea64
+    consensus2-sptesting:
+      args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --bind=0.0.0.0:3569
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid=4a616d65732048756e74657200440e4b6cc54c48c9235820945eb2607fc7c0e1
+        - --loglevel=DEBUG
+        - --block-rate-delay=800ms
+        - --chunk-alpha=1
+        - --emergency-sealing-active=false
+        - --insecure-access-api=false
+        - --access-node-ids=*
+      env:
+        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+          value: http://tempo:4317
+        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
+          value: "true"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: network=benchnet2,role=consensus,num=consensus2-sptesting-sptesting
+      image: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet/consensus:sptesting
+      nodeId: 4a616d65732048756e74657200440e4b6cc54c48c9235820945eb2607fc7c0e1
+execution:
+  defaults:
+    imagePullPolicy: Always
+    containerPorts:
+      - name: metrics
+        containerPort: 8080
+      - name: ptp
+        containerPort: 3569
+      - name: grpc
+        containerPort: 9000
+      - name: secure-grpc
+        containerPort: 9001
+      - name: admin
+        containerPort: 9002
+    env: []
+    servicePorts:
+      - name: ptp
+        protocol: TCP
+        port: 3569
+        targetPort: ptp
+      - name: grpc
+        protocol: TCP
+        port: 9000
+        targetPort: grpc
+      - name: secure-grpc
+        protocol: TCP
+        port: 9001
+        targetPort: secure-grpc
+      - name: admin
+        protocol: TCP
+        port: 9002
+        targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "1024Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
+    storage: 10G
+  nodes:
+    execution1-sptesting:
+      args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --bind=0.0.0.0:3569
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid=4a65666665727920446f796c6500ec8dc3e92bd4c540ee740e049e22f3a6b0c2
+        - --loglevel=INFO
+        - --triedir=/trie
+        - --rpc-addr=0.0.0.0:9000
+        - --cadence-tracing=false
+        - --extensive-tracing=false
+      env:
+        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+          value: http://tempo:4317
+        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
+          value: "true"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: network=benchnet2,role=execution,num=execution1-sptesting-sptesting
+      image: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet/execution:sptesting
+      nodeId: 4a65666665727920446f796c6500ec8dc3e92bd4c540ee740e049e22f3a6b0c2
+    execution2-sptesting:
+      args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --bind=0.0.0.0:3569
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid=4a6f7264616e20536368616c6d0084d55715194d4459d904740109b3454a9fe5
+        - --loglevel=INFO
+        - --triedir=/trie
+        - --rpc-addr=0.0.0.0:9000
+        - --cadence-tracing=false
+        - --extensive-tracing=false
+      env:
+        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+          value: http://tempo:4317
+        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
+          value: "true"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: network=benchnet2,role=execution,num=execution2-sptesting-sptesting
+      image: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet/execution:sptesting
+      nodeId: 4a6f7264616e20536368616c6d0084d55715194d4459d904740109b3454a9fe5
+verification:
+  defaults:
+    imagePullPolicy: Always
+    containerPorts:
+      - name: metrics
+        containerPort: 8080
+      - name: ptp
+        containerPort: 3569
+      - name: grpc
+        containerPort: 9000
+      - name: secure-grpc
+        containerPort: 9001
+      - name: admin
+        containerPort: 9002
+    env: []
+    servicePorts:
+      - name: ptp
+        protocol: TCP
+        port: 3569
+        targetPort: ptp
+      - name: grpc
+        protocol: TCP
+        port: 9000
+        targetPort: grpc
+      - name: secure-grpc
+        protocol: TCP
+        port: 9001
+        targetPort: secure-grpc
+      - name: admin
+        protocol: TCP
+        port: 9002
+        targetPort: admin
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
+    storage: 1G
+  nodes:
+    verification1-sptesting:
+      args:
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --bind=0.0.0.0:3569
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid=4a6f73682048616e6e616e00ece5e042c2a49305c46daa831582d351038c59d4
+        - --loglevel=INFO
+        - --chunk-alpha=1
+      env:
+        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+          value: http://tempo:4317
+        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
+          value: "true"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: network=benchnet2,role=verification,num=verification1-sptesting-sptesting
+      image: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet/verification:sptesting
+      nodeId: 4a6f73682048616e6e616e00ece5e042c2a49305c46daa831582d351038c59d4

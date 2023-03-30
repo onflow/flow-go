@@ -70,7 +70,7 @@ k8s-secrets-create:
 	bash ./create-secrets.sh ${NETWORK_ID} ${NAMESPACE}
 
 helm-deploy:
-	helm upgrade --install -f ./values.yml ${NETWORK_ID} ./flow --set networkId="${NETWORK_ID}" --set owner="${OWNER}" --set ingress.enabled="true"  --debug --namespace ${NAMESPACE}
+	helm upgrade --wait --install -f ./values.yml ${NETWORK_ID} ./flow --set networkId="${NETWORK_ID}" --set owner="${OWNER}" --set ingress.enabled="true"  --debug --namespace ${NAMESPACE}
 
 k8s-delete:
 	helm delete ${NETWORK_ID} --namespace ${NAMESPACE}
