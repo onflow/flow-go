@@ -238,6 +238,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 				Logger()
 			latestFinalizedView := e.finalizedBlockTracker.NewestBlock().View
 			e.submitConnectedBatch(log, latestFinalizedView, blockMsg.OriginID, []*flow.Block{block})
+			e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 			continue
 		}
 
@@ -282,8 +283,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 			parentID = block.Header.ID()
 		}
 		e.submitConnectedBatch(log, latestFinalizedView, batch.OriginID, blocks[indexOfLastConnected:])
-
-		e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
+		e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlocks)
 	}
 }
 
