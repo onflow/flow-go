@@ -160,6 +160,14 @@ func ClosedChannel() <-chan struct{} {
 	return ch
 }
 
+// AssertClosedChannelIsEmpty asserts that the input channel is empty.
+// This function will block until the input channel is closed.
+func AssertClosedChannelIsEmpty[E any](t *testing.T, ch <-chan E) {
+	for range ch {
+		t.Fail()
+	}
+}
+
 // AssertClosesBefore asserts that the given channel closes before the
 // duration expires.
 func AssertClosesBefore(t assert.TestingT, done <-chan struct{}, duration time.Duration, msgAndArgs ...interface{}) {

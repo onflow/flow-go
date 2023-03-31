@@ -12,12 +12,43 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	statepkg "github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/state/cached"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
+
+type cachedHeader struct {
+	id     flow.Identifier
+	header *flow.Header
+}
+
+//type finalizedHeaderCache struct {
+//	lock   sync.RWMutex
+//	id     flow.Identifier
+//	header *flow.Header
+//}
+//
+//func (c *finalizedHeaderCache) set(id flow.Identifier, header *flow.Header) {
+//	c.lock.Lock()
+//	c.id = id
+//	c.header = header
+//	c.lock.Unlock()
+//}
+//
+//func (c *finalizedHeaderCache) getID() flow.Identifier {
+//	c.lock.RLock()
+//	defer c.lock.RUnlock()
+//	return c.id
+//}
+//
+//func (c *finalizedHeaderCache) getHeader() *flow.Header {
+//	c.lock.RLock()
+//	defer c.lock.RUnlock()
+//	return c.header
+//}
 
 type State struct {
 	metrics module.ComplianceMetrics
@@ -36,6 +67,7 @@ type State struct {
 	rootHeight uint64
 	// cache the spork root block height because it cannot change over the lifecycle of a protocol state instance
 	sporkRootBlockHeight uint64
+	cachedFinalHeader    cached.Value[cachedHeader]
 }
 
 var _ protocol.State = (*State)(nil)
@@ -601,14 +633,14 @@ func (state *State) Sealed() protocol.Snapshot {
 }
 
 func (state *State) Final() protocol.Snapshot {
-	// retrieve the latest finalized height
-	var finalized uint64
-	err := state.db.View(operation.RetrieveFinalizedHeight(&finalized))
-	if err != nil {
-		// finalized height must always be set, so all errors here are critical
-		return invalid.NewSnapshot(fmt.Errorf("could not retrieve finalized height: %w", err))
+	final, ok := state.cachedFinalHeader.Get()
+	if !ok {
+		return invalid.NewSnapshotf("queried finalized header but cache was empty")
 	}
-	return state.AtHeight(finalized)
+	snap := NewSnapshot(state, final.id)
+	snap.header = cached.NewWriteOnce[flow.Header]()
+	snap.header.Set(final.header)
+	return snap
 }
 
 func (state *State) AtHeight(height uint64) protocol.Snapshot {
@@ -663,6 +695,7 @@ func newState(
 			commits:  commits,
 			statuses: statuses,
 		},
+		cachedFinalHeader: cached.NewValue[cachedHeader](),
 	}
 }
 
@@ -745,6 +778,27 @@ func (state *State) populateCache() error {
 		return fmt.Errorf("could not read spork root block height: %w", err)
 	}
 	state.sporkRootBlockHeight = sporkRootBlockHeight
+
+	var finalID flow.Identifier
+	var finalHeader *flow.Header
+	err = state.db.View(func(tx *badger.Txn) error {
+		var height uint64
+		err := operation.RetrieveFinalizedHeight(&height)(tx)
+		if err != nil {
+			return err
+		}
+		err = operation.LookupBlockHeight(height, &finalID)(tx)
+		if err != nil {
+			return err
+		}
+		finalHeader, err = state.headers.ByBlockID(finalID)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	state.cachedFinalHeader.Set(&cachedHeader{finalID, finalHeader})
+
 	return nil
 }
 

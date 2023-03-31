@@ -16,6 +16,33 @@ type NewestQCTracker struct {
 	newestQC *atomic.UnsafePointer
 }
 
+type EntityCompareFunc[E any] func(a, b E) bool
+
+type NewestEntityTracker[E any] struct {
+	cmp   EntityCompareFunc[*E]
+	store *atomic.UnsafePointer
+}
+
+func NewNewestEntityTracker[E any](cmp func(a, b *E) bool) NewestEntityTracker[E] {
+	return NewestEntityTracker[E]{
+		cmp:   cmp,
+		store: atomic.NewUnsafePointer(unsafe.Pointer(nil)),
+	}
+}
+
+func (t *NewestEntityTracker[E]) Track(e *E) bool {
+	for {
+		cur := t.Get()
+		if t.cmp(e, cur) {
+
+		}
+	}
+}
+
+func (t *NewestEntityTracker[E]) Get() *E {
+	return (*E)(t.store.Load())
+}
+
 func NewNewestQCTracker() *NewestQCTracker {
 	tracker := &NewestQCTracker{
 		newestQC: atomic.NewUnsafePointer(unsafe.Pointer(nil)),

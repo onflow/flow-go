@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/state/cached"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -31,6 +32,7 @@ import (
 type Snapshot struct {
 	state   *State
 	blockID flow.Identifier // reference block for this snapshot
+	header  cached.WriteOnce[flow.Header]
 }
 
 var _ protocol.Snapshot = (*Snapshot)(nil)
@@ -39,11 +41,27 @@ func NewSnapshot(state *State, blockID flow.Identifier) *Snapshot {
 	return &Snapshot{
 		state:   state,
 		blockID: blockID,
+		header:  cached.NewWriteOnce[flow.Header](),
+	}
+}
+
+func NewSnapshotWithHeader(state *State, blockID flow.Identifier, header *flow.Header) *Snapshot {
+	return &Snapshot{
+		state:   state,
+		blockID: blockID,
+		header:  cached.NewWriteOnce[flow.Header](),
 	}
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
+	if head, ok := s.header.Get(); ok {
+		return head, nil
+	}
 	head, err := s.state.headers.ByBlockID(s.blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get header (id=%x): %w", s.blockID, err)
+	}
+	s.header.Set(head)
 	return head, err
 }
 
