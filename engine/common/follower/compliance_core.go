@@ -264,7 +264,7 @@ func (c *ComplianceCore) processCertifiedBlocks(ctx context.Context, blocks Cert
 
 	// Step 2 & 3: extend protocol state with connected certified blocks and forward them to consensus follower
 	for _, certifiedBlock := range connectedBlocks {
-		s, _ := c.tracer.StartBlockSpan(ctx, certifiedBlock.ID(), trace.FollowerExtendCertified)
+		s, _ := c.tracer.StartBlockSpan(ctx, certifiedBlock.ID(), trace.FollowerExtendProtocolState)
 		err = c.state.ExtendCertified(ctx, certifiedBlock.Block, certifiedBlock.QC)
 		s.End()
 		if err != nil {

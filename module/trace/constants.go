@@ -56,7 +56,7 @@ const (
 	FollowerProcessFinalizedBlock  SpanName = "follower.processFinalizedBlock"
 	FollowerProcessCertifiedBlocks SpanName = "follower.processCertifiedBlocks"
 	FollowerExtendPendingTree      SpanName = "follower.extendPendingTree"
-	FollowerExtendCertified        SpanName = "follower.extendCertified"
+	FollowerExtendProtocolState    SpanName = "follower.extendProtocolState"
 
 	// Collection Node
 	//
