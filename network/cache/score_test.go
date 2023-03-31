@@ -156,14 +156,14 @@ func TestAppScoreRecordStoredByValue(t *testing.T) {
 func TestAppScoreCache_Get_WithPreprocessors(t *testing.T) {
 	cache := netcache.NewAppScoreCache(10, unittest.Logger(), metrics.NewNoopCollector(),
 		// first preprocessor: adds 1 to the score.
-		func(record netcache.AppScoreRecord, lastUpdated time.Time) netcache.AppScoreRecord {
+		func(record netcache.AppScoreRecord, lastUpdated time.Time) (netcache.AppScoreRecord, error) {
 			record.Score++
-			return record
+			return record, nil
 		},
 		// second preprocessor: multiplies the score by 2
-		func(record netcache.AppScoreRecord, lastUpdated time.Time) netcache.AppScoreRecord {
+		func(record netcache.AppScoreRecord, lastUpdated time.Time) (netcache.AppScoreRecord, error) {
 			record.Score *= 2
-			return record
+			return record, nil
 		},
 	)
 
@@ -185,6 +185,71 @@ func TestAppScoreCache_Get_WithPreprocessors(t *testing.T) {
 	assert.Equal(t, 4.0, cachedRecord.Score)               // score should be updated
 	assert.Equal(t, 0.5, cachedRecord.Decay)               // decay should not be modified
 	assert.Equal(t, peer.ID("peerA"), cachedRecord.PeerID) // peerID should not be modified
+}
+
+// TestAppScoreCache_Update_PreprocessingError tests if the cache returns an error if one of the preprocessors returns an error.
+// It adds a record to the cache and then checks if the cache returns an error if one of the preprocessors returns an error.
+// It also checks if a preprocessor is failed, the subsequent preprocessors are not called, and the original record is returned.
+// In other words, the Get method acts atomically on the record for applying the preprocessors. If one of the preprocessors
+// fails, the record is returned without applying the subsequent preprocessors.
+func TestAppScoreCache_Update_PreprocessingError(t *testing.T) {
+	secondPreprocessorCalledCount := 0
+	thirdPreprocessorCalledCount := 0
+
+	cache := netcache.NewAppScoreCache(10, unittest.Logger(), metrics.NewNoopCollector(),
+		// first preprocessor: adds 1 to the score.
+		func(record netcache.AppScoreRecord, lastUpdated time.Time) (netcache.AppScoreRecord, error) {
+			record.Score++
+			return record, nil
+		},
+		// second preprocessor: multiplies the score by 2 (this preprocessor returns an error on the second call)
+		func(record netcache.AppScoreRecord, lastUpdated time.Time) (netcache.AppScoreRecord, error) {
+			secondPreprocessorCalledCount++
+			if secondPreprocessorCalledCount < 2 {
+				// on the first call, the preprocessor is successful
+				return record, nil
+			} else {
+				// on the second call, the preprocessor returns an error
+				return netcache.AppScoreRecord{}, fmt.Errorf("error in preprocessor")
+			}
+		},
+		// since second preprocessor returns an error on the second call, the third preprocessor should not be called more than once..
+		func(record netcache.AppScoreRecord, lastUpdated time.Time) (netcache.AppScoreRecord, error) {
+			thirdPreprocessorCalledCount++
+			require.Less(t, secondPreprocessorCalledCount, 2)
+			return record, nil
+		},
+	)
+
+	record := netcache.AppScoreRecord{
+		PeerID: "peerA",
+		Decay:  0.5,
+		Score:  1,
+	}
+	err := cache.Update(record)
+	assert.NoError(t, err)
+
+	// verifies that the preprocessors were called and the score was updated accordingly.
+	cachedRecord, err, ok := cache.Get("peerA")
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, 2.0, cachedRecord.Score) // score should be updated by the first preprocessor (1 + 1 = 2)
+	assert.Equal(t, 0.5, cachedRecord.Decay)
+	assert.Equal(t, peer.ID("peerA"), cachedRecord.PeerID)
+
+	// query the cache again that should trigger the second preprocessor to return an error.
+	// the cache should return the original record without any modifications.
+	cachedRecord, err, ok = cache.Get("peerA")
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, 2.0, cachedRecord.Score) // score should not be updated
+	assert.Equal(t, 0.5, cachedRecord.Decay)
+	assert.Equal(t, peer.ID("peerA"), cachedRecord.PeerID)
+
+	// verifies that the third preprocessor was not called.
+	assert.Equal(t, 1, thirdPreprocessorCalledCount)
+	// verifies that the second preprocessor was called only twice (one success, and one failure).
+	assert.Equal(t, 2, secondPreprocessorCalledCount)
 }
 
 // TestAppScoreCache_Get_WithNoPreprocessors tests when no preprocessors are provided to the cache constructor
