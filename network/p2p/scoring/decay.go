@@ -36,10 +36,5 @@ func GeometricDecay(score float64, decay float64, lastUpdated time.Time) (float6
 		return 0.0, fmt.Errorf("decay factor is NaN for %f^%f", decay, t)
 	}
 
-	decayedScore := score * decayFactor
-	if decayedScore > score {
-		return 0.0, fmt.Errorf("decayed score is greater than the original score")
-	}
-
 	return score * decayFactor, nil
 }
