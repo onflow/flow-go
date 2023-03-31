@@ -130,6 +130,33 @@ func createMultipleRandomTries(t *testing.T) []*trie.MTrie {
 	return tries
 }
 
+func createMultipleRandomTriesMini(t *testing.T) []*trie.MTrie {
+	tries := make([]*trie.MTrie, 0)
+	activeTrie := trie.NewEmptyMTrie()
+
+	var err error
+	// add tries with no shared paths
+	for i := 0; i < 5; i++ {
+		paths, payloads := randNPathPayloads(10)
+		activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, paths, payloads, false)
+		require.NoError(t, err, "update registers")
+		tries = append(tries, activeTrie)
+	}
+
+	// add trie with some shared path
+	sharedPaths, payloads1 := randNPathPayloads(10)
+	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads1, false)
+	require.NoError(t, err, "update registers")
+	tries = append(tries, activeTrie)
+
+	_, payloads2 := randNPathPayloads(10)
+	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads2, false)
+	require.NoError(t, err, "update registers")
+	tries = append(tries, activeTrie)
+
+	return tries
+}
+
 func TestEncodeSubTrie(t *testing.T) {
 	file := "checkpoint"
 	logger := unittest.Logger()
@@ -276,6 +303,57 @@ func TestCheckpointV6IsDeterminstic(t *testing.T) {
 	})
 }
 
+func TestWriteAndReadCheckpointV6LeafEmptyTrie(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := []*trie.MTrie{trie.NewEmptyMTrie()}
+		fileName := "checkpoint-empty-trie"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		resultChan, err := OpenAndReadLeafNodesFromCheckpointV6(dir, fileName, &logger)
+		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+		for range resultChan {
+			require.Fail(t, "should not return any nodes")
+		}
+	})
+}
+
+func TestWriteAndReadCheckpointV6LeafSimpleTrie(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimpleTrie(t)
+		fileName := "checkpoint"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		resultChan, err := OpenAndReadLeafNodesFromCheckpointV6(dir, fileName, &logger)
+		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+		resultPayloads := make([]ledger.Payload, 0)
+		for readResult := range resultChan {
+			require.NoError(t, readResult.Err, "no errors in read results")
+			// avoid dummy payload from empty trie
+			if readResult.LeafNode.Payload != nil {
+				resultPayloads = append(resultPayloads, *readResult.LeafNode.Payload)
+			}
+		}
+		require.EqualValues(t, tries[1].AllPayloads(), resultPayloads)
+	})
+}
+
+func TestWriteAndReadCheckpointV6LeafMultipleTries(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		fileName := "checkpoint-multi-leaf-file"
+		tries := createMultipleRandomTriesMini(t)
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		resultChan, err := OpenAndReadLeafNodesFromCheckpointV6(dir, fileName, &logger)
+		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+		resultPayloads := make([]ledger.Payload, 0)
+		for readResult := range resultChan {
+			require.NoError(t, readResult.Err, "no errors in read results")
+			resultPayloads = append(resultPayloads, *readResult.LeafNode.Payload)
+		}
+		require.NotEmpty(t, resultPayloads)
+	})
+}
+
 // compareFiles takes two files' full path, and read them bytes by bytes and compare if
 // the two files are identical
 // it returns nil if identical
@@ -414,6 +492,34 @@ func TestAllPartFileExist(t *testing.T) {
 			require.NoError(t, err, "fail to remove part file")
 
 			_, err = OpenAndReadCheckpointV6(dir, fileName, &logger)
+			require.ErrorIs(t, err, os.ErrNotExist, "wrong error type returned")
+		}
+	})
+}
+
+// verify that if a part file is missing then os.ErrNotExist should return
+func TestAllPartFileExistLeafReader(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		for i := 0; i < 17; i++ {
+			tries := createSimpleTrie(t)
+			fileName := fmt.Sprintf("checkpoint_missing_part_file_%v", i)
+			var fileToDelete string
+			var err error
+			if i == 16 {
+				fileToDelete, _ = filePathTopTries(dir, fileName)
+			} else {
+				fileToDelete, _, err = filePathSubTries(dir, fileName, i)
+			}
+			require.NoErrorf(t, err, "fail to find sub trie file path")
+
+			logger := unittest.Logger()
+			require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+
+			// delete i-th part file, then the error should mention i-th file missing
+			err = os.Remove(fileToDelete)
+			require.NoError(t, err, "fail to remove part file")
+
+			_, err = OpenAndReadLeafNodesFromCheckpointV6(dir, fileName, &logger)
 			require.ErrorIs(t, err, os.ErrNotExist, "wrong error type returned")
 		}
 	})

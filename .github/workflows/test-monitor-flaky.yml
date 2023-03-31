@@ -72,6 +72,8 @@ jobs:
         TEST_FLAKY: true
         JSON_OUTPUT: true
         RACE_DETECTOR: 1
+    - name: Print test results
+      run: cat test-output
     - name: Process test results
       run: cat test-output | go run tools/test_monitor/level1/process_summary1_results.go
       env:

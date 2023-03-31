@@ -1,18 +1,15 @@
-package derived
+package logical
 
 import (
 	"math"
 )
 
-// We will use txIndex as logical time for the purpose of "caching" derived
-// data.
+// We will use txIndex as logical time for the purpose of block execution.
 //
 // Execution time refers to the transaction's start time.  Snapshot time refers
 // to the time when the snapshot first becomes readable (i.e., the "snapshot
-// time - 1" transaction committed the snapshot view).  The snapshot is where
-// the derived value is computed from if no cached value is available.
-// Each transaction's snapshot time must be smaller than or equal to its
-// execution time.
+// time - 1" transaction committed the snapshot view).  Each transaction's
+// snapshot time must be smaller than or equal to its execution time.
 //
 // Normal transaction advances the time clock and must be committed to
 // DerivedBlockData in monotonically increasing execution time order.
@@ -24,21 +21,21 @@ import (
 // Note that the "real" txIndex range is [0, math.MaxUint32], but we have
 // expanded the range to support events that are not part of the block
 // execution.
-type LogicalTime int64
+type Time int64
 
 const (
 	// All events associated with the parent block is assigned the same value.
 	//
 	// Note that we can assign the time to any value in the range
 	// [math.MinInt64, -1].
-	ParentBlockTime = LogicalTime(-1)
+	ParentBlockTime = Time(-1)
 
 	// All events associated with a child block is assigned the same value.
 	//
 	// Note that we can assign the time to any value in the range
 	// (math.MaxUint32 + 1, math.MaxInt64].  (The +1 is needed for assigning
 	// EndOfBlockExecutionTime a unique value)
-	ChildBlockTime = LogicalTime(math.MaxInt64)
+	ChildBlockTime = Time(math.MaxInt64)
 
 	// EndOfBlockExecutionTime is used when the real tx index is unavailable,
 	// such as during script execution.

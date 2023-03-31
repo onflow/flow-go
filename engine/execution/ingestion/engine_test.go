@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/engine/execution"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
@@ -138,8 +139,9 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	collectionConduit := &mocknetwork.Conduit{}
 
 	// generates signing identity including staking key for signing
-	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
-	_, err := rand.Read(seed)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, crypto.KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(t, err)
@@ -1538,8 +1540,9 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 	var engine *Engine
 
 	// generates signing identity including staking key for signing
-	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
-	_, err = rand.Read(seed)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, crypto.KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(t, err)

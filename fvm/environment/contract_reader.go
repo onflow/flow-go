@@ -127,8 +127,7 @@ func (reader *ContractReader) ResolveLocation(
 }
 
 func (reader *ContractReader) getCode(
-	address flow.Address,
-	contractName string,
+	location common.AddressLocation,
 ) (
 	[]byte,
 	error,
@@ -140,7 +139,7 @@ func (reader *ContractReader) getCode(
 		return nil, fmt.Errorf("get code failed: %w", err)
 	}
 
-	add, err := reader.accounts.GetContract(contractName, address)
+	add, err := reader.accounts.GetContract(location.Name, flow.ConvertAddress(location.Address))
 	if err != nil {
 		return nil, fmt.Errorf("get code failed: %w", err)
 	}
@@ -161,14 +160,11 @@ func (reader *ContractReader) GetCode(
 			"expecting an AddressLocation, but other location types are passed")
 	}
 
-	return reader.getCode(
-		flow.ConvertAddress(contractLocation.Address),
-		contractLocation.Name)
+	return reader.getCode(contractLocation)
 }
 
 func (reader *ContractReader) GetAccountContractCode(
-	runtimeAddress common.Address,
-	name string,
+	location common.AddressLocation,
 ) (
 	[]byte,
 	error,
@@ -183,9 +179,7 @@ func (reader *ContractReader) GetAccountContractCode(
 		return nil, fmt.Errorf("get account contract code failed: %w", err)
 	}
 
-	code, err := reader.getCode(
-		flow.ConvertAddress(runtimeAddress),
-		name)
+	code, err := reader.getCode(location)
 	if err != nil {
 		return nil, fmt.Errorf("get account contract code failed: %w", err)
 	}

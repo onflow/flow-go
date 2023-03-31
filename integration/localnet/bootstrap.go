@@ -657,7 +657,7 @@ func getAccessGatewayPublicKey(flowNodeContainerConfigs []testnet.ContainerConfi
 func writeObserverPrivateKey(observerName string) {
 	// make the observer private key for named observer
 	// only used for localnet, not for use with production
-	networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSASecp256k1)
+	networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLen)
 	networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
 	if err != nil {
 		panic(err)

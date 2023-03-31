@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -60,116 +59,11 @@ func NewPrograms(
 	}
 }
 
-func (programs *Programs) set(
-	location common.Location,
-	program *interpreter.Program,
-) error {
-	// ignore empty locations
-	if location == nil {
-		return nil
-	}
-
-	// derivedTransactionData only cache program/state for AddressLocation.
-	// For non-address location, simply keep track of the program in the
-	// environment.
-	address, ok := location.(common.AddressLocation)
-	if !ok {
-		programs.nonAddressPrograms[location] = program
-		return nil
-	}
-
-	snapshot, err := programs.txnState.CommitParseRestrictedNestedTransaction(
-		address)
-	if err != nil {
-		return err
-	}
-
-	if len(snapshot.WriteSet) > 0 {
-		// This should never happen. Loading a program should not write to the state.
-		// If this happens, it indicates an implementation error.
-		return fmt.Errorf("cannot set program. State was written to during program parsing")
-	}
-
-	// Get collected dependencies of the loaded program.
-	stackLocation, dependencies, err := programs.dependencyStack.pop()
-	if err != nil {
-		return err
-	}
-	if stackLocation != address {
-		// This should never happen, and indicates an implementation error.
-		// GetProgram and SetProgram should be always called in pair, this check depends on this assumption.
-		// Get pushes the stack and set pops the stack.
-		// Example: if loading B that depends on A (and none of them are in cache yet),
-		//   - get(A): pushes A
-		//   - get(B): pushes B
-		//   - set(B): pops B
-		//   - set(A): pops A
-		// Note: technically this check is redundant as `CommitParseRestricted` also has a similar check.
-		return fmt.Errorf(
-			"cannot set program. Popped dependencies are for an unexpeced address"+
-				" (expected %s, got %s)", address, stackLocation)
-	}
-
-	programs.txnState.SetProgram(
-		address,
-		&derived.Program{
-			Program:      program,
-			Dependencies: dependencies,
-		},
-		snapshot)
-	return nil
-}
-
-func (programs *Programs) get(
-	location common.Location,
-) (
-	*interpreter.Program,
-	bool,
-) {
-	// ignore empty locations
-	if location == nil {
-		return nil, false
-	}
-
-	address, ok := location.(common.AddressLocation)
-	if !ok {
-		program, ok := programs.nonAddressPrograms[location]
-		return program, ok
-	}
-
-	program, snapshot, has := programs.txnState.GetProgram(address)
-	if has {
-		programs.cacheHit()
-
-		programs.dependencyStack.addDependencies(program.Dependencies)
-		err := programs.txnState.AttachAndCommitNestedTransaction(snapshot)
-		if err != nil {
-			panic(fmt.Sprintf(
-				"merge error while getting program, panic: %s",
-				err))
-		}
-
-		return program.Program, true
-	}
-	programs.cacheMiss()
-
-	// this program is not in cache, so we need to load it into the cache.
-	// tho have proper invalidation, we need to track the dependencies of the program.
-	// If this program depends on another program,
-	// that program will be loaded before this one finishes loading (calls set).
-	// That is why this is a stack.
-	programs.dependencyStack.push(address)
-
-	// Address location program is reusable across transactions.  Create
-	// a nested transaction here in order to capture the states read to
-	// parse the program.
-	_, err := programs.txnState.BeginParseRestrictedNestedTransaction(
-		address)
-	if err != nil {
-		panic(err)
-	}
-
-	return nil, false
+// Reset resets the program cache.
+// this is called if the transactions happy path fails.
+func (programs *Programs) Reset() {
+	programs.nonAddressPrograms = make(map[common.Location]*interpreter.Program)
+	programs.dependencyStack = newDependencyStack()
 }
 
 // GetOrLoadProgram gets the program from the cache,
@@ -180,12 +74,6 @@ func (programs *Programs) GetOrLoadProgram(
 	location common.Location,
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
-	// TODO: check why this exists and try to remove.
-	// ignore empty locations
-	if location == nil {
-		return nil, nil
-	}
-
 	defer programs.tracer.StartChildSpan(trace.FVMEnvGetOrLoadProgram).End()
 	err := programs.meter.MeterComputation(ComputationKindGetOrLoadProgram, 1)
 	if err != nil {
@@ -206,6 +94,32 @@ func (programs *Programs) getOrLoadAddressProgram(
 	load func() (*interpreter.Program, error),
 ) (*interpreter.Program, error) {
 
+	top, err := programs.dependencyStack.top()
+	if err != nil {
+		return nil, err
+	}
+
+	if top.ContainsLocation(location) {
+		// this dependency has already been seen in the current stack/scope
+		// this means that it is safe to just fetch it and not reapply
+		// state/metering changes
+		program, ok := programs.txnState.GetProgram(location)
+		if !ok {
+			// program should be in the cache, if it is not,
+			// this means there is an implementation error
+			return nil, errors.NewDerivedDataCacheImplementationFailure(
+				fmt.Errorf("expected program missing"+
+					" in cache for location: %s", location))
+		}
+		err := programs.dependencyStack.add(program.Dependencies)
+		if err != nil {
+			return nil, err
+		}
+		programs.cacheHit()
+
+		return program.Program, nil
+	}
+
 	loader := newProgramLoader(load, programs.dependencyStack, location)
 	program, err := programs.txnState.GetOrComputeProgram(
 		programs.txnState,
@@ -219,7 +133,10 @@ func (programs *Programs) getOrLoadAddressProgram(
 	// Add dependencies to the stack.
 	// This is only really needed if loader was not called,
 	// but there is no harm in doing it always.
-	programs.dependencyStack.addDependencies(program.Dependencies)
+	err = programs.dependencyStack.add(program.Dependencies)
+	if err != nil {
+		return nil, err
+	}
 
 	if loader.Called() {
 		programs.cacheMiss()
@@ -228,6 +145,54 @@ func (programs *Programs) getOrLoadAddressProgram(
 	}
 
 	return program.Program, nil
+}
+
+func (programs *Programs) getOrLoadNonAddressProgram(
+	location common.Location,
+	load func() (*interpreter.Program, error),
+) (*interpreter.Program, error) {
+	program, ok := programs.nonAddressPrograms[location]
+	if ok {
+		return program, nil
+	}
+
+	program, err := load()
+	if err != nil {
+		return nil, err
+	}
+
+	programs.nonAddressPrograms[location] = program
+	return program, nil
+}
+
+func (programs *Programs) DecodeArgument(
+	bytes []byte,
+	_ cadence.Type,
+) (
+	cadence.Value,
+	error,
+) {
+	defer programs.tracer.StartExtensiveTracingChildSpan(
+		trace.FVMEnvDecodeArgument).End()
+
+	v, err := jsoncdc.Decode(programs.meter, bytes)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"decodeing argument failed: %w",
+			errors.NewInvalidArgumentErrorf(
+				"argument is not json decodable: %w",
+				err))
+	}
+
+	return v, err
+}
+
+func (programs *Programs) cacheHit() {
+	programs.metrics.RuntimeTransactionProgramsCacheHit()
+}
+
+func (programs *Programs) cacheMiss() {
+	programs.metrics.RuntimeTransactionProgramsCacheMiss()
 }
 
 // programLoader is used to load a program from a location.
@@ -265,12 +230,17 @@ func (loader *programLoader) Compute(
 		// This should never happen, as the program loader is only called once per
 		// program. The same loader is never reused. This is only here to make
 		// this more apparent.
-		panic("program loader called twice")
+		return nil,
+			errors.NewDerivedDataCacheImplementationFailure(
+				fmt.Errorf("program loader called twice"))
 	}
+
 	if loader.location != location {
 		// This should never happen, as the program loader constructed specifically
 		// to load one location once. This is only a sanity check.
-		panic("program loader called with unexpected location")
+		return nil,
+			errors.NewDerivedDataCacheImplementationFailure(
+				fmt.Errorf("program loader called with unexpected location"))
 	}
 
 	loader.called = true
@@ -316,7 +286,7 @@ func (loader *programLoader) loadWithDependencyTracking(
 	}
 
 	if err != nil {
-		return nil, nil, err
+		return nil, derived.NewProgramDependencies(), err
 	}
 
 	if stackLocation != address {
@@ -329,98 +299,11 @@ func (loader *programLoader) loadWithDependencyTracking(
 		//   - set(B): pops B
 		//   - set(A): pops A
 		// Note: technically this check is redundant as `CommitParseRestricted` also has a similar check.
-		return nil, nil, fmt.Errorf(
+		return nil, derived.NewProgramDependencies(), fmt.Errorf(
 			"cannot set program. Popped dependencies are for an unexpeced address"+
 				" (expected %s, got %s)", address, stackLocation)
 	}
 	return program, dependencies, nil
-}
-
-func (programs *Programs) getOrLoadNonAddressProgram(
-	location common.Location,
-	load func() (*interpreter.Program, error),
-) (*interpreter.Program, error) {
-	program, ok := programs.nonAddressPrograms[location]
-	if ok {
-		return program, nil
-	}
-
-	program, err := load()
-	if err != nil {
-		return nil, err
-	}
-
-	programs.nonAddressPrograms[location] = program
-	return program, nil
-}
-
-func (programs *Programs) GetProgram(
-	location common.Location,
-) (
-	*interpreter.Program,
-	error,
-) {
-	defer programs.tracer.StartChildSpan(trace.FVMEnvGetProgram).End()
-
-	err := programs.meter.MeterComputation(ComputationKindGetProgram, 1)
-	if err != nil {
-		return nil, fmt.Errorf("get program failed: %w", err)
-	}
-
-	program, has := programs.get(location)
-	if has {
-		return program, nil
-	}
-
-	return nil, nil
-}
-
-func (programs *Programs) SetProgram(
-	location common.Location,
-	program *interpreter.Program,
-) error {
-	defer programs.tracer.StartChildSpan(trace.FVMEnvSetProgram).End()
-
-	err := programs.meter.MeterComputation(ComputationKindSetProgram, 1)
-	if err != nil {
-		return fmt.Errorf("set program failed: %w", err)
-	}
-
-	err = programs.set(location, program)
-	if err != nil {
-		return fmt.Errorf("set program failed: %w", err)
-	}
-	return nil
-}
-
-func (programs *Programs) DecodeArgument(
-	bytes []byte,
-	_ cadence.Type,
-) (
-	cadence.Value,
-	error,
-) {
-	defer programs.tracer.StartExtensiveTracingChildSpan(
-		trace.FVMEnvDecodeArgument).End()
-
-	v, err := jsoncdc.Decode(programs.meter, bytes)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"decodeing argument failed: %w",
-			errors.NewInvalidArgumentErrorf(
-				"argument is not json decodable: %w",
-				err))
-	}
-
-	return v, err
-}
-
-func (programs *Programs) cacheHit() {
-	programs.metrics.RuntimeTransactionProgramsCacheHit()
-}
-
-func (programs *Programs) cacheMiss() {
-	programs.metrics.RuntimeTransactionProgramsCacheMiss()
 }
 
 // dependencyTracker tracks dependencies for a location
@@ -435,7 +318,7 @@ func (programs *Programs) cacheMiss() {
 //     (because A also depends on everything B depends on)
 //   - set(A): pop A, getting all the collected dependencies for A
 type dependencyTracker struct {
-	location     common.AddressLocation
+	location     common.Location
 	dependencies derived.ProgramDependencies
 }
 
@@ -446,18 +329,27 @@ type dependencyStack struct {
 }
 
 func newDependencyStack() *dependencyStack {
-	return &dependencyStack{
+	stack := &dependencyStack{
 		trackers: make([]dependencyTracker, 0),
 	}
+
+	// The root of the stack is the program (script/transaction) that is being executed.
+	// At the end of the transaction execution, this will hold all the dependencies
+	// of the script/transaction.
+	//
+	// The root of the stack should never be popped.
+	stack.push(common.StringLocation("^ProgramDependencyStackRoot$"))
+
+	return stack
 }
 
 // push a new location to track dependencies for.
 // it is assumed that the dependencies will be loaded before the program is set and pop is called.
-func (s *dependencyStack) push(loc common.AddressLocation) {
-	dependencies := make(derived.ProgramDependencies, 1)
+func (s *dependencyStack) push(loc common.Location) {
+	dependencies := derived.NewProgramDependencies()
 
 	// A program is listed as its own dependency.
-	dependencies.AddDependency(flow.ConvertAddress(loc.Address))
+	dependencies.Add(loc)
 
 	s.trackers = append(s.trackers, dependencyTracker{
 		location:     loc,
@@ -465,38 +357,50 @@ func (s *dependencyStack) push(loc common.AddressLocation) {
 	})
 }
 
-// addDependencies adds dependencies to the current dependency tracker
-func (s *dependencyStack) addDependencies(dependencies derived.ProgramDependencies) {
+// add adds dependencies to the current dependency tracker
+func (s *dependencyStack) add(dependencies derived.ProgramDependencies) error {
 	l := len(s.trackers)
 	if l == 0 {
-		// stack is empty.
-		// This is expected if loading a program that is already cached.
-		return
+		// This cannot happen, as the root of the stack is always present.
+		return errors.NewDerivedDataCacheImplementationFailure(
+			fmt.Errorf("dependency stack unexpectedly empty while calling add"))
 	}
 
 	s.trackers[l-1].dependencies.Merge(dependencies)
+	return nil
 }
 
 // pop the last dependencies on the stack and return them.
-func (s *dependencyStack) pop() (common.AddressLocation, derived.ProgramDependencies, error) {
-	if len(s.trackers) == 0 {
-		return common.AddressLocation{},
-			nil,
-			fmt.Errorf("cannot pop the programs dependency stack, because it is empty")
+func (s *dependencyStack) pop() (common.Location, derived.ProgramDependencies, error) {
+	if len(s.trackers) <= 1 {
+		return nil,
+			derived.NewProgramDependencies(),
+			errors.NewDerivedDataCacheImplementationFailure(
+				fmt.Errorf("cannot pop the programs" +
+					" dependency stack, because it is empty"))
 	}
 
 	// pop the last tracker
 	tracker := s.trackers[len(s.trackers)-1]
 	s.trackers = s.trackers[:len(s.trackers)-1]
 
-	// there are more trackers in the stack.
-	// add the dependencies of the popped tracker to the parent tracker
+	// Add the dependencies of the popped tracker to the parent tracker
 	// This is an optimisation to avoid having to iterate through the entire stack
 	// everytime a dependency is pushed or added, instead we add the popped dependencies to the new top of the stack.
 	// (because if C depends on B which depends on A, A's dependencies include C).
-	if len(s.trackers) > 0 {
-		s.trackers[len(s.trackers)-1].dependencies.Merge(tracker.dependencies)
-	}
+	s.trackers[len(s.trackers)-1].dependencies.Merge(tracker.dependencies)
 
 	return tracker.location, tracker.dependencies, nil
+}
+
+// top returns the last dependencies on the stack without pop-ing them.
+func (s *dependencyStack) top() (derived.ProgramDependencies, error) {
+	l := len(s.trackers)
+	if l == 0 {
+		// This cannot happen, as the root of the stack is always present.
+		return derived.ProgramDependencies{}, errors.NewDerivedDataCacheImplementationFailure(
+			fmt.Errorf("dependency stack unexpectedly empty while calling top"))
+	}
+
+	return s.trackers[len(s.trackers)-1].dependencies, nil
 }

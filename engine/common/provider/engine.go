@@ -78,7 +78,6 @@ func New(
 	// make sure we don't respond to request sent by self or unauthorized nodes
 	selector = filter.And(
 		selector,
-		filter.HasWeight(true),
 		filter.Not(filter.HasNodeID(me.NodeID())),
 	)
 

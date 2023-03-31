@@ -17,11 +17,12 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
-	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/chainsync"
@@ -133,7 +134,7 @@ func ProposalKeyFixture() flow.ProposalKey {
 
 // AccountKeyDefaultFixture returns a randomly generated ECDSA/SHA3 account key.
 func AccountKeyDefaultFixture() (*flow.AccountPrivateKey, error) {
-	return AccountKeyFixture(crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256, hash.SHA3_256)
+	return AccountKeyFixture(crypto.KeyGenSeedMinLen, crypto.ECDSAP256, hash.SHA3_256)
 }
 
 // AccountKeyFixture returns a randomly generated account key.
@@ -238,16 +239,6 @@ func AsSlashable[T any](msg T) flow.Slashable[T] {
 	return slashable
 }
 
-func StateDeltaFixture() *messages.ExecutionStateDelta {
-	header := BlockHeaderFixture()
-	block := BlockWithParentFixture(header)
-	return &messages.ExecutionStateDelta{
-		ExecutableBlock: entity.ExecutableBlock{
-			Block: block,
-		},
-	}
-}
-
 func ReceiptAndSealForBlock(block *flow.Block) (*flow.ExecutionReceipt, *flow.Seal) {
 	receipt := ReceiptForBlockFixture(block)
 	seal := Seal.Fixture(Seal.WithBlock(block.Header), Seal.WithResult(&receipt.ExecutionResult))
@@ -340,8 +331,8 @@ func WithoutGuarantee(payload *flow.Payload) {
 	payload.Guarantees = nil
 }
 
-func StateInteractionsFixture() *delta.Snapshot {
-	return &delta.NewDeltaView(nil).Interactions().Snapshot
+func StateInteractionsFixture() *state.ExecutionSnapshot {
+	return &state.ExecutionSnapshot{}
 }
 
 func BlockWithParentAndProposerFixture(t *testing.T, parent *flow.Header, proposer flow.Identifier) flow.Block {
@@ -378,26 +369,6 @@ func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Bl
 
 	block.SetPayload(payload)
 	return block
-}
-
-func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDelta {
-	payload := PayloadFixture()
-	header := BlockHeaderWithParentFixture(parent)
-	header.PayloadHash = payload.Hash()
-	block := flow.Block{
-		Header:  header,
-		Payload: &payload,
-	}
-
-	var stateInteractions []*delta.Snapshot
-	stateInteractions = append(stateInteractions, StateInteractionsFixture())
-
-	return &messages.ExecutionStateDelta{
-		ExecutableBlock: entity.ExecutableBlock{
-			Block: &block,
-		},
-		StateInteractions: stateInteractions,
-	}
 }
 
 func GenesisFixture() *flow.Block {
@@ -2095,17 +2066,17 @@ func PrivateKeyFixtureByIdentifier(algo crypto.SigningAlgorithm, seedLength int,
 }
 
 func StakingPrivKeyByIdentifier(id flow.Identifier) crypto.PrivateKey {
-	return PrivateKeyFixtureByIdentifier(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381, id)
+	return PrivateKeyFixtureByIdentifier(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen, id)
 }
 
 // NetworkingPrivKeyFixture returns random ECDSAP256 private key
 func NetworkingPrivKeyFixture() crypto.PrivateKey {
-	return PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
+	return PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen)
 }
 
 // StakingPrivKeyFixture returns a random BLS12381 private keyf
 func StakingPrivKeyFixture() crypto.PrivateKey {
-	return PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381)
+	return PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen)
 }
 
 func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {
