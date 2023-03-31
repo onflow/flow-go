@@ -16,6 +16,9 @@ import (
 type ValidationResult int
 
 const (
+	PublicNetworkEnabled  = true
+	PublicNetworkDisabled = false
+
 	ValidationAccept ValidationResult = iota
 	ValidationIgnore
 	ValidationReject

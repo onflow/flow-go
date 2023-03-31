@@ -384,6 +384,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.Metrics.Network,
 			fnb.MetricsRegisterer,
 			fnb.MetricsEnabled,
+			p2p.PublicNetworkDisabled,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors: %w", err)

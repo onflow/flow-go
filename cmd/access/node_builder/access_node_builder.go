@@ -1087,6 +1087,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibP2PFactory(networkKey crypto.
 			builder.Metrics.Network,
 			builder.MetricsRegisterer,
 			builder.MetricsEnabled,
+			p2p.PublicNetworkEnabled,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors: %w", err)
