@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -103,7 +104,7 @@ type Procedure interface {
 
 	// For transactions, the execution time is TxIndex.  For scripts, the
 	// execution time is EndOfBlockExecutionTime.
-	ExecutionTime() derived.LogicalTime
+	ExecutionTime() logical.Time
 
 	// TODO(patrick): deprecated this.
 	SetOutput(output ProcedureOutput)
@@ -256,8 +257,8 @@ func (vm *VirtualMachine) GetAccount(
 	}
 
 	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
-		derived.EndOfBlockExecutionTime,
-		derived.EndOfBlockExecutionTime)
+		logical.EndOfBlockExecutionTime,
+		logical.EndOfBlockExecutionTime)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error creating derived transaction data for GetAccount: %w",

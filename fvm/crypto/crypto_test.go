@@ -1,8 +1,8 @@
 package crypto_test
 
 import (
+	"crypto/rand"
 	"fmt"
-	"math/rand"
 	"testing"
 	"unicode/utf8"
 
@@ -88,7 +88,8 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 			for _, h := range hashAlgos {
 				t.Run(fmt.Sprintf("combination: %v, %v", s, h), func(t *testing.T) {
 					seed := make([]byte, seedLength)
-					rand.Read(seed)
+					_, err := rand.Read(seed)
+					require.NoError(t, err)
 					pk, err := gocrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
 					require.NoError(t, err)
 
@@ -179,7 +180,8 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 
 		for _, c := range cases {
 			seed := make([]byte, seedLength)
-			rand.Read(seed)
+			_, err := rand.Read(seed)
+			require.NoError(t, err)
 			pk, err := gocrypto.GeneratePrivateKey(gocrypto.BLSBLS12381, seed)
 			require.NoError(t, err)
 
@@ -261,7 +263,8 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 					t.Run(fmt.Sprintf("hash tag: %v, verify tag: %v [%v, %v]", c.signTag, c.verifyTag, s, h), func(t *testing.T) {
 
 						seed := make([]byte, seedLength)
-						rand.Read(seed)
+						_, err := rand.Read(seed)
+						require.NoError(t, err)
 						pk, err := gocrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
 						require.NoError(t, err)
 
@@ -326,7 +329,8 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 			for _, h := range hashAlgos {
 				t.Run(fmt.Sprintf("combination: %v, %v", s, h), func(t *testing.T) {
 					seed := make([]byte, seedLength)
-					rand.Read(seed)
+					_, err := rand.Read(seed)
+					require.NoError(t, err)
 					sk, err := gocrypto.GeneratePrivateKey(s, seed)
 					require.NoError(t, err)
 
@@ -397,7 +401,8 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 				for h := range hMaps {
 					t.Run(fmt.Sprintf("sign tag: %v [%v, %v]", c.signTag, s, h), func(t *testing.T) {
 						seed := make([]byte, seedLength)
-						rand.Read(seed)
+						_, err := rand.Read(seed)
+						require.NoError(t, err)
 						sk, err := gocrypto.GeneratePrivateKey(s, seed)
 						require.NoError(t, err)
 
@@ -425,7 +430,8 @@ func TestValidatePublicKey(t *testing.T) {
 
 	validPublicKey := func(t *testing.T, s runtime.SignatureAlgorithm) []byte {
 		seed := make([]byte, seedLength)
-		rand.Read(seed)
+		_, err := rand.Read(seed)
+		require.NoError(t, err)
 		pk, err := gocrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
 		require.NoError(t, err)
 		return pk.PublicKey().Encode()
