@@ -28,7 +28,7 @@ func TestFollowerEngine(t *testing.T) {
 	suite.Run(t, new(EngineSuite))
 }
 
-// EngineSuite wraps CoreSuite and stores additional state needed for Engine specific logic.
+// EngineSuite wraps CoreSuite and stores additional state needed for ComplianceEngine specific logic.
 type EngineSuite struct {
 	suite.Suite
 
@@ -42,7 +42,7 @@ type EngineSuite struct {
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
 	errs   <-chan error
-	engine *Engine
+	engine *ComplianceEngine
 }
 
 func (s *EngineSuite) SetupTest() {
@@ -63,7 +63,7 @@ func (s *EngineSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	s.finalized = unittest.BlockHeaderFixture()
-	eng, err := New(
+	eng, err := NewComplianceLayer(
 		unittest.Logger(),
 		s.net,
 		s.me,

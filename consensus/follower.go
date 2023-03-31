@@ -18,7 +18,8 @@ import (
 
 func NewFollower(log zerolog.Logger, committee hotstuff.DynamicCommittee, headers storage.Headers, updater module.Finalizer,
 	verifier hotstuff.Verifier, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header,
-	rootQC *flow.QuorumCertificate, finalized *flow.Header, pending []*flow.Header) (*hotstuff.FollowerLoop, error) {
+	rootQC *flow.QuorumCertificate, finalized *flow.Header, pending []*flow.Header,
+) (*hotstuff.FollowerLoop, error) {
 
 	forks, err := NewForks(finalized, headers, updater, notifier, rootHeader, rootQC)
 	if err != nil {

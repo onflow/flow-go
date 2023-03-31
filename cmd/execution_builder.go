@@ -123,8 +123,8 @@ type ExecutionNode struct {
 	checkerEng              *checker.Engine
 	syncCore                *chainsync.Core
 	syncEngine              *synchronization.Engine
-	followerCore            *hotstuff.FollowerLoop // follower hotstuff logic
-	followerEng             *followereng.Engine    // to sync blocks from consensus nodes
+	followerCore            *hotstuff.FollowerLoop        // follower hotstuff logic
+	followerEng             *followereng.ComplianceEngine // to sync blocks from consensus nodes
 	computationManager      *computation.Manager
 	collectionRequester     *requester.Engine
 	ingestionEng            *ingestion.Engine
@@ -889,7 +889,7 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 	}
 
-	core, err := followereng.NewCore(
+	core, err := followereng.NewComplianceCore(
 		node.Logger,
 		node.Metrics.Mempool,
 		heroCacheCollector,
@@ -905,7 +905,7 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		return nil, fmt.Errorf("could not create follower core: %w", err)
 	}
 
-	exeNode.followerEng, err = followereng.New(
+	exeNode.followerEng, err = followereng.NewComplianceLayer(
 		node.Logger,
 		node.Network,
 		node.Me,

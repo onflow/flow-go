@@ -109,16 +109,19 @@ func NewFullConsensusState(
 //
 //	candidate.View == certifyingQC.View && candidate.ID() == certifyingQC.BlockID
 //
-// NOTE: this function expects that `certifyingQC` has been validated.
+// Caution:
+//   - This function expects that `certifyingQC` has been validated.
+//   - The parent block must already be stored.
+//
 // No errors are expected during normal operations.
 func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
 
-	blockID := candidate.ID()
 	// check if candidate block has been already processed
-	processed, err := m.checkBlockAlreadyProcessed(blockID)
-	if err != nil || processed {
+	blockID := candidate.ID()
+	isDuplicate, err := m.checkBlockAlreadyProcessed(blockID)
+	if err != nil || isDuplicate {
 		return err
 	}
 
@@ -163,8 +166,8 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 	defer span.End()
 
 	// check if candidate block has been already processed
-	processed, err := m.checkBlockAlreadyProcessed(candidate.ID())
-	if err != nil || processed {
+	isDuplicate, err := m.checkBlockAlreadyProcessed(candidate.ID())
+	if err != nil || isDuplicate {
 		return err
 	}
 
@@ -256,7 +259,7 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 	return nil
 }
 
-// checkBlockAlreadyProcessed checks if block with given blockID has been added to the protocol state.
+// checkBlockAlreadyProcessed checks if block has been added to the protocol state.
 // Returns:
 // * (true, nil) - block has been already processed.
 // * (false, nil) - block has not been processed.
@@ -273,7 +276,7 @@ func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (boo
 	return true, nil
 }
 
-// checkOutdatedExtension checks whether candidate block is
+// checkOutdatedExtension checks whether given block is
 // valid in the context of the entire state. For this, the block needs to
 // directly connect, through its ancestors, to the last finalized block.
 // Expected errors during normal operations:
