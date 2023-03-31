@@ -288,7 +288,7 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 			lg.Warn().
 				Err(err).
 				Bool(logging.KeySuspicious, true).
-				Msg("ihave topic validation pre-processing failed rejecting rpc control message")
+				Msg("topic validation pre-processing failed rejecting rpc control message")
 			err = c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, err))
 			if err != nil {
 				lg.Error().
