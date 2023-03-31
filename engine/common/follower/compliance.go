@@ -11,8 +11,8 @@ import (
 // follower. Conceptually, the algorithm proceeds as follows:
 //
 //  1. _light_ validation of the block header:
-//     - check that the block's proposer is the legitimate primary for the respective view
-//     - verify the primary's signature
+//     - check that the block's proposer is the legitimate leader for the respective view
+//     - verify the leader's signature
 //     - verify QC within the block
 //     - verify whether TC should be included and check the TC
 //
@@ -29,7 +29,7 @@ import (
 //
 //  3. Only certified blocks pass the cache [Note: this is the reason why we need to validate the QC].
 //     This caching strategy provides the fist line of defence:
-//     - Broken blocks from malicious primaries do not pass this cache, as they will never get certified.
+//     - Broken blocks from malicious leaders do not pass this cache, as they will never get certified.
 //     - Hardening [heuristic] against spam via block synchronization:
 //     TODO: implement
 //     We differentiate between two scenarios: (i) the blocks are _all_ already known, i.e. a no-op from

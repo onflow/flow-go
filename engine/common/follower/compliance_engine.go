@@ -34,9 +34,13 @@ func WithChannel(channel channels.Channel) EngineOption {
 const defaultBatchProcessingWorkers = 4
 
 // defaultPendingBlockQueueCapacity maximum capacity of inbound queue for blocks directly received from other nodes.
+// Small capacity is suitable here, as there will be hardly any pending blocks during normal operations. If the node
+// is so overloaded that it can't keep up with the newest blocks within 10 seconds (processing them with priority),
+// it is probably better to fall back on synchronization anyway.
 const defaultPendingBlockQueueCapacity = 10
 
 // defaultSyncedBlockQueueCapacity maximum capacity of inbound queue for batches of synced blocks.
+// While catching up, we want to be able to buffer a bit larger amount of work.
 const defaultSyncedBlockQueueCapacity = 100
 
 // defaultPendingConnectedBlocksChanCapacity capacity of buffered channel that is used to receive pending blocks that form a sequence.
@@ -61,8 +65,8 @@ type ComplianceEngine struct {
 	con                        network.Conduit
 	channel                    channels.Channel
 	headers                    storage.Headers
-	pendingBlocks              *fifoqueue.FifoQueue        // queue for processing inbound blocks
-	syncedBlocks               *fifoqueue.FifoQueue        // queue for processing inbound batches of blocks
+	pendingProposals           *fifoqueue.FifoQueue        // queue for fresh proposals
+	syncedBlocks               *fifoqueue.FifoQueue        // queue for processing inbound batches of synced blocks
 	blocksAvailableNotifier    engine.Notifier             // notifies that new blocks are ready to be processed
 	finalizedBlockTracker      *tracker.NewestBlockTracker // tracks the latest finalization block
 	finalizedBlockNotifier     engine.Notifier             // notifies when the latest finalized block changes
@@ -99,7 +103,7 @@ func NewComplianceLayer(
 		me:                         me,
 		engMetrics:                 engMetrics,
 		channel:                    channels.ReceiveBlocks,
-		pendingBlocks:              pendingBlocks,
+		pendingProposals:           pendingBlocks,
 		syncedBlocks:               syncedBlocks,
 		blocksAvailableNotifier:    engine.NewNotifier(),
 		pendingConnectedBlocksChan: make(chan flow.Slashable[[]*flow.Block], defaultPendingConnectedBlocksChanCapacity),
@@ -147,16 +151,21 @@ func NewComplianceLayer(
 	return e, nil
 }
 
-// OnBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
+// OnBlockProposal queues *untrusted* proposals for further processing and notifies the Engine's
+// internal workers. This method is intended for fresh proposals received directly from leaders.
+// It can ingest synced blocks as well, but is less performant compared to method `OnSyncedBlocks`.
 func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
 	// queue proposal
-	if e.pendingBlocks.Push(proposal) {
+	if e.pendingProposals.Push(proposal) {
 		e.blocksAvailableNotifier.Notify()
 	}
 }
 
-// OnSyncedBlocks consumes incoming blocks by pushing into queue and notifying worker.
+// OnSyncedBlocks is an optimized consumer for *untrusted* synced blocks. It is specifically
+// efficient for batches of continuously connected blocks (honest nodes supply finalized blocks
+// in suitable sequences where possible). Nevertheless, the method tolerates blocks in arbitrary
+// order (less efficient), making it robust against byzantine nodes.
 func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlocks)
 	// The synchronization engine feeds the follower with batches of blocks. The field `Slashable.OriginID`
@@ -167,11 +176,13 @@ func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.Bloc
 	}
 }
 
-// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-// It informs follower.ComplianceCore about finalization of the respective block.
+// OnFinalizedBlock informs the compliance layer about finalization of a new block. It does not block
+// and asynchronously executes the internal pruning logic. We accept inputs out of order, and only act
+// on inputs with strictly monotonously increasing views.
 //
+// Implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
-// from external nodes cannot be considered as inputs to this function
+// from external nodes cannot be considered as inputs to this function.
 func (e *ComplianceEngine) OnFinalizedBlock(block *model.Block) {
 	if e.finalizedBlockTracker.Track(block) {
 		e.finalizedBlockNotifier.Notify()
@@ -180,6 +191,8 @@ func (e *ComplianceEngine) OnFinalizedBlock(block *model.Block) {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
+// This method is intended to be used as a callback by the networking layer,
+// notifying us about fresh proposals directly from the consensus leaders.
 func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
 	case *messages.BlockProposal:
@@ -215,6 +228,17 @@ func (e *ComplianceEngine) processBlocksLoop(ctx irrecoverable.SignalerContext, 
 
 // processQueuedBlocks processes any available messages until the message queue is empty.
 // Only returns when all inbound queues are empty (or the engine is terminated).
+// Prioritization: In a nutshell, we prioritize the resilience of the happy path over
+// performance gains on the recovery path. Details:
+//   - We prioritize new proposals. Thereby, it becomes much harder for a malicious node
+//     to overwhelm another node through synchronization messages and drown out new blocks
+//     for a node that is up-to-date.
+//   - On the flip side, new proposals are relatively infrequent compared to the load that
+//     synchronization produces for a note that is catching up. In other words, prioritizing
+//     the few new proposals first is probably not going to be much of a distraction.
+//     Proposals too far in the future are dropped (see parameter `SkipNewProposalsThreshold`
+//     in `compliance.Config`), to prevent memory overflow.
+//
 // No errors are expected during normal operation. All returned exceptions are potential
 // symptoms of internal state corruption and should be fatal.
 func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error {
@@ -225,7 +249,8 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 		default:
 		}
 
-		msg, ok := e.pendingBlocks.Pop()
+		// Priority 1: ingest fresh proposals
+		msg, ok := e.pendingProposals.Pop()
 		if ok {
 			blockMsg := msg.(flow.Slashable[*messages.BlockProposal])
 			block := blockMsg.Message.Block.ToInternal()
@@ -241,6 +266,7 @@ func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error
 			continue
 		}
 
+		// Priority 2: ingest synced blocks
 		msg, ok = e.syncedBlocks.Pop()
 		if !ok {
 			// when there are no more messages in the queue, back to the processQueuedBlocks to wait
