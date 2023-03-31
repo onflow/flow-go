@@ -19,9 +19,9 @@ func createByteArray(size int) []byte {
 	return bytes
 }
 
-func TestState_Finalize(t *testing.T) {
+func TestExecutionState_Finalize(t *testing.T) {
 	view := delta.NewDeltaView(nil)
-	parent := state.NewState(view, state.DefaultParameters())
+	parent := state.NewExecutionState(view, state.DefaultParameters())
 
 	child := parent.NewChild()
 
@@ -65,9 +65,9 @@ func TestState_Finalize(t *testing.T) {
 
 }
 
-func TestState_ChildMergeFunctionality(t *testing.T) {
+func TestExecutionState_ChildMergeFunctionality(t *testing.T) {
 	view := delta.NewDeltaView(nil)
-	st := state.NewState(view, state.DefaultParameters())
+	st := state.NewExecutionState(view, state.DefaultParameters())
 
 	t.Run("test read from parent state (backoff)", func(t *testing.T) {
 		key := flow.NewRegisterID("address", "key1")
@@ -137,9 +137,11 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 
 }
 
-func TestState_MaxValueSize(t *testing.T) {
+func TestExecutionState_MaxValueSize(t *testing.T) {
 	view := delta.NewDeltaView(nil)
-	st := state.NewState(view, state.DefaultParameters().WithMaxValueSizeAllowed(6))
+	st := state.NewExecutionState(
+		view,
+		state.DefaultParameters().WithMaxValueSizeAllowed(6))
 
 	key := flow.NewRegisterID("address", "key")
 
@@ -154,9 +156,9 @@ func TestState_MaxValueSize(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestState_MaxKeySize(t *testing.T) {
+func TestExecutionState_MaxKeySize(t *testing.T) {
 	view := delta.NewDeltaView(nil)
-	st := state.NewState(
+	st := state.NewExecutionState(
 		view,
 		// Note: owners are always 8 bytes
 		state.DefaultParameters().WithMaxKeySizeAllowed(8+2))
@@ -182,7 +184,7 @@ func TestState_MaxKeySize(t *testing.T) {
 
 }
 
-func TestState_MaxInteraction(t *testing.T) {
+func TestExecutionState_MaxInteraction(t *testing.T) {
 	view := delta.NewDeltaView(nil)
 
 	key1 := flow.NewRegisterID("1", "2")
@@ -200,7 +202,7 @@ func TestState_MaxInteraction(t *testing.T) {
 	key4 := flow.NewRegisterID("3", "4567")
 	key4Size := uint64(8 + 4)
 
-	st := state.NewState(
+	st := state.NewExecutionState(
 		view,
 		state.DefaultParameters().
 			WithMeterParameters(
@@ -222,7 +224,7 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, st.InteractionUsed(), key1Size+key2Size+key3Size)
 
-	st = state.NewState(
+	st = state.NewExecutionState(
 		view,
 		state.DefaultParameters().
 			WithMeterParameters(
