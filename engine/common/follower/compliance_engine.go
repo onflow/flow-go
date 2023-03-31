@@ -52,10 +52,12 @@ const defaultPendingConnectedBlocksChanCapacity = 100
 // is employed by consensus nodes (active consensus participants) where the
 // Follower engine is employed by all other node roles.
 // ComplianceEngine is responsible for:
-// 1. Consuming events from external sources such as sync engine.
-// 2. Splitting incoming batches in batches of connected blocks.
-// 3. Providing worker goroutines for concurrent processing of batches of connected blocks.
-// 4. Handling of finalization events.
+//  1. Consuming events from external sources such as sync engine.
+//  2. Splitting incoming batches in batches of connected blocks.
+//  3. Providing worker goroutines for concurrent processing of batches of connected blocks.
+//  4. Handling of finalization events.
+//
+// See interface `complianceCore` (this package) for detailed documentation of the algorithm.
 // Implements consensus.Compliance interface.
 type ComplianceEngine struct {
 	*component.ComponentManager
@@ -77,6 +79,8 @@ type ComplianceEngine struct {
 var _ network.MessageProcessor = (*ComplianceEngine)(nil)
 var _ consensus.Compliance = (*ComplianceEngine)(nil)
 
+// NewComplianceLayer instantiates th compliance layer for the consensus follower. See
+// interface `complianceCore` (this package) for detailed documentation of the algorithm.
 func NewComplianceLayer(
 	log zerolog.Logger,
 	net network.Network,
