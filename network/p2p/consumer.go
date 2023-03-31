@@ -29,6 +29,11 @@ const (
 	CtrlMsgPrune ControlMessageType = "PRUNE"
 )
 
+// ControlMessageTypes returns list of all libp2p control message types.
+func ControlMessageTypes() []ControlMessageType {
+	return []ControlMessageType{CtrlMsgIHave, CtrlMsgIWant, CtrlMsgGraft, CtrlMsgPrune}
+}
+
 // DisallowListUpdateNotification is the event that is submitted to the distributor when the disallow list is updated.
 type DisallowListUpdateNotification struct {
 	DisallowList flow.IdentifierList
@@ -79,6 +84,18 @@ type InvalidControlMessageNotification struct {
 	MsgType ControlMessageType
 	// Count is the number of invalid control messages received from the peer that is reported in this notification.
 	Count uint64
+	// Err any error associated with the invalid control message.
+	Err error
+}
+
+// NewInvalidControlMessageNotification returns a new *InvalidControlMessageNotification
+func NewInvalidControlMessageNotification(peerID peer.ID, msgType ControlMessageType, count uint64, err error) *InvalidControlMessageNotification {
+	return &InvalidControlMessageNotification{
+		PeerID:  peerID,
+		MsgType: msgType,
+		Count:   count,
+		Err:     err,
+	}
 }
 
 // GossipSubInvalidControlMessageNotificationConsumer is the interface for the consumer that consumes gossip sub inspector notifications.

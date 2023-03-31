@@ -14,6 +14,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/distributor"
+	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 )
 
@@ -41,6 +43,7 @@ func NewCorruptLibP2PNodeFactory(
 			panic("illegal chain id for using corrupt libp2p node")
 		}
 
+		rpcValidationInspector := validation.NewControlMsgValidationInspector(log, sporkId, p2pbuilder.DefaultRPCValidationConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(log))
 		builder, err := p2pbuilder.DefaultNodeBuilder(
 			log,
 			address,
@@ -54,7 +57,8 @@ func NewCorruptLibP2PNodeFactory(
 			peerManagerCfg,
 			gossipSubCfg,
 			p2pbuilder.DefaultResourceManagerConfig(),
-			uniCfg)
+			uniCfg,
+			rpcValidationInspector)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)
