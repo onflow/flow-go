@@ -311,7 +311,7 @@ func TestWriteAndReadCheckpointV6LeafEmptyTrie(t *testing.T) {
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
 
 		bufSize := 10
-		leafNodesCh := make(chan LeafNodeResult, bufSize)
+		leafNodesCh := make(chan *LeafNode, bufSize)
 		go func() {
 			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
 			require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
@@ -329,17 +329,16 @@ func TestWriteAndReadCheckpointV6LeafSimpleTrie(t *testing.T) {
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
 		bufSize := 1
-		leafNodesCh := make(chan LeafNodeResult, bufSize)
+		leafNodesCh := make(chan *LeafNode, bufSize)
 		go func() {
 			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
 			require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		}()
 		resultPayloads := make([]ledger.Payload, 0)
-		for readResult := range leafNodesCh {
-			require.NoError(t, readResult.Err, "no errors in read results")
+		for leafNode := range leafNodesCh {
 			// avoid dummy payload from empty trie
-			if readResult.LeafNode.Payload != nil {
-				resultPayloads = append(resultPayloads, *readResult.LeafNode.Payload)
+			if leafNode.Payload != nil {
+				resultPayloads = append(resultPayloads, *leafNode.Payload)
 			}
 		}
 		require.EqualValues(t, tries[1].AllPayloads(), resultPayloads)
@@ -353,15 +352,14 @@ func TestWriteAndReadCheckpointV6LeafMultipleTries(t *testing.T) {
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
 		bufSize := 5
-		leafNodesCh := make(chan LeafNodeResult, bufSize)
+		leafNodesCh := make(chan *LeafNode, bufSize)
 		go func() {
 			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
 			require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		}()
 		resultPayloads := make([]ledger.Payload, 0)
-		for readResult := range leafNodesCh {
-			require.NoError(t, readResult.Err, "no errors in read results")
-			resultPayloads = append(resultPayloads, *readResult.LeafNode.Payload)
+		for leafNode := range leafNodesCh {
+			resultPayloads = append(resultPayloads, *leafNode.Payload)
 		}
 		require.NotEmpty(t, resultPayloads)
 	})
@@ -533,7 +531,7 @@ func TestAllPartFileExistLeafReader(t *testing.T) {
 			require.NoError(t, err, "fail to remove part file")
 
 			bufSize := 10
-			leafNodesCh := make(chan LeafNodeResult, bufSize)
+			leafNodesCh := make(chan *LeafNode, bufSize)
 			err = OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
 			require.ErrorIs(t, err, os.ErrNotExist, "wrong error type returned")
 		}
