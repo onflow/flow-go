@@ -35,6 +35,11 @@ type Snapshot struct {
 	header  cached.WriteOnce[flow.Header]
 }
 
+type FinalizedSnapshot struct {
+	Snapshot
+	header *flow.Header
+}
+
 var _ protocol.Snapshot = (*Snapshot)(nil)
 
 func NewSnapshot(state *State, blockID flow.Identifier) *Snapshot {
@@ -45,12 +50,18 @@ func NewSnapshot(state *State, blockID flow.Identifier) *Snapshot {
 	}
 }
 
-func NewSnapshotWithHeader(state *State, blockID flow.Identifier, header *flow.Header) *Snapshot {
-	return &Snapshot{
-		state:   state,
-		blockID: blockID,
-		header:  cached.NewWriteOnce[flow.Header](),
+func NewFinalizedSnapshot(state *State, blockID flow.Identifier, header *flow.Header) *FinalizedSnapshot {
+	return &FinalizedSnapshot{
+		Snapshot: Snapshot{
+			state:   state,
+			blockID: blockID,
+		},
+		header: header,
 	}
+}
+
+func (s *FinalizedSnapshot) Head() (*flow.Header, error) {
+	return s.header, nil
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {

@@ -637,10 +637,7 @@ func (state *State) Final() protocol.Snapshot {
 	if !ok {
 		return invalid.NewSnapshotf("queried finalized header but cache was empty")
 	}
-	snap := NewSnapshot(state, final.id)
-	snap.header = cached.NewWriteOnce[flow.Header]()
-	snap.header.Set(final.header)
-	return snap
+	return NewFinalizedSnapshot(state, final.id, final.header)
 }
 
 func (state *State) AtHeight(height uint64) protocol.Snapshot {

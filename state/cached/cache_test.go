@@ -1,7 +1,6 @@
 package cached
 
 import (
-	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -99,8 +98,8 @@ func TestCachedOnce_MultiThreaded(t *testing.T) {
 	settersStopped.Add(nSetters)
 	for i := 0; i < nSetters; i++ {
 		go func() {
-			settingVal := randIntPtr()
 			defer settersStopped.Done()
+			settingVal := randIntPtr()
 			ok := cache.Set(settingVal)
 			if ok {
 				setVals <- *settingVal
@@ -108,20 +107,19 @@ func TestCachedOnce_MultiThreaded(t *testing.T) {
 		}()
 	}
 
-	fmt.Println("waiting for setters to stopReaders")
+	// wait for all setters to stop, then assert:
+	//  - only one setter succeeded in setting the value
+	//  - all readers read the same value as what was set
 	settersStopped.Wait()
 
 	close(setVals)
 	cachedVal := <-setVals
 	unittest.AssertClosedChannelIsEmpty[int](t, setVals)
-
-	fmt.Println("waiting for readers to get val")
 	for i := 0; i < nReaders; i++ {
 		assert.Equal(t, cachedVal, <-readVals)
 	}
 
-	fmt.Println("stopping readers")
+	// stop the readers
 	close(stopReaders)
-	fmt.Println("waiting for reads to stopReaders")
 	readersStopped.Wait()
 }
