@@ -46,10 +46,6 @@ const (
 	CodeExecutionReceipt
 	CodeResultApproval
 
-	// execution state synchronization
-	CodeExecutionStateSyncRequest
-	CodeExecutionStateDelta
-
 	// data exchange for execution of blocks
 	CodeChunkDataRequest
 	CodeChunkDataResponse
@@ -118,12 +114,6 @@ func MessageCodeFromInterface(v interface{}) (MessageCode, string, error) {
 		return CodeExecutionReceipt, s, nil
 	case *flow.ResultApproval:
 		return CodeResultApproval, s, nil
-
-	// execution state synchronization
-	case *messages.ExecutionStateSyncRequest:
-		return CodeExecutionStateSyncRequest, s, nil
-	case *messages.ExecutionStateDelta:
-		return CodeExecutionStateDelta, s, nil
 
 	// data exchange for execution of blocks
 	case *messages.ChunkDataRequest:
@@ -205,12 +195,6 @@ func InterfaceFromMessageCode(code MessageCode) (interface{}, string, error) {
 		return &flow.ExecutionReceipt{}, what(&flow.ExecutionReceipt{}), nil
 	case CodeResultApproval:
 		return &flow.ResultApproval{}, what(&flow.ResultApproval{}), nil
-
-	// execution state synchronization
-	case CodeExecutionStateSyncRequest:
-		return &messages.ExecutionStateSyncRequest{}, what(&messages.ExecutionStateSyncRequest{}), nil
-	case CodeExecutionStateDelta:
-		return &messages.ExecutionStateDelta{}, what(&messages.ExecutionStateDelta{}), nil
 
 	// data exchange for execution of blocks
 	case CodeChunkDataRequest:
