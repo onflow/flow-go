@@ -71,7 +71,7 @@ type FollowerState interface {
 // All blocks are validated in full, including payload validation, prior to insertion. Only valid blocks are inserted.
 type ParticipantState interface {
 	FollowerState
-	
+
 	// Extend introduces the block with the given ID into the persistent
 	// protocol state without modifying the current finalized state. It allows
 	// us to execute fork-aware queries against ambiguous protocol state, while

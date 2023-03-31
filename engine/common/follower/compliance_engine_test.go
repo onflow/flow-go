@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	commonmock "github.com/onflow/flow-go/engine/common/mock"
+	followermock "github.com/onflow/flow-go/engine/common/follower/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -37,7 +37,7 @@ type EngineSuite struct {
 	con       *mocknetwork.Conduit
 	me        *module.Local
 	headers   *storage.Headers
-	core      *commonmock.FollowerCore
+	core      *followermock.ComplianceCore
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -52,7 +52,7 @@ func (s *EngineSuite) SetupTest() {
 	s.me = module.NewLocal(s.T())
 	s.headers = storage.NewHeaders(s.T())
 
-	s.core = commonmock.NewFollowerCore(s.T())
+	s.core = followermock.NewComplianceCore(s.T())
 	s.core.On("Start", mock.Anything).Return().Once()
 	unittest.ReadyDoneify(s.core)
 
@@ -195,7 +195,7 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	// lower than finalized height
 	metricsMock := module.NewEngineMetrics(s.T())
 	metricsMock.On("MessageReceived", mock.Anything, metrics.MessageSyncedBlocks).Return().Once()
-	metricsMock.On("MessageHandled", mock.Anything, metrics.MessageBlockProposal).Run(func(_ mock.Arguments) {
+	metricsMock.On("MessageHandled", mock.Anything, metrics.MessageSyncedBlocks).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Return().Once()
 	s.engine.engMetrics = metricsMock
