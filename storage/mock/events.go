@@ -15,11 +15,11 @@ type Events struct {
 }
 
 // BatchRemoveByBlockID provides a mock function with given fields: blockID, batch
-func (_m *Events) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.WriteBatchContext) error {
+func (_m *Events) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
 	ret := _m.Called(blockID, batch)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.WriteBatchContext) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.BatchStorage) error); ok {
 		r0 = rf(blockID, batch)
 	} else {
 		r0 = ret.Error(0)
@@ -29,11 +29,11 @@ func (_m *Events) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.Wr
 }
 
 // BatchStore provides a mock function with given fields: blockID, events, batch
-func (_m *Events) BatchStore(blockID flow.Identifier, events []flow.EventsList, batch storage.WriteBatchContext) error {
+func (_m *Events) BatchStore(blockID flow.Identifier, events []flow.EventsList, batch storage.BatchStorage) error {
 	ret := _m.Called(blockID, events, batch)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.EventsList, storage.WriteBatchContext) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.EventsList, storage.BatchStorage) error); ok {
 		r0 = rf(blockID, events, batch)
 	} else {
 		r0 = ret.Error(0)

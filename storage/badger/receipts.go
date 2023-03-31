@@ -120,7 +120,7 @@ func (r *ExecutionReceipts) Store(receipt *flow.ExecutionReceipt) error {
 	return operation.RetryOnConflictTx(r.db, transaction.Update, r.storeTx(receipt))
 }
 
-func (r *ExecutionReceipts) BatchStore(receipt *flow.ExecutionReceipt, batch storage.WriteBatchContext) error {
+func (r *ExecutionReceipts) BatchStore(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 
 	err := r.results.BatchStore(&receipt.ExecutionResult, batch)

@@ -66,7 +66,7 @@ func (c *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) er
 // BatchStore stores Commit keyed by blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (c *Commits) BatchStore(blockID flow.Identifier, commit flow.StateCommitment, batch storage.WriteBatchContext) error {
+func (c *Commits) BatchStore(blockID flow.Identifier, commit flow.StateCommitment, batch storage.BatchStorage) error {
 	// we can't cache while using batches, as it's unknown at this point when, and if
 	// the batch will be committed. Cache will be populated on read however.
 	writeBatch := batch.GetWriter()
@@ -86,7 +86,7 @@ func (c *Commits) RemoveByBlockID(blockID flow.Identifier) error {
 // BatchRemoveByBlockID removes Commit keyed by blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (c *Commits) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.WriteBatchContext) error {
+func (c *Commits) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 	return operation.BatchRemoveStateCommitment(blockID)(writeBatch)
 }

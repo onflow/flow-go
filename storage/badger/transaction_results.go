@@ -152,7 +152,7 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 }
 
 // BatchStore will store the transaction results for the given block ID in a batch
-func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.WriteBatchContext) error {
+func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 
 	for i, result := range transactionResults {
@@ -239,7 +239,7 @@ func (tr *TransactionResults) RemoveByBlockID(blockID flow.Identifier) error {
 }
 
 // BatchRemoveByBlockID batch removes transaction results by block ID
-func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.WriteBatchContext) error {
+func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 	return tr.db.View(operation.BatchRemoveTransactionResultsByBlockID(blockID, writeBatch))
 }

@@ -124,7 +124,7 @@ func (m *MyExecutionReceipts) StoreMyReceipt(receipt *flow.ExecutionReceipt) err
 // No errors are expected during normal operation
 // If entity fails marshalling, the error is wrapped in a generic error and returned.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (m *MyExecutionReceipts) BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch storage.WriteBatchContext) error {
+func (m *MyExecutionReceipts) BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {
 
 	writeBatch := batch.GetWriter()
 
@@ -156,7 +156,7 @@ func (m *MyExecutionReceipts) RemoveIndexByBlockID(blockID flow.Identifier) erro
 // BatchRemoveIndexByBlockID removes blockID-to-my-execution-receipt index entry keyed by a blockID in a provided batch
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (m *MyExecutionReceipts) BatchRemoveIndexByBlockID(blockID flow.Identifier, batch storage.WriteBatchContext) error {
+func (m *MyExecutionReceipts) BatchRemoveIndexByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 	return operation.BatchRemoveOwnExecutionReceipt(blockID)(writeBatch)
 }

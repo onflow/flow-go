@@ -15,11 +15,11 @@ type ExecutionReceipts struct {
 }
 
 // BatchStore provides a mock function with given fields: receipt, batch
-func (_m *ExecutionReceipts) BatchStore(receipt *flow.ExecutionReceipt, batch storage.WriteBatchContext) error {
+func (_m *ExecutionReceipts) BatchStore(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {
 	ret := _m.Called(receipt, batch)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt, storage.WriteBatchContext) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt, storage.BatchStorage) error); ok {
 		r0 = rf(receipt, batch)
 	} else {
 		r0 = ret.Error(0)

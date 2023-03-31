@@ -38,7 +38,7 @@ func NewEvents(collector module.CacheMetrics, db *badger.DB) *Events {
 // BatchStore stores events keyed by a blockID in provided batch
 // No errors are expected during normal operation, but it may return generic error
 // if badger fails to process request
-func (e *Events) BatchStore(blockID flow.Identifier, blockEvents []flow.EventsList, batch storage.WriteBatchContext) error {
+func (e *Events) BatchStore(blockID flow.Identifier, blockEvents []flow.EventsList, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 
 	// pre-allocating and indexing slice is faster than appending
@@ -135,7 +135,7 @@ func (e *Events) RemoveByBlockID(blockID flow.Identifier) error {
 // BatchRemoveByBlockID removes events keyed by a blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (e *Events) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.WriteBatchContext) error {
+func (e *Events) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 	return e.db.View(operation.BatchRemoveEventsByBlockID(blockID, writeBatch))
 }
@@ -166,7 +166,7 @@ func NewServiceEvents(collector module.CacheMetrics, db *badger.DB) *ServiceEven
 // BatchStore stores service events keyed by a blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (e *ServiceEvents) BatchStore(blockID flow.Identifier, events []flow.Event, batch storage.WriteBatchContext) error {
+func (e *ServiceEvents) BatchStore(blockID flow.Identifier, events []flow.Event, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 	for _, event := range events {
 		err := operation.BatchInsertServiceEvent(blockID, event)(writeBatch)
@@ -201,7 +201,7 @@ func (e *ServiceEvents) RemoveByBlockID(blockID flow.Identifier) error {
 // BatchRemoveByBlockID removes service events keyed by a blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (e *ServiceEvents) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.WriteBatchContext) error {
+func (e *ServiceEvents) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 	return e.db.View(operation.BatchRemoveServiceEventsByBlockID(blockID, writeBatch))
 }

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
@@ -128,7 +126,7 @@ func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Id
 //   - ErrMultipleSealsForSameHeight in case there are seals repeatedly sealing block at the same height
 //   - ErrDiscontinuousSeals in case there are height-gaps in the sealed blocks
 //   - storage.ErrNotFound if any of the seals references an unknown block
-func OrderedSeals(payload *flow.Payload, headers storage.Headers[*badger.Txn]) ([]*flow.Seal, error) {
+func OrderedSeals(payload *flow.Payload, headers storage.Headers) ([]*flow.Seal, error) {
 	numSeals := uint64(len(payload.Seals))
 	if numSeals == 0 {
 		return nil, nil

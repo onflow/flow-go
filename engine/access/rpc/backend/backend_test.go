@@ -812,7 +812,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		Return(exeEventResp, status.Errorf(codes.NotFound, "not found")).
 		Once()
 
-	// first call - when block under test is greater height than the sealed head, but execution node does not know about Transaction
+	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
 	result, err := backend.GetTransactionResult(ctx, txID)
 	suite.checkResponse(result, err)
 
@@ -1140,7 +1140,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		DefaultSnapshotHistoryLimit,
 	)
 
-	// first call - when block under test is greater height than the sealed head, but execution node does not know about Transaction
+	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
 	result, err := backend.GetTransactionResult(ctx, txID)
 	suite.checkResponse(result, err)
 
