@@ -190,7 +190,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 		case ctrlMsgType == p2p.CtrlMsgIHave:
 			// iHave specific pre-processing
 			sampleSize := c.iHaveSampleSize(len(control.GetIhave()), validationConfig.IHaveInspectionMaxSampleSize, validationConfig.IHaveSyncInspectSampleSizePercentage)
-			err := c.blockingPreprocessingSampleRpc(from, validationConfig, control, sampleSize)
+			err := c.blockingIHaveSamplePreprocessing(from, validationConfig, control, sampleSize)
 			if err != nil {
 				lg.Error().
 					Err(err).
@@ -257,16 +257,25 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 	return nil
 }
 
-// blockingPreprocessingSampleRpc blocking pre-processing validation func that performs some pre-validation of RPC control messages.
-// If the RPC control message count exceeds the configured discard threshold we perform synchronous topic validation on a subset
-// of the control messages. This is used for control message types that do not have an upper bound on the amount of messages a node can send.
-func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
+// blockingPreprocessingSampleRpc blocking pre-processing of a sample of iHave control messages.
+func (c *ControlMsgValidationInspector) blockingIHaveSamplePreprocessing(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
 	c.metrics.IHavePreProcessingStarted(p2p.CtrlMsgIHave.String(), sampleSize)
 	start := time.Now()
 	defer func() {
 		c.metrics.IHavePreProcessingFinished(p2p.CtrlMsgIHave.String(), sampleSize, time.Since(start))
 	}()
 
+	err := c.blockingPreprocessingSampleRpc(from, validationConfig, controlMessage, sampleSize)
+	if err != nil {
+		return fmt.Errorf("failed to pre-process a sample of iHave messages: %w", err)
+	}
+	return nil
+}
+
+// blockingPreprocessingSampleRpc blocking pre-processing validation func that performs some pre-validation of RPC control messages.
+// If the RPC control message count exceeds the configured discard threshold we perform synchronous topic validation on a subset
+// of the control messages. This is used for control message types that do not have an upper bound on the amount of messages a node can send.
+func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
 		Uint64("ctrl_msg_count", count).
