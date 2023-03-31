@@ -50,6 +50,16 @@ func (_m *NetworkMetrics) AllowStream(p peer.ID, dir network.Direction) {
 	_m.Called(p, dir)
 }
 
+// AsyncProcessingFinished provides a mock function with given fields: msgType, duration
+func (_m *NetworkMetrics) AsyncProcessingFinished(msgType string, duration time.Duration) {
+	_m.Called(msgType, duration)
+}
+
+// AsyncProcessingStarted provides a mock function with given fields: msgType
+func (_m *NetworkMetrics) AsyncProcessingStarted(msgType string) {
+	_m.Called(msgType)
+}
+
 // BlockConn provides a mock function with given fields: dir, usefd
 func (_m *NetworkMetrics) BlockConn(dir network.Direction, usefd bool) {
 	_m.Called(dir, usefd)
@@ -98,6 +108,16 @@ func (_m *NetworkMetrics) DNSLookupDuration(duration time.Duration) {
 // DuplicateInboundMessagesDropped provides a mock function with given fields: topic, _a1, messageType
 func (_m *NetworkMetrics) DuplicateInboundMessagesDropped(topic string, _a1 string, messageType string) {
 	_m.Called(topic, _a1, messageType)
+}
+
+// IHavePreProcessingFinished provides a mock function with given fields: ihaveMsgType, sampleSize, duration
+func (_m *NetworkMetrics) IHavePreProcessingFinished(ihaveMsgType string, sampleSize uint, duration time.Duration) {
+	_m.Called(ihaveMsgType, sampleSize, duration)
+}
+
+// IHavePreProcessingStarted provides a mock function with given fields: ihaveMsgType, sampleSize
+func (_m *NetworkMetrics) IHavePreProcessingStarted(ihaveMsgType string, sampleSize uint) {
+	_m.Called(ihaveMsgType, sampleSize)
 }
 
 // InboundConnections provides a mock function with given fields: connectionCount
@@ -283,6 +303,16 @@ func (_m *NetworkMetrics) OutboundConnections(connectionCount uint) {
 // OutboundMessageSent provides a mock function with given fields: sizeBytes, topic, _a2, messageType
 func (_m *NetworkMetrics) OutboundMessageSent(sizeBytes int, topic string, _a2 string, messageType string) {
 	_m.Called(sizeBytes, topic, _a2, messageType)
+}
+
+// PreProcessingFinished provides a mock function with given fields: msgType, duration
+func (_m *NetworkMetrics) PreProcessingFinished(msgType string, duration time.Duration) {
+	_m.Called(msgType, duration)
+}
+
+// PreProcessingStarted provides a mock function with given fields: msgType
+func (_m *NetworkMetrics) PreProcessingStarted(msgType string) {
+	_m.Called(msgType)
 }
 
 // QueueDuration provides a mock function with given fields: duration, priority

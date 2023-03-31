@@ -43,7 +43,7 @@ func NewCorruptLibP2PNodeFactory(
 			panic("illegal chain id for using corrupt libp2p node")
 		}
 
-		rpcValidationInspector := validation.NewControlMsgValidationInspector(log, sporkId, p2pbuilder.DefaultRPCValidationConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(log))
+		rpcValidationInspector := validation.NewControlMsgValidationInspector(log, sporkId, p2pbuilder.DefaultRPCValidationConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(log), metrics)
 		builder, err := p2pbuilder.DefaultNodeBuilder(
 			log,
 			address,

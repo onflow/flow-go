@@ -618,13 +618,14 @@ func BuildGossipSubRPCValidationInspector(logger zerolog.Logger,
 	sporkId flow.Identifier,
 	validationConfigs *GossipSubRPCValidationConfigs,
 	distributor p2p.GossipSubInspectorNotificationDistributor,
+	inspectorMetrics module.GossipSubRPCValidationInspectorMetrics,
 	heroStoreOpts ...queue.HeroStoreConfigOption,
 ) (*validation.ControlMsgValidationInspector, error) {
 	controlMsgRPCInspectorCfg, err := gossipSubRPCValidationInspectorConfig(validationConfigs, heroStoreOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
 	}
-	rpcValidationInspector := validation.NewControlMsgValidationInspector(logger, sporkId, controlMsgRPCInspectorCfg, distributor)
+	rpcValidationInspector := validation.NewControlMsgValidationInspector(logger, sporkId, controlMsgRPCInspectorCfg, distributor, inspectorMetrics)
 	return rpcValidationInspector, nil
 }
 

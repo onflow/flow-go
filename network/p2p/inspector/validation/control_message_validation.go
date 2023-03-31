@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math"
+	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
@@ -82,6 +84,7 @@ type ControlMsgValidationInspector struct {
 	component.Component
 	logger  zerolog.Logger
 	sporkID flow.Identifier
+	metrics module.GossipSubRPCValidationInspectorMetrics
 	// config control message validation configurations.
 	config *ControlMsgValidationInspectorConfig
 	// distributor used to disseminate invalid RPC message notifications.
@@ -109,11 +112,13 @@ func NewControlMsgValidationInspector(
 	sporkID flow.Identifier,
 	config *ControlMsgValidationInspectorConfig,
 	distributor p2p.GossipSubInspectorNotificationDistributor,
+	inspectorMetrics module.GossipSubRPCValidationInspectorMetrics,
 ) *ControlMsgValidationInspector {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 	c := &ControlMsgValidationInspector{
 		logger:      lg,
 		sporkID:     sporkID,
+		metrics:     inspectorMetrics,
 		config:      config,
 		distributor: distributor,
 	}
@@ -158,7 +163,9 @@ func NewControlMsgValidationInspector(
 //	ErrDiscardThreshold - if the message count for the control message type exceeds the discard threshold.
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	control := rpc.GetControl()
+
 	for _, ctrlMsgType := range p2p.ControlMessageTypes() {
+
 		lg := c.logger.With().
 			Str("peer_id", from.String()).
 			Str("ctrl_msg_type", string(ctrlMsgType)).Logger()
@@ -217,6 +224,12 @@ func (c *ControlMsgValidationInspector) Name() string {
 
 // blockingPreprocessingRpc generic pre-processing validation func that ensures the RPC control message count does not exceed the configured discard threshold.
 func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
+	c.metrics.PreProcessingStarted(validationConfig.ControlMsg.String())
+	start := time.Now()
+	defer func() {
+		c.metrics.PreProcessingFinished(validationConfig.ControlMsg.String(), time.Since(start))
+	}()
+
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
 		Uint64("ctrl_msg_count", count).
@@ -248,6 +261,12 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 // If the RPC control message count exceeds the configured discard threshold we perform synchronous topic validation on a subset
 // of the control messages. This is used for control message types that do not have an upper bound on the amount of messages a node can send.
 func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
+	c.metrics.IHavePreProcessingStarted(p2p.CtrlMsgIHave.String(), sampleSize)
+	start := time.Now()
+	defer func() {
+		c.metrics.IHavePreProcessingFinished(p2p.CtrlMsgIHave.String(), sampleSize, time.Since(start))
+	}()
+
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
 		Uint64("ctrl_msg_count", count).
@@ -277,6 +296,12 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 // processInspectMsgReq func used by component workers to perform further inspection of control messages that will check if the messages are rate limited
 // and ensure all topic IDS are valid when the amount of messages is above the configured safety threshold.
 func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequest) error {
+	c.metrics.AsyncProcessingStarted(req.validationConfig.ControlMsg.String())
+	start := time.Now()
+	defer func() {
+		c.metrics.AsyncProcessingFinished(req.validationConfig.ControlMsg.String(), time.Since(start))
+	}()
+
 	count := c.getCtrlMsgCount(req.validationConfig.ControlMsg, req.ctrlMsg)
 	lg := c.logger.With().
 		Str("peer_id", req.Peer.String()).

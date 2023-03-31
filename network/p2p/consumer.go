@@ -22,6 +22,10 @@ type DisallowListConsumer interface {
 // ControlMessageType is the type of control message, as defined in the libp2p pubsub spec.
 type ControlMessageType string
 
+func (c ControlMessageType) String() string {
+	return string(c)
+}
+
 const (
 	CtrlMsgIHave ControlMessageType = "IHAVE"
 	CtrlMsgIWant ControlMessageType = "IWANT"

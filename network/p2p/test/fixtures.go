@@ -71,7 +71,7 @@ func NodeFixture(
 		Metrics:                          metrics.NewNoopCollector(),
 		ResourceManager:                  testutils.NewResourceManager(t),
 		GossipSubPeerScoreTracerInterval: 0, // disabled by default
-		GossipSubRPCValidationInspector:  validation.NewControlMsgValidationInspector(logger, sporkID, defaultRPCValidationInpectorCfg, rpcInspectorNotifDistributor),
+		GossipSubRPCValidationInspector:  validation.NewControlMsgValidationInspector(logger, sporkID, defaultRPCValidationInpectorCfg, rpcInspectorNotifDistributor, metrics.NewNoopCollector()),
 	}
 
 	for _, opt := range opts {

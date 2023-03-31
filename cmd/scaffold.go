@@ -377,7 +377,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		fnb.GossipSubInspectorNotifDistributor = BuildGossipsubRPCValidationInspectorNotificationDisseminator(fnb.GossipSubRPCInspectorNotificationCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
 		heroStoreOpts := BuildGossipsubRPCValidationInspectorHeroStoreOpts(fnb.GossipSubRPCInspectorCacheSize, fnb.MetricsRegisterer, fnb.MetricsEnabled)
-		rpcValidationInspector, err := p2pbuilder.BuildGossipSubRPCValidationInspector(fnb.Logger, fnb.SporkID, fnb.GossipSubRPCValidationConfigs, fnb.GossipSubInspectorNotifDistributor, heroStoreOpts...)
+		rpcValidationInspector, err := p2pbuilder.BuildGossipSubRPCValidationInspector(fnb.Logger, fnb.SporkID, fnb.GossipSubRPCValidationConfigs, fnb.GossipSubInspectorNotifDistributor, fnb.Metrics.Network, heroStoreOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gossipsub rpc validation inspector: %w", err)
 		}

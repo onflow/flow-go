@@ -463,7 +463,7 @@ func generateLibP2PNode(t *testing.T,
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t)).
 		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
-		SetGossipSubValidationInspector(validation.NewControlMsgValidationInspector(logger, sporkID, defaultRPCValidationInpectorCfg, rpcInspectorNotifDistributor))
+		SetGossipSubValidationInspector(validation.NewControlMsgValidationInspector(logger, sporkID, defaultRPCValidationInpectorCfg, rpcInspectorNotifDistributor, noopMetrics))
 
 	for _, opt := range opts {
 		opt(builder)

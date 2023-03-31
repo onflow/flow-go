@@ -860,7 +860,7 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 
 		builder.GossipSubInspectorNotifDistributor = cmd.BuildGossipsubRPCValidationInspectorNotificationDisseminator(builder.GossipSubRPCInspectorNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
 		heroStoreOpts := cmd.BuildGossipsubRPCValidationInspectorHeroStoreOpts(builder.GossipSubRPCInspectorCacheSize, builder.MetricsRegisterer, builder.MetricsEnabled)
-		rpcValidationInspector, err := p2pbuilder.BuildGossipSubRPCValidationInspector(builder.Logger, builder.SporkID, builder.GossipSubRPCValidationConfigs, builder.GossipSubInspectorNotifDistributor, heroStoreOpts...)
+		rpcValidationInspector, err := p2pbuilder.BuildGossipSubRPCValidationInspector(builder.Logger, builder.SporkID, builder.GossipSubRPCValidationConfigs, builder.GossipSubInspectorNotifDistributor, builder.Metrics.Network, heroStoreOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gossipsub rpc validation inspector: %w", err)
 		}

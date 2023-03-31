@@ -14,6 +14,26 @@ type GossipSubMetrics struct {
 	mock.Mock
 }
 
+// AsyncProcessingFinished provides a mock function with given fields: msgType, duration
+func (_m *GossipSubMetrics) AsyncProcessingFinished(msgType string, duration time.Duration) {
+	_m.Called(msgType, duration)
+}
+
+// AsyncProcessingStarted provides a mock function with given fields: msgType
+func (_m *GossipSubMetrics) AsyncProcessingStarted(msgType string) {
+	_m.Called(msgType)
+}
+
+// IHavePreProcessingFinished provides a mock function with given fields: ihaveMsgType, sampleSize, duration
+func (_m *GossipSubMetrics) IHavePreProcessingFinished(ihaveMsgType string, sampleSize uint, duration time.Duration) {
+	_m.Called(ihaveMsgType, sampleSize, duration)
+}
+
+// IHavePreProcessingStarted provides a mock function with given fields: ihaveMsgType, sampleSize
+func (_m *GossipSubMetrics) IHavePreProcessingStarted(ihaveMsgType string, sampleSize uint) {
+	_m.Called(ihaveMsgType, sampleSize)
+}
+
 // OnAppSpecificScoreUpdated provides a mock function with given fields: _a0
 func (_m *GossipSubMetrics) OnAppSpecificScoreUpdated(_a0 float64) {
 	_m.Called(_a0)
@@ -97,6 +117,16 @@ func (_m *GossipSubMetrics) OnPublishedGossipMessagesReceived(count int) {
 // OnTimeInMeshUpdated provides a mock function with given fields: _a0, _a1
 func (_m *GossipSubMetrics) OnTimeInMeshUpdated(_a0 channels.Topic, _a1 time.Duration) {
 	_m.Called(_a0, _a1)
+}
+
+// PreProcessingFinished provides a mock function with given fields: msgType, duration
+func (_m *GossipSubMetrics) PreProcessingFinished(msgType string, duration time.Duration) {
+	_m.Called(msgType, duration)
+}
+
+// PreProcessingStarted provides a mock function with given fields: msgType
+func (_m *GossipSubMetrics) PreProcessingStarted(msgType string) {
+	_m.Called(msgType)
 }
 
 // SetWarningStateCount provides a mock function with given fields: _a0

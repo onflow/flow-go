@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
@@ -72,7 +73,7 @@ func TestInspect_SafetyThreshold(t *testing.T) {
 	logger := zerolog.New(os.Stdout).Hook(hook)
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	defer distributor.AssertNotCalled(t, "DistributeInvalidControlMessageNotification", mockery.Anything)
-	inspector := validation.NewControlMsgValidationInspector(logger, sporkID, inspectorConfig, distributor)
+	inspector := validation.NewControlMsgValidationInspector(logger, sporkID, inspectorConfig, distributor, metrics.NewNoopCollector())
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(inspector)
 	victimNode, _ := p2ptest.NodeFixture(
 		t,
@@ -140,7 +141,7 @@ func TestInspect_DiscardThreshold(t *testing.T) {
 				close(done)
 			}
 		}).Return(nil)
-	inspector := validation.NewControlMsgValidationInspector(logger, sporkID, inspectorConfig, distributor)
+	inspector := validation.NewControlMsgValidationInspector(logger, sporkID, inspectorConfig, distributor, metrics.NewNoopCollector())
 	// we use inline inspector here so that we can check the error type when we inspect an RPC and
 	// track which control message type the error involves
 	inlineInspector := func(id peer.ID, rpc *corrupt.RPC) error {
@@ -216,7 +217,7 @@ func TestInspect_DiscardThresholdIHave(t *testing.T) {
 			// thus we can close this done channel immediately.
 			close(done)
 		}).Return(nil)
-	inspector := validation.NewControlMsgValidationInspector(logger, sporkID, inspectorConfig, distributor)
+	inspector := validation.NewControlMsgValidationInspector(logger, sporkID, inspectorConfig, distributor, metrics.NewNoopCollector())
 	// we use inline inspector here so that we can check the error type when we inspect an RPC and
 	// track which control message type the error involves
 	inlineInspector := func(id peer.ID, rpc *corrupt.RPC) error {
@@ -285,7 +286,7 @@ func TestInspect_RateLimitedPeer(t *testing.T) {
 				close(done)
 			}
 		}).Return(nil)
-	inspector := validation.NewControlMsgValidationInspector(unittest.Logger(), sporkID, inspectorConfig, distributor)
+	inspector := validation.NewControlMsgValidationInspector(unittest.Logger(), sporkID, inspectorConfig, distributor, metrics.NewNoopCollector())
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(inspector)
 	victimNode, _ := p2ptest.NodeFixture(
 		t,
@@ -385,7 +386,7 @@ func TestInspect_InvalidTopicID(t *testing.T) {
 				close(done)
 			}
 		}).Return(nil)
-	inspector := validation.NewControlMsgValidationInspector(unittest.Logger(), sporkID, inspectorConfig, distributor)
+	inspector := validation.NewControlMsgValidationInspector(unittest.Logger(), sporkID, inspectorConfig, distributor, metrics.NewNoopCollector())
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(inspector)
 	victimNode, _ := p2ptest.NodeFixture(
 		t,
