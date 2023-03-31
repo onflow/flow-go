@@ -25,11 +25,6 @@ else ifeq ($(strip $(NAMESPACE)),)
 	$(error NAMESPACE cannot be empty)
 endif
 
-init:
-ifeq ($(strip $(PROJECT_NAME)),)
-	$(eval PROJECT_NAME=$(COMMIT_SHA))
-endif
-
 # assumes there is a checked out version of flow-go in a "flow-go" sub-folder at this level so that the bootstrap executable
 # for the checked out version will be run in the sub folder but the bootstrap folder will be created here (outside of the checked out flow-go in the sub folder)
 gen-bootstrap: clone-flow
@@ -51,13 +46,16 @@ gen-helm-l2:
 # runs bootstrap to generate all node info
 # runs level 1 automation to read bootstrap data and generate data input for level 2
 # runs level 2 automation to generate values.yml based on template and data values from previous step
-gen-helm-values: validate init gen-bootstrap gen-helm-l1 gen-helm-l2
+gen-helm-values: validate gen-bootstrap gen-helm-l1 gen-helm-l2
 
 # main target for deployment
-deploy-all: validate init gen-helm-values k8s-secrets-create helm-deploy
+deploy-all: validate gen-helm-values k8s-secrets-create helm-deploy
 
 # main target for cleaning up a deployment
-clean-all: validate init k8s-delete k8s-delete-secrets clean-bootstrap clean-gen-helm clean-flow
+clean-all: validate k8s-delete k8s-delete-secrets clean-bootstrap clean-gen-helm clean-flow
+
+# target to be used in workflow as local clean up will not be needed
+remote-clean-all: validate k8s-delete-secrets k8s-delete 
 
 clean-bootstrap:
 	rm -rf ./bootstrap
@@ -70,7 +68,7 @@ k8s-secrets-create:
 	bash ./create-secrets.sh ${NETWORK_ID} ${NAMESPACE}
 
 helm-deploy:
-	helm upgrade --wait --install -f ./values.yml ${NETWORK_ID} ./flow --set networkId="${NETWORK_ID}" --set owner="${OWNER}" --set ingress.enabled="true"  --debug --namespace ${NAMESPACE}
+	helm upgrade --install -f ./values.yml ${NETWORK_ID} ./flow --set networkId="${NETWORK_ID}" --set owner="${OWNER}" --debug --namespace ${NAMESPACE} --wait
 
 k8s-delete:
 	helm delete ${NETWORK_ID} --namespace ${NAMESPACE}
@@ -91,7 +89,8 @@ k8s-test-network-accessibility:
 
 clone-flow: clean-flow 
 	# this cloned repo will be used for generating bootstrap info specific to that tag / version
-	git clone --depth 1 --branch $(REF_FOR_BOOTSTRAP) https://github.com/onflow/flow-go.git --single-branch
+	git clone https://github.com/onflow/flow-go.git
+	cd flow-go && git checkout $(REF_FOR_BOOTSTRAP)
 	
 clean-flow:
 	rm -rf flow-go
