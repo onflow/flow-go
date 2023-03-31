@@ -10,7 +10,25 @@ import (
 // The recommended decay factor is between (0, 1), however, the function does not enforce this.
 // The decayed score is calculated as follows:
 // score = score * decay^t where t is the time since the last update.
+// Args:
+// - score: the score to be decayed.
+// - decay: the decay factor, it should be in the range of (0, 1].
+// - lastUpdated: the time when the score was last updated.
+// Returns:
+//   - the decayed score.
+//   - an error if the decay factor is not in the range of (0, 1] or the decayed score is NaN.
+//     it also returns an error if the last updated time is in the future (to avoid overflow or Inf).
+//     The error is considered irrecoverable (unless the parameters can be adjusted).
 func GeometricDecay(score float64, decay float64, lastUpdated time.Time) (float64, error) {
+	if decay <= 0 || decay > 1 {
+		return 0.0, fmt.Errorf("decay factor must be in the range [0, 1], got %f", decay)
+	}
+
+	now := time.Now()
+	if lastUpdated.After(now) {
+		return 0.0, fmt.Errorf("last updated time is in the future %v now: %v", lastUpdated, now)
+	}
+
 	t := time.Since(lastUpdated).Seconds()
 	decayFactor := math.Pow(decay, t)
 
@@ -18,12 +36,9 @@ func GeometricDecay(score float64, decay float64, lastUpdated time.Time) (float6
 		return 0.0, fmt.Errorf("decay factor is NaN for %f^%f", decay, t)
 	}
 
-	if math.IsInf(decayFactor, 1) {
-		return 0.0, fmt.Errorf("decay factor is too large for %f^%f", decay, t)
-	}
-
-	if math.IsInf(decayFactor, -1) {
-		return 0.0, fmt.Errorf("decay factor is too small for %f^%f", decay, t)
+	decayedScore := score * decayFactor
+	if decayedScore > score {
+		return 0.0, fmt.Errorf("decayed score is greater than the original score")
 	}
 
 	return score * decayFactor, nil
