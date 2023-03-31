@@ -15,11 +15,11 @@ type Headers struct {
 }
 
 // BatchIndexByChunkID provides a mock function with given fields: headerID, chunkID, batch
-func (_m *Headers) BatchIndexByChunkID(headerID flow.Identifier, chunkID flow.Identifier, batch storage.BatchStorage) error {
+func (_m *Headers) BatchIndexByChunkID(headerID flow.Identifier, chunkID flow.Identifier, batch storage.WriteBatchContext) error {
 	ret := _m.Called(headerID, chunkID, batch)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier, storage.WriteBatchContext) error); ok {
 		r0 = rf(headerID, chunkID, batch)
 	} else {
 		r0 = ret.Error(0)
@@ -29,11 +29,11 @@ func (_m *Headers) BatchIndexByChunkID(headerID flow.Identifier, chunkID flow.Id
 }
 
 // BatchRemoveChunkBlockIndexByChunkID provides a mock function with given fields: chunkID, batch
-func (_m *Headers) BatchRemoveChunkBlockIndexByChunkID(chunkID flow.Identifier, batch storage.BatchStorage) error {
+func (_m *Headers) BatchRemoveChunkBlockIndexByChunkID(chunkID flow.Identifier, batch storage.WriteBatchContext) error {
 	ret := _m.Called(chunkID, batch)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.WriteBatchContext) error); ok {
 		r0 = rf(chunkID, batch)
 	} else {
 		r0 = ret.Error(0)

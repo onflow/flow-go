@@ -15,11 +15,11 @@ type Commits struct {
 }
 
 // BatchRemoveByBlockID provides a mock function with given fields: blockID, batch
-func (_m *Commits) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+func (_m *Commits) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.WriteBatchContext) error {
 	ret := _m.Called(blockID, batch)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.WriteBatchContext) error); ok {
 		r0 = rf(blockID, batch)
 	} else {
 		r0 = ret.Error(0)
@@ -29,11 +29,11 @@ func (_m *Commits) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.B
 }
 
 // BatchStore provides a mock function with given fields: blockID, commit, batch
-func (_m *Commits) BatchStore(blockID flow.Identifier, commit flow.StateCommitment, batch storage.BatchStorage) error {
+func (_m *Commits) BatchStore(blockID flow.Identifier, commit flow.StateCommitment, batch storage.WriteBatchContext) error {
 	ret := _m.Called(blockID, commit, batch)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.StateCommitment, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.StateCommitment, storage.WriteBatchContext) error); ok {
 		r0 = rf(blockID, commit, batch)
 	} else {
 		r0 = ret.Error(0)

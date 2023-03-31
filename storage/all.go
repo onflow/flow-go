@@ -1,23 +1,23 @@
 package storage
 
 // All includes all the storage modules
-type All struct {
-	Headers            Headers
+type All[wb WriteBatch, tx Transaction] struct {
+	Headers            Headers[wb]
 	Guarantees         Guarantees
 	Seals              Seals
 	Index              Index
 	Payloads           Payloads
-	Blocks             Blocks
-	QuorumCertificates QuorumCertificates
-	Setups             EpochSetups
-	EpochCommits       EpochCommits
-	Statuses           EpochStatuses
-	Results            ExecutionResults
-	Receipts           ExecutionReceipts
-	ChunkDataPacks     ChunkDataPacks
-	Commits            Commits
+	Blocks             Blocks[tx]
+	QuorumCertificates QuorumCertificates[tx]
+	Setups             EpochSetups[tx]
+	EpochCommits       EpochCommits[tx]
+	Statuses           EpochStatuses[tx]
+	Results            ExecutionResults[wb, tx]
+	Receipts           ExecutionReceipts[wb]
+	ChunkDataPacks     ChunkDataPacks[wb]
+	Commits            Commits[wb]
 	Transactions       Transactions
-	TransactionResults TransactionResults
+	TransactionResults TransactionResults[wb]
 	Collections        Collections
-	Events             Events
+	Events             Events[wb]
 }

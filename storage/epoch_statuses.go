@@ -4,13 +4,12 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-type EpochStatuses interface {
+type EpochStatuses[tx Transaction] interface {
 
 	// StoreTx stores a new epoch state in a DB transaction while going through the cache.
-	StoreTx(blockID flow.Identifier, state *flow.EpochStatus) func(*transaction.Tx) error
+	StoreTx(blockID flow.Identifier, state *flow.EpochStatus) func(TransactionContext[tx]) error
 
 	// ByBlockID will return the epoch status for the given block
 	// Error returns:

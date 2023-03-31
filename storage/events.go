@@ -5,10 +5,10 @@ import (
 )
 
 // Events represents persistent storage for events.
-type Events interface {
+type Events[wb WriteBatch] interface {
 
 	// BatchStore will store events for the given block ID in a given batch
-	BatchStore(blockID flow.Identifier, events []flow.EventsList, batch BatchStorage) error
+	BatchStore(blockID flow.Identifier, events []flow.EventsList, batch WriteBatchContext[wb]) error
 
 	// ByBlockID returns the events for the given block ID
 	ByBlockID(blockID flow.Identifier) ([]flow.Event, error)
@@ -25,14 +25,14 @@ type Events interface {
 	// BatchRemoveByBlockID removes events keyed by a blockID in provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-	BatchRemoveByBlockID(blockID flow.Identifier, batch BatchStorage) error
+	BatchRemoveByBlockID(blockID flow.Identifier, batch WriteBatchContext[wb]) error
 }
 
-type ServiceEvents interface {
+type ServiceEvents[wb WriteBatch] interface {
 	// BatchStore stores service events keyed by a blockID in provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-	BatchStore(blockID flow.Identifier, events []flow.Event, batch BatchStorage) error
+	BatchStore(blockID flow.Identifier, events []flow.Event, batch WriteBatchContext[wb]) error
 
 	// ByBlockID returns the events for the given block ID
 	ByBlockID(blockID flow.Identifier) ([]flow.Event, error)
@@ -40,5 +40,5 @@ type ServiceEvents interface {
 	// BatchRemoveByBlockID removes service events keyed by a blockID in provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-	BatchRemoveByBlockID(blockID flow.Identifier, batch BatchStorage) error
+	BatchRemoveByBlockID(blockID flow.Identifier, batch WriteBatchContext[wb]) error
 }

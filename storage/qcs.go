@@ -2,7 +2,6 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // QuorumCertificates represents storage for Quorum Certificates.
@@ -10,10 +9,10 @@ import (
 // When stored, QCs are indexed by the ID of the block they certify (not the block they are included within).
 // In the example below, `QC_1` is indexed by `Block_1.ID()`
 // Block_1 <- Block_2(QC_1)
-type QuorumCertificates interface {
+type QuorumCertificates[tx Transaction] interface {
 	// StoreTx stores a Quorum Certificate as part of database transaction QC is indexed by QC.BlockID.
 	// * storage.ErrAlreadyExists if any QC for blockID is already stored
-	StoreTx(qc *flow.QuorumCertificate) func(*transaction.Tx) error
+	StoreTx(qc *flow.QuorumCertificate) func(TransactionContext[tx]) error
 	// ByBlockID returns QC that certifies block referred by blockID.
 	// * storage.ErrNotFound if no QC for blockID doesn't exist.
 	ByBlockID(blockID flow.Identifier) (*flow.QuorumCertificate, error)

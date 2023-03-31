@@ -242,7 +242,7 @@ func (b *backendTransactions) GetTransactionResult(
 	txErr := rpc.ConvertStorageError(err)
 	if txErr != nil {
 		if status.Code(txErr) == codes.NotFound {
-			// Tx not found. If we have historical Sporks setup, lets look through those as well
+			// Transaction not found. If we have historical Sporks setup, lets look through those as well
 			historicalTxResult, err := b.getHistoricalTransactionResult(ctx, txID)
 			if err != nil {
 				// if tx not found in old access nodes either, then assume that the tx was submitted to a different AN

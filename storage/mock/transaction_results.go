@@ -15,11 +15,11 @@ type TransactionResults struct {
 }
 
 // BatchStore provides a mock function with given fields: blockID, transactionResults, batch
-func (_m *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.BatchStorage) error {
+func (_m *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.WriteBatchContext) error {
 	ret := _m.Called(blockID, transactionResults, batch)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.TransactionResult, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.TransactionResult, storage.WriteBatchContext) error); ok {
 		r0 = rf(blockID, transactionResults, batch)
 	} else {
 		r0 = ret.Error(0)

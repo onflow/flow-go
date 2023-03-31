@@ -15,11 +15,11 @@ type ChunkDataPacks struct {
 }
 
 // BatchRemove provides a mock function with given fields: chunkID, batch
-func (_m *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.BatchStorage) error {
+func (_m *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.WriteBatchContext) error {
 	ret := _m.Called(chunkID, batch)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.WriteBatchContext) error); ok {
 		r0 = rf(chunkID, batch)
 	} else {
 		r0 = ret.Error(0)
@@ -29,11 +29,11 @@ func (_m *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.Bat
 }
 
 // BatchStore provides a mock function with given fields: c, batch
-func (_m *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchStorage) error {
+func (_m *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.WriteBatchContext) error {
 	ret := _m.Called(c, batch)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ChunkDataPack, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.ChunkDataPack, storage.WriteBatchContext) error); ok {
 		r0 = rf(c, batch)
 	} else {
 		r0 = ret.Error(0)

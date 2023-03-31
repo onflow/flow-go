@@ -4,8 +4,6 @@ import (
 	"sync"
 
 	"github.com/dgraph-io/badger/v2"
-
-	"github.com/onflow/flow-go/storage"
 )
 
 type Batch struct {
@@ -23,7 +21,7 @@ func NewBatch(db *badger.DB) *Batch {
 	}
 }
 
-func (b *Batch) GetWriter() storage.WriteBatch {
+func (b *Batch) GetWriter() *badger.WriteBatch {
 	return b.writer
 }
 

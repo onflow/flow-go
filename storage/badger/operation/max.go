@@ -6,8 +6,6 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-
-	"github.com/onflow/flow-go/storage"
 )
 
 // maxKey is the biggest allowed key size in badger
@@ -20,6 +18,11 @@ var max uint32
 // we initialize max to maximum size, to detect if it wasn't set yet
 func init() {
 	max = maxKey
+}
+
+// writxOrWriteBatchte an interface to allow using either write batch or transaction.
+type txOrWriteBatch interface {
+	Set(k, v []byte) error
 }
 
 // InitMax retrieves the maximum key length to have it internally in the
@@ -44,7 +47,7 @@ func InitMax(tx *badger.Txn) error {
 
 // SetMax sets the value for the maximum key length used for efficient iteration.
 // No errors are expected during normal operation.
-func SetMax(tx storage.Transaction) error {
+func SetMax(tx txOrWriteBatch) error {
 	key := makePrefix(codeMax)
 	val := make([]byte, 4)
 	binary.LittleEndian.PutUint32(val, max)

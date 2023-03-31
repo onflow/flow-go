@@ -191,7 +191,7 @@ func (h *Headers) IndexByChunkID(headerID, chunkID flow.Identifier) error {
 	return operation.RetryOnConflictTx(h.db, transaction.Update, h.chunkIDCache.PutTx(chunkID, headerID))
 }
 
-func (h *Headers) BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch storage.BatchStorage) error {
+func (h *Headers) BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch storage.WriteBatchContext[*badger.WriteBatch]) error {
 	writeBatch := batch.GetWriter()
 	return operation.BatchIndexBlockByChunkID(headerID, chunkID)(writeBatch)
 }
@@ -203,7 +203,7 @@ func (h *Headers) RemoveChunkBlockIndexByChunkID(chunkID flow.Identifier) error 
 // BatchRemoveChunkBlockIndexByChunkID removes block to chunk index entry keyed by a blockID in a provided batch
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (h *Headers) BatchRemoveChunkBlockIndexByChunkID(chunkID flow.Identifier, batch storage.BatchStorage) error {
+func (h *Headers) BatchRemoveChunkBlockIndexByChunkID(chunkID flow.Identifier, batch storage.WriteBatchContext[*badger.WriteBatch]) error {
 	writeBatch := batch.GetWriter()
 	return operation.BatchRemoveBlockIDByChunkID(chunkID)(writeBatch)
 }

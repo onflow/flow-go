@@ -4,18 +4,17 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // Blocks represents persistent storage for blocks.
-type Blocks interface {
+type Blocks[tx Transaction] interface {
 
 	// Store will atomically store a block with all its dependencies.
 	Store(block *flow.Block) error
 
 	// StoreTx allows us to store a new block, including its payload & header, as part of a DB transaction, while
 	// still going through the caching layer.
-	StoreTx(block *flow.Block) func(*transaction.Tx) error
+	StoreTx(block *flow.Block) func(TransactionContext[tx]) error
 
 	// ByID returns the block with the given hash. It is available for
 	// finalized and ambiguous blocks.

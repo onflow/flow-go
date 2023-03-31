@@ -19,6 +19,10 @@ func (b *Tx) OnSucceed(callback func()) {
 	b.callbacks = append(b.callbacks, callback)
 }
 
+func (b *Tx) GetTx() *dbbadger.Txn {
+	return b.DBTxn
+}
+
 // Update creates a badger transaction, passing it to a chain of functions,
 // if all succeed. Useful to use callback to update cache in order to ensure data
 // in badgerDB and cache are consistent.

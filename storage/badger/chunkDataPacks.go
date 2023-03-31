@@ -73,7 +73,7 @@ func (ch *ChunkDataPacks) Remove(chunkID flow.Identifier) error {
 // BatchStore stores ChunkDataPack c keyed by its ChunkID in provided batch.
 // No errors are expected during normal operation, but it may return generic error
 // if entity is not serializable or Badger unexpectedly fails to process request
-func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchStorage) error {
+func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.WriteBatchContext[*badger.WriteBatch]) error {
 	sc := toStoredChunkDataPack(c)
 	writeBatch := batch.GetWriter()
 	batch.OnSucceed(func() {
@@ -85,7 +85,7 @@ func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchS
 // BatchRemove removes ChunkDataPack c keyed by its ChunkID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func (ch *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.BatchStorage) error {
+func (ch *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.WriteBatchContext[*badger.WriteBatch]) error {
 	writeBatch := batch.GetWriter()
 	batch.OnSucceed(func() {
 		ch.byChunkIDCache.Remove(chunkID)

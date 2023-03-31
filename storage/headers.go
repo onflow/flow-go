@@ -7,7 +7,7 @@ import (
 )
 
 // Headers represents persistent storage for blocks.
-type Headers interface {
+type Headers[wb WriteBatch] interface {
 
 	// Store will store a header.
 	Store(header *flow.Header) error
@@ -34,7 +34,7 @@ type Headers interface {
 	IndexByChunkID(headerID, chunkID flow.Identifier) error
 
 	// BatchIndexByChunkID indexes block ID by chunk ID in a given batch.
-	BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch BatchStorage) error
+	BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch WriteBatchContext[wb]) error
 
 	// IDByChunkID finds the ID of the block corresponding to given chunk ID.
 	IDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
@@ -42,5 +42,5 @@ type Headers interface {
 	// BatchRemoveChunkBlockIndexByChunkID removes block to chunk index entry keyed by a blockID in a provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-	BatchRemoveChunkBlockIndexByChunkID(chunkID flow.Identifier, batch BatchStorage) error
+	BatchRemoveChunkBlockIndexByChunkID(chunkID flow.Identifier, batch WriteBatchContext[wb]) error
 }
