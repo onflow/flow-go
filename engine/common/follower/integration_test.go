@@ -33,7 +33,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestFollowerHappyPath tests Engine integrated with real modules, mocked modules are used only for functionality which is static
+// TestFollowerHappyPath tests ComplianceEngine integrated with real modules, mocked modules are used only for functionality which is static
 // or implemented by our test case. Tests that syncing batches of blocks from other participants results in extending protocol state.
 // After processing all available blocks we check if chain has correct height and finalized block.
 // We use the following setup:
@@ -92,7 +92,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		require.NoError(t, err)
 
 		syncCore := module.NewBlockRequester(t)
-		followerCore, err := NewCore(
+		followerCore, err := NewComplianceCore(
 			unittest.Logger(),
 			metrics,
 			metrics,
@@ -114,7 +114,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 
 		// use real engine
-		engine, err := New(unittest.Logger(), net, me, metrics, headers, rootHeader, followerCore)
+		engine, err := NewComplianceLayer(unittest.Logger(), net, me, metrics, headers, rootHeader, followerCore)
 		require.NoError(t, err)
 		// don't forget to subscribe for finalization notifications
 		consensusConsumer.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)

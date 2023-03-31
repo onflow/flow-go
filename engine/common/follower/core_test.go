@@ -29,7 +29,7 @@ func TestFollowerCore(t *testing.T) {
 	suite.Run(t, new(CoreSuite))
 }
 
-// CoreSuite maintains minimal state for testing Core.
+// CoreSuite maintains minimal state for testing ComplianceCore.
 // Performs startup & shutdown using `module.Startable` and `module.ReadyDoneAware` interfaces.
 type CoreSuite struct {
 	suite.Suite
@@ -45,7 +45,7 @@ type CoreSuite struct {
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
 	errs   <-chan error
-	core   *Core
+	core   *ComplianceCore
 }
 
 func (s *CoreSuite) SetupTest() {
@@ -63,7 +63,7 @@ func (s *CoreSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	var err error
-	s.core, err = NewCore(
+	s.core, err = NewComplianceCore(
 		unittest.Logger(),
 		metrics,
 		metrics,

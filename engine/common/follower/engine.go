@@ -21,11 +21,11 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type EngineOption func(*Engine)
+type EngineOption func(*ComplianceEngine)
 
 // WithChannel sets the channel the follower engine will use to receive blocks.
 func WithChannel(channel channels.Channel) EngineOption {
-	return func(e *Engine) {
+	return func(e *ComplianceEngine) {
 		e.channel = channel
 	}
 }
@@ -42,18 +42,18 @@ const defaultSyncedBlockQueueCapacity = 100
 // defaultPendingConnectedBlocksChanCapacity capacity of buffered channel that is used to receive pending blocks that form a sequence.
 const defaultPendingConnectedBlocksChanCapacity = 100
 
-// Engine is the highest level structure that consumes events from other components.
+// ComplianceEngine is the highest level structure that consumes events from other components.
 // It's an entry point to the follower engine which follows and maintains the local copy of the protocol state.
 // It is a passive (read-only) version of the compliance engine. The compliance engine
 // is employed by consensus nodes (active consensus participants) where the
 // Follower engine is employed by all other node roles.
-// Engine is responsible for:
+// ComplianceEngine is responsible for:
 // 1. Consuming events from external sources such as sync engine.
 // 2. Splitting incoming batches in batches of connected blocks.
 // 3. Providing worker goroutines for concurrent processing of batches of connected blocks.
 // 4. Handling of finalization events.
 // Implements consensus.Compliance interface.
-type Engine struct {
+type ComplianceEngine struct {
 	*component.ComponentManager
 	log                        zerolog.Logger
 	me                         module.Local
@@ -70,10 +70,10 @@ type Engine struct {
 	core                       complianceCore // performs actual processing of incoming messages.
 }
 
-var _ network.MessageProcessor = (*Engine)(nil)
-var _ consensus.Compliance = (*Engine)(nil)
+var _ network.MessageProcessor = (*ComplianceEngine)(nil)
+var _ consensus.Compliance = (*ComplianceEngine)(nil)
 
-func New(
+func NewComplianceLayer(
 	log zerolog.Logger,
 	net network.Network,
 	me module.Local,
@@ -82,7 +82,7 @@ func New(
 	finalized *flow.Header,
 	core complianceCore,
 	opts ...EngineOption,
-) (*Engine, error) {
+) (*ComplianceEngine, error) {
 	// FIFO queue for inbound block proposals
 	pendingBlocks, err := fifoqueue.NewFifoQueue(defaultPendingBlockQueueCapacity)
 	if err != nil {
@@ -94,7 +94,7 @@ func New(
 		return nil, fmt.Errorf("failed to create queue for inbound blocks: %w", err)
 	}
 
-	e := &Engine{
+	e := &ComplianceEngine{
 		log:                        log.With().Str("engine", "follower").Logger(),
 		me:                         me,
 		engMetrics:                 engMetrics,
@@ -148,7 +148,7 @@ func New(
 }
 
 // OnBlockProposal performs processing of incoming block by pushing into queue and notifying worker.
-func (e *Engine) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
+func (e *ComplianceEngine) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
 	// queue proposal
 	if e.pendingBlocks.Push(proposal) {
@@ -157,7 +157,7 @@ func (e *Engine) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal
 }
 
 // OnSyncedBlocks consumes incoming blocks by pushing into queue and notifying worker.
-func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
+func (e *ComplianceEngine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
 	e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlocks)
 	// The synchronization engine feeds the follower with batches of blocks. The field `Slashable.OriginID`
 	// states which node forwarded the batch to us. Each block contains its proposer and signature.
@@ -168,11 +168,11 @@ func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-// It informs follower.Core about finalization of the respective block.
+// It informs follower.ComplianceCore about finalization of the respective block.
 //
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(block *model.Block) {
+func (e *ComplianceEngine) OnFinalizedBlock(block *model.Block) {
 	if e.finalizedBlockTracker.Track(block) {
 		e.finalizedBlockNotifier.Notify()
 	}
@@ -180,7 +180,7 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
+func (e *ComplianceEngine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
 	switch msg := message.(type) {
 	case *messages.BlockProposal:
 		e.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
@@ -195,7 +195,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, mes
 
 // processBlocksLoop processes available blocks as they are queued.
 // Implements `component.ComponentWorker` signature.
-func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (e *ComplianceEngine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	doneSignal := ctx.Done()
@@ -217,7 +217,7 @@ func (e *Engine) processBlocksLoop(ctx irrecoverable.SignalerContext, ready comp
 // Only returns when all inbound queues are empty (or the engine is terminated).
 // No errors are expected during normal operation. All returned exceptions are potential
 // symptoms of internal state corruption and should be fatal.
-func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
+func (e *ComplianceEngine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 	for {
 		select {
 		case <-doneSignal:
@@ -287,7 +287,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 }
 
 // submitConnectedBatch checks if batch is still pending and submits it via channel for further processing by worker goroutines.
-func (e *Engine) submitConnectedBatch(log zerolog.Logger, latestFinalizedView uint64, originID flow.Identifier, blocks []*flow.Block) {
+func (e *ComplianceEngine) submitConnectedBatch(log zerolog.Logger, latestFinalizedView uint64, originID flow.Identifier, blocks []*flow.Block) {
 	if len(blocks) < 1 {
 		return
 	}
@@ -308,8 +308,8 @@ func (e *Engine) submitConnectedBatch(log zerolog.Logger, latestFinalizedView ui
 	}
 }
 
-// processConnectedBatch is a worker goroutine which concurrently consumes connected batches that will be processed by Core.
-func (e *Engine) processConnectedBatch(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// processConnectedBatch is a worker goroutine which concurrently consumes connected batches that will be processed by ComplianceCore.
+func (e *ComplianceEngine) processConnectedBatch(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 	for {
 		select {
@@ -326,7 +326,7 @@ func (e *Engine) processConnectedBatch(ctx irrecoverable.SignalerContext, ready 
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events.
 // Implements `component.ComponentWorker` signature.
-func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (e *ComplianceEngine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	doneSignal := ctx.Done()

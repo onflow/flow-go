@@ -184,7 +184,7 @@ type ObserverServiceBuilder struct {
 	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
-	FollowerEng *followereng.Engine
+	FollowerEng *followereng.ComplianceEngine
 	SyncEng     *synceng.Engine
 
 	// Public network
@@ -355,7 +355,7 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 		if node.HeroCacheMetricsEnable {
 			heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 		}
-		core, err := followereng.NewCore(
+		core, err := followereng.NewComplianceCore(
 			node.Logger,
 			node.Metrics.Mempool,
 			heroCacheCollector,
@@ -371,7 +371,7 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 			return nil, fmt.Errorf("could not create follower core: %w", err)
 		}
 
-		builder.FollowerEng, err = followereng.New(
+		builder.FollowerEng, err = followereng.NewComplianceLayer(
 			node.Logger,
 			node.Network,
 			node.Me,

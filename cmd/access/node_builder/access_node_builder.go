@@ -222,7 +222,7 @@ type FlowAccessNodeBuilder struct {
 	// engines
 	IngestEng      *ingestion.Engine
 	RequestEng     *requester.Engine
-	FollowerEng    *followereng.Engine
+	FollowerEng    *followereng.ComplianceEngine
 	SyncEng        *synceng.Engine
 	StateStreamEng *state_stream.Engine
 }
@@ -323,7 +323,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 		}
 
-		core, err := followereng.NewCore(
+		core, err := followereng.NewComplianceCore(
 			node.Logger,
 			node.Metrics.Mempool,
 			heroCacheCollector,
@@ -339,7 +339,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			return nil, fmt.Errorf("could not create follower core: %w", err)
 		}
 
-		builder.FollowerEng, err = followereng.New(
+		builder.FollowerEng, err = followereng.NewComplianceLayer(
 			node.Logger,
 			node.Network,
 			node.Me,
