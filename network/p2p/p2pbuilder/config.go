@@ -30,3 +30,12 @@ type PeerManagerConfig struct {
 	// UpdateInterval interval used by the libp2p node peer manager component to periodically request peer updates.
 	UpdateInterval time.Duration
 }
+
+// GossipSubRPCValidationConfigs validation limits used for gossipsub RPC control message inspection.
+type GossipSubRPCValidationConfigs struct {
+	NumberOfWorkers int
+	// GraftLimits GRAFT control message validation limits.
+	GraftLimits map[string]int
+	// PruneLimits PRUNE control message validation limits.
+	PruneLimits map[string]int
+}
