@@ -313,7 +313,6 @@ func TestWriteAndReadCheckpointV6LeafEmptyTrie(t *testing.T) {
 		bufSize := 10
 		leafNodesCh := make(chan LeafNodeResult, bufSize)
 		go func() {
-			defer close(leafNodesCh)
 			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
 			require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		}()
@@ -329,10 +328,9 @@ func TestWriteAndReadCheckpointV6LeafSimpleTrie(t *testing.T) {
 		fileName := "checkpoint"
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
-		bufSize := 10
+		bufSize := 1
 		leafNodesCh := make(chan LeafNodeResult, bufSize)
 		go func() {
-			defer close(leafNodesCh)
 			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
 			require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		}()
@@ -357,7 +355,6 @@ func TestWriteAndReadCheckpointV6LeafMultipleTries(t *testing.T) {
 		bufSize := 5
 		leafNodesCh := make(chan LeafNodeResult, bufSize)
 		go func() {
-			defer close(leafNodesCh)
 			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
 			require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		}()
