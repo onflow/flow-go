@@ -37,7 +37,7 @@ type AppScoreCache struct {
 // Returns:
 //
 //	AppScoreRecord: the pre-processed entry.
-type ReadPreprocessorFunc func(record AppScoreRecord, lastUpdated time.Time) AppScoreRecord
+type ReadPreprocessorFunc func(record AppScoreRecord, lastUpdated time.Time) (AppScoreRecord, error)
 
 // NewAppScoreCache returns a new HeroCache-based application specific Score cache.
 // Args:
@@ -112,8 +112,9 @@ func (a *AppScoreCache) Update(record AppScoreRecord) error {
 //	PeerID: the peer ID of the peer in the GossipSub protocol.
 //
 // Returns:
-//   - the application specific Score of the peer.
-//   - the Decay factor of the application specific Score of the peer.
+//   - the application specific score record of the peer.
+//   - error if the underlying HeroCache update fails, or any of the pre-processors fails. The error is considered irrecoverable, and
+//     the caller should crash the node.
 //   - true if the application specific Score of the peer is found in the cache, false otherwise.
 func (a *AppScoreCache) Get(peerID peer.ID) (*AppScoreRecord, error, bool) {
 	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the entry.
@@ -121,12 +122,17 @@ func (a *AppScoreCache) Get(peerID peer.ID) (*AppScoreRecord, error, bool) {
 		return nil, nil, false
 	}
 
+	var err error
 	record, updated := a.c.Adjust(entityId, func(entry flow.Entity) flow.Entity {
 		e := entry.(appScoreRecordEntity)
 
 		currentRecord := e.AppScoreRecord
 		for _, apply := range a.preprocessFns {
-			e.AppScoreRecord = apply(e.AppScoreRecord, e.lastUpdated)
+			e.AppScoreRecord, err = apply(e.AppScoreRecord, e.lastUpdated)
+			if err != nil {
+				e.AppScoreRecord = currentRecord
+				return e // return the original entry if the pre-processing fails (atomic abort).
+			}
 		}
 		if e.AppScoreRecord != currentRecord {
 			e.lastUpdated = time.Now()
