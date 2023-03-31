@@ -1,0 +1,70 @@
+---
+name: Delete Benchnet Network
+
+on:
+  workflow_dispatch:
+    inputs:
+    
+      # The network_id is the unique identifier for the network.
+      # This ID is used to clean up and delete all 
+      network_id:
+        type: string
+        required: true
+        description: Input the network ID for the deployment to be deleted
+
+      # Allows for the ref to be altered for testing automation changes
+      automation_ref:
+        type: string
+        description: 'flow-go branch, commit, or tag to use for automation to use for bootstrapping and deployment'
+        required: false
+        default: master
+
+      # Allows for the public or private repo to be used for deployment automation
+      automation_repo:
+        required: true
+        type: choice
+        description: Choose the repo to use the public or private repo for automation
+        options:
+          - onflow/flow-go
+          - dapperlabs/flow-go
+
+env:
+  GCP_PROJECT: "dl-flow-benchnet-automation"
+  REPO: us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet
+  SERVICE_ACCOUNT_KEY: ${{ secrets.STAGING_DEPLOYER_SERVICE_ACCOUNT_KEY }}
+  CLUSTER_NAME: "us-west1-application"
+  REGION: us-west1
+jobs:
+  deleteNetwork:
+    name: Delete Benchnet Network
+    runs-on:
+      - self-hosted
+      - flow-bn2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          repository: ${{ inputs.automation_repo }}
+          ref: ${{ inputs.automation_ref }}
+
+      - name: Configure gcloud
+        uses: google-github-actions/setup-gcloud@v0.2.1
+        with:
+          version: "349.0.0"
+          project_id: ${{ env.GCP_PROJECT }}
+          service_account_key: ${{ env.SERVICE_ACCOUNT_KEY }}
+          export_default_credentials: true
+
+      - name: Create env.KUBECONFIG
+        uses: dapperlabs-platform/get-gke-credentials@enable-application-default-credentials
+        env:
+          GCLOUD_PROJECT: ${{ env.GCP_PROJECT }}
+        with:
+          cluster_name: ${{ env.CLUSTER_NAME }}
+          location: ${{ env.REGION }}
+          use_internal_ip: false
+
+      - name: Delete Network using provided Network ID
+        working-directory: integration/benchnet2/
+        run: make remote-clean-all NAMESPACE=benchnet NETWORK_ID=${{ inputs.network_id }}
