@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine/common"
 	"github.com/onflow/flow-go/engine/common/follower/cache"
 	"github.com/onflow/flow-go/engine/common/follower/pending_tree"
 	"github.com/onflow/flow-go/model/flow"
@@ -54,7 +53,7 @@ type Core struct {
 	finalizedBlocksChan chan *flow.Header    // delivers finalized blocks to main core worker.
 }
 
-var _ common.FollowerCore = (*Core)(nil)
+var _ complianceCore = (*Core)(nil)
 
 // NewCore creates new instance of Core.
 // No errors expected during normal operations.
@@ -108,10 +107,10 @@ func NewCore(log zerolog.Logger,
 	return c, nil
 }
 
-// OnBlockRange processes a range of connected blocks. The input list must be sequentially ordered forming a chain.
-// Effectively, this method validates the incoming batch, adds it to cache of pending blocks and possibly schedules
-// blocks for further processing if they were certified. Submitting a batch with invalid causes an
-// `ErrDisconnectedBatch` error and the batch is dropped (no-op).
+// OnBlockRange processes a range of connected blocks. It validates the incoming batch, adds it to cache of pending
+// blocks and schedules certified blocks for further processing. The input list must be sequentially ordered forming
+// a chain, i.e. connectedRange[i] is the parent of connectedRange[i+1]. Submitting a disconnected batch results in
+// an `ErrDisconnectedBatch` error and the batch is dropped (no-op).
 // This method is safe to use in concurrent environment.
 // Caution: method might block if internally too many certified blocks are queued in the channel `certifiedRangesChan`.
 // Expected errors during normal operations:
@@ -226,8 +225,7 @@ func (c *Core) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready com
 // OnFinalizedBlock updates local state of pendingCache tree using received finalized block and queues finalized block
 // to be processed by internal goroutine.
 // This function is safe to use in concurrent environment.
-// CAUTION: this function blocks and is therefore not compliant with the `FinalizationConsumer.OnFinalizedBlock`
-// interface. This function should only be executed within the a worker routine.
+// CAUTION: this function blocks and hence is not compliant with the `FinalizationConsumer.OnFinalizedBlock` interface.
 func (c *Core) OnFinalizedBlock(final *flow.Header) {
 	c.pendingCache.PruneUpToView(final.View)
 

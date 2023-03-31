@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
@@ -68,7 +67,7 @@ type Engine struct {
 	finalizedBlockTracker      *tracker.NewestBlockTracker // tracks the latest finalization block
 	finalizedBlockNotifier     engine.Notifier             // notifies when the latest finalized block changes
 	pendingConnectedBlocksChan chan flow.Slashable[[]*flow.Block]
-	core                       common.FollowerCore // performs actual processing of incoming messages.
+	core                       complianceCore // performs actual processing of incoming messages.
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -81,7 +80,7 @@ func New(
 	engMetrics module.EngineMetrics,
 	headers storage.Headers,
 	finalized *flow.Header,
-	core common.FollowerCore,
+	core complianceCore,
 	opts ...EngineOption,
 ) (*Engine, error) {
 	// FIFO queue for inbound block proposals
