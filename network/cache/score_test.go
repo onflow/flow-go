@@ -198,6 +198,40 @@ func TestConcurrentAdjust(t *testing.T) {
 	}
 }
 
+// TestAdjustWithPreprocess tests the AdjustAndPreprocess method of the AppScoreCache. It tests
+// when the cache has preprocessor functions, all preprocessor functions are called after
+// the adjustment function is called.
+// Also, it tests if the pre-processor functions are called in the order they are added.
+func TestAdjustWithPreprocess(t *testing.T) {
+	cache := netcache.NewAppScoreCache(200,
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+		func(record netcache.AppScoreRecord, lastUpdated time.Time) (netcache.AppScoreRecord, error) {
+			record.Score += 1.5
+			return record, nil
+		}, func(record netcache.AppScoreRecord, lastUpdated time.Time) (netcache.AppScoreRecord, error) {
+			record.Score *= 2
+			return record, nil
+		})
+
+	peerID := "peer1"
+	// adds a record to the cache.
+	require.NoError(t, cache.Add(netcache.AppScoreRecord{
+		PeerID: peer.ID(peerID),
+		Decay:  0.1,
+		Score:  0.5,
+	}))
+
+	// tests adjusting the score of an existing record.
+	record, err := cache.Adjust(peer.ID(peerID), func(record netcache.AppScoreRecord) netcache.AppScoreRecord {
+		record.Score = 0.7
+		return record
+	})
+	require.NoError(t, err)
+	require.Equal(t, 4.4, record.Score) // (0.7 + 1.5) * 2 = 4.4
+	require.Equal(t, 0.1, record.Decay) // checks if the decay is not changed.
+}
+
 // TestAppScoreRecordStoredByValue tests if the cache stores the AppScoreRecord by value.
 // It updates the cache with a record and then modifies the record. It then checks if the
 // record in the cache is still the original record. This is a desired behavior that
