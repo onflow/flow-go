@@ -232,6 +232,52 @@ func TestAdjustWithPreprocess(t *testing.T) {
 	require.Equal(t, 0.1, record.Decay) // checks if the decay is not changed.
 }
 
+// TestAdjustWithPreprocessError tests the AdjustAndPreprocess method of the AppScoreCache.
+// It tests if any of the preprocessor functions returns an error, the adjustment function effect
+// is reverted, and the error is returned.
+func TestAdjustWithPreprocessError(t *testing.T) {
+	secondPreprocessorCalled := false
+	cache := netcache.NewAppScoreCache(200,
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+		// the first preprocessor function adds 1.5 to the score.
+		func(record netcache.AppScoreRecord, lastUpdated time.Time) (netcache.AppScoreRecord, error) {
+			return record, nil
+		},
+		// the second preprocessor function returns an error on the first call.
+		func(record netcache.AppScoreRecord, lastUpdated time.Time) (netcache.AppScoreRecord, error) {
+			if !secondPreprocessorCalled {
+				secondPreprocessorCalled = true
+				return record, fmt.Errorf("error")
+			}
+			return record, nil
+		})
+
+	peerID := "peer1"
+	// adds a record to the cache.
+	require.NoError(t, cache.Add(netcache.AppScoreRecord{
+		PeerID: peer.ID(peerID),
+		Decay:  0.1,
+		Score:  0.5,
+	}))
+
+	// tests adjusting the score of an existing record.
+	record, err := cache.Adjust(peer.ID(peerID), func(record netcache.AppScoreRecord) netcache.AppScoreRecord {
+		record.Score = 0.7
+		return record
+	})
+	// since the second preprocessor function returns an error, the adjustment function effect should be reverted.
+	// the error should be returned.
+	require.Error(t, err)
+	require.Nil(t, record)
+
+	// checks if the record is not changed.
+	record, err, found := cache.Get(peer.ID(peerID))
+	require.True(t, found)
+	require.NoError(t, err)
+	require.Equal(t, 0.5, record.Score)
+}
+
 // TestAppScoreRecordStoredByValue tests if the cache stores the AppScoreRecord by value.
 // It updates the cache with a record and then modifies the record. It then checks if the
 // record in the cache is still the original record. This is a desired behavior that
@@ -349,20 +395,17 @@ func TestAppScoreCache_Update_PreprocessingError(t *testing.T) {
 
 	// verifies that the preprocessors were called and the score was updated accordingly.
 	cachedRecord, err, ok := cache.Get("peerA")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, 2.0, cachedRecord.Score) // score should be updated by the first preprocessor (1 + 1 = 2)
 	assert.Equal(t, 0.5, cachedRecord.Decay)
 	assert.Equal(t, peer.ID("peerA"), cachedRecord.PeerID)
 
 	// query the cache again that should trigger the second preprocessor to return an error.
-	// the cache should return the original record without any modifications.
 	cachedRecord, err, ok = cache.Get("peerA")
-	assert.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, 2.0, cachedRecord.Score) // score should not be updated
-	assert.Equal(t, 0.5, cachedRecord.Decay)
-	assert.Equal(t, peer.ID("peerA"), cachedRecord.PeerID)
+	require.Error(t, err)
+	assert.False(t, ok)
+	assert.Nil(t, cachedRecord)
 
 	// verifies that the third preprocessor was not called.
 	assert.Equal(t, 1, thirdPreprocessorCalledCount)
