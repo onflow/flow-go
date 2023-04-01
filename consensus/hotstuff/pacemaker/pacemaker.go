@@ -43,9 +43,11 @@ var _ hotstuff.PaceMaker = (*ActivePaceMaker)(nil)
 //
 // Expected error conditions:
 // * model.ConfigurationError if initial LivenessData is invalid
-func New(timeoutController *timeout.Controller,
+func New(
+	timeoutController *timeout.Controller,
 	notifier hotstuff.Consumer,
 	persist hotstuff.Persister,
+	pending ...
 ) (*ActivePaceMaker, error) {
 	livenessData, err := persist.GetLivenessData()
 	if err != nil {
@@ -228,3 +230,14 @@ func (p *ActivePaceMaker) Start(ctx context.Context) {
 func (p *ActivePaceMaker) BlockRateDelay() time.Duration {
 	return p.timeoutControl.BlockRateDelay()
 }
+
+/* ------------------------------------ recovery parameters for PaceMaker ------------------------------------ */
+
+// recoveryInformation provides optional information to the PaceMaker during its construction
+// to ingest additional information that was potentially lost during a crash or reboot.
+// Following the "information-driven" approach, we consider potentially older or redundant
+// information as consistent with our already-present knowledge, i.e. as a no-op.
+type recoveryInformation func(p *ActivePaceMaker) error
+
+func
+

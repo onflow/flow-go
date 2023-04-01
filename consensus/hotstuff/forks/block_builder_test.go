@@ -145,7 +145,7 @@ func makeBlockID(block *model.Block) flow.Identifier {
 	})
 }
 
-func makeGenesis() *BlockQC {
+func makeGenesis() *model.CertifiedBlock {
 	genesis := &model.Block{
 		View: 1,
 	}
@@ -155,7 +155,7 @@ func makeGenesis() *BlockQC {
 		View:    1,
 		BlockID: genesis.BlockID,
 	}
-	genesisBQ := &BlockQC{
+	genesisBQ := &model.CertifiedBlock{
 		Block: genesis,
 		QC:    genesisQC,
 	}

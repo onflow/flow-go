@@ -378,7 +378,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		BlockID:       rootBlock.BlockID,
 		SignerIndices: signerIndices,
 	}
-	rootBlockQC := &forks.BlockQC{Block: rootBlock, QC: rootQC}
+	rootBlockQC := &model.CertifiedBlock{Block: rootBlock, QC: rootQC}
 
 	livenessData := &hotstuff.LivenessData{
 		CurrentView: rootQC.View + 1,

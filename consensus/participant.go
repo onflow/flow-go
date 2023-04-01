@@ -148,7 +148,7 @@ func NewForks(final *flow.Header, headers storage.Headers, updater module.Finali
 }
 
 // recoverTrustedRoot based on our local state returns root block and QC that can be used to initialize base state
-func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*forks.BlockQC, error) {
+func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*model.CertifiedBlock, error) {
 	if final.View < rootHeader.View {
 		return nil, fmt.Errorf("finalized Block has older view than trusted root")
 	}
@@ -174,7 +174,7 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 	child := model.BlockFromFlow(children[0])
 
 	// create the root block to use
-	trustedRoot := &forks.BlockQC{
+	trustedRoot := &model.CertifiedBlock{
 		Block: model.BlockFromFlow(final),
 		QC:    child.QC,
 	}
@@ -182,7 +182,7 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 	return trustedRoot, nil
 }
 
-func makeRootBlockQC(header *flow.Header, qc *flow.QuorumCertificate) *forks.BlockQC {
+func makeRootBlockQC(header *flow.Header, qc *flow.QuorumCertificate) *model.CertifiedBlock {
 	// By convention of Forks, the trusted root block does not need to have a qc
 	// (as is the case for the genesis block). For simplify of the implementation, we always omit
 	// the QC of the root block. Thereby, we have one algorithm which handles all cases,
@@ -196,7 +196,7 @@ func makeRootBlockQC(header *flow.Header, qc *flow.QuorumCertificate) *forks.Blo
 		PayloadHash: header.PayloadHash,
 		Timestamp:   header.Timestamp,
 	}
-	return &forks.BlockQC{
+	return &model.CertifiedBlock{
 		QC:    qc,
 		Block: rootBlock,
 	}
