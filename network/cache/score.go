@@ -64,7 +64,7 @@ func NewAppScoreCache(sizeLimit uint32, logger zerolog.Logger, collector module.
 	}
 }
 
-// Update adds the application specific Score of a peer to the cache if not already present, or
+// Add adds the application specific Score of a peer to the cache if not already present, or
 // updates the application specific Score of a peer in the cache if already present.
 // Args:
 //
@@ -82,7 +82,7 @@ func NewAppScoreCache(sizeLimit uint32, logger zerolog.Logger, collector module.
 //		and this makes the GossipSub protocol vulnerable if the peer is malicious. As when there is no record of
 //		the application specific Score of a peer, the GossipSub considers the peer to have a Score of 0, and
 //		this does not prevent the GossipSub protocol from connecting to the peer on a topic mesh.
-func (a *AppScoreCache) Update(record AppScoreRecord) error {
+func (a *AppScoreCache) Add(record AppScoreRecord) error {
 	entityId := flow.HashToID([]byte(record.PeerID)) // HeroCache uses hash of peer.ID as the unique identifier of the entry.
 	switch exists := a.c.Has(entityId); {
 	case exists:
@@ -104,6 +104,52 @@ func (a *AppScoreCache) Update(record AppScoreRecord) error {
 	}
 
 	return nil
+}
+
+// Adjust adjusts the application specific Score of a peer in the cache.
+// It first reads the entry from the cache, applies the update function to the entry, and then runs the pre-processing functions on the entry.
+// The order of the pre-processing functions is the same as the order in which they were added to the cache.
+// Args:
+// - peerID: the peer ID of the peer in the GossipSub protocol.
+// - updateFn: the update function to be applied to the entry.
+// Returns:
+// - *AppScoreRecord: the updated entry.
+// - error on failure to update the entry. The returned error is irrecoverable and the caller should crash the node.
+// Note that if any of the pre-processing functions returns an error, the entry is reverted to its original state (prior to applying the update function).
+func (a *AppScoreCache) Adjust(peerID peer.ID, updateFn func(record AppScoreRecord) AppScoreRecord) (*AppScoreRecord, error) {
+	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the entry.
+	if !a.c.Has(entityId) {
+		return nil, fmt.Errorf("could not adjust app Score cache entry for peer %s, entry not found", peerID)
+	}
+
+	var err error
+	record, updated := a.c.Adjust(entityId, func(entry flow.Entity) flow.Entity {
+		e := entry.(appScoreRecordEntity)
+
+		currentRecord := e.AppScoreRecord
+
+		// apply the update function to the entry.
+		e.AppScoreRecord = updateFn(e.AppScoreRecord)
+
+		// apply the pre-processing functions to the entry.
+		for _, apply := range a.preprocessFns {
+			e.AppScoreRecord, err = apply(e.AppScoreRecord, e.lastUpdated)
+			if err != nil {
+				e.AppScoreRecord = currentRecord
+				return e // return the original entry if the pre-processing fails (atomic abort).
+			}
+		}
+		if e.AppScoreRecord != currentRecord {
+			e.lastUpdated = time.Now()
+		}
+		return e
+	})
+	if !updated {
+		return nil, fmt.Errorf("could not decay cache entry for peer %s", peerID)
+	}
+
+	r := record.(appScoreRecordEntity).AppScoreRecord
+	return &r, nil
 }
 
 // Get returns the application specific Score of a peer from the cache.
