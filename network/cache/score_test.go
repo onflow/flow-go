@@ -143,6 +143,61 @@ func TestAdjust(t *testing.T) {
 	require.Nil(t, record)
 }
 
+// TestConcurrentAdjust tests if the cache can be adjusted concurrently. It adjusts the cache
+// with a number of records concurrently and then checks if the cache can retrieve all records.
+func TestConcurrentAdjust(t *testing.T) {
+	cache := netcache.NewAppScoreCache(200, unittest.Logger(), metrics.NewNoopCollector())
+
+	// defines the number of records to update.
+	numRecords := 100
+
+	// adds all records to the cache.
+	for i := 0; i < numRecords; i++ {
+		peerID := fmt.Sprintf("peer%d", i)
+		err := cache.Add(netcache.AppScoreRecord{
+			PeerID: peer.ID(peerID),
+			Decay:  0.1 * float64(i),
+			Score:  float64(i),
+		})
+		require.NoError(t, err)
+	}
+
+	// uses a wait group to wait for all goroutines to finish.
+	var wg sync.WaitGroup
+	wg.Add(numRecords)
+
+	// Adjust the records concurrently.
+	for i := 0; i < numRecords; i++ {
+		go func(num int) {
+			defer wg.Done()
+			peerID := fmt.Sprintf("peer%d", num)
+			_, err := cache.Adjust(peer.ID(peerID), func(record netcache.AppScoreRecord) netcache.AppScoreRecord {
+				record.Score = 0.7 * float64(num)
+				record.Decay = 0.1 * float64(num)
+				return record
+			})
+			require.NoError(t, err)
+		}(i)
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "could not adjust all records concurrently on time")
+
+	// checks if the cache can retrieve all records.
+	for i := 0; i < numRecords; i++ {
+		peerID := fmt.Sprintf("peer%d", i)
+		record, err, found := cache.Get(peer.ID(peerID))
+		require.True(t, found)
+		require.NoError(t, err)
+
+		expectedScore := 0.7 * float64(i)
+		require.Equal(t, expectedScore, record.Score,
+			"Get() returned incorrect Score for record %s: expected %f, got %f", peerID, expectedScore, record.Score)
+		expectedDecay := 0.1 * float64(i)
+		require.Equal(t, expectedDecay, record.Decay,
+			"Get() returned incorrect Decay for record %s: expected %f, got %f", peerID, expectedDecay, record.Decay)
+	}
+}
+
 // TestAppScoreRecordStoredByValue tests if the cache stores the AppScoreRecord by value.
 // It updates the cache with a record and then modifies the record. It then checks if the
 // record in the cache is still the original record. This is a desired behavior that
