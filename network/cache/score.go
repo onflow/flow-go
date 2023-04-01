@@ -92,14 +92,14 @@ func (a *AppScoreCache) Add(record AppScoreRecord) error {
 			return appScoreCacheEntry
 		})
 		if !updated {
-			return fmt.Errorf("could not update app Score cache entry for peer %s", record.PeerID)
+			return fmt.Errorf("could not update app Score cache entry for peer %s", record.PeerID.String())
 		}
 	case !exists:
 		if added := a.c.Add(appScoreRecordEntity{
 			entityId:       entityId,
 			AppScoreRecord: record,
 		}); !added {
-			return fmt.Errorf("could not add app Score cache entry for peer %s", record.PeerID)
+			return fmt.Errorf("could not add app Score cache entry for peer %s", record.PeerID.String())
 		}
 	}
 
@@ -119,7 +119,7 @@ func (a *AppScoreCache) Add(record AppScoreRecord) error {
 func (a *AppScoreCache) Adjust(peerID peer.ID, updateFn func(record AppScoreRecord) AppScoreRecord) (*AppScoreRecord, error) {
 	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the entry.
 	if !a.c.Has(entityId) {
-		return nil, fmt.Errorf("could not adjust app Score cache entry for peer %s, entry not found", peerID)
+		return nil, fmt.Errorf("could not adjust app Score cache entry for peer %s, entry not found", peerID.String())
 	}
 
 	var err error
@@ -144,8 +144,12 @@ func (a *AppScoreCache) Adjust(peerID peer.ID, updateFn func(record AppScoreReco
 		}
 		return e
 	})
+	if err != nil {
+		return nil, fmt.Errorf("could not adjust app Score cache entry for peer %s, error: %w", peerID.String(), err)
+	}
 	if !updated {
-		return nil, fmt.Errorf("could not decay cache entry for peer %s", peerID)
+		// this happens when the underlying HeroCache fails to update the entry.
+		return nil, fmt.Errorf("internal cache error for updating %s", peerID.String())
 	}
 
 	r := record.(appScoreRecordEntity).AppScoreRecord
@@ -185,8 +189,11 @@ func (a *AppScoreCache) Get(peerID peer.ID) (*AppScoreRecord, error, bool) {
 		}
 		return e
 	})
+	if err != nil {
+		return nil, fmt.Errorf("error while applying pre-processing functions to cache entry for peer %s: %w", peerID.String(), err), false
+	}
 	if !updated {
-		return nil, fmt.Errorf("could not decay cache entry for peer %s", peerID), false
+		return nil, fmt.Errorf("could not decay cache entry for peer %s", peerID.String()), false
 	}
 
 	r := record.(appScoreRecordEntity).AppScoreRecord
