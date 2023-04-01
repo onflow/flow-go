@@ -22,14 +22,14 @@ func TestAppScoreCache_Update(t *testing.T) {
 	cache := netcache.NewAppScoreCache(100, unittest.Logger(), metrics.NewNoopCollector())
 
 	// tests adding a new entry to the cache.
-	require.NoError(t, cache.Update(netcache.AppScoreRecord{
+	require.NoError(t, cache.Add(netcache.AppScoreRecord{
 		PeerID: "peer1",
 		Decay:  0.1,
 		Score:  0.5,
 	}))
 
 	// tests updating an existing entry in the cache.
-	require.NoError(t, cache.Update(netcache.AppScoreRecord{
+	require.NoError(t, cache.Add(netcache.AppScoreRecord{
 		PeerID: "peer1",
 		Decay:  0.1,
 		Score:  0.5,
@@ -37,7 +37,7 @@ func TestAppScoreCache_Update(t *testing.T) {
 
 	// makes the cache full.
 	for i := 0; i < 100; i++ {
-		require.NoError(t, cache.Update(netcache.AppScoreRecord{
+		require.NoError(t, cache.Add(netcache.AppScoreRecord{
 			PeerID: peer.ID(fmt.Sprintf("peer%d", i)),
 			Decay:  0.1,
 			Score:  0.5,
@@ -45,7 +45,7 @@ func TestAppScoreCache_Update(t *testing.T) {
 	}
 
 	// adding a new entry to the cache should fail.
-	require.Error(t, cache.Update(netcache.AppScoreRecord{
+	require.Error(t, cache.Add(netcache.AppScoreRecord{
 		PeerID: "peer101",
 		Decay:  0.1,
 		Score:  0.5,
@@ -62,7 +62,7 @@ func TestAppScoreCache_Update(t *testing.T) {
 	}
 
 	// yet updating an existing entry should still work.
-	require.NoError(t, cache.Update(netcache.AppScoreRecord{
+	require.NoError(t, cache.Add(netcache.AppScoreRecord{
 		PeerID: "peer1",
 		Decay:  0.2,
 		Score:  0.8,
@@ -87,7 +87,7 @@ func TestConcurrentUpdateAndGet(t *testing.T) {
 		go func(num int) {
 			defer wg.Done()
 			peerID := fmt.Sprintf("peer%d", num)
-			err := cache.Update(netcache.AppScoreRecord{
+			err := cache.Add(netcache.AppScoreRecord{
 				PeerID: peer.ID(peerID),
 				Decay:  0.1 * float64(num),
 				Score:  float64(num),
@@ -114,6 +114,35 @@ func TestConcurrentUpdateAndGet(t *testing.T) {
 	}
 }
 
+// TestAdjust tests the Adjust method of the AppScoreCache. It tests if the cache can adjust
+// the score of an existing record and fail to adjust the score of a non-existing record.
+func TestAdjust(t *testing.T) {
+	cache := netcache.NewAppScoreCache(200, unittest.Logger(), metrics.NewNoopCollector())
+
+	peerID := "peer1"
+
+	// tests adjusting the score of an existing record.
+	require.NoError(t, cache.Add(netcache.AppScoreRecord{
+		PeerID: peer.ID(peerID),
+		Decay:  0.1,
+		Score:  0.5,
+	}))
+	record, err := cache.Adjust(peer.ID(peerID), func(record netcache.AppScoreRecord) netcache.AppScoreRecord {
+		record.Score = 0.7
+		return record
+	})
+	require.NoError(t, err)
+	require.Equal(t, 0.7, record.Score) // checks if the score is adjusted correctly.
+
+	// tests adjusting the score of a non-existing record.
+	record, err = cache.Adjust(peer.ID("peer2"), func(record netcache.AppScoreRecord) netcache.AppScoreRecord {
+		require.Fail(t, "the function should not be called for a non-existing record")
+		return record
+	})
+	require.Error(t, err)
+	require.Nil(t, record)
+}
+
 // TestAppScoreRecordStoredByValue tests if the cache stores the AppScoreRecord by value.
 // It updates the cache with a record and then modifies the record. It then checks if the
 // record in the cache is still the original record. This is a desired behavior that
@@ -123,7 +152,7 @@ func TestAppScoreRecordStoredByValue(t *testing.T) {
 	cache := netcache.NewAppScoreCache(200, unittest.Logger(), metrics.NewNoopCollector())
 
 	peerID := "peer1"
-	err := cache.Update(netcache.AppScoreRecord{
+	err := cache.Add(netcache.AppScoreRecord{
 		PeerID: peer.ID(peerID),
 		Decay:  0.1,
 		Score:  0.5,
@@ -172,7 +201,7 @@ func TestAppScoreCache_Get_WithPreprocessors(t *testing.T) {
 		Decay:  0.5,
 		Score:  1,
 	}
-	err := cache.Update(record)
+	err := cache.Add(record)
 	assert.NoError(t, err)
 
 	// verifies that the preprocessors were called and the score was updated accordingly.
@@ -226,7 +255,7 @@ func TestAppScoreCache_Update_PreprocessingError(t *testing.T) {
 		Decay:  0.5,
 		Score:  1,
 	}
-	err := cache.Update(record)
+	err := cache.Add(record)
 	assert.NoError(t, err)
 
 	// verifies that the preprocessors were called and the score was updated accordingly.
@@ -262,7 +291,7 @@ func TestAppScoreCache_Get_WithNoPreprocessors(t *testing.T) {
 		Decay:  0.5,
 		Score:  1,
 	}
-	err := cache.Update(record)
+	err := cache.Add(record)
 	assert.NoError(t, err)
 
 	// verifies that no preprocessors were called and the score was not updated.
