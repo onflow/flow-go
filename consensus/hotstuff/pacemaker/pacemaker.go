@@ -29,8 +29,7 @@ type ActivePaceMaker struct {
 	ctx            context.Context
 	timeoutControl *timeout.Controller
 	notifier       hotstuff.Consumer
-	persist        hotstuff.Persister
-	livenessData   *hotstuff.LivenessData
+	viewTracker    viewTracker
 	started        bool
 }
 
@@ -47,109 +46,66 @@ func New(
 	timeoutController *timeout.Controller,
 	notifier hotstuff.Consumer,
 	persist hotstuff.Persister,
-	pending ...recoveryInformation,
+	recovery ...recoveryInformation,
 ) (*ActivePaceMaker, error) {
-	livenessData, err := persist.GetLivenessData()
+	vt, err := newViewTracker(persist)
 	if err != nil {
-		return nil, fmt.Errorf("could not recover liveness data: %w", err)
+		return nil, fmt.Errorf("initializing view tracker failed: %w", err)
 	}
 
-	if livenessData.CurrentView < 1 {
-		return nil, model.NewConfigurationErrorf("PaceMaker cannot start in view 0 (view zero is reserved for genesis block, which has no proposer)")
-	}
-	pm := ActivePaceMaker{
-		livenessData:   livenessData,
+	pm := &ActivePaceMaker{
 		timeoutControl: timeoutController,
 		notifier:       notifier,
-		persist:        persist,
+		viewTracker:    vt,
 		started:        false,
 	}
-	return &pm, nil
-}
-
-// updateLivenessData updates the current view, qc, tc. Currently, the calling code
-// ensures that the view number is STRICTLY monotonously increasing. The method
-// updateLivenessData panics as a last resort if ActivePaceMaker is modified to violate this condition.
-// No errors are expected, any error should be treated as exception.
-func (p *ActivePaceMaker) updateLivenessData(newView uint64, qc *flow.QuorumCertificate, tc *flow.TimeoutCertificate) error {
-	if newView <= p.livenessData.CurrentView {
-		// This should never happen: in the current implementation, it is trivially apparent that
-		// newView is _always_ larger than currentView. This check is to protect the code from
-		// future modifications that violate the necessary condition for
-		// STRICTLY monotonously increasing view numbers.
-		return fmt.Errorf("cannot move from view %d to %d: currentView must be strictly monotonously increasing",
-			p.livenessData.CurrentView, newView)
+	for _, recoveryAction := range recovery {
+		err = recoveryAction(pm)
+		if err != nil {
+			return nil, fmt.Errorf("ingesting recovery information failed: %w", err)
+		}
 	}
-
-	p.livenessData.CurrentView = newView
-	if p.livenessData.NewestQC.View < qc.View {
-		p.livenessData.NewestQC = qc
-	}
-	p.livenessData.LastViewTC = tc
-	err := p.persist.PutLivenessData(p.livenessData)
-	if err != nil {
-		return fmt.Errorf("could not persist liveness data: %w", err)
-	}
-
-	return nil
-}
-
-// updateNewestQC updates the highest QC tracked by view, iff `qc` has a larger view than
-// the QC stored in the PaceMaker's `livenessData`. Otherwise, this method is a no-op.
-// No errors are expected, any error should be treated as exception.
-func (p *ActivePaceMaker) updateNewestQC(qc *flow.QuorumCertificate) error {
-	if p.livenessData.NewestQC.View >= qc.View {
-		return nil
-	}
-
-	p.livenessData.NewestQC = qc
-	err := p.persist.PutLivenessData(p.livenessData)
-	if err != nil {
-		return fmt.Errorf("could not persist liveness data: %w", err)
-	}
-
-	return nil
+	return pm, nil
 }
 
 // CurView returns the current view
-func (p *ActivePaceMaker) CurView() uint64 {
-	return p.livenessData.CurrentView
-}
+func (p *ActivePaceMaker) CurView() uint64 { return p.viewTracker.CurView() }
+
+// NewestQC returns QC with the highest view discovered by PaceMaker.
+func (p *ActivePaceMaker) NewestQC() *flow.QuorumCertificate { return p.viewTracker.NewestQC() }
+
+// LastViewTC returns TC for last view, this will be nil only if the current view
+// was entered with a QC.
+func (p *ActivePaceMaker) LastViewTC() *flow.TimeoutCertificate { return p.viewTracker.LastViewTC() }
 
 // TimeoutChannel returns the timeout channel for current active timeout.
 // Note the returned timeout channel returns only one timeout, which is the current
 // timeout.
 // To get the timeout for the next timeout, you need to call TimeoutChannel() again.
-func (p *ActivePaceMaker) TimeoutChannel() <-chan time.Time {
-	return p.timeoutControl.Channel()
-}
+func (p *ActivePaceMaker) TimeoutChannel() <-chan time.Time { return p.timeoutControl.Channel() }
+
+// BlockRateDelay returns the delay for broadcasting its own proposals.
+func (p *ActivePaceMaker) BlockRateDelay() time.Duration { return p.timeoutControl.BlockRateDelay() }
 
 // ProcessQC notifies the pacemaker with a new QC, which might allow pacemaker to
 // fast-forward its view. In contrast to `ProcessTC`, this function does _not_ handle `nil` inputs.
 // No errors are expected, any error should be treated as exception
 func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, error) {
-	oldView := p.CurView()
-	if qc.View < oldView {
-		err := p.updateNewestQC(qc)
-		if err != nil {
-			return nil, fmt.Errorf("could not update tracked newest QC: %w", err)
-		}
+	initialView := p.CurView()
+	resultingView, err := p.viewTracker.ProcessQC(qc)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected exception in viewTracker while processing QC for view %d: %w", qc.View, err)
+	}
+	if resultingView <= initialView {
 		return nil, nil
 	}
 
+	// TC triggered view change:
 	p.timeoutControl.OnProgressBeforeTimeout()
+	p.notifier.OnQcTriggeredViewChange(initialView, resultingView, qc)
 
-	// supermajority of replicas have already voted during round `qc.view`, hence it is safe to proceed to subsequent view
-	newView := qc.View + 1
-	err := p.updateLivenessData(newView, qc, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	p.notifier.OnQcTriggeredViewChange(oldView, newView, qc)
-	p.notifier.OnViewChange(oldView, newView)
-
-	timerInfo := p.timeoutControl.StartTimeout(p.ctx, newView)
+	p.notifier.OnViewChange(initialView, resultingView)
+	timerInfo := p.timeoutControl.StartTimeout(p.ctx, resultingView)
 	p.notifier.OnStartingTimeout(timerInfo)
 
 	return &model.NewViewEvent{
@@ -165,32 +121,21 @@ func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewE
 // which may or may not have a value.
 // No errors are expected, any error should be treated as exception
 func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, error) {
-	if tc == nil {
-		return nil, nil
-	}
-
-	oldView := p.CurView()
-	if tc.View < oldView {
-		err := p.updateNewestQC(tc.NewestQC)
-		if err != nil {
-			return nil, fmt.Errorf("could not update tracked newest QC: %w", err)
-		}
-		return nil, nil
-	}
-
-	p.timeoutControl.OnTimeout()
-
-	// supermajority of replicas have already reached their timeout for view `tc.View`, hence it is safe to proceed to subsequent view
-	newView := tc.View + 1
-	err := p.updateLivenessData(newView, tc.NewestQC, tc)
+	initialView := p.CurView()
+	resultingView, err := p.viewTracker.ProcessTC(tc)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unexpected exception in viewTracker while processing TC for view %d: %w", tc.View, err)
+	}
+	if resultingView <= initialView {
+		return nil, nil
 	}
 
-	p.notifier.OnTcTriggeredViewChange(oldView, newView, tc)
-	p.notifier.OnViewChange(oldView, newView)
+	// TC triggered view change:
+	p.timeoutControl.OnTimeout()
+	p.notifier.OnTcTriggeredViewChange(initialView, resultingView, tc)
 
-	timerInfo := p.timeoutControl.StartTimeout(p.ctx, newView)
+	p.notifier.OnViewChange(initialView, resultingView)
+	timerInfo := p.timeoutControl.StartTimeout(p.ctx, resultingView)
 	p.notifier.OnStartingTimeout(timerInfo)
 
 	return &model.NewViewEvent{
@@ -198,17 +143,6 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 		StartTime: timerInfo.StartTime,
 		Duration:  timerInfo.Duration,
 	}, nil
-}
-
-// NewestQC returns QC with the highest view discovered by PaceMaker.
-func (p *ActivePaceMaker) NewestQC() *flow.QuorumCertificate {
-	return p.livenessData.NewestQC
-}
-
-// LastViewTC returns TC for last view, this will be nil only if the current view
-// was entered with a QC.
-func (p *ActivePaceMaker) LastViewTC() *flow.TimeoutCertificate {
-	return p.livenessData.LastViewTC
 }
 
 // Start starts the pacemaker by starting the initial timer for the current view.
@@ -226,11 +160,6 @@ func (p *ActivePaceMaker) Start(ctx context.Context) {
 	p.notifier.OnStartingTimeout(timerInfo)
 }
 
-// BlockRateDelay returns the delay for broadcasting its own proposals.
-func (p *ActivePaceMaker) BlockRateDelay() time.Duration {
-	return p.timeoutControl.BlockRateDelay()
-}
-
 /* ------------------------------------ recovery parameters for PaceMaker ------------------------------------ */
 
 // recoveryInformation provides optional information to the PaceMaker during its construction
@@ -238,3 +167,24 @@ func (p *ActivePaceMaker) BlockRateDelay() time.Duration {
 // Following the "information-driven" approach, we consider potentially older or redundant
 // information as consistent with our already-present knowledge, i.e. as a no-op.
 type recoveryInformation func(p *ActivePaceMaker) error
+
+// WithQC informs the PaceMaker about the given QC. Old and nil QCs are accepted (no-op).
+func WithQC(qc *flow.QuorumCertificate) recoveryInformation {
+	// For recovery, we allow the special case of a nil QC, because the genesis block has no QC.
+	if qc == nil {
+		return func(p *ActivePaceMaker) error { return nil } // no-op
+	}
+	return func(p *ActivePaceMaker) error {
+		_, err := p.viewTracker.ProcessQC(qc)
+		return err
+	}
+}
+
+// WithTC informs the PaceMaker about the given TC. Old and nil TCs are accepted (no-op).
+func WithTC(tc *flow.TimeoutCertificate) recoveryInformation {
+	// Business logic accepts nil TC already, as this is the common case on the happy path.
+	return func(p *ActivePaceMaker) error {
+		_, err := p.viewTracker.ProcessTC(tc)
+		return err
+	}
+}
