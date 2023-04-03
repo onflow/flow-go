@@ -664,7 +664,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// If epoch emergency fallback is triggered, the current epoch continues until
 	// the next spork - so skip these updates.
 	if !epochFallbackTriggered {
-		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(header, epochStatus)
+		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(block, epochStatus)
 		if err != nil {
 			return fmt.Errorf("could not determine epoch phase metrics/events for finalized block: %w", err)
 		}
@@ -869,19 +869,13 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 //
 // This function should only be called when epoch fallback *has not already been triggered*.
 // No errors are expected during normal operation.
-func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.Header, epochStatus *flow.EpochStatus) (
+func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.Block, epochStatus *flow.EpochStatus) (
 	metrics []func(),
 	events []func(),
 	err error,
 ) {
-
-	parent, err := m.blocks.ByID(block.ParentID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get parent (id=%x): %w", block.ParentID, err)
-	}
-
 	// track service event driven metrics and protocol events that should be emitted
-	for _, seal := range parent.Payload.Seals {
+	for _, seal := range block.Payload.Seals {
 
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
@@ -893,12 +887,12 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.H
 				// update current epoch phase
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseSetup) })
 				// track epoch phase transition (staking->setup)
-				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, block) })
+				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, block.Header) })
 			case *flow.EpochCommit:
 				// update current epoch phase
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
 				// track epoch phase transition (setup->committed)
-				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, block) })
+				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, block.Header) })
 				// track final view of committed epoch
 				nextEpochSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
@@ -1025,20 +1019,16 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 		return dbUpdates, nil
 	}
 
-	// We apply service events from blocks which are sealed by this block's PARENT.
-	// The parent's payload might contain epoch preparation service events for the next
+	// We apply service events from blocks which are sealed by this candidate block.
+	// The block's payload might contain epoch preparation service events for the next
 	// epoch. In this case, we need to update the tentative protocol state.
 	// We need to validate whether all information is available in the protocol
 	// state to go to the next epoch when needed. In cases where there is a bug
 	// in the smart contract, it could be that this happens too late and the
 	// chain finalization should halt.
-	parent, err := m.blocks.ByID(candidate.Header.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get parent (id=%x): %w", candidate.Header.ParentID, err)
-	}
 
 	// block payload may not specify seals in order, so order them by block height before processing
-	orderedSeals, err := protocol.OrderedSeals(parent.Payload, m.headers)
+	orderedSeals, err := protocol.OrderedSeals(candidate.Payload, m.headers)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
