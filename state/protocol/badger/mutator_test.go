@@ -573,18 +573,18 @@ func TestExtendReceiptsValid(t *testing.T) {
 // event, then a commit event, then finalizing the first block of the next epoch.
 // Also tests that appropriate epoch transition events are fired.
 //
-// Epoch information becomes available in the protocol state in the block when processing
-// the block with relevant service event.
+// Epoch information becomes available in the protocol state in the block containing the seal
+// for the block in which the relevant service event was emitted.
 //
 // ROOT <- B1 <- B2(R1) <- B3(S1) <- B4 <- B5(R2) <- B6(S2) <- B7 <-|- B8
 //
 // B3 seals B1, in which EpochSetup is emitted.
-// * we can query the EpochSetup beginning with B3
-// * EpochSetupPhaseStarted triggered when B3 is finalized
+//   - we can query the EpochSetup beginning with B3
+//   - EpochSetupPhaseStarted triggered when B3 is finalized
 //
 // B6 seals B2, in which EpochCommitted is emitted.
-// * we can query the EpochCommit beginning with B6
-// * EpochSetupPhaseStarted triggered when B6 is finalized
+//   - we can query the EpochCommit beginning with B6
+//   - EpochCommittedPhaseStarted triggered when B6 is finalized
 //
 // B7 is the final block of the epoch.
 // B8 is the first block of the NEXT epoch.
@@ -1604,8 +1604,8 @@ func TestEmergencyEpochFallback(t *testing.T) {
 	})
 
 	// if an invalid epoch service event is incorporated, we should:
-	//  * not apply the phase transition corresponding to the invalid service event
-	//  * immediately trigger EECC
+	//   - not apply the phase transition corresponding to the invalid service event
+	//   - immediately trigger EECC
 	//
 	//                            Epoch Boundary
 	//                                 |
