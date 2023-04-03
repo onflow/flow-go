@@ -4,9 +4,9 @@ name: BN2 - Delete Benchnet 2 Network
 on:
   workflow_dispatch:
     inputs:
-    
+
       # The network_id is the unique identifier for the network.
-      # This ID is used to clean up and delete all 
+      # This ID is used to clean up and delete all
       network_id:
         type: string
         required: true
