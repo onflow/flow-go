@@ -124,7 +124,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: ${{ inputs.flow_repo }}
-          ref: ${{ inputs.flow_repo }}
+          ref: ${{ inputs.flow_ref }}
 
       - name: Configure gcloud
         uses: google-github-actions/setup-gcloud@v0.2.1
