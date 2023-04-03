@@ -9,24 +9,21 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
-
-	"github.com/onflow/flow-go/fvm/blueprints"
-	envMock "github.com/onflow/flow-go/fvm/environment/mock"
-
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/blueprints"
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -171,9 +168,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 
-		require.Len(t, output.Logs, 2)
-		assert.Equal(t, "\"foo\"", output.Logs[0])
-		assert.Equal(t, "\"bar\"", output.Logs[1])
+		require.Equal(t, []string{"\"foo\"", "\"bar\""}, output.Logs)
 	})
 
 	t.Run("Events", func(t *testing.T) {
@@ -213,16 +208,16 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	)
 
 	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
 
-		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(
+		// Bootstrap a ledger, creating accounts with the provided private keys
+		// and the root account.
+		snapshotTree, accounts, err := testutil.CreateAccounts(
 			vm,
-			ledger,
+			testutil.RootBootstrappedLedger(vm, ctx),
 			privateKeys,
 			chain)
 		require.NoError(t, err)
@@ -235,28 +230,31 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(
+			txBody,
+			chain.ServiceAddress(),
+			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		_, output, err := vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 	})
 
 	t.Run("account with deployed contract has `contracts.names` filled", func(t *testing.T) {
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
 
-		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(
+		// Bootstrap a ledger, creating accounts with the provided private keys
+		// and the root account.
+		snapshotTree, accounts, err := testutil.CreateAccounts(
 			vm,
-			ledger,
+			testutil.RootBootstrappedLedger(vm, ctx),
 			privateKeys,
 			chain)
 		require.NoError(t, err)
@@ -269,17 +267,20 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(
+			txBody,
+			chain.ServiceAddress(),
+			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		executionSnapshot, output, err := vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 
-		require.NoError(t, ledger.Merge(executionSnapshot))
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		// transaction will panic if `contracts.names` is incorrect
 		txBody = flow.NewTransactionBody().
@@ -304,33 +305,37 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(
+			txBody,
+			chain.ServiceAddress(),
+			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		_, output, err = vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 	})
 
 	t.Run("account update with checker heavy contract (local replay limit)", func(t *testing.T) {
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
 
-		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(
+		// Bootstrap a ledger, creating accounts with the provided private keys
+		// and the root account.
+		snapshotTree, accounts, err := testutil.CreateAccounts(
 			vm,
-			ledger,
+			testutil.RootBootstrappedLedger(vm, ctx),
 			privateKeys,
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployLocalReplayLimitedTransaction(accounts[0], chain)
+		txBody := testutil.DeployLocalReplayLimitedTransaction(
+			accounts[0],
+			chain)
 
 		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
 		txBody.SetPayer(chain.ServiceAddress())
@@ -338,36 +343,43 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(
+			txBody,
+			chain.ServiceAddress(),
+			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		_, output, err := vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 
 		var parsingCheckingError *runtime.ParsingCheckingError
-		assert.ErrorAs(t, output.Err, &parsingCheckingError)
-		assert.ErrorContains(t, output.Err, "program too ambiguous, local replay limit of 64 tokens exceeded")
+		require.ErrorAs(t, output.Err, &parsingCheckingError)
+		require.ErrorContains(
+			t,
+			output.Err,
+			"program too ambiguous, local replay limit of 64 tokens exceeded")
 	})
 
 	t.Run("account update with checker heavy contract (global replay limit)", func(t *testing.T) {
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
 
-		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(
+		// Bootstrap a ledger, creating accounts with the provided private keys
+		// and the root account.
+		snapshotTree, accounts, err := testutil.CreateAccounts(
 			vm,
-			ledger,
+			testutil.RootBootstrappedLedger(vm, ctx),
 			privateKeys,
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployGlobalReplayLimitedTransaction(accounts[0], chain)
+		txBody := testutil.DeployGlobalReplayLimitedTransaction(
+			accounts[0],
+			chain)
 
 		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
 		txBody.SetPayer(chain.ServiceAddress())
@@ -375,36 +387,42 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(
+			txBody,
+			chain.ServiceAddress(),
+			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		_, output, err := vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 
 		var parsingCheckingError *runtime.ParsingCheckingError
-		assert.ErrorAs(t, output.Err, &parsingCheckingError)
-		assert.ErrorContains(t, output.Err, "program too ambiguous, global replay limit of 1024 tokens exceeded")
+		require.ErrorAs(t, output.Err, &parsingCheckingError)
+		require.ErrorContains(
+			t,
+			output.Err,
+			"program too ambiguous, global replay limit of 1024 tokens exceeded")
 	})
 
 	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
 
-		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(
+		// Bootstrap a ledger, creating accounts with the provided private keys
+		// and the root account.
+		snapshotTree, accounts, err := testutil.CreateAccounts(
 			vm,
-			ledger,
+			testutil.RootBootstrappedLedger(vm, ctx),
 			privateKeys,
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(
+			accounts[0])
 
 		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 		require.NoError(t, err)
@@ -412,13 +430,16 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		_, output, err := vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 
 		require.Error(t, output.Err)
 
-		assert.Contains(t, output.Err.Error(), "deploying contracts requires authorization from specific accounts")
-		assert.True(t, errors.IsCadenceRuntimeError(output.Err))
+		require.ErrorContains(
+			t,
+			output.Err,
+			"deploying contracts requires authorization from specific accounts")
+		require.True(t, errors.IsCadenceRuntimeError(output.Err))
 	})
 
 	t.Run("account update with set code fails if not signed by service account if dis-allowed in the state", func(t *testing.T) {
@@ -428,25 +449,25 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			fvm.WithContractDeploymentRestricted(false),
 		)
 		restricted := true
-		ledger := testutil.RootBootstrappedLedger(
-			vm,
-			ctx,
-			fvm.WithRestrictedContractDeployment(&restricted),
-		)
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
 
-		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(
+		// Bootstrap a ledger, creating accounts with the provided private keys
+		// and the root account.
+		snapshotTree, accounts, err := testutil.CreateAccounts(
 			vm,
-			ledger,
+			testutil.RootBootstrappedLedger(
+				vm,
+				ctx,
+				fvm.WithRestrictedContractDeployment(&restricted)),
 			privateKeys,
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(
+			accounts[0])
 		txBody.SetProposalKey(accounts[0], 0, 0)
 		txBody.SetPayer(accounts[0])
 
@@ -456,35 +477,39 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		_, output, err := vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+
+			snapshotTree)
 		require.NoError(t, err)
 		require.Error(t, output.Err)
 
-		assert.Contains(t, output.Err.Error(), "deploying contracts requires authorization from specific accounts")
-		assert.True(t, errors.IsCadenceRuntimeError(output.Err))
+		require.ErrorContains(
+			t,
+			output.Err,
+			"deploying contracts requires authorization from specific accounts")
+		require.True(t, errors.IsCadenceRuntimeError(output.Err))
 	})
 
 	t.Run("account update with set succeeds if not signed by service account if allowed in the state", func(t *testing.T) {
-		restricted := false
-		ledger := testutil.RootBootstrappedLedger(
-			vm,
-			ctx,
-			fvm.WithRestrictedContractDeployment(&restricted),
-		)
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
 
-		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(
+		// Bootstrap a ledger, creating accounts with the provided private keys
+		// and the root account.
+		restricted := false
+		snapshotTree, accounts, err := testutil.CreateAccounts(
 			vm,
-			ledger,
+			testutil.RootBootstrappedLedger(
+				vm,
+				ctx,
+				fvm.WithRestrictedContractDeployment(&restricted)),
 			privateKeys,
 			chain)
 		require.NoError(t, err)
 
-		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(
+			accounts[0])
 		txBody.SetProposalKey(accounts[0], 0, 0)
 		txBody.SetPayer(accounts[0])
 
@@ -494,22 +519,21 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		_, output, err := vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 	})
 
 	t.Run("account update with update code succeeds if not signed by service account", func(t *testing.T) {
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
 
-		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(
+		// Bootstrap a ledger, creating accounts with the provided private keys
+		// and the root account.
+		snapshotTree, accounts, err := testutil.CreateAccounts(
 			vm,
-			ledger,
+			testutil.RootBootstrappedLedger(vm, ctx),
 			privateKeys,
 			chain)
 		require.NoError(t, err)
@@ -521,19 +545,23 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(
+			txBody,
+			chain.ServiceAddress(),
+			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		executionSnapshot, output, err := vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 
-		require.NoError(t, ledger.Merge(executionSnapshot))
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 
-		txBody = testutil.UpdateUnauthorizedCounterContractTransaction(accounts[0])
+		txBody = testutil.UpdateUnauthorizedCounterContractTransaction(
+			accounts[0])
 		txBody.SetProposalKey(accounts[0], 0, 0)
 		txBody.SetPayer(accounts[0])
 
@@ -543,22 +571,22 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		_, output, err = vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 	})
 
 	t.Run("account update with code removal fails if not signed by service account", func(t *testing.T) {
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
 
-		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(
+		// Bootstrap a ledger, creating accounts with the provided private keys
+		// and the root account.
+		snapshotTree, accounts, err := testutil.CreateAccounts(
 			vm,
-			ledger,
+			testutil.RootBootstrappedLedger(vm, ctx),
 			privateKeys,
 			chain)
 		require.NoError(t, err)
@@ -570,19 +598,23 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(
+			txBody,
+			chain.ServiceAddress(),
+			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		executionSnapshot, output, err := vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 
-		require.NoError(t, ledger.Merge(executionSnapshot))
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 
-		txBody = testutil.RemoveUnauthorizedCounterContractTransaction(accounts[0])
+		txBody = testutil.RemoveUnauthorizedCounterContractTransaction(
+			accounts[0])
 		txBody.SetProposalKey(accounts[0], 0, 0)
 		txBody.SetPayer(accounts[0])
 
@@ -592,25 +624,27 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		_, output, err = vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 		require.Error(t, output.Err)
 
-		assert.Contains(t, output.Err.Error(), "removing contracts requires authorization from specific accounts")
-		assert.True(t, errors.IsCadenceRuntimeError(output.Err))
+		require.ErrorContains(
+			t,
+			output.Err,
+			"removing contracts requires authorization from specific accounts")
+		require.True(t, errors.IsCadenceRuntimeError(output.Err))
 	})
 
 	t.Run("account update with code removal succeeds if signed by service account", func(t *testing.T) {
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
 
-		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(
+		// Bootstrap a ledger, creating accounts with the provided private keys
+		// and the root account.
+		snapshotTree, accounts, err := testutil.CreateAccounts(
 			vm,
-			ledger,
+			testutil.RootBootstrappedLedger(vm, ctx),
 			privateKeys,
 			chain)
 		require.NoError(t, err)
@@ -622,17 +656,20 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(
+			txBody,
+			chain.ServiceAddress(),
+			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		executionSnapshot, output, err := vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 
-		require.NoError(t, ledger.Merge(executionSnapshot))
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		txBody = testutil.RemoveCounterContractTransaction(accounts[0], chain)
 		txBody.SetProposalKey(accounts[0], 0, 0)
@@ -641,49 +678,56 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(
+			txBody,
+			chain.ServiceAddress(),
+			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		_, output, err = vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 	})
 
 	t.Run("account update with set code succeeds when account is added as authorized account", func(t *testing.T) {
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
 
-		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(
+		// Bootstrap a ledger, creating accounts with the provided private keys
+		// and the root account.
+		snapshotTree, accounts, err := testutil.CreateAccounts(
 			vm,
-			ledger,
+			testutil.RootBootstrappedLedger(vm, ctx),
 			privateKeys,
 			chain)
 		require.NoError(t, err)
 
 		// setup a new authorizer account
-		authTxBody, err := blueprints.SetContractDeploymentAuthorizersTransaction(chain.ServiceAddress(), []flow.Address{chain.ServiceAddress(), accounts[0]})
+		authTxBody, err := blueprints.SetContractDeploymentAuthorizersTransaction(
+			chain.ServiceAddress(),
+			[]flow.Address{chain.ServiceAddress(), accounts[0]})
 		require.NoError(t, err)
 
 		authTxBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
 		authTxBody.SetPayer(chain.ServiceAddress())
-		err = testutil.SignEnvelope(authTxBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(
+			authTxBody,
+			chain.ServiceAddress(),
+			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		executionSnapshot, output, err := vm.RunV2(
 			ctx,
 			fvm.Transaction(authTxBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 
-		require.NoError(t, ledger.Merge(executionSnapshot))
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		// test deploying a new contract (not authorized by service account)
 		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
@@ -696,7 +740,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		_, output, err = vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 	})
@@ -740,7 +784,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			check: func(t *testing.T, output fvm.ProcedureOutput) {
 				require.NoError(t, output.Err)
 				require.Len(t, output.Logs, 1)
-				assert.Equal(t, "42", output.Logs[0])
+				require.Equal(t, "42", output.Logs[0])
 			},
 		},
 		{
@@ -750,8 +794,8 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			check: func(t *testing.T, output fvm.ProcedureOutput) {
 				require.NoError(t, output.Err)
 				require.Len(t, output.Logs, 2)
-				assert.Equal(t, "42", output.Logs[0])
-				assert.Equal(t, `"foo"`, output.Logs[1])
+				require.Equal(t, "42", output.Logs[0])
+				require.Equal(t, `"foo"`, output.Logs[1])
 			},
 		},
 		{
@@ -765,7 +809,10 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			authorizers: []flow.Address{chain.ServiceAddress()},
 			check: func(t *testing.T, output fvm.ProcedureOutput) {
 				require.NoError(t, output.Err)
-				assert.ElementsMatch(t, []string{"0x" + chain.ServiceAddress().Hex(), "42", `"foo"`}, output.Logs)
+				require.ElementsMatch(
+					t,
+					[]string{"0x" + chain.ServiceAddress().Hex(), "42", `"foo"`},
+					output.Logs)
 			},
 		},
 	}
@@ -780,15 +827,13 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 				txBody.AddAuthorizer(authorizer)
 			}
 
-			ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
 			_, output, err := vm.RunV2(
 				ctx,
 				fvm.Transaction(txBody, 0),
-				ledger)
+				testutil.RootBootstrappedLedger(vm, ctx))
 			require.NoError(t, err)
 
 			tt.check(t, output)
@@ -860,15 +905,13 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 				SetScript([]byte(tt.script)).
 				SetGasLimit(tt.gasLimit)
 
-			ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
 			_, output, err := vm.RunV2(
 				ctx,
 				fvm.Transaction(txBody, 0),
-				ledger)
+				testutil.RootBootstrappedLedger(vm, ctx))
 			require.NoError(t, err)
 
 			tt.check(t, output)
@@ -904,14 +947,23 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
 			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View) {
-				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+				// TODO(patrick): fix plumbing
+				snapshotTree := storage.NewSnapshotTree(view)
+
+				// this test requires storage limits to be enforced
+				ctx.LimitAccountStorage = true
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 				require.NoError(t, err)
 
-				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-				accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
+				// Bootstrap a ledger, creating accounts with the provided
+				// private keys and the root account.
+				snapshotTree, accounts, err := testutil.CreateAccounts(
+					vm,
+					snapshotTree,
+					privateKeys,
+					chain)
 				require.NoError(t, err)
 
 				txBody := testutil.CreateContractDeploymentTransaction(
@@ -926,28 +978,41 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				err = testutil.SignEnvelope(
+					txBody,
+					chain.ServiceAddress(),
+					unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
 				_, output, err := vm.RunV2(
 					ctx,
 					fvm.Transaction(txBody, 0),
-					view)
+					snapshotTree)
 				require.NoError(t, err)
 
-				assert.True(t, errors.IsStorageCapacityExceededError(output.Err))
+				require.True(
+					t,
+					errors.IsStorageCapacityExceededError(output.Err))
 			}))
 	t.Run("Increasing storage capacity works", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
 			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View) {
+				// TODO(patrick): fix plumbing
+				snapshotTree := storage.NewSnapshotTree(view)
+
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 				require.NoError(t, err)
 
-				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-				accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
+				// Bootstrap a ledger, creating accounts with the provided
+				// private keys and the root account.
+				snapshotTree, accounts, err := testutil.CreateAccounts(
+					vm,
+					snapshotTree,
+					privateKeys,
+					chain)
 				require.NoError(t, err)
 
 				// deposit more flow to increase capacity
@@ -980,13 +1045,16 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				err = testutil.SignEnvelope(
+					txBody,
+					chain.ServiceAddress(),
+					unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
 				_, output, err := vm.RunV2(
 					ctx,
 					fvm.Transaction(txBody, 0),
-					view)
+					snapshotTree)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 			}))
@@ -1019,14 +1087,22 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
 		run(
 			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View) {
+				// TODO(patrick): fix plumbing
+				snapshotTree := storage.NewSnapshotTree(view)
+
 				ctx.MaxStateInteractionSize = 500_000
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 				require.NoError(t, err)
 
-				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-				accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
+				// Bootstrap a ledger, creating accounts with the provided
+				// private keys and the root account.
+				snapshotTree, accounts, err := testutil.CreateAccounts(
+					vm,
+					snapshotTree,
+					privateKeys,
+					chain)
 				require.NoError(t, err)
 
 				n := 0
@@ -1039,21 +1115,26 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				txBody := transferTokensTx(chain).
 					SetProposalKey(chain.ServiceAddress(), 0, seqNum()).
 					AddAuthorizer(chain.ServiceAddress()).
-					AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
-					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(accounts[0]))).
+					AddArgument(
+						jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
+					AddArgument(
+						jsoncdc.MustEncode(cadence.NewAddress(accounts[0]))).
 					SetPayer(chain.ServiceAddress())
 
-				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				err = testutil.SignEnvelope(
+					txBody,
+					chain.ServiceAddress(),
+					unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
 				executionSnapshot, output, err := vm.RunV2(
 					ctx,
 					fvm.Transaction(txBody, 0),
-					view)
+					snapshotTree)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				require.NoError(t, view.Merge(executionSnapshot))
+				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				ctx.MaxStateInteractionSize = 500_000
 
@@ -1066,7 +1147,10 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				txBody.SetProposalKey(chain.ServiceAddress(), 0, seqNum())
 				txBody.SetPayer(accounts[0])
 
-				err = testutil.SignPayload(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				err = testutil.SignPayload(
+					txBody,
+					chain.ServiceAddress(),
+					unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
@@ -1075,25 +1159,34 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				_, output, err = vm.RunV2(
 					ctx,
 					fvm.Transaction(txBody, 0),
-					view)
+					snapshotTree)
 				require.NoError(t, err)
 
-				assert.True(t, errors.IsLedgerInteractionLimitExceededError(output.Err))
+				require.True(
+					t,
+					errors.IsLedgerInteractionLimitExceededError(output.Err))
 			}))
 
 	t.Run("Using to much interaction but not failing because of service account", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
 		run(
 			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View) {
+				// TODO(patrick): fix plumbing
+				snapshotTree := storage.NewSnapshotTree(view)
+
 				ctx.MaxStateInteractionSize = 500_000
-				// ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 				require.NoError(t, err)
 
-				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-				accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
+				// Bootstrap a ledger, creating accounts with the provided
+				// private keys and the root account.
+				snapshotTree, accounts, err := testutil.CreateAccounts(
+					vm,
+					snapshotTree,
+					privateKeys,
+					chain)
 				require.NoError(t, err)
 
 				txBody := testutil.CreateContractDeploymentTransaction(
@@ -1108,13 +1201,16 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				err = testutil.SignEnvelope(
+					txBody,
+					chain.ServiceAddress(),
+					unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
 				_, output, err := vm.RunV2(
 					ctx,
 					fvm.Transaction(txBody, 0),
-					view)
+					snapshotTree)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 			}))
@@ -1126,22 +1222,36 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 		).
 		run(
 			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View) {
+				// TODO(patrick): fix plumbing
+				snapshotTree := storage.NewSnapshotTree(view)
+
 				ctx.MaxStateInteractionSize = 50_000
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 				require.NoError(t, err)
 
-				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-				accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
+				// Bootstrap a ledger, creating accounts with the provided
+				// private keys and the root account.
+				snapshotTree, accounts, err := testutil.CreateAccounts(
+					vm,
+					snapshotTree,
+					privateKeys,
+					chain)
 				require.NoError(t, err)
 
-				_, txBody := testutil.CreateMultiAccountCreationTransaction(t, chain, 40)
+				_, txBody := testutil.CreateMultiAccountCreationTransaction(
+					t,
+					chain,
+					40)
 
 				txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
 				txBody.SetPayer(accounts[0])
 
-				err = testutil.SignPayload(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				err = testutil.SignPayload(
+					txBody,
+					chain.ServiceAddress(),
+					unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
@@ -1150,11 +1260,11 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				_, output, err := vm.RunV2(
 					ctx,
 					fvm.Transaction(txBody, 0),
-					view)
+					snapshotTree)
 				require.NoError(t, err)
 				require.Error(t, output.Err)
 
-				assert.True(t, errors.IsCadenceRuntimeError(output.Err))
+				require.True(t, errors.IsCadenceRuntimeError(output.Err))
 			}))
 }
 
@@ -1184,12 +1294,11 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
             }
         `)
 
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
-		script := fvm.Script(code)
-
-		_, output, err := vm.RunV2(ctx, script, ledger)
-		assert.NoError(t, err)
+		_, output, err := vm.RunV2(
+			ctx,
+			fvm.Script(code),
+			testutil.RootBootstrappedLedger(vm, ctx))
+		require.NoError(t, err)
 
 		require.NoError(t, output.Err)
 	})
@@ -1202,12 +1311,11 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
             }
         `)
 
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
-		script := fvm.Script(code)
-
-		_, output, err := vm.RunV2(ctx, script, ledger)
-		assert.NoError(t, err)
+		_, output, err := vm.RunV2(
+			ctx,
+			fvm.Script(code),
+			testutil.RootBootstrappedLedger(vm, ctx))
+		require.NoError(t, err)
 
 		require.Error(t, output.Err)
 	})
@@ -1221,31 +1329,28 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
             }
         `)
 
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
-		script := fvm.Script(code)
-
-		_, output, err := vm.RunV2(ctx, script, ledger)
-		assert.NoError(t, err)
+		_, output, err := vm.RunV2(
+			ctx,
+			fvm.Script(code),
+			testutil.RootBootstrappedLedger(vm, ctx))
+		require.NoError(t, err)
 
 		require.NoError(t, output.Err)
 		require.Len(t, output.Logs, 2)
-		assert.Equal(t, "\"foo\"", output.Logs[0])
-		assert.Equal(t, "\"bar\"", output.Logs[1])
+		require.Equal(t, "\"foo\"", output.Logs[0])
+		require.Equal(t, "\"bar\"", output.Logs[1])
 	})
 
 	t.Run("storage ID allocation", func(t *testing.T) {
-
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
 		// Create an account private key.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
 
-		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(
+		// Bootstrap a ledger, creating accounts with the provided private
+		// keys and the root account.
+		snapshotTree, accounts, err := testutil.CreateAccounts(
 			vm,
-			ledger,
+			testutil.RootBootstrappedLedger(vm, ctx),
 			privateKeys,
 			chain)
 		require.NoError(t, err)
@@ -1271,7 +1376,11 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		address := accounts[0]
 
-		txBody := testutil.CreateContractDeploymentTransaction("Test", contract, address, chain)
+		txBody := testutil.CreateContractDeploymentTransaction(
+			"Test",
+			contract,
+			address,
+			chain)
 
 		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
 		txBody.SetPayer(chain.ServiceAddress())
@@ -1279,17 +1388,20 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 		err = testutil.SignPayload(txBody, address, privateKeys[0])
 		require.NoError(t, err)
 
-		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(
+			txBody,
+			chain.ServiceAddress(),
+			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		executionSnapshot, output, err := vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 
-		require.NoError(t, ledger.Merge(executionSnapshot))
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		// Run test script
 
@@ -1304,10 +1416,8 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			address.String(),
 		))
 
-		script := fvm.Script(code)
-
-		_, output, err = vm.RunV2(ctx, script, ledger)
-		assert.NoError(t, err)
+		_, output, err = vm.RunV2(ctx, fvm.Script(code), snapshotTree)
+		require.NoError(t, err)
 
 		require.NoError(t, output.Err)
 	})
@@ -1363,7 +1473,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		require.NoError(t, output.Err)
 
 		require.Len(t, output.Logs, 2)
-		assert.Equal(
+		require.Equal(
 			t,
 			fmt.Sprintf(
 				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
@@ -1374,7 +1484,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 			),
 			output.Logs[0],
 		)
-		assert.Equal(
+		require.Equal(
 			t,
 			fmt.Sprintf(
 				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
@@ -1398,14 +1508,15 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
             }
         `)
 
-		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
-		_, output, err := vm.RunV2(blockCtx, fvm.Script(code), ledger)
-		assert.NoError(t, err)
+		_, output, err := vm.RunV2(
+			blockCtx,
+			fvm.Script(code),
+			testutil.RootBootstrappedLedger(vm, ctx))
+		require.NoError(t, err)
 		require.NoError(t, output.Err)
 
 		require.Len(t, output.Logs, 2)
-		assert.Equal(t,
+		require.Equal(t,
 			fmt.Sprintf(
 				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
 				block1.Header.Height,
@@ -1415,7 +1526,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 			),
 			output.Logs[0],
 		)
-		assert.Equal(
+		require.Equal(
 			t,
 			fmt.Sprintf(
 				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
@@ -1480,12 +1591,13 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		fvm.WithCadenceLogging(true),
 	)
 
+	snapshotTree := testutil.RootBootstrappedLedger(vm, ctx)
 	sequenceNumber := uint64(0)
 
-	ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
 	createAccount := func() (flow.Address, crypto.PublicKey) {
-		privateKey, txBody := testutil.CreateAccountCreationTransaction(t, chain)
+		privateKey, txBody := testutil.CreateAccountCreationTransaction(
+			t,
+			chain)
 
 		txBody.SetProposalKey(chain.ServiceAddress(), 0, sequenceNumber)
 		txBody.SetPayer(chain.ServiceAddress())
@@ -1505,23 +1617,25 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		executionSnapshot, output, err := vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			ledger)
+			snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 
-		require.NoError(t, ledger.Merge(executionSnapshot))
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		accountCreatedEvents := filterAccountCreatedEvents(output.Events)
 
 		require.Len(t, accountCreatedEvents, 1)
 
-		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
+		// read the address of the account created (e.g. "0x01" and convert it
+		// to flow.address)
 		data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(t, err)
 		address := flow.ConvertAddress(
 			data.(cadence.Event).Fields[0].(cadence.Address))
 
-		return address, privateKey.PublicKey(fvm.AccountKeyWeightThreshold).PublicKey
+		return address, privateKey.PublicKey(
+			fvm.AccountKeyWeightThreshold).PublicKey
 	}
 
 	addressGen := chain.NewAddressGenerator()
@@ -1538,20 +1652,19 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		expectedAddress, err := addressGen.NextAddress()
 		require.NoError(t, err)
 
-		assert.Equal(t, expectedAddress, address)
+		require.Equal(t, expectedAddress, address)
 		accounts[address] = key
 	}
 
 	// happy path - get each of the created account and check if it is the right one
 	t.Run("get accounts", func(t *testing.T) {
 		for address, expectedKey := range accounts {
-
-			account, err := vm.GetAccount(ctx, address, ledger)
+			account, err := vm.GetAccount(ctx, address, snapshotTree)
 			require.NoError(t, err)
 
-			assert.Len(t, account.Keys, 1)
+			require.Len(t, account.Keys, 1)
 			actualKey := account.Keys[0].PublicKey
-			assert.Equal(t, expectedKey, actualKey)
+			require.Equal(t, expectedKey, actualKey)
 		}
 	})
 
@@ -1560,10 +1673,9 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		address, err := addressGen.NextAddress()
 		require.NoError(t, err)
 
-		var account *flow.Account
-		account, err = vm.GetAccount(ctx, address, ledger)
-		assert.True(t, errors.IsAccountNotFoundError(err))
-		assert.Nil(t, account)
+		account, err := vm.GetAccount(ctx, address, snapshotTree)
+		require.True(t, errors.IsAccountNotFoundError(err))
+		require.Nil(t, account)
 	})
 }
 
@@ -1643,11 +1755,17 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	address := flow.ConvertAddress(
 		data.(cadence.Event).Fields[0].(cadence.Address))
 
-	assert.Equal(t, flow.HexToAddress("05"), address)
+	require.Equal(t, flow.HexToAddress("05"), address)
 }
 
 func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
-	getBalance := func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View, address flow.Address) uint64 {
+	getBalance := func(
+		vm fvm.VM,
+		chain flow.Chain,
+		ctx fvm.Context,
+		storageSnapshot state.StorageSnapshot,
+		address flow.Address,
+	) uint64 {
 
 		code := []byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
@@ -1666,7 +1784,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			jsoncdc.MustEncode(cadence.NewAddress(address)),
 		)
 
-		_, output, err := vm.RunV2(ctx, script, view)
+		_, output, err := vm.RunV2(ctx, script, storageSnapshot)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 		return output.Value.ToGoValue().(uint64)
@@ -1679,22 +1797,36 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View) {
+			// TODO(patrick): fix plumbing
+			snapshotTree := storage.NewSnapshotTree(view)
+
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 			// Create an account private key.
 			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 			require.NoError(t, err)
 
-			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-			accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
+			// Bootstrap a ledger, creating accounts with the provided private
+			// keys and the root account.
+			snapshotTree, accounts, err := testutil.CreateAccounts(
+				vm,
+				snapshotTree,
+				privateKeys,
+				chain)
 			require.NoError(t, err)
 
-			balanceBefore := getBalance(vm, chain, ctx, view, accounts[0])
+			balanceBefore := getBalance(
+				vm,
+				chain,
+				ctx,
+				snapshotTree,
+				accounts[0])
 
 			txBody := transferTokensTx(chain).
 				AddAuthorizer(accounts[0]).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
-				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
+				AddArgument(jsoncdc.MustEncode(
+					cadence.NewAddress(chain.ServiceAddress())))
 
 			txBody.SetProposalKey(accounts[0], 0, 0)
 			txBody.SetPayer(accounts[0])
@@ -1705,14 +1837,19 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			executionSnapshot, output, err := vm.RunV2(
 				ctx,
 				fvm.Transaction(txBody, 0),
-				view)
+				snapshotTree)
 			require.NoError(t, err)
 
-			require.NoError(t, view.Merge(executionSnapshot))
+			snapshotTree = snapshotTree.Append(executionSnapshot)
 
 			require.True(t, errors.IsStorageCapacityExceededError(output.Err))
 
-			balanceAfter := getBalance(vm, chain, ctx, view, accounts[0])
+			balanceAfter := getBalance(
+				vm,
+				chain,
+				ctx,
+				snapshotTree.Append(executionSnapshot),
+				accounts[0])
 
 			require.Equal(t, balanceAfter, balanceBefore)
 		}),
@@ -1725,21 +1862,34 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View) {
+			// TODO(patrick): fix plumbing
+			snapshotTree := storage.NewSnapshotTree(view)
+
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 			// Create an account private key.
 			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 			require.NoError(t, err)
 
-			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-			accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
+			// Bootstrap a ledger, creating accounts with the provided private
+			// keys and the root account.
+			snapshotTree, accounts, err := testutil.CreateAccounts(
+				vm,
+				snapshotTree,
+				privateKeys,
+				chain)
 			require.NoError(t, err)
 
 			// non-existent account
 			lastAddress, err := chain.AddressAtIndex((1 << 45) - 1)
 			require.NoError(t, err)
 
-			balanceBefore := getBalance(vm, chain, ctx, view, accounts[0])
+			balanceBefore := getBalance(
+				vm,
+				chain,
+				ctx,
+				snapshotTree,
+				accounts[0])
 
 			// transfer tokens to non-existent account
 			txBody := transferTokensTx(chain).
@@ -1756,14 +1906,19 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			executionSnapshot, output, err := vm.RunV2(
 				ctx,
 				fvm.Transaction(txBody, 0),
-				view)
+				snapshotTree)
 			require.NoError(t, err)
 
-			require.NoError(t, view.Merge(executionSnapshot))
+			snapshotTree = snapshotTree.Append(executionSnapshot)
 
 			require.True(t, errors.IsCadenceRuntimeError(output.Err))
 
-			balanceAfter := getBalance(vm, chain, ctx, view, accounts[0])
+			balanceAfter := getBalance(
+				vm,
+				chain,
+				ctx,
+				snapshotTree.Append(executionSnapshot),
+				accounts[0])
 
 			require.Equal(t, balanceAfter, balanceBefore)
 		}),
@@ -1775,20 +1930,30 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 	).
 		run(
 			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View) {
-				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+				// TODO(patrick): fix plumbing
+				snapshotTree := storage.NewSnapshotTree(view)
+
+				// this test requires storage limits to be enforced
+				ctx.LimitAccountStorage = true
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 				require.NoError(t, err)
 
-				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-				accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
+				// Bootstrap a ledger, creating accounts with the provided
+				// private keys and the root account.
+				snapshotTree, accounts, err := testutil.CreateAccounts(
+					vm,
+					snapshotTree,
+					privateKeys,
+					chain)
 				require.NoError(t, err)
 
 				txBody := transferTokensTx(chain).
 					AddAuthorizer(accounts[0]).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000_0000))).
-					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
+					AddArgument(jsoncdc.MustEncode(
+						cadence.NewAddress(chain.ServiceAddress())))
 
 				// set wrong sequence number
 				txBody.SetProposalKey(accounts[0], 0, 10)
@@ -1800,7 +1965,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				executionSnapshot, output, err := vm.RunV2(
 					ctx,
 					fvm.Transaction(txBody, 0),
-					view)
+					snapshotTree)
 				require.NoError(t, err)
 
 				require.NoError(t, view.Merge(executionSnapshot))
@@ -1829,20 +1994,31 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 	).
 		run(
 			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View) {
-				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+				// TODO(patrick): fix plumbing
+				snapshotTree := storage.NewSnapshotTree(view)
+
+				// this test requires storage limits to be enforced
+				ctx.LimitAccountStorage = true
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 				require.NoError(t, err)
 
-				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-				accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
+				// Bootstrap a ledger, creating accounts with the provided
+				// private keys and the root account.
+				snapshotTree, accounts, err := testutil.CreateAccounts(
+					vm,
+					snapshotTree,
+					privateKeys,
+					chain)
 				require.NoError(t, err)
 
 				txBody := transferTokensTx(chain).
 					AddAuthorizer(accounts[0]).
-					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000_0000))).
-					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
+					AddArgument(jsoncdc.MustEncode(
+						cadence.UFix64(1_0000_0000_0000))).
+					AddArgument(jsoncdc.MustEncode(
+						cadence.NewAddress(chain.ServiceAddress())))
 
 				txBody.SetProposalKey(accounts[0], 0, 0)
 				txBody.SetPayer(accounts[0])
@@ -1853,10 +2029,10 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				executionSnapshot, output, err := vm.RunV2(
 					ctx,
 					fvm.Transaction(txBody, 0),
-					view)
+					snapshotTree)
 				require.NoError(t, err)
 
-				require.NoError(t, view.Merge(executionSnapshot))
+				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				require.True(t, errors.IsCadenceRuntimeError(output.Err))
 
@@ -1864,7 +2040,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				_, output, err = vm.RunV2(
 					ctx,
 					fvm.Transaction(txBody, 0),
-					view)
+					snapshotTree)
 				require.NoError(t, err)
 
 				require.Equal(
