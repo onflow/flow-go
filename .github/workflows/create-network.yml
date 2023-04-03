@@ -1,5 +1,5 @@
 ---
-name: Create Benchnet Network
+name: BN2 - Create Benchnet 2 Network
 
 on:
   workflow_dispatch:
