@@ -30,13 +30,25 @@ func (c *SlashingViolationsConsumer) OnDoubleVotingDetected(vote1 *model.Vote, v
 		Msg("OnDoubleVotingDetected")
 }
 
-func (c *SlashingViolationsConsumer) OnInvalidVoteDetected(vote *model.Vote) {
+func (c *SlashingViolationsConsumer) OnInvalidVoteDetected(err model.InvalidVoteError) {
+	vote := err.Vote
 	c.log.Warn().
 		Uint64("vote_view", vote.View).
 		Hex("voted_block_id", vote.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
+		Str("err", err.Error()).
 		Bool(logging.KeySuspicious, true).
 		Msg("OnInvalidVoteDetected")
+}
+
+func (c *SlashingViolationsConsumer) OnInvalidTimeoutDetected(err model.InvalidTimeoutError) {
+	timeout := err.Timeout
+	c.log.Warn().
+		Uint64("timeout_view", timeout.View).
+		Hex("signer_id", timeout.SignerID[:]).
+		Str("err", err.Error()).
+		Bool(logging.KeySuspicious, true).
+		Msg("OnInvalidTimeoutDetected")
 }
 
 func (c *SlashingViolationsConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal *model.Proposal) {

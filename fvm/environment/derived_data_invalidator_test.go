@@ -242,21 +242,22 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		memKind: memWeight,
 	}
 
-	baseView := delta.NewDeltaView(nil)
+	snapshotTree := storage.NewSnapshotTree(nil)
+
 	ctx := fvm.NewContext(fvm.WithChain(flow.Testnet.Chain()))
 
 	vm := fvm.NewVirtualMachine()
-	err := vm.Run(
+	executionSnapshot, _, err := vm.RunV2(
 		ctx,
 		fvm.Bootstrap(
 			unittest.ServiceAccountPublicKey,
 			fvm.WithExecutionMemoryLimit(memoryLimit),
 			fvm.WithExecutionEffortWeights(computationWeights),
 			fvm.WithExecutionMemoryWeights(memoryWeights)),
-		baseView)
+		snapshotTree)
 	require.NoError(t, err)
 
-	view := baseView.NewChild()
+	view := delta.NewDeltaView(snapshotTree.Append(executionSnapshot))
 	nestedTxn := state.NewTransactionState(view, state.DefaultParameters())
 
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
