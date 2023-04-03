@@ -83,18 +83,30 @@ bootstrap-ci:
 bootstrap-short-epochs:
 	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=10 DKGLEN=50 bootstrap
 
+# Starts the network - must have been bootstrapped first. Builds fresh images.
 .PHONY: start
 start: start-metrics start-flow
+
+# Starts the network, using the most recently built images.
+# Useful for rapid iteration, when no code has changed or only one images needs to be re-built.
+.PHONY: start-cached
+start-cached: start-metrics start-flow-cached
 
 # Starts metrics services
 .PHONY: start-metrics
 start-metrics:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d
 
-# Starts a version of localnet with just flow nodes and without metrics services. This prevents port collision and consumption
-# when these services are not needed.
+# Starts a version of localnet with just flow nodes and without metrics services.
+# This prevents port collision and consumption when these services are not needed.
+# All images are re-built prior to being started.
 .PHONY: start-flow
 start-flow:
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d --build
+
+# Same as start-flow, but most recently built images are used.
+.PHONY: start-flow-cached
+start-flow-cached:
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d
 
 .PHONY: build-flow

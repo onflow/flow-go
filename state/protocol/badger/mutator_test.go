@@ -1941,16 +1941,17 @@ func TestExtendBlockProcessable(t *testing.T) {
 	})
 }
 
-func TestHeaderExtendBlockNotConnected(t *testing.T) {
+// TestFollowerHeaderExtendBlockNotConnected tests adding an orphaned block to the follower state.
+// Specifically, we add 2 blocks, where:
+// first block is added and then finalized;
+// second block is a sibling to the finalized block
+// The Follower should accept this block since tracking of orphan blocks is implemented by another component.
+func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
-		// add 2 blocks, where:
-		// first block is added and then finalized;
-		// second block is a sibling to the finalized block
-		// The Follower should reject this block as an outdated chain extension
 		block1 := unittest.BlockWithParentFixture(head)
 		err = state.ExtendCertified(context.Background(), block1, unittest.CertifyBlock(block1.Header))
 		require.NoError(t, err)
@@ -1961,6 +1962,36 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 		// create a fork at view/height 1 and try to connect it to root
 		block2 := unittest.BlockWithParentFixture(head)
 		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
+		require.NoError(t, err)
+
+		// verify seal not indexed
+		var sealID flow.Identifier
+		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
+		require.NoError(t, err)
+	})
+}
+
+// TestParticipantHeaderExtendBlockNotConnected tests adding an orphaned block to the consensus participant state.
+// Specifically, we add 2 blocks, where:
+// first block is added and then finalized;
+// second block is a sibling to the finalized block
+// The Participant should reject this block as an outdated chain extension
+func TestParticipantHeaderExtendBlockNotConnected(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+
+		block1 := unittest.BlockWithParentFixture(head)
+		err = state.Extend(context.Background(), block1)
+		require.NoError(t, err)
+
+		err = state.Finalize(context.Background(), block1.ID())
+		require.NoError(t, err)
+
+		// create a fork at view/height 1 and try to connect it to root
+		block2 := unittest.BlockWithParentFixture(head)
+		err = state.Extend(context.Background(), block2)
 		require.True(t, st.IsOutdatedExtensionError(err), err)
 
 		// verify seal not indexed
@@ -2077,6 +2108,11 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 
 		// now the guarantee has invalid signer indices: the checksum should have 4 bytes, but it only has 1
 		payload.Guarantees[0].SignerIndices = []byte{byte(1)}
+
+		// create new block that has invalid collection guarantee
+		block = unittest.BlockWithParentFixture(head)
+		block.SetPayload(payload)
+
 		err = state.Extend(context.Background(), block)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
 		require.ErrorIs(t, err, signature.ErrInvalidChecksum)
@@ -2257,6 +2293,39 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		err = fullState.Extend(context.Background(), extend)
 		assert.Error(t, err, "a proposal with invalid timestamp has to be rejected")
 		assert.True(t, st.IsInvalidExtensionError(err), "if timestamp is invalid it should return invalid block error")
+	})
+}
+
+// TestProtocolStateIdempotent tests that both participant and follower states correctly process adding same block twice
+// where second extend doesn't result in an error and effectively is no-op.
+func TestProtocolStateIdempotent(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+	t.Run("follower", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
+			block := unittest.BlockWithParentFixture(head)
+			err := state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+			require.NoError(t, err)
+
+			// same operation should be no-op
+			err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+			require.NoError(t, err)
+		})
+	})
+	t.Run("participant", func(t *testing.T) {
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+			block := unittest.BlockWithParentFixture(head)
+			err := state.Extend(context.Background(), block)
+			require.NoError(t, err)
+
+			// same operation should be no-op
+			err = state.Extend(context.Background(), block)
+			require.NoError(t, err)
+
+			err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+			require.NoError(t, err)
+		})
 	})
 }
 

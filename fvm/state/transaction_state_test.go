@@ -523,3 +523,50 @@ func TestPauseAndResume(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, val)
 }
+
+func TestFinalizeMainTransactionFailWithUnexpectedNestedTransactions(
+	t *testing.T,
+) {
+	txn := newTestTransactionState()
+
+	_, err := txn.BeginNestedTransaction()
+	require.NoError(t, err)
+
+	executionSnapshot, err := txn.FinalizeMainTransaction()
+	require.Error(t, err)
+	require.Nil(t, executionSnapshot)
+}
+
+func TestFinalizeMainTransaction(t *testing.T) {
+	txn := newTestTransactionState()
+
+	id1, err := txn.BeginNestedTransaction()
+	require.NoError(t, err)
+
+	registerId := flow.NewRegisterID("foo", "bar")
+
+	value, err := txn.Get(registerId)
+	require.NoError(t, err)
+	require.Nil(t, value)
+
+	_, err = txn.CommitNestedTransaction(id1)
+	require.NoError(t, err)
+
+	value, err = txn.Get(registerId)
+	require.NoError(t, err)
+	require.Nil(t, value)
+
+	executionSnapshot, err := txn.FinalizeMainTransaction()
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		executionSnapshot.ReadSet,
+		map[flow.RegisterID]struct{}{
+			registerId: struct{}{},
+		})
+
+	// Sanity check state is no longer accessible after FinalizeMainTransaction.
+	_, err = txn.Get(registerId)
+	require.ErrorContains(t, err, "cannot Get on a finalized view")
+}
