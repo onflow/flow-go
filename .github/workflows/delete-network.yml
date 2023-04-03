@@ -10,12 +10,12 @@ on:
       network_id:
         type: string
         required: true
-        description: Input the network ID for the deployment to be deleted
+        description: 'NETWORK ID for the deployment to delete.'
 
       # Allows for the ref to be altered for testing automation changes
       automation_ref:
         type: string
-        description: 'flow-go branch, commit, or tag to use for automation to use for bootstrapping and deployment'
+        description: 'AUTOMATION branch, tag, or commit to use for the deletion.'
         required: false
         default: master
 
@@ -23,7 +23,7 @@ on:
       automation_repo:
         required: true
         type: choice
-        description: Choose the repo to use the public or private repo for automation
+        description: 'AUTOMATION REPO'
         options:
           - onflow/flow-go
           - dapperlabs/flow-go
