@@ -7,8 +7,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/onflow/flow-go/module/metrics"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p/scoring"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestDefaultDecayFunction tests the default decay function used by the peer scorer.
@@ -129,4 +131,16 @@ func TestDefaultDecayFunction(t *testing.T) {
 			assert.Equal(t, got.Decay, tt.want.record.Decay)
 		})
 	}
+}
+
+// newGossipSubAppSpecificScoreRegistry returns a new instance of GossipSubAppSpecificScoreRegistry with default values
+// for the testing purposes.
+func newGossipSubAppSpecificScoreRegistry() *scoring.GossipSubAppSpecificScoreRegistry {
+	return scoring.NewGossipSubAppSpecificScoreRegistry(&scoring.GossipSubAppSpecificScoreRegistryConfig{
+		SizeLimit:     100,
+		Logger:        unittest.Logger(),
+		Collector:     metrics.NewNoopCollector(),
+		DecayFunction: scoring.DefaultDecayFunction(),
+		Penalty:       scoring.DefaultGossipSubCtrlMsgPenaltyValue(),
+	})
 }
