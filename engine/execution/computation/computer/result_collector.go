@@ -153,6 +153,8 @@ func (collector *resultCollector) commitCollection(
 		collector.result.EventsHashes,
 		eventsHash)
 
+	// note: UpdatedRegisters returns sorted list of register entries
+	// thus id computation is deterministic
 	stateDeltaCommitment := collectionExecutionSnapshot.UpdatedRegisters().ID()
 	chunk := flow.NewChunk(
 		collection.blockId,
