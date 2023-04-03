@@ -82,8 +82,8 @@ func NewAppScoreCache(sizeLimit uint32, logger zerolog.Logger, collector module.
 //		and this makes the GossipSub protocol vulnerable if the peer is malicious. As when there is no record of
 //		the application specific Score of a peer, the GossipSub considers the peer to have a Score of 0, and
 //		this does not prevent the GossipSub protocol from connecting to the peer on a topic mesh.
-func (a *AppScoreCache) Add(record AppScoreRecord) error {
-	entityId := flow.HashToID([]byte(record.PeerID)) // HeroCache uses hash of peer.ID as the unique identifier of the entry.
+func (a *AppScoreCache) Add(peerId peer.ID, record AppScoreRecord) error {
+	entityId := flow.HashToID([]byte(peerId)) // HeroCache uses hash of peer.ID as the unique identifier of the entry.
 	switch exists := a.c.Has(entityId); {
 	case exists:
 		_, updated := a.c.Adjust(entityId, func(entry flow.Entity) flow.Entity {
@@ -92,14 +92,14 @@ func (a *AppScoreCache) Add(record AppScoreRecord) error {
 			return appScoreCacheEntry
 		})
 		if !updated {
-			return fmt.Errorf("could not update app Score cache entry for peer %s", record.PeerID.String())
+			return fmt.Errorf("could not update app Score cache entry for peer %s", peerId.String())
 		}
 	case !exists:
 		if added := a.c.Add(appScoreRecordEntity{
 			entityId:       entityId,
 			AppScoreRecord: record,
 		}); !added {
-			return fmt.Errorf("could not add app Score cache entry for peer %s", record.PeerID.String())
+			return fmt.Errorf("could not add app Score cache entry for peer %s", peerId.String())
 		}
 	}
 
@@ -214,11 +214,6 @@ func (a *AppScoreCache) Get(peerID peer.ID) (*AppScoreRecord, error, bool) {
 // It acts as a Score card for a peer in the GossipSub protocol that keeps the
 // application specific Score of the peer and its Decay factor.
 type AppScoreRecord struct {
-	entityId flow.Identifier // the ID of the entry (used to identify the entry in the cache).
-
-	// the peer ID of the peer in the GossipSub protocol.
-	PeerID peer.ID
-
 	// Decay factor of the app specific Score.
 	// the app specific Score is multiplied by the Decay factor every time the Score is updated if the Score is negative.
 	// this is to prevent the Score from being stuck at a negative value.
@@ -234,6 +229,8 @@ type AppScoreRecord struct {
 type appScoreRecordEntity struct {
 	entityId flow.Identifier // the ID of the entry (used to identify the entry in the cache).
 	// lastUpdated is the time at which the entry was last updated.
+	// the peer ID of the peer in the GossipSub protocol.
+	peerID      peer.ID
 	lastUpdated time.Time
 	AppScoreRecord
 }

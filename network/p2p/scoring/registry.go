@@ -102,17 +102,14 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 }
 
 func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(notification *p2p.InvalidControlMessageNotification) {
-	offendingPeerID := notification.PeerID
-
-	if !r.scoreCache.Has(offendingPeerID) {
+	if !r.scoreCache.Has(notification.PeerID) {
 		// record does not exist, we create a new one with the default score of 0.
-		if err := r.scoreCache.Add(netcache.AppScoreRecord{
-			PeerID: offendingPeerID,
-			Decay:  defaultDecay,
-			Score:  0,
+		if err := r.scoreCache.Add(notification.PeerID, netcache.AppScoreRecord{
+			Decay: defaultDecay,
+			Score: 0,
 		}); err != nil {
 			r.logger.Fatal().
-				Str("peer_id", offendingPeerID.String()).
+				Str("peer_id", notification.PeerID.String()).
 				Err(err).
 				Msg("could not add application specific score record to cache")
 			return
@@ -120,10 +117,10 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	}
 
 	lg := r.logger.With().
-		Str("peer_id", offendingPeerID.String()).
+		Str("peer_id", notification.PeerID.String()).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
 
-	record, err := r.scoreCache.Adjust(offendingPeerID, func(record netcache.AppScoreRecord) netcache.AppScoreRecord {
+	record, err := r.scoreCache.Adjust(notification.PeerID, func(record netcache.AppScoreRecord) netcache.AppScoreRecord {
 		switch notification.MsgType {
 		case p2p.CtrlMsgGraft:
 			record.Score -= r.penalty.Graft
@@ -171,7 +168,7 @@ func DefaultDecayFunction() netcache.ReadPreprocessorFunc {
 		// score is negative and below the threshold, we decay it.
 		score, err := GeometricDecay(record.Score, record.Decay, lastUpdated)
 		if err != nil {
-			return record, fmt.Errorf("could not decay application specific score for peer %s: %w", record.PeerID, err)
+			return record, fmt.Errorf("could not decay application specific score: %w", err)
 		}
 		record.Score = score
 		return record, nil
