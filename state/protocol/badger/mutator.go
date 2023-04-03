@@ -857,15 +857,11 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 //
 // Convention:
 //
-//	A <-- ... <-- P(Seal_A) <----- B
-//	              ↑                ↑
-//	block sealing service event    first block of new Epoch phase
-//	for epoch-phase transition     (e.g. EpochSetup phase)
-//	(e.g. EpochSetup event)
+//	A <-- ... <-- C(Seal_A)
 //
-// Per convention, protocol events for epoch phase changes are emitted when
-// the first block of the new phase (eg. EpochSetup phase) is _finalized_.
-// Meaning that the new phase has started.
+// Suppose an EpochSetup service event is emitted in block A. C seals A, therefore
+// we apply the metrics/events when C is finalized. The first block of the EpochSetup
+// phase is block C.
 //
 // This function should only be called when epoch fallback *has not already been triggered*.
 // No errors are expected during normal operation.
@@ -965,27 +961,25 @@ func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered b
 
 // handleEpochServiceEvents handles applying state changes which occur as a result
 // of service events being included in a block payload:
-// * inserting incorporated service events
-// * updating EpochStatus for the candidate block
+//   - inserting incorporated service events
+//   - updating EpochStatus for the candidate block
 //
 // Consider a chain where a service event is emitted during execution of block A.
-// Block B contains a receipt for A. Block C contains a seal for block A. Block
-// D contains a QC for C.
+// Block B contains a receipt for A. Block C contains a seal for block A.
 //
-// A <- B(RA) <- C(SA) <- D
+// A <- .. <- B(RA) <- .. <- C(SA)
 //
 // Service events are included within execution results, which are stored
 // opaquely as part of the block payload in block B. We only validate and insert
-// the typed service event to storage once we have received a valid QC for the
-// block containing the seal for A. This occurs once we mark block D as valid
-// with MarkValid. Because of this, any change to the protocol state introduced
-// by a service event emitted in A would only become visible when querying D or
-// later (D's children).
-// TODO(active-pacemaker) update docs here (remove reference to MarkValid) https://github.com/dapperlabs/flow-go/issues/6254
+// the typed service event to storage once we process C, the block containing the
+// seal for block A. This is because we rely on the sealing subsystem to validate
+// correctness of the service event before processing it.
+// Consequently, any change to the protocol state introduced by a service event
+// emitted in A would only become visible when querying C or later (C's children).
 //
 // This method will only apply service-event-induced state changes when the
-// input block has the form of block D (ie. has a parent, which contains a seal
-// for a block in which a service event was emitted).
+// input block has the form of block C (ie. contains a seal for a block in
+// which a service event was emitted).
 //
 // Return values:
 //   - dbUpdates - If the service events are valid, or there are no service events,
