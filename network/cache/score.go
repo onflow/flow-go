@@ -156,6 +156,16 @@ func (a *AppScoreCache) Adjust(peerID peer.ID, updateFn func(record AppScoreReco
 	return &r, nil
 }
 
+// Has returns true if the application specific Score of a peer is found in the cache, false otherwise.
+// Args:
+// - peerID: the peer ID of the peer in the GossipSub protocol.
+// Returns:
+// - true if the application specific Score of the peer is found in the cache, false otherwise.
+func (a *AppScoreCache) Has(peerID peer.ID) bool {
+	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the entry.
+	return a.c.Has(entityId)
+}
+
 // Get returns the application specific Score of a peer from the cache.
 // Args:
 //
