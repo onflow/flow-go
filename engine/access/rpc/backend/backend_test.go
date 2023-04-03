@@ -167,7 +167,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
-		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit| <- G(S_E)
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
 		epochBuilder.
 			BuildEpoch().
 			CompleteEpoch()
@@ -181,9 +181,9 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 			suite.state.On("AtHeight", height).Return(state.AtHeight(height)).Once()
 		}
 
-		// Take snapshot at height of block D (epoch1.heights[3]) for valid segment and valid snapshot
-		// where it's sealing segment is B <- C <- D
-		snap := state.AtHeight(epoch1.Range()[3])
+		// Take snapshot at height of block D (epoch1.heights[2]) for valid segment and valid snapshot
+		// where it's sealing segment is B <- C
+		snap := state.AtHeight(epoch1.Range()[2])
 		suite.state.On("Final").Return(snap).Once()
 
 		backend := New(
@@ -283,8 +283,8 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 		suite.Require().NoError(err)
 		fmt.Println()
 
-		// we expect the endpoint to return last valid snapshot which is the snapshot at block D (height 3)
-		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[3]))
+		// we expect the endpoint to return last valid snapshot which is the snapshot at block C (height 2)
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[2]))
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedSnapshotBytes, bytes)
 	})
@@ -300,7 +300,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
-		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit| <- G(S_E)
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
 		epochBuilder.
 			BuildEpoch().
 			CompleteEpoch()
@@ -314,11 +314,11 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
 		}
 
-		// Take snapshot at height of block E (epoch1.heights[4]) the sealing segment for this snapshot
-		// is C(S_A) <- D(S_B) |setup| <- E(S_C) which spans the epoch setup phase. This will force
+		// Take snapshot at height of block D (epoch1.heights[3]) the sealing segment for this snapshot
+		// is C(S_A) <- D(S_B) |setup|) which spans the epoch setup phase. This will force
 		// our RPC endpoint to return a snapshot at block D which is the snapshot at the boundary where the phase
 		// transition happens.
-		snap := state.AtHeight(epoch1.Range()[4])
+		snap := state.AtHeight(epoch1.Range()[3])
 		suite.state.On("Final").Return(snap).Once()
 
 		backend := New(
@@ -346,8 +346,8 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
 		suite.Require().NoError(err)
 
-		// we expect the endpoint to return last valid snapshot which is the snapshot at block D (height 3)
-		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[3]))
+		// we expect the endpoint to return last valid snapshot which is the snapshot at block C (height 2)
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[2]))
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedSnapshotBytes, bytes)
 	})
@@ -363,7 +363,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
-		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit| <- G(S_E)
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
 		epochBuilder.BuildEpoch()
 
 		// add more blocks to our state in the commit phase, this will allow
