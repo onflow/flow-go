@@ -4,7 +4,7 @@
 package crypto
 
 import (
-	"crypto/rand"
+	crand "crypto/rand"
 	"encoding/hex"
 	"testing"
 
@@ -15,7 +15,7 @@ import (
 func TestDeterministicKeyGen(t *testing.T) {
 	// 2 keys generated with the same seed should be equal
 	seed := make([]byte, KeyGenSeedMinLen)
-	n, err := rand.Read(seed)
+	n, err := crand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sk1, err := GeneratePrivateKey(BLSBLS12381, seed)
@@ -30,7 +30,7 @@ func TestPRGseeding(t *testing.T) {
 	blsInstance.reInit()
 	// 2 scalars generated with the same seed should be equal
 	seed := make([]byte, KeyGenSeedMinLen)
-	n, err := rand.Read(seed)
+	n, err := crand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	// 1st scalar (wrapped in a private key)
@@ -51,7 +51,8 @@ func TestPRGseeding(t *testing.T) {
 func BenchmarkScalarMultG1G2(b *testing.B) {
 	blsInstance.reInit()
 	seed := make([]byte, securityBits/8)
-	_, _ = rand.Read(seed)
+	_, err := crand.Read(seed)
+	require.NoError(b, err)
 	_ = seedRelic(seed)
 	var expo scalar
 	randZr(&expo)
@@ -139,7 +140,8 @@ func TestSubgroupCheck(t *testing.T) {
 	blsInstance.reInit()
 	// seed Relic PRG
 	seed := make([]byte, securityBits/8)
-	_, _ = rand.Read(seed)
+	_, err := crand.Read(seed)
+	require.NoError(t, err)
 	_ = seedRelic(seed)
 
 	t.Run("G1", func(t *testing.T) {

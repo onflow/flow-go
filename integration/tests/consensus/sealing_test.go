@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"context"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -65,9 +64,6 @@ func (ss *SealingSuite) Verification() *client.GhostClient {
 func (ss *SealingSuite) SetupTest() {
 	ss.log = unittest.LoggerForTest(ss.Suite.T(), zerolog.InfoLevel)
 	ss.log.Info().Msgf("================> SetupTest")
-
-	// seed random generator
-	rand.Seed(time.Now().UnixNano())
 
 	// to collect node confiss...
 	var nodeConfigs []testnet.NodeConfig

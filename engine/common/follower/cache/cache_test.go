@@ -177,7 +177,7 @@ func (s *CacheSuite) TestPruneUpToView() {
 }
 
 // TestConcurrentAdd simulates multiple workers adding batches of blocks out of order.
-// We use next setup:
+// We use the following setup:
 // Number of workers - workers
 // Number of batches submitted by worker - batchesPerWorker
 // Number of blocks in each batch submitted by worker - blocksPerBatch

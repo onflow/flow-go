@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine/common"
 	"github.com/onflow/flow-go/engine/common/follower/cache"
 	"github.com/onflow/flow-go/engine/common/follower/pending_tree"
 	"github.com/onflow/flow-go/model/flow"
@@ -35,9 +34,9 @@ const defaultFinalizedBlocksChannelCapacity = 10
 // defaultPendingBlocksCacheCapacity maximum capacity of cache for pending blocks.
 const defaultPendingBlocksCacheCapacity = 1000
 
-// Core implements main processing logic for follower engine.
+// ComplianceCore implements main processing logic for follower engine.
 // Generally is NOT concurrency safe but some functions can be used in concurrent setup.
-type Core struct {
+type ComplianceCore struct {
 	*component.ComponentManager
 	log                 zerolog.Logger
 	mempoolMetrics      module.MempoolMetrics
@@ -52,11 +51,11 @@ type Core struct {
 	finalizedBlocksChan chan *flow.Header    // delivers finalized blocks to main core worker.
 }
 
-var _ common.FollowerCore = (*Core)(nil)
+var _ complianceCore = (*ComplianceCore)(nil)
 
-// NewCore creates new instance of Core.
+// NewComplianceCore creates new instance of ComplianceCore.
 // No errors expected during normal operations.
-func NewCore(log zerolog.Logger,
+func NewComplianceCore(log zerolog.Logger,
 	mempoolMetrics module.MempoolMetrics,
 	heroCacheCollector module.HeroCacheMetrics,
 	finalizationConsumer hotstuff.FinalizationConsumer,
@@ -65,7 +64,7 @@ func NewCore(log zerolog.Logger,
 	validator hotstuff.Validator,
 	sync module.BlockRequester,
 	tracer module.Tracer,
-) (*Core, error) {
+) (*ComplianceCore, error) {
 	onEquivocation := func(block, otherBlock *flow.Block) {
 		finalizationConsumer.OnDoubleProposeDetected(model.BlockFromFlow(block.Header), model.BlockFromFlow(otherBlock.Header))
 	}
@@ -75,7 +74,7 @@ func NewCore(log zerolog.Logger,
 		return nil, fmt.Errorf("could not query finalized block: %w", err)
 	}
 
-	c := &Core{
+	c := &ComplianceCore{
 		log:                 log.With().Str("engine", "follower_core").Logger(),
 		mempoolMetrics:      mempoolMetrics,
 		state:               state,
@@ -99,15 +98,15 @@ func NewCore(log zerolog.Logger,
 	return c, nil
 }
 
-// OnBlockRange processes a range of connected blocks. The input list must be sequentially ordered forming a chain.
-// Effectively, this method validates the incoming batch, adds it to cache of pending blocks and possibly schedules
-// blocks for further processing if they were certified. Submitting a batch with invalid causes an
-// `ErrDisconnectedBatch` error and the batch is dropped (no-op).
+// OnBlockRange processes a range of connected blocks. It validates the incoming batch, adds it to cache of pending
+// blocks and schedules certified blocks for further processing. The input list must be sequentially ordered forming
+// a chain, i.e. connectedRange[i] is the parent of connectedRange[i+1]. Submitting a disconnected batch results in
+// an `ErrDisconnectedBatch` error and the batch is dropped (no-op).
 // This method is safe to use in concurrent environment.
 // Caution: method might block if internally too many certified blocks are queued in the channel `certifiedRangesChan`.
 // Expected errors during normal operations:
 //   - cache.ErrDisconnectedBatch
-func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error {
+func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error {
 	if len(batch) < 1 {
 		return nil
 	}
@@ -190,8 +189,9 @@ func (c *Core) OnBlockRange(originID flow.Identifier, batch []*flow.Block) error
 
 // processCoreSeqEvents processes events that need to be dispatched on dedicated core's goroutine.
 // Here we process events that need to be sequentially ordered(processing certified blocks and new finalized blocks).
+// Implements `component.ComponentWorker` signature.
 // Is NOT concurrency safe: should be executed by _single dedicated_ goroutine.
-func (c *Core) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (c *ComplianceCore) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	doneSignal := ctx.Done()
@@ -216,9 +216,8 @@ func (c *Core) processCoreSeqEvents(ctx irrecoverable.SignalerContext, ready com
 // OnFinalizedBlock updates local state of pendingCache tree using received finalized block and queues finalized block
 // to be processed by internal goroutine.
 // This function is safe to use in concurrent environment.
-// CAUTION: this function blocks and is therefore not compliant with the `FinalizationConsumer.OnFinalizedBlock`
-// interface. This function should only be executed within the a worker routine.
-func (c *Core) OnFinalizedBlock(final *flow.Header) {
+// CAUTION: this function blocks and hence is not compliant with the `FinalizationConsumer.OnFinalizedBlock` interface.
+func (c *ComplianceCore) OnFinalizedBlock(final *flow.Header) {
 	c.pendingCache.PruneUpToView(final.View)
 
 	// in-case we have already stopped our worker we use a select statement to avoid
@@ -242,7 +241,7 @@ func (c *Core) OnFinalizedBlock(final *flow.Header) {
 //
 // Is NOT concurrency safe: should be executed by _single dedicated_ goroutine.
 // No errors expected during normal operations.
-func (c *Core) processCertifiedBlocks(ctx context.Context, blocks CertifiedBlocks) error {
+func (c *ComplianceCore) processCertifiedBlocks(ctx context.Context, blocks CertifiedBlocks) error {
 	span, ctx := c.tracer.StartSpanFromContext(ctx, trace.FollowerProcessCertifiedBlocks)
 	defer span.End()
 
@@ -256,7 +255,7 @@ func (c *Core) processCertifiedBlocks(ctx context.Context, blocks CertifiedBlock
 
 	// Step 2 & 3: extend protocol state with connected certified blocks and forward them to consensus follower
 	for _, certifiedBlock := range connectedBlocks {
-		s, _ := c.tracer.StartBlockSpan(ctx, certifiedBlock.ID(), trace.FollowerExtendCertified)
+		s, _ := c.tracer.StartBlockSpan(ctx, certifiedBlock.ID(), trace.FollowerExtendProtocolState)
 		err = c.state.ExtendCertified(ctx, certifiedBlock.Block, certifiedBlock.QC)
 		s.End()
 		if err != nil {
@@ -272,7 +271,7 @@ func (c *Core) processCertifiedBlocks(ctx context.Context, blocks CertifiedBlock
 // processFinalizedBlock informs the PendingTree about finalization of the given block.
 // Is NOT concurrency safe: should be executed by _single dedicated_ goroutine.
 // No errors expected during normal operations.
-func (c *Core) processFinalizedBlock(ctx context.Context, finalized *flow.Header) error {
+func (c *ComplianceCore) processFinalizedBlock(ctx context.Context, finalized *flow.Header) error {
 	span, _ := c.tracer.StartSpanFromContext(ctx, trace.FollowerProcessFinalizedBlock)
 	defer span.End()
 

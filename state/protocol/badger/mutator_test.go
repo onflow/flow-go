@@ -1941,8 +1941,8 @@ func TestExtendBlockProcessable(t *testing.T) {
 	})
 }
 
-// TestFollowerHeaderExtendBlockNotConnected tests adding orphan block to the finalized state
-// add 2 blocks, where:
+// TestFollowerHeaderExtendBlockNotConnected tests adding an orphaned block to the follower state.
+// Specifically, we add 2 blocks, where:
 // first block is added and then finalized;
 // second block is a sibling to the finalized block
 // The Follower should accept this block since tracking of orphan blocks is implemented by another component.
@@ -1971,8 +1971,8 @@ func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 	})
 }
 
-// TestParticipantHeaderExtendBlockNotConnected tests adding orphan block to the finalized state
-// add 2 blocks, where:
+// TestParticipantHeaderExtendBlockNotConnected tests adding an orphaned block to the consensus participant state.
+// Specifically, we add 2 blocks, where:
 // first block is added and then finalized;
 // second block is a sibling to the finalized block
 // The Participant should reject this block as an outdated chain extension

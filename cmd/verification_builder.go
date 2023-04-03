@@ -106,7 +106,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 		committee    *committees.Consensus
 		followerCore *hotstuff.FollowerLoop     // follower hotstuff logic
-		followerEng  *follower.Engine           // the follower engine
+		followerEng  *follower.ComplianceEngine // the follower engine
 		collector    module.VerificationMetrics // used to collect metrics of all engines
 	)
 
@@ -371,7 +371,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 			}
 
-			core, err := followereng.NewCore(
+			core, err := followereng.NewComplianceCore(
 				node.Logger,
 				node.Metrics.Mempool,
 				heroCacheCollector,
@@ -386,7 +386,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				return nil, fmt.Errorf("could not create follower core: %w", err)
 			}
 
-			followerEng, err = followereng.New(
+			followerEng, err = followereng.NewComplianceLayer(
 				node.Logger,
 				node.Network,
 				node.Me,

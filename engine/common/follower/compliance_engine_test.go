@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	commonmock "github.com/onflow/flow-go/engine/common/mock"
+	followermock "github.com/onflow/flow-go/engine/common/follower/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -28,7 +28,7 @@ func TestFollowerEngine(t *testing.T) {
 	suite.Run(t, new(EngineSuite))
 }
 
-// EngineSuite wraps CoreSuite and stores additional state needed for Engine specific logic.
+// EngineSuite wraps CoreSuite and stores additional state needed for ComplianceEngine specific logic.
 type EngineSuite struct {
 	suite.Suite
 
@@ -37,12 +37,12 @@ type EngineSuite struct {
 	con       *mocknetwork.Conduit
 	me        *module.Local
 	headers   *storage.Headers
-	core      *commonmock.FollowerCore
+	core      *followermock.ComplianceCore
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
 	errs   <-chan error
-	engine *Engine
+	engine *ComplianceEngine
 }
 
 func (s *EngineSuite) SetupTest() {
@@ -52,7 +52,7 @@ func (s *EngineSuite) SetupTest() {
 	s.me = module.NewLocal(s.T())
 	s.headers = storage.NewHeaders(s.T())
 
-	s.core = commonmock.NewFollowerCore(s.T())
+	s.core = followermock.NewComplianceCore(s.T())
 	s.core.On("Start", mock.Anything).Return().Once()
 	unittest.ReadyDoneify(s.core)
 
@@ -63,7 +63,7 @@ func (s *EngineSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	s.finalized = unittest.BlockHeaderFixture()
-	eng, err := New(
+	eng, err := NewComplianceLayer(
 		unittest.Logger(),
 		s.net,
 		s.me,
@@ -124,6 +124,24 @@ func (s *EngineSuite) TestProcessGossipedBlock() {
 	unittest.AssertClosesBefore(s.T(), done, time.Second)
 }
 
+// TestProcessBlockFromComplianceInterface check that processing single gossiped block using compliance interface results in call to FollowerCore.
+func (s *EngineSuite) TestProcessBlockFromComplianceInterface() {
+	block := unittest.BlockWithParentFixture(s.finalized)
+
+	originID := unittest.IdentifierFixture()
+	done := make(chan struct{})
+	s.core.On("OnBlockRange", originID, []*flow.Block{block}).Return(nil).Run(func(_ mock.Arguments) {
+		close(done)
+	}).Once()
+
+	s.engine.OnBlockProposal(flow.Slashable[*messages.BlockProposal]{
+		OriginID: originID,
+		Message:  messages.NewBlockProposal(block),
+	})
+
+	unittest.AssertClosesBefore(s.T(), done, time.Second)
+}
+
 // TestProcessBatchOfDisconnectedBlocks tests that processing a batch that consists of one connected range and individual blocks
 // results in submitting all of them.
 func (s *EngineSuite) TestProcessBatchOfDisconnectedBlocks() {
@@ -177,7 +195,7 @@ func (s *EngineSuite) TestProcessFinalizedBlock() {
 	// lower than finalized height
 	metricsMock := module.NewEngineMetrics(s.T())
 	metricsMock.On("MessageReceived", mock.Anything, metrics.MessageSyncedBlocks).Return().Once()
-	metricsMock.On("MessageHandled", mock.Anything, metrics.MessageBlockProposal).Run(func(_ mock.Arguments) {
+	metricsMock.On("MessageHandled", mock.Anything, metrics.MessageSyncedBlocks).Run(func(_ mock.Arguments) {
 		close(done)
 	}).Return().Once()
 	s.engine.engMetrics = metricsMock

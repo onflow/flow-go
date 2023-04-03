@@ -689,7 +689,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
 	require.NoError(t, err)
 
-	core, err := follower.NewCore(
+	core, err := follower.NewComplianceCore(
 		node.Log,
 		node.Metrics,
 		node.Metrics,
@@ -701,7 +701,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Tracer,
 	)
 	require.NoError(t, err)
-	followerEng, err := follower.New(
+	followerEng, err := follower.NewComplianceLayer(
 		node.Log,
 		node.Net,
 		node.Me,

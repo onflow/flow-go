@@ -35,10 +35,10 @@ import (
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -362,14 +362,19 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		opts := append(baseOpts, contextOptions...)
 		ctx := fvm.NewContext(opts...)
-		view := delta.NewDeltaView(nil)
+		snapshotTree := storage.NewSnapshotTree(nil)
 
 		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		}
 		bootstrapOpts := append(baseBootstrapOpts, bootstrapOptions...)
-		err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view)
+		executionSnapshot, _, err := vm.RunV2(
+			ctx,
+			fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
+			snapshotTree)
 		require.NoError(t, err)
+
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		comm := new(computermock.ViewCommitter)
 
@@ -407,7 +412,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			context.Background(),
 			unittest.IdentifierFixture(),
 			block,
-			view,
+			snapshotTree,
 			derivedBlockData)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
@@ -547,7 +552,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
 		require.NoError(t, err)
 
-		payload, err := json.Decode(nil, []byte(fixtures.EpochSetupFixtureJSON))
+		payload, err := json.Decode(nil, []byte(unittest.EpochSetupFixtureJSON))
 		require.NoError(t, err)
 
 		serviceEventA, ok := payload.(cadence.Event)
@@ -558,7 +563,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		}
 		serviceEventA.EventType.QualifiedIdentifier = serviceEvents.EpochSetup.QualifiedIdentifier()
 
-		payload, err = json.Decode(nil, []byte(fixtures.EpochCommitFixtureJSON))
+		payload, err = json.Decode(nil, []byte(unittest.EpochCommitFixtureJSON))
 		require.NoError(t, err)
 
 		serviceEventB, ok := payload.(cadence.Event)
@@ -718,18 +723,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		const transactionCount = 2
 		block := generateBlock(collectionCount, transactionCount, rag)
 
-		view := delta.NewDeltaView(nil)
-
-		err = view.Set(
-			flow.AccountStatusRegisterID(flow.BytesToAddress(address.Bytes())),
-			environment.NewAccountStatus().ToBytes())
-		require.NoError(t, err)
+		key := flow.AccountStatusRegisterID(
+			flow.BytesToAddress(address.Bytes()))
+		value := environment.NewAccountStatus().ToBytes()
 
 		result, err := exe.ExecuteBlock(
 			context.Background(),
 			unittest.IdentifierFixture(),
 			block,
-			view,
+			state.MapStorageSnapshot{key: value},
 			derived.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
@@ -818,18 +820,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		block := generateBlock(collectionCount, transactionCount, rag)
 
-		view := delta.NewDeltaView(nil)
-
-		err = view.Set(
-			flow.AccountStatusRegisterID(flow.BytesToAddress(address.Bytes())),
-			environment.NewAccountStatus().ToBytes())
-		require.NoError(t, err)
+		key := flow.AccountStatusRegisterID(
+			flow.BytesToAddress(address.Bytes()))
+		value := environment.NewAccountStatus().ToBytes()
 
 		result, err := exe.ExecuteBlock(
 			context.Background(),
 			unittest.IdentifierFixture(),
 			block,
-			view,
+			state.MapStorageSnapshot{key: value},
 			derived.NewEmptyDerivedBlockData())
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
@@ -1154,13 +1153,11 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	// create empty block, it will have system collection attached while executing
 	block := generateBlock(0, 0, rag)
 
-	view := delta.NewDeltaView(ledger)
-
 	result, err := exe.ExecuteBlock(
 		context.Background(),
 		unittest.IdentifierFixture(),
 		block,
-		view,
+		ledger,
 		derived.NewEmptyDerivedBlockData())
 	assert.NoError(t, err)
 	assert.Len(t, result.StateSnapshots, 1) // +1 system chunk

@@ -86,7 +86,7 @@ func main() {
 		ing               *ingest.Engine
 		mainChainSyncCore *chainsync.Core
 		followerCore      *hotstuff.FollowerLoop // follower hotstuff logic
-		followerEng       *followereng.Engine
+		followerEng       *followereng.ComplianceEngine
 		colMetrics        module.CollectionMetrics
 		err               error
 
@@ -307,7 +307,7 @@ func main() {
 				heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 			}
 
-			core, err := followereng.NewCore(
+			core, err := followereng.NewComplianceCore(
 				node.Logger,
 				node.Metrics.Mempool,
 				heroCacheCollector,
@@ -322,7 +322,7 @@ func main() {
 				return nil, fmt.Errorf("could not create follower core: %w", err)
 			}
 
-			followerEng, err = followereng.New(
+			followerEng, err = followereng.NewComplianceLayer(
 				node.Logger,
 				node.Network,
 				node.Me,
