@@ -2,8 +2,10 @@ package atomic
 
 import (
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -72,4 +74,28 @@ func TestValue_Ptr(t *testing.T) {
 	x, ok = val.Get()
 	require.True(t, ok)
 	require.Nil(t, x)
+}
+
+func BenchmarkValue(b *testing.B) {
+	val := NewValue[*flow.Header]()
+	for i := 0; i < b.N; i++ {
+		val.Set(&flow.Header{Height: uint64(i)})
+		x, _ := val.Get()
+		if x.Height != uint64(i) {
+			b.Fail()
+		}
+	}
+}
+
+// Compare implementation to raw atomic.UnsafePointer.
+// Generics and supporting zero values incurs cost of ~30ns/op (~30%)
+func BenchmarkNoGenerics(b *testing.B) {
+	val := atomic.NewUnsafePointer(unsafe.Pointer(nil))
+	for i := 0; i < b.N; i++ {
+		val.Store((unsafe.Pointer)(&flow.Header{Height: uint64(i)}))
+		x := (*flow.Header)(val.Load())
+		if x.Height != uint64(i) {
+			b.Fail()
+		}
+	}
 }
