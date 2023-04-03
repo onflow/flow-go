@@ -53,6 +53,7 @@ func ComputationResultForBlockFixture(
 			completeBlock.ID(),
 			i,
 			*completeBlock.StartState,
+			unittest.IdentifierFixture(),
 			0,
 			unittest.IdentifierFixture(),
 			*completeBlock.StartState)

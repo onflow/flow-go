@@ -230,6 +230,7 @@ SearchLoop:
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex:      0, // irrelevant for consensus node
 			StartState:           seal.FinalState,
+			StateDeltaCommitment: flow.ZeroID,
 			EventCollection:      flow.ZeroID, // irrelevant for consensus node
 			BlockID:              targetID,
 			TotalComputationUsed: 0, // irrelevant for consensus node

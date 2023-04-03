@@ -392,6 +392,7 @@ func TestChunkIndexIsSet(t *testing.T) {
 		unittest.IdentifierFixture(),
 		i,
 		unittest.StateCommitmentFixture(),
+		unittest.IdentifierFixture(),
 		21,
 		unittest.IdentifierFixture(),
 		unittest.StateCommitmentFixture())
@@ -407,6 +408,7 @@ func TestChunkNumberOfTxsIsSet(t *testing.T) {
 		unittest.IdentifierFixture(),
 		3,
 		unittest.StateCommitmentFixture(),
+		unittest.IdentifierFixture(),
 		i,
 		unittest.IdentifierFixture(),
 		unittest.StateCommitmentFixture())

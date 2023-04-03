@@ -9,6 +9,9 @@ type ChunkBody struct {
 	// start state when starting executing this chunk
 	StartState StateCommitment
 
+	// a commitment over a set of state deltas
+	StateDeltaCommitment Identifier
+
 	//
 	// execution info
 	//
@@ -43,6 +46,7 @@ func NewChunk(
 	blockID Identifier,
 	collectionIndex int,
 	startState StateCommitment,
+	stateDeltaCommitment Identifier,
 	numberOfTransactions int,
 	eventCollection Identifier,
 	endState StateCommitment,
@@ -52,6 +56,7 @@ func NewChunk(
 			BlockID:              blockID,
 			CollectionIndex:      uint(collectionIndex),
 			StartState:           startState,
+			StateDeltaCommitment: stateDeltaCommitment,
 			NumberOfTransactions: uint64(numberOfTransactions),
 			EventCollection:      eventCollection,
 			TotalComputationUsed: 0, // TODO: record gas used

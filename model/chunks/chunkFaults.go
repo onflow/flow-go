@@ -81,6 +81,38 @@ func NewCFNonMatchingFinalState(expected flow.StateCommitment, computed flow.Sta
 		execResID:  execResID}
 }
 
+// CFNonMatchingStateDeltaCommitment is returned when the computed commitment over state delta
+// doesn't match the one provided by the chunk
+type CFNonMatchingStateDeltaCommitment struct {
+	expected   flow.Identifier
+	computed   flow.Identifier
+	chunkIndex uint64
+	execResID  flow.Identifier
+}
+
+func (cf CFNonMatchingStateDeltaCommitment) String() string {
+	return fmt.Sprintf("state delta commitment doesn't match, expected [%s] but computed [%s]", cf.expected.String(), cf.computed.String())
+}
+
+// ChunkIndex returns chunk index of the faulty chunk
+func (cf CFNonMatchingStateDeltaCommitment) ChunkIndex() uint64 {
+	return cf.chunkIndex
+}
+
+// ExecutionResultID returns the execution result identifier including the faulty chunk
+func (cf CFNonMatchingStateDeltaCommitment) ExecutionResultID() flow.Identifier {
+	return cf.execResID
+}
+
+// NewCFNonMatchingStateDeltaCommitment creates a new instance of CFNonMatchingStateDeltaCommitment
+func NewCFNonMatchingStateDeltaCommitment(expected, computed flow.Identifier, chInx uint64, execResID flow.Identifier) *CFNonMatchingStateDeltaCommitment {
+	return &CFNonMatchingStateDeltaCommitment{
+		expected:   expected,
+		computed:   computed,
+		chunkIndex: chInx,
+		execResID:  execResID}
+}
+
 // CFInvalidEventsCollection is returned when computed events collection hash is different from the chunk's one
 type CFInvalidEventsCollection struct {
 	expected   flow.Identifier

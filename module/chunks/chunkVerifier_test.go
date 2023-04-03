@@ -318,10 +318,11 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	// Chunk setup
 	chunk := flow.Chunk{
 		ChunkBody: flow.ChunkBody{
-			CollectionIndex: 0,
-			StartState:      flow.StateCommitment(startState),
-			BlockID:         blockID,
-			EventCollection: EventsMerkleRootHash,
+			CollectionIndex:      0,
+			StartState:           flow.StateCommitment(startState),
+			StateDeltaCommitment: entries.ID(),
+			BlockID:              blockID,
+			EventCollection:      EventsMerkleRootHash,
 		},
 		Index: 0,
 	}

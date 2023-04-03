@@ -153,10 +153,12 @@ func (collector *resultCollector) commitCollection(
 		collector.result.EventsHashes,
 		eventsHash)
 
+	stateDeltaCommitment := collectionExecutionSnapshot.UpdatedRegisters().ID()
 	chunk := flow.NewChunk(
 		collection.blockId,
 		collection.collectionIndex,
 		startState,
+		stateDeltaCommitment,
 		len(collection.Transactions),
 		eventsHash,
 		endState)

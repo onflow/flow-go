@@ -845,8 +845,9 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 		return nil, fmt.Errorf("failed to parse Message end state to Chunk: %w", err)
 	}
 	chunkBody := flow.ChunkBody{
-		CollectionIndex:      uint(m.CollectionIndex),
-		StartState:           startState,
+		CollectionIndex: uint(m.CollectionIndex),
+		StartState:      startState,
+		// StateDeltaCommitment: , // TODO(ramtin): update the protobuff first and then update this
 		EventCollection:      MessageToIdentifier(m.EventCollection),
 		BlockID:              MessageToIdentifier(m.BlockId),
 		TotalComputationUsed: m.TotalComputationUsed,
