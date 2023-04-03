@@ -467,6 +467,15 @@ func (c *Container) TestnetClient() (*Client, error) {
 	return NewClient(c.Addr(GRPCPort), chain)
 }
 
+// SDKClient returns a flow-go-sdk client that connects to this node
+func (c *Container) SDKClient() (*sdkclient.Client, error) {
+	if c.Config.Role != flow.RoleAccess && c.Config.Role != flow.RoleCollection {
+		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
+	}
+
+	return sdkclient.NewClient(c.Addr(GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+}
+
 // GhostClient returns a ghostnode client that connects to this node
 func (c *Container) GhostClient() (*ghostclient.GhostClient, error) {
 	if !c.Config.Ghost {
@@ -476,21 +485,17 @@ func (c *Container) GhostClient() (*ghostclient.GhostClient, error) {
 	return ghostclient.NewGhostClient(c.Addr(GRPCPort))
 }
 
-// SDKClient returns a flow-go-sdk client that connects to this node
-func (c *Container) SDKClient() (*sdkclient.Client, error) {
-	return sdkclient.NewClient(c.Addr(GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
-}
-
 // HealthcheckCallback returns a Docker healthcheck function that pings the node's GRPC
 // service exposed at the given port.
 func (c *Container) HealthcheckCallback() func() error {
 	return func() error {
-		fmt.Println("healthchecking...")
+		fmt.Printf("healthchecking %s...", c.Name())
 
 		ctx := context.Background()
 
 		// The admin server starts last, so it's a rough approximation of the node being ready.
-		err := client.NewAdminClient(c.Addr(AdminPort)).Ping(ctx)
+		adminAddress := fmt.Sprintf("localhost:%s", c.Port(AdminPort))
+		err := client.NewAdminClient(adminAddress).Ping(ctx)
 		if err != nil {
 			return fmt.Errorf("could not ping admin server: %w", err)
 		}
