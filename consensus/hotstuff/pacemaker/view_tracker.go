@@ -8,13 +8,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// viewTracker is a sub-component of the PaceMaker logic, which encapsulates the logic for tracking
-// and updating the current view. In addition, it internally maintains a proof to show that it
-// entered the current view according to protocol rules. For crash resilience, the viewTracker
-// persists its latest change.
+// viewTracker is a sub-component of the PaceMaker, which encapsulates the logic for tracking
+// and updating the current view. For crash resilience, the viewTracker persists its latest
+// internal state.
 //
-// To enter a new view `v`, the Pacemaker must observe a valid QC or TC for view `v-1`.
-// Per convention, the proof has the following structure:
+// In addition, viewTracker maintains and persists a proof to show that it entered the current
+// view according to protocol rules. To enter a new view `v`, the Pacemaker must observe a
+// valid QC or TC for view `v-1`. Per convention, the proof has the following structure:
 //   - If the current view was entered by observing a QC, this QC is returned by `NewestQC()`.
 //     Furthermore, `LastViewTC()` returns nil.
 //   - If the current view was entered by observing a TC, `NewestQC()` returns the newest QC

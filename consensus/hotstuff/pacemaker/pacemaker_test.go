@@ -145,7 +145,6 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
 
 	// skip 10 views
 	tc = helper.MakeTC(helper.WithTCView(tc.View+10),
-		helper.WithTCNewestQC(s.livenessData.NewestQC),
 		helper.WithTCNewestQC(QC(s.livenessData.CurrentView)))
 	expectedLivenessData = &hotstuff.LivenessData{
 		CurrentView: tc.View + 1,

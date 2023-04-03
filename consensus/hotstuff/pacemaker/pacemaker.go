@@ -47,7 +47,7 @@ func New(
 	timeoutController *timeout.Controller,
 	notifier hotstuff.Consumer,
 	persist hotstuff.Persister,
-	pending ...
+	pending ...recoveryInformation,
 ) (*ActivePaceMaker, error) {
 	livenessData, err := persist.GetLivenessData()
 	if err != nil {
@@ -238,6 +238,3 @@ func (p *ActivePaceMaker) BlockRateDelay() time.Duration {
 // Following the "information-driven" approach, we consider potentially older or redundant
 // information as consistent with our already-present knowledge, i.e. as a no-op.
 type recoveryInformation func(p *ActivePaceMaker) error
-
-func
-
