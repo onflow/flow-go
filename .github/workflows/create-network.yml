@@ -28,7 +28,7 @@ on:
         required: false
         default: master
 
-      repo_to_use_for_build:
+      flow_repo:
         required: true
         type: choice
         description: 'FLOW repo'
@@ -123,7 +123,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          repository: ${{ inputs.repo_to_use_for_build }}
+          repository: ${{ inputs.flow_repo }}
           ref: ${{ inputs.flow_repo }}
 
       - name: Configure gcloud
@@ -215,7 +215,7 @@ jobs:
         # As a result, files that are written to disk are owned by root.
         # As a final step, we need to chown the files to the 1001 user which is the runner user for the host
         run: |
-          docker run -v ${GITHUB_WORKSPACE}:/app -i bootstrap /bin/bash -c "cd /app/integration/benchnet2 && make ${{ env.ARGS }} REF_FOR_BOOTSTRAP=${{ inputs.flow_repo }} gen-helm-values && chown -R 1001 /app || chown -R 1001 /app"
+          docker run -v ${GITHUB_WORKSPACE}:/app -i bootstrap /bin/bash -c "cd /app/integration/benchnet2 && make ${{ env.ARGS }} REF_FOR_BOOTSTRAP=${{ inputs.flow_ref }} gen-helm-values && chown -R 1001 /app || chown -R 1001 /app"
 
       - name: Create Bootstrap Secrets
         working-directory: integration/benchnet2/
@@ -227,7 +227,7 @@ jobs:
 
       - name: Benchnet2 Deployment Summary
         run: |
-          SUMMARY=$'# Benchnet2 Deployment Summary\n## Your Network ID is ${{ needs.networkId.outputs.networkId }}\n This Network was built using the following inputs \n * Network ID ${{ inputs.network_id }} \n * Repo Used for Build ${{ inputs.repo_to_use_for_build }} \n * Ref Used for Build ${{ inputs.flow_repo }} \n * Ref Used for Automation ${{ inputs.automation_ref }} \n * Repo Used for automation ${{ inputs.automation_repo }} \n * Skip builds ${{ inputs.skip_builds }}'
+          SUMMARY=$'# Benchnet2 Deployment Summary\n## Your Network ID is ${{ needs.networkId.outputs.networkId }}\n This Network was built using the following inputs \n * Network ID ${{ inputs.network_id }} \n * Flow Repo Used for Build ${{ inputs.flow_repo }} \n * Flow Ref Used for Build ${{ inputs.flow_ref }} \n * Ref Used for Automation ${{ inputs.automation_ref }} \n * Repo Used for automation ${{ inputs.automation_repo }} \n * Skip builds ${{ inputs.skip_builds }}'
           echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
 
       - name: Clean working directory to reduce files filling disk
