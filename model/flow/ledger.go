@@ -222,7 +222,6 @@ func (sd StateDelta) Snapshot() StateDeltaSnapshot {
 	}
 	sort.Sort(keys)
 
-	i = 0
 	res := make(StateDeltaSnapshot, len(sd))
 	for i, key := range keys {
 		res[i] = RegisterEntry{
