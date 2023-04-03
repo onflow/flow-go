@@ -10,7 +10,7 @@ on:
       network_id:
         required: true
         type: string
-        description: ID for network. Must be unique, have only alphanumerirc characters, and be 10 or fewer characters in length.
+        description: 'NETWORK ID for the new deployment. Must be unique, have only alphanumeric characters and dashes (can''t start or end with a dash), and be 20 or fewer characters in length.'
 
       # Allows for the public or private repo to be used for deployment automation
       automation_repo:
@@ -24,7 +24,7 @@ on:
       # Allows for the ref to be altered for testing automation changes
       automation_ref:
         type: string
-        description: 'AUTOMATION branch, tag, or commit to use for bootstrapping and deployment'
+        description: 'AUTOMATION branch, tag, or commit to use for bootstrapping and deployment.'
         required: false
         default: master
 
