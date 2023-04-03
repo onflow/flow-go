@@ -17,7 +17,13 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/utils/atomic"
 )
+
+type cachedHeader struct {
+	id     flow.Identifier
+	header *flow.Header
+}
 
 type State struct {
 	metrics module.ComplianceMetrics
@@ -36,6 +42,8 @@ type State struct {
 	rootHeight uint64
 	// cache the spork root block height because it cannot change over the lifecycle of a protocol state instance
 	sporkRootBlockHeight uint64
+	// cache the latest finalized block
+	cachedFinal atomic.Value[cachedHeader]
 }
 
 var _ protocol.State = (*State)(nil)
@@ -556,6 +564,11 @@ func OpenState(
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
 	state := newState(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses)
+	// populate the protocol state cache
+	err = state.populateCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to populate cache: %w", err)
+	}
 
 	// report last finalized and sealed block height
 	finalSnapshot := state.Final()
@@ -575,11 +588,6 @@ func OpenState(
 	err = state.updateEpochMetrics(finalSnapshot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
-	}
-	// populate the protocol state cache
-	err = state.populateCache()
-	if err != nil {
-		return nil, fmt.Errorf("failed to populate cache: %w", err)
 	}
 
 	return state, nil
@@ -601,14 +609,11 @@ func (state *State) Sealed() protocol.Snapshot {
 }
 
 func (state *State) Final() protocol.Snapshot {
-	// retrieve the latest finalized height
-	var finalized uint64
-	err := state.db.View(operation.RetrieveFinalizedHeight(&finalized))
-	if err != nil {
-		// finalized height must always be set, so all errors here are critical
-		return invalid.NewSnapshot(fmt.Errorf("could not retrieve finalized height: %w", err))
+	cached, ok := state.cachedFinal.Get()
+	if !ok {
+		invalid.NewSnapshotf("internal inconsistency: no cached final header")
 	}
-	return state.AtHeight(finalized)
+	return NewFinalizedSnapshot(state, cached.id, cached.header)
 }
 
 func (state *State) AtHeight(height uint64) protocol.Snapshot {
@@ -663,6 +668,7 @@ func newState(
 			commits:  commits,
 			statuses: statuses,
 		},
+		cachedFinal: atomic.NewValue[cachedHeader](),
 	}
 }
 
@@ -732,7 +738,9 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 }
 
 // populateCache is used after opening or bootstrapping the state to populate the cache.
+// The cache must be populated before the State receives any queries.
 func (state *State) populateCache() error {
+	// cache the root height - fixed over the course of the database lifetime
 	var rootHeight uint64
 	err := state.db.View(operation.RetrieveRootHeight(&rootHeight))
 	if err != nil {
@@ -740,11 +748,37 @@ func (state *State) populateCache() error {
 	}
 	state.rootHeight = rootHeight
 
+	// cache the spork root block height - fixed over the course of the database lifetime
 	sporkRootBlockHeight, err := state.Params().SporkRootBlockHeight()
 	if err != nil {
 		return fmt.Errorf("could not read spork root block height: %w", err)
 	}
 	state.sporkRootBlockHeight = sporkRootBlockHeight
+
+	// cache the initial value for finalized block
+	var finalID flow.Identifier
+	var finalHeader *flow.Header
+	err = state.db.View(func(tx *badger.Txn) error {
+		var height uint64
+		err := operation.RetrieveFinalizedHeight(&height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup finalized height: %w", err)
+		}
+		err = operation.LookupBlockHeight(height, &finalID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup finalized id (height=%d): %w", height, err)
+		}
+		finalHeader, err = state.headers.ByBlockID(finalID)
+		if err != nil {
+			return fmt.Errorf("could not get finalized block (id=%x): %w", finalID, err)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("could not cache finalized header: %w", err)
+	}
+	state.cachedFinal.Set(cachedHeader{finalID, finalHeader})
+
 	return nil
 }
 

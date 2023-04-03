@@ -33,13 +33,34 @@ type Snapshot struct {
 	blockID flow.Identifier // reference block for this snapshot
 }
 
+// TODO docs
+type FinalizedSnapshot struct {
+	Snapshot
+	header *flow.Header
+}
+
 var _ protocol.Snapshot = (*Snapshot)(nil)
+var _ protocol.Snapshot = (*FinalizedSnapshot)(nil)
 
 func NewSnapshot(state *State, blockID flow.Identifier) *Snapshot {
 	return &Snapshot{
 		state:   state,
 		blockID: blockID,
 	}
+}
+
+func NewFinalizedSnapshot(state *State, blockID flow.Identifier, header *flow.Header) *FinalizedSnapshot {
+	return &FinalizedSnapshot{
+		Snapshot: Snapshot{
+			state:   state,
+			blockID: blockID,
+		},
+		header: header,
+	}
+}
+
+func (s *FinalizedSnapshot) Head() (*flow.Header, error) {
+	return s.header, nil
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
