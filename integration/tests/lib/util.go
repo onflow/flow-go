@@ -2,8 +2,8 @@ package lib
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
 	"testing"
 	"time"
 
