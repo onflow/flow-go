@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -204,32 +203,6 @@ func (d RegisterIDs) Less(i, j int) bool {
 
 func (d RegisterIDs) Swap(i, j int) {
 	d[i], d[j] = d[j], d[i]
-}
-
-// StateDelta is a mutable map of value changes to registers
-type StateDelta map[RegisterID]RegisterValue
-
-type StateDeltaSnapshot RegisterEntries
-
-// Snapshot conversts StateDelta into a sorted list of registers
-func (sd StateDelta) Snapshot() StateDeltaSnapshot {
-	// sort keys
-	i := 0
-	keys := make(RegisterIDs, len(sd))
-	for k := range sd {
-		keys[i] = k
-		i++
-	}
-	sort.Sort(keys)
-
-	res := make(StateDeltaSnapshot, len(sd))
-	for i, key := range keys {
-		res[i] = RegisterEntry{
-			Key:   key,
-			Value: sd[key],
-		}
-	}
-	return res
 }
 
 // StorageProof (proof of a read or update to the state, Merkle path of some sort)
