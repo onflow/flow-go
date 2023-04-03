@@ -1,7 +1,6 @@
 package testnet
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -11,40 +10,11 @@ import (
 	"path/filepath"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/integration/client"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 )
-
-// healthcheckAccessGRPC returns a Docker healthcheck function that pings the Access node GRPC
-// service exposed at the given port.
-func healthcheckAccessGRPC(apiPort string) func() error {
-	return func() error {
-		fmt.Println("healthchecking...")
-		c, err := client.NewAccessClient(fmt.Sprintf(":%s", apiPort))
-		if err != nil {
-			return err
-		}
-
-		return c.Ping(context.Background())
-	}
-}
-
-// healthcheckExecutionGRPC returns a Docker healthcheck function that pings the Execution node GRPC
-// service exposed at the given port.
-func healthcheckExecutionGRPC(apiPort string) func() error {
-	return func() error {
-		fmt.Println("healthchecking...")
-		c, err := client.NewExecutionClient(fmt.Sprintf(":%s", apiPort))
-		if err != nil {
-			return err
-		}
-
-		return c.Ping(context.Background())
-	}
-}
 
 // currentUser returns a uid:gid Unix user identifier string for the current
 // user. This is used to run node containers under the same user to avoid

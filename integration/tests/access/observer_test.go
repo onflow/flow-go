@@ -2,7 +2,6 @@ package access
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -86,8 +85,8 @@ func (s *ObserverSuite) SetupTest() {
 		ObserverName:            "observer_1",
 		ObserverImage:           "gcr.io/flow-container-registry/observer:latest",
 		AccessName:              "access_1",
-		AccessPublicNetworkPort: fmt.Sprint(testnet.AccessNodePublicNetworkPort),
-		AccessGRPCSecurePort:    fmt.Sprint(testnet.DefaultSecureGRPCPort),
+		AccessPublicNetworkPort: testnet.PublicNetworkPort,
+		AccessGRPCSecurePort:    testnet.GRPCSecurePort,
 	})
 	require.NoError(s.T(), err)
 

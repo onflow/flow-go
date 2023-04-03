@@ -73,27 +73,25 @@ const (
 	// DefaultExecutionDataServiceDir for the execution data service blobstore.
 	DefaultExecutionDataServiceDir = "/data/execution_data"
 
-	// GRPCPort is the name used for the GRPC API port.
-	GRPCPort = "grpc-port"
-	// GRPCSecurePort is the name used for the secure GRPC API port.
-	GRPCSecurePort = "grpc-secure-port"
-	// GRPCWebPort is the name used for the access node GRPC-Web API (HTTP proxy) port.
-	GRPCWebPort = "grpc-web-port"
-	// RESTPort is the name used for the access node REST API port.
-	RESTPort = "rest-port"
-	// MetricsPort is the name used for the metrics server port
-	MetricsPort = "metrics-port"
-	// AdminPort is the name used for the admin server port
-	AdminPort = "admin-port"
-	// PublicNetworkPort is the name used for the access node network port accessible from outside any docker container
-	PublicNetworkPort = "public-network-port"
+	// GRPCPort is the GRPC API port.
+	GRPCPort = "9000"
+	// GRPCSecurePort is the secure GRPC API port.
+	GRPCSecurePort = "9001"
+	// GRPCWebPort is the access node GRPC-Web API (HTTP proxy) port.
+	GRPCWebPort = "8000"
+	// RESTPort is the access node REST API port.
+	RESTPort = "8070"
+	// MetricsPort is the metrics server port
+	MetricsPort = "8080"
+	// AdminPort is the admin server port
+	AdminPort = "9002"
+	// PublicNetworkPort is the access node network port accessible from outside any docker container
+	PublicNetworkPort = "9876"
+	// DebuggerPort is the go debugger port
+	DebuggerPort = "2345"
 
 	// DefaultFlowPort default gossip network port
 	DefaultFlowPort = 2137
-	// DefaultSecureGRPCPort is the port used to access secure GRPC server running on ANs
-	DefaultSecureGRPCPort = 9001
-	// AccessNodePublicNetworkPort is the port used by access nodes for the public libp2p network
-	AccessNodePublicNetworkPort = 9876
 
 	DefaultViewsInStakingAuction uint64 = 5
 	DefaultViewsInDKGPhase       uint64 = 50
@@ -704,9 +702,6 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 			fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
 			fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", conf.ObserverName),
 			"--bind=0.0.0.0:0",
-			fmt.Sprintf("--rpc-addr=%s:9000", conf.ObserverName),
-			fmt.Sprintf("--secure-rpc-addr=%s:9001", conf.ObserverName),
-			fmt.Sprintf("--http-addr=%s:8000", conf.ObserverName),
 			"--bootstrapdir=/bootstrap",
 			"--datadir=/data/protocol",
 			"--secretsdir=/data/secrets",
@@ -739,11 +734,19 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 		opts:    &containerOpts,
 	}
 
-	hostGRPCPort := nodeContainer.exposePort(t, GRPCPort, "9000/tcp")
-	nodeContainer.exposePort(t, GRPCSecurePort, "9001/tcp")
-	nodeContainer.exposePort(t, GRPCWebPort, "8000/tcp")
+	nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
+	nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
 
-	nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
+	nodeContainer.exposePort(GRPCSecurePort, testingdock.RandomPort(t))
+	nodeContainer.AddFlag("secure-rpc-addr", nodeContainer.ContainerAddr(GRPCSecurePort))
+
+	nodeContainer.exposePort(GRPCWebPort, testingdock.RandomPort(t))
+	nodeContainer.AddFlag("http-addr", nodeContainer.ContainerAddr(GRPCWebPort))
+
+	nodeContainer.exposePort(AdminPort, testingdock.RandomPort(t))
+	nodeContainer.AddFlag("admin-addr", nodeContainer.ContainerAddr(AdminPort))
+
+	nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(nodeContainer.HealthcheckCallback())
 
 	suiteContainer := net.suite.Container(containerOpts)
 	nodeContainer.Container = suiteContainer
@@ -823,19 +826,17 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	if !nodeConf.Ghost {
 		switch nodeConf.Role {
 		case flow.RoleCollection:
-			hostGRPCPort := nodeContainer.exposePort(t, GRPCPort, "9000/tcp")
-			nodeContainer.AddFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
+			nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
+			nodeContainer.AddFlag("ingress-addr", nodeContainer.ContainerAddr(GRPCPort))
 
 			// set a low timeout so that all nodes agree on the current view more quickly
 			nodeContainer.AddFlag("hotstuff-min-timeout", time.Second.String())
-			t.Logf("%v hotstuff startup time will be in 8 seconds: %v", time.Now().UTC(), hotstuffStartupTime)
 			nodeContainer.AddFlag("hotstuff-startup-time", hotstuffStartupTime)
+			t.Logf("%v hotstuff startup time will be in 8 seconds: %v", time.Now().UTC(), hotstuffStartupTime)
 
 		case flow.RoleExecution:
-			hostGRPCPort := nodeContainer.exposePort(t, GRPCPort, "9000/tcp")
-			nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostGRPCPort))
+			nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
+			nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
 
 			// create directories for execution state trie and values in the tmp
 			// host directory.
@@ -861,27 +862,27 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
 
 		case flow.RoleAccess:
-			hostGRPCPort := nodeContainer.exposePort(t, GRPCPort, "9000/tcp")
-			nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
+			nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
+			nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
 
-			nodeContainer.exposePort(t, GRPCSecurePort, "9001/tcp")
-			nodeContainer.AddFlag("secure-rpc-addr", fmt.Sprintf("%s:9001", nodeContainer.Name()))
+			nodeContainer.exposePort(GRPCSecurePort, testingdock.RandomPort(t))
+			nodeContainer.AddFlag("secure-rpc-addr", nodeContainer.ContainerAddr(GRPCSecurePort))
 
-			nodeContainer.exposePort(t, GRPCWebPort, "8000/tcp")
-			nodeContainer.AddFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
+			nodeContainer.exposePort(GRPCWebPort, testingdock.RandomPort(t))
+			nodeContainer.AddFlag("http-addr", nodeContainer.ContainerAddr(GRPCWebPort))
 
-			nodeContainer.exposePort(t, RESTPort, "8070/tcp")
-			nodeContainer.AddFlag("rest-addr", fmt.Sprintf("%s:8070", nodeContainer.Name()))
+			nodeContainer.exposePort(RESTPort, testingdock.RandomPort(t))
+			nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
 
 			// uncomment line below to point the access node exclusively to a single collection node
 			// nodeContainer.AddFlag("static-collection-ingress-addr", "collection_1:9000")
-			nodeContainer.AddFlag("collection-ingress-port", "9000")
+			nodeContainer.AddFlag("collection-ingress-port", GRPCPort)
 
 			if nodeConf.SupportsUnstakedNodes {
-				nodeContainer.exposePort(t, PublicNetworkPort, fmt.Sprintf("%d/tcp", AccessNodePublicNetworkPort))
 				nodeContainer.AddFlag("supports-observer", "true")
-				nodeContainer.AddFlag("public-network-address", fmt.Sprintf("%s:%d", nodeContainer.Name(), AccessNodePublicNetworkPort))
+
+				nodeContainer.exposePort(PublicNetworkPort, testingdock.RandomPort(t))
+				nodeContainer.AddFlag("public-network-address", nodeContainer.ContainerAddr(PublicNetworkPort))
 			}
 
 			// execution-sync is enabled by default
@@ -903,9 +904,16 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				nodeContainer.AddFlag("chunk-alpha", "1")
 			}
 		}
+
+		// enable Admin server for all real nodes
+		nodeContainer.exposePort(AdminPort, testingdock.RandomPort(t))
+		nodeContainer.AddFlag("admin-addr", nodeContainer.ContainerAddr(AdminPort))
+
+		// enable healthchecks for all nodes (via admin server)
+		nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(nodeContainer.HealthcheckCallback())
 	} else {
-		nodeContainer.exposePort(t, GRPCPort, "9000/tcp")
-		nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+		nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
+		nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
 
 		if nodeConf.SupportsUnstakedNodes {
 			// TODO: Currently, it is not possible to create a ghost AN which participates
@@ -917,23 +925,19 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		}
 	}
 
-	// enable Admin server for all nodes
-	nodeContainer.exposePort(t, AdminPort, "9002/tcp")
-	nodeContainer.AddFlag("admin-addr", fmt.Sprintf("%s:9002", nodeContainer.Name()))
-
 	if nodeConf.EnableMetricsServer {
-		nodeContainer.exposePort(t, MetricsPort, "8080/tcp")
+		nodeContainer.exposePort(MetricsPort, testingdock.RandomPort(t))
 	}
 
 	if nodeConf.Debug {
-		nodeContainer.bindPort("2345", "2345/tcp")
+		nodeContainer.exposePort(DebuggerPort, DebuggerPort)
 	}
 
 	if nodeConf.Corrupted {
 		// corrupted nodes are running with a Corrupted Conduit Factory (CCF), hence need to bind their
 		// CCF port to local host, so they can be accessible by the orchestrator network.
 		hostPort := testingdock.RandomPort(t)
-		nodeContainer.bindPort(hostPort, strconv.Itoa(cmd.CorruptNetworkPort))
+		nodeContainer.exposePort(cmd.CorruptNetworkPort, hostPort)
 		net.CorruptedPortMapping[nodeConf.NodeID] = hostPort
 	}
 

@@ -43,12 +43,6 @@ func (s *Suite) AccessClient() *testnet.Client {
 	return client
 }
 
-func (s *Suite) ExecutionClient() *testnet.Client {
-	client, err := s.net.ContainerByID(s.exe1ID).TestnetClient()
-	require.NoError(s.T(), err, "could not get execution client")
-	return client
-}
-
 type AdminCommandRequest struct {
 	CommandName string `json:"commandName"`
 	Data        any    `json:"data"`

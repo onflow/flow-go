@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/dapperlabs/testingdock"
@@ -24,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/crypto"
 	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/integration/client"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -146,34 +146,36 @@ type Container struct {
 	opts    *testingdock.ContainerOpts
 }
 
-// Addr returns the host-accessible listening address of the container for the
-// given port name. Panics if the port does not exist.
-func (c *Container) Addr(portName string) string {
-	return fmt.Sprintf(":%s", c.Port(portName))
+// Addr returns the host-accessible listening address of the container for the given container port.
+// Panics if the port was not exposed.
+func (c *Container) Addr(containerPort string) string {
+	return fmt.Sprintf(":%s", c.Port(containerPort))
 }
 
-// Port returns the host-accessible port of the container for the given port name
-func (c *Container) Port(name string) string {
-	port, ok := c.Ports[name]
+// ContainerAddr returns the container address for the provided port
+// Panics if the port was not exposed.
+func (c *Container) ContainerAddr(containerPort string) string {
+	return fmt.Sprintf("%s:%s", c.Name(), containerPort)
+}
+
+// Port returns the container's host port for the given container port.
+// Panics if the port was not exposed.
+func (c *Container) Port(containerPort string) string {
+	port, ok := c.Ports[containerPort]
 	if !ok {
-		panic(fmt.Sprintf("port %s is not registered for %s", name, c.Config.ContainerName))
+		panic(fmt.Sprintf("port %s is not registered for %s", containerPort, c.Config.ContainerName))
 	}
 	return port
 }
 
-// exposePort generates a random host port for the provided container port, configures the bind,
-// and adds it to the Ports list.
-func (c *Container) exposePort(t *testing.T, portName, containerPort string) string {
-	hostPort := testingdock.RandomPort(t)
-	c.bindPort(hostPort, containerPort)
-	c.Ports[portName] = hostPort
-
-	return hostPort
+func (c *Container) exposePort(containerPort, hostPort string) {
+	c.bindPort(containerPort, hostPort)
+	c.Ports[containerPort] = hostPort
 }
 
 // bindPort exposes the given container port and binds it to the given host port.
 // If no protocol is specified, assumes TCP.
-func (c *Container) bindPort(hostPort, containerPort string) {
+func (c *Container) bindPort(containerPort, hostPort string) {
 
 	// use TCP protocol if none specified
 	containerNATPort := nat.Port(containerPort)
@@ -455,11 +457,17 @@ func (c *Container) waitForCondition(ctx context.Context, condition func(*types.
 	}
 }
 
+// TestnetClient returns a testnet client that connects to this node
 func (c *Container) TestnetClient() (*Client, error) {
+	if c.Config.Role != flow.RoleAccess && c.Config.Role != flow.RoleCollection {
+		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
+	}
+
 	chain := c.net.Root().Header.ChainID.Chain()
 	return NewClient(c.Addr(GRPCPort), chain)
 }
 
+// GhostClient returns a ghostnode client that connects to this node
 func (c *Container) GhostClient() (*ghostclient.GhostClient, error) {
 	if !c.Config.Ghost {
 		return nil, fmt.Errorf("container is not a ghost node")
@@ -468,6 +476,48 @@ func (c *Container) GhostClient() (*ghostclient.GhostClient, error) {
 	return ghostclient.NewGhostClient(c.Addr(GRPCPort))
 }
 
+// SDKClient returns a flow-go-sdk client that connects to this node
 func (c *Container) SDKClient() (*sdkclient.Client, error) {
 	return sdkclient.NewClient(c.Addr(GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+}
+
+// HealthcheckCallback returns a Docker healthcheck function that pings the node's GRPC
+// service exposed at the given port.
+func (c *Container) HealthcheckCallback() func() error {
+	return func() error {
+		fmt.Println("healthchecking...")
+
+		ctx := context.Background()
+
+		// The admin server starts last, so it's a rough approximation of the node being ready.
+		err := client.NewAdminClient(c.Addr(AdminPort)).Ping(ctx)
+		if err != nil {
+			return fmt.Errorf("could not ping admin server: %w", err)
+		}
+
+		// also ping the GRPC server if it's enabled
+		if _, ok := c.Ports[GRPCPort]; !ok {
+			return nil
+		}
+
+		switch c.Config.Role {
+		case flow.RoleExecution:
+			c, err := client.NewExecutionClient(c.Addr(GRPCPort))
+			if err != nil {
+				return fmt.Errorf("could not create execution client: %w", err)
+			}
+			defer c.Close()
+
+			return c.Ping(ctx)
+
+		default:
+			c, err := client.NewAccessClient(c.Addr(GRPCPort))
+			if err != nil {
+				return fmt.Errorf("could not create access client: %w", err)
+			}
+			defer c.Close()
+
+			return c.Ping(ctx)
+		}
+	}
 }
