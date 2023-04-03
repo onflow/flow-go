@@ -85,6 +85,8 @@ const (
 	MetricsPort = "8080"
 	// AdminPort is the admin server port
 	AdminPort = "9002"
+	// ExecutionStatePort is the execution state server port
+	ExecutionStatePort = "9003"
 	// PublicNetworkPort is the access node network port accessible from outside any docker container
 	PublicNetworkPort = "9876"
 	// DebuggerPort is the go debugger port
@@ -874,13 +876,16 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.exposePort(RESTPort, testingdock.RandomPort(t))
 			nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
 
+			if nodeContainer.IsFlagSet("execution-data-sync-enabled") {
+				nodeContainer.exposePort(ExecutionStatePort, testingdock.RandomPort(t))
+				nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(ExecutionStatePort))
+			}
+
 			// uncomment line below to point the access node exclusively to a single collection node
 			// nodeContainer.AddFlag("static-collection-ingress-addr", "collection_1:9000")
 			nodeContainer.AddFlag("collection-ingress-port", GRPCPort)
 
-			if nodeConf.SupportsUnstakedNodes {
-				nodeContainer.AddFlag("supports-observer", "true")
-
+			if nodeContainer.IsFlagSet("supports-observer") {
 				nodeContainer.exposePort(PublicNetworkPort, testingdock.RandomPort(t))
 				nodeContainer.AddFlag("public-network-address", nodeContainer.ContainerAddr(PublicNetworkPort))
 			}
@@ -915,7 +920,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
 		nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
 
-		if nodeConf.SupportsUnstakedNodes {
+		if nodeContainer.IsFlagSet("supports-observer") {
 			// TODO: Currently, it is not possible to create a ghost AN which participates
 			// in the public network, because connection gating is enabled by default and
 			// therefore the ghost node will deny incoming connections from all consensus
@@ -1263,14 +1268,13 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 		)
 
 		containerConf := ContainerConfig{
-			NodeInfo:              info,
-			ContainerName:         name,
-			LogLevel:              conf.LogLevel,
-			Ghost:                 conf.Ghost,
-			AdditionalFlags:       conf.AdditionalFlags,
-			Debug:                 conf.Debug,
-			SupportsUnstakedNodes: conf.SupportsUnstakedNodes,
-			Corrupted:             conf.Corrupted,
+			NodeInfo:        info,
+			ContainerName:   name,
+			LogLevel:        conf.LogLevel,
+			Ghost:           conf.Ghost,
+			AdditionalFlags: conf.AdditionalFlags,
+			Debug:           conf.Debug,
+			Corrupted:       conf.Corrupted,
 		}
 
 		confs = append(confs, containerConf)

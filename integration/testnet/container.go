@@ -50,14 +50,13 @@ func init() {
 type ContainerConfig struct {
 	bootstrap.NodeInfo
 	// Corrupted indicates a container is running a binary implementing a malicious node
-	Corrupted             bool
-	ContainerName         string
-	LogLevel              zerolog.Level
-	Ghost                 bool
-	AdditionalFlags       []string
-	Debug                 bool
-	SupportsUnstakedNodes bool
-	EnableMetricsServer   bool
+	Corrupted           bool
+	ContainerName       string
+	LogLevel            zerolog.Level
+	Ghost               bool
+	AdditionalFlags     []string
+	Debug               bool
+	EnableMetricsServer bool
 }
 
 func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, machineAccountAddr sdk.Address, machineAccountKey encodable.MachineAccountPrivKey, role flow.Role) error {
@@ -107,15 +106,14 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 	)
 
 	containerConf := ContainerConfig{
-		NodeInfo:              info,
-		ContainerName:         nodeName,
-		LogLevel:              conf.LogLevel,
-		Ghost:                 conf.Ghost,
-		AdditionalFlags:       conf.AdditionalFlags,
-		Debug:                 conf.Debug,
-		SupportsUnstakedNodes: conf.SupportsUnstakedNodes,
-		EnableMetricsServer:   conf.EnableMetricsServer,
-		Corrupted:             conf.Corrupted,
+		NodeInfo:            info,
+		ContainerName:       nodeName,
+		LogLevel:            conf.LogLevel,
+		Ghost:               conf.Ghost,
+		AdditionalFlags:     conf.AdditionalFlags,
+		Debug:               conf.Debug,
+		EnableMetricsServer: conf.EnableMetricsServer,
+		Corrupted:           conf.Corrupted,
 	}
 
 	return containerConf
