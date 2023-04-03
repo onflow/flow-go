@@ -82,28 +82,12 @@ func NewAppScoreCache(sizeLimit uint32, logger zerolog.Logger, collector module.
 //		and this makes the GossipSub protocol vulnerable if the peer is malicious. As when there is no record of
 //		the application specific Score of a peer, the GossipSub considers the peer to have a Score of 0, and
 //		this does not prevent the GossipSub protocol from connecting to the peer on a topic mesh.
-func (a *AppScoreCache) Add(peerId peer.ID, record AppScoreRecord) error {
+func (a *AppScoreCache) Add(peerId peer.ID, record AppScoreRecord) bool {
 	entityId := flow.HashToID([]byte(peerId)) // HeroCache uses hash of peer.ID as the unique identifier of the entry.
-	switch exists := a.c.Has(entityId); {
-	case exists:
-		_, updated := a.c.Adjust(entityId, func(entry flow.Entity) flow.Entity {
-			appScoreCacheEntry := entry.(appScoreRecordEntity)
-			appScoreCacheEntry.AppScoreRecord = record
-			return appScoreCacheEntry
-		})
-		if !updated {
-			return fmt.Errorf("could not update app Score cache entry for peer %s", peerId.String())
-		}
-	case !exists:
-		if added := a.c.Add(appScoreRecordEntity{
-			entityId:       entityId,
-			AppScoreRecord: record,
-		}); !added {
-			return fmt.Errorf("could not add app Score cache entry for peer %s", peerId.String())
-		}
-	}
-
-	return nil
+	return a.c.Add(appScoreRecordEntity{
+		entityId:       entityId,
+		AppScoreRecord: record,
+	})
 }
 
 // Adjust adjusts the application specific Score of a peer in the cache.
