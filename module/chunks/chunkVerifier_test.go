@@ -143,6 +143,20 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	assert.True(s.T(), ok)
 }
 
+// TestWrongEndState tests verification covering the case
+// the state delta commitment doesn't match the one provided by the chunks
+func (s *ChunkVerifierTestSuite) TestNonMatchingStateDeltaCommitment() {
+	vch := GetBaselineVerifiableChunk(s.T(), "nonMatchingStateDelta", false)
+	assert.NotNil(s.T(), vch)
+	vch.Chunk.StateDeltaCommitment = flow.ZeroID
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
+	assert.Nil(s.T(), err)
+	assert.NotNil(s.T(), chFaults)
+	assert.Nil(s.T(), spockSecret)
+	_, ok := chFaults.(*chunksmodels.CFNonMatchingStateDeltaCommitment)
+	assert.True(s.T(), ok)
+}
+
 // TestFailedTx tests verification behavior in case
 // of failed transaction. if a transaction fails, it should
 // still change the state commitment.

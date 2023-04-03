@@ -283,17 +283,18 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, chmodels.NewCFMissingRegisterTouch(nil, chIndex, execResID, problematicTx), nil
 	}
 
-	// check if the delta commitment matches what reported in chunk
-	stateDeltaCommitment := chunkExecutionSnapshot.UpdatedRegisters().ID()
-	if stateDeltaCommitment != chunk.StateDeltaCommitment {
-		return nil, chmodels.NewCFNonMatchingStateDeltaCommitment(chunk.StateDeltaCommitment, stateDeltaCommitment, chIndex, execResID), nil
-	}
-
 	// TODO check if exec node provided register touches that was not used (no read and no update)
 	// check if the end state commitment mentioned in the chunk matches
 	// what the partial trie is providing.
 	if flow.StateCommitment(expEndStateComm) != endState {
 		return nil, chmodels.NewCFNonMatchingFinalState(flow.StateCommitment(expEndStateComm), endState, chIndex, execResID), nil
 	}
+
+	// check if the delta commitment matches what reported in chunk
+	stateDeltaCommitment := chunkExecutionSnapshot.UpdatedRegisters().ID()
+	if stateDeltaCommitment != chunk.StateDeltaCommitment {
+		return nil, chmodels.NewCFNonMatchingStateDeltaCommitment(chunk.StateDeltaCommitment, stateDeltaCommitment, chIndex, execResID), nil
+	}
+
 	return chunkExecutionSnapshot.SpockSecret, nil, nil
 }
