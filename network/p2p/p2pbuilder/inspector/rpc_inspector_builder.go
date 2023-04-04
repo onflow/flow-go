@@ -96,6 +96,7 @@ func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier
 		sporkID:          sporkID,
 		inspectorsConfig: inspectorsConfig,
 		distributor:      distributor,
+		netMetrics:       metrics.NewNoopCollector(),
 		metricsEnabled:   p2p.MetricsDisabled,
 		publicNetwork:    p2p.PublicNetworkEnabled,
 	}
