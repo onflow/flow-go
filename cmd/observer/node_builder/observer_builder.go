@@ -858,7 +858,6 @@ func (builder *ObserverServiceBuilder) initPublicLibP2PFactory(networkKey crypto
 			builder.IdentityProvider,
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
-		//builder.GossipSubInspectorNotifDistributor = cmd.BuildGossipsubRPCValidationInspectorNotificationDisseminator(builder.GossipSubRPCInspectorNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
 		rpcInspectors, err := cmd.BuildGossipSubRPCInspectors(
 			builder.Logger,
 			builder.SporkID,
