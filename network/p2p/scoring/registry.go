@@ -79,6 +79,18 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	Penalty       GossipSubCtrlMsgPenaltyValue
 }
 
+func WithGossipSubAppSpecificScoreRegistryPenalty(penalty GossipSubCtrlMsgPenaltyValue) func(registry *GossipSubAppSpecificScoreRegistry) {
+	return func(registry *GossipSubAppSpecificScoreRegistry) {
+		registry.penalty = penalty
+	}
+}
+
+func WithScoreCache(cache *netcache.AppScoreCache) func(registry *GossipSubAppSpecificScoreRegistry) {
+	return func(registry *GossipSubAppSpecificScoreRegistry) {
+		registry.scoreCache = cache
+	}
+}
+
 func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig, opts ...func(registry *GossipSubAppSpecificScoreRegistry)) *GossipSubAppSpecificScoreRegistry {
 	cache := netcache.NewAppScoreCache(config.SizeLimit, config.Logger, config.Collector, config.DecayFunction)
 	reg := &GossipSubAppSpecificScoreRegistry{
@@ -106,7 +118,7 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 			return 0
 		}
 		if !ok {
-			init := initAppScoreRecord()
+			init := InitAppScoreRecordState()
 			initialized := r.scoreCache.Add(pid, init)
 			r.logger.Trace().
 				Bool("initialized", initialized).
@@ -127,7 +139,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	// try initializing the application specific score for the peer if it is not yet initialized.
 	// this is done to avoid the case where the peer is not yet cached and the application specific score is not yet initialized.
 	// initialization is gone successful only if the peer is not yet cached.
-	initialized := r.scoreCache.Add(notification.PeerID, initAppScoreRecord())
+	initialized := r.scoreCache.Add(notification.PeerID, InitAppScoreRecordState())
 	lg.Trace().Bool("initialized", initialized).Msg("initialization attempt for application specific")
 
 	record, err := r.scoreCache.Adjust(notification.PeerID, func(record netcache.AppScoreRecord) netcache.AppScoreRecord {
@@ -186,7 +198,7 @@ func DefaultDecayFunction() netcache.ReadPreprocessorFunc {
 	}
 }
 
-func initAppScoreRecord() netcache.AppScoreRecord {
+func InitAppScoreRecordState() netcache.AppScoreRecord {
 	return netcache.AppScoreRecord{
 		Decay: defaultDecay,
 		Score: 0,
