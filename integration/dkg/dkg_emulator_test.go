@@ -168,8 +168,6 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 
 	// shuffle the signatures and indices before constructing the group
 	// signature (since it only uses the first half signatures)
-	seed := time.Now().UnixNano()
-	rand.Seed(seed)
 	rand.Shuffle(len(signatures), func(i, j int) {
 		signatures[i], signatures[j] = signatures[j], signatures[i]
 		indices[i], indices[j] = indices[j], indices[i]

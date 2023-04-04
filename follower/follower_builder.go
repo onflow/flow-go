@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
@@ -30,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/buffer"
 	synchronization "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -61,7 +61,6 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
-	storage "github.com/onflow/flow-go/storage/badger"
 )
 
 // FlowBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -123,7 +122,7 @@ type FollowerServiceBuilder struct {
 	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
-	FollowerEng *followereng.Engine
+	FollowerEng *followereng.ComplianceEngine
 	SyncEng     *synceng.Engine
 
 	peerID peer.ID
@@ -229,32 +228,40 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 
 func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBuilder {
 	builder.Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// initialize cleaner for DB
-		cleaner := storage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-		conCache := buffer.NewPendingBlocks()
+		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if node.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
+		}
 
-		followerEng, err := follower.New(
+		core, err := followereng.NewComplianceCore(
 			node.Logger,
-			node.Network,
-			node.Me,
-			node.Metrics.Engine,
 			node.Metrics.Mempool,
-			cleaner,
-			node.Storage.Headers,
-			node.Storage.Payloads,
+			heroCacheCollector,
+			builder.FinalizationDistributor,
 			builder.FollowerState,
-			conCache,
 			builder.FollowerCore,
 			builder.Validator,
 			builder.SyncCore,
 			node.Tracer,
-			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
+			compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create follower core: %w", err)
+		}
+
+		builder.FollowerEng, err = followereng.NewComplianceLayer(
+			node.Logger,
+			node.Network,
+			node.Me,
+			node.Metrics.Engine,
+			node.Storage.Headers,
+			builder.Finalized,
+			core,
 			follower.WithChannel(channels.PublicReceiveBlocks),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
-		builder.FollowerEng = followerEng
 
 		return builder.FollowerEng, nil
 	})
@@ -345,6 +352,7 @@ func FlowConsensusFollowerService(opts ...FollowerOption) *FollowerServiceBuilde
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
+	ret.FinalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(ret.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	ret.FlowNodeBuilder.SkipNwAddressBasedValidations = true

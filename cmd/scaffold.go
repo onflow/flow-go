@@ -894,6 +894,10 @@ func (fnb *FlowNodeBuilder) initDB() error {
 		return nil
 	})
 
+	fnb.Component("badger log cleaner", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		return bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCWaitDuration), nil
+	})
+
 	return nil
 }
 

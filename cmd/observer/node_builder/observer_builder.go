@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
@@ -41,7 +42,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -185,7 +185,7 @@ type ObserverServiceBuilder struct {
 	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
-	FollowerEng *followereng.Engine
+	FollowerEng *followereng.ComplianceEngine
 	SyncEng     *synceng.Engine
 
 	// Public network
@@ -352,32 +352,39 @@ func (builder *ObserverServiceBuilder) buildFollowerCore() *ObserverServiceBuild
 
 func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBuilder {
 	builder.Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// initialize cleaner for DB
-		cleaner := bstorage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-		conCache := buffer.NewPendingBlocks()
-
-		followerEng, err := follower.New(
+		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if node.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
+		}
+		core, err := followereng.NewComplianceCore(
 			node.Logger,
-			node.Network,
-			node.Me,
-			node.Metrics.Engine,
 			node.Metrics.Mempool,
-			cleaner,
-			node.Storage.Headers,
-			node.Storage.Payloads,
+			heroCacheCollector,
+			builder.FinalizationDistributor,
 			builder.FollowerState,
-			conCache,
 			builder.FollowerCore,
 			builder.Validator,
 			builder.SyncCore,
 			node.Tracer,
-			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
+			compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create follower core: %w", err)
+		}
+
+		builder.FollowerEng, err = followereng.NewComplianceLayer(
+			node.Logger,
+			node.Network,
+			node.Me,
+			node.Metrics.Engine,
+			node.Storage.Headers,
+			builder.Finalized,
+			core,
 			follower.WithChannel(channels.PublicReceiveBlocks),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
-		builder.FollowerEng = followerEng
 
 		return builder.FollowerEng, nil
 	})
@@ -555,6 +562,7 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String()),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
+	anb.FinalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	anb.FlowNodeBuilder.SkipNwAddressBasedValidations = true
