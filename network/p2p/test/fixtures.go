@@ -30,11 +30,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/distributor"
-	"github.com/onflow/flow-go/network/p2p/inspector"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -61,11 +58,8 @@ func NodeFixture(
 ) (p2p.LibP2PNode, flow.Identity) {
 	// default parameters
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
-	defaultRPCValidationInpectorCfg := inspectorbuilder.DefaultRPCValidationConfig()
-	rpcInspectorNotifDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(logger)
-	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(metrics.NewNoopCollector(), logger)
-	metricsInspector := inspector.NewControlMsgMetricsInspector(logger, gossipSubMetrics, inspector.DefaultControlMsgMetricsInspectorNumberOfWorkers)
-	validationInspector := validation.NewControlMsgValidationInspector(logger, sporkID, defaultRPCValidationInpectorCfg, rpcInspectorNotifDistributor)
+	rpcInspectors, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(logger)).Build()
+	require.NoError(t, err)
 	parameters := &NodeFixtureParameters{
 		HandlerFunc:                      func(network.Stream) {},
 		Unicasts:                         nil,
@@ -77,7 +71,7 @@ func NodeFixture(
 		Metrics:                          metrics.NewNoopCollector(),
 		ResourceManager:                  testutils.NewResourceManager(t),
 		GossipSubPeerScoreTracerInterval: 0, // disabled by default
-		GossipSubRPCInspectors:           []p2p.GossipSubRPCInspector{metricsInspector, validationInspector},
+		GossipSubRPCInspectors:           rpcInspectors,
 	}
 
 	for _, opt := range opts {
