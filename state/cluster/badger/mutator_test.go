@@ -17,6 +17,7 @@ import (
 	model "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/cluster"
@@ -37,11 +38,13 @@ type MutatorSuite struct {
 	db    *badger.DB
 	dbdir string
 
-	genesis *model.Block
-	chainID flow.ChainID
+	genesis      *model.Block
+	chainID      flow.ChainID
+	epochCounter uint64
 
 	// protocol state for reference blocks for transactions
 	protoState   protocol.FollowerState
+	epochLookup  *mockmodule.EpochLookup
 	protoGenesis *flow.Header
 
 	state cluster.MutableState
@@ -60,29 +63,30 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
+	// just bootstrap with a genesis block, we'll use this as reference
+	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	genesis, result, seal := unittest.BootstrapFixture(participants)
+	// ensure we don't enter a new epoch for tests that build many blocks
+	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.Header.View + 100000
+	seal.ResultID = result.ID()
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
+	rootSnapshot, err := inmem.SnapshotFromBootstrapState(genesis, result, seal, qc)
+	require.NoError(suite.T(), err)
+	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
+
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	headers, _, seals, index, conPayloads, blocks, qcs, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
+	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
 
-	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
+	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.NoError(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, tracer, headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, tracer, headers, colPayloads, suite.epochLookup)
 	suite.Assert().Nil(err)
 	consumer := events.NewNoop()
-
-	// just bootstrap with a genesis block, we'll use this as reference
-	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	genesis, result, seal := unittest.BootstrapFixture(participants)
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
-	// ensure we don't enter a new epoch for tests that build many blocks
-	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.Header.View + 100000
-	seal.ResultID = result.ID()
-
-	rootSnapshot, err := inmem.SnapshotFromBootstrapState(genesis, result, seal, qc)
-	require.NoError(suite.T(), err)
 
 	suite.protoGenesis = genesis.Header
 
@@ -168,21 +172,21 @@ func TestMutator(t *testing.T) {
 func (suite *MutatorSuite) TestBootstrap_InvalidHeight() {
 	suite.genesis.Header.Height = 1
 
-	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
+	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidParentHash() {
 	suite.genesis.Header.ParentID = unittest.IdentifierFixture()
 
-	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
+	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidPayloadHash() {
 	suite.genesis.Header.PayloadHash = unittest.IdentifierFixture()
 
-	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
+	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Assert().Error(err)
 }
 
@@ -190,7 +194,7 @@ func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
 	// this is invalid because genesis collection should be empty
 	suite.genesis.Payload = unittest.ClusterPayloadFixture(2)
 
-	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
+	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Assert().Error(err)
 }
 

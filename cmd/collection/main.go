@@ -78,6 +78,7 @@ func main() {
 		rpcConf                 rpc.Config
 		clusterComplianceConfig modulecompliance.Config
 
+		epochLookup             *epochs.EpochLookup         // encapsulates EECC-aware view->epoch lookup
 		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
 		finalizationDistributor *pubsub.FinalizationDistributor
 		finalizedHeader         *consync.FinalizedHeaderCache
@@ -425,10 +426,18 @@ func main() {
 			)
 			return push, err
 		}).
+		Component("epoch lookup", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			epochLookup, err = epochs.NewEpochLookup(node.State)
+			if err != nil {
+				return nil, err
+			}
+			node.ProtocolEvents.AddConsumer(epochLookup)
+			return epochLookup, nil
+		}).
 		// Epoch manager encapsulates and manages epoch-dependent engines as we
 		// transition between epochs
 		Component("epoch manager", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
+			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer, epochLookup)
 			if err != nil {
 				return nil, err
 			}

@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/cluster"
 	clusterkv "github.com/onflow/flow-go/state/cluster/badger"
@@ -40,8 +41,9 @@ type BuilderSuite struct {
 	db    *badger.DB
 	dbdir string
 
-	genesis *model.Block
-	chainID flow.ChainID
+	genesis      *model.Block
+	chainID      flow.ChainID
+	epochCounter uint64
 
 	headers  *storage.Headers
 	payloads *storage.ClusterPayloads
@@ -50,7 +52,8 @@ type BuilderSuite struct {
 	state cluster.MutableState
 
 	// protocol state for reference blocks for transactions
-	protoState protocol.FollowerState
+	protoState  protocol.FollowerState
+	epochLookup *mockmodule.EpochLookup
 
 	pool    mempool.Transactions
 	builder *builder.Builder
@@ -78,15 +81,7 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.headers = headers
 	suite.blocks = blocks
 	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
-
-	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
-	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC)
-	suite.Require().NoError(err)
-	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
-	suite.Require().NoError(err)
-
-	suite.state, err = clusterkv.NewMutableState(clusterState, tracer, suite.headers, suite.payloads)
-	suite.Require().NoError(err)
+	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
@@ -97,6 +92,16 @@ func (suite *BuilderSuite) SetupTest() {
 
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID())))
 	require.NoError(suite.T(), err)
+	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
+
+	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
+	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC, suite.epochCounter)
+	suite.Require().NoError(err)
+	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
+	suite.Require().NoError(err)
+
+	suite.state, err = clusterkv.NewMutableState(clusterState, tracer, suite.headers, suite.payloads, suite.epochLookup)
+	suite.Require().NoError(err)
 
 	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, qcs, setups, commits, statuses, rootSnapshot)
 	require.NoError(suite.T(), err)
@@ -983,14 +988,15 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		suite.headers = headers
 		suite.blocks = blocks
 		suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
+		suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
 
 		qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
-		stateRoot, err := clusterkv.NewStateRoot(suite.genesis, qc)
+		stateRoot, err := clusterkv.NewStateRoot(suite.genesis, qc, suite.epochCounter)
 
 		state, err := clusterkv.Bootstrap(suite.db, stateRoot)
 		assert.NoError(b, err)
 
-		suite.state, err = clusterkv.NewMutableState(state, tracer, suite.headers, suite.payloads)
+		suite.state, err = clusterkv.NewMutableState(state, tracer, suite.headers, suite.payloads, suite.epochLookup)
 		assert.NoError(b, err)
 
 		// add some transactions to transaction pool

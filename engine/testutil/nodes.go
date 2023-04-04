@@ -64,6 +64,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
+	epochsmodule "github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
@@ -304,10 +305,16 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)
 	require.NoError(t, err)
 
+	epochLookup, err := epochsmodule.NewEpochLookup(node.State)
+	require.NoError(t, err)
+	node.ProtocolEvents.AddConsumer(epochLookup)
+	epochLookup.Start(ctx)
+
 	clusterStateFactory, err := factories.NewClusterStateFactory(
 		node.PublicDB,
 		node.Metrics,
 		node.Tracer,
+		epochLookup,
 	)
 	require.NoError(t, err)
 

@@ -11,20 +11,23 @@ import (
 )
 
 type ClusterStateFactory struct {
-	db      *badger.DB
-	metrics module.CacheMetrics
-	tracer  module.Tracer
+	db          *badger.DB
+	metrics     module.CacheMetrics
+	tracer      module.Tracer
+	epochLookup module.EpochLookup
 }
 
 func NewClusterStateFactory(
 	db *badger.DB,
 	metrics module.CacheMetrics,
 	tracer module.Tracer,
+	epochLookup module.EpochLookup,
 ) (*ClusterStateFactory, error) {
 	factory := &ClusterStateFactory{
-		db:      db,
-		metrics: metrics,
-		tracer:  tracer,
+		db:          db,
+		metrics:     metrics,
+		tracer:      tracer,
+		epochLookup: epochLookup,
 	}
 	return factory, nil
 }
@@ -47,7 +50,7 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot) (
 	}
 	var clusterState *clusterkv.State
 	if isBootStrapped {
-		clusterState, err = clusterkv.OpenState(f.db, f.tracer, headers, payloads, stateRoot.ClusterID())
+		clusterState, err = clusterkv.OpenState(f.db, f.tracer, headers, payloads, stateRoot.ClusterID(), stateRoot.EpochCounter())
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("could not open cluster state: %w", err)
 		}
@@ -58,7 +61,7 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot) (
 		}
 	}
 
-	mutableState, err := clusterkv.NewMutableState(clusterState, f.tracer, headers, payloads)
+	mutableState, err := clusterkv.NewMutableState(clusterState, f.tracer, headers, payloads, f.epochLookup)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could create mutable cluster state: %w", err)
 	}
