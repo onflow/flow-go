@@ -89,14 +89,13 @@ var (
 )
 
 func setupProgramsTest(t *testing.T) storage.SnapshotTree {
-	view := delta.NewDeltaView(nil)
+	txnState := storage.SerialTransaction{
+		NestedTransaction: state.NewTransactionState(
+			delta.NewDeltaView(nil),
+			state.DefaultParameters()),
+	}
 
-	accounts := environment.NewAccounts(
-		storage.SerialTransaction{
-			NestedTransaction: state.NewTransactionState(
-				view,
-				state.DefaultParameters()),
-		})
+	accounts := environment.NewAccounts(txnState)
 
 	err := accounts.Create(nil, addressA)
 	require.NoError(t, err)
@@ -107,7 +106,10 @@ func setupProgramsTest(t *testing.T) storage.SnapshotTree {
 	err = accounts.Create(nil, addressC)
 	require.NoError(t, err)
 
-	return storage.NewSnapshotTree(nil).Append(view.Finalize())
+	executionSnapshot, err := txnState.FinalizeMainTransaction()
+	require.NoError(t, err)
+
+	return storage.NewSnapshotTree(nil).Append(executionSnapshot)
 }
 
 func getTestContract(
@@ -261,7 +263,7 @@ func Test_Programs(t *testing.T) {
 
 		require.Contains(t, output.Logs, "\"hello from A\"")
 
-		// same transaction should produce the exact same views
+		// same transaction should produce the exact same execution snapshots
 		// but only because we don't do any conditional update in a tx
 		compareExecutionSnapshots(t, executionSnapshotA, executionSnapshotA2)
 	})
@@ -338,7 +340,7 @@ func Test_Programs(t *testing.T) {
 		// rerun transaction
 
 		// execute transaction again, this time make sure it doesn't load code
-		execB2Snapshot := delta.NewDeltaView(state.NewReadFuncStorageSnapshot(
+		execB2Snapshot := state.NewReadFuncStorageSnapshot(
 			func(id flow.RegisterID) (flow.RegisterValue, error) {
 				idA := flow.ContractRegisterID(
 					flow.BytesToAddress([]byte(id.Owner)),
@@ -351,7 +353,7 @@ func Test_Programs(t *testing.T) {
 				require.NotEqual(t, id.Key, idB.Key)
 
 				return mainSnapshot.Get(id)
-			}))
+			})
 
 		executionSnapshotB2, output, err := vm.RunV2(
 			context,
@@ -777,14 +779,6 @@ func updateContractTx(name, code string, address flow.Address) *flow.Transaction
              }
            }`, name, encoded)),
 	).AddAuthorizer(address)
-}
-
-// compareViews compares views using only data that matters (ie. two different hasher instances
-// trips the library comparison, even if actual SPoCKs are the same)
-func compareViews(t *testing.T, a, b *delta.View) {
-	require.Equal(t, a.Delta(), b.Delta())
-	require.Equal(t, a.Interactions(), b.Interactions())
-	require.Equal(t, a.SpockSecret(), b.SpockSecret())
 }
 
 func compareExecutionSnapshots(t *testing.T, a, b *state.ExecutionSnapshot) {
