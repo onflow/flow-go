@@ -65,6 +65,9 @@ func TestReExecuteBlock(t *testing.T) {
 		computationResult := unittest.ComputationResultFixture(t)
 		header := computationResult.Block.Header
 
+		err = headers.Store(header)
+		require.NoError(t, err)
+
 		// save execution results
 		err = es.SaveExecutionResults(context.Background(), computationResult)
 		require.NoError(t, err)
@@ -184,6 +187,9 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			genesis,
 			&unittest.GenesisStateCommitment)
 		header := executableBlock.Block.Header
+
+		err = headers.Store(header)
+		require.NoError(t, err)
 
 		computationResult := unittest.ComputationResultFixture(t)
 		computationResult.ExecutableBlock = executableBlock
