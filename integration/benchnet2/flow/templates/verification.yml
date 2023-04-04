@@ -148,5 +148,5 @@ spec:
   {{ end }}
   selector:
     app: {{ $k }}
-  type: ClusterIP
+  type: NodePort
 {{- end }}
