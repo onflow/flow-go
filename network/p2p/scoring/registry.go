@@ -2,13 +2,13 @@ package scoring
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p"
 )
@@ -44,8 +44,6 @@ const (
 	iHaveMisbehaviourPenalty = -10
 	// iWantMisbehaviourPenalty is the penalty applied to the application specific score when a peer conducts a iWant misbehaviour.
 	iWantMisbehaviourPenalty = -10
-
-	ctrlMsgTypeNoRecord p2p.ControlMessageType = "no record"
 )
 
 // GossipSubCtrlMsgPenaltyValue is the penalty value for each control message type.
@@ -70,6 +68,7 @@ type GossipSubAppSpecificScoreRegistry struct {
 	logger     zerolog.Logger
 	scoreCache *netcache.AppScoreCache
 	penalty    GossipSubCtrlMsgPenaltyValue
+	mu         sync.Mutex
 }
 
 type GossipSubAppSpecificScoreRegistryConfig struct {
@@ -80,12 +79,18 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	Penalty       GossipSubCtrlMsgPenaltyValue
 }
 
-func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig) *GossipSubAppSpecificScoreRegistry {
+func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig, opts ...func(registry *GossipSubAppSpecificScoreRegistry)) *GossipSubAppSpecificScoreRegistry {
 	cache := netcache.NewAppScoreCache(config.SizeLimit, config.Logger, config.Collector, config.DecayFunction)
-	return &GossipSubAppSpecificScoreRegistry{
+	reg := &GossipSubAppSpecificScoreRegistry{
 		logger:     config.Logger.With().Str("module", "app_score_registry").Logger(),
 		scoreCache: cache,
 	}
+
+	for _, opt := range opts {
+		opt(reg)
+	}
+
+	return reg
 }
 
 var _ p2p.GossipSubInvalidControlMessageNotificationConsumer = (*GossipSubAppSpecificScoreRegistry)(nil)
@@ -101,10 +106,13 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 			return 0
 		}
 		if !ok {
-			// this can happen if the peer recently joined the network and its application specific score is not yet cached.
-			// nevertheless, we log at the warning level as this should not happen frequently.
-			r.logger.Warn().Str("peer_id", pid.String()).Msgf("could not find application specific score for peer")
-			return 0
+			init := initAppScoreRecord()
+			initialized := r.scoreCache.Add(pid, init)
+			r.logger.Trace().
+				Bool("initialized", initialized).
+				Str("peer_id", pid.String()).
+				Msg("initialization attempt for application specific")
+			return init.Score
 		}
 
 		return record.Score
@@ -112,72 +120,42 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 }
 
 func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(notification *p2p.InvalidControlMessageNotification) {
-	// submit to queue
-}
+	lg := r.logger.With().
+		Str("peer_id", notification.PeerID.String()).
+		Str("misbehavior_type", notification.MsgType.String()).Logger()
 
-// workerLogic is the worker logic that is executed by the worker pool. It is responsible for updating the application specific score of a peer based on the received control message misbehaviour.
-// The worker logic is NOT concurrency safe and is not to meant to be called concurrently.
-// There must be only a single worker logic running at any given time.
-// The worker logic is blocking.
-// Arguments:
-// - ctx: the irrecoverable context that is used to signal the worker to stop as well as throw an irrecoverable error.
-// Returns:
-// - the worker logic function.
-func (r *GossipSubAppSpecificScoreRegistry) workerLogic(ctx irrecoverable.SignalerContext) func(notification *p2p.InvalidControlMessageNotification) {
-	return func(notification *p2p.InvalidControlMessageNotification) {
-		select {
-		case <-ctx.Done():
-			r.logger.Debug().Msg("context is cancelled worker logic is stopping")
-			return
+	// try initializing the application specific score for the peer if it is not yet initialized.
+	// this is done to avoid the case where the peer is not yet cached and the application specific score is not yet initialized.
+	// initialization is gone successful only if the peer is not yet cached.
+	initialized := r.scoreCache.Add(notification.PeerID, initAppScoreRecord())
+	lg.Trace().Bool("initialized", initialized).Msg("initialization attempt for application specific")
+
+	record, err := r.scoreCache.Adjust(notification.PeerID, func(record netcache.AppScoreRecord) netcache.AppScoreRecord {
+		switch notification.MsgType {
+		case p2p.CtrlMsgGraft:
+			record.Score -= r.penalty.Graft
+		case p2p.CtrlMsgPrune:
+			record.Score -= r.penalty.Prune
+		case p2p.CtrlMsgIHave:
+			record.Score -= r.penalty.IHave
+		case p2p.CtrlMsgIWant:
+			record.Score -= r.penalty.IWant
 		default:
+			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
+			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
 		}
 
-		if !r.scoreCache.Has(notification.PeerID) {
-			added := r.scoreCache.Add(notification.PeerID, netcache.AppScoreRecord{
-				Decay: defaultDecay,
-				Score: 0,
-			})
-			if !added {
-				ctx.Throw(fmt.Errorf("could not add application specific score record to cache for peer %s, potential race condition", notification.PeerID.String()))
-			}
-		}
+		return record
+	})
 
-		if notification.MsgType == ctrlMsgTypeNoRecord {
-			// a no-record message is not considered a misbehaviour, it is an internal message that is used to signal that the peer has no record of the message.
-			// by the time the code reaches here the peer record has been initiated if it does not exist.
-			return
-		}
-
-		lg := r.logger.With().
-			Str("peer_id", notification.PeerID.String()).
-			Str("misbehavior_type", notification.MsgType.String()).Logger()
-
-		record, err := r.scoreCache.Adjust(notification.PeerID, func(record netcache.AppScoreRecord) netcache.AppScoreRecord {
-			switch notification.MsgType {
-			case p2p.CtrlMsgGraft:
-				record.Score -= r.penalty.Graft
-			case p2p.CtrlMsgPrune:
-				record.Score -= r.penalty.Prune
-			case p2p.CtrlMsgIHave:
-				record.Score -= r.penalty.IHave
-			case p2p.CtrlMsgIWant:
-				record.Score -= r.penalty.IWant
-			default:
-				ctx.Throw(fmt.Errorf("unknown misbehavior type %s", notification.MsgType.String()))
-			}
-
-			return record
-		})
-
-		if err != nil {
-			// any returned error from adjust is non-recoverable and fatal, we crash the node.
-			ctx.Throw(fmt.Errorf("could not apply misbehaviour penalty (%s) and update application specific score for peer %s", notification.MsgType, notification.PeerID.String()))
-		}
-
-		lg.Debug().
-			Float64("app_specific_score", record.Score).
-			Msg("applied misbehaviour penalty and updated application specific score")
+	if err != nil {
+		// any returned error from adjust is non-recoverable and fatal, we crash the node.
+		lg.Fatal().Err(err).Msg("could not adjust application specific score for peer")
 	}
+
+	lg.Debug().
+		Float64("app_specific_score", record.Score).
+		Msg("applied misbehaviour penalty and updated application specific score")
 }
 
 // DefaultDecayFunction is the default decay function that is used to decay the application specific score of a peer.
@@ -205,5 +183,12 @@ func DefaultDecayFunction() netcache.ReadPreprocessorFunc {
 		}
 		record.Score = score
 		return record, nil
+	}
+}
+
+func initAppScoreRecord() netcache.AppScoreRecord {
+	return netcache.AppScoreRecord{
+		Decay: defaultDecay,
+		Score: 0,
 	}
 }
