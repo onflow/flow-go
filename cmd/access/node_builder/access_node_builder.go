@@ -170,7 +170,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
 		},
-		executionDataSyncEnabled: false,
+		executionDataSyncEnabled: true,
 		executionDataDir:         filepath.Join(homedir, ".flow", "execution_data"),
 		executionDataStartHeight: 0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
