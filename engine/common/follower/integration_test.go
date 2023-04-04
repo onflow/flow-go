@@ -49,17 +49,17 @@ func TestFollowerHappyPath(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		consumer := events.NewNoop()
-		headers, _, seals, index, payloads, blocks, qcs, setups, commits, statuses, results := storageutil.StorageLayer(t, db)
+		all := storageutil.StorageLayer(t, db)
 
 		// bootstrap root snapshot
-		state, err := pbadger.Bootstrap(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses, rootSnapshot)
+		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		mockTimer := util.MockBlockTimer()
 
 		// create follower state
-		followerState, err := pbadger.NewFollowerState(state, index, payloads, tracer, consumer, mockTimer)
+		followerState, err := pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, consumer, mockTimer)
 		require.NoError(t, err)
-		finalizer := moduleconsensus.NewFinalizer(db, headers, followerState, tracer)
+		finalizer := moduleconsensus.NewFinalizer(db, all.Headers, followerState, tracer)
 		rootHeader, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		rootQC, err := rootSnapshot.QuorumCertificate()
@@ -76,7 +76,7 @@ func TestFollowerHappyPath(t *testing.T) {
 
 		consensusConsumer := pubsub.NewFinalizationDistributor()
 		// use real consensus modules
-		forks, err := consensus.NewForks(rootHeader, headers, finalizer, consensusConsumer, rootHeader, rootQC)
+		forks, err := consensus.NewForks(rootHeader, all.Headers, finalizer, consensusConsumer, rootHeader, rootQC)
 		require.NoError(t, err)
 
 		// assume all proposals are valid
@@ -114,7 +114,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 
 		// use real engine
-		engine, err := NewComplianceLayer(unittest.Logger(), net, me, metrics, headers, rootHeader, followerCore)
+		engine, err := NewComplianceLayer(unittest.Logger(), net, me, metrics, all.Headers, rootHeader, followerCore)
 		require.NoError(t, err)
 		// don't forget to subscribe for finalization notifications
 		consensusConsumer.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)

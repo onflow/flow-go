@@ -194,11 +194,15 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			height := block.Header.Height
 			err := state.blocks.StoreTx(block)(tx)
 			if err != nil {
-				return fmt.Errorf("could not insert root block: %w", err)
+				return fmt.Errorf("could not insert SealingSegment extra block: %w", err)
 			}
 			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
 			if err != nil {
-				return fmt.Errorf("could not index root block segment (id=%x): %w", blockID, err)
+				return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
+			}
+			err = state.qcs.StoreTx(block.Header.QuorumCertificate())(tx)
+			if err != nil {
+				return fmt.Errorf("could not store qc for SealingSegment extra block (id=%x): %w", blockID, err)
 			}
 		}
 
@@ -208,11 +212,15 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 
 			err := state.blocks.StoreTx(block)(tx)
 			if err != nil {
-				return fmt.Errorf("could not insert root block: %w", err)
+				return fmt.Errorf("could not insert SealingSegment block: %w", err)
 			}
 			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
 			if err != nil {
-				return fmt.Errorf("could not index root block segment (id=%x): %w", blockID, err)
+				return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
+			}
+			err = state.qcs.StoreTx(block.Header.QuorumCertificate())(tx)
+			if err != nil {
+				return fmt.Errorf("could not store qc for SealingSegment block (id=%x): %w", blockID, err)
 			}
 
 			// index the latest seal as of this block
