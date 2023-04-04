@@ -182,7 +182,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 		}
 
 		// Take snapshot at height of block D (epoch1.heights[2]) for valid segment and valid snapshot
-		// where it's sealing segment is B <- C
+		// where its sealing segment is A <- B <- C
 		snap := state.AtHeight(epoch1.Range()[2])
 		suite.state.On("Final").Return(snap).Once()
 
