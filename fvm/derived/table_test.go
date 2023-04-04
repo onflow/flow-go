@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -21,7 +22,7 @@ func TestDerivedDataTableWithTransactionOffset(t *testing.T) {
 
 	require.Equal(
 		t,
-		LogicalTime(17),
+		logical.Time(17),
 		block.LatestCommitExecutionTimeForTestingOnly())
 }
 
@@ -36,10 +37,10 @@ func TestDerivedDataTableNormalTransactionInvalidExecutionTimeBound(
 	_, err = block.NewTableTransaction(0, 0)
 	require.NoError(t, err)
 
-	_, err = block.NewTableTransaction(0, EndOfBlockExecutionTime)
+	_, err = block.NewTableTransaction(0, logical.EndOfBlockExecutionTime)
 	require.ErrorContains(t, err, "execution time out of bound")
 
-	_, err = block.NewTableTransaction(0, EndOfBlockExecutionTime-1)
+	_, err = block.NewTableTransaction(0, logical.EndOfBlockExecutionTime-1)
 	require.NoError(t, err)
 }
 
@@ -65,19 +66,19 @@ func TestDerivedDataTableSnapshotReadTransactionInvalidExecutionTimeBound(
 	block := newEmptyTestBlock()
 
 	_, err := block.NewSnapshotReadTableTransaction(
-		ParentBlockTime,
-		ParentBlockTime)
+		logical.ParentBlockTime,
+		logical.ParentBlockTime)
 	require.ErrorContains(t, err, "execution time out of bound")
 
-	_, err = block.NewSnapshotReadTableTransaction(ParentBlockTime, 0)
+	_, err = block.NewSnapshotReadTableTransaction(logical.ParentBlockTime, 0)
 	require.NoError(t, err)
 
-	_, err = block.NewSnapshotReadTableTransaction(0, ChildBlockTime)
+	_, err = block.NewSnapshotReadTableTransaction(0, logical.ChildBlockTime)
 	require.ErrorContains(t, err, "execution time out of bound")
 
 	_, err = block.NewSnapshotReadTableTransaction(
 		0,
-		EndOfBlockExecutionTime)
+		logical.EndOfBlockExecutionTime)
 	require.NoError(t, err)
 }
 
@@ -85,10 +86,10 @@ func TestDerivedDataTableToValidateTime(t *testing.T) {
 	block := NewEmptyTableWithOffset[string, *string](8)
 	require.Equal(
 		t,
-		LogicalTime(7),
+		logical.Time(7),
 		block.LatestCommitExecutionTimeForTestingOnly())
 
-	testTxnSnapshotTime := LogicalTime(5)
+	testTxnSnapshotTime := logical.Time(5)
 
 	testTxn, err := block.NewTableTransaction(testTxnSnapshotTime, 20)
 	require.NoError(t, err)
@@ -107,7 +108,7 @@ func TestDerivedDataTableToValidateTime(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(
 		t,
-		LogicalTime(8),
+		logical.Time(8),
 		testTxn.ToValidateTimeForTestingOnly())
 
 	testSetupTxn, err := block.NewTableTransaction(8, 8)
@@ -123,7 +124,7 @@ func TestDerivedDataTableToValidateTime(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(
 		t,
-		LogicalTime(9),
+		logical.Time(9),
 		testTxn.ToValidateTimeForTestingOnly())
 
 	require.Equal(t, 1, invalidator1.callCount)
@@ -152,7 +153,7 @@ func TestDerivedDataTableToValidateTime(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(
 		t,
-		LogicalTime(11),
+		logical.Time(11),
 		testTxn.ToValidateTimeForTestingOnly())
 
 	require.Equal(t, 1, invalidator1.callCount)
@@ -165,7 +166,7 @@ func TestDerivedDataTableToValidateTime(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(
 		t,
-		LogicalTime(11),
+		logical.Time(11),
 		testTxn.ToValidateTimeForTestingOnly())
 
 	require.Equal(t, 1, invalidator1.callCount)
@@ -184,7 +185,7 @@ func TestDerivedDataTableToValidateTime(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(
 		t,
-		LogicalTime(11),
+		logical.Time(11),
 		testTxn.ToValidateTimeForTestingOnly())
 
 	// callCount = 3 because key1 is validated twice, key2 validated once.
@@ -217,7 +218,7 @@ func TestDerivedDataTableToValidateTime(t *testing.T) {
 		require.Error(t, err)
 		require.Equal(
 			t,
-			LogicalTime(11),
+			logical.Time(11),
 			testTxn.ToValidateTimeForTestingOnly())
 
 		require.Equal(t, 3, invalidator1.callCount)
@@ -405,7 +406,7 @@ func TestDerivedDataTableValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.
 func TestDerivedDataTableCommitEndOfBlockSnapshotRead(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	commitTime := LogicalTime(5)
+	commitTime := logical.Time(5)
 	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
 	require.NoError(t, err)
 
@@ -415,8 +416,8 @@ func TestDerivedDataTableCommitEndOfBlockSnapshotRead(t *testing.T) {
 	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
 
 	testTxn, err := block.NewSnapshotReadTableTransaction(
-		EndOfBlockExecutionTime,
-		EndOfBlockExecutionTime)
+		logical.EndOfBlockExecutionTime,
+		logical.EndOfBlockExecutionTime)
 	require.NoError(t, err)
 
 	err = testTxn.Commit()
@@ -428,7 +429,7 @@ func TestDerivedDataTableCommitEndOfBlockSnapshotRead(t *testing.T) {
 func TestDerivedDataTableCommitSnapshotReadDontAdvanceTime(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	commitTime := LogicalTime(71)
+	commitTime := logical.Time(71)
 	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
 	require.NoError(t, err)
 
@@ -483,7 +484,7 @@ func TestDerivedDataTableCommitWriteOnlyTransactionNoInvalidation(t *testing.T) 
 
 	require.Equal(
 		t,
-		LogicalTime(0),
+		logical.Time(0),
 		block.LatestCommitExecutionTimeForTestingOnly())
 
 	require.Equal(t, 0, len(block.InvalidatorsForTestingOnly()))
@@ -501,7 +502,7 @@ func TestDerivedDataTableCommitWriteOnlyTransactionNoInvalidation(t *testing.T) 
 func TestDerivedDataTableCommitWriteOnlyTransactionWithInvalidation(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	testTxnTime := LogicalTime(47)
+	testTxnTime := logical.Time(47)
 	testTxn, err := block.NewTableTransaction(0, testTxnTime)
 	require.NoError(t, err)
 
@@ -648,7 +649,7 @@ func TestDerivedDataTableCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
 
 	require.Equal(
 		t,
-		LogicalTime(1),
+		logical.Time(1),
 		block.LatestCommitExecutionTimeForTestingOnly())
 
 	require.Equal(t, 0, len(block.InvalidatorsForTestingOnly()))
@@ -672,14 +673,14 @@ func TestDerivedDataTableCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
 func TestDerivedDataTableCommitReadOnlyTransactionWithInvalidation(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	testSetupTxn1Time := LogicalTime(2)
+	testSetupTxn1Time := logical.Time(2)
 	testSetupTxn1, err := block.NewTableTransaction(0, testSetupTxn1Time)
 	require.NoError(t, err)
 
 	testSetupTxn2, err := block.NewTableTransaction(0, 4)
 	require.NoError(t, err)
 
-	testTxnTime := LogicalTime(6)
+	testTxnTime := logical.Time(6)
 	testTxn, err := block.NewTableTransaction(0, testTxnTime)
 	require.NoError(t, err)
 
@@ -773,7 +774,7 @@ func TestDerivedDataTableCommitValidateError(t *testing.T) {
 func TestDerivedDataTableCommitRejectCommitGapForNormalTxn(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	commitTime := LogicalTime(5)
+	commitTime := logical.Time(5)
 	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
 	require.NoError(t, err)
 
@@ -799,7 +800,7 @@ func TestDerivedDataTableCommitRejectCommitGapForNormalTxn(t *testing.T) {
 func TestDerivedDataTableCommitRejectCommitGapForSnapshotRead(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	commitTime := LogicalTime(5)
+	commitTime := logical.Time(5)
 	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
 	require.NoError(t, err)
 
@@ -825,7 +826,7 @@ func TestDerivedDataTableCommitRejectCommitGapForSnapshotRead(t *testing.T) {
 func TestDerivedDataTableCommitSnapshotReadDoesNotAdvanceCommitTime(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	expectedTime := LogicalTime(10)
+	expectedTime := logical.Time(10)
 	testSetupTxn, err := block.NewTableTransaction(0, expectedTime)
 	require.NoError(t, err)
 
@@ -884,7 +885,7 @@ func TestDerivedDataTableCommitFineGrainInvalidation(t *testing.T) {
 	// Setup the test transaction by read both existing entries and writing
 	// two new ones,
 
-	testTxnTime := LogicalTime(15)
+	testTxnTime := logical.Time(15)
 	testTxn, err := block.NewTableTransaction(1, testTxnTime)
 	require.NoError(t, err)
 
@@ -968,7 +969,7 @@ func TestDerivedDataTableNewChildDerivedBlockData(t *testing.T) {
 
 	require.Equal(
 		t,
-		ParentBlockTime,
+		logical.ParentBlockTime,
 		parentBlock.LatestCommitExecutionTimeForTestingOnly())
 	require.Equal(t, 0, len(parentBlock.InvalidatorsForTestingOnly()))
 	require.Equal(t, 0, len(parentBlock.EntriesForTestingOnly()))
@@ -998,7 +999,7 @@ func TestDerivedDataTableNewChildDerivedBlockData(t *testing.T) {
 
 	require.Equal(
 		t,
-		LogicalTime(1),
+		logical.Time(1),
 		parentBlock.LatestCommitExecutionTimeForTestingOnly())
 
 	require.Equal(t, 1, len(parentBlock.InvalidatorsForTestingOnly()))
@@ -1018,7 +1019,7 @@ func TestDerivedDataTableNewChildDerivedBlockData(t *testing.T) {
 
 	require.Equal(
 		t,
-		ParentBlockTime,
+		logical.ParentBlockTime,
 		childBlock.LatestCommitExecutionTimeForTestingOnly())
 
 	require.Equal(t, 0, len(childBlock.InvalidatorsForTestingOnly()))

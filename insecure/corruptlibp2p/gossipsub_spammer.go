@@ -32,26 +32,23 @@ func NewGossipSubRouterSpammer(t *testing.T, sporkId flow.Identifier, role flow.
 	}
 }
 
-// SpamIHave spams the victim with junk iHave messages.
+// SpamControlMessage spams the victim with junk control messages.
 // ctlMessages is the list of spam messages to send to the victim node.
-func (s *GossipSubRouterSpammer) SpamIHave(t *testing.T, victim p2p.LibP2PNode, ctlMessages []pb.ControlMessage) {
+func (s *GossipSubRouterSpammer) SpamControlMessage(t *testing.T, victim p2p.LibP2PNode, ctlMessages []pb.ControlMessage) {
 	for _, ctlMessage := range ctlMessages {
 		require.True(t, s.router.Get().SendControl(victim.Host().ID(), &ctlMessage))
 	}
 }
 
-// GenerateIHaveCtlMessages generates IHAVE control messages before they are sent so the test can prepare
+// GenerateCtlMessages generates control messages before they are sent so the test can prepare
 // to expect receiving them before they are sent by the spammer.
-func (s *GossipSubRouterSpammer) GenerateIHaveCtlMessages(t *testing.T, msgCount, msgSize int) []pb.ControlMessage {
-	var iHaveCtlMsgs []pb.ControlMessage
+func (s *GossipSubRouterSpammer) GenerateCtlMessages(msgCount int, opts ...GossipSubCtrlOption) []pb.ControlMessage {
+	var ctlMgs []pb.ControlMessage
 	for i := 0; i < msgCount; i++ {
-		iHaveCtlMsg := GossipSubCtrlFixture(WithIHave(msgCount, msgSize))
-
-		iHaves := iHaveCtlMsg.GetIhave()
-		require.Equal(t, msgCount, len(iHaves))
-		iHaveCtlMsgs = append(iHaveCtlMsgs, *iHaveCtlMsg)
+		ctlMsg := GossipSubCtrlFixture(opts...)
+		ctlMgs = append(ctlMgs, *ctlMsg)
 	}
-	return iHaveCtlMsgs
+	return ctlMgs
 }
 
 // Start starts the spammer and waits until it is fully initialized before returning.

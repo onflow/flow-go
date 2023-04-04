@@ -85,25 +85,27 @@ const (
 	ResourceNetworkingDnsTxtCache                   = "networking_dns_txt_cache"           // networking layer
 	ResourceNetworkingDisallowListNotificationQueue = "networking_disallow_list_notification_queue"
 	ResourceNetworkingRpcInspectorNotificationQueue = "networking_rpc_inspector_notification_queue"
+	ResourceNetworkingRpcInspectorQueue             = "networking_rpc_inspector_queue"
 
-	ResourceClusterBlockProposalQueue = "cluster_compliance_proposal_queue" // collection node, compliance engine
-	ResourceTransactionIngestQueue    = "ingest_transaction_queue"          // collection node, ingest engine
-	ResourceBeaconKey                 = "beacon-key"                        // consensus node, DKG engine
-	ResourceApprovalQueue             = "sealing_approval_queue"            // consensus node, sealing engine
-	ResourceReceiptQueue              = "sealing_receipt_queue"             // consensus node, sealing engine
-	ResourceApprovalResponseQueue     = "sealing_approval_response_queue"   // consensus node, sealing engine
-	ResourceBlockResponseQueue        = "compliance_block_response_queue"   // consensus node, compliance engine
-	ResourceBlockProposalQueue        = "compliance_proposal_queue"         // consensus node, compliance engine
-	ResourceBlockVoteQueue            = "vote_aggregator_queue"             // consensus/collection node, vote aggregator
-	ResourceTimeoutObjectQueue        = "timeout_aggregator_queue"          // consensus/collection node, timeout aggregator
-	ResourceCollectionGuaranteesQueue = "ingestion_col_guarantee_queue"     // consensus node, ingestion engine
-	ResourceChunkDataPack             = "chunk_data_pack"                   // execution node
-	ResourceChunkDataPackRequests     = "chunk_data_pack_request"           // execution node
-	ResourceEvents                    = "events"                            // execution node
-	ResourceServiceEvents             = "service_events"                    // execution node
-	ResourceTransactionResults        = "transaction_results"               // execution node
-	ResourceTransactionResultIndices  = "transaction_result_indices"        // execution node
-	ResourceTransactionResultByBlock  = "transaction_result_by_block"       // execution node
+	ResourceFollowerPendingBlocksCache = "follower_pending_block_cache"      // follower engine
+	ResourceClusterBlockProposalQueue  = "cluster_compliance_proposal_queue" // collection node, compliance engine
+	ResourceTransactionIngestQueue     = "ingest_transaction_queue"          // collection node, ingest engine
+	ResourceBeaconKey                  = "beacon-key"                        // consensus node, DKG engine
+	ResourceApprovalQueue              = "sealing_approval_queue"            // consensus node, sealing engine
+	ResourceReceiptQueue               = "sealing_receipt_queue"             // consensus node, sealing engine
+	ResourceApprovalResponseQueue      = "sealing_approval_response_queue"   // consensus node, sealing engine
+	ResourceBlockResponseQueue         = "compliance_block_response_queue"   // consensus node, compliance engine
+	ResourceBlockProposalQueue         = "compliance_proposal_queue"         // consensus node, compliance engine
+	ResourceBlockVoteQueue             = "vote_aggregator_queue"             // consensus/collection node, vote aggregator
+	ResourceTimeoutObjectQueue         = "timeout_aggregator_queue"          // consensus/collection node, timeout aggregator
+	ResourceCollectionGuaranteesQueue  = "ingestion_col_guarantee_queue"     // consensus node, ingestion engine
+	ResourceChunkDataPack              = "chunk_data_pack"                   // execution node
+	ResourceChunkDataPackRequests      = "chunk_data_pack_request"           // execution node
+	ResourceEvents                     = "events"                            // execution node
+	ResourceServiceEvents              = "service_events"                    // execution node
+	ResourceTransactionResults         = "transaction_results"               // execution node
+	ResourceTransactionResultIndices   = "transaction_result_indices"        // execution node
+	ResourceTransactionResultByBlock   = "transaction_result_by_block"       // execution node
 )
 
 const (

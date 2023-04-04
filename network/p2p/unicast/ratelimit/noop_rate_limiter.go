@@ -3,34 +3,35 @@ package ratelimit
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-type NoopRateLimiter struct{}
-
-func (n *NoopRateLimiter) Allow(_ peer.ID, _ int) bool {
-	return true
+type NoopRateLimiter struct {
+	component.Component
 }
 
-func (n *NoopRateLimiter) IsRateLimited(_ peer.ID) bool {
+func (n *NoopRateLimiter) Allow(peer.ID, int) bool {
+	return true
+}
+func (n *NoopRateLimiter) IsRateLimited(peer.ID) bool {
 	return false
 }
 
-func (n *NoopRateLimiter) SetTimeNowFunc(_ p2p.GetTimeNow) {}
-
-func (n *NoopRateLimiter) Stop() {}
-
-func (n *NoopRateLimiter) Start() {}
+func (n *NoopRateLimiter) Start(irrecoverable.SignalerContext) {}
 
 func NewNoopRateLimiter() *NoopRateLimiter {
-	return &NoopRateLimiter{}
+	return &NoopRateLimiter{
+		Component: &module.NoopComponent{},
+	}
 }
 
 // NoopRateLimiters returns noop rate limiters.
 func NoopRateLimiters() *RateLimiters {
 	return &RateLimiters{
-		MessageRateLimiter:   &NoopRateLimiter{},
-		BandWidthRateLimiter: &NoopRateLimiter{},
+		MessageRateLimiter:   NewNoopRateLimiter(),
+		BandWidthRateLimiter: NewNoopRateLimiter(),
 		disabled:             true,
 		notifier:             NewUnicastRateLimiterDistributor(),
 	}

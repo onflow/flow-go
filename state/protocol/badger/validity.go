@@ -290,7 +290,7 @@ func IsValidRootSnapshotQCs(snap protocol.Snapshot) error {
 		}
 		err = validateClusterQC(cluster)
 		if err != nil {
-			return fmt.Errorf("invalid cluster qc %d: %W", clusterIndex, err)
+			return fmt.Errorf("invalid cluster qc %d: %w", clusterIndex, err)
 		}
 	}
 	return nil

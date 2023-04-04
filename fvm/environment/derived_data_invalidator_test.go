@@ -30,6 +30,7 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	addressA := flow.HexToAddress("0xa")
 	cAddressA := common.MustBytesToAddress(addressA.Bytes())
 	programALoc := common.AddressLocation{Address: cAddressA, Name: "A"}
+	programA2Loc := common.AddressLocation{Address: cAddressA, Name: "A2"}
 	programA := &derived.Program{
 		Program: nil,
 		Dependencies: derived.NewProgramDependencies().
@@ -94,11 +95,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	t.Run("contract A update invalidation", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
 			ContractUpdates: environment.ContractUpdates{
-				Updates: []environment.ContractUpdateKey{
-					{
-						addressA,
-						"A",
-					},
+				Updates: []common.AddressLocation{
+					programALoc,
 				},
 			},
 		}.ProgramInvalidator()
@@ -113,11 +111,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	t.Run("contract D update invalidate", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
 			ContractUpdates: environment.ContractUpdates{
-				Updates: []environment.ContractUpdateKey{
-					{
-						addressD,
-						"D",
-					},
+				Updates: []common.AddressLocation{
+					programDLoc,
 				},
 			},
 		}.ProgramInvalidator()
@@ -132,11 +127,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	t.Run("contract B update invalidate", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
 			ContractUpdates: environment.ContractUpdates{
-				Updates: []environment.ContractUpdateKey{
-					{
-						addressB,
-						"B",
-					},
+				Updates: []common.AddressLocation{
+					programBLoc,
 				},
 			},
 		}.ProgramInvalidator()
@@ -151,11 +143,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	t.Run("contract invalidator C invalidates C", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
 			ContractUpdates: environment.ContractUpdates{
-				Updates: []environment.ContractUpdateKey{
-					{
-						Address: addressC,
-						Name:    "C",
-					},
+				Updates: []common.AddressLocation{
+					programCLoc,
 				},
 			},
 		}.ProgramInvalidator()
@@ -170,11 +159,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	t.Run("contract invalidator D invalidates C, D", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
 			ContractUpdates: environment.ContractUpdates{
-				Updates: []environment.ContractUpdateKey{
-					{
-						Address: addressD,
-						Name:    "D",
-					},
+				Updates: []common.AddressLocation{
+					programDLoc,
 				},
 			},
 		}.ProgramInvalidator()
@@ -189,11 +175,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	t.Run("new contract deploy on address A", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
 			ContractUpdates: environment.ContractUpdates{
-				Deploys: []environment.ContractUpdateKey{
-					{
-						Address: addressA,
-						Name:    "A2",
-					},
+				Deploys: []common.AddressLocation{
+					programA2Loc,
 				},
 			},
 		}.ProgramInvalidator()
@@ -208,11 +191,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	t.Run("contract delete on address A", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
 			ContractUpdates: environment.ContractUpdates{
-				Deletions: []environment.ContractUpdateKey{
-					{
-						Address: addressA,
-						Name:    "A2",
-					},
+				Deletions: []common.AddressLocation{
+					programA2Loc,
 				},
 			},
 		}.ProgramInvalidator()
@@ -262,21 +242,22 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		memKind: memWeight,
 	}
 
-	baseView := delta.NewDeltaView(nil)
+	snapshotTree := storage.NewSnapshotTree(nil)
+
 	ctx := fvm.NewContext(fvm.WithChain(flow.Testnet.Chain()))
 
 	vm := fvm.NewVirtualMachine()
-	err := vm.Run(
+	executionSnapshot, _, err := vm.RunV2(
 		ctx,
 		fvm.Bootstrap(
 			unittest.ServiceAccountPublicKey,
 			fvm.WithExecutionMemoryLimit(memoryLimit),
 			fvm.WithExecutionEffortWeights(computationWeights),
 			fvm.WithExecutionMemoryWeights(memoryWeights)),
-		baseView)
+		snapshotTree)
 	require.NoError(t, err)
 
-	view := baseView.NewChild()
+	view := delta.NewDeltaView(snapshotTree.Append(executionSnapshot))
 	nestedTxn := state.NewTransactionState(view, state.DefaultParameters())
 
 	derivedBlockData := derived.NewEmptyDerivedBlockData()

@@ -64,12 +64,20 @@ func DisallowListNotificationQueueMetricFactory(registrar prometheus.Registerer)
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDisallowListNotificationQueue, registrar)
 }
 
+func GossipSubRPCInspectorQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcInspectorQueue, registrar)
+}
+
 func RpcInspectorNotificationQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcInspectorNotificationQueue, registrar)
 }
 
 func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer, epoch uint64) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceCollection, fmt.Sprintf("%s_%d", ResourceTransaction, epoch), registrar)
+}
+
+func FollowerCacheMetrics(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceFollowerEngine, ResourceFollowerPendingBlocksCache, registrar)
 }
 
 func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometheus.Registerer) *HeroCacheCollector {

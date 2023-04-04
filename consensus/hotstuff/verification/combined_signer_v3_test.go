@@ -7,11 +7,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -338,7 +339,7 @@ func generateAggregatedSignature(t *testing.T, n int, msg []byte, tag string) ([
 // generateSignature creates a single private BLS 12-381 key, signs the provided `message` with
 // using domain separation `tag` and return the private key and signature.
 func generateSignature(t *testing.T, message []byte, tag string) (crypto.PrivateKey, crypto.Signature) {
-	priv := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381)
+	priv := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen)
 	sig, err := priv.Sign(message, msig.NewBLSHasher(tag))
 	require.NoError(t, err)
 	return priv, sig

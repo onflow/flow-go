@@ -8,9 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -44,7 +45,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	ids := make([]*flow.Identity, 0, signersNumber)
 	sigs := make([]crypto.Signature, 0, signersNumber)
 	pks := make([]crypto.PublicKey, 0, signersNumber)
-	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	for i := 0; i < signersNumber; i++ {
 		// id
 		ids = append(ids, unittest.IdentityFixture())
@@ -75,7 +76,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		_, err := NewWeightedSignatureAggregator(flow.IdentityList{signer}, []crypto.PublicKey{nil}, msg, tag)
 		assert.Error(t, err)
 		// wrong key type
-		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+		seed := make([]byte, crypto.KeyGenSeedMinLen)
 		_, err = rand.Read(seed)
 		require.NoError(t, err)
 		sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)

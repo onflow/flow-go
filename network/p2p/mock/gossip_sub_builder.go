@@ -93,6 +93,11 @@ func (_m *GossipSubBuilder) SetGossipSubTracer(_a0 p2p.PubSubTracer) {
 	_m.Called(_a0)
 }
 
+// SetGossipSubValidationInspector provides a mock function with given fields: inspector
+func (_m *GossipSubBuilder) SetGossipSubValidationInspector(inspector p2p.GossipSubRPCInspector) {
+	_m.Called(inspector)
+}
+
 // SetHost provides a mock function with given fields: _a0
 func (_m *GossipSubBuilder) SetHost(_a0 host.Host) {
 	_m.Called(_a0)

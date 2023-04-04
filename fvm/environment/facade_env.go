@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/tracing"
 )
 
@@ -166,8 +167,8 @@ func NewScriptEnvironmentFromStorageSnapshot(
 ) *facadeEnvironment {
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	derivedTxn, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
-		derived.EndOfBlockExecutionTime,
-		derived.EndOfBlockExecutionTime)
+		logical.EndOfBlockExecutionTime,
+		logical.EndOfBlockExecutionTime)
 	if err != nil {
 		panic(err)
 	}

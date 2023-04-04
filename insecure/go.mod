@@ -10,11 +10,12 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.8.2
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/flow-go v0.29.8
-	github.com/onflow/flow-go/crypto v0.24.6
+	github.com/onflow/flow-go/crypto v0.24.7
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.1
 	github.com/yhassanzadeh13/go-libp2p-pubsub v0.6.2-0.20221208234712-b44d9133e4ee
+	go.uber.org/atomic v1.10.0
 	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.28.1
 )
@@ -179,11 +180,11 @@ require (
 	github.com/multiformats/go-multistream v0.3.3 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/onflow/atree v0.5.0 // indirect
-	github.com/onflow/cadence v0.36.1-0.20230321154305-ba9bfc7b2551 // indirect
+	github.com/onflow/cadence v0.37.0 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.12.1 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.12.1 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
-	github.com/onflow/flow-go-sdk v0.35.0 // indirect
+	github.com/onflow/flow-go-sdk v0.37.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221202093946-932d1c70e288 // indirect
 	github.com/onflow/go-bitswap v0.0.0-20221017184039-808c5791a8a8 // indirect
 	github.com/onflow/sdks v0.5.0 // indirect
@@ -239,7 +240,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.8.0 // indirect
 	go.opentelemetry.io/otel/trace v1.8.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
-	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/dig v1.15.0 // indirect
 	go.uber.org/fx v1.18.2 // indirect
 	go.uber.org/multierr v1.9.0 // indirect

@@ -8,20 +8,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type ContractUpdateKey struct {
-	Address flow.Address
-	Name    string
-}
-
 type ContractUpdate struct {
-	ContractUpdateKey
-	Code []byte
+	Location common.AddressLocation
+	Code     []byte
 }
 
 type ContractUpdates struct {
-	Updates   []ContractUpdateKey
-	Deploys   []ContractUpdateKey
-	Deletions []ContractUpdateKey
+	Updates   []common.AddressLocation
+	Deploys   []common.AddressLocation
+	Deletions []common.AddressLocation
 }
 
 func (u ContractUpdates) Any() bool {
@@ -113,11 +108,7 @@ func (invalidator ProgramInvalidator) ShouldInvalidateEntry(
 	// invalidate all programs depending on any of the contracts that were
 	// updated. A program has itself listed as a dependency, so that this
 	// simpler.
-	for _, key := range invalidator.ContractUpdates.Updates {
-		loc := common.AddressLocation{
-			Address: common.MustBytesToAddress(key.Address.Bytes()),
-			Name:    key.Name,
-		}
+	for _, loc := range invalidator.ContractUpdates.Updates {
 		ok := program.Dependencies.ContainsLocation(loc)
 		if ok {
 			return true
@@ -126,14 +117,14 @@ func (invalidator ProgramInvalidator) ShouldInvalidateEntry(
 
 	// In case a contract was deployed or removed from an address,
 	// we need to invalidate all programs depending on that address.
-	for _, key := range invalidator.ContractUpdates.Deploys {
-		ok := program.Dependencies.ContainsAddress(common.MustBytesToAddress(key.Address.Bytes()))
+	for _, loc := range invalidator.ContractUpdates.Deploys {
+		ok := program.Dependencies.ContainsAddress(loc.Address)
 		if ok {
 			return true
 		}
 	}
-	for _, key := range invalidator.ContractUpdates.Deletions {
-		ok := program.Dependencies.ContainsAddress(common.MustBytesToAddress(key.Address.Bytes()))
+	for _, loc := range invalidator.ContractUpdates.Deletions {
+		ok := program.Dependencies.ContainsAddress(loc.Address)
 		if ok {
 			return true
 		}

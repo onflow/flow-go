@@ -61,7 +61,6 @@ type CommonSuite struct {
 	me                *module.Local
 	metrics           *metrics.NoopCollector
 	tracer            realModule.Tracer
-	cleaner           *storage.Cleaner
 	headers           *storage.Headers
 	payloads          *storage.Payloads
 	state             *protocol.ParticipantState
@@ -110,10 +109,6 @@ func (cs *CommonSuite) SetupTest() {
 			return cs.myID
 		},
 	)
-
-	// set up storage cleaner
-	cs.cleaner = &storage.Cleaner{}
-	cs.cleaner.On("RunGC").Return()
 
 	// set up header storage mock
 	cs.headers = &storage.Headers{}
@@ -257,7 +252,6 @@ func (cs *CommonSuite) SetupTest() {
 		cs.metrics,
 		cs.metrics,
 		cs.tracer,
-		cs.cleaner,
 		cs.headers,
 		cs.payloads,
 		cs.state,
