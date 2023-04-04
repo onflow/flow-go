@@ -158,11 +158,26 @@ func TestGossipSubAppSpecificScoreRegistry_AppSpecificScoreFunc_Init(t *testing.
 	assert.Equal(t, record.Decay, scoring.InitAppScoreRecordState().Decay) // decay should be initialized to the initial state.
 }
 
-// TestGossipSubAppSpecificScoreRegistry_Get_Then_Report tests when a peer id is queried for the first time by the
+func TestInitWhenGetGoesFirst(t *testing.T) {
+	t.Run("graft", func(t *testing.T) {
+		testInitWhenGetFirst(t, p2p.CtrlMsgGraft, penaltyValueFixtures().Graft)
+	})
+	t.Run("prune", func(t *testing.T) {
+		testInitWhenGetFirst(t, p2p.CtrlMsgPrune, penaltyValueFixtures().Prune)
+	})
+	t.Run("ihave", func(t *testing.T) {
+		testInitWhenGetFirst(t, p2p.CtrlMsgIHave, penaltyValueFixtures().IHave)
+	})
+	t.Run("iwant", func(t *testing.T) {
+		testInitWhenGetFirst(t, p2p.CtrlMsgIWant, penaltyValueFixtures().IWant)
+	})
+}
+
+// testInitWhenGetFirst tests when a peer id is queried for the first time by the
 // app specific score function, the score is initialized to the initial state. Then, the score is reported and the
 // score is updated in the cache. The next time the app specific score function is called, the score should be the
 // updated score.
-func TestGossipSubAppSpecificScoreRegistry_Get_Then_Report(t *testing.T) {
+func testInitWhenGetFirst(t *testing.T, messageType p2p.ControlMessageType, expectedPenalty float64) {
 	reg, cache := newGossipSubAppSpecificScoreRegistry()
 	peerID := peer.ID("peer-1")
 
@@ -184,7 +199,7 @@ func TestGossipSubAppSpecificScoreRegistry_Get_Then_Report(t *testing.T) {
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
 		PeerID:  peerID,
-		MsgType: p2p.CtrlMsgGraft,
+		MsgType: messageType,
 		Count:   1,
 	})
 
@@ -192,19 +207,34 @@ func TestGossipSubAppSpecificScoreRegistry_Get_Then_Report(t *testing.T) {
 	record, err, ok = cache.Get(peerID) // get the record from the cache.
 	assert.True(t, ok)
 	assert.NoError(t, err)
-	assert.Less(t, math.Abs(scoring.DefaultGossipSubCtrlMsgPenaltyValue().Graft-record.Score), 10e-3) // score should be updated to -10.
-	assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay)                            // decay should be initialized to the initial state.
+	assert.Less(t, math.Abs(expectedPenalty-record.Score), 10e-3)          // score should be updated to -10.
+	assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
 
 	// when the app specific score function is called again, the score should be updated.
 	score = reg.AppSpecificScoreFunc()(peerID)
-	assert.Less(t, math.Abs(scoring.DefaultGossipSubCtrlMsgPenaltyValue().Graft-score), 10e-3) // score should be updated to -10.
+	assert.Less(t, math.Abs(expectedPenalty-score), 10e-3) // score should be updated to -10.
 }
 
-// TestGossipSubAppSpecificScoreRegistry_Report_Then_Get tests situation where a peer id is report for the first time
+func TestInitWhenReportGoesFirst(t *testing.T) {
+	t.Run("graft", func(t *testing.T) {
+		testInitWhenReportGoesFirst(t, p2p.CtrlMsgGraft, penaltyValueFixtures().Graft)
+	})
+	t.Run("prune", func(t *testing.T) {
+		testInitWhenReportGoesFirst(t, p2p.CtrlMsgPrune, penaltyValueFixtures().Prune)
+	})
+	t.Run("ihave", func(t *testing.T) {
+		testInitWhenReportGoesFirst(t, p2p.CtrlMsgIHave, penaltyValueFixtures().IHave)
+	})
+	t.Run("iwant", func(t *testing.T) {
+		testInitWhenReportGoesFirst(t, p2p.CtrlMsgIWant, penaltyValueFixtures().IWant)
+	})
+}
+
+// testInitWhenReportGoesFirst tests situation where a peer id is reported for the first time
 // before the app specific score function is called for the first time on it.
 // The test expects the score to be initialized to the initial state and then updated by the penalty value.
 // Subsequent calls to the app specific score function should return the updated score.
-func TestGossipSubAppSpecificScoreRegistry_Report_Then_Get(t *testing.T) {
+func testInitWhenReportGoesFirst(t *testing.T, messageType p2p.ControlMessageType, expectedPenalty float64) {
 	reg, cache := newGossipSubAppSpecificScoreRegistry()
 	peerID := peer.ID("peer-1")
 
@@ -227,11 +257,64 @@ func TestGossipSubAppSpecificScoreRegistry_Report_Then_Get(t *testing.T) {
 	assert.Less(t, math.Abs(scoring.DefaultGossipSubCtrlMsgPenaltyValue().Graft-score), 10e-3) // score should be updated to -10, we account for decay.
 }
 
-// TestGossipSubAppSpecificScoreRegistry_Concurrent_Report_And_Get tests concurrent calls to the app specific score
+// TestScoreDecays tests that the score decays over time.
+func TestScoreDecays(t *testing.T) {
+	reg, _ := newGossipSubAppSpecificScoreRegistry()
+	peerID := peer.ID("peer-1")
+
+	// report a misbehavior for the peer id.
+	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+		PeerID:  peerID,
+		MsgType: p2p.CtrlMsgPrune,
+		Count:   1,
+	})
+
+	time.Sleep(1 * time.Second) // wait for the score to decay.
+
+	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+		PeerID:  peerID,
+		MsgType: p2p.CtrlMsgGraft,
+		Count:   1,
+	})
+
+	time.Sleep(1 * time.Second) // wait for the score to decay.
+
+	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+		PeerID:  peerID,
+		MsgType: p2p.CtrlMsgIHave,
+		Count:   1,
+	})
+
+	time.Sleep(1 * time.Second) // wait for the score to decay.
+
+	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+		PeerID:  peerID,
+		MsgType: p2p.CtrlMsgIWant,
+		Count:   1,
+	})
+
+	time.Sleep(1 * time.Second) // wait for the score to decay.
+
+	// when the app specific score function is called for the first time, the score should be updated.
+	score := reg.AppSpecificScoreFunc()(peerID)
+	scoreUpperBound := penaltyValueFixtures().Prune +
+		penaltyValueFixtures().Graft +
+		penaltyValueFixtures().IHave +
+		penaltyValueFixtures().IWant // the upper bound is the sum of the penalties without decay.
+	// the lower bound is the sum of the penalties with decay assuming the decay is applied 4 times to the sum of the penalties.
+	// in reality, the decay is applied 4 times to the first penalty, then 3 times to the second penalty, and so on.
+	scoreLowerBound := scoreUpperBound * math.Pow(scoring.InitAppScoreRecordState().Decay, 4)
+
+	// with decay, the score should be between the upper and lower bounds.
+	assert.Greater(t, score, scoreUpperBound)
+	assert.Less(t, score, scoreLowerBound)
+}
+
+// TestConcurrentGetAndReport tests concurrent calls to the app specific score
 // and report function when there is no record in the cache about the peer.
 // The test expects the score to be initialized to the initial state and then updated by the penalty value, regardless of
 // the order of the calls.
-func TestGossipSubAppSpecificScoreRegistry_Concurrent_Report_And_Get(t *testing.T) {
+func TestConcurrentGetAndReport(t *testing.T) {
 	reg, cache := newGossipSubAppSpecificScoreRegistry()
 	peerID := peer.ID("peer-1")
 
@@ -273,6 +356,18 @@ func newGossipSubAppSpecificScoreRegistry() (*scoring.GossipSubAppSpecificScoreR
 		Logger:        unittest.Logger(),
 		Collector:     metrics.NewNoopCollector(),
 		DecayFunction: scoring.DefaultDecayFunction(),
-		Penalty:       scoring.DefaultGossipSubCtrlMsgPenaltyValue(),
+		Penalty:       penaltyValueFixtures(),
 	}, scoring.WithScoreCache(cache)), cache
+}
+
+// penaltyValueFixtures returns a set of penalty values for testing purposes.
+// The values are not realistic. The important thing is that they are different from each other. This is to make sure
+// that the tests are not passing because of the default values.
+func penaltyValueFixtures() scoring.GossipSubCtrlMsgPenaltyValue {
+	return scoring.GossipSubCtrlMsgPenaltyValue{
+		Graft: -100,
+		Prune: -50,
+		IHave: -20,
+		IWant: -10,
+	}
 }
