@@ -11,6 +11,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -79,6 +80,7 @@ func (suite *MutatorSuite) SetupTest() {
 	headers, _, seals, index, conPayloads, blocks, qcs, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
+	suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.NoError(err)

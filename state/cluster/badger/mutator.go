@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/fork"
@@ -135,20 +136,9 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		checkTxsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
 		defer checkTxsSpan.End()
 
-		// a valid collection must reference a valid reference block
-		// NOTE: it is valid for a collection to be expired at this point,
-		// otherwise we would compromise liveness of the cluster.
-		refBlock, err := m.headers.ByBlockID(payload.ReferenceBlockID)
+		err = m.checkReferenceBlockValidity(payload, finalizedConsensusHeight)
 		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				return state.NewUnverifiableExtensionError("cluster block references unknown reference block (id=%x)", payload.ReferenceBlockID)
-			}
-			return fmt.Errorf("could not check reference block: %w", err)
-		}
-		// The reference block must fall within this cluster's operating epoch
-		err = m.checkReferenceBlockInOperatingEpoch(refBlock)
-		if err != nil {
-			return fmt.Errorf("invalid reference block (id=%x): %w", payload.ReferenceBlockID, err) // state.InvalidExtensionError or exception
+			return fmt.Errorf("invalid reference block: %w", err)
 		}
 
 		// no validation of transactions is necessary for empty collections
@@ -196,9 +186,6 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 				minRefHeight, maxRefHeight, flow.DefaultTransactionExpiry)
 		}
 
-		// TODO ensure the reference block is part of the main chain
-		_ = refBlock
-
 		// check for duplicate transactions in block's ancestry
 		txLookup := make(map[flow.Identifier]struct{})
 		for _, tx := range block.Payload.Collection.Transactions {
@@ -244,11 +231,44 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 	return nil
 }
 
-// checkReferenceBlockInOperatingEpoch validates that the reference block must
-// be within the cluster's operating epoch.
+// checkReferenceBlockValidity validates the reference block is valid.
+//   - it must be a known, finalized block on the main consensus chain
+//   - it must be within the cluster's operating epoch
+//
 // Expected error returns:
 //   - state.InvalidExtensionError if the reference block is invalid for use.
-func (m *MutableState) checkReferenceBlockInOperatingEpoch(refBlock *flow.Header) error {
+//   - state.UnverifiableExtensionError if the reference block is unknown.
+func (m *MutableState) checkReferenceBlockValidity(payload *cluster.Payload, finalizedConsensusHeight uint64) error {
+
+	// 1 - the reference block must be known
+	refBlock, err := m.headers.ByBlockID(payload.ReferenceBlockID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return state.NewUnverifiableExtensionError("cluster block references unknown reference block (id=%x)", payload.ReferenceBlockID)
+		}
+		return fmt.Errorf("could not check reference block: %w", err)
+	}
+
+	// 2 - the reference block must be finalized
+	if refBlock.Height > finalizedConsensusHeight {
+		// a reference block which is above the finalized boundary can't be verified yet
+		return state.NewUnverifiableExtensionError("reference block is above finalized boundary (%d>%d)", refBlock.Height, finalizedConsensusHeight)
+	} else {
+		storedBlockIDForHeight, err := m.headers.BlockIDByHeight(refBlock.Height)
+		if err != nil {
+			return irrecoverable.NewExceptionf("could not look up block ID for finalized height: %w", err)
+		}
+		// a reference block with height at or below the finalized boundary must have been finalized
+		if storedBlockIDForHeight != payload.ReferenceBlockID {
+			return state.NewInvalidExtensionErrorf("cluster block references orphaned reference block (id=%x, height=%d), the block finalized at this height is %x",
+				payload.ReferenceBlockID, refBlock.Height, storedBlockIDForHeight)
+		}
+	}
+
+	// TODO ensure the reference block is part of the main chain
+	_ = refBlock
+
+	// 3 - the reference block must fall within the operating epoch of the cluster
 	refEpoch, err := m.epochLookup.EpochForViewWithFallback(refBlock.View)
 	if err != nil {
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {

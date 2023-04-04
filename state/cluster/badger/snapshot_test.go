@@ -9,6 +9,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/onflow/flow-go/model/cluster"
@@ -66,6 +67,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.Require().NoError(err)
 	suite.epochCounter = root.Encodable().Epochs.Current.Counter
 	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
+	suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Require().NoError(err)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -82,6 +83,7 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.blocks = blocks
 	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
 	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
+	suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter)
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
