@@ -121,9 +121,9 @@ func (b *GossipSubInspectorBuilder) SetPublicNetwork(public bool) *GossipSubInsp
 	return b
 }
 
-// buildGossipsubRPCInspectorHeroStoreOpts builds the gossipsub rpc validation inspector hero store opts.
+// heroStoreOpts builds the gossipsub rpc validation inspector hero store opts.
 // These options are used in the underlying worker pool hero store.
-func (b *GossipSubInspectorBuilder) buildGossipsubRPCInspectorHeroStoreOpts(size uint32, collectorFactory metricsCollectorFactory) []queue.HeroStoreConfigOption {
+func (b *GossipSubInspectorBuilder) heroStoreOpts(size uint32, collectorFactory metricsCollectorFactory) []queue.HeroStoreConfigOption {
 	heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(size)}
 	if b.metricsEnabled {
 		heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collectorFactory()))
@@ -146,13 +146,13 @@ func (b *GossipSubInspectorBuilder) metricsInspectorMetricsCollectorFactory() me
 // buildGossipSubMetricsInspector builds the gossipsub rpc metrics inspector.
 func (b *GossipSubInspectorBuilder) buildGossipSubMetricsInspector() p2p.GossipSubRPCInspector {
 	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(b.netMetrics, b.logger)
-	metricsInspectorHeroStoreOpts := b.buildGossipsubRPCInspectorHeroStoreOpts(b.inspectorsConfig.MetricsInspectorConfigs.CacheSize, b.metricsInspectorMetricsCollectorFactory())
+	metricsInspectorHeroStoreOpts := b.heroStoreOpts(b.inspectorsConfig.MetricsInspectorConfigs.CacheSize, b.metricsInspectorMetricsCollectorFactory())
 	metricsInspector := inspector.NewControlMsgMetricsInspector(b.logger, gossipSubMetrics, b.inspectorsConfig.MetricsInspectorConfigs.NumberOfWorkers, metricsInspectorHeroStoreOpts...)
 	return metricsInspector
 }
 
-// gossipSubRPCValidationInspectorConfig returns a new inspector.ControlMsgValidationInspectorConfig using configuration provided by the node builder.
-func (b *GossipSubInspectorBuilder) gossipSubRPCValidationInspectorConfig(validationConfigs *GossipSubRPCValidationInspectorConfigs, opts ...queue.HeroStoreConfigOption) (*validation.ControlMsgValidationInspectorConfig, error) {
+// validationInspectorConfig returns a new inspector.ControlMsgValidationInspectorConfig using configuration provided by the node builder.
+func (b *GossipSubInspectorBuilder) validationInspectorConfig(validationConfigs *GossipSubRPCValidationInspectorConfigs, opts ...queue.HeroStoreConfigOption) (*validation.ControlMsgValidationInspectorConfig, error) {
 	// setup rpc validation configuration for each control message type
 	graftValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, validationConfigs.GraftLimits)
 	if err != nil {
@@ -175,8 +175,8 @@ func (b *GossipSubInspectorBuilder) gossipSubRPCValidationInspectorConfig(valida
 
 // buildGossipSubValidationInspector builds the gossipsub rpc validation inspector.
 func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.GossipSubRPCInspector, error) {
-	rpcValidationInspectorHeroStoreOpts := b.buildGossipsubRPCInspectorHeroStoreOpts(b.inspectorsConfig.ValidationInspectorConfigs.CacheSize, b.validationInspectorMetricsCollectorFactory())
-	controlMsgRPCInspectorCfg, err := b.gossipSubRPCValidationInspectorConfig(b.inspectorsConfig.ValidationInspectorConfigs, rpcValidationInspectorHeroStoreOpts...)
+	rpcValidationInspectorHeroStoreOpts := b.heroStoreOpts(b.inspectorsConfig.ValidationInspectorConfigs.CacheSize, b.validationInspectorMetricsCollectorFactory())
+	controlMsgRPCInspectorCfg, err := b.validationInspectorConfig(b.inspectorsConfig.ValidationInspectorConfigs, rpcValidationInspectorHeroStoreOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
 	}
