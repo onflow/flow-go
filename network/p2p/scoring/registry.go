@@ -96,6 +96,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 	reg := &GossipSubAppSpecificScoreRegistry{
 		logger:     config.Logger.With().Str("module", "app_score_registry").Logger(),
 		scoreCache: cache,
+		penalty:    config.Penalty,
 	}
 
 	for _, opt := range opts {
@@ -145,13 +146,13 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	record, err := r.scoreCache.Adjust(notification.PeerID, func(record netcache.AppScoreRecord) netcache.AppScoreRecord {
 		switch notification.MsgType {
 		case p2p.CtrlMsgGraft:
-			record.Score -= r.penalty.Graft
+			record.Score += r.penalty.Graft
 		case p2p.CtrlMsgPrune:
-			record.Score -= r.penalty.Prune
+			record.Score += r.penalty.Prune
 		case p2p.CtrlMsgIHave:
-			record.Score -= r.penalty.IHave
+			record.Score += r.penalty.IHave
 		case p2p.CtrlMsgIWant:
-			record.Score -= r.penalty.IWant
+			record.Score += r.penalty.IWant
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
 			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")

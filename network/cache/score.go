@@ -86,6 +86,8 @@ func (a *AppScoreCache) Add(peerId peer.ID, record AppScoreRecord) bool {
 	entityId := flow.HashToID([]byte(peerId)) // HeroCache uses hash of peer.ID as the unique identifier of the entry.
 	return a.c.Add(appScoreRecordEntity{
 		entityId:       entityId,
+		peerID:         peerId,
+		lastUpdated:    time.Now(),
 		AppScoreRecord: record,
 	})
 }
@@ -111,10 +113,6 @@ func (a *AppScoreCache) Adjust(peerID peer.ID, updateFn func(record AppScoreReco
 		e := entry.(appScoreRecordEntity)
 
 		currentRecord := e.AppScoreRecord
-
-		// apply the update function to the entry.
-		e.AppScoreRecord = updateFn(e.AppScoreRecord)
-
 		// apply the pre-processing functions to the entry.
 		for _, apply := range a.preprocessFns {
 			e.AppScoreRecord, err = apply(e.AppScoreRecord, e.lastUpdated)
@@ -123,6 +121,10 @@ func (a *AppScoreCache) Adjust(peerID peer.ID, updateFn func(record AppScoreReco
 				return e // return the original entry if the pre-processing fails (atomic abort).
 			}
 		}
+
+		// apply the update function to the entry.
+		e.AppScoreRecord = updateFn(e.AppScoreRecord)
+
 		if e.AppScoreRecord != currentRecord {
 			e.lastUpdated = time.Now()
 		}

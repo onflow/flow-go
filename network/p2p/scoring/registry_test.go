@@ -2,6 +2,7 @@ package scoring_test
 
 import (
 	"math"
+	"sync"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -156,10 +158,116 @@ func TestGossipSubAppSpecificScoreRegistry_AppSpecificScoreFunc_Init(t *testing.
 	assert.Equal(t, record.Decay, scoring.InitAppScoreRecordState().Decay) // decay should be initialized to the initial state.
 }
 
+// TestGossipSubAppSpecificScoreRegistry_Get_Then_Report tests when a peer id is queried for the first time by the
+// app specific score function, the score is initialized to the initial state. Then, the score is reported and the
+// score is updated in the cache. The next time the app specific score function is called, the score should be the
+// updated score.
+func TestGossipSubAppSpecificScoreRegistry_Get_Then_Report(t *testing.T) {
+	reg, cache := newGossipSubAppSpecificScoreRegistry()
+	peerID := peer.ID("peer-1")
+
+	// initially, the cache should not have the peer id.
+	assert.False(t, cache.Has(peerID))
+
+	// when the app specific score function is called for the first time, the score should be initialized to the initial state.
+	score := reg.AppSpecificScoreFunc()(peerID)
+	assert.Equal(t, score, scoring.InitAppScoreRecordState().Score) // score should be initialized to the initial state.
+
+	// the cache should now have the peer id.
+	assert.True(t, cache.Has(peerID))
+	record, err, ok := cache.Get(peerID) // get the record from the cache.
+	assert.True(t, ok)
+	assert.NoError(t, err)
+	assert.Equal(t, record.Score, scoring.InitAppScoreRecordState().Score) // score should be initialized to the initial state.
+	assert.Equal(t, record.Decay, scoring.InitAppScoreRecordState().Decay) // decay should be initialized to the initial state.
+
+	// report a misbehavior for the peer id.
+	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+		PeerID:  peerID,
+		MsgType: p2p.CtrlMsgGraft,
+		Count:   1,
+	})
+
+	// the score should now be updated.
+	record, err, ok = cache.Get(peerID) // get the record from the cache.
+	assert.True(t, ok)
+	assert.NoError(t, err)
+	assert.Less(t, math.Abs(scoring.DefaultGossipSubCtrlMsgPenaltyValue().Graft-record.Score), 10e-3) // score should be updated to -10.
+	assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay)                            // decay should be initialized to the initial state.
+
+	// when the app specific score function is called again, the score should be updated.
+	score = reg.AppSpecificScoreFunc()(peerID)
+	assert.Less(t, math.Abs(scoring.DefaultGossipSubCtrlMsgPenaltyValue().Graft-score), 10e-3) // score should be updated to -10.
+}
+
+// TestGossipSubAppSpecificScoreRegistry_Report_Then_Get tests situation where a peer id is report for the first time
+// before the app specific score function is called for the first time on it.
+// The test expects the score to be initialized to the initial state and then updated by the penalty value.
+// Subsequent calls to the app specific score function should return the updated score.
+func TestGossipSubAppSpecificScoreRegistry_Report_Then_Get(t *testing.T) {
+	reg, cache := newGossipSubAppSpecificScoreRegistry()
+	peerID := peer.ID("peer-1")
+
+	// report a misbehavior for the peer id.
+	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+		PeerID:  peerID,
+		MsgType: p2p.CtrlMsgGraft,
+		Count:   1,
+	})
+
+	// the score should now be updated.
+	record, err, ok := cache.Get(peerID) // get the record from the cache.
+	assert.True(t, ok)
+	assert.NoError(t, err)
+	assert.Less(t, math.Abs(scoring.DefaultGossipSubCtrlMsgPenaltyValue().Graft-record.Score), 10e-3) // score should be updated to -10, we account for decay.
+	assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay)                            // decay should be initialized to the initial state.
+
+	// when the app specific score function is called for the first time, the score should be updated.
+	score := reg.AppSpecificScoreFunc()(peerID)
+	assert.Less(t, math.Abs(scoring.DefaultGossipSubCtrlMsgPenaltyValue().Graft-score), 10e-3) // score should be updated to -10, we account for decay.
+}
+
+// TestGossipSubAppSpecificScoreRegistry_Concurrent_Report_And_Get tests concurrent calls to the app specific score
+// and report function when there is no record in the cache about the peer.
+// The test expects the score to be initialized to the initial state and then updated by the penalty value, regardless of
+// the order of the calls.
+func TestGossipSubAppSpecificScoreRegistry_Concurrent_Report_And_Get(t *testing.T) {
+	reg, cache := newGossipSubAppSpecificScoreRegistry()
+	peerID := peer.ID("peer-1")
+
+	wg := sync.WaitGroup{} // wait group to wait for all the go routines to finish.
+	wg.Add(2)              // we expect 2 go routines to finish.
+
+	// go routine to call the app specific score function.
+	go func() {
+		defer wg.Done()
+		score := reg.AppSpecificScoreFunc()(peerID)
+		assert.Equal(t, score, scoring.InitAppScoreRecordState().Score) // score should be initialized to the initial state.
+	}()
+
+	// go routine to report a misbehavior for the peer id.
+	go func() {
+		defer wg.Done()
+		reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+			PeerID:  peerID,
+			MsgType: p2p.CtrlMsgGraft,
+			Count:   1,
+		})
+	}()
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "goroutines are not done on time") // wait for the go routines to finish.
+
+	// the score should now be updated.
+	record, err, ok := cache.Get(peerID) // get the record from the cache.
+	assert.True(t, ok)
+	assert.NoError(t, err)
+	assert.Less(t, math.Abs(scoring.DefaultGossipSubCtrlMsgPenaltyValue().Graft-record.Score), 10e-3) // score should be updated to -10.
+}
+
 // newGossipSubAppSpecificScoreRegistry returns a new instance of GossipSubAppSpecificScoreRegistry with default values
 // for the testing purposes.
 func newGossipSubAppSpecificScoreRegistry() (*scoring.GossipSubAppSpecificScoreRegistry, *netcache.AppScoreCache) {
-	cache := netcache.NewAppScoreCache(100, unittest.Logger(), metrics.NewNoopCollector())
+	cache := netcache.NewAppScoreCache(100, unittest.Logger(), metrics.NewNoopCollector(), scoring.DefaultDecayFunction())
 	return scoring.NewGossipSubAppSpecificScoreRegistry(&scoring.GossipSubAppSpecificScoreRegistryConfig{
 		SizeLimit:     100,
 		Logger:        unittest.Logger(),
