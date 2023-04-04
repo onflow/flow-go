@@ -21,16 +21,24 @@ func TestViewTracker(t *testing.T) {
 type ViewTrackerTestSuite struct {
 	suite.Suite
 
-	livenessData *hotstuff.LivenessData
+	initialView uint64
+	initialQC   *flow.QuorumCertificate
+	initialTC   *flow.TimeoutCertificate
+
+	livenessData *hotstuff.LivenessData // Caution: we hand the memory address to viewTracker, which could modify this
 	persist      *mocks.Persister
 	tracker      viewTracker
 }
 
 func (s *ViewTrackerTestSuite) SetupTest() {
+	s.initialView = 5
+	s.initialQC = helper.MakeQC(helper.WithQCView(4))
+	s.initialTC = nil
+
 	s.livenessData = &hotstuff.LivenessData{
-		NewestQC:    helper.MakeQC(helper.WithQCView(4)),
-		LastViewTC:  nil,
-		CurrentView: 5, // we entered view 5 by observing a QC for view 4
+		NewestQC:    s.initialQC,
+		LastViewTC:  s.initialTC,
+		CurrentView: s.initialView, // we entered view 5 by observing a QC for view 4
 	}
 	s.persist = mocks.NewPersister(s.T())
 	s.persist.On("GetLivenessData").Return(s.livenessData, nil).Once()
@@ -54,8 +62,8 @@ func (s *ViewTrackerTestSuite) confirmResultingState(curView uint64, qc *flow.Qu
 // if applicable, by skipping views
 func (s *ViewTrackerTestSuite) TestProcessQC_SkipIncreaseViewThroughQC() {
 	// seeing a QC for the current view should advance the view by one
-	qc := QC(s.livenessData.CurrentView)
-	expectedResultingView := s.livenessData.CurrentView + 1
+	qc := QC(s.initialView)
+	expectedResultingView := s.initialView + 1
 	s.persist.On("PutLivenessData", LivenessData(qc)).Return(nil).Once()
 	resultingCurView, err := s.tracker.ProcessQC(qc)
 	require.NoError(s.T(), err)
@@ -77,9 +85,9 @@ func (s *ViewTrackerTestSuite) TestProcessQC_SkipIncreaseViewThroughQC() {
 // if applicable, by skipping views
 func (s *ViewTrackerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
 	// seeing a TC for the current view should advance the view by one
-	qc := s.livenessData.NewestQC
-	tc := helper.MakeTC(helper.WithTCView(s.livenessData.CurrentView), helper.WithTCNewestQC(qc))
-	expectedResultingView := s.livenessData.CurrentView + 1
+	qc := s.initialQC
+	tc := helper.MakeTC(helper.WithTCView(s.initialView), helper.WithTCNewestQC(qc))
+	expectedResultingView := s.initialView + 1
 	expectedLivenessData := &hotstuff.LivenessData{
 		CurrentView: expectedResultingView,
 		LastViewTC:  tc,
@@ -116,7 +124,7 @@ func (s *ViewTrackerTestSuite) TestProcessTC_IgnoreOldTC() {
 	resultingCurView, err := s.tracker.ProcessTC(tc)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), curView, resultingCurView)
-	s.confirmResultingState(curView, s.livenessData.NewestQC, s.livenessData.LastViewTC)
+	s.confirmResultingState(curView, s.initialQC, s.initialTC)
 }
 
 // TestProcessTC_IgnoreNilTC tests that viewTracker accepts nil TC as allowed input but doesn't trigger a new view event
@@ -125,13 +133,13 @@ func (s *ViewTrackerTestSuite) TestProcessTC_IgnoreNilTC() {
 	resultingCurView, err := s.tracker.ProcessTC(nil)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), curView, resultingCurView)
-	s.confirmResultingState(curView, s.livenessData.NewestQC, s.livenessData.LastViewTC)
+	s.confirmResultingState(curView, s.initialQC, s.initialTC)
 }
 
 // TestProcessQC_PersistException tests that viewTracker propagates exception
 // when processing QC
 func (s *ViewTrackerTestSuite) TestProcessQC_PersistException() {
-	qc := QC(s.livenessData.CurrentView)
+	qc := QC(s.initialView)
 	exception := errors.New("persist-exception")
 	s.persist.On("PutLivenessData", mock.Anything).Return(exception).Once()
 
@@ -142,7 +150,7 @@ func (s *ViewTrackerTestSuite) TestProcessQC_PersistException() {
 // TestProcessTC_PersistException tests that viewTracker propagates exception
 // when processing TC
 func (s *ViewTrackerTestSuite) TestProcessTC_PersistException() {
-	tc := helper.MakeTC(helper.WithTCView(s.livenessData.CurrentView))
+	tc := helper.MakeTC(helper.WithTCView(s.initialView))
 	exception := errors.New("persist-exception")
 	s.persist.On("PutLivenessData", mock.Anything).Return(exception).Once()
 
@@ -155,7 +163,7 @@ func (s *ViewTrackerTestSuite) TestProcessTC_PersistException() {
 func (s *ViewTrackerTestSuite) TestProcessQC_InvalidatesLastViewTC() {
 	initialView := s.tracker.CurView()
 	tc := helper.MakeTC(helper.WithTCView(initialView),
-		helper.WithTCNewestQC(s.livenessData.NewestQC))
+		helper.WithTCNewestQC(s.initialQC))
 	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Twice()
 	resultingCurView, err := s.tracker.ProcessTC(tc)
 	require.NoError(s.T(), err)
@@ -171,11 +179,11 @@ func (s *ViewTrackerTestSuite) TestProcessQC_InvalidatesLastViewTC() {
 
 // TestProcessQC_IgnoreOldQC tests that viewTracker ignores old QC and doesn't advance round
 func (s *ViewTrackerTestSuite) TestProcessQC_IgnoreOldQC() {
-	qc := QC(s.livenessData.CurrentView - 1)
+	qc := QC(s.initialView - 1)
 	resultingCurView, err := s.tracker.ProcessQC(qc)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), s.livenessData.CurrentView, resultingCurView)
-	s.confirmResultingState(s.livenessData.CurrentView, s.livenessData.NewestQC, s.livenessData.LastViewTC)
+	require.Equal(s.T(), s.initialView, resultingCurView)
+	s.confirmResultingState(s.initialView, s.initialQC, s.initialTC)
 }
 
 // TestProcessQC_UpdateNewestQC tests that viewTracker tracks the newest QC even if it has advanced past this view.
@@ -192,13 +200,13 @@ func (s *ViewTrackerTestSuite) TestProcessQC_UpdateNewestQC() {
 	// * newest known QC is for view 4
 	// * we receive a TC for view 55, which results in entering view 56
 	initialView := s.tracker.CurView() //
-	tc := helper.MakeTC(helper.WithTCView(initialView+50), helper.WithTCNewestQC(s.livenessData.NewestQC))
+	tc := helper.MakeTC(helper.WithTCView(initialView+50), helper.WithTCNewestQC(s.initialQC))
 	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Once()
 	expectedView := uint64(56) // processing the TC should results in entering view 56
 	resultingCurView, err := s.tracker.ProcessTC(tc)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), expectedView, resultingCurView)
-	s.confirmResultingState(expectedView, s.livenessData.NewestQC, tc)
+	s.confirmResultingState(expectedView, s.initialQC, tc)
 
 	// Test 1: add QC for view 9, which
 	qc := QC(s.tracker.NewestQC().View + 2)
