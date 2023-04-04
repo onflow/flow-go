@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/module/metrics"
 	netcache "github.com/onflow/flow-go/network/cache"
@@ -418,4 +419,66 @@ func TestAppScoreCache_Get_WithNoPreprocessors(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, 1.0, cachedRecord.Score)
 	assert.Equal(t, 0.5, cachedRecord.Decay)
+}
+
+// TestAppScoreCache_DuplicateAdd_Sequential tests if the cache returns false when a duplicate record is added to the cache.
+// This test evaluates that the cache deduplicates the records based on their peer id and not content, and hence
+// each peer id can only be added once to the cache. We use this feature to check if a peer is already in the cache, and
+// if not initializing its record.
+func TestAppScoreCache_DuplicateAdd_Sequential(t *testing.T) {
+	cache := netcache.NewAppScoreCache(10, unittest.Logger(), metrics.NewNoopCollector())
+
+	record := netcache.AppScoreRecord{
+		Decay: 0.5,
+		Score: 1,
+	}
+	added := cache.Add("peerA", record)
+	assert.True(t, added)
+
+	// verifies that the cache returns false when a duplicate record is added.
+	added = cache.Add("peerA", record)
+	assert.False(t, added)
+
+	// verifies that the cache deduplicates the records based on their peer id and not content.
+	record.Score = 2
+	added = cache.Add("peerA", record)
+	assert.False(t, added)
+}
+
+// TestAppScoreCache_DuplicateAdd_Concurrent tests if the cache returns false when a duplicate record is added to the cache.
+// Test is the concurrent version of TestAppScoreCache_DuplicateAdd_Sequential.
+func TestAppScoreCache_DuplicateAdd_Concurrent(t *testing.T) {
+	cache := netcache.NewAppScoreCache(10, unittest.Logger(), metrics.NewNoopCollector())
+
+	successAdd := atomic.Int32{}
+	successAdd.Store(0)
+
+	record1 := netcache.AppScoreRecord{
+		Decay: 0.5,
+		Score: 1,
+	}
+
+	record2 := netcache.AppScoreRecord{
+		Decay: 0.5,
+		Score: 2,
+	}
+
+	wg := sync.WaitGroup{} // wait group to wait for all goroutines to finish.
+	wg.Add(2)
+	// adds a record to the cache concurrently.
+	add := func(record netcache.AppScoreRecord) {
+		added := cache.Add("peerA", record)
+		if added {
+			successAdd.Inc()
+		}
+		wg.Done()
+	}
+
+	go add(record1)
+	go add(record2)
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "could not add records to the cache")
+
+	// verifies that only one of the records was added to the cache.
+	assert.Equal(t, int32(1), successAdd.Load())
 }
