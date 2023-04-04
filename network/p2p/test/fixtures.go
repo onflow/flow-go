@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -60,7 +61,7 @@ func NodeFixture(
 ) (p2p.LibP2PNode, flow.Identity) {
 	// default parameters
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
-	defaultRPCValidationInpectorCfg := p2pbuilder.DefaultRPCValidationConfig()
+	defaultRPCValidationInpectorCfg := inspectorbuilder.DefaultRPCValidationConfig()
 	rpcInspectorNotifDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(logger)
 	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(metrics.NewNoopCollector(), logger)
 	metricsInspector := inspector.NewControlMsgMetricsInspector(logger, gossipSubMetrics, inspector.DefaultControlMsgMetricsInspectorNumberOfWorkers)

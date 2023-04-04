@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -109,7 +110,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		idProvider,
 		p2pbuilder.DefaultGossipSubConfig().LocalMeshLogInterval)
 
-	defaultRPCValidationInpectorCfg := p2pbuilder.DefaultRPCValidationConfig()
+	defaultRPCValidationInpectorCfg := inspectorbuilder.DefaultRPCValidationConfig()
 	rpcInspectorNotifDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(logger)
 
 	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(metrics.NewNoopCollector(), logger)

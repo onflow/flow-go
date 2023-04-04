@@ -42,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
@@ -451,7 +452,7 @@ func generateLibP2PNode(t *testing.T,
 	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, connection.DefaultConnManagerConfig())
 	require.NoError(t, err)
 
-	defaultRPCValidationInpectorCfg := p2pbuilder.DefaultRPCValidationConfig()
+	defaultRPCValidationInpectorCfg := inspectorbuilder.DefaultRPCValidationConfig()
 	rpcInspectorNotifDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(logger)
 
 	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(metrics.NewNoopCollector(), logger)

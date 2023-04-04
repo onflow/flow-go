@@ -165,3 +165,24 @@ func (b *GossipSubInspectorBuilder) Build() ([]p2p.GossipSubRPCInspector, error)
 	}
 	return []p2p.GossipSubRPCInspector{metricsInspector, validationInspector}, nil
 }
+
+// DefaultRPCValidationConfig returns default RPC control message inspector config.
+func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation.ControlMsgValidationInspectorConfig {
+	graftCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, validation.CtrlMsgValidationLimits{
+		validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
+		validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
+		validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
+	})
+	pruneCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgPrune, validation.CtrlMsgValidationLimits{
+		validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
+		validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
+		validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
+	})
+
+	return &validation.ControlMsgValidationInspectorConfig{
+		NumberOfWorkers:     validation.DefaultNumberOfWorkers,
+		InspectMsgStoreOpts: opts,
+		GraftValidationCfg:  graftCfg,
+		PruneValidationCfg:  pruneCfg,
+	}
+}

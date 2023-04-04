@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 )
 
@@ -47,7 +48,7 @@ func NewCorruptLibP2PNodeFactory(
 
 		gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(metrics, log)
 		metricsInspector := inspector.NewControlMsgMetricsInspector(log, gossipSubMetrics, inspector.DefaultControlMsgMetricsInspectorNumberOfWorkers)
-		rpcValidationInspector := validation.NewControlMsgValidationInspector(log, sporkId, p2pbuilder.DefaultRPCValidationConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(log))
+		rpcValidationInspector := validation.NewControlMsgValidationInspector(log, sporkId, inspectorbuilder.DefaultRPCValidationConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(log))
 		gossipSubCfg.RPCInspectors = []p2p.GossipSubRPCInspector{metricsInspector, rpcValidationInspector}
 		builder, err := p2pbuilder.DefaultNodeBuilder(
 			log,

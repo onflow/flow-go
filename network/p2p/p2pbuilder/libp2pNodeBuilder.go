@@ -21,7 +21,6 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
@@ -37,7 +36,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	gossipsubbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/gossipsub"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -154,27 +152,6 @@ func DefaultResourceManagerConfig() *ResourceManagerConfig {
 		MemoryLimitRatio:          defaultMemoryLimitRatio,
 		FileDescriptorsRatio:      defaultFileDescriptorsRatio,
 		PeerBaseLimitConnsInbound: defaultPeerBaseLimitConnsInbound,
-	}
-}
-
-// DefaultRPCValidationConfig returns default RPC control message inspector config.
-func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation.ControlMsgValidationInspectorConfig {
-	graftCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, validation.CtrlMsgValidationLimits{
-		validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
-		validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
-		validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
-	})
-	pruneCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgPrune, validation.CtrlMsgValidationLimits{
-		validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
-		validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
-		validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
-	})
-
-	return &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:     validation.DefaultNumberOfWorkers,
-		InspectMsgStoreOpts: opts,
-		GraftValidationCfg:  graftCfg,
-		PruneValidationCfg:  pruneCfg,
 	}
 }
 
