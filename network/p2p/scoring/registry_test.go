@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/module/metrics"
@@ -133,14 +134,37 @@ func TestDefaultDecayFunction(t *testing.T) {
 	}
 }
 
+// TestGossipSubAppSpecificScoreRegistry_AppSpecificScoreFunc_Init tests when a peer id is queried for the first time by the
+// app specific score function, the score is initialized to the initial state.
+func TestGossipSubAppSpecificScoreRegistry_AppSpecificScoreFunc_Init(t *testing.T) {
+	reg, cache := newGossipSubAppSpecificScoreRegistry()
+	peerID := peer.ID("peer-1")
+
+	// initially, the cache should not have the peer id.
+	assert.False(t, cache.Has(peerID))
+
+	// when the app specific score function is called for the first time, the score should be initialized to the initial state.
+	score := reg.AppSpecificScoreFunc()(peerID)
+	assert.Equal(t, score, scoring.InitAppScoreRecordState().Score) // score should be initialized to the initial state.
+
+	// the cache should now have the peer id.
+	assert.True(t, cache.Has(peerID))
+	record, err, ok := cache.Get(peerID) // get the record from the cache.
+	assert.True(t, ok)
+	assert.NoError(t, err)
+	assert.Equal(t, record.Score, scoring.InitAppScoreRecordState().Score) // score should be initialized to the initial state.
+	assert.Equal(t, record.Decay, scoring.InitAppScoreRecordState().Decay) // decay should be initialized to the initial state.
+}
+
 // newGossipSubAppSpecificScoreRegistry returns a new instance of GossipSubAppSpecificScoreRegistry with default values
 // for the testing purposes.
-func newGossipSubAppSpecificScoreRegistry() *scoring.GossipSubAppSpecificScoreRegistry {
+func newGossipSubAppSpecificScoreRegistry() (*scoring.GossipSubAppSpecificScoreRegistry, *netcache.AppScoreCache) {
+	cache := netcache.NewAppScoreCache(100, unittest.Logger(), metrics.NewNoopCollector())
 	return scoring.NewGossipSubAppSpecificScoreRegistry(&scoring.GossipSubAppSpecificScoreRegistryConfig{
 		SizeLimit:     100,
 		Logger:        unittest.Logger(),
 		Collector:     metrics.NewNoopCollector(),
 		DecayFunction: scoring.DefaultDecayFunction(),
 		Penalty:       scoring.DefaultGossipSubCtrlMsgPenaltyValue(),
-	})
+	}, scoring.WithScoreCache(cache)), cache
 }
