@@ -123,9 +123,10 @@ func withConsumer(
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationBlockHeight)
 		collector := &metrics.NoopCollector{}
 		tracer := trace.NewNoopTracer()
+		log := unittest.Logger()
 		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		s := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
+		s := testutil.CompleteStateFixture(t, log, collector, tracer, rootSnapshot)
 
 		engine := &mockBlockProcessor{
 			process: process,
