@@ -27,7 +27,7 @@ const (
 // ObserveRPCMetricsRequest represents a request to capture metrics for the provided RPC
 type ObserveRPCMetricsRequest struct {
 	// Nonce adds random value so that when msg req is stored on hero store a unique ID can be created from the struct fields.
-	Nonce string
+	Nonce []byte
 	// From the sender of the RPC.
 	From peer.ID
 	// rpc the rpc message.

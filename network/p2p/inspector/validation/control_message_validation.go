@@ -32,7 +32,7 @@ const (
 // InspectMsgRequest represents a short digest of an RPC control message. It is used for further message inspection by component workers.
 type InspectMsgRequest struct {
 	// Nonce adds random value so that when msg req is stored on hero store a unique ID can be created from the struct fields.
-	Nonce string
+	Nonce []byte
 	// Peer sender of the message.
 	Peer peer.ID
 	// CtrlMsg the control message that will be inspected.
