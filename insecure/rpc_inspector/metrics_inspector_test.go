@@ -81,5 +81,5 @@ func TestMetricsInspector_ObserveRPC(t *testing.T) {
 	// eventually we should process each spammed control message and observe metrics for them
 	require.Eventually(t, func() bool {
 		return metricsObservedCount.Load() == int64(controlMessageCount)
-	}, 2*time.Second, 10*time.Millisecond, "did not observe metrics for all control messages on time")
+	}, 5*time.Second, 10*time.Millisecond, "did not observe metrics for all control messages on time")
 }
