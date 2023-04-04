@@ -78,7 +78,7 @@ func (s *blockSignerDecoderSuite) Test_CommitteeException() {
 		require.Empty(s.T(), ids)
 		require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
 		require.False(s.T(), signature.IsInvalidSignerIndicesError(err))
-		require.True(s.T(), errors.Is(err, exception))
+		require.ErrorIs(s.T(), err, exception)
 	})
 	s.Run("ByBlock exception", func() {
 		exception := errors.New("unexpected exception")
@@ -90,7 +90,7 @@ func (s *blockSignerDecoderSuite) Test_CommitteeException() {
 		require.Empty(s.T(), ids)
 		require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
 		require.False(s.T(), signature.IsInvalidSignerIndicesError(err))
-		require.True(s.T(), errors.Is(err, exception))
+		require.ErrorIs(s.T(), err, exception)
 	})
 }
 

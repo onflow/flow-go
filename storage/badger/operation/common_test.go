@@ -276,6 +276,7 @@ func TestRetrieveUnencodeable(t *testing.T) {
 	})
 }
 
+// TestExists verifies that `exists` returns correct results in different scenarios.
 func TestExists(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		t.Run("non-existent key", func(t *testing.T) {
