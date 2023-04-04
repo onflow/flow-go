@@ -34,8 +34,8 @@ func (s *InMemStorage) Commit(header *flow.Header, update map[flow.RegisterID]fl
 
 	h := header.Height
 	// check commit sequence
-	if s.headerMeta.height != h+1 {
-		return fmt.Errorf("commit height mismatch [%d] != [%d]", s.headerMeta.height, h+1)
+	if s.headerMeta.height+1 != h {
+		return fmt.Errorf("commit height mismatch [%d] != [%d]", s.headerMeta.height+1, h)
 	}
 	if s.headerMeta.id != header.ParentID {
 		return fmt.Errorf("commit parent id mismatch [%x] != [%x]", s.headerMeta.id, header.ParentID)
