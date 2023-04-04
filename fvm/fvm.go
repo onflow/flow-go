@@ -176,9 +176,8 @@ func (vm *VirtualMachine) RunV2(
 	}
 
 	// TODO(patrick): initialize view inside TransactionState
-	view := delta.NewDeltaView(storageSnapshot)
 	nestedTxn := state.NewTransactionState(
-		view,
+		delta.NewDeltaView(storageSnapshot),
 		state.DefaultParameters().
 			WithMeterParameters(getBasicMeterParameters(ctx, proc)).
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
@@ -207,7 +206,12 @@ func (vm *VirtualMachine) RunV2(
 		}
 	}
 
-	return view.Finalize(), executor.Output(), nil
+	executionSnapshot, err := txnState.FinalizeMainTransaction()
+	if err != nil {
+		return nil, ProcedureOutput{}, err
+	}
+
+	return executionSnapshot, executor.Output(), nil
 }
 
 func (vm *VirtualMachine) Run(

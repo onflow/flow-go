@@ -164,7 +164,8 @@ func main() {
 	displayPortAssignments()
 	fmt.Println()
 
-	fmt.Print("Run \"make start\" to launch the network.\n")
+	fmt.Println("Run \"make start\" to re-build images and launch the network.")
+	fmt.Println("Run \"make start-cached\" to launch the network without rebuilding images")
 }
 
 func displayFlowNetworkConf(flowNetworkConf testnet.NetworkConfig) {
