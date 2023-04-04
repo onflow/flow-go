@@ -22,27 +22,27 @@ func TestAppScoreCache_Update(t *testing.T) {
 	cache := netcache.NewAppScoreCache(100, unittest.Logger(), metrics.NewNoopCollector())
 
 	// tests adding a new entry to the cache.
-	require.NoError(t, cache.Add("peer1", netcache.AppScoreRecord{
+	require.True(t, cache.Add("peer0", netcache.AppScoreRecord{
 		Decay: 0.1,
 		Score: 0.5,
 	}))
 
 	// tests updating an existing entry in the cache.
-	require.NoError(t, cache.Add("peer1", netcache.AppScoreRecord{
+	require.False(t, cache.Add("peer0", netcache.AppScoreRecord{
 		Decay: 0.1,
 		Score: 0.5,
 	}))
 
 	// makes the cache full.
-	for i := 0; i < 100; i++ {
-		require.NoError(t, cache.Add(peer.ID(fmt.Sprintf("peer%d", i)), netcache.AppScoreRecord{
+	for i := 1; i < 100; i++ {
+		require.True(t, cache.Add(peer.ID(fmt.Sprintf("peer%d", i)), netcache.AppScoreRecord{
 			Decay: 0.1,
 			Score: 0.5,
 		}))
 	}
 
 	// adding a new entry to the cache should fail.
-	require.Error(t, cache.Add("peer101", netcache.AppScoreRecord{
+	require.False(t, cache.Add("peer101", netcache.AppScoreRecord{
 		Decay: 0.1,
 		Score: 0.5,
 	}))
@@ -57,8 +57,8 @@ func TestAppScoreCache_Update(t *testing.T) {
 		require.Equal(t, 0.5, record.Score)
 	}
 
-	// yet updating an existing entry should still work.
-	require.NoError(t, cache.Add("peer1", netcache.AppScoreRecord{
+	// yet attempting on adding an existing entity should fail.
+	require.False(t, cache.Add("peer1", netcache.AppScoreRecord{
 		Decay: 0.2,
 		Score: 0.8,
 	}))
@@ -82,11 +82,11 @@ func TestConcurrentUpdateAndGet(t *testing.T) {
 		go func(num int) {
 			defer wg.Done()
 			peerID := fmt.Sprintf("peer%d", num)
-			err := cache.Add(peer.ID(peerID), netcache.AppScoreRecord{
+			added := cache.Add(peer.ID(peerID), netcache.AppScoreRecord{
 				Decay: 0.1 * float64(num),
 				Score: float64(num),
 			})
-			require.NoError(t, err)
+			require.True(t, added)
 		}(i)
 	}
 
@@ -116,7 +116,7 @@ func TestAdjust(t *testing.T) {
 	peerID := "peer1"
 
 	// tests adjusting the score of an existing record.
-	require.NoError(t, cache.Add(peer.ID(peerID), netcache.AppScoreRecord{
+	require.True(t, cache.Add(peer.ID(peerID), netcache.AppScoreRecord{
 		Decay: 0.1,
 		Score: 0.5,
 	}))
@@ -151,7 +151,7 @@ func TestConcurrentAdjust(t *testing.T) {
 			Decay: 0.1 * float64(i),
 			Score: float64(i),
 		})
-		require.NoError(t, err)
+		require.True(t, err)
 	}
 
 	// uses a wait group to wait for all goroutines to finish.
@@ -208,7 +208,7 @@ func TestAdjustWithPreprocess(t *testing.T) {
 
 	peerID := "peer1"
 	// adds a record to the cache.
-	require.NoError(t, cache.Add(peer.ID(peerID), netcache.AppScoreRecord{
+	require.True(t, cache.Add(peer.ID(peerID), netcache.AppScoreRecord{
 		Decay: 0.1,
 		Score: 0.5,
 	}))
@@ -246,7 +246,7 @@ func TestAdjustWithPreprocessError(t *testing.T) {
 
 	peerID := "peer1"
 	// adds a record to the cache.
-	require.NoError(t, cache.Add(peer.ID(peerID), netcache.AppScoreRecord{
+	require.True(t, cache.Add(peer.ID(peerID), netcache.AppScoreRecord{
 		Decay: 0.1,
 		Score: 0.5,
 	}))
@@ -277,15 +277,16 @@ func TestAppScoreRecordStoredByValue(t *testing.T) {
 	cache := netcache.NewAppScoreCache(200, unittest.Logger(), metrics.NewNoopCollector())
 
 	peerID := "peer1"
-	err := cache.Add(peer.ID(peerID), netcache.AppScoreRecord{
+	added := cache.Add(peer.ID(peerID), netcache.AppScoreRecord{
 		Decay: 0.1,
 		Score: 0.5,
 	})
-	require.NoError(t, err)
+	require.True(t, added)
 
 	// get the record from the cache
 	record, err, found := cache.Get(peer.ID(peerID))
 	require.True(t, found)
+	require.NoError(t, err)
 
 	// modify the record
 	record.Decay = 0.2
@@ -294,6 +295,7 @@ func TestAppScoreRecordStoredByValue(t *testing.T) {
 	// get the record from the cache again
 	record, err, found = cache.Get(peer.ID(peerID))
 	require.True(t, found)
+	require.NoError(t, err)
 
 	// check if the record is still the same
 	require.Equal(t, 0.1, record.Decay)
@@ -324,8 +326,8 @@ func TestAppScoreCache_Get_WithPreprocessors(t *testing.T) {
 		Decay: 0.5,
 		Score: 1,
 	}
-	err := cache.Add("peerA", record)
-	assert.NoError(t, err)
+	added := cache.Add("peerA", record)
+	assert.True(t, added)
 
 	// verifies that the preprocessors were called and the score was updated accordingly.
 	cachedRecord, err, ok := cache.Get("peerA")
@@ -376,8 +378,8 @@ func TestAppScoreCache_Update_PreprocessingError(t *testing.T) {
 		Decay: 0.5,
 		Score: 1,
 	}
-	err := cache.Add("peerA", record)
-	assert.NoError(t, err)
+	added := cache.Add("peerA", record)
+	assert.True(t, added)
 
 	// verifies that the preprocessors were called and the score was updated accordingly.
 	cachedRecord, err, ok := cache.Get("peerA")
@@ -407,8 +409,8 @@ func TestAppScoreCache_Get_WithNoPreprocessors(t *testing.T) {
 		Decay: 0.5,
 		Score: 1,
 	}
-	err := cache.Add("peerA", record)
-	assert.NoError(t, err)
+	added := cache.Add("peerA", record)
+	assert.True(t, added)
 
 	// verifies that no preprocessors were called and the score was not updated.
 	cachedRecord, err, ok := cache.Get("peerA")
