@@ -388,6 +388,17 @@ func HeaderWithView(view uint64) func(*flow.Header) {
 	}
 }
 
+func BlockHeaderFixtures(number int) []*flow.Header {
+	headers := make([]*flow.Header, 1, number)
+	header := BlockHeaderFixture()
+	headers[0] = header
+	for ; number > 1; number-- {
+		header = BlockHeaderWithParentFixture(header)
+		headers = append(headers, header)
+	}
+	return headers
+}
+
 func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
 	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
