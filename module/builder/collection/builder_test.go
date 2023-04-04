@@ -83,7 +83,7 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.blocks = blocks
 	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
 	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
-	suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter)
+	suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter, nil).Maybe()
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())

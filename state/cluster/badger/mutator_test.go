@@ -80,7 +80,7 @@ func (suite *MutatorSuite) SetupTest() {
 	headers, _, seals, index, conPayloads, blocks, qcs, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
-	suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter)
+	suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter, nil).Maybe()
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.NoError(err)
@@ -409,6 +409,9 @@ func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromDifferentEpoch() {
 	suite.Assert().Error(err)
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
+
+func (suite *MutatorSuite) TestExtend_WithUnfinalizedReferenceBlock() {} // TODO
+func (suite *MutatorSuite) TestExtend_WithOrphanedReferenceBlock()    {} // TODO
 
 func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
 	tx1 := suite.Tx()

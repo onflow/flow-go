@@ -67,7 +67,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.Require().NoError(err)
 	suite.epochCounter = root.Encodable().Epochs.Current.Counter
 	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
-	suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter)
+	suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter, nil).Maybe()
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Require().NoError(err)
