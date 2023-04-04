@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -17,10 +16,7 @@ import (
 	"github.com/go-yaml/yaml"
 	"github.com/plus3it/gorecurcopy"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/cmd"
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/cmd/build"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -655,28 +651,6 @@ func getAccessGatewayPublicKey(flowNodeContainerConfigs []testnet.ContainerConfi
 	return "", fmt.Errorf("Unable to find public key for Access Gateway expected in container '%s'", DefaultAccessGatewayName)
 }
 
-func writeObserverPrivateKey(observerName string) {
-	// make the observer private key for named observer
-	// only used for localnet, not for use with production
-	networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLen)
-	networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
-	if err != nil {
-		panic(err)
-	}
-
-	// hex encode
-	keyBytes := networkKey.Encode()
-	output := make([]byte, hex.EncodedLen(len(keyBytes)))
-	hex.Encode(output, keyBytes)
-
-	// write to file
-	outputFile := fmt.Sprintf("%s/private-root-information/%s_key", BootstrapDir, observerName)
-	err = os.WriteFile(outputFile, output, 0600)
-	if err != nil {
-		panic(err)
-	}
-}
-
 func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs []testnet.ContainerConfig) Services {
 	if observerCount == 0 {
 		return dockerServices
@@ -704,7 +678,10 @@ func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs [
 		dockerServices[observerName] = observerService
 
 		// Generate observer private key (localnet only, not for production)
-		writeObserverPrivateKey(observerName)
+		err := testnet.WriteObserverPrivateKey(observerName, BootstrapDir)
+		if err != nil {
+			panic(err)
+		}
 	}
 	fmt.Println()
 	fmt.Println("Observer services bootstrapping data generated...")

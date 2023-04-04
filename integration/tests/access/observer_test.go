@@ -81,92 +81,63 @@ func (s *ObserverSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
-	err := s.net.AddObserver(s.T(), ctx, &testnet.ObserverConfig{
-		ObserverName:            "observer_1",
-		ObserverImage:           "gcr.io/flow-container-registry/observer:latest",
-		AccessName:              "access_1",
-		AccessPublicNetworkPort: testnet.PublicNetworkPort,
-		AccessGRPCSecurePort:    testnet.GRPCSecurePort,
-	})
+	err := s.net.AddObserver(s.T(), ctx, &testnet.ObserverConfig{})
 	require.NoError(s.T(), err)
 
 	s.net.Start(ctx)
 }
 
-// TestObserverConnection tests that the observer can be pinged successfully but returns an error
-// when the upstream access node is stopped
-func (s *ObserverSuite) TestObserverConnection() {
+// TestObserver runs the following tests:
+// 1. CompareRPCs: verifies that the observer client returns the same errors as the access client for rpcs proxied to the upstream AN
+// 2. HandledByUpstream: stops the upstream AN and verifies that the observer client returns errors for all rpcs handled by the upstream
+// 3. HandledByObserver: stops the upstream AN and verifies that the observer client handles all other queries
+func (s *ObserverSuite) TestObserver() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	t := s.T()
 
 	// get an observer client
-	observer, err := s.getObserverClient()
-	require.NoError(t, err)
-
-	// ping the observer while the access container is running
-	_, err = observer.Ping(ctx, &accessproto.PingRequest{})
-	assert.NoError(t, err)
-}
-
-// TestObserverCompareRPCs tests that the observer returns the same errors as the access node
-func (s *ObserverSuite) TestObserverCompareRPCs() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	t := s.T()
-
-	// get an observer and access client
 	observer, err := s.getObserverClient()
 	require.NoError(t, err)
 
 	access, err := s.getAccessClient()
 	require.NoError(t, err)
 
-	// verify that both clients return the same errors
-	for _, rpc := range s.getRPCs() {
-		if _, local := s.local[rpc.name]; local {
-			continue
+	t.Run("CompareRPCs", func(t *testing.T) {
+		// verify that both clients return the same errors for proxied rpcs
+		for _, rpc := range s.getRPCs() {
+			// skip rpcs handled locally by observer
+			if _, local := s.local[rpc.name]; local {
+				continue
+			}
+			t.Run(rpc.name, func(t *testing.T) {
+				accessErr := rpc.call(ctx, access)
+				observerErr := rpc.call(ctx, observer)
+				assert.Equal(t, accessErr, observerErr)
+			})
 		}
-		t.Run(rpc.name, func(t *testing.T) {
-			accessErr := rpc.call(ctx, access)
-			observerErr := rpc.call(ctx, observer)
-			assert.Equal(t, accessErr, observerErr)
-		})
-	}
-}
-
-// TestObserverWithoutAccess tests that the observer returns errors when the access node is stopped
-func (s *ObserverSuite) TestObserverWithoutAccess() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	t := s.T()
-
-	// get an observer client
-	observer, err := s.getObserverClient()
-	require.NoError(t, err)
+	})
 
 	// stop the upstream access container
 	err = s.net.StopContainerByName(ctx, "access_1")
 	require.NoError(t, err)
 
 	t.Run("HandledByUpstream", func(t *testing.T) {
-		// verify that we receive errors from all rpcs handled upstream
+		// verify that we receive Unavailable errors from all rpcs handled upstream
 		for _, rpc := range s.getRPCs() {
 			if _, local := s.local[rpc.name]; local {
 				continue
 			}
 			t.Run(rpc.name, func(t *testing.T) {
 				err := rpc.call(ctx, observer)
-				assert.Error(t, err)
+				assert.Equal(t, codes.Unavailable, status.Code(err))
 			})
 		}
 	})
 
 	t.Run("HandledByObserver", func(t *testing.T) {
-		// verify that we receive not found errors or no error from all rpcs handled locally
+		// verify that we receive NotFound or no error from all rpcs handled locally
 		for _, rpc := range s.getRPCs() {
 			if _, local := s.local[rpc.name]; !local {
 				continue
@@ -176,8 +147,7 @@ func (s *ObserverSuite) TestObserverWithoutAccess() {
 				if err == nil {
 					return
 				}
-				code := status.Code(err)
-				assert.Equal(t, codes.NotFound, code)
+				assert.Equal(t, codes.NotFound, status.Code(err))
 			})
 		}
 	})

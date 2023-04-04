@@ -25,11 +25,9 @@ import (
 
 	"github.com/onflow/flow-go-sdk/crypto"
 
-	cmd2 "github.com/onflow/flow-go/cmd/bootstrap/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	crypto2 "github.com/onflow/flow-go/crypto"
 	consensus_follower "github.com/onflow/flow-go/follower"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/insecure/cmd"
@@ -131,6 +129,10 @@ type FlowNetwork struct {
 	BootstrapDir         string
 	BootstrapSnapshot    *inmem.Snapshot
 	BootstrapData        *BootstrapData
+
+	// keep track of the number of observers so we can assign them unique names
+	// TODO: refactor observer support so it's more consistent with the other node types.
+	observerCount int
 }
 
 // CorruptedIdentities returns the identities of corrupted nodes in testnet (for BFT testing).
@@ -646,43 +648,26 @@ func (net *FlowNetwork) StopContainerByName(ctx context.Context, containerName s
 }
 
 type ObserverConfig struct {
-	ObserverName            string
-	ObserverImage           string
-	AccessName              string // Does not change the access node.
-	AccessPublicNetworkPort string // Does not change the access node
-	AccessGRPCSecurePort    string // Does not change the access node
+	BootstrapAccessName string
+	ObserverName        string
 }
 
 func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *ObserverConfig) (err error) {
-	// Find the public key for the access node
-	accessNode := net.ContainerByName(conf.AccessName)
-	accessPublicKey := hex.EncodeToString(accessNode.Config.NetworkPubKey().Encode())
-	if accessPublicKey == "" {
-		panic(fmt.Sprintf("failed to find the staked conf for access node with container name '%s'", conf.AccessName))
+	if conf.BootstrapAccessName == "" {
+		conf.BootstrapAccessName = "access_1"
+	}
+	if conf.ObserverName == "" {
+		net.observerCount++
+		conf.ObserverName = fmt.Sprintf("observer_%d", net.observerCount)
 	}
 
-	// Copy of writeObserverPrivateKey in localnet bootstrap.go
-	func() {
-		// make the observer private key for named observer
-		// only used for localnet, not for use with production
-		networkSeed := cmd2.GenerateRandomSeed(crypto2.KeyGenSeedMinLen)
-		networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
-		if err != nil {
-			panic(err)
-		}
+	// Find the public key for the access node
+	accessNode := net.ContainerByName(conf.BootstrapAccessName)
+	accessPublicKey := hex.EncodeToString(accessNode.Config.NetworkPubKey().Encode())
+	require.NotEmptyf(t, accessPublicKey, "failed to find the staked conf for access node with container name '%s'", conf.BootstrapAccessName)
 
-		// hex encode
-		keyBytes := networkKey.Encode()
-		output := make([]byte, hex.EncodedLen(len(keyBytes)))
-		hex.Encode(output, keyBytes)
-
-		// write to file
-		outputFile := fmt.Sprintf("%s/private-root-information/%s_key", net.BootstrapDir, conf.ObserverName)
-		err = os.WriteFile(outputFile, output, 0600)
-		if err != nil {
-			panic(err)
-		}
-	}()
+	err = WriteObserverPrivateKey(conf.ObserverName, net.BootstrapDir)
+	require.NoError(t, err)
 
 	// Setup directories
 	tmpdir := tempDir(t)
@@ -694,39 +679,36 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	err = io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
 	require.NoError(t, err)
 
-	containerConfig := &container.Config{
-		Image: conf.ObserverImage,
-		User:  currentUser(),
-		Cmd: []string{
-			fmt.Sprintf("--bootstrap-node-addresses=%s:%s", conf.AccessName, conf.AccessPublicNetworkPort),
-			fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
-			fmt.Sprintf("--upstream-node-addresses=%s:%s", conf.AccessName, conf.AccessGRPCSecurePort),
-			fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
-			fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", conf.ObserverName),
-			"--bind=0.0.0.0:0",
-			"--bootstrapdir=/bootstrap",
-			"--datadir=/data/protocol",
-			"--secretsdir=/data/secrets",
-			"--loglevel=DEBUG",
-			fmt.Sprintf("--profiler-enabled=%t", false),
-			fmt.Sprintf("--tracer-enabled=%t", false),
-			"--profiler-dir=/profiler",
-			"--profiler-interval=2m",
-		},
-	}
-	containerHostConfig := &container.HostConfig{
-		Binds: []string{
-			fmt.Sprintf("%s:%s:rw", flowDataDir, "/data"),
-			fmt.Sprintf("%s:%s:rw", flowProfilerDir, "/profiler"),
-			fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, "/bootstrap"),
-		},
-	}
-
 	containerOpts := testingdock.ContainerOpts{
-		ForcePull:  false,
-		Config:     containerConfig,
-		HostConfig: containerHostConfig,
-		Name:       conf.ObserverName,
+		ForcePull: false,
+		Name:      conf.ObserverName,
+		Config: &container.Config{
+			Image: "gcr.io/flow-container-registry/observer:latest",
+			User:  currentUser(),
+			Cmd: []string{
+				fmt.Sprintf("--bootstrap-node-addresses=%s", accessNode.ContainerAddr(PublicNetworkPort)),
+				fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
+				fmt.Sprintf("--upstream-node-addresses=%s", accessNode.ContainerAddr(GRPCSecurePort)),
+				fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
+				fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", conf.ObserverName),
+				"--bind=0.0.0.0:0",
+				"--bootstrapdir=/bootstrap",
+				"--datadir=/data/protocol",
+				"--secretsdir=/data/secrets",
+				"--loglevel=DEBUG",
+				fmt.Sprintf("--tracer-enabled=%t", false),
+				fmt.Sprintf("--profiler-enabled=%t", false),
+				"--profiler-dir=/profiler",
+				"--profiler-interval=2m",
+			},
+		},
+		HostConfig: &container.HostConfig{
+			Binds: []string{
+				fmt.Sprintf("%s:%s:rw", flowDataDir, "/data"),
+				fmt.Sprintf("%s:%s:rw", flowProfilerDir, "/profiler"),
+				fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, "/bootstrap"),
+			},
+		},
 	}
 
 	nodeContainer := &Container{

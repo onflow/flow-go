@@ -2,6 +2,7 @@ package testnet
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -9,6 +10,8 @@ import (
 	"os/user"
 	"path/filepath"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/cmd"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -87,4 +90,28 @@ func rootProtocolJsonWithoutAddresses(srcfile string, dstFile string) error {
 	strippedSnapshot := inmem.StrippedInmemSnapshot(rootSnapshot)
 
 	return WriteJSON(dstFile, strippedSnapshot)
+}
+
+func WriteObserverPrivateKey(observerName, bootstrapDir string) error {
+	// make the observer private key for named observer
+	// only used for localnet, not for use with production
+	networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLen)
+	networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
+	if err != nil {
+		return fmt.Errorf("could not generate networking key: %w", err)
+	}
+
+	// hex encode
+	keyBytes := networkKey.Encode()
+	output := make([]byte, hex.EncodedLen(len(keyBytes)))
+	hex.Encode(output, keyBytes)
+
+	// write to file
+	outputFile := fmt.Sprintf("%s/private-root-information/%s_key", bootstrapDir, observerName)
+	err = os.WriteFile(outputFile, output, 0600)
+	if err != nil {
+		return fmt.Errorf("could not write private key to file: %w", err)
+	}
+
+	return nil
 }
