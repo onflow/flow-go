@@ -52,6 +52,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -376,16 +377,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		fnb.GossipSubInspectorNotifDistributor = BuildGossipsubRPCValidationInspectorNotificationDisseminator(fnb.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
 
-		rpcInspectors, err := BuildGossipSubRPCInspectors(
-			fnb.Logger,
-			fnb.SporkID,
-			fnb.GossipSubRPCInspectorsConfig,
-			fnb.GossipSubInspectorNotifDistributor,
-			fnb.Metrics.Network,
-			fnb.MetricsRegisterer,
-			fnb.MetricsEnabled,
-			p2p.PublicNetworkDisabled,
-		)
+		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.GossipSubRPCInspectorsConfig, fnb.GossipSubInspectorNotifDistributor, fnb.Metrics.Network, fnb.MetricsRegisterer)
+		rpcInspectors, err := rpcInspectorBuilder.SetPublicNetwork(p2p.PublicNetworkDisabled).SetMetricsEnabled(fnb.MetricsEnabled).Build()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors: %w", err)
 		}

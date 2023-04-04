@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -188,7 +189,7 @@ type NetworkConfig struct {
 	// GossipSubConfig core gossipsub configuration.
 	GossipSubConfig *p2pbuilder.GossipSubConfig
 	// GossipSubRPCInspectorsConfig configuration for all gossipsub RPC control message inspectors.
-	GossipSubRPCInspectorsConfig *GossipSubRPCInspectorsConfig
+	GossipSubRPCInspectorsConfig *inspectorbuilder.GossipSubRPCInspectorsConfig
 	// PreferredUnicastProtocols list of unicast protocols in preferred order
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
@@ -204,16 +205,6 @@ type NetworkConfig struct {
 	DisallowListNotificationCacheSize uint32
 	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
 	UnicastRateLimitersConfig *UnicastRateLimitersConfig
-}
-
-// GossipSubRPCInspectorsConfig encompasses configuration related to gossipsub RPC message inspectors.
-type GossipSubRPCInspectorsConfig struct {
-	// GossipSubRPCInspectorNotificationCacheSize size of the queue for notifications about invalid RPC messages.
-	GossipSubRPCInspectorNotificationCacheSize uint32
-	// ValidationInspectorConfigs control message validation inspector validation configuration and limits.
-	ValidationInspectorConfigs *p2pbuilder.GossipSubRPCValidationInspectorConfigs
-	// MetricsInspectorConfigs control message metrics inspector configuration.
-	MetricsInspectorConfigs *p2pbuilder.GossipSubRPCMetricsInspectorConfigs
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
@@ -312,9 +303,9 @@ func DefaultBaseConfig() *BaseConfig {
 				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
 			},
 			GossipSubConfig: p2pbuilder.DefaultGossipSubConfig(),
-			GossipSubRPCInspectorsConfig: &GossipSubRPCInspectorsConfig{
+			GossipSubRPCInspectorsConfig: &inspectorbuilder.GossipSubRPCInspectorsConfig{
 				GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
-				ValidationInspectorConfigs: &p2pbuilder.GossipSubRPCValidationInspectorConfigs{
+				ValidationInspectorConfigs: &inspectorbuilder.GossipSubRPCValidationInspectorConfigs{
 					NumberOfWorkers: validation.DefaultNumberOfWorkers,
 					CacheSize:       validation.DefaultControlMsgValidationInspectorQueueCacheSize,
 					GraftLimits: map[string]int{
@@ -328,7 +319,7 @@ func DefaultBaseConfig() *BaseConfig {
 						validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
 					},
 				},
-				MetricsInspectorConfigs: &p2pbuilder.GossipSubRPCMetricsInspectorConfigs{
+				MetricsInspectorConfigs: &inspectorbuilder.GossipSubRPCMetricsInspectorConfigs{
 					NumberOfWorkers: inspector.DefaultControlMsgMetricsInspectorNumberOfWorkers,
 					CacheSize:       inspector.DefaultControlMsgMetricsInspectorQueueCacheSize,
 				},

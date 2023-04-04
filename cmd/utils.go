@@ -11,14 +11,10 @@ import (
 
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
-	"github.com/onflow/flow-go/network/p2p/inspector"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -91,41 +87,4 @@ func BuildGossipsubRPCValidationInspectorNotificationDisseminator(size uint32, m
 		heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
 	}
 	return distributor.DefaultGossipSubInspectorNotificationDistributor(logger, heroStoreOpts...)
-}
-
-// buildGossipsubRPCInspectorHeroStoreOpts builds the gossipsub rpc validation inspector hero store opts.
-// These options are used in the underlying worker pool hero store.
-func buildGossipsubRPCInspectorHeroStoreOpts(size uint32, collectorFactory func() *metrics.HeroCacheCollector, metricsEnabled bool) []queue.HeroStoreConfigOption {
-	heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(size)}
-	if metricsEnabled {
-		heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collectorFactory()))
-	}
-	return heroStoreOpts
-}
-
-// BuildGossipSubRPCInspectors builds the gossipsub metrics and validation inspectors.
-func BuildGossipSubRPCInspectors(logger zerolog.Logger,
-	sporkID flow.Identifier,
-	inspectorsConfig *GossipSubRPCInspectorsConfig,
-	distributor p2p.GossipSubInspectorNotificationDistributor,
-	netMetrics module.NetworkMetrics,
-	metricsRegistry prometheus.Registerer,
-	metricsEnabled,
-	publicNetwork bool) ([]p2p.GossipSubRPCInspector, error) {
-	// setup RPC metrics inspector
-	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(netMetrics, logger)
-	metricsInspectorHeroStoreOpts := buildGossipsubRPCInspectorHeroStoreOpts(inspectorsConfig.MetricsInspectorConfigs.CacheSize, func() *metrics.HeroCacheCollector {
-		return metrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(publicNetwork, metricsRegistry)
-	}, metricsEnabled)
-	metricsInspector := inspector.NewControlMsgMetricsInspector(logger, gossipSubMetrics, inspectorsConfig.MetricsInspectorConfigs.NumberOfWorkers, metricsInspectorHeroStoreOpts...)
-	// setup RPC validation inspector
-	rpcValidationInspectorHeroStoreOpts := buildGossipsubRPCInspectorHeroStoreOpts(inspectorsConfig.ValidationInspectorConfigs.CacheSize, func() *metrics.HeroCacheCollector {
-		return metrics.GossipSubRPCValidationInspectorQueueMetricFactory(publicNetwork, metricsRegistry)
-	}, metricsEnabled)
-	validationInspector, err := p2pbuilder.BuildGossipSubRPCValidationInspector(logger, sporkID, inspectorsConfig.ValidationInspectorConfigs, distributor, rpcValidationInspectorHeroStoreOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gossipsub rpc validation inspector: %w", err)
-	}
-
-	return []p2p.GossipSubRPCInspector{metricsInspector, validationInspector}, nil
 }

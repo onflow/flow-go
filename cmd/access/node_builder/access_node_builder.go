@@ -18,9 +18,6 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/go-bitswap"
-
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
@@ -69,6 +66,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
@@ -83,6 +81,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/grpcutils"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/go-bitswap"
 )
 
 // AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node.
@@ -1079,16 +1079,8 @@ func (builder *FlowAccessNodeBuilder) initPublicLibP2PFactory(networkKey crypto.
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
 		// setup RPC inspectors
-		rpcInspectors, err := cmd.BuildGossipSubRPCInspectors(
-			builder.Logger,
-			builder.SporkID,
-			builder.GossipSubRPCInspectorsConfig,
-			builder.GossipSubInspectorNotifDistributor,
-			builder.Metrics.Network,
-			builder.MetricsRegisterer,
-			builder.MetricsEnabled,
-			p2p.PublicNetworkEnabled,
-		)
+		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubRPCInspectorsConfig, builder.GossipSubInspectorNotifDistributor, builder.Metrics.Network, builder.MetricsRegisterer)
+		rpcInspectors, err := rpcInspectorBuilder.SetPublicNetwork(p2p.PublicNetworkEnabled).SetMetricsEnabled(builder.MetricsEnabled).Build()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors: %w", err)
 		}
