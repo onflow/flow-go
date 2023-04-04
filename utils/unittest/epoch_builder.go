@@ -129,8 +129,8 @@ func (builder *EpochBuilder) EpochHeights(counter uint64) (*EpochHeights, bool) 
 //	| ER(P-1)    |->| ER(P)      |->| ER(A)     |->| ER(B)     |->| ER(C)    |->| ER(D)    |->| ER(E)    |
 //	| S(ER(P-2)) |  | S(ER(P-1)) |  | S(ER(P))  |  | S(ER(A))  |  | S(ER(B)) |  | S(ER(C)) |  | S(ER(D)) |
 //	+------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+
-//	                                                                            |             |
-//	                                                                          Setup         Commit
+//	                                                              |                           |
+//	                                                            Setup                       Commit
 //
 // ER(X)    := ExecutionReceipt for block X
 // S(ER(X)) := Seal for the ExecutionResult contained in ER(X) (seals block X)
@@ -139,7 +139,7 @@ func (builder *EpochBuilder) EpochHeights(counter uint64) (*EpochHeights, bool) 
 // previous block and a seal for the receipt contained in the previous block.
 // The only exception is when A is the root block, in which case block B does
 // not contain a receipt for block A, and block C does not contain a seal for
-// block A. This is because the root block is sealed from genesis and we
+// block A. This is because the root block is sealed from genesis, and we
 // can't insert duplicate seals.
 //
 // D contains a seal for block B containing the EpochSetup service event,
