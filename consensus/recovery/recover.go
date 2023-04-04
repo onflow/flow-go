@@ -13,10 +13,10 @@ import (
 )
 
 // Recover implements the core logic for recovering HotStuff state after a restart.
-// It accepts the finalized block and a list of pending blocks that have been
+// It receives the list `pending` that should contain _all_ blocks that have been
 // received but not finalized, and that share the latest finalized block as a common
 // ancestor.
-func Recover(log zerolog.Logger, finalized *flow.Header, pending []*flow.Header, validator hotstuff.Validator, onProposal func(*model.Proposal) error) error {
+func Recover(log zerolog.Logger, pending []*flow.Header, validator hotstuff.Validator, onProposal func(*model.Proposal) error) error {
 	log.Info().Int("total", len(pending)).Msgf("recovery started")
 
 	// add all pending blocks to forks
