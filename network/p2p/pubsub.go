@@ -19,6 +19,9 @@ const (
 	PublicNetworkEnabled  = true
 	PublicNetworkDisabled = false
 
+	MetricsEnabled  = true
+	MetricsDisabled = false
+
 	ValidationAccept ValidationResult = iota
 	ValidationIgnore
 	ValidationReject

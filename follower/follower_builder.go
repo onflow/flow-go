@@ -597,8 +597,11 @@ func (builder *FollowerServiceBuilder) initPublicLibP2PFactory(networkKey crypto
 			builder.IdentityProvider,
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
-		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubRPCInspectorsConfig, builder.GossipSubInspectorNotifDistributor, builder.Metrics.Network, builder.MetricsRegisterer)
-		rpcInspectors, err := rpcInspectorBuilder.SetPublicNetwork(p2p.PublicNetworkEnabled).SetMetricsEnabled(builder.MetricsEnabled).Build()
+		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubRPCInspectorsConfig, builder.GossipSubInspectorNotifDistributor)
+		rpcInspectors, err := rpcInspectorBuilder.
+			SetPublicNetwork(p2p.PublicNetworkEnabled).
+			SetMetrics(builder.Metrics.Network, builder.MetricsRegisterer).
+			SetMetricsEnabled(builder.MetricsEnabled).Build()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for public libp2p node: %w", err)
 		}

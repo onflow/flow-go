@@ -28,8 +28,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/dns"
-	"github.com/onflow/flow-go/network/p2p/inspector"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
@@ -302,28 +300,8 @@ func DefaultBaseConfig() *BaseConfig {
 				BandwidthRateLimit:  0,
 				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
 			},
-			GossipSubConfig: p2pbuilder.DefaultGossipSubConfig(),
-			GossipSubRPCInspectorsConfig: &inspectorbuilder.GossipSubRPCInspectorsConfig{
-				GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
-				ValidationInspectorConfigs: &inspectorbuilder.GossipSubRPCValidationInspectorConfigs{
-					NumberOfWorkers: validation.DefaultNumberOfWorkers,
-					CacheSize:       validation.DefaultControlMsgValidationInspectorQueueCacheSize,
-					GraftLimits: map[string]int{
-						validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
-						validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
-						validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
-					},
-					PruneLimits: map[string]int{
-						validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
-						validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
-						validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
-					},
-				},
-				MetricsInspectorConfigs: &inspectorbuilder.GossipSubRPCMetricsInspectorConfigs{
-					NumberOfWorkers: inspector.DefaultControlMsgMetricsInspectorNumberOfWorkers,
-					CacheSize:       inspector.DefaultControlMsgMetricsInspectorQueueCacheSize,
-				},
-			},
+			GossipSubConfig:                   p2pbuilder.DefaultGossipSubConfig(),
+			GossipSubRPCInspectorsConfig:      inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(),
 			DNSCacheTTL:                       dns.DefaultTimeToLive,
 			LibP2PResourceManagerConfig:       p2pbuilder.DefaultResourceManagerConfig(),
 			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),

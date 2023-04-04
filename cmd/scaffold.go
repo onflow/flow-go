@@ -377,8 +377,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		fnb.GossipSubInspectorNotifDistributor = BuildGossipsubRPCValidationInspectorNotificationDisseminator(fnb.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
 
-		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.GossipSubRPCInspectorsConfig, fnb.GossipSubInspectorNotifDistributor, fnb.Metrics.Network, fnb.MetricsRegisterer)
-		rpcInspectors, err := rpcInspectorBuilder.SetPublicNetwork(p2p.PublicNetworkDisabled).SetMetricsEnabled(fnb.MetricsEnabled).Build()
+		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.GossipSubRPCInspectorsConfig, fnb.GossipSubInspectorNotifDistributor)
+		rpcInspectors, err := rpcInspectorBuilder.
+			SetPublicNetwork(p2p.PublicNetworkDisabled).
+			SetMetrics(fnb.Metrics.Network, fnb.MetricsRegisterer).
+			SetMetricsEnabled(fnb.MetricsEnabled).Build()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors: %w", err)
 		}

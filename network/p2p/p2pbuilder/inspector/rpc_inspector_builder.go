@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
@@ -49,6 +50,30 @@ type GossipSubRPCInspectorsConfig struct {
 	MetricsInspectorConfigs *GossipSubRPCMetricsInspectorConfigs
 }
 
+func DefaultGossipSubRPCInspectorsConfig() *GossipSubRPCInspectorsConfig {
+	return &GossipSubRPCInspectorsConfig{
+		GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
+		ValidationInspectorConfigs: &GossipSubRPCValidationInspectorConfigs{
+			NumberOfWorkers: validation.DefaultNumberOfWorkers,
+			CacheSize:       validation.DefaultControlMsgValidationInspectorQueueCacheSize,
+			GraftLimits: map[string]int{
+				validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
+				validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
+				validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
+			},
+			PruneLimits: map[string]int{
+				validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
+				validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
+				validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
+			},
+		},
+		MetricsInspectorConfigs: &GossipSubRPCMetricsInspectorConfigs{
+			NumberOfWorkers: inspector.DefaultControlMsgMetricsInspectorNumberOfWorkers,
+			CacheSize:       inspector.DefaultControlMsgMetricsInspectorQueueCacheSize,
+		},
+	}
+}
+
 // GossipSubInspectorBuilder builder that constructs all rpc inspectors used by gossip sub. The following
 // rpc inspectors are created with this builder.
 // - validation inspector: performs validation on all control messages.
@@ -65,22 +90,27 @@ type GossipSubInspectorBuilder struct {
 }
 
 // NewGossipSubInspectorBuilder returns new *GossipSubInspectorBuilder.
-func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier, inspectorsConfig *GossipSubRPCInspectorsConfig, distributor p2p.GossipSubInspectorNotificationDistributor, netMetrics module.NetworkMetrics, metricsRegistry prometheus.Registerer) *GossipSubInspectorBuilder {
+func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier, inspectorsConfig *GossipSubRPCInspectorsConfig, distributor p2p.GossipSubInspectorNotificationDistributor) *GossipSubInspectorBuilder {
 	return &GossipSubInspectorBuilder{
 		logger:           logger,
 		sporkID:          sporkID,
 		inspectorsConfig: inspectorsConfig,
 		distributor:      distributor,
-		netMetrics:       netMetrics,
-		metricsRegistry:  metricsRegistry,
-		metricsEnabled:   true,
-		publicNetwork:    true,
+		metricsEnabled:   p2p.MetricsDisabled,
+		publicNetwork:    p2p.PublicNetworkEnabled,
 	}
 }
 
 // SetMetricsEnabled disable and enable metrics collection for the inspectors underlying hero store cache.
-func (b *GossipSubInspectorBuilder) SetMetricsEnabled(enabled bool) *GossipSubInspectorBuilder {
-	b.metricsEnabled = enabled
+func (b *GossipSubInspectorBuilder) SetMetricsEnabled(metricsEnabled bool) *GossipSubInspectorBuilder {
+	b.metricsEnabled = metricsEnabled
+	return b
+}
+
+// SetMetrics sets the network metrics and registry.
+func (b *GossipSubInspectorBuilder) SetMetrics(netMetrics module.NetworkMetrics, metricsRegistry prometheus.Registerer) *GossipSubInspectorBuilder {
+	b.netMetrics = netMetrics
+	b.metricsRegistry = metricsRegistry
 	return b
 }
 
