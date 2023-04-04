@@ -2,9 +2,10 @@ package inspector
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 
 	"github.com/rs/zerolog"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -12,8 +13,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector"
+	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 type metricsCollectorFactory func() *metrics.HeroCacheCollector
