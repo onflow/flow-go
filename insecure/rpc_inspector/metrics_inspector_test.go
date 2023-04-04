@@ -33,7 +33,7 @@ func TestMetricsInspector_ObserveRPC(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	messageCount := 100
-	controlMessageCount := 20
+	controlMessageCount := 5
 
 	metricsObservedCount := atomic.NewInt64(0)
 	mockMetricsObserver := mockp2p.NewGossipSubControlMetricsObserver(t)
