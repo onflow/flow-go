@@ -68,7 +68,9 @@ type GossipSubAppSpecificScoreRegistry struct {
 	logger     zerolog.Logger
 	scoreCache *netcache.AppScoreCache
 	penalty    GossipSubCtrlMsgPenaltyValue
-	mu         sync.Mutex
+	// initial application specific score record, used to initialize the score cache entry.
+	init func() netcache.AppScoreRecord
+	mu   sync.Mutex
 }
 
 type GossipSubAppSpecificScoreRegistryConfig struct {
@@ -77,6 +79,7 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	Collector     module.HeroCacheMetrics
 	DecayFunction netcache.ReadPreprocessorFunc
 	Penalty       GossipSubCtrlMsgPenaltyValue
+	Init          func() netcache.AppScoreRecord
 }
 
 func WithGossipSubAppSpecificScoreRegistryPenalty(penalty GossipSubCtrlMsgPenaltyValue) func(registry *GossipSubAppSpecificScoreRegistry) {
@@ -91,12 +94,19 @@ func WithScoreCache(cache *netcache.AppScoreCache) func(registry *GossipSubAppSp
 	}
 }
 
+func WithRecordInit(init func() netcache.AppScoreRecord) func(registry *GossipSubAppSpecificScoreRegistry) {
+	return func(registry *GossipSubAppSpecificScoreRegistry) {
+		registry.init = init
+	}
+}
+
 func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig, opts ...func(registry *GossipSubAppSpecificScoreRegistry)) *GossipSubAppSpecificScoreRegistry {
 	cache := netcache.NewAppScoreCache(config.SizeLimit, config.Logger, config.Collector, config.DecayFunction)
 	reg := &GossipSubAppSpecificScoreRegistry{
 		logger:     config.Logger.With().Str("module", "app_score_registry").Logger(),
 		scoreCache: cache,
 		penalty:    config.Penalty,
+		init:       config.Init,
 	}
 
 	for _, opt := range opts {
@@ -119,7 +129,7 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 			return 0
 		}
 		if !ok {
-			init := InitAppScoreRecordState()
+			init := r.init()
 			initialized := r.scoreCache.Add(pid, init)
 			r.logger.Trace().
 				Bool("initialized", initialized).
@@ -140,7 +150,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	// try initializing the application specific score for the peer if it is not yet initialized.
 	// this is done to avoid the case where the peer is not yet cached and the application specific score is not yet initialized.
 	// initialization is gone successful only if the peer is not yet cached.
-	initialized := r.scoreCache.Add(notification.PeerID, InitAppScoreRecordState())
+	initialized := r.scoreCache.Add(notification.PeerID, r.init())
 	lg.Trace().Bool("initialized", initialized).Msg("initialization attempt for application specific")
 
 	record, err := r.scoreCache.Adjust(notification.PeerID, func(record netcache.AppScoreRecord) netcache.AppScoreRecord {
