@@ -79,7 +79,7 @@ func (vt *viewTracker) ProcessQC(qc *flow.QuorumCertificate) (uint64, error) {
 	newView := qc.View + 1
 	err := vt.updateLivenessData(newView, qc, nil)
 	if err != nil {
-		return newView, fmt.Errorf("failed to update liveness data: %w", err)
+		return 0, fmt.Errorf("failed to update liveness data: %w", err)
 	}
 	return newView, nil
 }
