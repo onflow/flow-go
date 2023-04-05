@@ -64,8 +64,18 @@ func DisallowListNotificationQueueMetricFactory(registrar prometheus.Registerer)
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDisallowListNotificationQueue, registrar)
 }
 
-func GossipSubRPCInspectorQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcInspectorQueue, registrar)
+func GossipSubRPCValidationInspectorQueueMetricFactory(publicNetwork bool, registrar prometheus.Registerer) *HeroCacheCollector {
+	if publicNetwork {
+		return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingPublicRpcValidationInspectorQueue, registrar)
+	}
+	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcValidationInspectorQueue, registrar)
+}
+
+func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(publicNetwork bool, registrar prometheus.Registerer) *HeroCacheCollector {
+	if publicNetwork {
+		return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingPublicRpcMetricsObserverInspectorQueue, registrar)
+	}
+	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcMetricsObserverInspectorQueue, registrar)
 }
 
 func RpcInspectorNotificationQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {

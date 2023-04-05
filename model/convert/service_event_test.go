@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/convert"
-	"github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEventConversion(t *testing.T) {
@@ -17,7 +17,7 @@ func TestEventConversion(t *testing.T) {
 
 	t.Run("epoch setup", func(t *testing.T) {
 
-		fixture, expected := fixtures.EpochSetupFixtureByChainID(chainID)
+		fixture, expected := unittest.EpochSetupFixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
 		event, err := convert.ServiceEvent(chainID, fixture)
@@ -34,7 +34,7 @@ func TestEventConversion(t *testing.T) {
 
 	t.Run("epoch commit", func(t *testing.T) {
 
-		fixture, expected := fixtures.EpochCommitFixtureByChainID(chainID)
+		fixture, expected := unittest.EpochCommitFixtureByChainID(chainID)
 
 		// convert Cadence types to Go types
 		event, err := convert.ServiceEvent(chainID, fixture)
