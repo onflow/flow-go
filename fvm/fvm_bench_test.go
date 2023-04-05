@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -369,7 +367,6 @@ var _ io.Writer = &logExtractor{}
 // BenchmarkRuntimeEmptyTransaction simulates executing blocks with `transactionsPerBlock`
 // where each transaction is an empty transaction
 func BenchmarkRuntimeTransaction(b *testing.B) {
-	rand.Seed(time.Now().UnixNano())
 
 	transactionsPerBlock := 10
 

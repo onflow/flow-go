@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 )
@@ -259,7 +260,7 @@ func (BootstrapProcedure) Type() ProcedureType {
 	return BootstrapProcedureType
 }
 
-func (proc *BootstrapProcedure) ExecutionTime() derived.LogicalTime {
+func (proc *BootstrapProcedure) ExecutionTime() logical.Time {
 	return 0
 }
 

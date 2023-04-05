@@ -69,7 +69,7 @@ type transactionExecutor struct {
 	errs *errors.ErrorsCollector
 
 	nestedTxnId state.NestedTransactionId
-	pausedState *state.State
+	pausedState *state.ExecutionState
 
 	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
 	txnBodyExecutor runtime.Executor
@@ -383,8 +383,8 @@ func (executor *transactionExecutor) normalExecution() (
 
 	// Before checking storage limits, we must apply all pending changes
 	// that may modify storage usage.
-	var contractKeys []environment.ContractUpdateKey
-	contractKeys, err = executor.env.FlushPendingUpdates()
+	var contractUpdates environment.ContractUpdates
+	contractUpdates, err = executor.env.FlushPendingUpdates()
 	if err != nil {
 		err = fmt.Errorf(
 			"transaction invocation failed to flush pending changes from "+
@@ -400,7 +400,7 @@ func (executor *transactionExecutor) normalExecution() (
 	}
 
 	invalidator = environment.NewDerivedDataInvalidator(
-		contractKeys,
+		contractUpdates,
 		executor.ctx.Chain.ServiceAddress(),
 		bodySnapshot)
 

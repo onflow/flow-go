@@ -2,9 +2,9 @@ package testnet
 
 import (
 	"context"
+	crand "crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
 	gonet "net"
 	"os"
 	"path/filepath"
@@ -692,7 +692,7 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 	func() {
 		// make the observer private key for named observer
 		// only used for localnet, not for use with production
-		networkSeed := cmd2.GenerateRandomSeed(crypto2.KeyGenSeedMinLenECDSASecp256k1)
+		networkSeed := cmd2.GenerateRandomSeed(crypto2.KeyGenSeedMinLen)
 		networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
 		if err != nil {
 			panic(err)
@@ -1145,7 +1145,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	//            this ordering defines the DKG participant's indices
 	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), order.Canonical)
 
-	dkg, err := runDKG(stakedConfs)
+	dkg, err := runBeaconKG(stakedConfs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
@@ -1235,7 +1235,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	}
 
 	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
-	_, err = rand.Read(randomSource)
+	_, err = crand.Read(randomSource)
 	if err != nil {
 		return nil, err
 	}
@@ -1382,17 +1382,16 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 	return confs, nil
 }
 
-// runDKG simulates the distributed key generation process for all consensus nodes
+// runBeaconKG simulates the distributed key generation process for all consensus nodes
 // and returns all DKG data. This includes the group private key, node indices,
 // and per-node public and private key-shares.
 // Only consensus nodes participate in the DKG.
-func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
+func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 
 	// filter by consensus nodes
 	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
 	nConsensusNodes := len(consensusNodes)
 
-	// run the core dkg algorithm
 	dkgSeed, err := getSeed()
 	if err != nil {
 		return dkgmod.DKGData{}, err
@@ -1401,15 +1400,6 @@ func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 	dkg, err := dkg.RunFastKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return dkgmod.DKGData{}, err
-	}
-
-	// sanity check
-	if nConsensusNodes != len(dkg.PrivKeyShares) {
-		return dkgmod.DKGData{}, fmt.Errorf(
-			"consensus node count does not match DKG participant count: nodes=%d, participants=%d",
-			nConsensusNodes,
-			len(dkg.PrivKeyShares),
-		)
 	}
 
 	return dkg, nil

@@ -37,8 +37,10 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -447,6 +449,9 @@ func generateLibP2PNode(t *testing.T,
 	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, connection.DefaultConnManagerConfig())
 	require.NoError(t, err)
 
+	rpcInspectors, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(logger)).Build()
+	require.NoError(t, err)
+
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
 		metrics.NewNoopCollector(),
@@ -456,7 +461,8 @@ func generateLibP2PNode(t *testing.T,
 		p2pbuilder.DefaultResourceManagerConfig()).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t)).
-		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay)
+		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
+		SetGossipSubRPCInspectors(rpcInspectors...)
 
 	for _, opt := range opts {
 		opt(builder)
@@ -478,7 +484,7 @@ func OptionalSleep(send ConduitSendWrapperFunc) {
 
 // generateNetworkingKey generates a Flow ECDSA key using the given seed
 func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
 }
@@ -543,7 +549,6 @@ func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.
 		idProvider,
 		connection.WithOnInterceptPeerDialFilters(filters),
 		connection.WithOnInterceptSecuredFilters(filters))
-
 }
 
 // IsRateLimitedPeerFilter returns a p2p.PeerFilter that will return an error if the peer is rate limited.

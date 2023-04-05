@@ -172,13 +172,13 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 		certifiedBatch = append(s, certifiedBatch...)
 	}
 
-	if len(certifiedBatch) < 1 {
-		return nil, nil, nil
-	}
-
 	// report equivocations
 	for _, pair := range bc.equivocatingBlocks {
 		c.onEquivocation(pair[0], pair[1])
+	}
+
+	if len(certifiedBatch) < 1 {
+		return nil, nil, nil
 	}
 
 	return certifiedBatch, certifyingQC, nil
