@@ -73,16 +73,17 @@ func (s *ObserverSuite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
 	}
 
+	observers := []testnet.ObserverConfig{{
+		LogLevel: zerolog.InfoLevel,
+	}}
+
 	// prepare the network
-	conf := testnet.NewNetworkConfig("observer_api_test", nodeConfigs)
+	conf := testnet.NewNetworkConfig("observer_api_test", nodeConfigs, testnet.WithObservers(observers...))
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 
 	// start the network
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-
-	err := s.net.AddObserver(s.T(), ctx, &testnet.ObserverConfig{})
-	require.NoError(s.T(), err)
 
 	s.net.Start(ctx)
 }

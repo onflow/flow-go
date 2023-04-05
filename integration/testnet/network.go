@@ -352,6 +352,7 @@ func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKe
 type NetworkConfig struct {
 	Nodes                      NodeConfigs
 	ConsensusFollowers         []ConsensusFollowerConfig
+	Observers                  []ObserverConfig
 	Name                       string
 	NClusters                  uint
 	ViewsInDKGPhase            uint64
@@ -424,6 +425,12 @@ func WithEpochCommitSafetyThreshold(threshold uint64) func(*NetworkConfig) {
 func WithClusters(n uint) func(*NetworkConfig) {
 	return func(conf *NetworkConfig) {
 		conf.NClusters = n
+	}
+}
+
+func WithObservers(observers ...ObserverConfig) func(*NetworkConfig) {
+	return func(conf *NetworkConfig) {
+		conf.Observers = observers
 	}
 }
 
@@ -553,6 +560,14 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 		}
 	}
 
+	for i, observerConf := range networkConf.Observers {
+		if observerConf.ContainerName == "" {
+			observerConf.ContainerName = fmt.Sprintf("observer_%d", i+1)
+		}
+		t.Logf("add observer %v", observerConf.ContainerName)
+		flowNetwork.addObserver(t, observerConf)
+	}
+
 	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
 
 	// add each follower to the network
@@ -588,29 +603,19 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
 	)
 
-	var stakedANContainer *ContainerConfig
-	var accessNodeName string
-	// find the upstream Access node container for this follower engine
-	for _, cont := range containers {
-		if cont.NodeID == followerConf.StakedNodeID {
-			stakedANContainer = &cont
-			accessNodeName = cont.ContainerName
-			break
-		}
-	}
+	stakedANContainer := net.ContainerByID(followerConf.StakedNodeID)
 	require.NotNil(t, stakedANContainer, "unable to find staked AN for the follower engine %s", followerConf.NodeID.String())
 
 	// capture the public network port as an uint
 	// the consensus follower runs within the test suite, and does not have access to the internal docker network.
-	portStr := net.ContainerByName(accessNodeName).Port(PublicNetworkPort)
-	portU64, err := strconv.ParseUint(portStr, 10, 32)
+	portStr := stakedANContainer.Port(PublicNetworkPort)
+	port, err := strconv.ParseUint(portStr, 10, 32)
 	require.NoError(t, err)
-	port := uint(portU64)
 
 	bootstrapNodeInfo := consensus_follower.BootstrapNodeInfo{
 		Host:             "localhost",
-		Port:             port,
-		NetworkPublicKey: stakedANContainer.NetworkPubKey(),
+		Port:             uint(port),
+		NetworkPublicKey: stakedANContainer.Config.NetworkPubKey(),
 	}
 
 	// it should be able to figure out the rest on its own.
@@ -636,7 +641,7 @@ type ObserverConfig struct {
 	BootstrapAccessName string
 }
 
-func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *ObserverConfig) (err error) {
+func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) (err error) {
 	if conf.BootstrapAccessName == "" {
 		conf.BootstrapAccessName = "access_1"
 	}
