@@ -43,18 +43,6 @@ func NewFinalizedBlockQueue(
 	}
 }
 
-func (ft *FinalizedBlockQueue) size() int {
-	return ft.end - ft.start
-}
-
-func (ft *FinalizedBlockQueue) isEmpty() bool {
-	return ft.start == ft.end
-}
-
-func (ft *FinalizedBlockQueue) isFull() bool {
-	return ft.size() == ft.capacity
-}
-
 // Enqueue append a header to the queue given that header is compatible
 // with previously added header (parentID matches and height is right)
 // it returns an error if the queue has reached the capacity
@@ -108,4 +96,16 @@ func (ft *FinalizedBlockQueue) Dequeue() {
 		ft.lastDequeuedHeader = &ft.headers[ft.start]
 		ft.start = (ft.start + 1) % ft.capacity
 	}
+}
+
+func (ft *FinalizedBlockQueue) size() int {
+	return ft.end - ft.start
+}
+
+func (ft *FinalizedBlockQueue) isEmpty() bool {
+	return ft.start == ft.end
+}
+
+func (ft *FinalizedBlockQueue) isFull() bool {
+	return ft.size() == ft.capacity
 }
