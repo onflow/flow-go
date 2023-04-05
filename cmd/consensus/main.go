@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
@@ -241,7 +242,17 @@ func main() {
 				return err
 			}
 
-			mutableState, err = badgerState.NewFullConsensusState(state, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blockTimer, receiptValidator, sealValidator)
+			mutableState, err = badgerState.NewFullConsensusState(
+				node.Logger,
+				node.Tracer,
+				node.ProtocolEvents,
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				blockTimer,
+				receiptValidator,
+				sealValidator,
+			)
 			return err
 		}).
 		Module("random beacon key", func(node *cmd.NodeConfig) error {
@@ -355,6 +366,7 @@ func main() {
 		}).
 		Module("finalization distributor", func(node *cmd.NodeConfig) error {
 			finalizationDistributor = pubsub.NewFinalizationDistributor()
+			finalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
 			return nil
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
@@ -375,7 +387,7 @@ func main() {
 			return nil
 		}).
 		Component("machine account config validator", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
+			// @TODO use fallback logic for flowClient similar to DKG/QC contract clients
 			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
@@ -683,20 +695,17 @@ func main() {
 			return hot, nil
 		}).
 		Component("consensus compliance engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// initialize the entity database accessors
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()
 
 			logger := createLogger(node.Logger, node.RootChainID)
-			complianceCore, err := compliance.NewCore(logger,
+			complianceCore, err := compliance.NewCore(
+				logger,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				mainMetrics,
 				node.Metrics.Compliance,
 				node.Tracer,
-				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
 				mutableState,

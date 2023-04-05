@@ -30,8 +30,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/distributor"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -58,8 +58,8 @@ func NodeFixture(
 ) (p2p.LibP2PNode, flow.Identity) {
 	// default parameters
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
-	defaultRPCValidationInpectorCfg := p2pbuilder.DefaultRPCValidationConfig()
-	rpcInspectorNotifDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(logger)
+	rpcInspectors, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(logger)).Build()
+	require.NoError(t, err)
 	parameters := &NodeFixtureParameters{
 		HandlerFunc:                      func(network.Stream) {},
 		Unicasts:                         nil,
@@ -71,7 +71,7 @@ func NodeFixture(
 		Metrics:                          metrics.NewNoopCollector(),
 		ResourceManager:                  testutils.NewResourceManager(t),
 		GossipSubPeerScoreTracerInterval: 0, // disabled by default
-		GossipSubRPCValidationInspector:  validation.NewControlMsgValidationInspector(logger, sporkID, defaultRPCValidationInpectorCfg, rpcInspectorNotifDistributor),
+		GossipSubRPCInspectors:           rpcInspectors,
 	}
 
 	for _, opt := range opts {
@@ -107,7 +107,7 @@ func NodeFixture(
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
 		SetStreamCreationRetryInterval(parameters.CreateStreamRetryDelay).
 		SetResourceManager(parameters.ResourceManager).
-		SetGossipSubValidationInspector(parameters.GossipSubRPCValidationInspector)
+		SetGossipSubRPCInspectors(parameters.GossipSubRPCInspectors...)
 
 	if parameters.ResourceManager != nil {
 		builder.SetResourceManager(parameters.ResourceManager)
@@ -183,7 +183,7 @@ type NodeFixtureParameters struct {
 	PubSubTracer                     p2p.PubSubTracer
 	GossipSubPeerScoreTracerInterval time.Duration // intervals at which the peer score is updated and logged.
 	CreateStreamRetryDelay           time.Duration
-	GossipSubRPCValidationInspector  p2p.GossipSubRPCInspector
+	GossipSubRPCInspectors           []p2p.GossipSubRPCInspector
 }
 
 func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {

@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
@@ -1375,13 +1374,12 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, address)))
 
-				view = delta.NewDeltaView(
-					errorOnAddressSnapshotWrapper{
-						view:  view,
-						owner: address,
-					})
+				snapshot := errorOnAddressSnapshotWrapper{
+					view:  view,
+					owner: address,
+				}
 
-				_, _, err := vm.RunV2(ctx, script, view)
+				_, _, err := vm.RunV2(ctx, script, snapshot)
 				require.ErrorContains(
 					t,
 					err,
