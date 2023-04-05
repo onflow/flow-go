@@ -1,7 +1,6 @@
 package test
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
@@ -17,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -101,14 +99,9 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	tc.root, err = inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
-	cancelCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
-	defer cancel()
-
 	// create a mock node for each collector identity
 	for _, collector := range nodeInfos {
-		node := testutil.CollectionNode(tc.T(), ctx, tc.hub, collector, tc.root)
+		node := testutil.CollectionNode(tc.T(), tc.hub, collector, tc.root)
 		tc.nodes = append(tc.nodes, node)
 	}
 

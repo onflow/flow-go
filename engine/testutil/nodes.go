@@ -263,8 +263,7 @@ func CompleteStateFixture(
 }
 
 // CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, _ irrecoverable.SignalerContext, hub *stub.Hub, identity bootstrap.NodeInfo, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
-	// TODO remove context
+func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
 
 	node := GenericNode(t, hub, identity.Identity(), rootSnapshot)
 	privKeys, err := identity.PrivateKeys()
