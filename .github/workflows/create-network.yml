@@ -178,7 +178,7 @@ jobs:
       - self-hosted
       - flow-bn2
     env:
-      ARGS: NAMESPACE=benchnet ACCESS=${{ inputs.access_nodes }} COLLECTION=6 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 NETWORK_ID=${{ needs.networkId.outputs.networkId }} OWNER=${{ github.actor }}
+      ARGS: NAMESPACE=benchnet ACCESS=${{ inputs.access_nodes }} COLLECTION=6 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 NETWORK_ID="${{ needs.networkId.outputs.networkId }}" OWNER=${{ github.actor }}
     steps:
 
       - name: Fail if Network ID was unable to be retrieved or was not unique
