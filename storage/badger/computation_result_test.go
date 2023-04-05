@@ -10,13 +10,14 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestUpsertAndRetrieveComputationResult(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.ComputationResultFixture(t)
+		expected := testutil.ComputationResultFixture(t)
 		crStorage := bstorage.NewComputationResultUploadStatus(db)
 		crId := expected.ExecutableBlock.ID()
 
@@ -45,7 +46,7 @@ func TestUpsertAndRetrieveComputationResult(t *testing.T) {
 func TestRemoveComputationResults(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		t.Run("Remove ComputationResult", func(t *testing.T) {
-			expected := unittest.ComputationResultFixture(t)
+			expected := testutil.ComputationResultFixture(t)
 			crId := expected.ExecutableBlock.ID()
 			crStorage := bstorage.NewComputationResultUploadStatus(db)
 
@@ -69,8 +70,8 @@ func TestListComputationResults(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		t.Run("List all ComputationResult with given status", func(t *testing.T) {
 			expected := [...]*execution.ComputationResult{
-				unittest.ComputationResultFixture(t),
-				unittest.ComputationResultFixture(t),
+				testutil.ComputationResultFixture(t),
+				testutil.ComputationResultFixture(t),
 			}
 			crStorage := bstorage.NewComputationResultUploadStatus(db)
 
@@ -84,8 +85,8 @@ func TestListComputationResults(t *testing.T) {
 			}
 			// Add in entries with non-targeted status
 			unexpected := [...]*execution.ComputationResult{
-				unittest.ComputationResultFixture(t),
-				unittest.ComputationResultFixture(t),
+				testutil.ComputationResultFixture(t),
+				testutil.ComputationResultFixture(t),
 			}
 			for _, cr := range unexpected {
 				crId := cr.ExecutableBlock.ID()

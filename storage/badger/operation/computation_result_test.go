@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -16,7 +17,7 @@ import (
 
 func TestInsertAndUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.ComputationResultFixture(t)
+		expected := testutil.ComputationResultFixture(t)
 		expectedId := expected.ExecutableBlock.ID()
 
 		t.Run("Update existing ComputationResult", func(t *testing.T) {
@@ -56,7 +57,7 @@ func TestInsertAndUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 
 func TestUpsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.ComputationResultFixture(t)
+		expected := testutil.ComputationResultFixture(t)
 		expectedId := expected.ExecutableBlock.ID()
 
 		t.Run("Upsert ComputationResult", func(t *testing.T) {
@@ -88,7 +89,7 @@ func TestUpsertAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 
 func TestRemoveComputationResultUploadStatus(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.ComputationResultFixture(t)
+		expected := testutil.ComputationResultFixture(t)
 		expectedId := expected.ExecutableBlock.ID()
 
 		t.Run("Remove ComputationResult", func(t *testing.T) {
@@ -115,8 +116,8 @@ func TestRemoveComputationResultUploadStatus(t *testing.T) {
 func TestListComputationResults(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := [...]*execution.ComputationResult{
-			unittest.ComputationResultFixture(t),
-			unittest.ComputationResultFixture(t),
+			testutil.ComputationResultFixture(t),
+			testutil.ComputationResultFixture(t),
 		}
 		t.Run("List all ComputationResult with status True", func(t *testing.T) {
 			expectedIDs := make(map[string]bool, 0)

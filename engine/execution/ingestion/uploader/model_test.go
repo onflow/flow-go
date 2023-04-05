@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -101,7 +102,7 @@ func generateComputationResult(
 
 	trieUpdate4, err := pathfinder.UpdateToTrieUpdate(update4, complete.DefaultPathFinderVersion)
 	require.NoError(t, err)
-	return unittest.ComputationResultFixture(t), []*ledger.TrieUpdate{
+	return testutil.ComputationResultFixture(t), []*ledger.TrieUpdate{
 		trieUpdate1,
 		trieUpdate2,
 		trieUpdate3,

@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -62,7 +63,7 @@ func TestReExecuteBlock(t *testing.T) {
 		)
 		require.NotNil(t, es)
 
-		computationResult := unittest.ComputationResultFixture(t)
+		computationResult := testutil.ComputationResultFixture(t)
 		header := computationResult.Block.Header
 
 		err = headers.Store(header)
@@ -191,7 +192,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		err = headers.Store(header)
 		require.NoError(t, err)
 
-		computationResult := unittest.ComputationResultFixture(t)
+		computationResult := testutil.ComputationResultFixture(t)
 		computationResult.ExecutableBlock = executableBlock
 		computationResult.ExecutionReceipt.ExecutionResult.BlockID = header.ID()
 
@@ -241,7 +242,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, err2)
 
-		computationResult2 := unittest.ComputationResultFixture(t)
+		computationResult2 := testutil.ComputationResultFixture(t)
 		computationResult2.ExecutableBlock = executableBlock
 		computationResult2.ExecutionResult.BlockID = header.ID()
 

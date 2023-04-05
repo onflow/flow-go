@@ -22,12 +22,8 @@ import (
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/chunks"
@@ -39,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/updatable_configs"
@@ -2196,125 +2191,4 @@ func GetFlowProtocolEventID(t *testing.T, channel channels.Channel, event interf
 	eventIDHash, err := network.EventId(channel, payload)
 	require.NoError(t, err)
 	return flow.HashToID(eventIDHash)
-}
-
-func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
-	startState := StateCommitmentFixture()
-	update1, err := ledger.NewUpdate(
-		ledger.State(startState),
-		[]ledger.Key{
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(3, []byte{33})}),
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(1, []byte{11})}),
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(2, []byte{1, 1}), ledger.NewKeyPart(3, []byte{2, 5})}),
-		},
-		[]ledger.Value{
-			[]byte{21, 37},
-			nil,
-			[]byte{3, 3, 3, 3, 3},
-		},
-	)
-	require.NoError(t, err)
-
-	trieUpdate1, err := pathfinder.UpdateToTrieUpdate(update1, complete.DefaultPathFinderVersion)
-	require.NoError(t, err)
-
-	update2, err := ledger.NewUpdate(
-		ledger.State(StateCommitmentFixture()),
-		[]ledger.Key{},
-		[]ledger.Value{},
-	)
-	require.NoError(t, err)
-
-	trieUpdate2, err := pathfinder.UpdateToTrieUpdate(update2, complete.DefaultPathFinderVersion)
-	require.NoError(t, err)
-
-	update3, err := ledger.NewUpdate(
-		ledger.State(StateCommitmentFixture()),
-		[]ledger.Key{
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(9, []byte{6})}),
-		},
-		[]ledger.Value{
-			[]byte{21, 37},
-		},
-	)
-	require.NoError(t, err)
-
-	trieUpdate3, err := pathfinder.UpdateToTrieUpdate(update3, complete.DefaultPathFinderVersion)
-	require.NoError(t, err)
-
-	update4, err := ledger.NewUpdate(
-		ledger.State(StateCommitmentFixture()),
-		[]ledger.Key{
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(9, []byte{6})}),
-		},
-		[]ledger.Value{
-			[]byte{21, 37},
-		},
-	)
-	require.NoError(t, err)
-
-	trieUpdate4, err := pathfinder.UpdateToTrieUpdate(update4, complete.DefaultPathFinderVersion)
-	require.NoError(t, err)
-
-	executableBlock := ExecutableBlockFixture([][]flow.Identifier{
-		{IdentifierFixture()},
-		{IdentifierFixture()},
-		{IdentifierFixture()},
-	}, &startState)
-
-	blockExecResult := execution.NewPopulatedBlockExecutionResult(executableBlock)
-	blockExecResult.CollectionExecutionResultAt(0).AppendTransactionResults(
-		flow.EventsList{
-			EventFixture("what", 0, 0, IdentifierFixture(), 2),
-			EventFixture("ever", 0, 1, IdentifierFixture(), 22),
-		},
-		nil,
-		nil,
-		flow.TransactionResult{
-			TransactionID:   IdentifierFixture(),
-			ErrorMessage:    "",
-			ComputationUsed: 23,
-			MemoryUsed:      101,
-		},
-	)
-	blockExecResult.CollectionExecutionResultAt(1).AppendTransactionResults(
-		flow.EventsList{
-			EventFixture("what", 2, 0, IdentifierFixture(), 2),
-			EventFixture("ever", 2, 1, IdentifierFixture(), 22),
-			EventFixture("ever", 2, 2, IdentifierFixture(), 2),
-			EventFixture("ever", 2, 3, IdentifierFixture(), 22),
-		},
-		nil,
-		nil,
-		flow.TransactionResult{
-			TransactionID:   IdentifierFixture(),
-			ErrorMessage:    "fail",
-			ComputationUsed: 1,
-			MemoryUsed:      22,
-		},
-	)
-
-	return &execution.ComputationResult{
-		BlockExecutionResult: blockExecResult,
-		BlockAttestationResult: &execution.BlockAttestationResult{
-			BlockExecutionData: &execution_data.BlockExecutionData{
-				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-					{TrieUpdate: trieUpdate1},
-					{TrieUpdate: trieUpdate2},
-					{TrieUpdate: trieUpdate3},
-					{TrieUpdate: trieUpdate4},
-				},
-			},
-		},
-		ExecutionReceipt: &flow.ExecutionReceipt{
-			ExecutionResult: flow.ExecutionResult{
-				Chunks: flow.ChunkList{
-					{EndState: StateCommitmentFixture()},
-					{EndState: StateCommitmentFixture()},
-					{EndState: StateCommitmentFixture()},
-					{EndState: StateCommitmentFixture()},
-				},
-			},
-		},
-	}
 }
