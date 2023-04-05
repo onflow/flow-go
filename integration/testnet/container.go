@@ -150,7 +150,7 @@ func (c *Container) Addr(containerPort string) string {
 	return fmt.Sprintf(":%s", c.Port(containerPort))
 }
 
-// ContainerAddr returns the container address for the provided port
+// ContainerAddr returns the container address for the provided port.
 // Panics if the port was not exposed.
 func (c *Container) ContainerAddr(containerPort string) string {
 	return fmt.Sprintf("%s:%s", c.Name(), containerPort)
@@ -166,14 +166,11 @@ func (c *Container) Port(containerPort string) string {
 	return port
 }
 
-func (c *Container) exposePort(containerPort, hostPort string) {
-	c.bindPort(containerPort, hostPort)
-	c.Ports[containerPort] = hostPort
-}
-
-// bindPort exposes the given container port and binds it to the given host port.
+// exposePort exposes the given container port and binds it to the given host port.
 // If no protocol is specified, assumes TCP.
-func (c *Container) bindPort(containerPort, hostPort string) {
+func (c *Container) exposePort(containerPort, hostPort string) {
+	// keep track of port mapping for easy lookups
+	c.Ports[containerPort] = hostPort
 
 	// use TCP protocol if none specified
 	containerNATPort := nat.Port(containerPort)
@@ -455,7 +452,7 @@ func (c *Container) waitForCondition(ctx context.Context, condition func(*types.
 	}
 }
 
-// TestnetClient returns a testnet client that connects to this node
+// TestnetClient returns a testnet client that connects to this node.
 func (c *Container) TestnetClient() (*Client, error) {
 	if c.Config.Role != flow.RoleAccess && c.Config.Role != flow.RoleCollection {
 		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
@@ -465,7 +462,7 @@ func (c *Container) TestnetClient() (*Client, error) {
 	return NewClient(c.Addr(GRPCPort), chain)
 }
 
-// SDKClient returns a flow-go-sdk client that connects to this node
+// SDKClient returns a flow-go-sdk client that connects to this node.
 func (c *Container) SDKClient() (*sdkclient.Client, error) {
 	if c.Config.Role != flow.RoleAccess && c.Config.Role != flow.RoleCollection {
 		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
@@ -474,7 +471,7 @@ func (c *Container) SDKClient() (*sdkclient.Client, error) {
 	return sdkclient.NewClient(c.Addr(GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
 }
 
-// GhostClient returns a ghostnode client that connects to this node
+// GhostClient returns a ghostnode client that connects to this node.
 func (c *Container) GhostClient() (*ghostclient.GhostClient, error) {
 	if !c.Config.Ghost {
 		return nil, fmt.Errorf("container is not a ghost node")

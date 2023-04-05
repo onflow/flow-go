@@ -67,7 +67,7 @@ func (c *AdminClient) Ping(ctx context.Context) error {
 	}
 
 	if response.Output != "pong" {
-		return fmt.Errorf("unexpected response: %s", response.Output)
+		return fmt.Errorf("unexpected response: %v", response.Output)
 	}
 
 	return nil

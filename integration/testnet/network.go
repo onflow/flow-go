@@ -567,8 +567,6 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
 	}
 
-	// flowNetwork.PrintPorts()
-
 	t.Logf("%v finish preparing flow network for %v", time.Now().UTC(), t.Name())
 
 	return flowNetwork
@@ -598,8 +596,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	require.NoError(t, err)
 
 	// consensus follower
-	bindPort := testingdock.RandomPort(t)
-	bindAddr := gonet.JoinHostPort("localhost", bindPort)
+	bindAddr := gonet.JoinHostPort("localhost", testingdock.RandomPort(t))
 	opts := append(
 		followerConf.Opts,
 		consensus_follower.WithDataDir(dataDir),
@@ -898,6 +895,10 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 		// enable healthchecks for all nodes (via admin server)
 		nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(nodeContainer.HealthcheckCallback())
+
+		if nodeConf.EnableMetricsServer {
+			nodeContainer.exposePort(MetricsPort, testingdock.RandomPort(t))
+		}
 	} else {
 		nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
 		nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
@@ -910,10 +911,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// overriding the default behavior (see: https://github.com/dapperlabs/flow-go/issues/5696).
 			return fmt.Errorf("currently ghost node for an access node which supports unstaked node is not implemented")
 		}
-	}
-
-	if nodeConf.EnableMetricsServer {
-		nodeContainer.exposePort(MetricsPort, testingdock.RandomPort(t))
 	}
 
 	if nodeConf.Debug {
