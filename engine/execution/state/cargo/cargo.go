@@ -4,6 +4,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// Cargo is responsible for synchronization
+// queue of block headers and views
 type Cargo struct {
 	blockQueue *FinalizedBlockQueue
 	views      *Views
