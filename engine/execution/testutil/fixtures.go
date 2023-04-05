@@ -13,11 +13,9 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -189,19 +187,31 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 // CreateAccounts inserts accounts into the ledger using the provided private keys.
 func CreateAccounts(
 	vm fvm.VM,
-	view state.View,
+	snapshotTree storage.SnapshotTree,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
-) ([]flow.Address, error) {
-	return CreateAccountsWithSimpleAddresses(vm, view, privateKeys, chain)
+) (
+	storage.SnapshotTree,
+	[]flow.Address,
+	error,
+) {
+	return CreateAccountsWithSimpleAddresses(
+		vm,
+		snapshotTree,
+		privateKeys,
+		chain)
 }
 
 func CreateAccountsWithSimpleAddresses(
 	vm fvm.VM,
-	view state.View,
+	snapshotTree storage.SnapshotTree,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
-) ([]flow.Address, error) {
+) (
+	storage.SnapshotTree,
+	[]flow.Address,
+	error,
+) {
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),
@@ -249,22 +259,27 @@ func CreateAccountsWithSimpleAddresses(
 			AddAuthorizer(serviceAddress)
 
 		tx := fvm.Transaction(txBody, 0)
-		err := vm.Run(ctx, tx, view)
+		executionSnapshot, output, err := vm.RunV2(ctx, tx, snapshotTree)
 		if err != nil {
-			return nil, err
+			return snapshotTree, nil, err
 		}
 
-		if tx.Err != nil {
-			return nil, fmt.Errorf("failed to create account: %w", tx.Err)
+		if output.Err != nil {
+			return snapshotTree, nil, fmt.Errorf(
+				"failed to create account: %w",
+				output.Err)
 		}
+
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		var addr flow.Address
 
-		for _, event := range tx.Events {
+		for _, event := range output.Events {
 			if event.Type == flow.EventAccountCreated {
 				data, err := jsoncdc.Decode(nil, event.Payload)
 				if err != nil {
-					return nil, errors.New("error decoding events")
+					return snapshotTree, nil, errors.New(
+						"error decoding events")
 				}
 				addr = flow.ConvertAddress(
 					data.(cadence.Event).Fields[0].(cadence.Address))
@@ -272,17 +287,20 @@ func CreateAccountsWithSimpleAddresses(
 			}
 		}
 		if addr == flow.EmptyAddress {
-			return nil, errors.New("no account creation event emitted")
+			return snapshotTree, nil, errors.New(
+				"no account creation event emitted")
 		}
 		accounts = append(accounts, addr)
 	}
 
-	return accounts, nil
+	return snapshotTree, accounts, nil
 }
 
-func RootBootstrappedLedger(vm fvm.VM, ctx fvm.Context, additionalOptions ...fvm.BootstrapProcedureOption) state.View {
-	view := delta.NewDeltaView(nil)
-
+func RootBootstrappedLedger(
+	vm fvm.VM,
+	ctx fvm.Context,
+	additionalOptions ...fvm.BootstrapProcedureOption,
+) storage.SnapshotTree {
 	// set 0 clusters to pass n_collectors >= n_clusters check
 	epochConfig := epochs.DefaultEpochConfig()
 	epochConfig.NumCollectorClusters = 0
@@ -299,11 +317,11 @@ func RootBootstrappedLedger(vm fvm.VM, ctx fvm.Context, additionalOptions ...fvm
 		options...,
 	)
 
-	err := vm.Run(ctx, bootstrap, view)
+	snapshot, _, err := vm.RunV2(ctx, bootstrap, nil)
 	if err != nil {
 		panic(err)
 	}
-	return view
+	return storage.NewSnapshotTree(nil).Append(snapshot)
 }
 
 func BytesToCadenceArray(l []byte) cadence.Array {

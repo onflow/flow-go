@@ -52,6 +52,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -211,13 +212,16 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitersConfig.DryRun, "unicast-rate-limit-dry-run", defaultConfig.UnicastRateLimitersConfig.DryRun, "disable peer disconnects and connections gating when rate limiting peers")
 
 	// gossipsub RPC control message validation limits used for validation configuration and rate limiting
-	fnb.flags.IntVar(&fnb.BaseConfig.GossipSubRPCValidationConfigs.NumberOfWorkers, "gossipsub-rpc-inspection-workers", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.NumberOfWorkers, "number of gossupsub RPC control message inspector component workers")
-	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubRPCValidationConfigs.GraftLimits, "gossipsub-rpc-graft-limits", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.GraftLimits, fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC GRAFT message validation e.g: %s=1000,%s=100,%s=1000", validation.DiscardThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
-	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubRPCValidationConfigs.PruneLimits, "gossipsub-rpc-prune-limits", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.PruneLimits, fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC PRUNE message validation e.g: %s=1000,%s=20,%s=1000", validation.DiscardThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
+	fnb.flags.IntVar(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.NumberOfWorkers, "gossipsub-rpc-validation-inspector-workers", defaultConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.NumberOfWorkers, "number of gossupsub RPC control message validation inspector component workers")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.CacheSize, "gossipsub-rpc-validation-inspector-cache-size", defaultConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.CacheSize, "cache size for gossipsub RPC validation inspector events worker pool queue.")
+	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.GraftLimits, "gossipsub-rpc-graft-limits", defaultConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.GraftLimits, fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC GRAFT message validation e.g: %s=1000,%s=100,%s=1000", validation.DiscardThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
+	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.PruneLimits, "gossipsub-rpc-prune-limits", defaultConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.PruneLimits, fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC PRUNE message validation e.g: %s=1000,%s=20,%s=1000", validation.DiscardThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
+	// gossipsub RPC control message metrics observer inspector configuration
+	fnb.flags.IntVar(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.MetricsInspectorConfigs.NumberOfWorkers, "gossipsub-rpc-metrics-inspector-workers", defaultConfig.GossipSubRPCInspectorsConfig.MetricsInspectorConfigs.NumberOfWorkers, "cache size for gossipsub RPC metrics inspector events worker pool queue.")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.MetricsInspectorConfigs.CacheSize, "gossipsub-rpc-metrics-inspector-cache-size", defaultConfig.GossipSubRPCInspectorsConfig.MetricsInspectorConfigs.CacheSize, "cache size for gossipsub RPC metrics inspector events worker pool.")
 
 	// networking event notifications
-	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubRPCInspectorNotificationCacheSize, "gossipsub-rpc-inspector-notification-cache-size", defaultConfig.GossipSubRPCInspectorNotificationCacheSize, "cache size for notification events from gossipsub rpc inspector")
-	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubRPCInspectorCacheSize, "gossipsub-rpc-inspector-cache-size", defaultConfig.GossipSubRPCInspectorNotificationCacheSize, "cache size for gossipsub RPC validation inspector events worker pool.")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize, "gossipsub-rpc-inspector-notification-cache-size", defaultConfig.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize, "cache size for notification events from gossipsub rpc inspector")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.DisallowListNotificationCacheSize, "disallow-list-notification-cache-size", defaultConfig.DisallowListNotificationCacheSize, "cache size for notification events from disallow list")
 
 	// unicast manager options
@@ -371,12 +375,19 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
 
-		fnb.GossipSubInspectorNotifDistributor = BuildGossipsubRPCValidationInspectorNotificationDisseminator(fnb.GossipSubRPCInspectorNotificationCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
-		heroStoreOpts := BuildGossipsubRPCValidationInspectorHeroStoreOpts(fnb.GossipSubRPCInspectorCacheSize, fnb.MetricsRegisterer, fnb.MetricsEnabled)
-		rpcValidationInspector, err := p2pbuilder.BuildGossipSubRPCValidationInspector(fnb.Logger, fnb.SporkID, fnb.GossipSubRPCValidationConfigs, fnb.GossipSubInspectorNotifDistributor, heroStoreOpts...)
+		fnb.GossipSubInspectorNotifDistributor = BuildGossipsubRPCValidationInspectorNotificationDisseminator(fnb.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
+
+		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.GossipSubRPCInspectorsConfig, fnb.GossipSubInspectorNotifDistributor)
+		rpcInspectors, err := rpcInspectorBuilder.
+			SetPublicNetwork(p2p.PublicNetworkDisabled).
+			SetMetrics(fnb.Metrics.Network, fnb.MetricsRegisterer).
+			SetMetricsEnabled(fnb.MetricsEnabled).Build()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc validation inspector: %w", err)
+			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors: %w", err)
 		}
+
+		// set rpc inspectors on gossipsub config
+		fnb.GossipSubConfig.RPCInspectors = rpcInspectors
 
 		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
 			fnb.Logger,
@@ -393,7 +404,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.GossipSubConfig,
 			fnb.LibP2PResourceManagerConfig,
 			uniCfg,
-			rpcValidationInspector,
 		)
 
 		libp2pNode, err := libP2PNodeFactory()
@@ -885,6 +895,10 @@ func (fnb *FlowNodeBuilder) initDB() error {
 			return fmt.Errorf("error closing protocol database: %w", err)
 		}
 		return nil
+	})
+
+	fnb.Component("badger log cleaner", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		return bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCWaitDuration), nil
 	})
 
 	return nil

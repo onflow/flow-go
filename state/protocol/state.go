@@ -43,16 +43,18 @@ type State interface {
 // However, since all blocks are certified upon insertion, they are immediately processable by other components.
 type FollowerState interface {
 	State
+
 	// ExtendCertified introduces the block with the given ID into the persistent
-	// protocol state without modifying the current finalized state. It allows
-	// us to execute fork-aware queries against ambiguous protocol state, while
-	// still checking that the given block is a valid extension of the protocol state.
-	// Caller must pass a QC for candidate block to prove that candidate block
-	// has been certified, and it's safe to add it to the protocol state.
-	// QC cannot be nil and must certify candidate block (candidate.View == qc.View && candidate.BlockID == qc.BlockID)
-	// The `candidate` block and its QC _must be valid_ (otherwise, the state will be corrupted).
-	// Expected errors during normal operations:
-	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+	// protocol state without modifying the current finalized state. It allows us
+	// to execute fork-aware queries against the known protocol state. The caller
+	// must pass a QC for candidate block to prove that the candidate block has
+	// been certified, and it's safe to add it to the protocol state. The QC
+	// cannot be nil and must certify candidate block:
+	//   candidate.View == qc.View && candidate.BlockID == qc.BlockID
+	// The `candidate` block and its QC _must be valid_ (otherwise, the state will
+	// be corrupted). ExtendCertified inserts any given block, as long as its
+	// parent is already in the protocol state. Also orphaned blocks are excepted.
+	// No errors are expected during normal operations.
 	ExtendCertified(ctx context.Context, candidate *flow.Block, qc *flow.QuorumCertificate) error
 
 	// Finalize finalizes the block with the given hash.
@@ -69,6 +71,7 @@ type FollowerState interface {
 // All blocks are validated in full, including payload validation, prior to insertion. Only valid blocks are inserted.
 type ParticipantState interface {
 	FollowerState
+
 	// Extend introduces the block with the given ID into the persistent
 	// protocol state without modifying the current finalized state. It allows
 	// us to execute fork-aware queries against ambiguous protocol state, while

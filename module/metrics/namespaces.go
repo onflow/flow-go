@@ -14,6 +14,7 @@ const (
 	namespaceStateSync         = "state_synchronization"
 	namespaceExecutionDataSync = "execution_data_sync"
 	namespaceChainsync         = "chainsync"
+	namespaceFollowerEngine    = "follower"
 )
 
 // Network subsystems represent the various layers of networking.

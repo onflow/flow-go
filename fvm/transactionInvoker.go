@@ -69,7 +69,7 @@ type transactionExecutor struct {
 	errs *errors.ErrorsCollector
 
 	nestedTxnId state.NestedTransactionId
-	pausedState *state.State
+	pausedState *state.ExecutionState
 
 	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
 	txnBodyExecutor runtime.Executor
