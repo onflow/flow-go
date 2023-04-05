@@ -49,6 +49,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
@@ -566,7 +567,7 @@ func (builder *FollowerServiceBuilder) validateParams() error {
 	return nil
 }
 
-// initLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the observer.
+// initPublicLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the observer.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
 // The LibP2P host is created with the following options:
 //   - DHT as client and seeded with the given bootstrap peers
@@ -576,7 +577,7 @@ func (builder *FollowerServiceBuilder) validateParams() error {
 //   - No connection manager
 //   - No peer manager
 //   - Default libp2p pubsub options
-func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
+func (builder *FollowerServiceBuilder) initPublicLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		var pis []peer.AddrInfo
 
@@ -596,11 +597,13 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			builder.IdentityProvider,
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
-		builder.GossipSubInspectorNotifDistributor = cmd.BuildGossipsubRPCValidationInspectorNotificationDisseminator(builder.GossipSubRPCInspectorNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
-		heroStoreOpts := cmd.BuildGossipsubRPCValidationInspectorHeroStoreOpts(builder.GossipSubRPCInspectorCacheSize, builder.MetricsRegisterer, builder.MetricsEnabled)
-		rpcValidationInspector, err := p2pbuilder.BuildGossipSubRPCValidationInspector(builder.Logger, builder.SporkID, builder.GossipSubRPCValidationConfigs, builder.GossipSubInspectorNotifDistributor, heroStoreOpts...)
+		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubRPCInspectorsConfig, builder.GossipSubInspectorNotifDistributor)
+		rpcInspectors, err := rpcInspectorBuilder.
+			SetPublicNetwork(p2p.PublicNetworkEnabled).
+			SetMetrics(builder.Metrics.Network, builder.MetricsRegisterer).
+			SetMetricsEnabled(builder.MetricsEnabled).Build()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc validation inspector: %w", err)
+			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for public libp2p node: %w", err)
 		}
 
 		node, err := p2pbuilder.NewNodeBuilder(
@@ -626,11 +629,11 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
 			SetGossipSubTracer(meshTracer).
 			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
-			SetGossipSubValidationInspector(rpcValidationInspector).
+			SetGossipSubRPCInspectors(rpcInspectors...).
 			Build()
 
 		if err != nil {
-			return nil, fmt.Errorf("could not build libp2p node: %w", err)
+			return nil, fmt.Errorf("could not build public libp2p node: %w", err)
 		}
 
 		builder.LibP2PNode = node
@@ -674,7 +677,7 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 	var libp2pNode p2p.LibP2PNode
 	builder.
 		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			libP2PFactory := builder.initLibP2PFactory(node.NetworkKey)
+			libP2PFactory := builder.initPublicLibP2PFactory(node.NetworkKey)
 
 			var err error
 			libp2pNode, err = libP2PFactory()
