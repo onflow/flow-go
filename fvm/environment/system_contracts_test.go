@@ -57,6 +57,7 @@ func TestSystemContractsInvoke(t *testing.T) {
 			tracer := tracing.NewTracerSpan()
 			runtimePool := reusableRuntime.NewCustomReusableCadenceRuntimePool(
 				0,
+				runtime.Config{},
 				func(_ runtime.Config) runtime.Runtime {
 					return &testutil.TestInterpreterRuntime{
 						InvokeContractFunc: tc.contractFunction,
