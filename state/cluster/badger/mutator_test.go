@@ -34,6 +34,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+func matchViewInEpoch(epoch inmem.EncodableEpoch) func(uint64) bool {
+	return func(view uint64) bool {
+		return view >= epoch.FirstView && view <= epoch.FinalView
+	}
+}
+
 type MutatorSuite struct {
 	suite.Suite
 	db    *badger.DB
@@ -64,22 +70,32 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
+	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
+	all := util.StorageLayer(suite.T(), suite.db)
+	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
+
 	// just bootstrap with a genesis block, we'll use this as reference
 	genesis, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	// ensure we don't enter a new epoch for tests that build many blocks
-	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.Header.View + 100000
+	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.Header.View + 100_000
 	seal.ResultID = result.ID()
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(genesis, result, seal, qc)
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
 
-	metrics := metrics.NewNoopCollector()
-	tracer := trace.NewNoopTracer()
-	all := util.StorageLayer(suite.T(), suite.db)
-	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
+	suite.protoGenesis = genesis.Header
+	state, err := pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
+	require.NoError(suite.T(), err)
+	suite.protoState, err = pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, events.NewNoop(), protocolutil.MockBlockTimer())
+	require.NoError(suite.T(), err)
+
 	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
-	suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter, nil).Maybe()
+	suite.epochLookup.On(
+		"EpochForViewWithFallback",
+		mock.MatchedBy(matchViewInEpoch(rootSnapshot.Encodable().Epochs.Current)),
+	).Return(suite.epochCounter, nil).Maybe()
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.NoError(err)
@@ -87,15 +103,7 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.Assert().Nil(err)
 	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads, suite.epochLookup)
 	suite.Assert().Nil(err)
-	consumer := events.NewNoop()
 
-	suite.protoGenesis = genesis.Header
-
-	state, err := pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
-	require.NoError(suite.T(), err)
-
-	suite.protoState, err = pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, consumer, protocolutil.MockBlockTimer())
-	require.NoError(suite.T(), err)
 }
 
 // runs after each test finishes
@@ -401,6 +409,7 @@ func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromDifferentEpoch() {
 	require.True(suite.T(), ok)
 	nextEpochHeader, err := suite.protoState.AtHeight(heights.FinalHeight() + 1).Head()
 	require.NoError(suite.T(), err)
+	suite.epochLookup.On("EpochForViewWithFallback", nextEpochHeader.View).Return(suite.epochCounter+1, nil)
 
 	block := suite.Block()
 	block.SetPayload(model.EmptyPayload(nextEpochHeader.ID()))
@@ -409,8 +418,53 @@ func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromDifferentEpoch() {
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
-func (suite *MutatorSuite) TestExtend_WithUnfinalizedReferenceBlock() {} // TODO
-func (suite *MutatorSuite) TestExtend_WithOrphanedReferenceBlock()    {} // TODO
+// TestExtend_WithUnfinalizedReferenceBlock tests that extending the cluster state
+// with a reference block which is un-finalized and above the finalized boundary
+// should be considered an unverifiable extension. It's possible that this reference
+// block has been finalized, we just haven't processed it yet.
+func (suite *MutatorSuite) TestExtend_WithUnfinalizedReferenceBlock() {
+	unfinalized := unittest.BlockWithParentFixture(suite.protoGenesis)
+	unfinalized.Payload.Guarantees = nil
+	unfinalized.SetPayload(*unfinalized.Payload)
+	err := suite.protoState.ExtendCertified(context.Background(), unfinalized, unittest.CertifyBlock(unfinalized.Header))
+	suite.Require().NoError(err)
+
+	block := suite.Block()
+	block.SetPayload(model.EmptyPayload(unfinalized.ID()))
+	err = suite.state.Extend(&block)
+	suite.Assert().Error(err)
+	suite.Assert().True(state.IsUnverifiableExtensionError(err))
+}
+
+// TestExtend_WithOrphanedReferenceBlock tests that extending the cluster state
+// with a reference block is un-finalized and below the finalized boundary
+// (i.e. orphaned) should be considered an invalid extension. This reference block
+// can never be finalized, therefore the proposer knowingly generated an invalid
+// cluster block proposal.
+func (suite *MutatorSuite) TestExtend_WithOrphanedReferenceBlock() {
+	// create a block extending genesis which is not finalized
+	orphaned := unittest.BlockWithParentFixture(suite.protoGenesis)
+	orphaned.Payload.Guarantees = nil
+	orphaned.SetPayload(*orphaned.Payload)
+	err := suite.protoState.ExtendCertified(context.Background(), orphaned, unittest.CertifyBlock(orphaned.Header))
+	suite.Require().NoError(err)
+
+	// create a block extending genesis (conflicting with previous) which is finalized
+	finalized := unittest.BlockWithParentFixture(suite.protoGenesis)
+	finalized.Payload.Guarantees = nil
+	finalized.SetPayload(*finalized.Payload)
+	err = suite.protoState.ExtendCertified(context.Background(), finalized, unittest.CertifyBlock(finalized.Header))
+	suite.Require().NoError(err)
+	err = suite.protoState.Finalize(context.Background(), finalized.ID())
+	suite.Require().NoError(err)
+
+	// test referencing the orphaned block
+	block := suite.Block()
+	block.SetPayload(model.EmptyPayload(orphaned.ID()))
+	err = suite.state.Extend(&block)
+	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
+}
 
 func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
 	tx1 := suite.Tx()

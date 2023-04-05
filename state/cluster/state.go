@@ -36,6 +36,7 @@ type MutableState interface {
 	// without modifying the current finalized state.
 	// Expected errors during normal operations:
 	//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+	//   - state.UnverifiableExtensionError if the candidate block cannot be verified
 	//   - state.InvalidExtensionError if the candidate block is invalid
 	Extend(candidate *cluster.Block) error
 }

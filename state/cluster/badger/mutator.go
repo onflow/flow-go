@@ -46,6 +46,7 @@ func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers
 // TODO (Ramtin) pass context here
 // Expected errors during normal operations:
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+//   - state.UnverifiableExtensionError if the candidate block cannot be verified
 //   - state.InvalidExtensionError if the candidate block is invalid
 func (m *MutableState) Extend(block *cluster.Block) error {
 
@@ -272,7 +273,9 @@ func (m *MutableState) checkReferenceBlockValidity(payload *cluster.Payload, fin
 	refEpoch, err := m.epochLookup.EpochForViewWithFallback(refBlock.View)
 	if err != nil {
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
-			return state.NewInvalidExtensionErrorf("invalid reference block has no known epoch: %w", err)
+			// indicates data inconsistency in the protocol state - we know the block is finalized,
+			// but don't know what epoch it belongs to
+			return irrecoverable.NewExceptionf("finalized reference block has no known epoch: %w", err)
 		}
 		return fmt.Errorf("could not get reference epoch: %w", err)
 	}
