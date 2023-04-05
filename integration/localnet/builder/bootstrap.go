@@ -151,7 +151,7 @@ func main() {
 		panic(err)
 	}
 
-	if err = ports.Save(); err != nil {
+	if err = ports.WriteMappingConfig(); err != nil {
 		panic(err)
 	}
 

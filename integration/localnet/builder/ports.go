@@ -15,45 +15,46 @@ type portConfig struct {
 	// end is the first port to use for the next role
 	// e.g. the role's range is [start, end)
 	end int
-	// count is the number of ports to allocate for each node
-	count int
+	// portCount is the number of ports to allocate for each node
+	portCount int
 	// nodeCount is the current number of nodes that have been allocated
 	nodeCount int
 }
 
 var config = map[string]*portConfig{
 	"access": {
-		start: 4000, // 4000-5000 => 100 nodes
-		end:   5000,
-		count: 10,
+		start:     4000, // 4000-5000 => 100 nodes
+		end:       5000,
+		portCount: 10,
 	},
 	"observer": {
-		start: 5000, // 5000-6000 => 100 nodes
-		end:   6000,
-		count: 10,
+		start:     5000, // 5000-6000 => 100 nodes
+		end:       6000,
+		portCount: 10,
 	},
 	"execution": {
-		start: 6000, // 6000-6100 => 20 nodes
-		end:   6100,
-		count: 5,
+		start:     6000, // 6000-6100 => 20 nodes
+		end:       6100,
+		portCount: 5,
 	},
 	"collection": {
-		start: 6100, // 6100-7100 => 200 nodes
-		end:   7100,
-		count: 5,
+		start:     6100, // 6100-7100 => 200 nodes
+		end:       7100,
+		portCount: 5,
 	},
 	"consensus": {
-		start: 7100, // 7100-7600 => 250 nodes
-		end:   7600,
-		count: 2,
+		start:     7100, // 7100-7600 => 250 nodes
+		end:       7600,
+		portCount: 2,
 	},
 	"verification": {
-		start: 7600, // 7600-8000 => 200 nodes
-		end:   8000,
-		count: 2,
+		start:     7600, // 7600-8000 => 200 nodes
+		end:       8000,
+		portCount: 2,
 	},
 }
 
+// PortAllocator is responsible for allocating and tracking container-to-host port mappings for each node
 type PortAllocator struct {
 	exposedPorts   map[string]map[string]string
 	availablePorts map[string]int
@@ -65,6 +66,26 @@ func NewPortAllocator() *PortAllocator {
 		exposedPorts:   make(map[string]map[string]string),
 		availablePorts: make(map[string]int),
 	}
+}
+
+// AllocatePorts allocates a block of ports for a given node and role.
+func (a *PortAllocator) AllocatePorts(node, role string) error {
+	if _, ok := a.availablePorts[node]; ok {
+		return fmt.Errorf("container %s already allocated", node)
+	}
+
+	c := config[role]
+
+	nodeStart := c.start + c.nodeCount*c.portCount
+	if nodeStart >= c.end {
+		return fmt.Errorf("no more ports available for role %s", role)
+	}
+
+	a.nodesNames = append(a.nodesNames, node)
+	a.availablePorts[node] = nodeStart
+	c.nodeCount++
+
+	return nil
 }
 
 // HostPort returns the host port for a given node and container port.
@@ -81,21 +102,21 @@ func (a *PortAllocator) HostPort(node string, containerPort string) string {
 	return port
 }
 
-func (a *PortAllocator) AllocatePorts(node, role string) error {
-	if _, ok := a.availablePorts[node]; ok {
-		return fmt.Errorf("container %s already allocated", node)
+// WriteMappingConfig writes the port mappings to a JSON file.
+func (a *PortAllocator) WriteMappingConfig() error {
+	f, err := openAndTruncate(PortMapFile)
+	if err != nil {
+		return err
 	}
+	defer f.Close()
 
-	c := config[role]
+	enc := json.NewEncoder(f)
+	enc.SetIndent("", "  ")
 
-	nodeStart := c.start + c.nodeCount*c.count
-	if nodeStart >= c.end {
-		return fmt.Errorf("no more ports available for role %s", role)
+	err = enc.Encode(a.exposedPorts)
+	if err != nil {
+		return err
 	}
-
-	a.nodesNames = append(a.nodesNames, node)
-	a.availablePorts[node] = nodeStart
-	c.nodeCount++
 
 	return nil
 }
@@ -132,25 +153,7 @@ func (a *PortAllocator) Print() {
 	}
 }
 
-// Save saves the port mappings to a file.
-func (a *PortAllocator) Save() error {
-	f, err := openAndTruncate(PortMapFile)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	enc := json.NewEncoder(f)
-	enc.SetIndent("", "  ")
-
-	err = enc.Encode(a.exposedPorts)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
+// portName returns a human-readable name for a given container port.
 func portName(containerPort string) string {
 	switch containerPort {
 	case testnet.GRPCPort:
