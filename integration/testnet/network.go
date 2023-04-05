@@ -56,6 +56,9 @@ const (
 	// to docker by default on macOS
 	TmpRoot = "/tmp"
 
+	// integrationNamespace returns the temp directory pattern for the integration test
+	integrationNamespace = "flow-integration-test"
+
 	// DefaultBootstrapDir is the default directory for bootstrap files
 	DefaultBootstrapDir = "/bootstrap"
 
@@ -65,11 +68,12 @@ const (
 	DefaultFlowDBDir = "/data/protocol"
 	// DefaultFlowSecretsDBDir is the default directory for secrets database.
 	DefaultFlowSecretsDBDir = "/data/secrets"
-	// DefaultExecutionRootDir is the default directory for the execution node
-	// state database.
-	DefaultExecutionRootDir = "/exedb"
+	// DefaultExecutionRootDir is the default directory for the execution node state database.
+	DefaultExecutionRootDir = "/data/exedb"
 	// DefaultExecutionDataServiceDir for the execution data service blobstore.
 	DefaultExecutionDataServiceDir = "/data/execution_data"
+	// DefaultProfilerDir is the default directory for the profiler
+	DefaultProfilerDir = "/data/profiler"
 
 	// GRPCPort is the GRPC API port.
 	GRPCPort = "9000"
@@ -96,8 +100,6 @@ const (
 	DefaultViewsInStakingAuction uint64 = 5
 	DefaultViewsInDKGPhase       uint64 = 50
 	DefaultViewsInEpoch          uint64 = 180
-
-	integrationBootstrap = "flow-integration-bootstrap"
 
 	// DefaultMinimumNumOfAccessNodeIDS at-least 1 AN ID must be configured for LN & SN
 	DefaultMinimumNumOfAccessNodeIDS = 1
@@ -126,13 +128,13 @@ type FlowNetwork struct {
 	root                 *flow.Block
 	result               *flow.ExecutionResult
 	seal                 *flow.Seal
-	BootstrapDir         string
-	BootstrapSnapshot    *inmem.Snapshot
-	BootstrapData        *BootstrapData
 
-	// keep track of the number of observers so we can assign them unique names
-	// TODO: refactor observer support so it's more consistent with the other node types.
-	observerCount int
+	// baseTempdir is the root directory for all temporary data used within a test network.
+	baseTempdir string
+
+	BootstrapDir      string
+	BootstrapSnapshot *inmem.Snapshot
+	BootstrapData     *BootstrapData
 }
 
 // CorruptedIdentities returns the identities of corrupted nodes in testnet (for BFT testing).
@@ -451,17 +453,6 @@ func (n *NetworkConfig) Swap(i, j int) {
 	n.Nodes[i], n.Nodes[j] = n.Nodes[j], n.Nodes[i]
 }
 
-// tempDir creates a temporary directory at /tmp/flow-integration-bootstrap
-func tempDir(t *testing.T) string {
-	dir, err := os.MkdirTemp(TmpRoot, integrationBootstrap)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		err := os.RemoveAll(dir)
-		require.NoError(t, err)
-	})
-	return dir
-}
-
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.ChainID) *FlowNetwork {
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
@@ -488,8 +479,10 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 	})
 
 	// create a temporary directory to store all bootstrapping files
-	bootstrapDir := tempDir(t)
+	baseTempdir := makeTempDir(t, integrationNamespace)
+	bootstrapDir := makeDir(t, baseTempdir, "bootstrap")
 
+	t.Logf("Base Tempdir: %s \n", baseTempdir)
 	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
 	bootstrapData, err := BootstrapNetwork(networkConf, bootstrapDir, chainID)
@@ -519,6 +512,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 		root:                 root,
 		seal:                 seal,
 		result:               result,
+		baseTempdir:          baseTempdir,
 		BootstrapDir:         bootstrapDir,
 		BootstrapSnapshot:    bootstrapSnapshot,
 		BootstrapData:        bootstrapData,
@@ -573,26 +567,17 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 }
 
 func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, containers []ContainerConfig) {
-	tmpdir, err := os.MkdirTemp(TmpRoot, "flow-consensus-follower")
-	require.NoError(t, err)
+	tmpdir := makeTempSubDir(t, net.baseTempdir, "flow-consensus-follower")
 
 	// create a directory for the follower database
-	dataDir := filepath.Join(tmpdir, DefaultFlowDBDir)
-	err = os.MkdirAll(dataDir, 0700)
-	require.NoError(t, err)
+	dataDir := makeDir(t, tmpdir, DefaultFlowDBDir)
 
 	// create a follower-specific directory for the bootstrap files
-	followerBootstrapDir := filepath.Join(tmpdir, DefaultBootstrapDir)
-	err = os.Mkdir(followerBootstrapDir, 0700)
-	require.NoError(t, err)
-
-	publicRootInformationDir := filepath.Join(followerBootstrapDir, bootstrap.DirnamePublicBootstrap)
-	err = os.Mkdir(publicRootInformationDir, 0700)
-	require.NoError(t, err)
+	followerBootstrapDir := makeDir(t, tmpdir, DefaultBootstrapDir)
 
 	// strip out the node addresses from root-protocol-state-snapshot.json and copy it to the follower-specific
 	// bootstrap/public-root-information directory
-	err = rootProtocolJsonWithoutAddresses(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
+	err := rootProtocolJsonWithoutAddresses(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
 	require.NoError(t, err)
 
 	// consensus follower
@@ -645,65 +630,59 @@ func (net *FlowNetwork) StopContainerByName(ctx context.Context, containerName s
 }
 
 type ObserverConfig struct {
+	ContainerName       string
+	LogLevel            zerolog.Level
+	AdditionalFlags     []string
 	BootstrapAccessName string
-	ObserverName        string
 }
 
 func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *ObserverConfig) (err error) {
 	if conf.BootstrapAccessName == "" {
 		conf.BootstrapAccessName = "access_1"
 	}
-	if conf.ObserverName == "" {
-		net.observerCount++
-		conf.ObserverName = fmt.Sprintf("observer_%d", net.observerCount)
-	}
+
+	// Setup directories
+	tmpdir := makeTempSubDir(t, net.baseTempdir, fmt.Sprintf("flow-node-%s-", conf.ContainerName))
+
+	nodeBootstrapDir := makeDir(t, tmpdir, DefaultBootstrapDir)
+	flowDataDir := makeDir(t, tmpdir, DefaultFlowDataDir)
+	_ = makeDir(t, tmpdir, DefaultProfilerDir)
+
+	err = io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
+	require.NoError(t, err)
 
 	// Find the public key for the access node
 	accessNode := net.ContainerByName(conf.BootstrapAccessName)
 	accessPublicKey := hex.EncodeToString(accessNode.Config.NetworkPubKey().Encode())
 	require.NotEmptyf(t, accessPublicKey, "failed to find the staked conf for access node with container name '%s'", conf.BootstrapAccessName)
 
-	err = WriteObserverPrivateKey(conf.ObserverName, net.BootstrapDir)
-	require.NoError(t, err)
-
-	// Setup directories
-	tmpdir := tempDir(t)
-
-	flowDataDir := net.makeDir(t, tmpdir, DefaultFlowDataDir)
-	nodeBootstrapDir := net.makeDir(t, tmpdir, DefaultBootstrapDir)
-	flowProfilerDir := net.makeDir(t, flowDataDir, "./profiler")
-
-	err = io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
+	err = WriteObserverPrivateKey(conf.ContainerName, nodeBootstrapDir)
 	require.NoError(t, err)
 
 	containerOpts := testingdock.ContainerOpts{
 		ForcePull: false,
-		Name:      conf.ObserverName,
+		Name:      conf.ContainerName,
 		Config: &container.Config{
 			Image: "gcr.io/flow-container-registry/observer:latest",
 			User:  currentUser(),
 			Cmd: []string{
+				"--bind=0.0.0.0:0",
+				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
+				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
+				fmt.Sprintf("--secretsdir=%s", DefaultFlowSecretsDBDir),
+				fmt.Sprintf("--profiler-dir=%s", DefaultProfilerDir),
+				fmt.Sprintf("--loglevel=%s", conf.LogLevel.String()),
 				fmt.Sprintf("--bootstrap-node-addresses=%s", accessNode.ContainerAddr(PublicNetworkPort)),
 				fmt.Sprintf("--bootstrap-node-public-keys=%s", accessPublicKey),
 				fmt.Sprintf("--upstream-node-addresses=%s", accessNode.ContainerAddr(GRPCSecurePort)),
 				fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
-				fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", conf.ObserverName),
-				"--bind=0.0.0.0:0",
-				"--bootstrapdir=/bootstrap",
-				"--datadir=/data/protocol",
-				"--secretsdir=/data/secrets",
-				"--loglevel=DEBUG",
-				fmt.Sprintf("--tracer-enabled=%t", false),
-				fmt.Sprintf("--profiler-enabled=%t", false),
-				"--profiler-dir=/profiler",
-				"--profiler-interval=2m",
+				fmt.Sprintf("--observer-networking-key-path=%s/private-root-information/%s_key", DefaultBootstrapDir, conf.ContainerName),
 			},
 		},
 		HostConfig: &container.HostConfig{
 			Binds: []string{
-				fmt.Sprintf("%s:%s:rw", flowDataDir, "/data"),
-				fmt.Sprintf("%s:%s:rw", flowProfilerDir, "/profiler"),
-				fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, "/bootstrap"),
+				fmt.Sprintf("%s:%s:rw", flowDataDir, DefaultFlowDataDir),
+				fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, DefaultBootstrapDir),
 			},
 		},
 	}
@@ -742,7 +721,6 @@ func (net *FlowNetwork) AddObserver(t *testing.T, ctx context.Context, conf *Obs
 // AddNode creates a node container with the given config and adds it to the
 // network.
 func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf ContainerConfig) error {
-	profilerDir := "/profiler"
 	opts := &testingdock.ContainerOpts{
 		ForcePull: false,
 		Name:      nodeConf.ContainerName,
@@ -754,7 +732,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				fmt.Sprintf("--nodeid=%s", nodeConf.NodeID.String()),
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
-				fmt.Sprintf("--profiler-dir=%s", profilerDir),
+				fmt.Sprintf("--profiler-dir=%s", DefaultProfilerDir),
 				fmt.Sprintf("--secretsdir=%s", DefaultFlowSecretsDBDir),
 				fmt.Sprintf("--loglevel=%s", nodeConf.LogLevel.String()),
 				fmt.Sprintf("--herocache-metrics-collector=%t", true), // to cache integration issues with this collector (if any)
@@ -763,7 +741,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		HostConfig: &container.HostConfig{},
 	}
 
-	tmpdir := tempDir(t)
+	tmpdir := makeTempSubDir(t, net.baseTempdir, fmt.Sprintf("flow-node-%s-", nodeConf.ContainerName))
 
 	t.Logf("%v adding container %v for %v node", time.Now().UTC(), nodeConf.ContainerName, nodeConf.Role)
 
@@ -776,16 +754,16 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	}
 
 	// create a directory for the node database
-	flowDataDir := net.makeDir(t, tmpdir, DefaultFlowDataDir)
+	flowDataDir := makeDir(t, tmpdir, DefaultFlowDataDir)
 
 	// create the profiler dir for the node
-	flowProfilerDir := net.makeDir(t, flowDataDir, "./profiler")
+	flowProfilerDir := makeDir(t, tmpdir, DefaultProfilerDir)
 	t.Logf("create profiler dir: %v", flowProfilerDir)
 
 	// create a directory for the bootstrap files
 	// we create a node-specific bootstrap directory to enable testing nodes
 	// bootstrapping from different root state snapshots and epochs
-	nodeBootstrapDir := net.makeDir(t, tmpdir, DefaultBootstrapDir)
+	nodeBootstrapDir := makeDir(t, tmpdir, DefaultBootstrapDir)
 
 	// copy bootstrap files to node-specific bootstrap directory
 	err := io.CopyDirectory(bootstrapDir, nodeBootstrapDir)
@@ -798,7 +776,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	opts.HostConfig.Binds = append(
 		opts.HostConfig.Binds,
 		fmt.Sprintf("%s:%s:rw", flowDataDir, DefaultFlowDataDir),
-		fmt.Sprintf("%s:%s:rw", flowProfilerDir, profilerDir),
 		fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, DefaultBootstrapDir),
 	)
 
@@ -819,27 +796,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
 			nodeContainer.AddFlag("rpc-addr", nodeContainer.ContainerAddr(GRPCPort))
 
-			// create directories for execution state trie and values in the tmp
-			// host directory.
-			tmpLedgerDir, err := os.MkdirTemp(tmpdir, "flow-integration-trie")
-			require.NoError(t, err)
-
-			opts.HostConfig.Binds = append(
-				opts.HostConfig.Binds,
-				fmt.Sprintf("%s:%s:rw", tmpLedgerDir, DefaultExecutionRootDir),
-			)
-
 			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
-
-			exeDataDir := filepath.Join(tmpdir, "execution-data")
-			err = os.Mkdir(exeDataDir, 0700)
-			require.NoError(t, err)
-
-			opts.HostConfig.Binds = append(
-				opts.HostConfig.Binds,
-				fmt.Sprintf("%s:%s:rw", exeDataDir, DefaultExecutionDataServiceDir),
-			)
-
 			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
 
 		case flow.RoleAccess:
@@ -954,13 +911,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) {
 	err := WriteJSON(filepath.Join(net.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
 	require.NoError(net.t, err)
-}
-
-func (net *FlowNetwork) makeDir(t *testing.T, base string, dir string) string {
-	flowDataDir := filepath.Join(base, dir)
-	err := os.Mkdir(flowDataDir, 0700)
-	require.NoError(t, err)
-	return flowDataDir
 }
 
 func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, error) {

@@ -9,6 +9,9 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
@@ -18,6 +21,30 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 )
+
+func makeDir(t *testing.T, base string, subdir string) string {
+	dir := filepath.Join(base, subdir)
+	err := os.MkdirAll(dir, 0700)
+	require.NoError(t, err)
+	return dir
+}
+
+// makeTempDir creates a temporary directory in TmpRoot, and deletes it after the test completes.
+func makeTempDir(t *testing.T, pattern string) string {
+	dir := makeTempSubDir(t, TmpRoot, pattern)
+	t.Cleanup(func() {
+		// err := os.RemoveAll(dir)
+		// require.NoError(t, err)
+	})
+	return dir
+}
+
+// makeTempSubDir creates a randomly named subdirectory in the given directory.
+func makeTempSubDir(t *testing.T, dir, pattern string) string {
+	dir, err := os.MkdirTemp(dir, pattern)
+	require.NoError(t, err)
+	return dir
+}
 
 // currentUser returns a uid:gid Unix user identifier string for the current
 // user. This is used to run node containers under the same user to avoid
