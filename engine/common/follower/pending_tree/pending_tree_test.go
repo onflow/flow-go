@@ -87,7 +87,7 @@ func (s *PendingTreeSuite) TestAllConnectedForksAreCollected() {
 	// make sure short fork doesn't have conflicting views, so we don't trigger exception
 	B2.Header.View = longestFork[len(longestFork)-1].Block.Header.View + 1
 	B3 := unittest.BlockWithParentFixture(B2.Header)
-	shortFork := []CertifiedBlock{{
+	shortFork := []flow.CertifiedBlock{{
 		Block: B2,
 		QC:    B3.Header.QuorumCertificate(),
 	}, certifiedBlockFixture(B3)}
@@ -125,12 +125,12 @@ func (s *PendingTreeSuite) TestByzantineThresholdExceeded() {
 	// use same view for conflicted blocks, this is not possible unless there is more than
 	// 1/3 byzantine participants
 	conflictingBlock.Header.View = block.Header.View
-	_, err := s.pendingTree.AddBlocks([]CertifiedBlock{certifiedBlockFixture(block)})
+	_, err := s.pendingTree.AddBlocks([]flow.CertifiedBlock{certifiedBlockFixture(block)})
 	require.NoError(s.T(), err)
 	// adding same block should result in no-op
-	_, err = s.pendingTree.AddBlocks([]CertifiedBlock{certifiedBlockFixture(block)})
+	_, err = s.pendingTree.AddBlocks([]flow.CertifiedBlock{certifiedBlockFixture(block)})
 	require.NoError(s.T(), err)
-	connectedBlocks, err := s.pendingTree.AddBlocks([]CertifiedBlock{certifiedBlockFixture(conflictingBlock)})
+	connectedBlocks, err := s.pendingTree.AddBlocks([]flow.CertifiedBlock{certifiedBlockFixture(conflictingBlock)})
 	require.Empty(s.T(), connectedBlocks)
 	require.True(s.T(), model.IsByzantineThresholdExceededError(err))
 }
@@ -155,7 +155,7 @@ func (s *PendingTreeSuite) TestBatchWithSkipsAndInRandomOrder() {
 	require.NoError(s.T(), err)
 
 	// restore view based order since that's what we will get from PendingTree
-	slices.SortFunc(blocks, func(lhs CertifiedBlock, rhs CertifiedBlock) bool {
+	slices.SortFunc(blocks, func(lhs flow.CertifiedBlock, rhs flow.CertifiedBlock) bool {
 		return lhs.View() < rhs.View()
 	})
 
@@ -178,7 +178,7 @@ func (s *PendingTreeSuite) TestResolveBlocksAfterFinalization() {
 	// make sure short fork doesn't have conflicting views, so we don't trigger exception
 	B2.Header.View = longestFork[len(longestFork)-1].Block.Header.View + 1
 	B3 := unittest.BlockWithParentFixture(B2.Header)
-	shortFork := []CertifiedBlock{{
+	shortFork := []flow.CertifiedBlock{{
 		Block: B2,
 		QC:    B3.Header.QuorumCertificate(),
 	}, certifiedBlockFixture(B3)}
@@ -202,7 +202,7 @@ func (s *PendingTreeSuite) TestBlocksLowerThanFinalizedView() {
 	newFinalized := unittest.BlockWithParentFixture(block.Header)
 	_, err := s.pendingTree.FinalizeFork(newFinalized.Header)
 	require.NoError(s.T(), err)
-	_, err = s.pendingTree.AddBlocks([]CertifiedBlock{certifiedBlockFixture(block)})
+	_, err = s.pendingTree.AddBlocks([]flow.CertifiedBlock{certifiedBlockFixture(block)})
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), uint64(0), s.pendingTree.forest.GetSize())
 }
@@ -245,8 +245,8 @@ func (s *PendingTreeSuite) TestAddingBlocksWithSameHeight() {
 	E := unittest.BlockWithParentFixture(D.Header)
 	E.Header.View = D.Header.View + 1
 
-	firstBatch := []CertifiedBlock{certifiedBlockFixture(A), certifiedBlockFixture(B), certifiedBlockFixture(D)}
-	secondBatch := []CertifiedBlock{certifiedBlockFixture(C), certifiedBlockFixture(E)}
+	firstBatch := []flow.CertifiedBlock{certifiedBlockFixture(A), certifiedBlockFixture(B), certifiedBlockFixture(D)}
+	secondBatch := []flow.CertifiedBlock{certifiedBlockFixture(C), certifiedBlockFixture(E)}
 
 	actual, err := s.pendingTree.AddBlocks(firstBatch)
 	require.NoError(s.T(), err)
@@ -258,11 +258,11 @@ func (s *PendingTreeSuite) TestAddingBlocksWithSameHeight() {
 }
 
 // certifiedBlocksFixture builds a chain of certified blocks starting at some block.
-func certifiedBlocksFixture(count int, parent *flow.Header) []CertifiedBlock {
-	result := make([]CertifiedBlock, 0, count)
+func certifiedBlocksFixture(count int, parent *flow.Header) []flow.CertifiedBlock {
+	result := make([]flow.CertifiedBlock, 0, count)
 	blocks := unittest.ChainFixtureFrom(count, parent)
 	for i := 0; i < count-1; i++ {
-		result = append(result, CertifiedBlock{
+		result = append(result, flow.CertifiedBlock{
 			Block: blocks[i],
 			QC:    blocks[i+1].Header.QuorumCertificate(),
 		})
@@ -272,8 +272,8 @@ func certifiedBlocksFixture(count int, parent *flow.Header) []CertifiedBlock {
 }
 
 // certifiedBlockFixture builds a certified block using a QC with fixture signatures.
-func certifiedBlockFixture(block *flow.Block) CertifiedBlock {
-	return CertifiedBlock{
+func certifiedBlockFixture(block *flow.Block) flow.CertifiedBlock {
+	return flow.CertifiedBlock{
 		Block: block,
 		QC:    unittest.CertifyBlock(block.Header),
 	}

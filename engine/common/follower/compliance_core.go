@@ -21,7 +21,7 @@ import (
 )
 
 // CertifiedBlocks is a connected list of certified blocks, in ascending height order.
-type CertifiedBlocks []pending_tree.CertifiedBlock
+type CertifiedBlocks []flow.CertifiedBlock
 
 // defaultCertifiedRangeChannelCapacity maximum capacity of buffered channel that is used to transfer ranges of
 // certified blocks to specific worker.
@@ -314,7 +314,7 @@ func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.Quo
 		} else {
 			qc = certifyingQC
 		}
-		certifiedBlocks = append(certifiedBlocks, pending_tree.CertifiedBlock{
+		certifiedBlocks = append(certifiedBlocks, flow.CertifiedBlock{
 			Block: block,
 			QC:    qc,
 		})

@@ -70,3 +70,28 @@ const (
 func (s BlockStatus) String() string {
 	return [...]string{"BLOCK_UNKNOWN", "BLOCK_FINALIZED", "BLOCK_SEALED"}[s]
 }
+
+// CertifiedBlock holds a certified block, which is a block and a QC that is pointing to
+// the block. A QC is the aggregated form of votes from a supermajority of HotStuff and
+// therefore proves validity of the block. A certified block satisfies:
+// Block.View == QC.View and Block.BlockID == QC.BlockID
+type CertifiedBlock struct {
+	Block *Block
+	QC    *QuorumCertificate
+}
+
+// ID returns unique identifier for the block.
+// To avoid repeated computation, we use value from the QC.
+func (b *CertifiedBlock) ID() Identifier {
+	return b.QC.BlockID
+}
+
+// View returns view where the block was produced.
+func (b *CertifiedBlock) View() uint64 {
+	return b.QC.View
+}
+
+// Height returns height of the block.
+func (b *CertifiedBlock) Height() uint64 {
+	return b.Block.Header.Height
+}
