@@ -318,7 +318,7 @@ func TestSealingSegment(t *testing.T) {
 				next := unittest.BlockWithParentFixture(parent.Header)
 				if i == 0 {
 					// Repetitions of the same receipt in one fork would be a protocol violation.
-					// Hence, we include the result only once in the direct child of B1. 
+					// Hence, we include the result only once in the direct child of B1.
 					next.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
 				}
 				buildFinalizedBlock(t, state, next)

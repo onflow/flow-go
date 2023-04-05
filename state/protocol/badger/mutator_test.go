@@ -574,7 +574,7 @@ func TestExtendReceiptsValid(t *testing.T) {
 // Also tests that appropriate epoch transition events are fired.
 //
 // Epoch information becomes available in the protocol state in the block containing the seal
-// for the block in which the relevant service event was emitted.
+// for the block whose execution emitted the service event.
 //
 // ROOT <- B1 <- B2(R1) <- B3(S1) <- B4 <- B5(R2) <- B6(S2) <- B7 <-|- B8
 //

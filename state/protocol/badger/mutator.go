@@ -870,9 +870,18 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.B
 	events []func(),
 	err error,
 ) {
-	// track service event driven metrics and protocol events that should be emitted
-	for _, seal := range block.Payload.Seals {
 
+	// block payload may not specify seals in order, so order them by block height before processing
+	orderedSeals, err := protocol.OrderedSeals(block.Payload, m.headers)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
+		}
+		return nil, nil, fmt.Errorf("unexpected error ordering seals: %w", err)
+	}
+
+	// track service event driven metrics and protocol events that should be emitted
+	for _, seal := range orderedSeals {
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
@@ -976,7 +985,7 @@ func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered b
 // correctness of the service event before processing it.
 // Consequently, any change to the protocol state introduced by a service event
 // emitted during execution of block A would only become visible when querying
-// C or its descendants. 
+// C or its descendants.
 //
 // This method will only apply service-event-induced state changes when the
 // input block has the form of block C (ie. contains a seal for a block in
