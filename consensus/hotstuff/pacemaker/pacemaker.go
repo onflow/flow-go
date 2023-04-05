@@ -100,7 +100,7 @@ func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewE
 		return nil, nil
 	}
 
-	// TC triggered view change:
+	// QC triggered view change:
 	p.timeoutControl.OnProgressBeforeTimeout()
 	p.notifier.OnQcTriggeredViewChange(initialView, resultingView, qc)
 

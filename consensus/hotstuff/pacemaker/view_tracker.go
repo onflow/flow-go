@@ -102,7 +102,7 @@ func (vt *viewTracker) ProcessTC(tc *flow.TimeoutCertificate) (uint64, error) {
 		// now contributed its newest QC to this TC.
 		err := vt.updateNewestQC(tc.NewestQC)
 		if err != nil {
-			return view, fmt.Errorf("could not update tracked newest QC: %w", err)
+			return 0, fmt.Errorf("could not update tracked newest QC: %w", err)
 		}
 		return view, nil
 	}
@@ -111,7 +111,7 @@ func (vt *viewTracker) ProcessTC(tc *flow.TimeoutCertificate) (uint64, error) {
 	newView := tc.View + 1
 	err := vt.updateLivenessData(newView, tc.NewestQC, tc)
 	if err != nil {
-		return newView, fmt.Errorf("failed to update liveness data: %w", err)
+		return 0, fmt.Errorf("failed to update liveness data: %w", err)
 	}
 	return newView, nil
 }

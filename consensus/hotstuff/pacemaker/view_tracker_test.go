@@ -48,6 +48,8 @@ func (s *ViewTrackerTestSuite) SetupTest() {
 	require.NoError(s.T(), err)
 }
 
+// confirmResultingState asserts that the view tracker's stored LivenessData reflects the provided
+// current view, newest QC, and last view TC.
 func (s *ViewTrackerTestSuite) confirmResultingState(curView uint64, qc *flow.QuorumCertificate, tc *flow.TimeoutCertificate) {
 	require.Equal(s.T(), curView, s.tracker.CurView())
 	require.Equal(s.T(), qc, s.tracker.NewestQC())
@@ -208,7 +210,7 @@ func (s *ViewTrackerTestSuite) TestProcessQC_UpdateNewestQC() {
 	require.Equal(s.T(), expectedView, resultingCurView)
 	s.confirmResultingState(expectedView, s.initialQC, tc)
 
-	// Test 1: add QC for view 9, which
+	// Test 1: add QC for view 9, which is newer than our initial QC - it should become our newest QC
 	qc := QC(s.tracker.NewestQC().View + 2)
 	expectedLivenessData := &hotstuff.LivenessData{
 		CurrentView: expectedView,
