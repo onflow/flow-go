@@ -257,8 +257,9 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		snapshotTree)
 	require.NoError(t, err)
 
-	view := delta.NewDeltaView(snapshotTree.Append(executionSnapshot))
-	nestedTxn := state.NewTransactionState(view, state.DefaultParameters())
+	nestedTxn := state.NewTransactionState(
+		delta.NewDeltaView(snapshotTree.Append(executionSnapshot)),
+		state.DefaultParameters())
 
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
@@ -300,7 +301,10 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		require.Equal(t, expected, invalidator.MeterParamOverridesUpdated)
 	}
 
-	for _, registerId := range view.Finalize().AllRegisterIDs() {
+	executionSnapshot, err = nestedTxn.FinalizeMainTransaction()
+	require.NoError(t, err)
+
+	for _, registerId := range executionSnapshot.AllRegisterIDs() {
 		checkForUpdates(registerId, true)
 		checkForUpdates(
 			flow.NewRegisterID("other owner", registerId.Key),
