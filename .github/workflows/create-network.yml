@@ -9,7 +9,24 @@ on:
       network_id:
         required: true
         type: string
-        description: 'NETWORK ID for the new deployment. Must be unique, have only alphanumeric characters and dashes (can''t start or end with a dash), and be 20 or fewer characters in length.'
+        description: 'NETWORK ID for the new deployment. Must be unique, have only alphanumeric characters (can''t start with a digit) and dashes (can''t start or end with a dash), and be 20 or fewer characters in length.'
+
+      access_nodes:
+        required: false
+        type: choice
+        description: 'Number of Access Nodes to create (default: 1)'
+        options:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+        default: 1
 
       # Allows for the public or private repo to be used for deployment automation
       automation_repo:
@@ -161,7 +178,7 @@ jobs:
       - self-hosted
       - flow-bn2
     env:
-      ARGS: NAMESPACE=benchnet ACCESS=1 COLLECTION=6 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 NETWORK_ID=${{ needs.networkId.outputs.networkId }} OWNER=${{ github.actor }}
+      ARGS: NAMESPACE=benchnet ACCESS=${{ inputs.access_nodes }} COLLECTION=6 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 NETWORK_ID=${{ needs.networkId.outputs.networkId }} OWNER=${{ github.actor }}
     steps:
 
       - name: Fail if Network ID was unable to be retrieved or was not unique
