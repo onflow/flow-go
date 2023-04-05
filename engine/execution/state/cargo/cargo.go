@@ -5,7 +5,7 @@ import (
 )
 
 type Cargo struct {
-	finBlocks *FinalizedBlockTracker
+	finBlocks *FinalizedBlockQueue
 	views     *Views
 }
 
@@ -19,7 +19,7 @@ func NewCargo(
 		return nil, err
 	}
 	return &Cargo{
-		finBlocks: NewFinalizedBlockTracker(blockQueueCapacity, startBlockParent),
+		finBlocks: NewFinalizedBlockQueue(blockQueueCapacity, startBlockParent),
 		views:     views,
 	}, nil
 }

@@ -15,9 +15,11 @@ type headerWithID struct {
 	ID     flow.Identifier
 }
 
-// FinTracker holds on to an ordered list of consumable headers
-// it checks that blocks are forming a chain
-type FinalizedBlockTracker struct {
+// FinalizedBlockQueue maintains an ordered queue of consumable block headers
+// it also verifies that headers are added to the queue in the right order
+// under the hood it uses a circular buffer with a limited size to keep these block headers
+// if it reaches the limit it prevents adding more block headers
+type FinalizedBlockQueue struct {
 	start, end, capacity int
 	headers              []headerWithID
 	lock                 sync.RWMutex
@@ -25,49 +27,58 @@ type FinalizedBlockTracker struct {
 	lastQueuedHeader     *headerWithID
 }
 
-// startHeader won't be included, it would just be used for validation initially
-// when queue is empty
-func NewFinalizedBlockTracker(
+// NewFinalizedBlockQueue constructs a new FinalizedBlockQueue
+// capacity limits the number of unconsumed headers in the queue
+// genesis is used to validate the very first header that is going to be added to the queue
+func NewFinalizedBlockQueue(
 	capacity int,
 	genesis *flow.Header,
-) *FinalizedBlockTracker {
-	return &FinalizedBlockTracker{
+) *FinalizedBlockQueue {
+	return &FinalizedBlockQueue{
 		capacity:           capacity,
 		headers:            make([]headerWithID, capacity),
 		lastDequeuedHeader: &headerWithID{genesis, genesis.ID()},
 	}
 }
 
-func (ft *FinalizedBlockTracker) size() int {
+func (ft *FinalizedBlockQueue) size() int {
 	return ft.end - ft.start
 }
 
-func (ft *FinalizedBlockTracker) isEmpty() bool {
+func (ft *FinalizedBlockQueue) isEmpty() bool {
 	return ft.start == ft.end
 }
 
-func (ft *FinalizedBlockTracker) isFull() bool {
+func (ft *FinalizedBlockQueue) isFull() bool {
 	return ft.size() == ft.capacity
 }
 
-// Enqueue append a header to the queue (returns error if reached capacity)
-func (ft *FinalizedBlockTracker) Enqueue(header *flow.Header) error {
+// Enqueue append a header to the queue given that header is compatible
+// with previously added header (parentID matches and height is right)
+// it returns an error if the queue has reached the capacity
+func (ft *FinalizedBlockQueue) Enqueue(header *flow.Header) error {
 	ft.lock.Lock()
 	defer ft.lock.Unlock()
 
 	if ft.isFull() {
-		return fmt.Errorf("fin tracker queue is full (capacity: %d)", ft.capacity)
+		return fmt.Errorf("queue is full (capacity: %d)", ft.capacity)
 	}
 
 	parentID := ft.lastDequeuedHeader.ID
+	lastHeight := ft.lastDequeuedHeader.Header.Height
 	// check compliance
 	if !ft.isEmpty() {
 		parentID = ft.lastQueuedHeader.ID
+		lastHeight = ft.lastQueuedHeader.Header.Height
 	}
 
 	if parentID != header.ParentID {
 		return fmt.Errorf("block finalization events are not order preserving, last block ID: %x, new block's parent ID: %x", parentID, header.ParentID)
 	}
+	if lastHeight+1 != header.Height {
+		return fmt.Errorf("block finalization events are not order preserving, last block height: %d, new block height: %d", lastHeight, header.Height)
+	}
+
 	h := headerWithID{header, header.ID()}
 	ft.headers[ft.end] = h
 	ft.lastQueuedHeader = &h
@@ -77,7 +88,7 @@ func (ft *FinalizedBlockTracker) Enqueue(header *flow.Header) error {
 
 // Peak returns the oldest header in the queue without removing it
 // if queue is empty returns zero ID and nil header
-func (ft *FinalizedBlockTracker) Peak() (flow.Identifier, *flow.Header) {
+func (ft *FinalizedBlockQueue) Peak() (flow.Identifier, *flow.Header) {
 	ft.lock.RLock()
 	defer ft.lock.RUnlock()
 
@@ -90,7 +101,7 @@ func (ft *FinalizedBlockTracker) Peak() (flow.Identifier, *flow.Header) {
 
 // Dequeue removes the oldest header from the queue (without returning it)
 // Dequeue from empty queue is a no-op
-func (ft *FinalizedBlockTracker) Dequeue() {
+func (ft *FinalizedBlockQueue) Dequeue() {
 	ft.lock.Lock()
 	defer ft.lock.Unlock()
 
