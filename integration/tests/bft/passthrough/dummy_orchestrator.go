@@ -68,6 +68,7 @@ func (o *orchestrator) trackEgressEvents(event *insecure.EgressEvent) error {
 		o.egressEventTracker[typeChunkDataResponse] = append(o.egressEventTracker[typeChunkDataResponse], e.ChunkDataPack.ChunkID)
 	case *flow.ResultApproval:
 		o.egressEventTracker[typeResultApproval] = append(o.egressEventTracker[typeResultApproval], e.ID())
+		o.Logger.Info().Hex("result_id", logging.ID(e.Body.ExecutionResultID)).Uint64("chunk_index", e.Body.ChunkIndex).Msg("result approval")
 	}
 	return nil
 }
