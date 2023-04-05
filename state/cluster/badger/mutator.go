@@ -275,7 +275,8 @@ func (m *MutableState) checkReferenceBlockValidity(payload *cluster.Payload, fin
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
 			// indicates data inconsistency in the protocol state - we know the block is finalized,
 			// but don't know what epoch it belongs to
-			return irrecoverable.NewExceptionf("finalized reference block has no known epoch: %w", err)
+			return irrecoverable.NewExceptionf("finalized reference block (id=%x, height=%d, view=%d has no known epoch: %w",
+				payload.ReferenceBlockID, refBlock.Height, refBlock.View, err)
 		}
 		return fmt.Errorf("could not get reference epoch: %w", err)
 	}

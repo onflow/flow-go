@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
@@ -122,6 +123,7 @@ type CollectionNode struct {
 	Collections        storage.Collections
 	Transactions       storage.Transactions
 	ClusterPayloads    storage.ClusterPayloads
+	EpochLookup        *epochs.EpochLookup
 	TxPools            *epochpool.TransactionPools
 	Voter              module.ClusterRootQCVoter
 	IngestionEngine    *collectioningest.Engine
@@ -134,10 +136,13 @@ func (n CollectionNode) Start(t *testing.T) {
 	go unittest.FailOnIrrecoverableError(t, n.Ctx.Done(), n.Errs)
 	n.IngestionEngine.Start(n.Ctx)
 	n.EpochManagerEngine.Start(n.Ctx)
+	n.ProviderEngine.Start(n.Ctx)
+	n.EpochLookup.Start(n.Ctx)
 }
 
 func (n CollectionNode) Ready() <-chan struct{} {
 	return util.AllReady(
+		n.EpochLookup,
 		n.PusherEngine,
 		n.ProviderEngine,
 		n.IngestionEngine,

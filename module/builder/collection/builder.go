@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -38,13 +37,10 @@ type Builder struct {
 	tracer         module.Tracer
 	config         Config
 	log            zerolog.Logger
+	clusterEpoch   uint64 // the operating epoch for this cluster
 }
 
-// TODO: #6435
-//   - pass in epoch (minimally counter, preferably cluster chain ID as well)
-//   - check candidate reference blocks by view (need to get whole header each time - cheap if header in cache)
-//   - if outside view boundary, look up first+final block height of epoch (can cache both)
-func NewBuilder(db *badger.DB, tracer module.Tracer, mainHeaders storage.Headers, clusterHeaders storage.Headers, payloads storage.ClusterPayloads, transactions mempool.Transactions, log zerolog.Logger, opts ...Opt) (*Builder, error) {
+func NewBuilder(db *badger.DB, tracer module.Tracer, mainHeaders storage.Headers, clusterHeaders storage.Headers, payloads storage.ClusterPayloads, transactions mempool.Transactions, log zerolog.Logger, epochCounter uint64, opts ...Opt) (*Builder, error) {
 	b := Builder{
 		db:             db,
 		tracer:         tracer,
@@ -54,6 +50,7 @@ func NewBuilder(db *badger.DB, tracer module.Tracer, mainHeaders storage.Headers
 		transactions:   transactions,
 		config:         DefaultConfig(),
 		log:            log.With().Str("component", "cluster_builder").Logger(),
+		clusterEpoch:   epochCounter,
 	}
 
 	for _, apply := range opts {
@@ -68,6 +65,97 @@ func NewBuilder(db *badger.DB, tracer module.Tracer, mainHeaders storage.Headers
 	return &b, nil
 }
 
+// blockBuildContext is the required information about the cluster chain and
+// main chain state needed to build a new cluster block proposal.
+type blockBuildContext struct {
+	parent                     flow.Header     // parent of the block we are building
+	clusterChainFinalizedBlock flow.Header     // finalized block on the cluster chain
+	refChainFinalizedHeight    uint64          // finalized height on reference chain
+	refChainFinalizedID        flow.Identifier // finalized block ID on reference chain
+	refEpochFirstHeight        uint64          // first height of this cluster's operating epoch
+	refEpochFinalHeight        uint64          // last height of this cluster's operating epoch (may not be known)
+	refEpochFinalID            flow.Identifier // ID of last block in this cluster's operating epoch (may not be known)
+	refEpochHasEnded           bool            // whether this cluster's operating epoch has ended (and whether above 2 fields are known)
+}
+
+// highestPossibleReferenceBlockHeight returns the height of the highest possible valid reference block,
+// based on our local state. It is the highest finalized block which is in this cluster's operating epoch.
+func (ctx blockBuildContext) highestPossibleReferenceBlockHeight() uint64 {
+	if ctx.refEpochHasEnded {
+		return ctx.refEpochFinalHeight
+	}
+	return ctx.refChainFinalizedHeight
+}
+
+// highestPossibleReferenceBlockID returns the ID of the highest possible valid reference block,
+// based on our local state. It is the highest finalized block which is in this cluster's operating epoch.
+func (ctx blockBuildContext) highestPossibleReferenceBlockID() flow.Identifier {
+	if ctx.refEpochHasEnded {
+		return ctx.refEpochFinalID
+	}
+	return ctx.refChainFinalizedID
+}
+
+// getBlockBuildContext retrieves the required contextual information from the database
+// required to build a new block proposal.
+// No errors are expected during normal operation.
+func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (blockBuildContext, error) {
+	var ctx blockBuildContext
+
+	err := b.db.View(func(btx *badger.Txn) error {
+
+		// TODO (ramtin): enable this again
+		// b.tracer.StartSpan(parentID, trace.COLBuildOnSetup)
+		// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnSetup)
+
+		err := operation.RetrieveHeader(parentID, &ctx.parent)(btx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve parent: %w", err)
+		}
+		// retrieve the finalized boundary ON THE CLUSTER CHAIN
+		err = procedure.RetrieveLatestFinalizedClusterHeader(ctx.parent.ChainID, &ctx.clusterChainFinalizedBlock)(btx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve cluster final: %w", err)
+		}
+
+		// retrieve the height and ID of the latest finalized block ON THE MAIN CHAIN
+		// this is used as the reference point for transaction expiry
+		err = operation.RetrieveFinalizedHeight(&ctx.refChainFinalizedHeight)(btx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve main finalized height: %w", err)
+		}
+		err = operation.LookupBlockHeight(ctx.refChainFinalizedHeight, &ctx.refChainFinalizedID)(btx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve main finalized ID: %w", err)
+		}
+		// retrieve the height bounds of the operating epoch
+		err = operation.RetrieveEpochFirstHeight(b.clusterEpoch, &ctx.refEpochFirstHeight)(btx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve first height of operating epoch: %w", err)
+		}
+		err = operation.RetrieveEpochLastHeight(b.clusterEpoch, &ctx.refEpochFinalHeight)(btx)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				ctx.refEpochHasEnded = false
+				return nil
+			}
+			return fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
+		}
+
+		ctx.refEpochHasEnded = true
+		err = operation.LookupBlockHeight(ctx.refEpochFinalHeight, &ctx.refEpochFinalID)(btx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve ID of final block of operating epoch: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return blockBuildContext{}, err
+	}
+	return ctx, nil
+}
+
 // BuildOn creates a new block built on the given parent. It produces a payload
 // that is valid with respect to the un-finalized chain it extends.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
@@ -76,6 +164,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	var clusterChainFinalizedBlock flow.Header // finalized block on the cluster chain
 	var refChainFinalizedHeight uint64         // finalized height on reference chain
 	var refChainFinalizedID flow.Identifier    // finalized block ID on reference chain
+	var refEpochFirstHeight uint64             // first height of this cluster's operating epoch
+	var refEpochFinalHeight uint64             // last height of this cluster's operating epoch (may not be known)
+	var refEpochFinalID flow.Identifier        // ID of last block in this cluster's operating epoch (may not be known)
+	var refEpochHasEnded bool                  // whether this cluster's operating epoch has ended (and whether above 2 fields are known)
 
 	startTime := time.Now()
 
@@ -97,7 +189,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	//
 	// A collection with overlapping expiry window can be finalized or un-finalized.
 	// * to find all non-expired and finalized collections, we make use of an index
-	//   (main_chain_finalized_height -> cluster_block_ids with respective reference height), to search for a range of main chain heights	//   which could be only referenced by collections with overlapping expiry windows.
+	//   (main_chain_finalized_height -> cluster_block_ids with respective reference height), to search for a range of main chain heights
+	//   which could be only referenced by collections with overlapping expiry windows.
 	// * to find all overlapping and un-finalized collections, we can't use the above index, because it's
 	//   only for finalized collections. Instead, we simply traverse along the chain up to the last
 	//   finalized block. This could possibly include some collections with expiry windows that DON'T
@@ -115,6 +208,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if err != nil {
 			return fmt.Errorf("could not retrieve parent: %w", err)
 		}
+		// retrieve the finalized boundary ON THE CLUSTER CHAIN
+		err = procedure.RetrieveLatestFinalizedClusterHeader(parent.ChainID, &clusterChainFinalizedBlock)(btx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve cluster final: %w", err)
+		}
 
 		// retrieve the height and ID of the latest finalized block ON THE MAIN CHAIN
 		// this is used as the reference point for transaction expiry
@@ -126,12 +224,26 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if err != nil {
 			return fmt.Errorf("could not retrieve main finalized ID: %w", err)
 		}
-
-		// retrieve the finalized boundary ON THE CLUSTER CHAIN
-		err = procedure.RetrieveLatestFinalizedClusterHeader(parent.ChainID, &clusterChainFinalizedBlock)(btx)
+		// retrieve the height bounds of the operating epoch
+		err = operation.RetrieveEpochFirstHeight(b.clusterEpoch, &refEpochFirstHeight)(btx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve cluster final: %w", err)
+			return fmt.Errorf("could not retrieve first height of operating epoch: %w", err)
 		}
+		err = operation.RetrieveEpochLastHeight(b.clusterEpoch, &refEpochFinalHeight)(btx)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				refEpochHasEnded = false
+				return nil
+			}
+			return fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
+		}
+
+		refEpochHasEnded = true
+		err = operation.LookupBlockHeight(refEpochFinalHeight, &refEpochFinalID)(btx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve ID of final block of operating epoch: %w", err)
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -143,6 +255,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	minPossibleRefHeight := refChainFinalizedHeight - uint64(flow.DefaultTransactionExpiry-b.config.ExpiryBuffer)
 	if minPossibleRefHeight > refChainFinalizedHeight {
 		minPossibleRefHeight = 0 // overflow check
+	}
+	if minPossibleRefHeight < refEpochFirstHeight {
+		minPossibleRefHeight = refEpochFirstHeight
+	}
+	maxPossibleRefHeight := refChainFinalizedHeight
+	if refEpochHasEnded {
+		maxPossibleRefHeight = refEpochFinalHeight
 	}
 
 	log := b.log.With().
@@ -185,7 +304,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
 
 	// second, look up previously included transactions in FINALIZED ancestors
-	err = b.populateFinalizedAncestryLookup(minPossibleRefHeight, refChainFinalizedHeight, lookup, limiter)
+	err = b.populateFinalizedAncestryLookup(minPossibleRefHeight, maxPossibleRefHeight, lookup, limiter)
 	if err != nil {
 		return nil, fmt.Errorf("could not populate finalized ancestry lookup: %w", err)
 	}
@@ -199,8 +318,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// time figuring out the correct reference block ID for the collection.
 
 	// keep track of the actual smallest reference height of all included transactions
-	minRefHeight := uint64(math.MaxUint64)
+	minRefHeight := refChainFinalizedHeight
 	minRefID := refChainFinalizedID
+	if refEpochHasEnded {
+		minRefHeight = refEpochFinalHeight
+		minRefID = refEpochFinalID
+	}
 
 	var transactions []*flow.TransactionBody
 	var totalByteSize uint64
@@ -248,15 +371,19 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 
 		// disallow un-finalized reference blocks
-		if refChainFinalizedHeight < refHeader.Height {
+		if refHeader.Height > refChainFinalizedHeight {
+			continue
+		}
+		// disallow reference blocks above
+		if refEpochHasEnded && refHeader.Height > refEpochFinalHeight {
 			continue
 		}
 		// make sure the reference block is finalized and not orphaned
-		blockFinalizedAtReferenceHeight, err := b.mainHeaders.ByHeight(refHeader.Height)
+		blockIDFinalizedAtRefHeight, err := b.mainHeaders.BlockIDByHeight(refHeader.Height)
 		if err != nil {
 			return nil, fmt.Errorf("could not check that reference block (id=%x) is finalized: %w", tx.ReferenceBlockID, err)
 		}
-		if blockFinalizedAtReferenceHeight.ID() != tx.ReferenceBlockID {
+		if blockIDFinalizedAtRefHeight != tx.ReferenceBlockID {
 			// the transaction references an orphaned block - it will never be valid
 			b.transactions.Remove(tx.ID())
 			continue

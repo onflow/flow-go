@@ -255,13 +255,17 @@ func (lookup *EpochLookup) EpochForViewWithFallback(view uint64) (uint64, error)
 // the leader selection and cache static info for the epoch. When we observe
 // epoch emergency fallback being triggered, we inject a fallback epoch.
 func (lookup *EpochLookup) handleProtocolEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	fmt.Println("handlProtocolEvents started")
 	ready()
+	fmt.Println("handlProtocolEvents started  after ready")
 
 	for {
 		select {
 		case <-ctx.Done():
+			fmt.Println("handlePRotocolevents exited")
 			return
 		case block := <-lookup.committedEpochsCh:
+			fmt.Println("received epoch commit")
 			epoch := lookup.state.AtBlockID(block.ID()).Epochs().Next()
 			err := lookup.cacheEpoch(epoch)
 			if err != nil {
@@ -273,7 +277,9 @@ func (lookup *EpochLookup) handleProtocolEvents(ctx irrecoverable.SignalerContex
 
 // EpochCommittedPhaseStarted informs the `committee.Consensus` that the block starting the Epoch Committed Phase has been finalized.
 func (lookup *EpochLookup) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
+	fmt.Println("epoch lookup EpochCommittedPhaseStarted")
 	lookup.committedEpochsCh <- first
+	fmt.Println("epoch lookup EpochCommittedPhaseStarted after channel send")
 }
 
 // EpochEmergencyFallbackTriggered passes the protocol event to the worker thread.

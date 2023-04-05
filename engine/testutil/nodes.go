@@ -263,7 +263,8 @@ func CompleteStateFixture(
 }
 
 // CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.Hub, identity bootstrap.NodeInfo, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
+func CollectionNode(t *testing.T, _ irrecoverable.SignalerContext, hub *stub.Hub, identity bootstrap.NodeInfo, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
+	// TODO remove context
 
 	node := GenericNode(t, hub, identity.Identity(), rootSnapshot)
 	privKeys, err := identity.PrivateKeys()
@@ -299,8 +300,6 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 		selector,
 		retrieve)
 	require.NoError(t, err)
-	// TODO: move this start logic to a more generalized test utility (we need all engines to be startable).
-	providerEngine.Start(ctx)
 
 	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)
 	require.NoError(t, err)
@@ -308,7 +307,6 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 	epochLookup, err := epochsmodule.NewEpochLookup(node.State)
 	require.NoError(t, err)
 	node.ProtocolEvents.AddConsumer(epochLookup)
-	epochLookup.Start(ctx)
 
 	clusterStateFactory, err := factories.NewClusterStateFactory(
 		node.PublicDB,
@@ -399,13 +397,13 @@ func CollectionNode(t *testing.T, ctx irrecoverable.SignalerContext, hub *stub.H
 		heights,
 	)
 	require.NoError(t, err)
-
 	node.ProtocolEvents.AddConsumer(epochManager)
 
 	return testmock.CollectionNode{
 		GenericNode:        node,
 		Collections:        collections,
 		Transactions:       transactions,
+		EpochLookup:        epochLookup,
 		ClusterPayloads:    clusterPayloads,
 		IngestionEngine:    ingestionEngine,
 		PusherEngine:       pusherEngine,

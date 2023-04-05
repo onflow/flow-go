@@ -67,7 +67,7 @@ func (factory *EpochComponentsFactory) Create(
 	err error,
 ) {
 
-	counter, err := epoch.Counter()
+	epochCounter, err := epoch.Counter()
 	if err != nil {
 		err = fmt.Errorf("could not get epoch counter: %w", err)
 		return
@@ -81,7 +81,7 @@ func (factory *EpochComponentsFactory) Create(
 	}
 	_, exists := identities.ByNodeID(factory.me.NodeID())
 	if !exists {
-		err = fmt.Errorf("%w (node_id=%x, epoch=%d)", epochmgr.ErrNotAuthorizedForEpoch, factory.me.NodeID(), counter)
+		err = fmt.Errorf("%w (node_id=%x, epoch=%d)", epochmgr.ErrNotAuthorizedForEpoch, factory.me.NodeID(), epochCounter)
 		return
 	}
 
@@ -123,9 +123,9 @@ func (factory *EpochComponentsFactory) Create(
 	}
 
 	// get the transaction pool for the epoch
-	pool := factory.pools.ForEpoch(counter)
+	pool := factory.pools.ForEpoch(epochCounter)
 
-	builder, finalizer, err := factory.builder.Create(headers, payloads, pool)
+	builder, finalizer, err := factory.builder.Create(headers, payloads, pool, epochCounter)
 	if err != nil {
 		err = fmt.Errorf("could not create builder/finalizer: %w", err)
 		return
