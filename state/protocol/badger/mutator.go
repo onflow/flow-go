@@ -664,7 +664,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// If epoch emergency fallback is triggered, the current epoch continues until
 	// the next spork - so skip these updates.
 	if !epochFallbackTriggered {
-		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(header, epochStatus)
+		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(block, epochStatus)
 		if err != nil {
 			return fmt.Errorf("could not determine epoch phase metrics/events for finalized block: %w", err)
 		}
@@ -848,41 +848,38 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 	return
 }
 
-// epochPhaseMetricsAndEventsOnBlockFinalized determines metrics to update
-// and protocol events to emit, if this block is the first of a new epoch phase.
-//
-// Protocol events and metric updates happen when we finalize the block at
-// which a service event causing an epoch phase change comes into effect.
-// See handleEpochServiceEvents for details.
+// epochPhaseMetricsAndEventsOnBlockFinalized determines metrics to update and protocol
+// events to emit. Service Events embedded into an execution result take effect, when the
+// execution result's _seal is finalized_ (i.e. when the block holding a seal for the
+// result is finalized). See also handleEpochServiceEvents for further details. Example:
 //
 // Convention:
 //
-//	A <-- ... <-- P(Seal_A) <----- B
-//	              ↑                ↑
-//	block sealing service event    first block of new Epoch phase
-//	for epoch-phase transition     (e.g. EpochSetup phase)
-//	(e.g. EpochSetup event)
+//	A <-- ... <-- C(Seal_A)
 //
-// Per convention, protocol events for epoch phase changes are emitted when
-// the first block of the new phase (eg. EpochSetup phase) is _finalized_.
-// Meaning that the new phase has started.
+// Suppose an EpochSetup service event is emitted during execution of block A. C seals A, therefore
+// we apply the metrics/events when C is finalized. The first block of the EpochSetup
+// phase is block C.
 //
 // This function should only be called when epoch fallback *has not already been triggered*.
 // No errors are expected during normal operation.
-func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.Header, epochStatus *flow.EpochStatus) (
+func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.Block, epochStatus *flow.EpochStatus) (
 	metrics []func(),
 	events []func(),
 	err error,
 ) {
 
-	parent, err := m.blocks.ByID(block.ParentID)
+	// block payload may not specify seals in order, so order them by block height before processing
+	orderedSeals, err := protocol.OrderedSeals(block.Payload, m.headers)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not get parent (id=%x): %w", block.ParentID, err)
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
+		}
+		return nil, nil, fmt.Errorf("unexpected error ordering seals: %w", err)
 	}
 
 	// track service event driven metrics and protocol events that should be emitted
-	for _, seal := range parent.Payload.Seals {
-
+	for _, seal := range orderedSeals {
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
@@ -893,12 +890,12 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.H
 				// update current epoch phase
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseSetup) })
 				// track epoch phase transition (staking->setup)
-				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, block) })
+				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, block.Header) })
 			case *flow.EpochCommit:
 				// update current epoch phase
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
 				// track epoch phase transition (setup->committed)
-				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, block) })
+				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, block.Header) })
 				// track final view of committed epoch
 				nextEpochSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
@@ -971,27 +968,26 @@ func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered b
 
 // handleEpochServiceEvents handles applying state changes which occur as a result
 // of service events being included in a block payload:
-// * inserting incorporated service events
-// * updating EpochStatus for the candidate block
+//   - inserting incorporated service events
+//   - updating EpochStatus for the candidate block
 //
 // Consider a chain where a service event is emitted during execution of block A.
-// Block B contains a receipt for A. Block C contains a seal for block A. Block
-// D contains a QC for C.
+// Block B contains a receipt for A. Block C contains a seal for block A.
 //
-// A <- B(RA) <- C(SA) <- D
+// A <- .. <- B(RA) <- .. <- C(SA)
 //
 // Service events are included within execution results, which are stored
 // opaquely as part of the block payload in block B. We only validate and insert
-// the typed service event to storage once we have received a valid QC for the
-// block containing the seal for A. This occurs once we mark block D as valid
-// with MarkValid. Because of this, any change to the protocol state introduced
-// by a service event emitted in A would only become visible when querying D or
-// later (D's children).
-// TODO(active-pacemaker) update docs here (remove reference to MarkValid) https://github.com/dapperlabs/flow-go/issues/6254
+// the typed service event to storage once we process C, the block containing the
+// seal for block A. This is because we rely on the sealing subsystem to validate
+// correctness of the service event before processing it.
+// Consequently, any change to the protocol state introduced by a service event
+// emitted during execution of block A would only become visible when querying
+// C or its descendants.
 //
 // This method will only apply service-event-induced state changes when the
-// input block has the form of block D (ie. has a parent, which contains a seal
-// for a block in which a service event was emitted).
+// input block has the form of block C (ie. contains a seal for a block in
+// which a service event was emitted).
 //
 // Return values:
 //   - dbUpdates - If the service events are valid, or there are no service events,
@@ -1025,20 +1021,16 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 		return dbUpdates, nil
 	}
 
-	// We apply service events from blocks which are sealed by this block's PARENT.
-	// The parent's payload might contain epoch preparation service events for the next
+	// We apply service events from blocks which are sealed by this candidate block.
+	// The block's payload might contain epoch preparation service events for the next
 	// epoch. In this case, we need to update the tentative protocol state.
 	// We need to validate whether all information is available in the protocol
 	// state to go to the next epoch when needed. In cases where there is a bug
 	// in the smart contract, it could be that this happens too late and the
 	// chain finalization should halt.
-	parent, err := m.blocks.ByID(candidate.Header.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get parent (id=%x): %w", candidate.Header.ParentID, err)
-	}
 
 	// block payload may not specify seals in order, so order them by block height before processing
-	orderedSeals, err := protocol.OrderedSeals(parent.Payload, m.headers)
+	orderedSeals, err := protocol.OrderedSeals(candidate.Payload, m.headers)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
