@@ -992,6 +992,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		suite.blocks = all.Blocks
 		suite.payloads = bstorage.NewClusterPayloads(metrics, suite.db)
 		suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
+		suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter, nil).Maybe()
 
 		qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
 		stateRoot, err := clusterkv.NewStateRoot(suite.genesis, qc, suite.epochCounter)
