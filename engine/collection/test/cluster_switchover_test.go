@@ -274,8 +274,8 @@ func (tc *ClusterSwitchoverTestCase) ExpectTransaction(epochCounter uint64, clus
 }
 
 // ClusterState opens and returns a read-only cluster state for the given node and cluster ID.
-func (tc *ClusterSwitchoverTestCase) ClusterState(node testmock.CollectionNode, clusterID flow.ChainID) cluster.State {
-	state, err := bcluster.OpenState(node.PublicDB, node.Tracer, node.Headers, node.ClusterPayloads, clusterID)
+func (tc *ClusterSwitchoverTestCase) ClusterState(node testmock.CollectionNode, clusterID flow.ChainID, epoch uint64) cluster.State {
+	state, err := bcluster.OpenState(node.PublicDB, node.Tracer, node.Headers, node.ClusterPayloads, clusterID, epoch)
 	require.NoError(tc.T(), err)
 	return state
 }
@@ -371,7 +371,7 @@ func (tc *ClusterSwitchoverTestCase) CheckClusterState(
 	clusterInfo protocol.Cluster,
 ) {
 	node := tc.Collector(identity.NodeID)
-	state := tc.ClusterState(node, clusterInfo.ChainID())
+	state := tc.ClusterState(node, clusterInfo.ChainID(), clusterInfo.EpochCounter())
 	expected := tc.sentTransactions[clusterInfo.EpochCounter()][clusterInfo.Index()]
 	unittest.NewClusterStateChecker(state).
 		ExpectTxCount(len(expected)).
