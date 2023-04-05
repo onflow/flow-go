@@ -859,7 +859,7 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 //
 //	A <-- ... <-- C(Seal_A)
 //
-// Suppose an EpochSetup service event is emitted in block A. C seals A, therefore
+// Suppose an EpochSetup service event is emitted during execution of block A. C seals A, therefore
 // we apply the metrics/events when C is finalized. The first block of the EpochSetup
 // phase is block C.
 //
@@ -975,7 +975,8 @@ func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered b
 // seal for block A. This is because we rely on the sealing subsystem to validate
 // correctness of the service event before processing it.
 // Consequently, any change to the protocol state introduced by a service event
-// emitted in A would only become visible when querying C or later (C's children).
+// emitted during execution of block A would only become visible when querying
+// C or its descendants. 
 //
 // This method will only apply service-event-induced state changes when the
 // input block has the form of block C (ie. contains a seal for a block in

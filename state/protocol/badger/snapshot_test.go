@@ -291,8 +291,8 @@ func TestSealingSegment(t *testing.T) {
 			// build a valid child B3 to ensure we have a QC
 			buildBlock(t, state, unittest.BlockWithParentFixture(block3.Header))
 
-			// sealing segment should contain B1 and B2
-			// B2 is reference of snapshot, B1 is latest sealed
+			// sealing segment should contain B1, B2, B3
+			// B3 is reference of snapshot, B1 is latest sealed
 			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1, block2, block3}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, state.AtBlockID(block3.ID()))
@@ -316,7 +316,11 @@ func TestSealingSegment(t *testing.T) {
 			// build a large chain of intermediary blocks
 			for i := 0; i < 100; i++ {
 				next := unittest.BlockWithParentFixture(parent.Header)
-				next.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+				if i == 0 {
+					// Repetitions of the same receipt in one fork would be a protocol violation.
+					// Hence, we include the result only once in the direct child of B1. 
+					next.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+				}
 				buildFinalizedBlock(t, state, next)
 				parent = next
 			}
@@ -833,17 +837,17 @@ func TestLatestSealedResult(t *testing.T) {
 			err = state.ExtendCertified(context.Background(), block4, block5.Header.QuorumCertificate())
 			require.NoError(t, err)
 
-			// B1 <- B2(S1) <- B3(S1)
+			// B1 <- B2(S1) <- B3(S1) <- B4(R2,R3)
 			// querying B3 should still return (R1,S1) even though they are in parent block
 			t.Run("reference block contains no seal", func(t *testing.T) {
-				gotResult, gotSeal, err := state.AtBlockID(block3.ID()).SealedResult()
+				gotResult, gotSeal, err := state.AtBlockID(block4.ID()).SealedResult()
 				require.NoError(t, err)
 				assert.Equal(t, &receipt1.ExecutionResult, gotResult)
 				assert.Equal(t, seal1, gotSeal)
 			})
 
 			// B1 <- B2(R1) <- B3(S1) <- B4(R2,R3) <- B5(S2,S3)
-			// There are two seals in B4 - should return latest by height (S3,R3)
+			// There are two seals in B5 - should return latest by height (S3,R3)
 			t.Run("reference block contains multiple seals", func(t *testing.T) {
 				err = state.ExtendCertified(context.Background(), block5, unittest.CertifyBlock(block5.Header))
 				require.NoError(t, err)
