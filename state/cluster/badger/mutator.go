@@ -8,7 +8,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -269,21 +268,49 @@ func (m *MutableState) checkReferenceBlockValidity(payload *cluster.Payload, fin
 	// TODO ensure the reference block is part of the main chain
 	_ = refBlock
 
-	// 3 - the reference block must fall within the operating epoch of the cluster
-	refEpoch, err := m.epochLookup.EpochForViewWithFallback(refBlock.View)
-	if err != nil {
-		if errors.Is(err, model.ErrViewForUnknownEpoch) {
-			// indicates data inconsistency in the protocol state - we know the block is finalized,
-			// but don't know what epoch it belongs to
-			return irrecoverable.NewExceptionf("finalized reference block (id=%x, height=%d, view=%d has no known epoch: %w",
-				payload.ReferenceBlockID, refBlock.Height, refBlock.View, err)
+	var epochFirstHeight uint64
+	var epochLastHeight uint64
+	var epochHasEnded bool
+	m.db.View(func(tx *badger.Txn) error {
+		err := operation.RetrieveEpochFirstHeight(m.State.epoch, &epochFirstHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get operating epoch first height: %w", err)
 		}
-		return fmt.Errorf("could not get reference epoch: %w", err)
-	}
-	if refEpoch == m.State.epoch {
+		err = operation.RetrieveEpochLastHeight(m.State.epoch, &epochLastHeight)(tx)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				epochHasEnded = false
+				return nil
+			}
+			return fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
+		}
+		epochHasEnded = true
 		return nil
+	})
+	// 3 - the reference block must be within the finalized boundary
+	if refBlock.Height < epochFirstHeight {
+		return state.NewInvalidExtensionErrorf("invalid reference block is before operating epoch for cluster, height %d<%d", refBlock.Height, epochFirstHeight)
 	}
-	return state.NewInvalidExtensionErrorf("invalid reference block is within epoch %d, cluster has operating epoch %d", refEpoch, m.epoch)
+	if epochHasEnded && refBlock.Height > epochLastHeight {
+		return state.NewInvalidExtensionErrorf("invalid reference block is after operating epoch for cluster, height %d>%d", refBlock.Height, epochLastHeight)
+	}
+	return nil
+	//
+	//// 3 - the reference block must fall within the operating epoch of the cluster
+	//refEpoch, err := m.epochLookup.EpochForViewWithFallback(refBlock.View)
+	//if err != nil {
+	//	if errors.Is(err, model.ErrViewForUnknownEpoch) {
+	//		// indicates data inconsistency in the protocol state - we know the block is finalized,
+	//		// but don't know what epoch it belongs to
+	//		return irrecoverable.NewExceptionf("finalized reference block (id=%x, height=%d, view=%d has no known epoch: %w",
+	//			payload.ReferenceBlockID, refBlock.Height, refBlock.View, err)
+	//	}
+	//	return fmt.Errorf("could not get reference epoch: %w", err)
+	//}
+	//if refEpoch == m.State.epoch {
+	//	return nil
+	//}
+	//return state.NewInvalidExtensionErrorf("invalid reference block is within epoch %d, cluster has operating epoch %d", refEpoch, m.epoch)
 }
 
 // checkDupeTransactionsInUnfinalizedAncestry checks for duplicate transactions in the un-finalized

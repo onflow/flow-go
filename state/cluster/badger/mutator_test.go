@@ -409,7 +409,6 @@ func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromDifferentEpoch() {
 	require.True(suite.T(), ok)
 	nextEpochHeader, err := suite.protoState.AtHeight(heights.FinalHeight() + 1).Head()
 	require.NoError(suite.T(), err)
-	suite.epochLookup.On("EpochForViewWithFallback", nextEpochHeader.View).Return(suite.epochCounter+1, nil)
 
 	block := suite.Block()
 	block.SetPayload(model.EmptyPayload(nextEpochHeader.ID()))
