@@ -39,14 +39,14 @@ func (s *Suite) SetupSuite() {
 	s.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.ErrorLevel),
+		testnet.WithLogLevel(zerolog.InfoLevel),
 		testnet.AsCorrupted())
 	s.NodeConfigs = append(s.NodeConfigs, verConfig)
 
 	s.ver2ID = unittest.IdentifierFixture()
 	ver2Config := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.ver2ID),
-		testnet.WithLogLevel(zerolog.ErrorLevel),
+		testnet.WithLogLevel(zerolog.InfoLevel),
 		testnet.AsCorrupted())
 	s.NodeConfigs = append(s.NodeConfigs, ver2Config)
 
