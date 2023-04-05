@@ -8,6 +8,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
 	netcache "github.com/onflow/flow-go/network/cache"
@@ -297,10 +298,11 @@ func TestScoreDecays(t *testing.T) {
 
 	// when the app specific score function is called for the first time, the score should be updated.
 	score := reg.AppSpecificScoreFunc()(peerID)
+	// the upper bound is the sum of the penalties without decay.
 	scoreUpperBound := penaltyValueFixtures().Prune +
 		penaltyValueFixtures().Graft +
 		penaltyValueFixtures().IHave +
-		penaltyValueFixtures().IWant // the upper bound is the sum of the penalties without decay.
+		penaltyValueFixtures().IWant
 	// the lower bound is the sum of the penalties with decay assuming the decay is applied 4 times to the sum of the penalties.
 	// in reality, the decay is applied 4 times to the first penalty, then 3 times to the second penalty, and so on.
 	scoreLowerBound := scoreUpperBound * math.Pow(scoring.InitAppScoreRecordState().Decay, 4)
@@ -345,6 +347,52 @@ func TestConcurrentGetAndReport(t *testing.T) {
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	assert.Less(t, math.Abs(scoring.DefaultGossipSubCtrlMsgPenaltyValue().Graft-record.Score), 10e-3) // score should be updated to -10.
+}
+
+// TestDecayToZero tests that the score decays to zero. The test expects the score to be updated to the penalty value
+// and then decay to zero over time.
+func TestDecayToZero(t *testing.T) {
+	cache := netcache.NewAppScoreCache(100, unittest.Logger(), metrics.NewNoopCollector(), scoring.DefaultDecayFunction())
+	reg := scoring.NewGossipSubAppSpecificScoreRegistry(&scoring.GossipSubAppSpecificScoreRegistryConfig{
+		SizeLimit:     100,
+		Logger:        unittest.Logger(),
+		Collector:     metrics.NewNoopCollector(),
+		DecayFunction: scoring.DefaultDecayFunction(),
+		Penalty:       penaltyValueFixtures(),
+	}, scoring.WithScoreCache(cache), scoring.WithRecordInit(func() netcache.AppScoreRecord {
+		return netcache.AppScoreRecord{
+			Decay: 0.02, // we choose a small decay value to speed up the test.
+			Score: 0,
+		}
+	}))
+
+	peerID := peer.ID("peer-1")
+
+	// report a misbehavior for the peer id.
+	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+		PeerID:  peerID,
+		MsgType: p2p.CtrlMsgGraft,
+		Count:   1,
+	})
+
+	// decays happen every second, so we wait for 1 second to make sure the score is updated.
+	time.Sleep(1 * time.Second)
+	// the score should now be updated, it should be still negative but greater than the penalty value (due to decay).
+	score := reg.AppSpecificScoreFunc()(peerID)
+	require.Less(t, score, float64(0))                      // the score should be less than zero.
+	require.Greater(t, score, penaltyValueFixtures().Graft) // the score should be less than the penalty value due to decay.
+
+	// wait for the score to decay to zero.
+	require.Eventually(t, func() bool {
+		score := reg.AppSpecificScoreFunc()(peerID)
+		return score == 0 // the score should eventually decay to zero.
+	}, 5*time.Second, 100*time.Millisecond)
+
+	// the score should now be zero.
+	record, err, ok := cache.Get(peerID) // get the record from the cache.
+	assert.True(t, ok)
+	assert.NoError(t, err)
+	assert.Equal(t, 0.0, record.Score) // score should be zero.
 }
 
 // newGossipSubAppSpecificScoreRegistry returns a new instance of GossipSubAppSpecificScoreRegistry with default values
