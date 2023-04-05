@@ -5,8 +5,8 @@ import (
 )
 
 type Cargo struct {
-	finBlocks *FinalizedBlockQueue
-	views     *Views
+	blockQueue *FinalizedBlockQueue
+	views      *Views
 }
 
 func NewCargo(
@@ -19,8 +19,8 @@ func NewCargo(
 		return nil, err
 	}
 	return &Cargo{
-		finBlocks: NewFinalizedBlockQueue(blockQueueCapacity, startBlockParent),
-		views:     views,
+		blockQueue: NewFinalizedBlockQueue(blockQueueCapacity, startBlockParent),
+		views:      views,
 	}, nil
 }
 
@@ -32,18 +32,18 @@ func (c *Cargo) BlockFinalized(new *flow.Header) error {
 	// first enqueue the header
 	// if we reach a capacity that we could not enqueu blocks and they stay uncommitable
 	// then here we are returning an error
-	if err := c.finBlocks.Enqueue(new); err != nil {
+	if err := c.blockQueue.Enqueue(new); err != nil {
 		return err
 	}
 
 	// then trigger sync until not commitable
-	blockID, header := c.finBlocks.Peak()
+	blockID, header := c.blockQueue.Peak()
 	for found, err := c.views.Commit(blockID, header); found; {
 		if err != nil {
 			return err
 		}
-		c.finBlocks.Dequeue()
-		blockID, header = c.finBlocks.Peak()
+		c.blockQueue.Dequeue()
+		blockID, header = c.blockQueue.Peak()
 	}
 
 	return nil
