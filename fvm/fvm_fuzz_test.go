@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -32,7 +32,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 
 		tt := fuzzTransactionTypes[transactionType]
 
-		vmt.run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View) {
+		vmt.run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
 			// create the transaction
 			txBody := tt.createTxBody(t, tctx)
 			// set the computation limit
@@ -58,7 +58,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 				_, output, err = vm.RunV2(
 					ctx,
 					fvm.Transaction(txBody, 0),
-					view)
+					snapshotTree)
 			}, "Transaction should never result in a panic.")
 			require.NoError(t, err, "Transaction should never result in an error.")
 
@@ -254,24 +254,24 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 	).withContextOptions(
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
-	).bootstrapWith(func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, view state.View) error {
+	).bootstrapWith(func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) (storage.SnapshotTree, error) {
 		// ==== Create an account ====
 		var txBody *flow.TransactionBody
 		privateKey, txBody = testutil.CreateAccountCreationTransaction(tb, chain)
 
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		if err != nil {
-			return err
+			return snapshotTree, err
 		}
 
 		executionSnapshot, output, err := vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			view)
+			snapshotTree)
 		require.NoError(tb, err)
 		require.NoError(tb, output.Err)
 
-		require.NoError(tb, view.Merge(executionSnapshot))
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		accountCreatedEvents := filterAccountCreatedEvents(output.Events)
 
@@ -298,15 +298,15 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		)
 		require.NoError(tb, err)
 
-		_, output, err = vm.RunV2(
+		executionSnapshot, output, err = vm.RunV2(
 			ctx,
 			fvm.Transaction(txBody, 0),
-			view)
+			snapshotTree)
 		if err != nil {
-			return err
+			return snapshotTree, err
 		}
 
-		return output.Err
+		return snapshotTree.Append(executionSnapshot), output.Err
 	})
 	require.NoError(tb, err)
 

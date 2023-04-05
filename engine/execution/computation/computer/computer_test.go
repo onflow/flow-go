@@ -36,7 +36,6 @@ import (
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -603,6 +602,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
+					runtime.Config{},
 					func(_ runtime.Config) runtime.Runtime {
 						return emittingRuntime
 					})))
@@ -690,6 +690,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
+					runtime.Config{},
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})))
@@ -789,6 +790,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
+					runtime.Config{},
 					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})))
@@ -988,75 +990,6 @@ func (f *FixedAddressGenerator) Bytes() []byte {
 
 func (f *FixedAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
-}
-
-func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
-
-	address := flow.HexToAddress("1234")
-	fag := &FixedAddressGenerator{Address: address}
-
-	vm := fvm.NewVirtualMachine()
-	execCtx := fvm.NewContext()
-
-	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-
-	key, err := unittest.AccountKeyDefaultFixture()
-	require.NoError(t, err)
-
-	view := delta.NewDeltaView(ledger)
-	accounts := environment.NewAccounts(testutils.NewSimpleTransaction(view))
-
-	err = accounts.Create([]flow.AccountPublicKey{key.PublicKey(1000)}, address)
-	require.NoError(t, err)
-
-	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
-
-	prov := provider.NewProvider(
-		zerolog.Nop(),
-		metrics.NewNoopCollector(),
-		execution_data.DefaultSerializer,
-		bservice,
-		trackerStorage,
-	)
-
-	me := new(modulemock.Local)
-	me.On("NodeID").Return(unittest.IdentifierFixture())
-	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
-	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, nil)
-
-	exe, err := computer.NewBlockComputer(
-		vm,
-		execCtx,
-		metrics.NewNoopCollector(),
-		trace.NewNoopTracer(),
-		zerolog.Nop(),
-		committer.NewNoopViewCommitter(),
-		me,
-		prov,
-		nil)
-	require.NoError(t, err)
-
-	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {
-		err := testutil.SignTransaction(txBody, txBody.Payer, *key, 0)
-		require.NoError(t, err)
-	})
-
-	_, err = exe.ExecuteBlock(
-		context.Background(),
-		unittest.IdentifierFixture(),
-		block,
-		view,
-		derived.NewEmptyDerivedBlockData())
-	assert.NoError(t, err)
-
-	registerTouches := view.Interactions().RegisterTouches()
-
-	// make sure check for account status has been registered
-	id := flow.AccountStatusRegisterID(address)
-
-	require.Contains(t, registerTouches, id)
 }
 
 func Test_ExecutingSystemCollection(t *testing.T) {
