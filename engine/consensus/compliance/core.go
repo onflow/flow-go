@@ -158,10 +158,10 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// ignore proposals which are too far ahead of our local finalized state
 	// instead, rely on sync engine to catch up finalization more effectively, and avoid
 	// large subtree of blocks to be cached.
-	if header.Height > finalHeight+c.config.SkipNewProposalsThreshold {
+	if header.View > finalView+c.config.SkipNewProposalsThreshold {
 		log.Debug().
 			Uint64("skip_new_proposals_threshold", c.config.SkipNewProposalsThreshold).
-			Msg("dropping block too far ahead of locally finalized height")
+			Msg("dropping block too far ahead of locally finalized view")
 		return nil
 	}
 

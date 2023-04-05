@@ -242,7 +242,17 @@ func main() {
 				return err
 			}
 
-			mutableState, err = badgerState.NewFullConsensusState(state, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blockTimer, receiptValidator, sealValidator)
+			mutableState, err = badgerState.NewFullConsensusState(
+				node.Logger,
+				node.Tracer,
+				node.ProtocolEvents,
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				blockTimer,
+				receiptValidator,
+				sealValidator,
+			)
 			return err
 		}).
 		Module("random beacon key", func(node *cmd.NodeConfig) error {
@@ -377,7 +387,7 @@ func main() {
 			return nil
 		}).
 		Component("machine account config validator", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
+			// @TODO use fallback logic for flowClient similar to DKG/QC contract clients
 			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
