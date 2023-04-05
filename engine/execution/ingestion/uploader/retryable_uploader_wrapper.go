@@ -247,12 +247,7 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 	eventsByTxIndex := make(map[int]flow.EventsList, 0)
 	for _, event := range events {
 		idx := int(event.TransactionIndex)
-		list, found := eventsByTxIndex[idx]
-		if found {
-			list = append(list, event)
-			continue
-		}
-		eventsByTxIndex[idx] = flow.EventsList{event}
+		eventsByTxIndex[idx] = append(eventsByTxIndex[idx], event)
 	}
 
 	lastChunk := len(completeCollections)
