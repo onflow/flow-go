@@ -70,7 +70,7 @@ var (
 	collectionDelay        time.Duration
 	logLevel               string
 
-	allocator *PortAllocator
+	ports *PortAllocator
 )
 
 func init() {
@@ -113,7 +113,7 @@ func main() {
 	flag.Parse()
 
 	// Allocate blocks of IPs for each node
-	allocator = NewPortAllocator()
+	ports = NewPortAllocator()
 
 	// Prepare test node configurations of each type, access, execution, verification, etc
 	flowNodes := prepareFlowNodes()
@@ -151,16 +151,16 @@ func main() {
 		panic(err)
 	}
 
-	err = allocator.Save()
-	if err != nil {
+	if err = ports.Save(); err != nil {
 		panic(err)
 	}
 
 	fmt.Print("Bootstrapping success!\n\n")
-	allocator.Print()
+	ports.Print()
 	fmt.Println()
 
-	fmt.Print("Run \"make start\" to launch the network.\n")
+	fmt.Println("Run \"make start\" to re-build images and launch the network.")
+	fmt.Println("Run \"make start-cached\" to launch the network without rebuilding images")
 }
 
 func displayFlowNetworkConf(flowNetworkConf testnet.NetworkConfig) {
@@ -235,9 +235,9 @@ type Service struct {
 	name string // don't export
 }
 
-func (s *Service) AddExposedPorts(ports ...string) {
-	for _, port := range ports {
-		s.Ports = append(s.Ports, fmt.Sprintf("%s:%s", allocator.HostPort(s.name, port), port))
+func (s *Service) AddExposedPorts(containerPorts ...string) {
+	for _, port := range containerPorts {
+		s.Ports = append(s.Ports, fmt.Sprintf("%s:%s", ports.HostPort(s.name, port), port))
 	}
 }
 
@@ -415,6 +415,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		fmt.Sprintf("--secure-rpc-addr=%s:%s", container.ContainerName, testnet.GRPCSecurePort),
 		fmt.Sprintf("--http-addr=%s:%s", container.ContainerName, testnet.GRPCWebPort),
 		fmt.Sprintf("--rest-addr=%s:%s", container.ContainerName, testnet.RESTPort),
+		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.ExecutionStatePort),
 		fmt.Sprintf("--collection-ingress-port=%s", testnet.GRPCPort),
 		"--supports-observer=true",
 		fmt.Sprintf("--public-network-address=%s:%s", container.ContainerName, testnet.PublicNetworkPort),
@@ -423,7 +424,6 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--log-tx-time-to-finalized-executed",
 		"--execution-data-sync-enabled=true",
 		"--execution-data-dir=/data/execution-data",
-		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.ExecutionStatePort),
 	)
 
 	service.AddExposedPorts(
@@ -469,8 +469,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 }
 
 func defaultService(name, role, dataDir, profilerDir string, i int) Service {
-
-	err := allocator.AllocatePorts(name, role)
+	err := ports.AllocatePorts(name, role)
 	if err != nil {
 		panic(err)
 	}
