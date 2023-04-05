@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -44,14 +44,21 @@ type testAccounts struct {
 	seq      uint64
 }
 
-func createAccounts(b *testing.B, vm fvm.VM, ledger state.View, num int) *testAccounts {
+func createAccounts(
+	b *testing.B,
+	vm fvm.VM,
+	snapshotTree storage.SnapshotTree,
+	num int,
+) (
+	storage.SnapshotTree,
+	*testAccounts,
+) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(num)
 	require.NoError(b, err)
 
-	addresses, err := testutil.CreateAccounts(
+	snapshotTree, addresses, err := testutil.CreateAccounts(
 		vm,
-		ledger,
-		derived.NewEmptyDerivedBlockData(),
+		snapshotTree,
 		privateKeys,
 		chain)
 	require.NoError(b, err)
@@ -65,16 +72,16 @@ func createAccounts(b *testing.B, vm fvm.VM, ledger state.View, num int) *testAc
 			privateKey: privateKeys[i],
 		}
 	}
-	return accs
+	return snapshotTree, accs
 }
 
 func mustFundAccounts(
 	b *testing.B,
 	vm fvm.VM,
-	ledger state.View,
+	snapshotTree storage.SnapshotTree,
 	execCtx fvm.Context,
 	accs *testAccounts,
-) {
+) storage.SnapshotTree {
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	execCtx = fvm.NewContextFromParent(
 		execCtx,
@@ -90,10 +97,13 @@ func mustFundAccounts(
 		tx := fvm.Transaction(
 			transferTx,
 			derivedBlockData.NextTxIndexForTestingOnly())
-		err = vm.Run(execCtx, tx, ledger)
+		executionSnapshot, output, err := vm.RunV2(execCtx, tx, snapshotTree)
 		require.NoError(b, err)
-		require.NoError(b, tx.Err)
+		require.NoError(b, output.Err)
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 	}
+
+	return snapshotTree
 }
 
 func BenchmarkComputeBlock(b *testing.B) {
@@ -116,7 +126,7 @@ func BenchmarkComputeBlock(b *testing.B) {
 				runtime.Config{},
 			)),
 	)
-	ledger := testutil.RootBootstrappedLedger(
+	snapshotTree := testutil.RootBootstrappedLedger(
 		vm,
 		execCtx,
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
@@ -124,8 +134,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	)
-	accs := createAccounts(b, vm, ledger, 1000)
-	mustFundAccounts(b, vm, ledger, execCtx, accs)
+	snapshotTree, accs := createAccounts(b, vm, snapshotTree, 1000)
+	snapshotTree = mustFundAccounts(b, vm, snapshotTree, execCtx, accs)
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
@@ -153,7 +163,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 		zerolog.Nop(),
 		committer.NewNoopViewCommitter(),
 		me,
-		prov)
+		prov,
+		nil)
 	require.NoError(b, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(
@@ -192,13 +203,12 @@ func BenchmarkComputeBlock(b *testing.B) {
 				context.Background(),
 				unittest.IdentifierFixture(),
 				executableBlock,
-				ledger)
+				snapshotTree)
 			elapsed += time.Since(start)
 			b.StopTimer()
 
 			for _, snapshot := range res.StateSnapshots {
-				err := ledger.Merge(snapshot)
-				require.NoError(b, err)
+				snapshotTree = snapshotTree.Append(snapshot)
 			}
 
 			require.NoError(b, err)

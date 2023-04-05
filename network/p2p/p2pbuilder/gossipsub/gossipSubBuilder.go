@@ -37,6 +37,7 @@ type Builder struct {
 	peerScoringParameterOptions []scoring.PeerScoreParamsOption
 	idProvider                  module.IdentityProvider
 	routingSystem               routing.Routing
+	rpcInspectors               []p2p.GossipSubRPCInspector
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -137,6 +138,11 @@ func (g *Builder) SetAppSpecificScoreParams(f func(peer.ID) float64) {
 	g.peerScoringParameterOptions = append(g.peerScoringParameterOptions, scoring.WithAppSpecificScoreFunction(f))
 }
 
+// SetGossipSubRPCInspectors sets the gossipsub rpc inspectors.
+func (g *Builder) SetGossipSubRPCInspectors(inspectors ...p2p.GossipSubRPCInspector) {
+	g.rpcInspectors = inspectors
+}
+
 func NewGossipSubBuilder(logger zerolog.Logger, metrics module.GossipSubMetrics) *Builder {
 	return &Builder{
 		logger:                      logger.With().Str("component", "gossipsub").Logger(),
@@ -144,6 +150,7 @@ func NewGossipSubBuilder(logger zerolog.Logger, metrics module.GossipSubMetrics)
 		gossipSubFactory:            defaultGossipSubFactory(),
 		gossipSubConfigFunc:         defaultGossipSubAdapterConfig(),
 		peerScoringParameterOptions: make([]scoring.PeerScoreParamsOption, 0),
+		rpcInspectors:               make([]p2p.GossipSubRPCInspector, 0),
 	}
 }
 
@@ -200,11 +207,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 		}
 	}
 
-	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(g.metrics, g.logger)
-	gossipSubConfigs.WithAppSpecificRpcInspector(func(from peer.ID, rpc *pubsub.RPC) error {
-		gossipSubMetrics.ObserveRPC(from, rpc)
-		return nil
-	})
+	gossipSubConfigs.WithAppSpecificRpcInspectors(g.rpcInspectors...)
 
 	if g.gossipSubTracer != nil {
 		gossipSubConfigs.WithTracer(g.gossipSubTracer)

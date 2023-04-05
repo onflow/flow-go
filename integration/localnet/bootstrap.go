@@ -164,7 +164,8 @@ func main() {
 	displayPortAssignments()
 	fmt.Println()
 
-	fmt.Print("Run \"make start\" to launch the network.\n")
+	fmt.Println("Run \"make start\" to re-build images and launch the network.")
+	fmt.Println("Run \"make start-cached\" to launch the network without rebuilding images")
 }
 
 func displayFlowNetworkConf(flowNetworkConf testnet.NetworkConfig) {
@@ -657,7 +658,7 @@ func getAccessGatewayPublicKey(flowNodeContainerConfigs []testnet.ContainerConfi
 func writeObserverPrivateKey(observerName string) {
 	// make the observer private key for named observer
 	// only used for localnet, not for use with production
-	networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSASecp256k1)
+	networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLen)
 	networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
 	if err != nil {
 		panic(err)

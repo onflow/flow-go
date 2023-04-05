@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
+	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 )
 
 const (
@@ -36,7 +37,7 @@ var (
 // Manager manages libp2p stream negotiation and creation, which is utilized for unicast dispatches.
 type Manager struct {
 	logger                 zerolog.Logger
-	streamFactory          StreamFactory
+	streamFactory          stream.Factory
 	protocols              []protocols.Protocol
 	defaultHandler         libp2pnet.StreamHandler
 	sporkId                flow.Identifier
@@ -47,7 +48,7 @@ type Manager struct {
 }
 
 func NewUnicastManager(logger zerolog.Logger,
-	streamFactory StreamFactory,
+	streamFactory stream.Factory,
 	sporkId flow.Identifier,
 	createStreamRetryDelay time.Duration,
 	connStatus p2p.PeerConnections,
@@ -264,7 +265,7 @@ func (m *Manager) dialPeer(ctx context.Context, peerID peer.ID, maxAttempts uint
 		if err != nil {
 			// if the connection was rejected due to invalid node id or
 			// if the connection was rejected due to connection gating skip the re-attempt
-			if IsErrSecurityProtocolNegotiationFailed(err) || IsErrGaterDisallowedConnection(err) {
+			if stream.IsErrSecurityProtocolNegotiationFailed(err) || stream.IsErrGaterDisallowedConnection(err) {
 				return multierror.Append(errs, err)
 			}
 			m.logger.Warn().
@@ -314,7 +315,7 @@ func (m *Manager) rawStream(ctx context.Context, peerID peer.ID, protocolID prot
 		s, err = m.streamFactory.NewStream(ctx, peerID, protocolID)
 		if err != nil {
 			// if the stream creation failed due to invalid protocol id, skip the re-attempt
-			if IsErrProtocolNotSupported(err) {
+			if stream.IsErrProtocolNotSupported(err) {
 				return err
 			}
 			return retry.RetryableError(multierror.Append(errs, err))

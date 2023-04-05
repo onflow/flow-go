@@ -4,8 +4,7 @@ package mock
 
 import (
 	fvm "github.com/onflow/flow-go/fvm"
-	derived "github.com/onflow/flow-go/fvm/derived"
-
+	logical "github.com/onflow/flow-go/fvm/storage/logical"
 	mock "github.com/stretchr/testify/mock"
 
 	storage "github.com/onflow/flow-go/fvm/storage"
@@ -31,14 +30,14 @@ func (_m *Procedure) ComputationLimit(ctx fvm.Context) uint64 {
 }
 
 // ExecutionTime provides a mock function with given fields:
-func (_m *Procedure) ExecutionTime() derived.LogicalTime {
+func (_m *Procedure) ExecutionTime() logical.Time {
 	ret := _m.Called()
 
-	var r0 derived.LogicalTime
-	if rf, ok := ret.Get(0).(func() derived.LogicalTime); ok {
+	var r0 logical.Time
+	if rf, ok := ret.Get(0).(func() logical.Time); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(derived.LogicalTime)
+		r0 = ret.Get(0).(logical.Time)
 	}
 
 	return r0

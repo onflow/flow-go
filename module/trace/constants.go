@@ -52,10 +52,11 @@ const (
 	CONSealingProcessIncorporatedResult       SpanName = "con.sealing.processIncorporatedResult"
 	CONSealingProcessApproval                 SpanName = "con.sealing.processApproval"
 
-	// Follower Engine
-	FollowerOnBlockProposal        SpanName = "follower.onBlockProposal"
-	FollowerProcessBlockProposal   SpanName = "follower.processBlockProposal"
-	FollowerProcessPendingChildren SpanName = "follower.processPendingChildren"
+	// Follower Core
+	FollowerProcessFinalizedBlock  SpanName = "follower.processFinalizedBlock"
+	FollowerProcessCertifiedBlocks SpanName = "follower.processCertifiedBlocks"
+	FollowerExtendPendingTree      SpanName = "follower.extendPendingTree"
+	FollowerExtendProtocolState    SpanName = "follower.extendProtocolState"
 
 	// Collection Node
 	//

@@ -109,32 +109,33 @@ func NewFullConsensusState(
 //
 //	candidate.View == certifyingQC.View && candidate.ID() == certifyingQC.BlockID
 //
-// NOTE: this function expects that `certifyingQC` has been validated.
-// Expected errors during normal operations:
-//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+// Caution:
+//   - This function expects that `certifyingQC` has been validated.
+//   - The parent block must already be stored.
+//
+// No errors are expected during normal operations.
 func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
 
-	// TODO: this is a temporary if statement since follower engine doesn't deliver QCs yet. Once the implementation is complete
-	// there are no cases where certifyingQC can be nil.
-	if certifyingQC != nil {
-		blockID := candidate.ID()
-		// sanity check if certifyingQC actually certifies candidate block
-		if certifyingQC.View != candidate.Header.View {
-			return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", candidate.Header.View, certifyingQC.View)
-		}
-		if certifyingQC.BlockID != blockID {
-			return fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
-		}
+	// check if candidate block has been already processed
+	blockID := candidate.ID()
+	isDuplicate, err := m.checkBlockAlreadyProcessed(blockID)
+	if err != nil || isDuplicate {
+		return err
 	}
 
-	// check if the block header is a valid extension of the finalized state
-	err := m.headerExtend(candidate)
+	// sanity check if certifyingQC actually certifies candidate block
+	if certifyingQC.View != candidate.Header.View {
+		return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", candidate.Header.View, certifyingQC.View)
+	}
+	if certifyingQC.BlockID != blockID {
+		return fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
+	}
+
+	// check if the block header is a valid extension of parent block
+	err = m.headerExtend(candidate)
 	if err != nil {
-		if state.IsOutdatedExtensionError(err) {
-			return fmt.Errorf("candidate block is an outdated extension: %w", err)
-		}
 		// since we have a QC for this block, it cannot be an invalid extension
 		return fmt.Errorf("unexpected invalid block (id=%x) with certifying qc (id=%x): %s",
 			candidate.ID(), certifyingQC.ID(), err.Error())
@@ -164,10 +165,25 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
 
-	// check if the block header is a valid extension of the finalized state
-	err := m.headerExtend(candidate)
+	// check if candidate block has been already processed
+	isDuplicate, err := m.checkBlockAlreadyProcessed(candidate.ID())
+	if err != nil || isDuplicate {
+		return err
+	}
+
+	// check if the block header is a valid extension of parent block
+	err = m.headerExtend(candidate)
 	if err != nil {
 		return fmt.Errorf("header not compliant with chain state: %w", err)
+	}
+
+	// check if the block header is a valid extension of the finalized state
+	err = m.checkOutdatedExtension(candidate.Header)
+	if err != nil {
+		if state.IsOutdatedExtensionError(err) {
+			return fmt.Errorf("candidate block is an outdated extension: %w", err)
+		}
+		return fmt.Errorf("could not check if block is an outdated extension: %w", err)
 	}
 
 	// check if the guarantees in the payload is a valid extension of the finalized state
@@ -200,7 +216,6 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 // headerExtend verifies the validity of the block header (excluding verification of the
 // consensus rules). Specifically, we check that the block connects to the last finalized block.
 // Expected errors during normal operations:
-//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 //   - state.InvalidExtensionError if the candidate block is invalid
 func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 	// FIRST: We do some initial cheap sanity checks, like checking the payload
@@ -241,13 +256,34 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 		return fmt.Errorf("validating block's time stamp failed with unexpected error: %w", err)
 	}
 
-	// THIRD: Once we have established the block is valid within itself, and the
-	// block is valid in relation to its parent, we can check whether it is
-	// valid in the context of the entire state. For this, the block needs to
-	// directly connect, through its ancestors, to the last finalized block.
+	return nil
+}
 
+// checkBlockAlreadyProcessed checks if block has been added to the protocol state.
+// Returns:
+// * (true, nil) - block has been already processed.
+// * (false, nil) - block has not been processed.
+// * (false, error) - unknown error when trying to query protocol state.
+// No errors are expected during normal operation.
+func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (bool, error) {
+	_, err := m.headers.ByBlockID(blockID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return false, nil
+		}
+		return false, fmt.Errorf("could not check if candidate block (%x) has been already processed: %w", blockID, err)
+	}
+	return true, nil
+}
+
+// checkOutdatedExtension checks whether given block is
+// valid in the context of the entire state. For this, the block needs to
+// directly connect, through its ancestors, to the last finalized block.
+// Expected errors during normal operations:
+//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+func (m *ParticipantState) checkOutdatedExtension(header *flow.Header) error {
 	var finalizedHeight uint64
-	err = m.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
+	err := m.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
@@ -277,7 +313,6 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 		}
 		ancestorID = ancestor.ParentID
 	}
-
 	return nil
 }
 
@@ -797,6 +832,8 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 	events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, block) })
 	// set current epoch counter corresponding to new epoch
 	metrics = append(metrics, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
+	// denote the most recent epoch transition height
+	metrics = append(metrics, func() { m.metrics.EpochTransitionHeight(block.Height) })
 	// set epoch phase - since we are starting a new epoch we begin in the staking phase
 	metrics = append(metrics, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
 	// set current epoch view values

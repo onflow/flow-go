@@ -1,7 +1,4 @@
 # from https://github.com/onflow/flow-go/blob/fa60c8f96b4a22f0f252c4b82a5dc4bbf54128c1/integration/localnet/values.yml
-branch: fake-branch
-# Commit must be a string
-commit: "123456"
 
 defaults: {}
 access:
@@ -48,8 +45,6 @@ collection:
       args:{{template "args" .}}
         - --loglevel=INFO
         - --block-rate-delay=950ms
-        - --hotstuff-timeout=2.15s
-        - --hotstuff-min-timeout=2.15s
         - --ingress-addr=0.0.0.0:9000
         - --insecure-access-api=false
         - --access-node-ids=*
@@ -73,8 +68,6 @@ consensus:
       args:{{template "args" .}}
         - --loglevel=DEBUG
         - --block-rate-delay=800ms
-        - --hotstuff-timeout=2s
-        - --hotstuff-min-timeout=2s
         - --chunk-alpha=1
         - --emergency-sealing-active=false
         - --insecure-access-api=false
@@ -88,7 +81,10 @@ execution:
     resources:
       requests:
         cpu: "200m"
-        memory: "512Mi"
+        memory: "1024Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
     storage: 10G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("execution")}}
