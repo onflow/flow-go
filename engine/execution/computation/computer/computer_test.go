@@ -196,7 +196,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			nil,
 			derived.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
-		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
+		assert.Len(t, result.AllExecutionSnapshots(), 1+1) // +1 system chunk
 
 		require.Equal(t, 2, committer.callCount)
 
@@ -205,7 +205,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		expectedChunk1EndState := incStateCommitment(*block.StartState)
 		expectedChunk2EndState := incStateCommitment(expectedChunk1EndState)
 
-		assert.Equal(t, expectedChunk2EndState, result.EndState)
+		assert.Equal(t, expectedChunk2EndState, result.CurrentEndState())
 
 		assertEventHashesMatch(t, 1+1, result)
 
@@ -224,10 +224,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		chunk1 := receipt.Chunks[0]
 
+		eventCommits := result.AllEventCommitments()
 		assert.Equal(t, block.ID(), chunk1.BlockID)
 		assert.Equal(t, uint(0), chunk1.CollectionIndex)
 		assert.Equal(t, uint64(2), chunk1.NumberOfTransactions)
-		assert.Equal(t, result.EventsHashes[0], chunk1.EventCollection)
+		assert.Equal(t, eventCommits[0], chunk1.EventCollection)
 
 		assert.Equal(t, *block.StartState, chunk1.StartState)
 
@@ -239,7 +240,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Equal(t, block.ID(), chunk2.BlockID)
 		assert.Equal(t, uint(1), chunk2.CollectionIndex)
 		assert.Equal(t, uint64(1), chunk2.NumberOfTransactions)
-		assert.Equal(t, result.EventsHashes[1], chunk2.EventCollection)
+		assert.Equal(t, eventCommits[1], chunk2.EventCollection)
 
 		assert.Equal(t, expectedChunk1EndState, chunk2.StartState)
 
@@ -250,16 +251,17 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// Verify ChunkDataPacks
 
-		assert.Len(t, result.ChunkDataPacks, 1+1) // +1 system chunk
+		chunkDataPacks := result.AllChunkDataPacks()
+		assert.Len(t, chunkDataPacks, 1+1) // +1 system chunk
 
-		chunkDataPack1 := result.ChunkDataPacks[0]
+		chunkDataPack1 := chunkDataPacks[0]
 
 		assert.Equal(t, chunk1.ID(), chunkDataPack1.ChunkID)
 		assert.Equal(t, *block.StartState, chunkDataPack1.StartState)
 		assert.Equal(t, []byte{1}, chunkDataPack1.Proof)
 		assert.NotNil(t, chunkDataPack1.Collection)
 
-		chunkDataPack2 := result.ChunkDataPacks[1]
+		chunkDataPack2 := chunkDataPacks[1]
 
 		assert.Equal(t, chunk2.ID(), chunkDataPack2.ChunkID)
 		assert.Equal(t, chunk2.StartState, chunkDataPack2.StartState)
@@ -335,8 +337,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			nil,
 			derivedBlockData)
 		assert.NoError(t, err)
-		assert.Len(t, result.StateSnapshots, 1)
-		assert.Len(t, result.TransactionResults, 1)
+		assert.Len(t, result.AllExecutionSnapshots(), 1)
+		assert.Len(t, result.AllTransactionResults(), 1)
 		assert.Len(t, result.ChunkExecutionDatas, 1)
 
 		assertEventHashesMatch(t, 1, result)
@@ -421,11 +423,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			view,
 			derivedBlockData)
 		assert.NoError(t, err)
-		assert.Len(t, result.StateSnapshots, 1)
-		assert.Len(t, result.TransactionResults, 1)
+		assert.Len(t, result.AllExecutionSnapshots(), 1)
+		assert.Len(t, result.AllTransactionResults(), 1)
 		assert.Len(t, result.ChunkExecutionDatas, 1)
 
-		assert.Empty(t, result.TransactionResults[0].ErrorMessage)
+		assert.Empty(t, result.AllTransactionResults()[0].ErrorMessage)
 	})
 
 	t.Run("multiple collections", func(t *testing.T) {
@@ -494,26 +496,24 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NoError(t, err)
 
 		// chunk count should match collection count
-		assert.Len(t, result.StateSnapshots, collectionCount+1) // system chunk
+		assert.Equal(t, result.BlockExecutionResult.Size(), collectionCount+1) // system chunk
 
 		// all events should have been collected
-		assert.Len(t, result.Events, collectionCount+1)
-
 		for i := 0; i < collectionCount; i++ {
-			assert.Len(t, result.Events[i], eventsPerCollection)
+			events := result.CollectionExecutionResultAt(i).Events()
+			assert.Len(t, events, eventsPerCollection)
 		}
 
-		assert.Len(t, result.Events[len(result.Events)-1], eventsPerTransaction)
+		// system chunk
+		assert.Len(t, result.CollectionExecutionResultAt(collectionCount).Events(), eventsPerTransaction)
+
+		events := result.AllEvents()
 
 		// events should have been indexed by transaction and event
 		k := 0
 		for expectedTxIndex := 0; expectedTxIndex < totalTransactionCount; expectedTxIndex++ {
 			for expectedEventIndex := 0; expectedEventIndex < eventsPerTransaction; expectedEventIndex++ {
-
-				chunkIndex := k / eventsPerCollection
-				eventIndex := k % eventsPerCollection
-
-				e := result.Events[chunkIndex][eventIndex]
+				e := events[k]
 				assert.EqualValues(t, expectedEventIndex, int(e.EventIndex))
 				assert.EqualValues(t, expectedTxIndex, e.TransactionIndex)
 				k++
@@ -532,7 +532,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				expectedResults = append(expectedResults, txResult)
 			}
 		}
-		assert.ElementsMatch(t, expectedResults, result.TransactionResults[0:len(result.TransactionResults)-1]) // strip system chunk
+		txResults := result.AllTransactionResults()
+		assert.ElementsMatch(t, expectedResults, txResults[0:len(txResults)-1]) // strip system chunk
 
 		assertEventHashesMatch(t, collectionCount+1, result)
 
@@ -653,8 +654,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 
 		// make sure event index sequence are valid
-		for _, eventsList := range result.Events {
-			unittest.EnsureEventsIndexSeq(t, eventsList, execCtx.Chain.ChainID())
+		for i := 0; i < result.BlockExecutionResult.Size(); i++ {
+			collectionResult := result.CollectionExecutionResultAt(i)
+			unittest.EnsureEventsIndexSeq(t, collectionResult.Events(), execCtx.Chain.ChainID())
 		}
 
 		sEvents := result.AllServiceEvents()
@@ -751,7 +753,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			view,
 			derived.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
-		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
+		assert.Len(t, result.AllExecutionSnapshots(), collectionCount+1) // +1 system chunk
 	})
 
 	t.Run("failing transactions do not store programs", func(t *testing.T) {
@@ -851,20 +853,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			view,
 			derived.NewEmptyDerivedBlockData())
 		require.NoError(t, err)
-		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
+		assert.Len(t, result.AllExecutionSnapshots(), collectionCount+1) // +1 system chunk
 	})
 }
 
 func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execution.ComputationResult) {
-
-	require.Len(t, result.Events, expectedNoOfChunks)
-	require.Len(t, result.EventsHashes, expectedNoOfChunks)
+	execResSize := result.BlockExecutionResult.Size()
+	attestResSize := result.BlockAttestationResult.Size()
+	require.Equal(t, execResSize, expectedNoOfChunks)
+	require.Equal(t, execResSize, attestResSize)
 
 	for i := 0; i < expectedNoOfChunks; i++ {
-		calculatedHash, err := flow.EventsMerkleRootHash(result.Events[i])
+		events := result.CollectionExecutionResultAt(i).Events()
+		calculatedHash, err := flow.EventsMerkleRootHash(events)
 		require.NoError(t, err)
-
-		require.Equal(t, calculatedHash, result.EventsHashes[i])
+		require.Equal(t, calculatedHash, result.CollectionAttestationResultAt(i).EventCommitment())
 	}
 }
 
@@ -1182,10 +1185,10 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		view,
 		derived.NewEmptyDerivedBlockData())
 	assert.NoError(t, err)
-	assert.Len(t, result.StateSnapshots, 1) // +1 system chunk
-	assert.Len(t, result.TransactionResults, 1)
+	assert.Len(t, result.AllExecutionSnapshots(), 1) // +1 system chunk
+	assert.Len(t, result.AllTransactionResults(), 1)
 
-	assert.Empty(t, result.TransactionResults[0].ErrorMessage)
+	assert.Empty(t, result.AllTransactionResults()[0].ErrorMessage)
 
 	committer.AssertExpectations(t)
 }

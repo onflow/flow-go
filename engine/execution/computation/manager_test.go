@@ -162,8 +162,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotEmpty(t, blockView.(*delta.View).Delta())
-	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
-	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].UpdatedRegisters())
+	require.Equal(t, returnedComputationResult.BlockExecutionResult.Size(), 1+1) // 1 coll + 1 system chunk
+	assert.NotEmpty(t, returnedComputationResult.AllExecutionSnapshots()[0].UpdatedRegisters())
 }
 
 func TestComputeBlock_Uploader(t *testing.T) {
@@ -802,19 +802,23 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		blockView)
 	require.NoError(t, err)
 
-	require.Len(t, returnedComputationResult.Events, 2)             // 1 collection + 1 system chunk
-	require.Len(t, returnedComputationResult.TransactionResults, 4) // 2 txs + 1 system tx
+	txResults := returnedComputationResult.AllTransactionResults()
+	require.Len(t, txResults, 4) // 2 txs + 1 system tx
 
-	require.Empty(t, returnedComputationResult.TransactionResults[0].ErrorMessage)
-	require.Contains(t, returnedComputationResult.TransactionResults[1].ErrorMessage, "I failed encoding")
-	require.Empty(t, returnedComputationResult.TransactionResults[2].ErrorMessage)
+	require.Empty(t, txResults[0].ErrorMessage)
+	require.Contains(t, txResults[1].ErrorMessage, "I failed encoding")
+	require.Empty(t, txResults[2].ErrorMessage)
+
+	colRes := returnedComputationResult.CollectionExecutionResultAt(0)
+	events := colRes.Events()
+	require.Len(t, events, 2) // 1 collection + 1 system chunk
 
 	// first event should be contract deployed
-	assert.EqualValues(t, "flow.AccountContractAdded", returnedComputationResult.Events[0][0].Type)
+	assert.EqualValues(t, "flow.AccountContractAdded", events[0].Type)
 
 	// second event should come from tx3 (index 2)  as tx2 (index 1) should fail encoding
-	hasValidEventValue(t, returnedComputationResult.Events[0][1], 1)
-	assert.Equal(t, returnedComputationResult.Events[0][1].TransactionIndex, uint32(2))
+	hasValidEventValue(t, events[1], 1)
+	assert.Equal(t, events[1].TransactionIndex, uint32(2))
 }
 
 type testingEventEncoder struct {

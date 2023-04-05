@@ -154,22 +154,22 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		ledger)
 	require.NoError(t, err)
 
-	require.Len(t, returnedComputationResult.Events, 2) // 1 collection + 1 system chunk
+	events := returnedComputationResult.AllEvents()
 
 	// first event should be contract deployed
-	assert.EqualValues(t, "flow.AccountContractAdded", returnedComputationResult.Events[0][0].Type)
+	assert.EqualValues(t, "flow.AccountContractAdded", events[0].Type)
 
 	// second event should have a value of 1 (since is calling version 1 of contract)
-	hasValidEventValue(t, returnedComputationResult.Events[0][1], 1)
+	hasValidEventValue(t, events[1], 1)
 
 	// third event should be contract updated
-	assert.EqualValues(t, "flow.AccountContractUpdated", returnedComputationResult.Events[0][2].Type)
+	assert.EqualValues(t, "flow.AccountContractUpdated", events[2].Type)
 
 	// 4th event should have a value of 2 (since is calling version 2 of contract)
-	hasValidEventValue(t, returnedComputationResult.Events[0][3], 2)
+	hasValidEventValue(t, events[3], 2)
 
 	// 5th event should have a value of 2 (since is calling version 2 of contract)
-	hasValidEventValue(t, returnedComputationResult.Events[0][4], 2)
+	hasValidEventValue(t, events[4], 2)
 }
 
 type blockProvider struct {
@@ -308,7 +308,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// cache should include value for this block
 		require.NotNil(t, derivedChainData.Get(block11.ID()))
 		// 1st event should be contract deployed
-		assert.EqualValues(t, "flow.AccountContractAdded", res.Events[0][0].Type)
+
+		assert.EqualValues(t, "flow.AccountContractAdded", res.AllEvents()[0].Type)
 	})
 
 	t.Run("executing block111 (emit event (expected v1), update contract to v3)", func(t *testing.T) {
@@ -331,12 +332,13 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block111.ID()))
 
-		require.Len(t, res.Events, 2)
+		events := res.AllEvents()
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
-		hasValidEventValue(t, res.Events[0][0], block111ExpectedValue)
+		hasValidEventValue(t, events[0], block111ExpectedValue)
 		// second event should be contract deployed
-		assert.EqualValues(t, "flow.AccountContractUpdated", res.Events[0][1].Type)
+		assert.EqualValues(t, "flow.AccountContractUpdated", events[1].Type)
 	})
 
 	t.Run("executing block1111 (emit event (expected v3))", func(t *testing.T) {
@@ -354,10 +356,11 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block1111.ID()))
 
-		require.Len(t, res.Events, 2)
+		events := res.AllEvents()
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
-		hasValidEventValue(t, res.Events[0][0], block1111ExpectedValue)
+		hasValidEventValue(t, events[0], block1111ExpectedValue)
 	})
 
 	t.Run("executing block112 (emit event (expected v1))", func(t *testing.T) {
@@ -379,12 +382,13 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block112.ID()))
 
-		require.Len(t, res.Events, 2)
+		events := res.AllEvents()
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
-		hasValidEventValue(t, res.Events[0][0], block112ExpectedValue)
+		hasValidEventValue(t, events[0], block112ExpectedValue)
 		// second event should be contract deployed
-		assert.EqualValues(t, "flow.AccountContractUpdated", res.Events[0][1].Type)
+		assert.EqualValues(t, "flow.AccountContractUpdated", events[1].Type)
 
 	})
 	t.Run("executing block1121 (emit event (expected v4))", func(t *testing.T) {
@@ -402,10 +406,11 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block1121.ID()))
 
-		require.Len(t, res.Events, 2)
+		events := res.AllEvents()
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
-		hasValidEventValue(t, res.Events[0][0], block1121ExpectedValue)
+		hasValidEventValue(t, events[0], block1121ExpectedValue)
 
 	})
 	t.Run("executing block12 (deploys contract V2)", func(t *testing.T) {
@@ -424,9 +429,10 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block12.ID()))
 
-		require.Len(t, res.Events, 2)
+		events := res.AllEvents()
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
-		assert.EqualValues(t, "flow.AccountContractAdded", res.Events[0][0].Type)
+		assert.EqualValues(t, "flow.AccountContractAdded", events[0].Type)
 	})
 	t.Run("executing block121 (emit event (expected V2)", func(t *testing.T) {
 		block121ExpectedValue := 2
@@ -443,10 +449,11 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block121.ID()))
 
-		require.Len(t, res.Events, 2)
+		events := res.AllEvents()
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
-		hasValidEventValue(t, res.Events[0][0], block121ExpectedValue)
+		hasValidEventValue(t, events[0], block121ExpectedValue)
 	})
 	t.Run("executing Block1211 (emit event (expected V2)", func(t *testing.T) {
 		block1211ExpectedValue := 2
@@ -466,10 +473,11 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// had no change so cache should be equal to parent
 		require.Equal(t, derivedChainData.Get(block121.ID()), derivedChainData.Get(block1211.ID()))
 
-		require.Len(t, res.Events, 2)
+		events := res.AllEvents()
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
-		hasValidEventValue(t, res.Events[0][0], block1211ExpectedValue)
+		hasValidEventValue(t, events[0], block1211ExpectedValue)
 	})
 
 }
@@ -518,12 +526,12 @@ func createTestBlockAndRun(
 		snapshot)
 	require.NoError(t, err)
 
-	for _, txResult := range returnedComputationResult.TransactionResults {
+	for _, txResult := range returnedComputationResult.AllTransactionResults() {
 		require.Empty(t, txResult.ErrorMessage)
 	}
 
 	view := delta.NewDeltaView(snapshot)
-	for _, snapshot := range returnedComputationResult.StateSnapshots {
+	for _, snapshot := range returnedComputationResult.AllExecutionSnapshots() {
 		for _, entry := range snapshot.UpdatedRegisters() {
 			err := view.Set(entry.Key, entry.Value)
 			require.NoError(t, err)
