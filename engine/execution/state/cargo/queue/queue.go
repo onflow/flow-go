@@ -1,4 +1,4 @@
-package cargo
+package queue
 
 import (
 	"errors"
@@ -7,10 +7,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var ErrHeaderOrder = errors.New("headers are received in a non-compliant order")
 var ErrCapacityReached = errors.New("queue capacity has reached")
-
-// TODO deal with duplications
+var ErrNonCompliantHeader = errors.New("headers are received in a non-compliant order, either height doesn't match or parentID")
+var ErrOldHeader = errors.New("header is in the past, queue is already on a higher hight")
 
 type headerWithID struct {
 	Header *flow.Header
@@ -61,9 +60,12 @@ func (ft *FinalizedBlockQueue) Enqueue(header *flow.Header) error {
 		parentID = ft.lastQueuedHeader.ID
 		lastHeight = ft.lastQueuedHeader.Header.Height
 	}
+	if header.Height <= lastHeight {
+		return ErrOldHeader
+	}
 
 	if parentID != header.ParentID || lastHeight+1 != header.Height {
-		return ErrHeaderOrder
+		return ErrNonCompliantHeader
 	}
 
 	h := headerWithID{header, header.ID()}
@@ -98,14 +100,10 @@ func (ft *FinalizedBlockQueue) Dequeue() {
 	}
 }
 
-func (ft *FinalizedBlockQueue) size() int {
-	return ft.end - ft.start
-}
-
 func (ft *FinalizedBlockQueue) isEmpty() bool {
 	return ft.start == ft.end
 }
 
 func (ft *FinalizedBlockQueue) isFull() bool {
-	return ft.size() == ft.capacity
+	return (ft.end+1)%ft.capacity == ft.start
 }

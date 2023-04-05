@@ -1,4 +1,4 @@
-package cargo
+package payload
 
 import (
 	"sync"

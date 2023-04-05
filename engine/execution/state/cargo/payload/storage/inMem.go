@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/onflow/flow-go/engine/execution/state/cargo"
+	"github.com/onflow/flow-go/engine/execution/state/cargo/payload"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -15,7 +15,7 @@ type InMemStorage struct {
 	lock       sync.RWMutex
 }
 
-var _ cargo.Storage = &InMemStorage{}
+var _ payload.Storage = &InMemStorage{}
 
 func NewInMemStorage(
 	historyCap int,

@@ -1,11 +1,11 @@
-package cargo_test
+package queue_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/cargo"
+	"github.com/onflow/flow-go/engine/execution/state/cargo/queue"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -17,41 +17,49 @@ func TestFinalizedBlockQueue(t *testing.T) {
 		headers := unittest.BlockHeaderFixtures(13)
 		genesis, batch1, batch2, batch3 := headers[0], headers[1:5], headers[5:9], headers[9:]
 
-		queue := cargo.NewFinalizedBlockQueue(capacity, genesis)
+		bq := queue.NewFinalizedBlockQueue(capacity, genesis)
 
 		// add the first batch of headers
 		for _, header := range batch1 {
-			err = queue.Enqueue(header)
+			err = bq.Enqueue(header)
 			require.NoError(t, err)
 		}
 
 		// dequeue them all all
 		for _, header := range batch1 {
-			retID, retHeader := queue.Peak()
+			retID, retHeader := bq.Peak()
 			require.Equal(t, header.ID(), retID)
 			require.Equal(t, header, retHeader)
 
-			queue.Dequeue()
+			bq.Dequeue()
+		}
+
+		// trying the third batch of headers should fail (in the future)
+		for _, header := range batch3 {
+			err = bq.Enqueue(header)
+			require.Error(t, err)
+			require.ErrorIs(t, err, queue.ErrNonCompliantHeader)
 		}
 
 		// add the second batch of headers
 		for _, header := range batch2 {
-			err = queue.Enqueue(header)
+			err = bq.Enqueue(header)
 			require.NoError(t, err)
 		}
 
 		// pop one
-		queue.Dequeue()
+		bq.Dequeue()
 
-		// trying adding the second batch again should fail
+		// trying adding the second batch again should fail (in the past)
 		for _, header := range batch2 {
-			err = queue.Enqueue(header)
+			err = bq.Enqueue(header)
 			require.Error(t, err)
+			require.ErrorIs(t, err, queue.ErrOldHeader)
 		}
 
 		// add the third batch of headers
 		for _, header := range batch3 {
-			err = queue.Enqueue(header)
+			err = bq.Enqueue(header)
 			require.NoError(t, err)
 		}
 	})
@@ -59,17 +67,18 @@ func TestFinalizedBlockQueue(t *testing.T) {
 	t.Run("capacity check", func(t *testing.T) {
 		var err error
 		capacity := 5
-		headers := unittest.BlockHeaderFixtures(1 + capacity + 1)
-		genesis, batch1, invalid := headers[0], headers[1:6], headers[6]
+		headers := unittest.BlockHeaderFixtures(1 + capacity)
+		genesis, batch1, invalid := headers[0], headers[1:5], headers[5]
 
-		queue := cargo.NewFinalizedBlockQueue(capacity, genesis)
+		bq := queue.NewFinalizedBlockQueue(capacity, genesis)
 		// should be enough space for all of the
 		for _, header := range batch1 {
-			err = queue.Enqueue(header)
+			err = bq.Enqueue(header)
 			require.NoError(t, err)
 		}
 
-		err = queue.Enqueue(invalid)
+		err = bq.Enqueue(invalid)
 		require.Error(t, err)
+		require.ErrorIs(t, err, queue.ErrCapacityReached)
 	})
 }
