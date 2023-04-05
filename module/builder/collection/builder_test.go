@@ -28,7 +28,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
-	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	sutil "github.com/onflow/flow-go/storage/util"
@@ -46,9 +47,9 @@ type BuilderSuite struct {
 	chainID      flow.ChainID
 	epochCounter uint64
 
-	headers  *storage.Headers
-	payloads *storage.ClusterPayloads
-	blocks   *storage.Blocks
+	headers  storage.Headers
+	payloads storage.ClusterPayloads
+	blocks   storage.Blocks
 
 	state cluster.MutableState
 
@@ -77,24 +78,24 @@ func (suite *BuilderSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	headers, _, seals, index, conPayloads, blocks, qcs, setups, commits, statuses, results := sutil.StorageLayer(suite.T(), suite.db)
+	all := sutil.StorageLayer(suite.T(), suite.db)
 	consumer := events.NewNoop()
-	suite.headers = headers
-	suite.blocks = blocks
-	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
-	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
-	suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter, nil).Maybe()
+
+	suite.headers = all.Headers
+	suite.blocks = all.Blocks
+	suite.payloads = bstorage.NewClusterPayloads(metrics, suite.db)
 
 	// just bootstrap with a genesis block, we'll use this as reference
-	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	root, result, seal := unittest.BootstrapFixture(participants)
+	root, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	// ensure we don't enter a new epoch for tests that build many blocks
 	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
 	seal.ResultID = result.ID()
-
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID())))
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
+
+	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
+	suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter, nil).Maybe()
 
 	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
 	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC, suite.epochCounter)
@@ -105,10 +106,10 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.state, err = clusterkv.NewMutableState(clusterState, tracer, suite.headers, suite.payloads, suite.epochLookup)
 	suite.Require().NoError(err)
 
-	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, qcs, setups, commits, statuses, rootSnapshot)
+	state, err := pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 	require.NoError(suite.T(), err)
 
-	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer, util.MockBlockTimer())
+	suite.protoState, err = pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, consumer, util.MockBlockTimer())
 	require.NoError(suite.T(), err)
 
 	// add some transactions to transaction pool
@@ -986,10 +987,10 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, _, _, _, blocks, _, _, _, _, _ := sutil.StorageLayer(suite.T(), suite.db)
-		suite.headers = headers
-		suite.blocks = blocks
-		suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
+		all := sutil.StorageLayer(suite.T(), suite.db)
+		suite.headers = all.Headers
+		suite.blocks = all.Blocks
+		suite.payloads = bstorage.NewClusterPayloads(metrics, suite.db)
 		suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
 
 		qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))

@@ -58,14 +58,15 @@ func (suite *SnapshotSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	headers, _, seals, _, _, blocks, qcs, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
+	all := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
-	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	root := unittest.RootSnapshotFixture(participants)
-	suite.protoState, err = pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, qcs, setups, commits, statuses, root)
-	suite.Require().NoError(err)
+	root := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	suite.epochCounter = root.Encodable().Epochs.Current.Counter
+
+	suite.protoState, err = pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, root)
+	suite.Require().NoError(err)
+
 	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
 	suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter, nil).Maybe()
 
@@ -73,7 +74,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.Require().NoError(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Require().NoError(err)
-	suite.state, err = NewMutableState(clusterState, tracer, headers, colPayloads, suite.epochLookup)
+	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads, suite.epochLookup)
 	suite.Require().NoError(err)
 }
 
