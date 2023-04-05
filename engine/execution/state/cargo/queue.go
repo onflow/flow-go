@@ -1,14 +1,16 @@
 package cargo
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO add error type duplication found
-// mismatched
+var ErrHeaderOrder = errors.New("headers are received in a non-compliant order")
+var ErrCapacityReached = errors.New("queue capacity has reached")
+
+// TODO deal with duplications
 
 type headerWithID struct {
 	Header *flow.Header
@@ -61,7 +63,7 @@ func (ft *FinalizedBlockQueue) Enqueue(header *flow.Header) error {
 	defer ft.lock.Unlock()
 
 	if ft.isFull() {
-		return fmt.Errorf("queue is full (capacity: %d)", ft.capacity)
+		return ErrCapacityReached
 	}
 
 	parentID := ft.lastDequeuedHeader.ID
@@ -72,11 +74,8 @@ func (ft *FinalizedBlockQueue) Enqueue(header *flow.Header) error {
 		lastHeight = ft.lastQueuedHeader.Header.Height
 	}
 
-	if parentID != header.ParentID {
-		return fmt.Errorf("block finalization events are not order preserving, last block ID: %x, new block's parent ID: %x", parentID, header.ParentID)
-	}
-	if lastHeight+1 != header.Height {
-		return fmt.Errorf("block finalization events are not order preserving, last block height: %d, new block height: %d", lastHeight, header.Height)
+	if parentID != header.ParentID || lastHeight+1 != header.Height {
+		return ErrHeaderOrder
 	}
 
 	h := headerWithID{header, header.ID()}
