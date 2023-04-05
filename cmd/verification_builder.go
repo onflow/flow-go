@@ -381,7 +381,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				validator,
 				syncCore,
 				node.Tracer,
-				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core: %w", err)
@@ -395,6 +394,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Headers,
 				finalizedHeader.Get(),
 				core,
+				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)

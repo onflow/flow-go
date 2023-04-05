@@ -899,7 +899,6 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		validator,
 		exeNode.syncCore,
 		node.Tracer,
-		compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower core: %w", err)
@@ -913,6 +912,7 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		node.Storage.Headers,
 		exeNode.finalizedHeader.Get(),
 		core,
+		followereng.WithComplianceConfigOpt(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower engine: %w", err)

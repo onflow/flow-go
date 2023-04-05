@@ -317,7 +317,6 @@ func main() {
 				validator,
 				mainChainSyncCore,
 				node.Tracer,
-				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core: %w", err)
@@ -331,6 +330,7 @@ func main() {
 				node.Storage.Headers,
 				finalizedHeader.Get(),
 				core,
+				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
