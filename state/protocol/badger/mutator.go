@@ -848,12 +848,10 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 	return
 }
 
-// epochPhaseMetricsAndEventsOnBlockFinalized determines metrics to update
-// and protocol events to emit, if this block is the first of a new epoch phase.
-//
-// Protocol events and metric updates happen when we finalize the block at
-// which a service event causing an epoch phase change comes into effect.
-// See handleEpochServiceEvents for details.
+// epochPhaseMetricsAndEventsOnBlockFinalized determines metrics to update and protocol
+// events to emit. Service Events embedded into an execution result take effect, when the
+// execution result's _seal is finalized_ (i.e. when the block holding a seal for the
+// result is finalized). See also handleEpochServiceEvents for further details. Example:
 //
 // Convention:
 //
