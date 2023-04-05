@@ -641,7 +641,7 @@ type ObserverConfig struct {
 	BootstrapAccessName string
 }
 
-func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) (err error) {
+func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 	if conf.BootstrapAccessName == "" {
 		conf.BootstrapAccessName = "access_1"
 	}
@@ -653,7 +653,7 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) (err erro
 	flowDataDir := makeDir(t, tmpdir, DefaultFlowDataDir)
 	_ = makeDir(t, tmpdir, DefaultProfilerDir)
 
-	err = io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
+	err := io.CopyDirectory(net.BootstrapDir, nodeBootstrapDir)
 	require.NoError(t, err)
 
 	// Find the public key for the access node
@@ -719,8 +719,6 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) (err erro
 
 	// start after the bootstrap access node
 	accessNode.After(suiteContainer)
-
-	return nil
 }
 
 // AddNode creates a node container with the given config and adds it to the
