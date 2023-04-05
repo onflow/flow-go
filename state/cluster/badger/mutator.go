@@ -22,20 +22,18 @@ import (
 
 type MutableState struct {
 	*State
-	tracer      module.Tracer
-	headers     storage.Headers
-	payloads    storage.ClusterPayloads
-	epochLookup module.EpochLookup
+	tracer   module.Tracer
+	headers  storage.Headers
+	payloads storage.ClusterPayloads
 }
 
-func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads, epochLookup module.EpochLookup) (*MutableState, error) {
+func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads) (*MutableState, error) {
 
 	mutableState := &MutableState{
-		State:       state,
-		tracer:      tracer,
-		headers:     headers,
-		payloads:    payloads,
-		epochLookup: epochLookup,
+		State:    state,
+		tracer:   tracer,
+		headers:  headers,
+		payloads: payloads,
 	}
 	return mutableState, nil
 }
@@ -295,22 +293,6 @@ func (m *MutableState) checkReferenceBlockValidity(payload *cluster.Payload, fin
 		return state.NewInvalidExtensionErrorf("invalid reference block is after operating epoch for cluster, height %d>%d", refBlock.Height, epochLastHeight)
 	}
 	return nil
-	//
-	//// 3 - the reference block must fall within the operating epoch of the cluster
-	//refEpoch, err := m.epochLookup.EpochForViewWithFallback(refBlock.View)
-	//if err != nil {
-	//	if errors.Is(err, model.ErrViewForUnknownEpoch) {
-	//		// indicates data inconsistency in the protocol state - we know the block is finalized,
-	//		// but don't know what epoch it belongs to
-	//		return irrecoverable.NewExceptionf("finalized reference block (id=%x, height=%d, view=%d has no known epoch: %w",
-	//			payload.ReferenceBlockID, refBlock.Height, refBlock.View, err)
-	//	}
-	//	return fmt.Errorf("could not get reference epoch: %w", err)
-	//}
-	//if refEpoch == m.State.epoch {
-	//	return nil
-	//}
-	//return state.NewInvalidExtensionErrorf("invalid reference block is within epoch %d, cluster has operating epoch %d", refEpoch, m.epoch)
 }
 
 // checkDupeTransactionsInUnfinalizedAncestry checks for duplicate transactions in the un-finalized

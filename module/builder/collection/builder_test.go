@@ -9,7 +9,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -19,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
-	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/cluster"
 	clusterkv "github.com/onflow/flow-go/state/cluster/badger"
@@ -54,8 +52,7 @@ type BuilderSuite struct {
 	state cluster.MutableState
 
 	// protocol state for reference blocks for transactions
-	protoState  protocol.FollowerState
-	epochLookup *mockmodule.EpochLookup
+	protoState protocol.FollowerState
 
 	pool    mempool.Transactions
 	builder *builder.Builder
@@ -94,16 +91,13 @@ func (suite *BuilderSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
 
-	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
-	suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter, nil).Maybe()
-
 	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
 	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC, suite.epochCounter)
 	suite.Require().NoError(err)
 	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
 	suite.Require().NoError(err)
 
-	suite.state, err = clusterkv.NewMutableState(clusterState, tracer, suite.headers, suite.payloads, suite.epochLookup)
+	suite.state, err = clusterkv.NewMutableState(clusterState, tracer, suite.headers, suite.payloads)
 	suite.Require().NoError(err)
 
 	state, err := pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
@@ -991,8 +985,6 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		suite.headers = all.Headers
 		suite.blocks = all.Blocks
 		suite.payloads = bstorage.NewClusterPayloads(metrics, suite.db)
-		suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
-		suite.epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(suite.epochCounter, nil).Maybe()
 
 		qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
 		stateRoot, err := clusterkv.NewStateRoot(suite.genesis, qc, suite.epochCounter)
@@ -1000,7 +992,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		state, err := clusterkv.Bootstrap(suite.db, stateRoot)
 		assert.NoError(b, err)
 
-		suite.state, err = clusterkv.NewMutableState(state, tracer, suite.headers, suite.payloads, suite.epochLookup)
+		suite.state, err = clusterkv.NewMutableState(state, tracer, suite.headers, suite.payloads)
 		assert.NoError(b, err)
 
 		// add some transactions to transaction pool

@@ -11,14 +11,12 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/cluster"
@@ -51,7 +49,6 @@ type MutatorSuite struct {
 
 	// protocol state for reference blocks for transactions
 	protoState   protocol.FollowerState
-	epochLookup  *mockmodule.EpochLookup
 	protoGenesis *flow.Header
 
 	state cluster.MutableState
@@ -91,17 +88,11 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.protoState, err = pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, events.NewNoop(), protocolutil.MockBlockTimer())
 	require.NoError(suite.T(), err)
 
-	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
-	suite.epochLookup.On(
-		"EpochForViewWithFallback",
-		mock.MatchedBy(matchViewInEpoch(rootSnapshot.Encodable().Epochs.Current)),
-	).Return(suite.epochCounter, nil).Maybe()
-
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.NoError(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads, suite.epochLookup)
+	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
 	suite.Assert().Nil(err)
 
 }

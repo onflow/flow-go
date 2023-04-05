@@ -11,23 +11,20 @@ import (
 )
 
 type ClusterStateFactory struct {
-	db          *badger.DB
-	metrics     module.CacheMetrics
-	tracer      module.Tracer
-	epochLookup module.EpochLookup
+	db      *badger.DB
+	metrics module.CacheMetrics
+	tracer  module.Tracer
 }
 
 func NewClusterStateFactory(
 	db *badger.DB,
 	metrics module.CacheMetrics,
 	tracer module.Tracer,
-	epochLookup module.EpochLookup,
 ) (*ClusterStateFactory, error) {
 	factory := &ClusterStateFactory{
-		db:          db,
-		metrics:     metrics,
-		tracer:      tracer,
-		epochLookup: epochLookup,
+		db:      db,
+		metrics: metrics,
+		tracer:  tracer,
 	}
 	return factory, nil
 }
@@ -61,7 +58,7 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot) (
 		}
 	}
 
-	mutableState, err := clusterkv.NewMutableState(clusterState, f.tracer, headers, payloads, f.epochLookup)
+	mutableState, err := clusterkv.NewMutableState(clusterState, f.tracer, headers, payloads)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could create mutable cluster state: %w", err)
 	}
