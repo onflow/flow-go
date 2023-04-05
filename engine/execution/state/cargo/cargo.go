@@ -12,14 +12,14 @@ type Cargo struct {
 func NewCargo(
 	storage Storage,
 	blockQueueCapacity int,
-	startBlockParent *flow.Header,
+	genesis *flow.Header,
 ) (*Cargo, error) {
 	views, err := NewViews(storage) // TODO pass startBlockParent to Views as well for validation
 	if err != nil {
 		return nil, err
 	}
 	return &Cargo{
-		blockQueue: NewFinalizedBlockQueue(blockQueueCapacity, startBlockParent),
+		blockQueue: NewFinalizedBlockQueue(blockQueueCapacity, genesis),
 		views:      views,
 	}, nil
 }
