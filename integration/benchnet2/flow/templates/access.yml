@@ -7,10 +7,10 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
-    branch: {{ $.Values.branch }}
+    networkId: {{ $.Values.networkId }}
     nodeType: access
+    owner: {{ $.Values.owner }}
     service: flow
-    project: {{ $.Values.commit }} # Prefixing the project name as label
 
 spec:
   serviceName: {{ $k }}
@@ -20,16 +20,19 @@ spec:
       app: {{ $k }}
       nodeType: access
       service: flow
-      project: {{ $.Values.commit }}
+      networkId: {{ $.Values.networkId }}
 
   template:
     metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8080"
       labels:
         app: {{ $k }}
-        branch: {{ $.Values.branch }}
         nodeType: access
         service: flow
-        project: {{ $.Values.commit }}
+        networkId: {{ $.Values.networkId }}
     spec:
       containers:
         - name: {{ $k }}
@@ -92,29 +95,29 @@ spec:
       volumes:
         - name: node-info-priv-json
           secret: 
-            secretName: {{ $.Values.commit }}.{{ $v.nodeId }}.node-info.priv.json
+            secretName: {{ $.Values.networkId }}.{{ $v.nodeId }}.node-info.priv.json
 
         - name: node-info-pub-json
           secret: 
-            secretName: {{ $.Values.commit }}.node-infos.pub.json
+            secretName: {{ $.Values.networkId }}.node-infos.pub.json
 
         - name: root-block-json
           secret: 
-            secretName: {{ $.Values.commit }}.root-block.json
+            secretName: {{ $.Values.networkId }}.root-block.json
 
         - name: root-protocol-state-snapshot-json
           secret: 
-            secretName: {{ $.Values.commit }}.root-protocol-state-snapshot.json
+            secretName: {{ $.Values.networkId }}.root-protocol-state-snapshot.json
 
         - name: secretsdb-key
           secret: 
-            secretName: {{ $.Values.commit }}.{{ $v.nodeId }}.secretsdb-key
+            secretName: {{ $.Values.networkId }}.{{ $v.nodeId }}.secretsdb-key
 
   volumeClaimTemplates:
     - metadata:
         name: data
         labels:
-          project: {{ $.Values.commit }}
+          networkId: {{ $.Values.networkId }}
       spec:
         accessModes: ["ReadWriteOnce"]
         resources:
@@ -135,7 +138,7 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
-    project: {{ $.Values.commit }}
+    networkId: {{ $.Values.networkId }}
 spec:
   {{ if $v.servicePorts }}
   ports: {{ $v.servicePorts | toYaml | nindent 12 }}

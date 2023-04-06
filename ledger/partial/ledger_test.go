@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -119,27 +118,16 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	// create empty update
 	emptyState := l.InitialState()
 
-	view := delta.NewDeltaView(
-		executionState.NewLedgerStorageSnapshot(
-			l,
-			flow.StateCommitment(emptyState)))
-
-	registerID := flow.NewRegisterID("b", "nk")
-
-	v, err := view.Get(registerID)
-	require.NoError(t, err)
-	require.Empty(t, v)
-
-	keys, values := executionState.RegisterEntriesToKeysValues(
-		view.Delta().UpdatedRegisters())
+	// No updates.
+	keys, values := executionState.RegisterEntriesToKeysValues(nil)
 
 	updated, err := ledger.NewUpdate(emptyState, keys, values)
 	require.NoError(t, err)
 
-	allRegisters := view.Interactions().AllRegisterIDs()
-	allKeys := make([]ledger.Key, len(allRegisters))
-	for i, id := range allRegisters {
-		allKeys[i] = executionState.RegisterIDToKey(id)
+	// Read one register during execution.
+	registerID := flow.NewRegisterID("b", "nk")
+	allKeys := []ledger.Key{
+		executionState.RegisterIDToKey(registerID),
 	}
 
 	newState := updated.State()

@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -92,9 +93,10 @@ func TestMVP_Bootstrap(t *testing.T) {
 	flowNetwork.RemoveContainers()
 
 	// pick 1 consensus node to restart with empty database and downloaded snapshot
-	con1 := flowNetwork.Identities().
-		Filter(filter.HasRole(flow.RoleConsensus)).
-		Sample(1)[0]
+	cons := flowNetwork.Identities().Filter(filter.HasRole(flow.RoleConsensus))
+	random, err := rand.Uintn(uint(len(cons)))
+	require.NoError(t, err)
+	con1 := cons[random]
 
 	t.Log("@@ booting from non-root state on consensus node ", con1.NodeID)
 
