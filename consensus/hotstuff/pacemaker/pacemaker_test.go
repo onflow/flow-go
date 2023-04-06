@@ -3,6 +3,7 @@ package pacemaker
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -43,18 +44,21 @@ type ActivePaceMakerTestSuite struct {
 	initialQC   *flow.QuorumCertificate
 	initialTC   *flow.TimeoutCertificate
 
-	notifier  *mocks.Consumer
-	persist   *mocks.Persister
-	paceMaker *ActivePaceMaker
-	stop      context.CancelFunc
+	notifier     *mocks.Consumer
+	persist      *mocks.Persister
+	paceMaker    *ActivePaceMaker
+	stop         context.CancelFunc
+	timeoutConf  timeout.Config
+	livenessData *hotstuff.LivenessData // should not be used by tests to determine expected values!
 }
 
 func (s *ActivePaceMakerTestSuite) SetupTest() {
 	s.initialView = 3
 	s.initialQC = QC(2)
 	s.initialTC = nil
+	var err error
 
-	tc, err := timeout.NewConfig(
+	s.timeoutConf, err = timeout.NewConfig(
 		time.Duration(minRepTimeout*1e6),
 		time.Duration(maxRepTimeout*1e6),
 		multiplicativeIncrease,
@@ -69,18 +73,17 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 
 	// init Persister dependency for PaceMaker
 	// CAUTION: The Persister hands a pointer to `livenessData` to the PaceMaker, which means the PaceMaker
-	// could modify our struct in-place. `livenessData` is a local variable, which is not accessible by the
-	// tests. Thereby, we avoid any possibility of tests deriving any expected values from  `livenessData`.
+	// could modify our struct in-place. `livenessData` should not be used by tests to determine expected values!
 	s.persist = mocks.NewPersister(s.T())
-	livenessData := &hotstuff.LivenessData{
+	s.livenessData = &hotstuff.LivenessData{
 		CurrentView: 3,
 		LastViewTC:  nil,
 		NewestQC:    s.initialQC,
 	}
-	s.persist.On("GetLivenessData").Return(livenessData, nil).Once()
+	s.persist.On("GetLivenessData").Return(s.livenessData, nil).Once()
 
 	// init PaceMaker and start
-	s.paceMaker, err = New(timeout.NewController(tc), s.notifier, s.persist)
+	s.paceMaker, err = New(timeout.NewController(s.timeoutConf), s.notifier, s.persist)
 	require.NoError(s.T(), err)
 
 	var ctx context.Context
@@ -300,4 +303,112 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_UpdateNewestQC() {
 	require.NoError(s.T(), err)
 	require.Nil(s.T(), nve)
 	require.Equal(s.T(), qc, s.paceMaker.NewestQC())
+}
+
+// Test_Initialization tests QCs and TCs provided as optional constructor arguments.
+// We want to test that nil, old and duplicate TCs & QCs are accepted in arbitrary order.
+// The constructed PaceMaker should be in the state:
+//   - in view V+1, where V is the _largest view of _any_ of the ingested QCs and TCs
+//   - method `NewestQC` should report the QC with the highest View in _any_ of the inputs
+func (s *ActivePaceMakerTestSuite) Test_Initialization() {
+	highestView := uint64(0) // highest View of any QC or TC constructed below
+
+	// Randomly create 80 TCs:
+	//  * their view is randomly sampled from the range [3, 103)
+	//  * as we sample 80 times, probability of creating 2 TCs for the same
+	//    view is practically 1 (-> birthday problem)
+	//  * we place the TCs in a slice of length 110, i.e. some elements are guaranteed to be nil
+	//  * Note: we specifically allow for the TC to have the same view as the highest QC.
+	//    This is useful as a fallback, because it allows replicas other than the designated
+	//     leader to also collect votes and generate a QC.
+	tcs := make([]*flow.TimeoutCertificate, 110)
+	for i := 0; i < 80; i++ {
+		tcView := s.initialView + uint64(rand.Intn(100))
+		qcView := 1 + uint64(rand.Intn(int(tcView)))
+		tcs[i] = helper.MakeTC(helper.WithTCView(tcView), helper.WithTCNewestQC(QC(qcView)))
+		highestView = max(highestView, tcView, qcView)
+	}
+	rand.Shuffle(len(tcs), func(i, j int) {
+		tcs[i], tcs[j] = tcs[j], tcs[i]
+	})
+
+	// randomly create 80 QCs (same logic as above)
+	qcs := make([]*flow.QuorumCertificate, 110)
+	for i := 0; i < 80; i++ {
+		qcs[i] = QC(s.initialView + uint64(rand.Intn(100)))
+		highestView = max(highestView, qcs[i].View)
+	}
+	rand.Shuffle(len(qcs), func(i, j int) {
+		qcs[i], qcs[j] = qcs[j], qcs[i]
+	})
+
+	// set up mocks
+	s.persist.On("GetLivenessData").Return(s.livenessData, nil)
+	s.persist.On("PutLivenessData", mock.Anything).Return(nil)
+
+	// test that the constructor finds the newest QC and TC
+	s.Run("Random TCs and QCs combined", func() {
+		pm, err := New(
+			timeout.NewController(s.timeoutConf), s.notifier, s.persist,
+			WithQCs(qcs...), WithTCs(tcs...),
+		)
+		s.Require().NoError(err)
+
+		s.Require().Equal(highestView+1, pm.CurView())
+		if tc := pm.LastViewTC(); tc != nil {
+			s.Require().Equal(highestView, tc.View)
+		} else {
+			s.Require().Equal(highestView, pm.NewestQC().View)
+		}
+	})
+
+	// We specifically test an edge case: an outdated TC can still contain a QC that
+	// is newer than the newest QC the pacemaker knows so far.
+	s.Run("Newest QC in older TC", func() {
+		tcs[17] = helper.MakeTC(helper.WithTCView(highestView+20), helper.WithTCNewestQC(QC(highestView+5)))
+		tcs[45] = helper.MakeTC(helper.WithTCView(highestView+15), helper.WithTCNewestQC(QC(highestView+12)))
+
+		pm, err := New(
+			timeout.NewController(s.timeoutConf), s.notifier, s.persist,
+			WithTCs(tcs...), WithQCs(qcs...),
+		)
+		s.Require().NoError(err)
+
+		// * when observing tcs[17], which is newer than any other QC or TC, the pacemaker should enter view tcs[17].View + 1
+		// * when observing tcs[45], which is older than tcs[17], the PaceMaker should notice that the QC in tcs[45]
+		//   is newer than its local QC and update it
+		s.Require().Equal(tcs[17].View+1, pm.CurView())
+		s.Require().Equal(tcs[17], pm.LastViewTC())
+		s.Require().Equal(tcs[45].NewestQC, pm.NewestQC())
+	})
+
+	// Another edge case: a TC from a past view contains QC for the same view.
+	// While is TC is outdated, the contained QC is still newer that the QC the pacemaker knows so far.
+	s.Run("Newest QC in older TC", func() {
+		tcs[17] = helper.MakeTC(helper.WithTCView(highestView+20), helper.WithTCNewestQC(QC(highestView+5)))
+		tcs[45] = helper.MakeTC(helper.WithTCView(highestView+15), helper.WithTCNewestQC(QC(highestView+15)))
+
+		pm, err := New(
+			timeout.NewController(s.timeoutConf), s.notifier, s.persist,
+			WithTCs(tcs...), WithQCs(qcs...),
+		)
+		s.Require().NoError(err)
+
+		// * when observing tcs[17], which is newer than any other QC or TC, the pacemaker should enter view tcs[17].View + 1
+		// * when observing tcs[45], which is older than tcs[17], the PaceMaker should notice that the QC in tcs[45]
+		//   is newer than its local QC and update it
+		s.Require().Equal(tcs[17].View+1, pm.CurView())
+		s.Require().Equal(tcs[17], pm.LastViewTC())
+		s.Require().Equal(tcs[45].NewestQC, pm.NewestQC())
+	})
+
+}
+
+func max(a uint64, values ...uint64) uint64 {
+	for _, v := range values {
+		if v > a {
+			a = v
+		}
+	}
+	return a
 }

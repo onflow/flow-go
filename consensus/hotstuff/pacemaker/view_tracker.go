@@ -57,9 +57,10 @@ func (vt *viewTracker) LastViewTC() *flow.TimeoutCertificate {
 	return vt.livenessData.LastViewTC
 }
 
-// ProcessQC ingests a QC, which might advance the current view. QCs with views smaller or equal
-// to the newest QC known are a no-op. ProcessQC returns the resulting view after processing the
-// QC. No errors are expected, any error should be treated as exception.
+// ProcessQC ingests a QC, which might advance the current view. Panics for nil input!
+// QCs with views smaller or equal to the newest QC known are a no-op. ProcessQC returns
+// the resulting view after processing the QC.
+// No errors are expected, any error should be treated as exception.
 func (vt *viewTracker) ProcessQC(qc *flow.QuorumCertificate) (uint64, error) {
 	view := vt.livenessData.CurrentView
 	if qc.View < view {
