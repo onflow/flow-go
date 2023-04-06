@@ -38,4 +38,8 @@ type GossipSubRPCValidationConfigs struct {
 	GraftLimits map[string]int
 	// PruneLimits PRUNE control message validation limits.
 	PruneLimits map[string]int
+	// NotificationCacheSize is the size of the cache used to store the rpc inspector notifications.
+	NotificationCacheSize uint32
+	// InspectorCacheSize is the size of the cache used to store the rpc messages for inspection.
+	InspectorCacheSize uint32
 }

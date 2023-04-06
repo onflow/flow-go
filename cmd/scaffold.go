@@ -371,20 +371,16 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
 
-		fnb.GossipSubInspectorNotifDistributor = BuildGossipsubRPCValidationInspectorNotificationDisseminator(fnb.GossipSubRPCInspectorNotificationCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
-		heroStoreOpts := BuildGossipsubRPCValidationInspectorHeroStoreOpts(fnb.GossipSubRPCInspectorCacheSize, fnb.MetricsRegisterer, fnb.MetricsEnabled)
-		rpcValidationInspector, err := p2pbuilder.BuildGossipSubRPCValidationInspector(fnb.Logger, fnb.SporkID, fnb.GossipSubRPCValidationConfigs, fnb.GossipSubInspectorNotifDistributor, heroStoreOpts...)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc validation inspector: %w", err)
-		}
-
 		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
 			fnb.Logger,
 			myAddr,
 			fnb.NetworkKey,
 			fnb.SporkID,
 			fnb.IdentityProvider,
-			fnb.Metrics.Network,
+			&p2pbuilder.MetricsConfig{
+				Metrics:          fnb.Metrics.Network,
+				HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
+			},
 			fnb.Resolver,
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
@@ -393,7 +389,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.GossipSubConfig,
 			fnb.LibP2PResourceManagerConfig,
 			uniCfg,
-			rpcValidationInspector,
 		)
 
 		libp2pNode, err := libP2PNodeFactory()
@@ -427,6 +422,16 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.DependableComponent("peer manager", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		return fnb.LibP2PNode.PeerManagerComponent(), nil
 	}, fnb.PeerManagerDependencies)
+}
+
+// HeroCacheMetricsFactory returns a HeroCacheMetricsFactory based on the MetricsEnabled flag.
+// If MetricsEnabled is true, it returns a HeroCacheMetricsFactory that will register metrics with the provided MetricsRegisterer.
+// If MetricsEnabled is false, it returns a no-op HeroCacheMetricsFactory that will not register any metrics.
+func (fnb *FlowNodeBuilder) HeroCacheMetricsFactory() metrics.HeroCacheMetricsFactory {
+	if fnb.MetricsEnabled {
+		return metrics.NewHeroCacheMetricsFactory(fnb.MetricsRegisterer)
+	}
+	return metrics.NewNoopHeroCacheMetricsFactory()
 }
 
 func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory, unicastRateLimiters *ratelimit.RateLimiters, peerManagerFilters []p2p.PeerFilter) (network.Network, error) {

@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
@@ -199,11 +198,7 @@ type NetworkConfig struct {
 	UnicastCreateStreamRetryDelay time.Duration
 	// size of the queue for notifications about new peers in the disallow list.
 	DisallowListNotificationCacheSize uint32
-	// size of the queue for notifications about gossipsub RPC inspections.
-	GossipSubRPCInspectorNotificationCacheSize uint32
-	GossipSubRPCInspectorCacheSize             uint32
-	UnicastRateLimitersConfig                  *UnicastRateLimitersConfig
-	GossipSubRPCValidationConfigs              *p2pbuilder.GossipSubRPCValidationConfigs
+	UnicastRateLimitersConfig         *UnicastRateLimitersConfig
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
@@ -276,8 +271,6 @@ type NodeConfig struct {
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
 	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
-	// GossipSubInspectorNotifDistributor notifies consumers when an invalid RPC message is encountered.
-	GossipSubInspectorNotifDistributor p2p.GossipSubInspectorNotificationDistributor
 }
 
 func DefaultBaseConfig() *BaseConfig {
@@ -301,27 +294,12 @@ func DefaultBaseConfig() *BaseConfig {
 				BandwidthRateLimit:  0,
 				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
 			},
-			GossipSubRPCValidationConfigs: &p2pbuilder.GossipSubRPCValidationConfigs{
-				NumberOfWorkers: validation.DefaultNumberOfWorkers,
-				GraftLimits: map[string]int{
-					validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
-					validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
-					validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
-				},
-				PruneLimits: map[string]int{
-					validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
-					validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
-					validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
-				},
-			},
-			DNSCacheTTL:                                dns.DefaultTimeToLive,
-			LibP2PResourceManagerConfig:                p2pbuilder.DefaultResourceManagerConfig(),
-			ConnectionManagerConfig:                    connection.DefaultConnManagerConfig(),
-			NetworkConnectionPruning:                   connection.ConnectionPruningEnabled,
-			GossipSubConfig:                            p2pbuilder.DefaultGossipSubConfig(),
-			GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
-			GossipSubRPCInspectorCacheSize:             validation.DefaultControlMsgValidationInspectorQueueCacheSize,
-			DisallowListNotificationCacheSize:          distributor.DefaultDisallowListNotificationQueueCacheSize,
+			DNSCacheTTL:                       dns.DefaultTimeToLive,
+			LibP2PResourceManagerConfig:       p2pbuilder.DefaultResourceManagerConfig(),
+			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),
+			NetworkConnectionPruning:          connection.ConnectionPruningEnabled,
+			GossipSubConfig:                   p2pbuilder.DefaultGossipSubConfig(),
+			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,

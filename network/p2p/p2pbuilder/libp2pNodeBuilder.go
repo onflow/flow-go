@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -77,6 +78,7 @@ func DefaultGossipSubConfig() *GossipSubConfig {
 		PeerScoring:          defaultPeerScoringEnabled,
 		LocalMeshLogInterval: defaultMeshTracerLoggingInterval,
 		ScoreTracerInterval:  defaultGossipSubScoreTracerInterval,
+		RpcValidation:        defaultGossipSubRpcValidationConfig(),
 	}
 }
 
@@ -109,7 +111,6 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
 	uniCfg *UnicastConfig,
-	rpcValidationInspector p2p.GossipSubRPCInspector,
 ) p2p.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		builder, err := DefaultNodeBuilder(log,
@@ -124,8 +125,7 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 			peerManagerCfg,
 			gossipCfg,
 			rCfg,
-			uniCfg,
-			rpcValidationInspector)
+			uniCfg)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create node builder: %w", err)
@@ -152,6 +152,8 @@ type GossipSubConfig struct {
 	ScoreTracerInterval time.Duration
 	// PeerScoring is whether to enable GossipSub peer scoring.
 	PeerScoring bool
+	// RpcValidation is the configuration for the RPC validation.
+	RpcValidation *GossipSubRPCValidationConfigs
 }
 
 func DefaultResourceManagerConfig() *ResourceManagerConfig {
@@ -180,6 +182,24 @@ func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation
 		InspectMsgStoreOpts: opts,
 		GraftValidationCfg:  graftCfg,
 		PruneValidationCfg:  pruneCfg,
+	}
+}
+
+func defaultGossipSubRpcValidationConfig() *GossipSubRPCValidationConfigs {
+	return &GossipSubRPCValidationConfigs{
+		NumberOfWorkers: validation.DefaultNumberOfWorkers,
+		GraftLimits: map[string]int{
+			validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
+			validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
+			validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
+		},
+		PruneLimits: map[string]int{
+			validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
+			validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
+			validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
+		},
+		InspectorCacheSize:    validation.DefaultControlMsgValidationInspectorQueueCacheSize,
+		NotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
 	}
 }
 
@@ -561,8 +581,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	peerManagerCfg *PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
-	uniCfg *UnicastConfig,
-	rpcValidationInspector p2p.GossipSubRPCInspector) (p2p.NodeBuilder, error) {
+	uniCfg *UnicastConfig) (p2p.NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(log, metricsCfg.Metrics, connection.DefaultConnManagerConfig())
 	if err != nil {
@@ -577,6 +596,11 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		idProvider,
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
+
+	rpcValidationInspector, err := BuildGossipSubRpcInspector(log, sporkId, gossipCfg.RpcValidation, metricsCfg.HeroCacheFactory)
+	if err != nil {
+		return nil, fmt.Errorf("could not create gossipsub rpc validation inspector: %w", err)
+	}
 
 	builder := NewNodeBuilder(log, metricsCfg.Metrics, address, flowKey, sporkId, rCfg).
 		SetBasicResolver(resolver).
@@ -608,23 +632,12 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	return builder, nil
 }
 
-// BuildGossipSubRPCValidationInspector helper that sets up the gossipsub RPC validation inspector.
-func BuildGossipSubRPCValidationInspector(logger zerolog.Logger,
+// BuildGossipSubRpcInspector returns a new inspector.ControlMsgValidationInspectorConfig using configuration provided by the node builder.
+func BuildGossipSubRpcInspector(
+	logger zerolog.Logger,
 	sporkId flow.Identifier,
 	validationConfigs *GossipSubRPCValidationConfigs,
-	distributor p2p.GossipSubInspectorNotificationDistributor,
-	heroStoreOpts ...queue.HeroStoreConfigOption,
-) (*validation.ControlMsgValidationInspector, error) {
-	controlMsgRPCInspectorCfg, err := gossipSubRPCValidationInspectorConfig(validationConfigs, heroStoreOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
-	}
-	rpcValidationInspector := validation.NewControlMsgValidationInspector(logger, sporkId, controlMsgRPCInspectorCfg, distributor)
-	return rpcValidationInspector, nil
-}
-
-// gossipSubRPCValidationInspectorConfig returns a new inspector.ControlMsgValidationInspectorConfig using configuration provided by the node builder.
-func gossipSubRPCValidationInspectorConfig(validationConfigs *GossipSubRPCValidationConfigs, opts ...queue.HeroStoreConfigOption) (*validation.ControlMsgValidationInspectorConfig, error) {
+	heroCacheFactory metrics.HeroCacheMetricsFactory) (p2p.GossipSubRPCInspector, error) {
 	// setup rpc validation configuration for each control message type
 	graftValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, validationConfigs.GraftLimits)
 	if err != nil {
@@ -637,10 +650,22 @@ func gossipSubRPCValidationInspectorConfig(validationConfigs *GossipSubRPCValida
 
 	// setup gossip sub RPC control message inspector config
 	controlMsgRPCInspectorCfg := &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:     validationConfigs.NumberOfWorkers,
-		InspectMsgStoreOpts: opts,
-		GraftValidationCfg:  graftValidationCfg,
-		PruneValidationCfg:  pruneValidationCfg,
+		NumberOfWorkers: validationConfigs.NumberOfWorkers,
+		InspectMsgStoreOpts: []queue.HeroStoreConfigOption{
+			queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(heroCacheFactory)),
+			queue.WithHeroStoreSizeLimit(validationConfigs.InspectorCacheSize)},
+		GraftValidationCfg: graftValidationCfg,
+		PruneValidationCfg: pruneValidationCfg,
 	}
-	return controlMsgRPCInspectorCfg, nil
+
+	return validation.NewControlMsgValidationInspector(
+		logger,
+		sporkId,
+		controlMsgRPCInspectorCfg,
+		distributor.DefaultGossipSubInspectorNotificationDistributor(
+			logger,
+			[]queue.HeroStoreConfigOption{
+				queue.WithHeroStoreSizeLimit(validationConfigs.NotificationCacheSize),
+				queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(heroCacheFactory))}...)), nil
+
 }

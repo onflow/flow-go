@@ -78,24 +78,3 @@ func BuildDisallowListNotificationDisseminator(size uint32, metricsRegistry prom
 	}
 	return distributor.DefaultDisallowListNotificationDistributor(logger, heroStoreOpts...)
 }
-
-// BuildGossipsubRPCValidationInspectorNotificationDisseminator builds the gossipsub rpc validation inspector notification distributor.
-func BuildGossipsubRPCValidationInspectorNotificationDisseminator(size uint32, metricsRegistry prometheus.Registerer, logger zerolog.Logger, metricsEnabled bool) p2p.GossipSubInspectorNotificationDistributor {
-	heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(size)}
-	if metricsEnabled {
-		collector := metrics.RpcInspectorNotificationQueueMetricFactory(metricsRegistry)
-		heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
-	}
-	return distributor.DefaultGossipSubInspectorNotificationDistributor(logger, heroStoreOpts...)
-}
-
-// BuildGossipsubRPCValidationInspectorHeroStoreOpts builds the gossipsub rpc validation inspector hero store opts.
-// These options are used in the underlying worker pool hero store.
-func BuildGossipsubRPCValidationInspectorHeroStoreOpts(size uint32, metricsRegistry prometheus.Registerer, metricsEnabled bool) []queue.HeroStoreConfigOption {
-	heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(size)}
-	if metricsEnabled {
-		collector := metrics.GossipSubRPCInspectorQueueMetricFactory(metricsRegistry)
-		heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
-	}
-	return heroStoreOpts
-}

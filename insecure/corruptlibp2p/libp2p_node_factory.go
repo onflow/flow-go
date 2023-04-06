@@ -13,6 +13,7 @@ import (
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
@@ -27,7 +28,7 @@ func NewCorruptLibP2PNodeFactory(
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metrics module.LibP2PMetrics,
+	metricsCfg module.LibP2PMetrics,
 	resolver madns.BasicResolver,
 	role string,
 	connGaterCfg *p2pbuilder.ConnectionGaterConfig,
@@ -50,7 +51,10 @@ func NewCorruptLibP2PNodeFactory(
 			flowKey,
 			sporkId,
 			idProvider,
-			metrics,
+			&p2pbuilder.MetricsConfig{
+				HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+				Metrics:          metricsCfg,
+			},
 			resolver,
 			role,
 			connGaterCfg,
