@@ -21,3 +21,16 @@ func (b *BlockContainer) Level() uint64             { return b.Proposal.Block.Vi
 func (b *BlockContainer) Parent() (flow.Identifier, uint64) {
 	return b.Proposal.Block.QC.BlockID, b.Proposal.Block.QC.View
 }
+
+// BlockContainer wraps a block proposal to implement forest.Vertex
+// so the proposal can be stored in forest.LevelledForest
+type BlockContainer2 model.Block
+
+var _ forest.Vertex = (*BlockContainer2)(nil)
+
+// Functions implementing forest.Vertex
+
+func (b *BlockContainer2) VertexID() flow.Identifier         { return b.BlockID }
+func (b *BlockContainer2) Level() uint64                     { return b.View }
+func (b *BlockContainer2) Parent() (flow.Identifier, uint64) { return b.QC.BlockID, b.QC.View }
+func (b *BlockContainer2) Block() *model.Block               { return (*model.Block)(b) }
