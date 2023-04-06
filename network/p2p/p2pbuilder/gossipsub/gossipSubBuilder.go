@@ -34,11 +34,11 @@ type Builder struct {
 	gossipSubScoreTracerInterval time.Duration // the interval at which the gossipsub score tracer logs the peer scores.
 	// gossipSubTracer is a callback interface that is called by the gossipsub implementation upon
 	// certain events. Currently, we use it to log and observe the local mesh of the node.
-	gossipSubTracer             p2p.PubSubTracer
-	peerScoringParameterOptions []scoring.PeerScoreParamsOption
-	idProvider                  module.IdentityProvider
-	routingSystem               routing.Routing
-	rpcValidationInspector      p2p.GossipSubRPCInspector
+	gossipSubTracer        p2p.PubSubTracer
+	scoreOptionConfig      *scoring.ScoreOptionConfig
+	idProvider             module.IdentityProvider
+	routingSystem          routing.Routing
+	rpcValidationInspector p2p.GossipSubRPCInspector
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -132,11 +132,11 @@ func (g *Builder) SetRoutingSystem(routingSystem routing.Routing) {
 }
 
 func (g *Builder) SetTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) {
-	g.peerScoringParameterOptions = append(g.peerScoringParameterOptions, scoring.WithTopicScoreParams(topic, topicScoreParams))
+	g.scoreOptionConfig.SetTopicScoreParams(topic, topicScoreParams)
 }
 
 func (g *Builder) SetAppSpecificScoreParams(f func(peer.ID) float64) {
-	g.peerScoringParameterOptions = append(g.peerScoringParameterOptions, scoring.WithAppSpecificScoreFunction(f))
+	g.scoreOptionConfig.SetAppSpecificScoreFunction(f)
 }
 
 // SetGossipSubValidationInspector sets the rpc validation inspector.
@@ -150,12 +150,13 @@ func (g *Builder) SetGossipSubValidationInspector(inspector p2p.GossipSubRPCInsp
 }
 
 func NewGossipSubBuilder(logger zerolog.Logger, metrics module.GossipSubMetrics) *Builder {
+	lg := logger.With().Str("component", "gossipsub").Logger()
 	return &Builder{
-		logger:                      logger.With().Str("component", "gossipsub").Logger(),
-		metrics:                     metrics,
-		gossipSubFactory:            defaultGossipSubFactory(),
-		gossipSubConfigFunc:         defaultGossipSubAdapterConfig(),
-		peerScoringParameterOptions: make([]scoring.PeerScoreParamsOption, 0),
+		logger:              lg,
+		metrics:             metrics,
+		gossipSubFactory:    defaultGossipSubFactory(),
+		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
+		scoreOptionConfig:   scoring.NewScoreOptionConfig(lg),
 	}
 }
 
@@ -199,7 +200,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 	var scoreOpt *scoring.ScoreOption
 	var scoreTracer p2p.PeerScoreTracer
 	if g.gossipSubPeerScoring {
-		scoreOpt = scoring.NewScoreOption(g.logger, g.idProvider, g.peerScoringParameterOptions...)
+		scoreOpt = scoring.NewScoreOption(g.scoreOptionConfig)
 		gossipSubConfigs.WithScoreOption(scoreOpt)
 
 		if g.gossipSubScoreTracerInterval > 0 {
