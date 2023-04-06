@@ -32,12 +32,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func matchViewInEpoch(epoch inmem.EncodableEpoch) func(uint64) bool {
-	return func(view uint64) bool {
-		return view >= epoch.FirstView && view <= epoch.FinalView
-	}
-}
-
 type MutatorSuite struct {
 	suite.Suite
 	db    *badger.DB

@@ -28,7 +28,6 @@ type MutableState struct {
 }
 
 func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads) (*MutableState, error) {
-
 	mutableState := &MutableState{
 		State:    state,
 		tracer:   tracer,
@@ -36,6 +35,55 @@ func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers
 		payloads: payloads,
 	}
 	return mutableState, nil
+}
+
+// extendContext encapsulates all state information required in order to validate a candidate cluster block.
+type extendContext struct {
+	candidate                *cluster.Block // the proposed candidate cluster block
+	finalizedClusterBlock    flow.Header    // the latest finalized cluster block
+	finalizedConsensusHeight uint64         // the latest finalized height on the main change
+	epochFirstHeight         uint64         // the first height of this cluster's operating epoch
+	epochLastHeight          uint64         // the last height of this cluster's operating epoch (may be unknown)
+	epochHasEnded            bool           // whether this cluster's operating epoch has ended (whether the above field is known)
+}
+
+// getExtendCtx reads all required information from the database in order to validate
+// a candidate extending cluster block.
+// No errors are expected during normal operation.
+func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, error) {
+	var ctx extendContext
+	ctx.candidate = candidate
+
+	err := m.State.db.View(func(tx *badger.Txn) error {
+		// get the latest finalized cluster block and latest finalized consensus height
+		err := procedure.RetrieveLatestFinalizedClusterHeader(candidate.Header.ChainID, &ctx.finalizedClusterBlock)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized cluster head: %w", err)
+		}
+		err = operation.RetrieveFinalizedHeight(&ctx.finalizedConsensusHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized height on consensus chain: %w", err)
+		}
+
+		err = operation.RetrieveEpochFirstHeight(m.State.epoch, &ctx.epochFirstHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get operating epoch first height: %w", err)
+		}
+		err = operation.RetrieveEpochLastHeight(m.State.epoch, &ctx.epochLastHeight)(tx)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				ctx.epochHasEnded = false
+				return nil
+			}
+			return fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
+		}
+		ctx.epochHasEnded = true
+		return nil
+	})
+	if err != nil {
+		return extendContext{}, fmt.Errorf("could not read required state information for Extend checks: %w", err)
+	}
+	return ctx, nil
 }
 
 // Extend validates that the given cluster block passes compliance rules, then inserts
@@ -46,181 +94,91 @@ func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers
 //   - state.UnverifiableExtensionError if the candidate block cannot be verified
 //   - state.InvalidExtensionError if the candidate block is invalid
 func (m *MutableState) Extend(block *cluster.Block) error {
-
 	blockID := block.ID()
+	header := block.Header
+	payload := block.Payload
 
 	span, ctx := m.tracer.StartCollectionSpan(context.Background(), blockID, trace.COLClusterStateMutatorExtend)
 	defer span.End()
 
-	err := m.State.db.View(func(tx *badger.Txn) error {
-
-		setupSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendSetup)
-
-		header := block.Header
-		payload := block.Payload
-
-		// check chain ID
-		if header.ChainID != m.State.clusterID {
-			return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.State.clusterID)
-		}
-
-		// check for a specified reference block
-		// we also implicitly check this later, but can fail fast here
-		if payload.ReferenceBlockID == flow.ZeroID {
-			return state.NewInvalidExtensionError("new block has empty reference block ID")
-		}
-
-		// get the chain ID, which determines which cluster state to query
-		chainID := header.ChainID
-
-		// get the latest finalized cluster block and latest finalized consensus height
-		var finalizedClusterBlock flow.Header
-		err := procedure.RetrieveLatestFinalizedClusterHeader(chainID, &finalizedClusterBlock)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized cluster head: %w", err)
-		}
-		var finalizedConsensusHeight uint64
-		err = operation.RetrieveFinalizedHeight(&finalizedConsensusHeight)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized height on consensus chain: %w", err)
-		}
-
-		// get the header of the parent of the new block
-		parent, err := m.headers.ByBlockID(header.ParentID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve latest finalized header: %w", err)
-		}
-
-		// extending block must have correct parent view
-		if header.ParentView != parent.View {
-			return state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
-				header.ParentView, parent.View)
-		}
-
-		// the extending block must increase height by 1 from parent
-		if header.Height != parent.Height+1 {
-			return state.NewInvalidExtensionErrorf("extending block height (%d) must be parent height + 1 (%d)",
-				block.Header.Height, parent.Height)
-		}
-
-		// ensure that the extending block connects to the finalized state, we
-		// do this by tracing back until we see a parent block that is the
-		// latest finalized block, or reach height below the finalized boundary
-
-		setupSpan.End()
-		checkAnsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckAncestry)
-
-		// start with the extending block's parent
-		parentID := header.ParentID
-		for parentID != finalizedClusterBlock.ID() {
-
-			// get the parent of current block
-			ancestor, err := m.headers.ByBlockID(parentID)
-			if err != nil {
-				return fmt.Errorf("could not get parent (%x): %w", block.Header.ParentID, err)
-			}
-
-			// if its height is below current boundary, the block does not connect
-			// to the finalized protocol state and would break database consistency
-			if ancestor.Height < finalizedClusterBlock.Height {
-				return state.NewOutdatedExtensionErrorf("block doesn't connect to finalized state. ancestor.Height (%d), final.Height (%d)",
-					ancestor.Height, finalizedClusterBlock.Height)
-			}
-
-			parentID = ancestor.ParentID
-		}
-
-		checkAnsSpan.End()
-		checkTxsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
-		defer checkTxsSpan.End()
-
-		err = m.checkReferenceBlockValidity(payload, finalizedConsensusHeight)
-		if err != nil {
-			return fmt.Errorf("invalid reference block: %w", err)
-		}
-
-		// no validation of transactions is necessary for empty collections
-		if payload.Collection.Len() == 0 {
-			return nil
-		}
-
-		// check that all transactions within the collection are valid
-		// keep track of the min/max reference blocks - the collection must be non-empty
-		// at this point so these are guaranteed to be set correctly
-		minRefID := flow.ZeroID
-		minRefHeight := uint64(math.MaxUint64)
-		maxRefHeight := uint64(0)
-		for _, flowTx := range payload.Collection.Transactions {
-			refBlock, err := m.headers.ByBlockID(flowTx.ReferenceBlockID)
-			if errors.Is(err, storage.ErrNotFound) {
-				// unknown reference blocks are invalid
-				return state.NewUnverifiableExtensionError("collection contains tx (tx_id=%x) with unknown reference block (block_id=%x): %w", flowTx.ID(), flowTx.ReferenceBlockID, err)
-			}
-			if err != nil {
-				return fmt.Errorf("could not check reference block (id=%x): %w", flowTx.ReferenceBlockID, err)
-			}
-
-			if refBlock.Height < minRefHeight {
-				minRefHeight = refBlock.Height
-				minRefID = flowTx.ReferenceBlockID
-			}
-			if refBlock.Height > maxRefHeight {
-				maxRefHeight = refBlock.Height
-			}
-		}
-
-		// a valid collection must reference the oldest reference block among
-		// its constituent transactions
-		if minRefID != payload.ReferenceBlockID {
-			return state.NewInvalidExtensionErrorf(
-				"reference block (id=%x) must match oldest transaction's reference block (id=%x)",
-				payload.ReferenceBlockID, minRefID,
-			)
-		}
-		// a valid collection must contain only transactions within its expiry window
-		if maxRefHeight-minRefHeight >= flow.DefaultTransactionExpiry {
-			return state.NewInvalidExtensionErrorf(
-				"collection contains reference height range [%d,%d] exceeding expiry window size: %d",
-				minRefHeight, maxRefHeight, flow.DefaultTransactionExpiry)
-		}
-
-		// check for duplicate transactions in block's ancestry
-		txLookup := make(map[flow.Identifier]struct{})
-		for _, tx := range block.Payload.Collection.Transactions {
-			txID := tx.ID()
-			if _, exists := txLookup[txID]; exists {
-				return state.NewInvalidExtensionErrorf("collection contains transaction (id=%x) more than once", txID)
-			}
-			txLookup[txID] = struct{}{}
-		}
-
-		// first, check for duplicate transactions in the un-finalized ancestry
-		duplicateTxIDs, err := m.checkDupeTransactionsInUnfinalizedAncestry(block, txLookup, finalizedClusterBlock.Height)
-		if err != nil {
-			return fmt.Errorf("could not check for duplicate txs in un-finalized ancestry: %w", err)
-		}
-		if len(duplicateTxIDs) > 0 {
-			return state.NewInvalidExtensionErrorf("payload includes duplicate transactions in un-finalized ancestry (duplicates: %s)", duplicateTxIDs)
-		}
-
-		// second, check for duplicate transactions in the finalized ancestry
-		duplicateTxIDs, err = m.checkDupeTransactionsInFinalizedAncestry(txLookup, minRefHeight, maxRefHeight)
-		if err != nil {
-			return fmt.Errorf("could not check for duplicate txs in finalized ancestry: %w", err)
-		}
-		if len(duplicateTxIDs) > 0 {
-			return state.NewInvalidExtensionErrorf("payload includes duplicate transactions in finalized ancestry (duplicates: %s)", duplicateTxIDs)
-		}
-
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("could not validate extending block: %w", err)
+	setupSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendSetup)
+	// check chain ID
+	if header.ChainID != m.State.clusterID {
+		return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.State.clusterID)
 	}
+
+	// check for a specified reference block
+	// we also implicitly check this later, but can fail fast here
+	if payload.ReferenceBlockID == flow.ZeroID {
+		return state.NewInvalidExtensionError("new block has empty reference block ID")
+	}
+
+	// get the header of the parent of the new block
+	parent, err := m.headers.ByBlockID(header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve latest finalized header: %w", err)
+	}
+
+	// extending block must have correct parent view
+	if header.ParentView != parent.View {
+		return state.NewInvalidExtensionErrorf("candidate build with inconsistent parent view (candidate: %d, parent %d)",
+			header.ParentView, parent.View)
+	}
+
+	// the extending block must increase height by 1 from parent
+	if header.Height != parent.Height+1 {
+		return state.NewInvalidExtensionErrorf("extending block height (%d) must be parent height + 1 (%d)",
+			block.Header.Height, parent.Height)
+	}
+
+	extendCtx, err := m.getExtendCtx(block)
+	if err != nil {
+		return fmt.Errorf("could not get extend context data: %w", err)
+	}
+	setupSpan.End()
+
+	checkAncestrySpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckAncestry)
+	// ensure that the extending block connects to the finalized state, we
+	// do this by tracing back until we see a parent block that is the
+	// latest finalized block, or reach height below the finalized boundary
+
+	// start with the extending block's parent
+	parentID := header.ParentID
+	for parentID != extendCtx.finalizedClusterBlock.ID() {
+
+		// get the parent of current block
+		ancestor, err := m.headers.ByBlockID(parentID)
+		if err != nil {
+			return fmt.Errorf("could not get parent (%x): %w", block.Header.ParentID, err)
+		}
+
+		// if its height is below current boundary, the block does not connect
+		// to the finalized protocol state and would break database consistency
+		if ancestor.Height < extendCtx.finalizedClusterBlock.Height {
+			return state.NewOutdatedExtensionErrorf("block doesn't connect to finalized state. ancestor.Height (%d), final.Height (%d)",
+				ancestor.Height, extendCtx.finalizedClusterBlock.Height)
+		}
+
+		parentID = ancestor.ParentID
+	}
+	checkAncestrySpan.End()
+
+	checkRefBlockSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckReferenceBlock)
+	err = m.checkPayloadReferenceBlock(extendCtx)
+	if err != nil {
+		return fmt.Errorf("invalid reference block: %w", err)
+	}
+	checkRefBlockSpan.End()
+
+	checkTxsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
+	err = m.checkPayloadTransactions(extendCtx)
+	if err != nil {
+		return fmt.Errorf("invalid payload transactions: %w", err)
+	}
+	checkTxsSpan.End()
 
 	insertDbSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
 	defer insertDbSpan.End()
-
 	// insert the new block
 	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(block))
 	if err != nil {
@@ -229,14 +187,15 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 	return nil
 }
 
-// checkReferenceBlockValidity validates the reference block is valid.
+// checkPayloadReferenceBlock validates the reference block is valid.
 //   - it must be a known, finalized block on the main consensus chain
 //   - it must be within the cluster's operating epoch
 //
 // Expected error returns:
 //   - state.InvalidExtensionError if the reference block is invalid for use.
 //   - state.UnverifiableExtensionError if the reference block is unknown.
-func (m *MutableState) checkReferenceBlockValidity(payload *cluster.Payload, finalizedConsensusHeight uint64) error {
+func (m *MutableState) checkPayloadReferenceBlock(ctx extendContext) error {
+	payload := ctx.candidate.Payload
 
 	// 1 - the reference block must be known
 	refBlock, err := m.headers.ByBlockID(payload.ReferenceBlockID)
@@ -248,9 +207,9 @@ func (m *MutableState) checkReferenceBlockValidity(payload *cluster.Payload, fin
 	}
 
 	// 2 - the reference block must be finalized
-	if refBlock.Height > finalizedConsensusHeight {
+	if refBlock.Height > ctx.finalizedConsensusHeight {
 		// a reference block which is above the finalized boundary can't be verified yet
-		return state.NewUnverifiableExtensionError("reference block is above finalized boundary (%d>%d)", refBlock.Height, finalizedConsensusHeight)
+		return state.NewUnverifiableExtensionError("reference block is above finalized boundary (%d>%d)", refBlock.Height, ctx.finalizedConsensusHeight)
 	} else {
 		storedBlockIDForHeight, err := m.headers.BlockIDByHeight(refBlock.Height)
 		if err != nil {
@@ -266,32 +225,98 @@ func (m *MutableState) checkReferenceBlockValidity(payload *cluster.Payload, fin
 	// TODO ensure the reference block is part of the main chain
 	_ = refBlock
 
-	var epochFirstHeight uint64
-	var epochLastHeight uint64
-	var epochHasEnded bool
-	m.db.View(func(tx *badger.Txn) error {
-		err := operation.RetrieveEpochFirstHeight(m.State.epoch, &epochFirstHeight)(tx)
-		if err != nil {
-			return fmt.Errorf("could not get operating epoch first height: %w", err)
-		}
-		err = operation.RetrieveEpochLastHeight(m.State.epoch, &epochLastHeight)(tx)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				epochHasEnded = false
-				return nil
-			}
-			return fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
-		}
-		epochHasEnded = true
-		return nil
-	})
 	// 3 - the reference block must be within the finalized boundary
-	if refBlock.Height < epochFirstHeight {
-		return state.NewInvalidExtensionErrorf("invalid reference block is before operating epoch for cluster, height %d<%d", refBlock.Height, epochFirstHeight)
+	if refBlock.Height < ctx.epochFirstHeight {
+		return state.NewInvalidExtensionErrorf("invalid reference block is before operating epoch for cluster, height %d<%d", refBlock.Height, ctx.epochFirstHeight)
 	}
-	if epochHasEnded && refBlock.Height > epochLastHeight {
-		return state.NewInvalidExtensionErrorf("invalid reference block is after operating epoch for cluster, height %d>%d", refBlock.Height, epochLastHeight)
+	if ctx.epochHasEnded && refBlock.Height > ctx.epochLastHeight {
+		return state.NewInvalidExtensionErrorf("invalid reference block is after operating epoch for cluster, height %d>%d", refBlock.Height, ctx.epochLastHeight)
 	}
+	return nil
+}
+
+// checkPayloadTransactions validates the transactions included int the candidate cluster block's payload.
+// It enforces:
+//   - transactions are individually valid
+//   - no duplicate transaction exists along the fork being extended
+//   - the collection's reference block is equal to the oldest reference block among
+//     its constituent transactions
+func (m *MutableState) checkPayloadTransactions(ctx extendContext) error {
+	block := ctx.candidate
+	payload := block.Payload
+
+	if payload.Collection.Len() == 0 {
+		return nil
+	}
+
+	// check that all transactions within the collection are valid
+	// keep track of the min/max reference blocks - the collection must be non-empty
+	// at this point so these are guaranteed to be set correctly
+	minRefID := flow.ZeroID
+	minRefHeight := uint64(math.MaxUint64)
+	maxRefHeight := uint64(0)
+	for _, flowTx := range payload.Collection.Transactions {
+		refBlock, err := m.headers.ByBlockID(flowTx.ReferenceBlockID)
+		if errors.Is(err, storage.ErrNotFound) {
+			// unknown reference blocks are invalid
+			return state.NewUnverifiableExtensionError("collection contains tx (tx_id=%x) with unknown reference block (block_id=%x): %w", flowTx.ID(), flowTx.ReferenceBlockID, err)
+		}
+		if err != nil {
+			return fmt.Errorf("could not check reference block (id=%x): %w", flowTx.ReferenceBlockID, err)
+		}
+
+		if refBlock.Height < minRefHeight {
+			minRefHeight = refBlock.Height
+			minRefID = flowTx.ReferenceBlockID
+		}
+		if refBlock.Height > maxRefHeight {
+			maxRefHeight = refBlock.Height
+		}
+	}
+
+	// a valid collection must reference the oldest reference block among
+	// its constituent transactions
+	if minRefID != payload.ReferenceBlockID {
+		return state.NewInvalidExtensionErrorf(
+			"reference block (id=%x) must match oldest transaction's reference block (id=%x)",
+			payload.ReferenceBlockID, minRefID,
+		)
+	}
+	// a valid collection must contain only transactions within its expiry window
+	if maxRefHeight-minRefHeight >= flow.DefaultTransactionExpiry {
+		return state.NewInvalidExtensionErrorf(
+			"collection contains reference height range [%d,%d] exceeding expiry window size: %d",
+			minRefHeight, maxRefHeight, flow.DefaultTransactionExpiry)
+	}
+
+	// check for duplicate transactions in block's ancestry
+	txLookup := make(map[flow.Identifier]struct{})
+	for _, tx := range block.Payload.Collection.Transactions {
+		txID := tx.ID()
+		if _, exists := txLookup[txID]; exists {
+			return state.NewInvalidExtensionErrorf("collection contains transaction (id=%x) more than once", txID)
+		}
+		txLookup[txID] = struct{}{}
+	}
+
+	// first, check for duplicate transactions in the un-finalized ancestry
+	duplicateTxIDs, err := m.checkDupeTransactionsInUnfinalizedAncestry(block, txLookup, ctx.finalizedClusterBlock.Height)
+	if err != nil {
+		return fmt.Errorf("could not check for duplicate txs in un-finalized ancestry: %w", err)
+	}
+	if len(duplicateTxIDs) > 0 {
+		return state.NewInvalidExtensionErrorf("payload includes duplicate transactions in un-finalized ancestry (duplicates: %s)", duplicateTxIDs)
+	}
+
+	// second, check for duplicate transactions in the finalized ancestry
+	duplicateTxIDs, err = m.checkDupeTransactionsInFinalizedAncestry(txLookup, minRefHeight, maxRefHeight)
+	if err != nil {
+		return fmt.Errorf("could not check for duplicate txs in finalized ancestry: %w", err)
+	}
+	if len(duplicateTxIDs) > 0 {
+		return state.NewInvalidExtensionErrorf("payload includes duplicate transactions in finalized ancestry (duplicates: %s)", duplicateTxIDs)
+	}
+
 	return nil
 }
 
