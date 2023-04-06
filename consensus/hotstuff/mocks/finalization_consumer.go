@@ -27,6 +27,11 @@ func (_m *FinalizationConsumer) OnFinalizedBlock(_a0 *model.Block) {
 	_m.Called(_a0)
 }
 
+// OnInvalidBlockDetected provides a mock function with given fields: err
+func (_m *FinalizationConsumer) OnInvalidBlockDetected(err model.InvalidBlockError) {
+	_m.Called(err)
+}
+
 type mockConstructorTestingTNewFinalizationConsumer interface {
 	mock.TestingT
 	Cleanup(func())

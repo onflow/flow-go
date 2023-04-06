@@ -163,15 +163,19 @@ func (e InvalidTCError) Unwrap() error {
 	return e.Err
 }
 
-// InvalidBlockError indicates that the block with identifier `BlockID` is invalid
+// InvalidBlockError indicates that the block is invalid
 type InvalidBlockError struct {
-	BlockID flow.Identifier
-	View    uint64
-	Err     error
+	InvalidBlock *Proposal
+	Err          error
 }
 
 func (e InvalidBlockError) Error() string {
-	return fmt.Sprintf("invalid block %x at view %d: %s", e.BlockID, e.View, e.Err.Error())
+	return fmt.Sprintf(
+		"invalid block %x at view %d: %s",
+		e.InvalidBlock.Block.BlockID,
+		e.InvalidBlock.Block.View,
+		e.Err.Error(),
+	)
 }
 
 // IsInvalidBlockError returns whether an error is InvalidBlockError

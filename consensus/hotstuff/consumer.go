@@ -7,6 +7,30 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// BaseProtocolViolationConsumer consumes outbound notifications produced by compliance.
+// Notifications can be produced by consensus participants and followers.
+// Notifications are meant to report protocol violations that can be observed by executing compliance checks.
+//
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
+type BaseProtocolViolationConsumer interface {
+	// OnInvalidBlockDetected notifications are produced by components that have detected
+	// that a block proposal is invalid and need to report it.
+	// Most of the time such block can be detected by calling Validator.ValidateProposal.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnInvalidBlockDetected(err model.InvalidBlockError)
+	// OnDoubleProposeDetected notifications are produced by the Finalization Logic
+	// whenever a double block proposal (equivocation) was detected.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnDoubleProposeDetected(*model.Block, *model.Block)
+}
+
 // FinalizationConsumer consumes outbound notifications produced by the finalization logic.
 // Notifications represent finalization-specific state changes which are potentially relevant
 // to the larger node. The notifications are emitted in the order in which the
@@ -17,6 +41,7 @@ import (
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
 type FinalizationConsumer interface {
+	BaseProtocolViolationConsumer
 
 	// OnBlockIncorporated notifications are produced by the Finalization Logic
 	// whenever a block is incorporated into the consensus state.
@@ -31,13 +56,6 @@ type FinalizationConsumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnFinalizedBlock(*model.Block)
-
-	// OnDoubleProposeDetected notifications are produced by the Finalization Logic
-	// whenever a double block proposal (equivocation) was detected.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnDoubleProposeDetected(*model.Block, *model.Block)
 }
 
 // Consumer consumes outbound notifications produced by HotStuff and its components.

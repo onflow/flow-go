@@ -67,15 +67,15 @@ func (*NoopPartialConsumer) OnInvalidTimeoutDetected(model.InvalidTimeoutError) 
 
 // no-op implementation of hotstuff.FinalizationConsumer
 
-type NoopFinalizationConsumer struct{}
+type NoopFinalizationConsumer struct {
+	NoopBaseProtocolViolationConsumer
+}
 
 var _ hotstuff.FinalizationConsumer = (*NoopFinalizationConsumer)(nil)
 
 func (*NoopFinalizationConsumer) OnBlockIncorporated(*model.Block) {}
 
 func (*NoopFinalizationConsumer) OnFinalizedBlock(*model.Block) {}
-
-func (*NoopFinalizationConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
 
 // no-op implementation of hotstuff.TimeoutCollectorConsumer
 
@@ -111,3 +111,13 @@ type NoopQCCreatedConsumer struct{}
 var _ hotstuff.QCCreatedConsumer = (*NoopQCCreatedConsumer)(nil)
 
 func (*NoopQCCreatedConsumer) OnQcConstructedFromVotes(*flow.QuorumCertificate) {}
+
+// no-op implementation of hotstuff.BaseProtocolViolationConsumer
+
+type NoopBaseProtocolViolationConsumer struct{}
+
+var _ hotstuff.BaseProtocolViolationConsumer = (*NoopBaseProtocolViolationConsumer)(nil)
+
+func (n NoopBaseProtocolViolationConsumer) OnInvalidBlockDetected(model.InvalidBlockError) {}
+
+func (n NoopBaseProtocolViolationConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}

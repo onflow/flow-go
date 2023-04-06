@@ -346,7 +346,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
-			finalizationDistributor.AddConsumer(blockConsumer)
+			finalizationDistributor.AddOnBlockFinalizedConsumer(blockConsumer.OnFinalizedBlock)
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block

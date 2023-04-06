@@ -165,12 +165,16 @@ func (s *CoreSuite) TestProcessingNotOrderedBatch() {
 func (s *CoreSuite) TestProcessingInvalidBlock() {
 	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
 
-	s.validator.On("ValidateProposal", model.ProposalFromFlow(blocks[len(blocks)-1].Header)).Return(model.InvalidBlockError{Err: fmt.Errorf("")}).Once()
+	invalidProposal := model.ProposalFromFlow(blocks[len(blocks)-1].Header)
+	s.validator.On("ValidateProposal", invalidProposal).Return(model.InvalidBlockError{
+		InvalidBlock: invalidProposal,
+		Err:          fmt.Errorf(""),
+	}).Once()
 	err := s.core.OnBlockRange(s.originID, blocks)
 	require.NoError(s.T(), err, "sentinel error has to be handled internally")
 
 	exception := errors.New("validate-proposal-exception")
-	s.validator.On("ValidateProposal", model.ProposalFromFlow(blocks[len(blocks)-1].Header)).Return(exception).Once()
+	s.validator.On("ValidateProposal", invalidProposal).Return(exception).Once()
 	err = s.core.OnBlockRange(s.originID, blocks)
 	require.ErrorIs(s.T(), err, exception, "exception has to be propagated")
 }

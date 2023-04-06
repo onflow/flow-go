@@ -1,6 +1,7 @@
 package recovery
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -27,21 +28,20 @@ func TestRecover(t *testing.T) {
 	}
 
 	// make 3 invalid blocks extend from the last valid block
-	invalidblocks := unittest.ChainFixtureFrom(3, pending[len(pending)-1])
+	invalidBlocks := unittest.ChainFixtureFrom(3, pending[len(pending)-1])
 	invalid := make(map[flow.Identifier]struct{})
-	for _, b := range invalidblocks {
+	for _, b := range invalidBlocks {
 		invalid[b.ID()] = struct{}{}
 		pending = append(pending, b.Header)
 	}
 
 	validator := &mocks.Validator{}
 	validator.On("ValidateProposal", mock.Anything).Return(func(proposal *model.Proposal) error {
-		header := model.ProposalToFlow(proposal)
-		_, isInvalid := invalid[header.ID()]
+		_, isInvalid := invalid[proposal.Block.BlockID]
 		if isInvalid {
-			return &model.InvalidBlockError{
-				BlockID: header.ID(),
-				View:    header.View,
+			return model.InvalidBlockError{
+				InvalidBlock: proposal,
+				Err:          fmt.Errorf(""),
 			}
 		}
 		return nil
@@ -51,5 +51,5 @@ func TestRecover(t *testing.T) {
 	require.NoError(t, err)
 
 	// only pending blocks are valid
-	require.Len(t, recovered, len(pending))
+	require.Len(t, recovered, len(pending)-len(invalidBlocks))
 }

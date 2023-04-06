@@ -962,7 +962,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, err
 			}
 			builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
-			builder.FinalizationDistributor.AddConsumer(builder.IngestEng)
+			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
 
 			return builder.IngestEng, nil
 		}).

@@ -53,6 +53,11 @@ func (_m *Consumer) OnFinalizedBlock(_a0 *model.Block) {
 	_m.Called(_a0)
 }
 
+// OnInvalidBlockDetected provides a mock function with given fields: err
+func (_m *Consumer) OnInvalidBlockDetected(err model.InvalidBlockError) {
+	_m.Called(err)
+}
+
 // OnInvalidTimeoutDetected provides a mock function with given fields: err
 func (_m *Consumer) OnInvalidTimeoutDetected(err model.InvalidTimeoutError) {
 	_m.Called(err)

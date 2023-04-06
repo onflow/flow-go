@@ -158,6 +158,14 @@ func (p *Distributor) OnFinalizedBlock(block *model.Block) {
 	}
 }
 
+func (p *Distributor) OnInvalidBlockDetected(err model.InvalidBlockError) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnInvalidBlockDetected(err)
+	}
+}
+
 func (p *Distributor) OnDoubleProposeDetected(block1, block2 *model.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
