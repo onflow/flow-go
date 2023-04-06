@@ -9,7 +9,7 @@ on:
       network_id:
         required: true
         type: string
-        description: 'NETWORK ID for the new deployment. Must be unique, have only alphanumeric characters (can''t start with a digit) and dashes (can''t start or end with a dash), and be 20 or fewer characters in length.'
+        description: 'NETWORK ID for the new deployment. Must be unique, have only alphanumeric characters (can''t start with a digit, no UPPERCASE) and dashes (can''t start or end with a dash), and be 20 or fewer characters in length.'
 
       access_nodes:
         required: false
