@@ -127,6 +127,13 @@ func NewControlMsgValidationInspector(
 	c.workerPool = pool
 
 	builder := component.NewComponentManagerBuilder()
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		distributor.Start(ctx)
+		<-distributor.Ready()
+
+		ready()
+		<-distributor.Done()
+	})
 	// start rate limiters cleanup loop in workers
 	for _, conf := range c.config.allCtrlMsgValidationConfig() {
 		validationConfig := conf
