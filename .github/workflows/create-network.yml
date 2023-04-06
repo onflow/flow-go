@@ -112,29 +112,12 @@ on:
           - 20
         default: 1
 
-      # Allows for the public or private repo to be used for deployment automation
-      automation_repo:
-        required: true
-        type: choice
-        description: 'AUTOMATION repo'
-        options:
-          - onflow/flow-go
-          - dapperlabs/flow-go
-
       # Allows for the ref to be altered for testing automation changes
       automation_ref:
         type: string
         description: 'AUTOMATION branch, tag, or commit to use for bootstrapping and deployment.'
         required: false
         default: master
-
-      flow_repo:
-        required: true
-        type: choice
-        description: 'FLOW repo'
-        options:
-          # We currently only support the public repo as we are running the bootstrap command in a container which downloads the codebase
-          - onflow/flow-go
 
       flow_ref:
         type: string
@@ -223,7 +206,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          repository: ${{ inputs.flow_repo }}
+          repository: onflow/flow-go
           ref: ${{ inputs.flow_ref }}
 
       - name: Configure gcloud
@@ -283,7 +266,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
-          repository: ${{ inputs.automation_repo }}
+          repository: onflow/flow-go
           ref: ${{ inputs.automation_ref }}
 
       - name: Configure gcloud
@@ -327,7 +310,7 @@ jobs:
 
       - name: Benchnet2 Deployment Summary
         run: |
-          SUMMARY=$'# Benchnet2 Deployment Summary\n## Your Network ID is ${{ needs.networkId.outputs.networkId }}\n This Network was built using the following inputs \n * Network ID ${{ inputs.network_id }} \n * Your network is accessible at access1-${{ inputs.network_id }}.benchnet.onflow.org \n * Repo Used for Build ${{ inputs.repo_to_use_for_build }} \n * Ref Used for Build ${{ inputs.ref_to_build_and_deploy }} \n * Ref Used for Automation ${{ inputs.automation_ref }} \n * Repo Used for automation ${{ inputs.automation_repo }} \n * Skip builds ${{ inputs.skip_builds }}'
+          SUMMARY=$'# Benchnet2 Deployment Summary\n## Your Network ID is ${{ needs.networkId.outputs.networkId }}\n This Network was built using the following inputs \n * Network ID ${{ inputs.network_id }} \n * Your network is accessible at access1-${{ inputs.network_id }}.benchnet.onflow.org \n * Repo Used for Build ${{ inputs.repo_to_use_for_build }} \n * Ref Used for Build ${{ inputs.ref_to_build_and_deploy }} \n * Ref Used for Automation ${{ inputs.automation_ref }} \n * Repo Used for automation onflow/flow-go \n * Skip builds ${{ inputs.skip_builds }}'
           echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
 
       - name: Clean working directory to reduce files filling disk
