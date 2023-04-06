@@ -7,8 +7,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -73,41 +73,84 @@ const (
 	// MaxDebugLogs sets the max number of debug/trace log events per second. Logs emitted above
 	// this threshold are dropped.
 	MaxDebugLogs = 50
+
+	// defaultScoreCacheSize is the default size of the cache used to store the app specific score of peers.
+	defaultScoreCacheSize = 1000
 )
 
 // ScoreOption is a functional option for configuring the peer scoring system.
 type ScoreOption struct {
-	logger                   zerolog.Logger
-	validator                *SubscriptionValidator
-	idProvider               module.IdentityProvider
-	peerScoreParams          *pubsub.PeerScoreParams
-	peerThresholdParams      *pubsub.PeerScoreThresholds
-	appSpecificScoreFunction func(peer.ID) float64
+	logger zerolog.Logger
+
+	peerScoreParams     *pubsub.PeerScoreParams
+	peerThresholdParams *pubsub.PeerScoreThresholds
+	validator           *SubscriptionValidator
+	appScoreFunc        func(peer.ID) float64
 }
 
-type PeerScoreParamsOption func(option *ScoreOption)
+type ScoreOptionConfig struct {
+	logger       zerolog.Logger
+	provider     module.IdentityProvider
+	cacheSize    uint32
+	cacheMetrics module.HeroCacheMetrics
+	appScoreFunc func(peer.ID) float64
+	topicParams  []func(map[string]*pubsub.TopicScoreParams)
+}
 
-func WithAppSpecificScoreFunction(appSpecificScoreFunction func(peer.ID) float64) PeerScoreParamsOption {
-	return func(s *ScoreOption) {
-		s.appSpecificScoreFunction = appSpecificScoreFunction
+func NewScoreOptionConfig(logger zerolog.Logger) *ScoreOptionConfig {
+	return &ScoreOptionConfig{
+		logger:       logger,
+		cacheSize:    defaultScoreCacheSize,
+		cacheMetrics: metrics.NewNoopCollector(), // no metrics by default
+		topicParams:  make([]func(map[string]*pubsub.TopicScoreParams), 0),
 	}
 }
 
-// WithTopicScoreParams adds the topic score parameters to the peer score parameters.
+// SetProvider sets the identity provider for the score option.
+// It is used to retrieve the identity of a peer when calculating the app specific score.
+// If the provider is not set, the score registry will crash. This is a required field.
+// It is safe to call this method multiple times, the last call will be used.
+func (c *ScoreOptionConfig) SetProvider(provider module.IdentityProvider) {
+	c.provider = provider
+}
+
+// SetCacheSize sets the size of the cache used to store the app specific score of peers.
+// If the cache size is not set, the default value will be used.
+// It is safe to call this method multiple times, the last call will be used.
+func (c *ScoreOptionConfig) SetCacheSize(size uint32) {
+	c.cacheSize = size
+}
+
+// SetCacheMetrics sets the cache metrics collector for the score option.
+// It is used to collect metrics for the app specific score cache. If the cache metrics collector is not set,
+// a no-op collector will be used.
+// It is safe to call this method multiple times, the last call will be used.
+func (c *ScoreOptionConfig) SetCacheMetrics(metrics module.HeroCacheMetrics) {
+	c.cacheMetrics = metrics
+}
+
+// SetAppSpecificScoreFunction sets the app specific score function for the score option.
+// It is used to calculate the app specific score of a peer.
+// If the app specific score function is not set, the default one is used.
+// Note that it is always safer to use the default one, unless you know what you are doing.
+// It is safe to call this method multiple times, the last call will be used.
+func (c *ScoreOptionConfig) SetAppSpecificScoreFunction(appSpecificScoreFunction func(peer.ID) float64) {
+	c.appScoreFunc = appSpecificScoreFunction
+}
+
+// SetTopicScoreParams adds the topic score parameters to the peer score parameters.
 // It is used to configure the topic score parameters for the pubsub system.
-// If there is already a topic score parameter for the given topic, it will be overwritten.
-func WithTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) PeerScoreParamsOption {
-	return func(s *ScoreOption) {
-		if s.peerScoreParams.Topics == nil {
-			s.peerScoreParams.Topics = make(map[string]*pubsub.TopicScoreParams)
-		}
-		s.peerScoreParams.Topics[topic.String()] = topicScoreParams
-	}
+// If there is already a topic score parameter for the given topic, the last call will be used.
+func (c *ScoreOptionConfig) SetTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) {
+	c.topicParams = append(c.topicParams, func(topics map[string]*pubsub.TopicScoreParams) {
+		topics[topic.String()] = topicScoreParams
+	})
 }
 
-func NewScoreOption(logger zerolog.Logger, idProvider module.IdentityProvider, opts ...PeerScoreParamsOption) *ScoreOption {
+// NewScoreOption creates a new score option with the given configuration.
+func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 	throttledSampler := logging.BurstSampler(MaxDebugLogs, time.Second)
-	logger = logger.With().
+	logger := cfg.logger.With().
 		Str("module", "pubsub_score_option").
 		Logger().
 		Sample(zerolog.LevelSampler{
@@ -115,20 +158,34 @@ func NewScoreOption(logger zerolog.Logger, idProvider module.IdentityProvider, o
 			DebugSampler: throttledSampler,
 		})
 	validator := NewSubscriptionValidator()
-	appSpecificScore := defaultAppSpecificScoreFunction(logger, idProvider, validator)
+	scoreRegistry := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
+		SizeLimit:     cfg.cacheSize,
+		Logger:        logger,
+		Collector:     cfg.cacheMetrics,
+		DecayFunction: DefaultDecayFunction(),
+		Penalty:       DefaultGossipSubCtrlMsgPenaltyValue(),
+		Validator:     validator,
+		Init:          InitAppScoreRecordState,
+	})
 	s := &ScoreOption{
-		logger:                   logger,
-		validator:                validator,
-		idProvider:               idProvider,
-		appSpecificScoreFunction: appSpecificScore,
-		peerScoreParams:          defaultPeerScoreParams(),
+		logger:          logger,
+		peerScoreParams: defaultPeerScoreParams(),
 	}
 
-	for _, opt := range opts {
-		opt(s)
+	// set the app specific score function for the score option
+	// if the app specific score function is not set, use the default one
+	if cfg.appScoreFunc == nil {
+		s.appScoreFunc = scoreRegistry.AppSpecificScoreFunc()
+	} else {
+		s.appScoreFunc = cfg.appScoreFunc
 	}
 
-	s.peerScoreParams.AppSpecificScore = s.appSpecificScoreFunction
+	s.peerScoreParams.AppSpecificScore = s.appScoreFunc
+
+	// apply the topic score parameters if any.
+	for _, topicParams := range cfg.topicParams {
+		topicParams(s.peerScoreParams.Topics)
+	}
 
 	return s
 }
@@ -166,6 +223,7 @@ func (s *ScoreOption) preparePeerScoreThresholds() {
 
 func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 	return &pubsub.PeerScoreParams{
+		Topics: make(map[string]*pubsub.TopicScoreParams),
 		// we don't set all the parameters, so we skip the atomic validation.
 		// atomic validation fails initialization if any parameter is not set.
 		SkipAtomicValidation: true,
@@ -198,45 +256,4 @@ func (s *ScoreOption) BuildGossipSubScoreOption() pubsub.Option {
 		s.peerScoreParams,
 		s.peerThresholdParams,
 	)
-}
-
-func defaultAppSpecificScoreFunction(logger zerolog.Logger, idProvider module.IdentityProvider, validator *SubscriptionValidator) func(peer.ID) float64 {
-	return func(pid peer.ID) float64 {
-		lg := logger.With().Str("peer_id", pid.String()).Logger()
-
-		// checks if peer has a valid Flow protocol identity.
-		flowId, err := HasValidFlowIdentity(idProvider, pid)
-		if err != nil {
-			lg.Error().
-				Err(err).
-				Bool(logging.KeySuspicious, true).
-				Msg("invalid peer identity, penalizing peer")
-			return MaxAppSpecificPenalty
-		}
-
-		lg = lg.With().
-			Hex("flow_id", logging.ID(flowId.NodeID)).
-			Str("role", flowId.Role.String()).
-			Logger()
-
-		// checks if peer has any subscription violation.
-		if err := validator.CheckSubscribedToAllowedTopics(pid, flowId.Role); err != nil {
-			lg.Err(err).
-				Bool(logging.KeySuspicious, true).
-				Msg("invalid subscription detected, penalizing peer")
-			return MaxAppSpecificPenalty
-		}
-
-		// checks if peer is an access node, and if so, pushes it to the
-		// edges of the network by giving the minimum penalty.
-		if flowId.Role == flow.RoleAccess {
-			lg.Trace().
-				Msg("pushing access node to edge by penalizing with minimum penalty value")
-			return MinAppSpecificPenalty
-		}
-
-		lg.Trace().
-			Msg("rewarding well-behaved non-access node peer with maximum reward value")
-		return MaxAppSpecificReward
-	}
 }
