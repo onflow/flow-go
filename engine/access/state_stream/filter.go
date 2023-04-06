@@ -7,6 +7,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const (
+	DefaultMaxEventTypes = 1000
+	DefaultMaxAddresses  = 1000
+	DefaultMaxContracts  = 1000
+)
+
 // EventFilter represents a filter applied to events for a given subscription
 type EventFilter struct {
 	hasFilters bool
@@ -21,6 +27,20 @@ func NewEventFilter(
 	addresses []string,
 	contracts []string,
 ) (EventFilter, error) {
+	// put some reasonable limits on the number of filters. Lookups use a map so they are fast,
+	// this just puts a cap on the memory consumed per filter.
+	if len(eventTypes) > DefaultMaxEventTypes {
+		return EventFilter{}, fmt.Errorf("too many event types in filter (%d). use %d or fewer", len(eventTypes), DefaultMaxEventTypes)
+	}
+
+	if len(addresses) > DefaultMaxAddresses {
+		return EventFilter{}, fmt.Errorf("too many addresses in filter (%d). use %d or fewer", len(addresses), DefaultMaxAddresses)
+	}
+
+	if len(contracts) > DefaultMaxContracts {
+		return EventFilter{}, fmt.Errorf("too many contracts in filter (%d). use %d or fewer", len(contracts), DefaultMaxContracts)
+	}
+
 	f := EventFilter{
 		EventTypes: make(map[flow.EventType]struct{}, len(eventTypes)),
 		Addresses:  make(map[string]struct{}, len(addresses)),

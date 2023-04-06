@@ -107,7 +107,7 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 			reqFilter.GetContract(),
 		)
 		if err != nil {
-			return status.Errorf(codes.InvalidArgument, "could not convert event filter: %v", err)
+			return status.Errorf(codes.InvalidArgument, "invalid event filter: %v", err)
 		}
 	}
 
