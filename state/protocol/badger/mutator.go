@@ -696,7 +696,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	}
 
 	// update the finalized header cache
-	m.State.cachedFinal.Set(cachedHeader{blockID, header})
+	m.State.cachedFinal.Store(&cachedHeader{blockID, header})
 
 	// Emit protocol events after database transaction succeeds. Event delivery is guaranteed,
 	// _except_ in case of a crash. Hence, when recovering from a crash, consumers need to deduce
