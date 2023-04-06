@@ -47,7 +47,7 @@ func TestRecover(t *testing.T) {
 		return nil
 	})
 
-	err := Recover(unittest.Logger(), finalized, pending, validator, onProposal)
+	err := Recover(unittest.Logger(), pending, validator, onProposal)
 	require.NoError(t, err)
 
 	// only pending blocks are valid

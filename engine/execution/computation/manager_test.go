@@ -58,8 +58,11 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
 	require.NoError(t, err)
 
-	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+	snapshotTree, accounts, err := testutil.CreateAccounts(
+		vm,
+		testutil.RootBootstrappedLedger(vm, execCtx),
+		privateKeys,
+		chain)
 	require.NoError(t, err)
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -150,17 +153,21 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		derivedChainData: derivedChainData,
 	}
 
-	view := delta.NewDeltaView(ledger)
-	blockView := view.NewChild()
-
 	returnedComputationResult, err := engine.ComputeBlock(
 		context.Background(),
 		unittest.IdentifierFixture(),
 		executableBlock,
-		blockView)
+		snapshotTree)
 	require.NoError(t, err)
 
-	require.NotEmpty(t, blockView.(*delta.View).Delta())
+	hasUpdates := false
+	for _, snapshot := range returnedComputationResult.StateSnapshots {
+		if len(snapshot.WriteSet) > 0 {
+			hasUpdates = true
+			break
+		}
+	}
+	require.True(t, hasUpdates)
 	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].UpdatedRegisters())
 }
@@ -544,7 +551,9 @@ func (l *LongRunningVM) RunV2(
 	time.Sleep(l.duration)
 
 	snapshot := &state.ExecutionSnapshot{}
-	output := fvm.ProcedureOutput{}
+	output := fvm.ProcedureOutput{
+		Value: cadence.NewVoid(),
+	}
 	return snapshot, output, nil
 }
 
@@ -703,8 +712,11 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
-	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+	snapshotTree, accounts, err := testutil.CreateAccounts(
+		vm,
+		testutil.RootBootstrappedLedger(vm, execCtx),
+		privateKeys,
+		chain)
 	require.NoError(t, err)
 
 	// setup transactions
@@ -789,16 +801,13 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		derivedChainData: derivedChainData,
 	}
 
-	view := delta.NewDeltaView(ledger)
-	blockView := view.NewChild()
-
 	eventEncoder.enabled = true
 
 	returnedComputationResult, err := engine.ComputeBlock(
 		context.Background(),
 		unittest.IdentifierFixture(),
 		executableBlock,
-		blockView)
+		snapshotTree)
 	require.NoError(t, err)
 
 	require.Len(t, returnedComputationResult.Events, 2)             // 1 collection + 1 system chunk
@@ -858,14 +867,18 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		},
 	)
 	vm := manager.vm
-	view := testutil.RootBootstrappedLedger(vm, ctx)
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 
-	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
+	// Bootstrap a ledger, creating accounts with the provided private keys
+	// and the root account.
+	snapshotTree, accounts, err := testutil.CreateAccounts(
+		vm,
+		testutil.RootBootstrappedLedger(vm, ctx),
+		privateKeys,
+		chain)
 	require.NoError(t, err)
 	account := accounts[0]
 	address := cadence.NewAddress(account)
@@ -884,13 +897,13 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		script,
 		[][]byte{jsoncdc.MustEncode(address)},
 		header,
-		view)
+		snapshotTree)
 
 	require.NoError(t, err)
 
 	env := environment.NewScriptEnvironmentFromStorageSnapshot(
 		ctx.EnvironmentParams,
-		view)
+		snapshotTree)
 
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)

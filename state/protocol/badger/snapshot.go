@@ -43,7 +43,9 @@ type FinalizedSnapshot struct {
 var _ protocol.Snapshot = (*Snapshot)(nil)
 var _ protocol.Snapshot = (*FinalizedSnapshot)(nil)
 
-func NewSnapshot(state *State, blockID flow.Identifier) *Snapshot {
+// newSnapshotWithIncorporatedReferenceBlock creates a new state snapshot with the given reference block.
+// CAUTION: The caller is responsible for ensuring that the reference block has been incorporated.
+func newSnapshotWithIncorporatedReferenceBlock(state *State, blockID flow.Identifier) *Snapshot {
 	return &Snapshot{
 		state:   state,
 		blockID: blockID,
@@ -106,7 +108,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, err
 	}
 
-	// sort the identities so the 'Exists' binary search works
+	// sort the identities so the 'IsCached' binary search works
 	identities := setup.Participants.Sort(order.Canonical)
 
 	// get identities that are in either last/next epoch but NOT in the current epoch

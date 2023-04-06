@@ -83,6 +83,17 @@ func (_m *GossipSubBuilder) SetGossipSubPeerScoring(_a0 bool) {
 	_m.Called(_a0)
 }
 
+// SetGossipSubRPCInspectors provides a mock function with given fields: inspectors
+func (_m *GossipSubBuilder) SetGossipSubRPCInspectors(inspectors ...p2p.GossipSubRPCInspector) {
+	_va := make([]interface{}, len(inspectors))
+	for _i := range inspectors {
+		_va[_i] = inspectors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, _va...)
+	_m.Called(_ca...)
+}
+
 // SetGossipSubScoreTracerInterval provides a mock function with given fields: _a0
 func (_m *GossipSubBuilder) SetGossipSubScoreTracerInterval(_a0 time.Duration) {
 	_m.Called(_a0)
@@ -91,11 +102,6 @@ func (_m *GossipSubBuilder) SetGossipSubScoreTracerInterval(_a0 time.Duration) {
 // SetGossipSubTracer provides a mock function with given fields: _a0
 func (_m *GossipSubBuilder) SetGossipSubTracer(_a0 p2p.PubSubTracer) {
 	_m.Called(_a0)
-}
-
-// SetGossipSubValidationInspector provides a mock function with given fields: inspector
-func (_m *GossipSubBuilder) SetGossipSubValidationInspector(inspector p2p.GossipSubRPCInspector) {
-	_m.Called(inspector)
 }
 
 // SetHost provides a mock function with given fields: _a0

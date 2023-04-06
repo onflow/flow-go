@@ -51,9 +51,10 @@ func withReader(
 
 		collector := &metrics.NoopCollector{}
 		tracer := trace.NewNoopTracer()
+		log := unittest.Logger()
 		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		s := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
+		s := testutil.CompleteStateFixture(t, log, collector, tracer, rootSnapshot)
 
 		reader := jobqueue.NewFinalizedBlockReader(s.State, s.Storage.Blocks)
 

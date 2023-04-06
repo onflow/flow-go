@@ -81,6 +81,7 @@ func (f *HotStuffFactory) CreateModules(
 	notifier.AddConsumer(notifications.NewLogConsumer(log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
 	notifier.AddConsumer(notifications.NewTelemetryConsumer(log))
+	notifier.AddConsumer(notifications.NewSlashingViolationsConsumer(log))
 
 	var (
 		err       error
