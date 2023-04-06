@@ -41,7 +41,7 @@ type Forks struct {
 
 	finalizationCallback module.Finalizer
 	newestView           uint64                // newestView is the highest view of block proposal stored in Forks
-	lastFinalized        *model.CertifiedBlock // lastFinalized is the QC that POINTS TO the most recently finalized locked block
+	lastFinalized        *model.CertifiedBlock // the most recently finalized block and the QC that certifies it
 }
 
 var _ hotstuff.Forks = (*Forks)(nil)

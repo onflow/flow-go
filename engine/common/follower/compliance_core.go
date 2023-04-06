@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/follower/pending_tree"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/trace"
@@ -21,7 +20,7 @@ import (
 )
 
 // CertifiedBlocks is a connected list of certified blocks, in ascending height order.
-type CertifiedBlocks []pending_tree.CertifiedBlock
+type CertifiedBlocks []flow.CertifiedBlock
 
 // defaultCertifiedRangeChannelCapacity maximum capacity of buffered channel that is used to transfer ranges of
 // certified blocks to specific worker.
@@ -41,7 +40,6 @@ type ComplianceCore struct {
 	*component.ComponentManager
 	log                 zerolog.Logger
 	mempoolMetrics      module.MempoolMetrics
-	config              compliance.Config
 	tracer              module.Tracer
 	pendingCache        *cache.Cache
 	pendingTree         *pending_tree.PendingTree
@@ -66,15 +64,9 @@ func NewComplianceCore(log zerolog.Logger,
 	validator hotstuff.Validator,
 	sync module.BlockRequester,
 	tracer module.Tracer,
-	opts ...compliance.Opt,
 ) (*ComplianceCore, error) {
 	onEquivocation := func(block, otherBlock *flow.Block) {
 		finalizationConsumer.OnDoubleProposeDetected(model.BlockFromFlow(block.Header), model.BlockFromFlow(otherBlock.Header))
-	}
-
-	config := compliance.DefaultConfig()
-	for _, apply := range opts {
-		apply(&config)
 	}
 
 	finalizedBlock, err := state.Final().Head()
@@ -92,7 +84,6 @@ func NewComplianceCore(log zerolog.Logger,
 		validator:           validator,
 		sync:                sync,
 		tracer:              tracer,
-		config:              config,
 		certifiedRangesChan: make(chan CertifiedBlocks, defaultCertifiedRangeChannelCapacity),
 		finalizedBlocksChan: make(chan *flow.Header, defaultFinalizedBlocksChannelCapacity),
 	}
@@ -314,7 +305,7 @@ func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.Quo
 		} else {
 			qc = certifyingQC
 		}
-		certifiedBlocks = append(certifiedBlocks, pending_tree.CertifiedBlock{
+		certifiedBlocks = append(certifiedBlocks, flow.CertifiedBlock{
 			Block: block,
 			QC:    qc,
 		})

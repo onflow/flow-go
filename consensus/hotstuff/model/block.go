@@ -45,11 +45,22 @@ func GenesisBlockFromFlow(header *flow.Header) *Block {
 	return genesis
 }
 
-// CertifiedBlock holds a certified block, which is a block and a QC that pointing to it.
-// A QC is the aggregated form of votes from a supermajority of HotStuff participants.
-// Existence of a QC proves validity of the block. A certified block satisfies:
+// CertifiedBlock holds a certified block, which is a block and a QC that is pointing to
+// the block. A QC is the aggregated form of votes from a supermajority of HotStuff and
+// therefore proves validity of the block. A certified block satisfies:
 // Block.View == QC.View and Block.BlockID == QC.BlockID
 type CertifiedBlock struct {
 	Block *Block
 	QC    *flow.QuorumCertificate
+}
+
+// ID returns unique identifier for the block.
+// To avoid repeated computation, we use value from the QC.
+func (b *CertifiedBlock) ID() flow.Identifier {
+	return b.QC.BlockID
+}
+
+// View returns view where the block was proposed.
+func (b *CertifiedBlock) View() uint64 {
+	return b.QC.View
 }

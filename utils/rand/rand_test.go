@@ -9,90 +9,103 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gonum.org/v1/gonum/stat"
+
+	_ "github.com/onflow/flow-go/crypto/random"
 )
 
-// Evaluate if the input distribution is close to uinform through a basic quick test.
-// The test computes the standard deviation and checks it is small enough compared
-// to the distribution mean.
-func evaluateDistributionUniformity(t *testing.T, distribution []float64) {
+// TODO: these functions are copied from flow-go/crypto/rand
+// Once the new flow-go/crypto/ module version is tagged, flow-go would upgrade
+// to the new version and import these functions
+func BasicDistributionTest(t *testing.T, n uint64, classWidth uint64, randf func() (uint64, error)) {
+	// sample size should ideally be a high number multiple of `n`
+	// but if `n` is too small, we could use a small sample size so that the test
+	// isn't too slow
+	sampleSize := 1000 * n
+	if n < 100 {
+		sampleSize = (80000 / n) * n // highest multiple of n less than 80000
+	}
+	distribution := make([]float64, n)
+	// populate the distribution
+	for i := uint64(0); i < sampleSize; i++ {
+		r, err := randf()
+		require.NoError(t, err)
+		if n*classWidth != 0 {
+			require.Less(t, r, n*classWidth)
+		}
+		distribution[r/classWidth] += 1.0
+	}
+	EvaluateDistributionUniformity(t, distribution)
+}
+
+func EvaluateDistributionUniformity(t *testing.T, distribution []float64) {
 	tolerance := 0.05
 	stdev := stat.StdDev(distribution, nil)
 	mean := stat.Mean(distribution, nil)
-	assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
+	assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed: n: %d, stdev: %v, mean: %v", len(distribution), stdev, mean))
 }
 
-// Simple unit tests using a very basic randomness test.
-// It doesn't evaluate randomness of the output and doesn't perform advanced statistical tests.
 func TestRandomIntegers(t *testing.T) {
-	t.Run("basic randomness", func(t *testing.T) {
-		sampleSize := 80000
-		n := 10 + mrand.Intn(100)
-		distribution := make([]float64, n)
-
-		// generic test function to run a basic statistic test on `randf` output.
-		// It partitions all outputs into `n` classes and compute the distribution
-		// over the partition. Each class has a width of `classWidth`
-		// It computes the frequency of outputs in the `n` classes and computes the
-		// standard deviation of frequencies. A small standard deviation is a necessary
-		// condition for a uniform distribution of `randf` (though is not a guarantee of
-		// uniformity)
-		basicDistributionTest := func(t *testing.T, classWidth uint64, randf func() (uint64, error)) {
-			// populate the distribution
-			for i := 0; i < sampleSize; i++ {
-				r, err := randf()
-				require.NoError(t, err)
-				distribution[r/classWidth] += 1.0
-			}
-			evaluateDistributionUniformity(t, distribution)
-		}
+	t.Run("basic uniformity", func(t *testing.T) {
 
 		t.Run("Uint", func(t *testing.T) {
-			classWidth := math.MaxUint / uint(n)
+			// make sure n is a power of 2 so that there is no bias in the last class
+			// n is a random power of 2 (from 2 to 2^10)
+			n := 1 << (1 + mrand.Intn(10))
+			classWidth := (math.MaxUint / uint(n)) + 1
 			uintf := func() (uint64, error) {
 				r, err := Uint()
 				return uint64(r), err
 			}
-			basicDistributionTest(t, uint64(classWidth), uintf)
+			BasicDistributionTest(t, uint64(n), uint64(classWidth), uintf)
 		})
 
 		t.Run("Uint64", func(t *testing.T) {
-			classWidth := math.MaxUint64 / uint64(n)
-			basicDistributionTest(t, uint64(classWidth), Uint64)
+			// make sure n is a power of 2 so that there is no bias in the last class
+			// n is a random power of 2 (from 2 to 2^10)
+			n := 1 << (1 + mrand.Intn(10))
+			classWidth := (math.MaxUint64 / uint64(n)) + 1
+			BasicDistributionTest(t, uint64(n), uint64(classWidth), Uint64)
 		})
 
 		t.Run("Uint32", func(t *testing.T) {
-			classWidth := math.MaxUint32 / uint32(n)
+			// make sure n is a power of 2 so that there is no bias in the last class
+			// n is a random power of 2 (from 2 to 2^10)
+			n := 1 << (1 + mrand.Intn(10))
+			classWidth := (math.MaxUint32 / uint32(n)) + 1
 			uintf := func() (uint64, error) {
 				r, err := Uint32()
 				return uint64(r), err
 			}
-			basicDistributionTest(t, uint64(classWidth), uintf)
+			BasicDistributionTest(t, uint64(n), uint64(classWidth), uintf)
 		})
 
 		t.Run("Uintn", func(t *testing.T) {
+			n := 10 + mrand.Intn(100)
 			uintf := func() (uint64, error) {
 				r, err := Uintn(uint(n))
 				return uint64(r), err
 			}
 			// classWidth is 1 since `n` is small
-			basicDistributionTest(t, uint64(1), uintf)
+			BasicDistributionTest(t, uint64(n), uint64(1), uintf)
 		})
 
 		t.Run("Uint64n", func(t *testing.T) {
+			n := 10 + mrand.Intn(100)
 			uintf := func() (uint64, error) {
 				return Uint64n(uint64(n))
 			}
 			// classWidth is 1 since `n` is small
-			basicDistributionTest(t, uint64(1), uintf)
+			BasicDistributionTest(t, uint64(n), uint64(1), uintf)
 		})
 
 		t.Run("Uint32n", func(t *testing.T) {
+			n := 10 + mrand.Intn(100)
 			uintf := func() (uint64, error) {
 				r, err := Uint32n(uint32(n))
 				return uint64(r), err
 			}
 			// classWidth is 1 since `n` is small
-			basicDistributionTest(t, uint64(1), uintf)
+			BasicDistributionTest(t, uint64(n), uint64(1), uintf)
 		})
 	})
 
@@ -156,7 +169,7 @@ func TestShuffle(t *testing.T) {
 			}
 			// if the shuffle is uniform, the test element
 			// should end up uniformly in all positions of the slice
-			evaluateDistributionUniformity(t, distribution)
+			EvaluateDistributionUniformity(t, distribution)
 		})
 
 		t.Run("shuffle a same permutation", func(t *testing.T) {
@@ -169,7 +182,7 @@ func TestShuffle(t *testing.T) {
 			}
 			// if the shuffle is uniform, the test element
 			// should end up uniformly in all positions of the slice
-			evaluateDistributionUniformity(t, distribution)
+			EvaluateDistributionUniformity(t, distribution)
 		})
 	})
 
@@ -219,10 +232,10 @@ func TestSamples(t *testing.T) {
 		}
 		// if the sampling is uniform, all elements
 		// should end up being sampled an equivalent number of times
-		evaluateDistributionUniformity(t, samplingDistribution)
+		EvaluateDistributionUniformity(t, samplingDistribution)
 		// if the sampling is uniform, the test element
 		// should end up uniformly in all positions of the sample slice
-		evaluateDistributionUniformity(t, orderingDistribution)
+		EvaluateDistributionUniformity(t, orderingDistribution)
 	})
 
 	t.Run("zero edge cases", func(t *testing.T) {

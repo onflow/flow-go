@@ -120,7 +120,15 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			if !ok {
 				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
-			followerState, err = badgerState.NewFollowerState(state, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
+			followerState, err = badgerState.NewFollowerState(
+				node.Logger,
+				node.Tracer,
+				node.ProtocolEvents,
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				blocktimer.DefaultBlockTimer,
+			)
 			return err
 		}).
 		Module("verification metrics", func(node *NodeConfig) error {
@@ -381,7 +389,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				validator,
 				syncCore,
 				node.Tracer,
-				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core: %w", err)
@@ -395,6 +402,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Headers,
 				finalizedHeader.Get(),
 				core,
+				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)

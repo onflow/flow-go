@@ -57,9 +57,10 @@ func (vt *viewTracker) LastViewTC() *flow.TimeoutCertificate {
 	return vt.livenessData.LastViewTC
 }
 
-// ProcessQC ingests a QC, which might advance the current view. QCs with views smaller or equal
-// to the newest QC known are a no-op. ProcessQC returns the resulting view after processing the
-// QC. No errors are expected, any error should be treated as exception.
+// ProcessQC ingests a QC, which might advance the current view. Panics for nil input!
+// QCs with views smaller or equal to the newest QC known are a no-op. ProcessQC returns
+// the resulting view after processing the QC.
+// No errors are expected, any error should be treated as exception.
 func (vt *viewTracker) ProcessQC(qc *flow.QuorumCertificate) (uint64, error) {
 	view := vt.livenessData.CurrentView
 	if qc.View < view {
@@ -79,7 +80,7 @@ func (vt *viewTracker) ProcessQC(qc *flow.QuorumCertificate) (uint64, error) {
 	newView := qc.View + 1
 	err := vt.updateLivenessData(newView, qc, nil)
 	if err != nil {
-		return newView, fmt.Errorf("failed to update liveness data: %w", err)
+		return 0, fmt.Errorf("failed to update liveness data: %w", err)
 	}
 	return newView, nil
 }
@@ -102,7 +103,7 @@ func (vt *viewTracker) ProcessTC(tc *flow.TimeoutCertificate) (uint64, error) {
 		// now contributed its newest QC to this TC.
 		err := vt.updateNewestQC(tc.NewestQC)
 		if err != nil {
-			return view, fmt.Errorf("could not update tracked newest QC: %w", err)
+			return 0, fmt.Errorf("could not update tracked newest QC: %w", err)
 		}
 		return view, nil
 	}
@@ -111,7 +112,7 @@ func (vt *viewTracker) ProcessTC(tc *flow.TimeoutCertificate) (uint64, error) {
 	newView := tc.View + 1
 	err := vt.updateLivenessData(newView, tc.NewestQC, tc)
 	if err != nil {
-		return newView, fmt.Errorf("failed to update liveness data: %w", err)
+		return 0, fmt.Errorf("failed to update liveness data: %w", err)
 	}
 	return newView, nil
 }

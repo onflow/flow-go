@@ -6,8 +6,8 @@ import (
 )
 
 // complianceCore interface describes the follower's compliance core logic. Slightly simplified, the
-// compliance layer ingest incoming untrusted blocks from the network, filter out all invalid block,
-// extend the protocol state with the valid blocks, and lastly pipes the valid blocks to the HotStuff
+// compliance layer ingests incoming untrusted blocks from the network, filters out all invalid blocks,
+// extends the protocol state with the valid blocks, and lastly pipes the valid blocks to the HotStuff
 // follower. Conceptually, the algorithm proceeds as follows:
 //
 //  1. _light_ validation of the block header:
@@ -62,7 +62,7 @@ import (
 // to extend the protocol state. Step 6 is only a queuing operation, with vanishing cost. There is little
 // benefit to parallelizing state extension, because under normal operations forks are rare and knowing
 // the full ancestry is required for the protocol state. Therefore, we have a single thread to extend
-// the protocol state with new certified blocks, executing
+// the protocol state with new certified blocks.
 //
 // Notes:
 //   - At the moment, this interface exists to facilitate testing. Specifically, it allows to
