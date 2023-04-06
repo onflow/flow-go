@@ -6,9 +6,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onflow/flow-go/network/p2p/distributor"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,8 +26,11 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -184,7 +184,10 @@ type NetworkConfig struct {
 	// that are not part of protocol state should be trimmed
 	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
 	NetworkConnectionPruning bool
-	GossipSubConfig          *p2pbuilder.GossipSubConfig
+	// GossipSubConfig core gossipsub configuration.
+	GossipSubConfig *p2pbuilder.GossipSubConfig
+	// GossipSubRPCInspectorsConfig configuration for all gossipsub RPC control message inspectors.
+	GossipSubRPCInspectorsConfig *inspectorbuilder.GossipSubRPCInspectorsConfig
 	// PreferredUnicastProtocols list of unicast protocols in preferred order
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
@@ -198,7 +201,8 @@ type NetworkConfig struct {
 	UnicastCreateStreamRetryDelay time.Duration
 	// size of the queue for notifications about new peers in the disallow list.
 	DisallowListNotificationCacheSize uint32
-	UnicastRateLimitersConfig         *UnicastRateLimitersConfig
+	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
+	UnicastRateLimitersConfig *UnicastRateLimitersConfig
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
@@ -294,11 +298,11 @@ func DefaultBaseConfig() *BaseConfig {
 				BandwidthRateLimit:  0,
 				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
 			},
+			GossipSubConfig:                   p2pbuilder.DefaultGossipSubConfig(),
 			DNSCacheTTL:                       dns.DefaultTimeToLive,
 			LibP2PResourceManagerConfig:       p2pbuilder.DefaultResourceManagerConfig(),
 			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),
 			NetworkConnectionPruning:          connection.ConnectionPruningEnabled,
-			GossipSubConfig:                   p2pbuilder.DefaultGossipSubConfig(),
 			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
 		},
 		nodeIDHex:        NotSet,

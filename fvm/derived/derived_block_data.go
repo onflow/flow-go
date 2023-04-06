@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 )
 
 type DerivedTransaction interface {
@@ -101,8 +102,8 @@ func (block *DerivedBlockData) NewChildDerivedBlockData() *DerivedBlockData {
 }
 
 func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData(
-	snapshotTime LogicalTime,
-	executionTime LogicalTime,
+	snapshotTime logical.Time,
+	executionTime logical.Time,
 ) (
 	DerivedTransactionCommitter,
 	error,
@@ -128,8 +129,8 @@ func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData(
 }
 
 func (block *DerivedBlockData) NewDerivedTransactionData(
-	snapshotTime LogicalTime,
-	executionTime LogicalTime,
+	snapshotTime logical.Time,
+	executionTime logical.Time,
 ) (
 	DerivedTransactionCommitter,
 	error,

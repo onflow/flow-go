@@ -39,7 +39,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	gossipsubbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/gossipsub"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -78,7 +77,7 @@ func DefaultGossipSubConfig() *GossipSubConfig {
 		PeerScoring:          defaultPeerScoringEnabled,
 		LocalMeshLogInterval: defaultMeshTracerLoggingInterval,
 		ScoreTracerInterval:  defaultGossipSubScoreTracerInterval,
-		RpcValidation:        defaultGossipSubRpcValidationConfig(),
+		RPCInspectors:        make([]p2p.GossipSubRPCInspector, 0),
 	}
 }
 
@@ -152,8 +151,8 @@ type GossipSubConfig struct {
 	ScoreTracerInterval time.Duration
 	// PeerScoring is whether to enable GossipSub peer scoring.
 	PeerScoring bool
-	// RpcValidation is the configuration for the RPC validation.
-	RpcValidation *GossipSubRPCValidationConfigs
+	// RPCInspectors gossipsub RPC control message inspectors
+	RPCInspectors []p2p.GossipSubRPCInspector
 }
 
 func DefaultResourceManagerConfig() *ResourceManagerConfig {
@@ -339,8 +338,8 @@ func (builder *LibP2PNodeBuilder) SetGossipSubScoreTracerInterval(interval time.
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubValidationInspector(inspector p2p.GossipSubRPCInspector) p2p.NodeBuilder {
-	builder.gossipSubBuilder.SetGossipSubValidationInspector(inspector)
+func (builder *LibP2PNodeBuilder) SetGossipSubRPCInspectors(inspectors ...p2p.GossipSubRPCInspector) p2p.NodeBuilder {
+	builder.gossipSubBuilder.SetGossipSubRPCInspectors(inspectors...)
 	return builder
 }
 
@@ -613,7 +612,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
 		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor).
-		SetGossipSubValidationInspector(rpcValidationInspector)
+		SetGossipSubRPCInspectors(gossipCfg.RPCInspectors...)
 
 	if gossipCfg.PeerScoring {
 		// currently, we only enable peer scoring with default parameters. So, we set the score parameters to nil.

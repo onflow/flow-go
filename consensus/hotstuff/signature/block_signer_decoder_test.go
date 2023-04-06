@@ -2,7 +2,6 @@ package signature
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -14,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -65,31 +65,57 @@ func (s *blockSignerDecoderSuite) Test_RootBlock() {
 	require.Empty(s.T(), ids)
 }
 
-// Test_UnexpectedCommitteeException verifies that `BlockSignerDecoder`
+// Test_CommitteeException verifies that `BlockSignerDecoder`
 // does _not_ erroneously interpret an unexpected exception from the committee as
 // a sign of an unknown block, i.e. the decoder should _not_ return an `model.ErrViewForUnknownEpoch` or `signature.InvalidSignerIndicesError`
-func (s *blockSignerDecoderSuite) Test_UnexpectedCommitteeException() {
-	exception := errors.New("unexpected exception")
-	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
-	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(nil, exception)
+func (s *blockSignerDecoderSuite) Test_CommitteeException() {
+	s.Run("ByEpoch exception", func() {
+		exception := errors.New("unexpected exception")
+		*s.committee = *hotstuff.NewDynamicCommittee(s.T())
+		s.committee.On("IdentitiesByEpoch", mock.Anything).Return(nil, exception)
 
-	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
-	require.Empty(s.T(), ids)
-	require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
-	require.False(s.T(), signature.IsInvalidSignerIndicesError(err))
-	require.True(s.T(), errors.Is(err, exception))
+		ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
+		require.Empty(s.T(), ids)
+		require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
+		require.False(s.T(), signature.IsInvalidSignerIndicesError(err))
+		require.ErrorIs(s.T(), err, exception)
+	})
+	s.Run("ByBlock exception", func() {
+		exception := errors.New("unexpected exception")
+		*s.committee = *hotstuff.NewDynamicCommittee(s.T())
+		s.committee.On("IdentitiesByEpoch", mock.Anything).Return(nil, model.ErrViewForUnknownEpoch)
+		s.committee.On("IdentitiesByBlock", mock.Anything).Return(nil, exception)
+
+		ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
+		require.Empty(s.T(), ids)
+		require.NotErrorIs(s.T(), err, model.ErrViewForUnknownEpoch)
+		require.False(s.T(), signature.IsInvalidSignerIndicesError(err))
+		require.ErrorIs(s.T(), err, exception)
+	})
 }
 
-// Test_UnknownEpoch tests handling of a block from an unknown epoch.
-// It should propagate the sentinel error model.ErrViewForUnknownEpoch from Committee.
-func (s *blockSignerDecoderSuite) Test_UnknownEpoch() {
+// Test_UnknownEpoch_KnownBlock tests handling of a block from an un-cached epoch but
+// where the block is known - should return identities for block.
+func (s *blockSignerDecoderSuite) Test_UnknownEpoch_KnownBlock() {
 	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
 	s.committee.On("IdentitiesByEpoch", s.block.Header.ParentView).Return(nil, model.ErrViewForUnknownEpoch)
-	s.committee.On("IdentitiesByBlock", s.block.Header.ParentID).Return(nil, fmt.Errorf(""))
+	s.committee.On("IdentitiesByBlock", s.block.Header.ParentID).Return(s.allConsensus, nil)
 
 	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), s.allConsensus.NodeIDs(), ids)
+}
+
+// Test_UnknownEpoch_UnknownBlock tests handling of a block from an un-cached epoch
+// where the block is unknown - should propagate state.ErrUnknownSnapshotReference.
+func (s *blockSignerDecoderSuite) Test_UnknownEpoch_UnknownBlock() {
+	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
+	s.committee.On("IdentitiesByEpoch", s.block.Header.ParentView).Return(nil, model.ErrViewForUnknownEpoch)
+	s.committee.On("IdentitiesByBlock", s.block.Header.ParentID).Return(nil, state.ErrUnknownSnapshotReference)
+
+	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
+	require.ErrorIs(s.T(), err, state.ErrUnknownSnapshotReference)
 	require.Empty(s.T(), ids)
-	require.Error(s.T(), err)
 }
 
 // Test_InvalidIndices verifies that `BlockSignerDecoder` returns

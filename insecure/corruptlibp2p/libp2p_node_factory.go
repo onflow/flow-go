@@ -16,8 +16,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 )
 
 // NewCorruptLibP2PNodeFactory wrapper around the original DefaultLibP2PNodeFactory. Nodes returned from this factory func will be corrupted libp2p nodes.
@@ -44,7 +44,13 @@ func NewCorruptLibP2PNodeFactory(
 			panic("illegal chain id for using corrupt libp2p node")
 		}
 
-		rpcValidationInspector := validation.NewControlMsgValidationInspector(log, sporkId, p2pbuilder.DefaultRPCValidationConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(log))
+		rpcInspectorBuilder := inspectorbuilder.NewGossipSubInspectorBuilder(log, sporkId, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(log))
+		rpcInspectors, err := rpcInspectorBuilder.Build()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for public libp2p node: %w", err)
+		}
+		gossipSubCfg.RPCInspectors = rpcInspectors
+
 		builder, err := p2pbuilder.DefaultNodeBuilder(
 			log,
 			address,
@@ -61,8 +67,7 @@ func NewCorruptLibP2PNodeFactory(
 			peerManagerCfg,
 			gossipSubCfg,
 			p2pbuilder.DefaultResourceManagerConfig(),
-			uniCfg,
-			rpcValidationInspector)
+			uniCfg)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)
