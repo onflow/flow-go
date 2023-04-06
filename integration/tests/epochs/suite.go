@@ -672,7 +672,7 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	s.TimedLogf("retrieved header after entering EpochSetup phase: root_height=%d, root_view=%d, segment_heights=[%d-%d], segment_views=[%d-%d]",
 		header.Height, header.View,
 		segment.Sealed().Header.Height, segment.Highest().Header.Height,
-		segment.Sealed().Header.View, segment.Highest().Header.Height)
+		segment.Sealed().Header.View, segment.Highest().Header.View)
 
 	testContainer.WriteRootSnapshot(rootSnapshot)
 	testContainer.Container.Start(s.ctx)

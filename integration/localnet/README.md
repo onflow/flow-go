@@ -74,12 +74,25 @@ and then start the test network:
 make start
 ```
 
+Alternatively, this command will start the test network without re-building, using the most recently built image.
+```shell
+make start-cached
+```
+
+
 ## Stop the network
 
 The network needs to be stopped between each consecutive run to clear the chain state:
 
 ```sh
 make stop
+```
+
+## Build Localnet images
+
+To build images for Localnet, run this command.
+```shell
+make build-flow
 ```
 
 ## Logs

@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -38,7 +37,7 @@ type Builder struct {
 	peerScoringParameterOptions []scoring.PeerScoreParamsOption
 	idProvider                  module.IdentityProvider
 	routingSystem               routing.Routing
-	rpcValidationInspector      p2p.GossipSubRPCInspector
+	rpcInspectors               []p2p.GossipSubRPCInspector
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -139,14 +138,9 @@ func (g *Builder) SetAppSpecificScoreParams(f func(peer.ID) float64) {
 	g.peerScoringParameterOptions = append(g.peerScoringParameterOptions, scoring.WithAppSpecificScoreFunction(f))
 }
 
-// SetGossipSubValidationInspector sets the rpc validation inspector.
-// If the rpc validation inspector has already been set, a fatal error is logged.
-func (g *Builder) SetGossipSubValidationInspector(inspector p2p.GossipSubRPCInspector) {
-	if g.rpcValidationInspector != nil {
-		g.logger.Fatal().Msg("rpc validation inspector has already been set")
-		return
-	}
-	g.rpcValidationInspector = inspector
+// SetGossipSubRPCInspectors sets the gossipsub rpc inspectors.
+func (g *Builder) SetGossipSubRPCInspectors(inspectors ...p2p.GossipSubRPCInspector) {
+	g.rpcInspectors = inspectors
 }
 
 func NewGossipSubBuilder(logger zerolog.Logger, metrics module.GossipSubMetrics) *Builder {
@@ -156,6 +150,7 @@ func NewGossipSubBuilder(logger zerolog.Logger, metrics module.GossipSubMetrics)
 		gossipSubFactory:            defaultGossipSubFactory(),
 		gossipSubConfigFunc:         defaultGossipSubAdapterConfig(),
 		peerScoringParameterOptions: make([]scoring.PeerScoreParamsOption, 0),
+		rpcInspectors:               make([]p2p.GossipSubRPCInspector, 0),
 	}
 }
 
@@ -212,13 +207,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 		}
 	}
 
-	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(g.metrics, g.logger)
-	metricsInspector := inspector.NewControlMsgMetricsInspector(gossipSubMetrics)
-	inspectors := []p2p.GossipSubRPCInspector{metricsInspector}
-	if g.rpcValidationInspector != nil {
-		inspectors = append(inspectors, g.rpcValidationInspector)
-	}
-	gossipSubConfigs.WithAppSpecificRpcInspectors(inspectors...)
+	gossipSubConfigs.WithAppSpecificRpcInspectors(g.rpcInspectors...)
 
 	if g.gossipSubTracer != nil {
 		gossipSubConfigs.WithTracer(g.gossipSubTracer)

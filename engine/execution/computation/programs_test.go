@@ -19,11 +19,10 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/derived"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -43,10 +42,9 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
-	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(
+	snapshotTree, accounts, err := testutil.CreateAccounts(
 		vm,
-		ledger,
+		testutil.RootBootstrappedLedger(vm, execCtx),
 		privateKeys,
 		chain)
 	require.NoError(t, err)
@@ -150,7 +148,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		context.Background(),
 		unittest.IdentifierFixture(),
 		executableBlock,
-		ledger)
+		snapshotTree)
 	require.NoError(t, err)
 
 	require.Len(t, returnedComputationResult.Events, 2) // 1 collection + 1 system chunk
@@ -209,10 +207,9 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
-	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(
+	snapshotTree, accounts, err := testutil.CreateAccounts(
 		vm,
-		ledger,
+		testutil.RootBootstrappedLedger(vm, execCtx),
 		privateKeys,
 		chain)
 	require.NoError(t, err)
@@ -257,16 +254,14 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		derivedChainData: derivedChainData,
 	}
 
-	view := delta.NewDeltaView(ledger)
-
 	var (
 		res *execution.ComputationResult
 
 		block1, block11, block111, block112, block1121,
 		block1111, block12, block121, block1211 *flow.Block
 
-		block1View, block11View, block111View, block112View,
-		block12View, block121View, block1211View state.View
+		block1Snapshot, block11Snapshot, block111Snapshot, block112Snapshot,
+		block12Snapshot, block121Snapshot storage.SnapshotTree
 	)
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
@@ -278,7 +273,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 				Guarantees: []*flow.CollectionGuarantee{},
 			},
 		}
-		block1View = view.NewChild()
+		block1Snapshot = snapshotTree
 		executableBlock := &entity.ExecutableBlock{
 			Block:      block1,
 			StartState: unittest.StateCommitmentPointerFixture(),
@@ -287,7 +282,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 			context.Background(),
 			unittest.IdentifierFixture(),
 			executableBlock,
-			block1View)
+			block1Snapshot)
 		require.NoError(t, err)
 	})
 
@@ -297,12 +292,12 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 		txs11 := []*flow.TransactionBody{block11tx1}
 		col11 := flow.Collection{Transactions: txs11}
-		block11, res, block11View = createTestBlockAndRun(
+		block11, res, block11Snapshot = createTestBlockAndRun(
 			t,
 			engine,
 			block1,
 			col11,
-			block1View)
+			block1Snapshot)
 		// cache should include value for this block
 		require.NotNil(t, derivedChainData.Get(block11.ID()))
 		// 1st event should be contract deployed
@@ -320,12 +315,12 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		prepareTx(t, block111tx2, account, privKey, 2, chain)
 
 		col111 := flow.Collection{Transactions: []*flow.TransactionBody{block111tx1, block111tx2}}
-		block111, res, block111View = createTestBlockAndRun(
+		block111, res, block111Snapshot = createTestBlockAndRun(
 			t,
 			engine,
 			block11,
 			col111,
-			block11View)
+			block11Snapshot)
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block111.ID()))
 
@@ -348,7 +343,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 			engine,
 			block111,
 			col1111,
-			block111View)
+			block111Snapshot)
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block1111.ID()))
 
@@ -368,12 +363,12 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		prepareTx(t, block112tx2, account, privKey, 2, chain)
 
 		col112 := flow.Collection{Transactions: []*flow.TransactionBody{block112tx1, block112tx2}}
-		block112, res, block112View = createTestBlockAndRun(
+		block112, res, block112Snapshot = createTestBlockAndRun(
 			t,
 			engine,
 			block11,
 			col112,
-			block11View)
+			block11Snapshot)
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block112.ID()))
 
@@ -396,7 +391,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 			engine,
 			block112,
 			col1121,
-			block112View)
+			block112Snapshot)
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block1121.ID()))
 
@@ -412,13 +407,12 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		prepareTx(t, block12tx1, account, privKey, 0, chain)
 
 		col12 := flow.Collection{Transactions: []*flow.TransactionBody{block12tx1}}
-		block12View = block1View.NewChild()
-		block12, res, block12View = createTestBlockAndRun(
+		block12, res, block12Snapshot = createTestBlockAndRun(
 			t,
 			engine,
 			block1,
 			col12,
-			block1View)
+			block1Snapshot)
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block12.ID()))
 
@@ -432,12 +426,12 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		prepareTx(t, block121tx1, account, privKey, 1, chain)
 
 		col121 := flow.Collection{Transactions: []*flow.TransactionBody{block121tx1}}
-		block121, res, block121View = createTestBlockAndRun(
+		block121, res, block121Snapshot = createTestBlockAndRun(
 			t,
 			engine,
 			block12,
 			col121,
-			block12View)
+			block12Snapshot)
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block121.ID()))
 
@@ -452,13 +446,12 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		prepareTx(t, block1211tx1, account, privKey, 2, chain)
 
 		col1211 := flow.Collection{Transactions: []*flow.TransactionBody{block1211tx1}}
-		block1211View = block121View.NewChild()
-		block1211, res, block1211View = createTestBlockAndRun(
+		block1211, res, _ = createTestBlockAndRun(
 			t,
 			engine,
 			block121,
 			col1211,
-			block1211View)
+			block121Snapshot)
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block1211.ID()))
 		// had no change so cache should be equal to parent
@@ -477,11 +470,11 @@ func createTestBlockAndRun(
 	engine *Manager,
 	parentBlock *flow.Block,
 	col flow.Collection,
-	snapshot state.StorageSnapshot,
+	snapshotTree storage.SnapshotTree,
 ) (
 	*flow.Block,
 	*execution.ComputationResult,
-	state.View,
+	storage.SnapshotTree,
 ) {
 	guarantee := flow.CollectionGuarantee{
 		CollectionID: col.ID(),
@@ -513,22 +506,18 @@ func createTestBlockAndRun(
 		context.Background(),
 		unittest.IdentifierFixture(),
 		executableBlock,
-		snapshot)
+		snapshotTree)
 	require.NoError(t, err)
 
 	for _, txResult := range returnedComputationResult.TransactionResults {
 		require.Empty(t, txResult.ErrorMessage)
 	}
 
-	view := delta.NewDeltaView(snapshot)
 	for _, snapshot := range returnedComputationResult.StateSnapshots {
-		for _, entry := range snapshot.UpdatedRegisters() {
-			err := view.Set(entry.Key, entry.Value)
-			require.NoError(t, err)
-		}
+		snapshotTree = snapshotTree.Append(snapshot)
 	}
 
-	return block, returnedComputationResult, view
+	return block, returnedComputationResult, snapshotTree
 }
 
 func prepareTx(t *testing.T,
