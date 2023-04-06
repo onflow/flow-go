@@ -597,6 +597,8 @@ func (state *State) Params() protocol.Params {
 	return Params{state: state}
 }
 
+// Sealed returns a snapshot for the latest sealed block. A latest sealed block
+// must always exist, so this function always returns a valid snapshot.
 func (state *State) Sealed() protocol.Snapshot {
 	// retrieve the latest sealed height
 	var sealed uint64
@@ -608,6 +610,8 @@ func (state *State) Sealed() protocol.Snapshot {
 	return state.AtHeight(sealed)
 }
 
+// Final returns a snapshot for the latest finalized block. A latest finalized
+// block must always exist, so this function always returns a valid snapshot.
 func (state *State) Final() protocol.Snapshot {
 	// retrieve the latest finalized height
 	var finalized uint64
@@ -619,6 +623,12 @@ func (state *State) Final() protocol.Snapshot {
 	return state.AtHeight(finalized)
 }
 
+// AtHeight returns a snapshot for the finalized block at the given height.
+// This function may return an invalid.Snapshot with:
+//   - state.ErrUnknownSnapshotReference:
+//     -> if no block with the given height has been finalized, even if it is incorporated
+//     -> if the given height is below the root height
+//   - exception for critical unexpected storage errors
 func (state *State) AtHeight(height uint64) protocol.Snapshot {
 	// retrieve the block ID for the finalized height
 	var blockID flow.Identifier
@@ -630,18 +640,30 @@ func (state *State) AtHeight(height uint64) protocol.Snapshot {
 		// critical storage error
 		return invalid.NewSnapshotf("could not look up block by height: %w", err)
 	}
-	return state.AtBlockID(blockID)
+	return newSnapshotWithIncorporatedReferenceBlock(state, blockID)
 }
 
+// AtBlockID returns a snapshot for the block with the given ID. The block may be
+// finalized or un-finalized.
+// This function may return an invalid.Snapshot with:
+//   - state.ErrUnknownSnapshotReference:
+//     -> if no block with the given ID exists in the state
+//   - exception for critical unexpected storage errors
 func (state *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
-	// TODO should return invalid.NewSnapshot(ErrUnknownSnapshotReference) if block doesn't exist
-	return NewSnapshot(state, blockID)
+	exists, err := state.headers.Exists(blockID)
+	if err != nil {
+		return invalid.NewSnapshotf("could not check existence of reference block: %w", err)
+	}
+	if !exists {
+		return invalid.NewSnapshotf("unknown block %x: %w", blockID, statepkg.ErrUnknownSnapshotReference)
+	}
+	return newSnapshotWithIncorporatedReferenceBlock(state, blockID)
 }
 
 // newState initializes a new state backed by the provided a badger database,
 // mempools and service components.
-// The parameter `expectedBootstrappedState` indicates whether or not the database
-// is expected to contain a an already bootstrapped state or not
+// The parameter `expectedBootstrappedState` indicates whether the database
+// is expected to contain an already bootstrapped state or not
 func newState(
 	metrics module.ComplianceMetrics,
 	db *badger.DB,

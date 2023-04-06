@@ -183,7 +183,15 @@ func main() {
 			if !ok {
 				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
-			followerState, err = badgerState.NewFollowerState(state, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
+			followerState, err = badgerState.NewFollowerState(
+				node.Logger,
+				node.Tracer,
+				node.ProtocolEvents,
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				blocktimer.DefaultBlockTimer,
+			)
 			return err
 		}).
 		Module("transactions mempool", func(node *cmd.NodeConfig) error {
@@ -229,7 +237,7 @@ func main() {
 			return nil
 		}).
 		Component("machine account config validator", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
+			// @TODO use fallback logic for flowClient similar to DKG/QC contract clients
 			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
@@ -317,7 +325,6 @@ func main() {
 				validator,
 				mainChainSyncCore,
 				node.Tracer,
-				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core: %w", err)
@@ -331,6 +338,7 @@ func main() {
 				node.Storage.Headers,
 				finalizedHeader.Get(),
 				core,
+				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)

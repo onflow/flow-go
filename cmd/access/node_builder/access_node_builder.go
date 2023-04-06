@@ -237,7 +237,15 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 			return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 		}
 
-		followerState, err := badgerState.NewFollowerState(state, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
+		followerState, err := badgerState.NewFollowerState(
+			node.Logger,
+			node.Tracer,
+			node.ProtocolEvents,
+			state,
+			node.Storage.Index,
+			node.Storage.Payloads,
+			blocktimer.DefaultBlockTimer,
+		)
 		builder.FollowerState = followerState
 
 		return err
@@ -334,7 +342,6 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			builder.Validator,
 			builder.SyncCore,
 			node.Tracer,
-			modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower core: %w", err)
@@ -348,6 +355,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			node.Storage.Headers,
 			builder.Finalized,
 			core,
+			followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
