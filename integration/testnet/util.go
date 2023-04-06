@@ -33,8 +33,8 @@ func makeDir(t *testing.T, base string, subdir string) string {
 func makeTempDir(t *testing.T, pattern string) string {
 	dir := makeTempSubDir(t, TmpRoot, pattern)
 	t.Cleanup(func() {
-		// err := os.RemoveAll(dir)
-		// require.NoError(t, err)
+		err := os.RemoveAll(dir)
+		require.NoError(t, err)
 	})
 	return dir
 }

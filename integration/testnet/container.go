@@ -502,22 +502,22 @@ func (c *Container) HealthcheckCallback() func() error {
 
 		switch c.Config.Role {
 		case flow.RoleExecution:
-			c, err := client.NewExecutionClient(c.Addr(GRPCPort))
+			apiClient, err := client.NewExecutionClient(c.Addr(GRPCPort))
 			if err != nil {
 				return fmt.Errorf("could not create execution client: %w", err)
 			}
-			defer c.Close()
+			defer apiClient.Close()
 
-			return c.Ping(ctx)
+			return apiClient.Ping(ctx)
 
 		default:
-			c, err := client.NewAccessClient(c.Addr(GRPCPort))
+			apiClient, err := client.NewAccessClient(c.Addr(GRPCPort))
 			if err != nil {
 				return fmt.Errorf("could not create access client: %w", err)
 			}
-			defer c.Close()
+			defer apiClient.Close()
 
-			return c.Ping(ctx)
+			return apiClient.Ping(ctx)
 		}
 	}
 }
