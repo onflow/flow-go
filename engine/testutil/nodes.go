@@ -730,6 +730,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		core,
 	)
 	require.NoError(t, err)
+	finalizationDistributor.AddOnBlockFinalizedConsumer(followerEng.OnFinalizedBlock)
 
 	idCache, err := cache.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
 	require.NoError(t, err, "could not create finalized snapshot cache")

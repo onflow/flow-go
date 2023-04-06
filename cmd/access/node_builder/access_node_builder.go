@@ -360,6 +360,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
+		builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.FollowerEng.OnFinalizedBlock)
 
 		return builder.FollowerEng, nil
 	})
