@@ -218,6 +218,9 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 }
 
 func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(notification *p2p.InvalidControlMessageNotification) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	
 	lg := r.logger.With().
 		Str("peer_id", notification.PeerID.String()).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
