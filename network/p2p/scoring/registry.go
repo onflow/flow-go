@@ -8,9 +8,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -66,16 +68,20 @@ func DefaultGossipSubCtrlMsgPenaltyValue() GossipSubCtrlMsgPenaltyValue {
 
 type GossipSubAppSpecificScoreRegistry struct {
 	logger     zerolog.Logger
-	scoreCache *netcache.AppScoreCache
-	penalty    GossipSubCtrlMsgPenaltyValue
+	idProvider module.IdentityProvider
+	// spamScoreCache currently only holds the control message misbehaviour score (spam related score).
+	spamScoreCache *netcache.AppScoreCache
+	penalty        GossipSubCtrlMsgPenaltyValue
 	// initial application specific score record, used to initialize the score cache entry.
-	init func() netcache.AppScoreRecord
-	mu   sync.Mutex
+	init      func() netcache.AppScoreRecord
+	validator *SubscriptionValidator
+	mu        sync.Mutex
 }
 
 type GossipSubAppSpecificScoreRegistryConfig struct {
 	SizeLimit     uint32
 	Logger        zerolog.Logger
+	Validator     *SubscriptionValidator
 	Collector     module.HeroCacheMetrics
 	DecayFunction netcache.ReadPreprocessorFunc
 	Penalty       GossipSubCtrlMsgPenaltyValue
@@ -90,7 +96,7 @@ func WithGossipSubAppSpecificScoreRegistryPenalty(penalty GossipSubCtrlMsgPenalt
 
 func WithScoreCache(cache *netcache.AppScoreCache) func(registry *GossipSubAppSpecificScoreRegistry) {
 	return func(registry *GossipSubAppSpecificScoreRegistry) {
-		registry.scoreCache = cache
+		registry.spamScoreCache = cache
 	}
 }
 
@@ -103,10 +109,10 @@ func WithRecordInit(init func() netcache.AppScoreRecord) func(registry *GossipSu
 func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig, opts ...func(registry *GossipSubAppSpecificScoreRegistry)) *GossipSubAppSpecificScoreRegistry {
 	cache := netcache.NewAppScoreCache(config.SizeLimit, config.Logger, config.Collector, config.DecayFunction)
 	reg := &GossipSubAppSpecificScoreRegistry{
-		logger:     config.Logger.With().Str("module", "app_score_registry").Logger(),
-		scoreCache: cache,
-		penalty:    config.Penalty,
-		init:       config.Init,
+		logger:         config.Logger.With().Str("module", "app_score_registry").Logger(),
+		spamScoreCache: cache,
+		penalty:        config.Penalty,
+		init:           config.Init,
 	}
 
 	for _, opt := range opts {
@@ -121,16 +127,19 @@ var _ p2p.GossipSubInvalidControlMessageNotificationConsumer = (*GossipSubAppSpe
 // AppSpecificScoreFunc returns the application specific score function that is called by the GossipSub protocol to determine the application specific score of a peer.
 func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID) float64 {
 	return func(pid peer.ID) float64 {
-		record, err, ok := r.scoreCache.Get(pid)
+		// score of a peer is composed of 3 parts: (1) spam penalty (2) staking score (3) subscription penalty.
+		lg := r.logger.With().Str("peer_id", pid.String()).Logger()
+		// (1) spam penalty: the penalty is applied to the application specific score when a peer conducts a spamming misbehaviour.
+		spamRecord, err, ok := r.spamScoreCache.Get(pid)
 		if err != nil {
 			// the error is considered fatal as it means the cache is not working properly.
 			// we should not continue with the execution as it may lead to routing attack vulnerability.
 			r.logger.Fatal().Str("peer_id", pid.String()).Err(err).Msg("could not get application specific score for peer")
-			return 0
+			return 0 // unreachable, but added to avoid proceeding with the execution if log level is changed.
 		}
 		if !ok {
 			init := r.init()
-			initialized := r.scoreCache.Add(pid, init)
+			initialized := r.spamScoreCache.Add(pid, init)
 			r.logger.Trace().
 				Bool("initialized", initialized).
 				Str("peer_id", pid.String()).
@@ -138,8 +147,74 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 			return init.Score
 		}
 
-		return record.Score
+		// (2) staking score: the staking score is the score of a peer based on its role.
+		// staking score is applied only if the peer is a staked node and does not have a negative penalty on spamming.
+		// it is meant to reward well-behaved staked nodes.
+		stakingScore, flowId, role := r.stakingScore(pid)
+		if stakingScore > 0 && spamRecord.Score < 0 {
+			// if the peer is a staked node but has a negative penalty on spamming, we do not apply the
+			// staking score and only apply the penalty.
+			return spamRecord.Score
+		}
+
+		// (3) subscription penalty: the subscription penalty is applied to the application specific score when a
+		// peer is subscribed to a topic that it is not allowed to subscribe to based on its role.
+		subscriptionPenalty := r.subscriptionPenalty(pid, flowId, role)
+		appSpecificScore := stakingScore + subscriptionPenalty + spamRecord.Score
+		lg.Trace().
+			Float64("subscription_penalty", subscriptionPenalty).
+			Float64("staking_score", stakingScore).
+			Float64("spam_penalty", spamRecord.Score).
+			Float64("total_app_specific_score", appSpecificScore).
+			Msg("subscription penalty applied")
+		return stakingScore + subscriptionPenalty + spamRecord.Score
 	}
+}
+
+func (r *GossipSubAppSpecificScoreRegistry) stakingScore(pid peer.ID) (float64, flow.Identifier, flow.Role) {
+	lg := r.logger.With().Str("peer_id", pid.String()).Logger()
+
+	// checks if peer has a valid Flow protocol identity.
+	flowId, err := HasValidFlowIdentity(r.idProvider, pid)
+	if err != nil {
+		lg.Error().
+			Err(err).
+			Bool(logging.KeySuspicious, true).
+			Msg("invalid peer identity, penalizing peer")
+		return MaxAppSpecificPenalty, flow.Identifier{}, 0
+	}
+
+	lg = lg.With().
+		Hex("flow_id", logging.ID(flowId.NodeID)).
+		Str("role", flowId.Role.String()).
+		Logger()
+
+	// checks if peer is an access node, and if so, pushes it to the
+	// edges of the network by giving the minimum penalty.
+	if flowId.Role == flow.RoleAccess {
+		lg.Trace().
+			Msg("pushing access node to edge by penalizing with minimum penalty value")
+		return MinAppSpecificPenalty, flowId.NodeID, flowId.Role
+	}
+
+	lg.Trace().
+		Msg("rewarding well-behaved non-access node peer with maximum reward value")
+
+	return MaxAppSpecificReward, flowId.NodeID, flowId.Role
+}
+
+func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flowId flow.Identifier, role flow.Role) float64 {
+	// checks if peer has any subscription violation.
+	if err := r.validator.CheckSubscribedToAllowedTopics(pid, role); err != nil {
+		r.logger.Err(err).
+			Str("peer_id", pid.String()).
+			Hex("flow_id", logging.ID(flowId)).
+			Bool(logging.KeySuspicious, true).
+			Msg("invalid subscription detected, penalizing peer")
+		return MaxAppSpecificPenalty
+	}
+
+	return 0
 }
 
 func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(notification *p2p.InvalidControlMessageNotification) {
@@ -150,10 +225,10 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	// try initializing the application specific score for the peer if it is not yet initialized.
 	// this is done to avoid the case where the peer is not yet cached and the application specific score is not yet initialized.
 	// initialization is gone successful only if the peer is not yet cached.
-	initialized := r.scoreCache.Add(notification.PeerID, r.init())
+	initialized := r.spamScoreCache.Add(notification.PeerID, r.init())
 	lg.Trace().Bool("initialized", initialized).Msg("initialization attempt for application specific")
 
-	record, err := r.scoreCache.Adjust(notification.PeerID, func(record netcache.AppScoreRecord) netcache.AppScoreRecord {
+	record, err := r.spamScoreCache.Adjust(notification.PeerID, func(record netcache.AppScoreRecord) netcache.AppScoreRecord {
 		switch notification.MsgType {
 		case p2p.CtrlMsgGraft:
 			record.Score += r.penalty.Graft
