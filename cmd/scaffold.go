@@ -211,13 +211,13 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitersConfig.DryRun, "unicast-rate-limit-dry-run", defaultConfig.UnicastRateLimitersConfig.DryRun, "disable peer disconnects and connections gating when rate limiting peers")
 
 	// gossipsub RPC control message validation limits used for validation configuration and rate limiting
-	fnb.flags.IntVar(&fnb.BaseConfig.GossipSubConfig.RpcValidation.NumberOfWorkers, "gossipsub-rpc-inspection-workers", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.NumberOfWorkers, "number of gossupsub RPC control message inspector component workers")
-	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubConfig.RpcValidation.GraftLimits, "gossipsub-rpc-graft-limits", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.GraftLimits, fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC GRAFT message validation e.g: %s=1000,%s=100,%s=1000", validation.DiscardThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
-	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubConfig.RpcValidation.PruneLimits, "gossipsub-rpc-prune-limits", defaultConfig.NetworkConfig.GossipSubRPCValidationConfigs.PruneLimits, fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC PRUNE message validation e.g: %s=1000,%s=20,%s=1000", validation.DiscardThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
+	fnb.flags.IntVar(&fnb.BaseConfig.GossipSubConfig.RpcValidation.NumberOfWorkers, "gossipsub-rpc-inspection-workers", defaultConfig.NetworkConfig.GossipSubConfig.RpcValidation.NumberOfWorkers, "number of gossupsub RPC control message inspector component workers")
+	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubConfig.RpcValidation.GraftLimits, "gossipsub-rpc-graft-limits", defaultConfig.NetworkConfig.GossipSubConfig.RpcValidation.GraftLimits, fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC GRAFT message validation e.g: %s=1000,%s=100,%s=1000", validation.DiscardThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
+	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubConfig.RpcValidation.PruneLimits, "gossipsub-rpc-prune-limits", defaultConfig.NetworkConfig.GossipSubConfig.RpcValidation.PruneLimits, fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC PRUNE message validation e.g: %s=1000,%s=20,%s=1000", validation.DiscardThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
 
 	// networking event notifications
-	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubConfig.RpcValidation.NotificationCacheSize, "gossipsub-rpc-inspector-notification-cache-size", defaultConfig.GossipSubRPCInspectorNotificationCacheSize, "cache size for notification events from gossipsub rpc inspector")
-	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubConfig.RpcValidation.InspectorCacheSize, "gossipsub-rpc-inspector-cache-size", defaultConfig.GossipSubRPCInspectorNotificationCacheSize, "cache size for gossipsub RPC validation inspector events worker pool.")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubConfig.RpcValidation.NotificationCacheSize, "gossipsub-rpc-inspector-notification-cache-size", defaultConfig.GossipSubConfig.RpcValidation.NotificationCacheSize, "cache size for notification events from gossipsub rpc inspector")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubConfig.RpcValidation.InspectorCacheSize, "gossipsub-rpc-inspector-cache-size", defaultConfig.GossipSubConfig.RpcValidation.InspectorCacheSize, "cache size for gossipsub RPC validation inspector events worker pool.")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.DisallowListNotificationCacheSize, "disallow-list-notification-cache-size", defaultConfig.DisallowListNotificationCacheSize, "cache size for notification events from disallow list")
 
 	// unicast manager options
@@ -398,13 +398,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		fnb.LibP2PNode = libp2pNode
 
 		return libp2pNode, nil
-	})
-	fnb.Component("gossipsub inspector notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		// distributor is returned as a component to be started and stopped.
-		if fnb.GossipSubInspectorNotifDistributor == nil {
-			return nil, fmt.Errorf("gossipsub inspector notification distributor has not been set")
-		}
-		return fnb.GossipSubInspectorNotifDistributor, nil
 	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		cf := conduit.NewDefaultConduitFactory()
