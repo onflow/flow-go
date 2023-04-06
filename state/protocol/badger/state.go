@@ -5,6 +5,7 @@ package badger
 import (
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -17,9 +18,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
-	"github.com/onflow/flow-go/utils/atomic"
 )
 
+// cachedHeader caches a block header and its ID.
 type cachedHeader struct {
 	id     flow.Identifier
 	header *flow.Header
@@ -43,7 +44,7 @@ type State struct {
 	// cache the spork root block height because it cannot change over the lifecycle of a protocol state instance
 	sporkRootBlockHeight uint64
 	// cache the latest finalized block
-	cachedFinal atomic.Value[cachedHeader]
+	cachedFinal *atomic.Pointer[cachedHeader]
 }
 
 var _ protocol.State = (*State)(nil)
@@ -609,8 +610,8 @@ func (state *State) Sealed() protocol.Snapshot {
 }
 
 func (state *State) Final() protocol.Snapshot {
-	cached, ok := state.cachedFinal.Get()
-	if !ok {
+	cached := state.cachedFinal.Load()
+	if cached == nil {
 		invalid.NewSnapshotf("internal inconsistency: no cached final header")
 	}
 	return NewFinalizedSnapshot(state, cached.id, cached.header)
@@ -668,7 +669,7 @@ func newState(
 			commits:  commits,
 			statuses: statuses,
 		},
-		cachedFinal: atomic.NewValue[cachedHeader](),
+		cachedFinal: new(atomic.Pointer[cachedHeader]),
 	}
 }
 
@@ -777,7 +778,7 @@ func (state *State) populateCache() error {
 	if err != nil {
 		return fmt.Errorf("could not cache finalized header: %w", err)
 	}
-	state.cachedFinal.Set(cachedHeader{finalID, finalHeader})
+	state.cachedFinal.Store(&cachedHeader{finalID, finalHeader})
 
 	return nil
 }

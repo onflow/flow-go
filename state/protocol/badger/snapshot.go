@@ -33,7 +33,8 @@ type Snapshot struct {
 	blockID flow.Identifier // reference block for this snapshot
 }
 
-// TODO docs
+// FinalizedSnapshot represents a read-only immutable snapshot of the protocol state
+// at a finalized block. It is guaranteed to have a header available.
 type FinalizedSnapshot struct {
 	Snapshot
 	header *flow.Header
