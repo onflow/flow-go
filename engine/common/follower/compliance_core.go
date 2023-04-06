@@ -310,7 +310,7 @@ func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.Quo
 			qc = certifyingQC
 		}
 
-		// create the root block to use
+		// bundle block and its certifying QC to `CertifiedBlock`:
 		certBlock, err := flow.NewCertifiedBlock(block, qc)
 		if err != nil {
 			return nil, fmt.Errorf("constructing certified root block failed: %w", err)

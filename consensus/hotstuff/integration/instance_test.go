@@ -378,7 +378,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		BlockID:       rootBlock.BlockID,
 		SignerIndices: signerIndices,
 	}
-
 	certifiedRootBlock, err := model.NewCertifiedBlock(rootBlock, rootQC)
 	require.NoError(t, err)
 
