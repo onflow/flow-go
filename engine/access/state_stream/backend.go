@@ -129,13 +129,16 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, blockID flow.
 	return blockExecData, nil
 }
 
-// getStartHeight returns the start height to use when searching
-// The height is chosen using the following priority order:
-// 1. startBlockID
-// 2. startHeight
-// 3. the latest sealed block
-// If a block is provided and does not exist, an error is returned
+// getStartHeight returns the start height to use when searching.
+// Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
+// If a block is provided and does not exist, a NotFound error is returned.
+// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
 func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
+	// make sure only one of start block ID and start height is provided
+	if startBlockID != flow.ZeroID && startHeight > 0 {
+		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
+	}
+
 	// first, if a start block ID is provided, use that
 	// invalid or missing block IDs will result in an error
 	if startBlockID != flow.ZeroID {

@@ -159,6 +159,14 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	s.Run("returns error if both start blockID and start height are provided", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeEvents(subCtx, unittest.IdentifierFixture(), 1, EventFilter{})
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
+	})
+
 	s.Run("returns error for unindexed start blockID", func() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
