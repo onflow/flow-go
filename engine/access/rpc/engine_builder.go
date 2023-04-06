@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"fmt"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -18,6 +19,7 @@ type RPCEngineBuilder struct {
 	// optional parameters, only one can be set during build phase
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
 	handler              accessproto.AccessAPIServer // Use the parent interface instead of implementation, so that we can assign it to proxy.
+	finalizedHeaderCache *synceng.FinalizedHeaderCache
 }
 
 // NewRPCEngineBuilder helps to build a new RPC engine.
@@ -57,6 +59,11 @@ func (builder *RPCEngineBuilder) WithNewHandler(handler accessproto.AccessAPISer
 	return builder
 }
 
+func (builder *RPCEngineBuilder) WithFinalizedHeaderCache(cache *synceng.FinalizedHeaderCache) *RPCEngineBuilder {
+	builder.finalizedHeaderCache = cache
+	return builder
+}
+
 // WithLegacy specifies that a legacy access API should be instantiated
 // Returns self-reference for chaining.
 func (builder *RPCEngineBuilder) WithLegacy() *RPCEngineBuilder {
@@ -88,10 +95,13 @@ func (builder *RPCEngineBuilder) Build() (*Engine, error) {
 	}
 	handler := builder.handler
 	if handler == nil {
+		if builder.finalizedHeaderCache == nil {
+			return nil, fmt.Errorf("FinalizedHeaderCache (via method `WithFinalizedHeaderCache`) has to be specified")
+		}
 		if builder.signerIndicesDecoder == nil {
-			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain)
+			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache)
 		} else {
-			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
+			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
 		}
 	}
 	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, handler)

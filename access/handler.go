@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -19,15 +20,19 @@ type Handler struct {
 	api                  API
 	chain                flow.Chain
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
+	finalizedHeaderCache *synceng.FinalizedHeaderCache
 }
 
 // HandlerOption is used to hand over optional constructor parameters
 type HandlerOption func(*Handler)
 
-func NewHandler(api API, chain flow.Chain, options ...HandlerOption) *Handler {
+var _ access.AccessAPIServer = (*Handler)(nil)
+
+func NewHandler(api API, chain flow.Chain, finalizedHeader *synceng.FinalizedHeaderCache, options ...HandlerOption) *Handler {
 	h := &Handler{
 		api:                  api,
 		chain:                chain,
+		finalizedHeaderCache: finalizedHeader,
 		signerIndicesDecoder: &signature.NoopBlockSignerDecoder{},
 	}
 	for _, opt := range options {
@@ -158,7 +163,8 @@ func (h *Handler) GetCollectionByID(
 	}
 
 	return &access.CollectionResponse{
-		Collection: colMsg,
+		Collection:         colMsg,
+		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
 	}, nil
 }
 
@@ -202,7 +208,8 @@ func (h *Handler) GetTransaction(
 	}
 
 	return &access.TransactionResponse{
-		Transaction: convert.TransactionToMessage(*tx),
+		Transaction:        convert.TransactionToMessage(*tx),
+		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
 	}, nil
 }
 
@@ -256,7 +263,8 @@ func (h *Handler) GetTransactionsByBlockID(
 	}
 
 	return &access.TransactionsResponse{
-		Transactions: convert.TransactionsToMessages(transactions),
+		Transactions:       convert.TransactionsToMessages(transactions),
+		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
 	}, nil
 }
 
@@ -297,7 +305,8 @@ func (h *Handler) GetAccount(
 	}
 
 	return &access.GetAccountResponse{
-		Account: accountMsg,
+		Account:            accountMsg,
+		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
 	}, nil
 }
 
@@ -322,7 +331,8 @@ func (h *Handler) GetAccountAtLatestBlock(
 	}
 
 	return &access.AccountResponse{
-		Account: accountMsg,
+		Account:            accountMsg,
+		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
 	}, nil
 }
 
@@ -346,7 +356,8 @@ func (h *Handler) GetAccountAtBlockHeight(
 	}
 
 	return &access.AccountResponse{
-		Account: accountMsg,
+		Account:            accountMsg,
+		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
 	}, nil
 }
 
@@ -429,7 +440,8 @@ func (h *Handler) GetEventsForHeightRange(
 		return nil, err
 	}
 	return &access.EventsResponse{
-		Results: resultEvents,
+		Results:            resultEvents,
+		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
 	}, nil
 }
 
@@ -459,7 +471,8 @@ func (h *Handler) GetEventsForBlockIDs(
 	}
 
 	return &access.EventsResponse{
-		Results: resultEvents,
+		Results:            resultEvents,
+		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
 	}, nil
 }
 
@@ -472,6 +485,7 @@ func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *acces
 
 	return &access.ProtocolStateSnapshotResponse{
 		SerializedSnapshot: snapshot,
+		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
 	}, nil
 }
 
@@ -486,7 +500,7 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 		return nil, err
 	}
 
-	return executionResultToMessages(result)
+	return executionResultToMessages(result, h.buildLastFinalizedBlockResponse())
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {
@@ -504,9 +518,11 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flo
 	} else {
 		msg = convert.BlockToMessageLight(block)
 	}
+
 	return &access.BlockResponse{
-		Block:       msg,
-		BlockStatus: entities.BlockStatus(status),
+		Block:              msg,
+		BlockStatus:        entities.BlockStatus(status),
+		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
 	}, nil
 }
 
@@ -522,17 +538,30 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 	}
 
 	return &access.BlockHeaderResponse{
-		Block:       msg,
-		BlockStatus: entities.BlockStatus(status),
+		Block:              msg,
+		BlockStatus:        entities.BlockStatus(status),
+		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
 	}, nil
 }
 
-func executionResultToMessages(er *flow.ExecutionResult) (*access.ExecutionResultForBlockIDResponse, error) {
+func (h *Handler) buildLastFinalizedBlockResponse() *entities.LastFinalizedBlock {
+	lastFinalizedHeader := h.finalizedHeaderCache.Get()
+	blockId := lastFinalizedHeader.ID()
+	return &entities.LastFinalizedBlock{
+		Id:     blockId[:],
+		Height: lastFinalizedHeader.Height,
+	}
+}
+
+func executionResultToMessages(er *flow.ExecutionResult, lastFinalizedBlock *entities.LastFinalizedBlock) (*access.ExecutionResultForBlockIDResponse, error) {
 	execResult, err := convert.ExecutionResultToMessage(er)
 	if err != nil {
 		return nil, err
 	}
-	return &access.ExecutionResultForBlockIDResponse{ExecutionResult: execResult}, nil
+	return &access.ExecutionResultForBlockIDResponse{
+		ExecutionResult:    execResult,
+		LastFinalizedBlock: lastFinalizedBlock,
+	}, nil
 }
 
 func blockEventsToMessages(blocks []flow.BlockEvents) ([]*access.EventsResponse_Result, error) {

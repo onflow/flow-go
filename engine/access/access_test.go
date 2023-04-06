@@ -1,6 +1,12 @@
 package access_test
 
 import (
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/stretchr/testify/suite"
+)
+
+import (
 	"context"
 	"encoding/json"
 	"os"
@@ -15,7 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/onflow/flow-go/access"
@@ -63,6 +68,7 @@ type Suite struct {
 	chainID              flow.ChainID
 	metrics              *metrics.NoopCollector
 	backend              *backend.Backend
+	finalizedHeader      *synceng.FinalizedHeaderCache
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -106,6 +112,8 @@ func (suite *Suite) SetupTest() {
 
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
+	suite.finalizedHeader, _ = synceng.NewFinalizedHeaderCache(suite.log, suite.state, pubsub.NewFinalizationDistributor())
+
 }
 
 func (suite *Suite) RunTest(
@@ -136,8 +144,7 @@ func (suite *Suite) RunTest(
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
 		)
-
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeader, access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
 		f(handler, db, blocks, headers, results)
 	})
 }
@@ -312,7 +319,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(backend, suite.chainID.Chain())
+		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeader)
 
 		// Send transaction 1
 		resp, err := handler.SendTransaction(context.Background(), sendReq1)
@@ -623,12 +630,12 @@ func (suite *Suite) TestGetSealedTransaction() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(backend, suite.chainID.Chain())
+		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeader)
 
 		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions, receipts,
 			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
 		require.NoError(suite.T(), err)
-		rpcEng, err := rpcEngBuilder.WithLegacy().Build()
+		rpcEng, err := rpcEngBuilder.WithFinalizedHeaderCache(suite.finalizedHeader).WithLegacy().Build()
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
@@ -716,7 +723,7 @@ func (suite *Suite) TestExecuteScript() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeader)
 
 		// initialize metrics related storage
 		metrics := metrics.NewNoopCollector()
