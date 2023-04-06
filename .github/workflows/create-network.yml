@@ -28,6 +28,25 @@ on:
           - 10
         default: 1
 
+      collection_nodes:
+        required: false
+        type: choice
+        description: 'Number of Collection Nodes to create (default: 6)'
+        options:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+          - 11
+          - 12
+        default: 6
+
       # Allows for the public or private repo to be used for deployment automation
       automation_repo:
         required: true
@@ -178,7 +197,7 @@ jobs:
       - self-hosted
       - flow-bn2
     env:
-      ARGS: NAMESPACE=benchnet ACCESS=${{ inputs.access_nodes }} COLLECTION=6 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 NETWORK_ID="${{ needs.networkId.outputs.networkId }}" OWNER=${{ github.actor }}
+      ARGS: NAMESPACE=benchnet ACCESS=${{ inputs.access_nodes }} COLLECTION=${{ inputs.collection_nodes }} CONSENSUS=2 EXECUTION=2 VERIFICATION=1 NETWORK_ID="${{ needs.networkId.outputs.networkId }}" OWNER=${{ github.actor }}
     steps:
 
       - name: Fail if Network ID was unable to be retrieved or was not unique
