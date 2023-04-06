@@ -123,7 +123,15 @@ func TestFollowerHappyPath(t *testing.T) {
 		net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 
 		// use real engine
-		engine, err := NewComplianceLayer(unittest.Logger(), net, me, metrics, all.Headers, rootHeader, followerCore)
+		engine, err := NewComplianceLayer(
+			unittest.Logger(),
+			net,
+			me,
+			metrics,
+			all.Headers,
+			rootHeader,
+			followerCore,
+		)
 		require.NoError(t, err)
 		// don't forget to subscribe for finalization notifications
 		consensusConsumer.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
