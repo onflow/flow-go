@@ -367,9 +367,11 @@ func (f *Forks) getNextAncestryLevel(block *model.Block) (*model.CertifiedBlock,
 			block.BlockID, block.View, block.QC.View, block.QC.BlockID, parentBlock.BlockID, parentBlock.View)
 	}
 
-	blockQC := model.CertifiedBlock{Block: parentBlock, QC: block.QC}
-
-	return &blockQC, nil
+	certifiedBlock, err := model.NewCertifiedBlock(parentBlock, block.QC)
+	if err != nil {
+		return nil, fmt.Errorf("constructing certified block failed: %w", err)
+	}
+	return &certifiedBlock, nil
 }
 
 // finalizeUpToBlock finalizes all blocks up to (and including) the block pointed to by `qc`.
@@ -416,7 +418,10 @@ func (f *Forks) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 	}
 
 	// finalize block itself:
-	f.lastFinalized = &model.CertifiedBlock{Block: block, QC: qc}
+	*f.lastFinalized, err = model.NewCertifiedBlock(block, qc)
+	if err != nil {
+		return fmt.Errorf("constructing certified block failed: %w", err)
+	}
 	err = f.forest.PruneUpToLevel(block.View)
 	if err != nil {
 		if mempool.IsBelowPrunedThresholdError(err) {

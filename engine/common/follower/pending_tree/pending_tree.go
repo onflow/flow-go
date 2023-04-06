@@ -20,10 +20,6 @@ var _ forest.Vertex = (*PendingBlockVertex)(nil)
 
 // NewVertex creates new vertex while performing a sanity check of data correctness.
 func NewVertex(certifiedBlock flow.CertifiedBlock, connectedToFinalized bool) (*PendingBlockVertex, error) {
-	if certifiedBlock.Block.Header.View != certifiedBlock.QC.View {
-		return nil, fmt.Errorf("missmatched block(%d) and QC(%d) view",
-			certifiedBlock.Block.Header.View, certifiedBlock.QC.View)
-	}
 	return &PendingBlockVertex{
 		CertifiedBlock:       certifiedBlock,
 		connectedToFinalized: connectedToFinalized,

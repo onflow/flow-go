@@ -2,6 +2,8 @@
 
 package flow
 
+import "fmt"
+
 func Genesis(chainID ChainID) *Block {
 
 	// create the raw content for the genesis block
@@ -78,6 +80,23 @@ func (s BlockStatus) String() string {
 type CertifiedBlock struct {
 	Block *Block
 	QC    *QuorumCertificate
+}
+
+// NewCertifiedBlock constructs a new certified block. It checks the consistency
+// requirements and errors otherwise:
+//
+//	Block.View == QC.View and Block.BlockID == QC.BlockID
+func NewCertifiedBlock(block *Block, qc *QuorumCertificate) (CertifiedBlock, error) {
+	if block.Header.View != qc.View {
+		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", block.Header.View, qc.View)
+	}
+	if block.ID() != qc.BlockID {
+		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", block.ID(), qc.BlockID)
+	}
+	return CertifiedBlock{
+		Block: block,
+		QC:    qc,
+	}, nil
 }
 
 // ID returns unique identifier for the block.

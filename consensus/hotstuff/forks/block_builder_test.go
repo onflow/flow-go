@@ -155,9 +155,9 @@ func makeGenesis() *model.CertifiedBlock {
 		View:    1,
 		BlockID: genesis.BlockID,
 	}
-	genesisBQ := &model.CertifiedBlock{
-		Block: genesis,
-		QC:    genesisQC,
+	certifiedGenesisBlock, err := model.NewCertifiedBlock(genesis, genesisQC)
+	if err != nil {
+		panic(fmt.Sprintf("combining genesis block and genensis QC to certified block failed: %s", err.Error()))
 	}
-	return genesisBQ
+	return &certifiedGenesisBlock
 }

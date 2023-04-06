@@ -158,7 +158,11 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 		if final.ID() != rootHeader.ID() {
 			return nil, fmt.Errorf("finalized Block conflicts with trusted root")
 		}
-		return makeRootBlockQC(rootHeader, rootQC), nil
+		certifiedRoot, err := makeCertifiedRootBlock(rootHeader, rootQC)
+		if err != nil {
+			return nil, fmt.Errorf("constructing certified root block failed: %w", err)
+		}
+		return &certifiedRoot, nil
 	}
 
 	// find a valid child of the finalized block in order to get its QC
@@ -174,15 +178,14 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 	child := model.BlockFromFlow(children[0])
 
 	// create the root block to use
-	trustedRoot := &model.CertifiedBlock{
-		Block: model.BlockFromFlow(final),
-		QC:    child.QC,
+	trustedRoot, err := model.NewCertifiedBlock(model.BlockFromFlow(final), child.QC)
+	if err != nil {
+		return nil, fmt.Errorf("constructing certified root block failed: %w", err)
 	}
-
-	return trustedRoot, nil
+	return &trustedRoot, nil
 }
 
-func makeRootBlockQC(header *flow.Header, qc *flow.QuorumCertificate) *model.CertifiedBlock {
+func makeCertifiedRootBlock(header *flow.Header, qc *flow.QuorumCertificate) (model.CertifiedBlock, error) {
 	// By convention of Forks, the trusted root block does not need to have a qc
 	// (as is the case for the genesis block). For simplify of the implementation, we always omit
 	// the QC of the root block. Thereby, we have one algorithm which handles all cases,
@@ -196,8 +199,5 @@ func makeRootBlockQC(header *flow.Header, qc *flow.QuorumCertificate) *model.Cer
 		PayloadHash: header.PayloadHash,
 		Timestamp:   header.Timestamp,
 	}
-	return &model.CertifiedBlock{
-		QC:    qc,
-		Block: rootBlock,
-	}
+	return model.NewCertifiedBlock(rootBlock, qc)
 }
