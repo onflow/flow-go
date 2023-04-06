@@ -71,7 +71,6 @@ on:
         type: choice
         description: 'Number of Execution Nodes to create (default: 2)'
         options:
-          - 1
           - 2
           - 3
           - 4
