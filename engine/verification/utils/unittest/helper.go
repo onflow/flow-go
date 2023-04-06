@@ -475,9 +475,10 @@ func withConsumers(t *testing.T,
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
 	tracer := trace.NewNoopTracer()
+	log := zerolog.Nop()
 
 	// bootstraps system with one node of each role.
-	s, verID, participants := bootstrapSystem(t, tracer, authorized)
+	s, verID, participants := bootstrapSystem(t, log, tracer, authorized)
 	exeID := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 	conID := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
 	// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
@@ -601,17 +602,25 @@ func withConsumers(t *testing.T,
 // Otherwise, it bootstraps the verification node as unauthorized in current epoch.
 //
 // As the return values, it returns the state, local module, and list of identities in system.
-func bootstrapSystem(t *testing.T, tracer module.Tracer, authorized bool) (*enginemock.StateFixture, *flow.Identity,
-	flow.IdentityList) {
+func bootstrapSystem(
+	t *testing.T,
+	log zerolog.Logger,
+	tracer module.Tracer,
+	authorized bool,
+) (
+	*enginemock.StateFixture,
+	*flow.Identity,
+	flow.IdentityList,
+) {
 	// creates identities to bootstrap system with
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	identities := unittest.CompleteIdentitySet(verID)
 	identities = append(identities, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))) // adds extra execution node
 
-	// bootstraps the system
 	collector := &metrics.NoopCollector{}
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
+	stateFixture := testutil.CompleteStateFixture(t, log, collector, tracer, rootSnapshot)
+	// bootstraps the system
 
 	if !authorized {
 		// creates a new verification node identity that is unauthorized for this epoch
