@@ -100,7 +100,7 @@ jobs:
         id: getNetworkId
         # Set Network ID to input provided
         run: |
-          if [[ ${{ inputs.network_id }} =~ ^[a-z0-9][a-z0-9-]{0,18}[a-z0-9]$ ]]; then echo "networkId=${{ inputs.network_id }}" >> $GITHUB_OUTPUT; else echo "network_id does not meet criteria."; exit 1; fi;
+          if [[ ${{ inputs.network_id }} =~ ^[a-z][a-z0-9-]{0,18}[a-z0-9]$ ]]; then echo "networkId=${{ inputs.network_id }}" >> $GITHUB_OUTPUT; else echo "network_id does not meet criteria."; exit 1; fi;
 
       - name: Print Network ID
         run: |
