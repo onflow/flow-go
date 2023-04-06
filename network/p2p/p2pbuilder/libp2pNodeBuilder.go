@@ -22,6 +22,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/mempool/queue"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
@@ -88,6 +89,11 @@ type CreateNodeFunc func(logger zerolog.Logger,
 	peerManager *connection.PeerManager) p2p.LibP2PNode
 type GossipSubAdapterConfigFunc func(*p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig
 
+type MetricsConfig struct {
+	HeroCacheFactory metrics.HeroCacheMetricsFactory
+	Metrics          module.LibP2PMetrics
+}
+
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
 func DefaultLibP2PNodeFactory(log zerolog.Logger,
@@ -95,7 +101,7 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metrics module.NetworkMetrics,
+	metricsCfg *MetricsConfig,
 	resolver madns.BasicResolver,
 	role string,
 	connGaterCfg *ConnectionGaterConfig,
@@ -111,7 +117,7 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 			flowKey,
 			sporkId,
 			idProvider,
-			metrics,
+			metricsCfg,
 			resolver,
 			role,
 			connGaterCfg,
@@ -548,7 +554,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metrics module.LibP2PMetrics,
+	metricsCfg *MetricsConfig,
 	resolver madns.BasicResolver,
 	role string,
 	connGaterCfg *ConnectionGaterConfig,
@@ -558,7 +564,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	uniCfg *UnicastConfig,
 	rpcValidationInspector p2p.GossipSubRPCInspector) (p2p.NodeBuilder, error) {
 
-	connManager, err := connection.NewConnManager(log, metrics, connection.DefaultConnManagerConfig())
+	connManager, err := connection.NewConnManager(log, metricsCfg.Metrics, connection.DefaultConnManagerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
@@ -572,12 +578,12 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
-	builder := NewNodeBuilder(log, metrics, address, flowKey, sporkId, rCfg).
+	builder := NewNodeBuilder(log, metricsCfg.Metrics, address, flowKey, sporkId, rCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
 		SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
-			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), log, metrics, dht.AsServer())
+			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), log, metricsCfg.Metrics, dht.AsServer())
 		}).
 		SetPeerManagerOptions(peerManagerCfg.ConnectionPruning, peerManagerCfg.UpdateInterval).
 		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
@@ -590,7 +596,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		builder.EnableGossipSubPeerScoring(idProvider, nil)
 	}
 
-	meshTracer := tracer.NewGossipSubMeshTracer(log, metrics, idProvider, gossipCfg.LocalMeshLogInterval)
+	meshTracer := tracer.NewGossipSubMeshTracer(log, metricsCfg.Metrics, idProvider, gossipCfg.LocalMeshLogInterval)
 	builder.SetGossipSubTracer(meshTracer)
 	builder.SetGossipSubScoreTracerInterval(gossipCfg.ScoreTracerInterval)
 
