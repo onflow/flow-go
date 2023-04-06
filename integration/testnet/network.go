@@ -670,7 +670,7 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 		Config: &container.Config{
 			Image: "gcr.io/flow-container-registry/observer:latest",
 			User:  currentUser(),
-			Cmd: []string{
+			Cmd: append([]string{
 				"--bind=0.0.0.0:0",
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
@@ -682,7 +682,7 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 				fmt.Sprintf("--upstream-node-addresses=%s", accessNode.ContainerAddr(GRPCSecurePort)),
 				fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
 				fmt.Sprintf("--observer-networking-key-path=%s/private-root-information/%s_key", DefaultBootstrapDir, conf.ContainerName),
-			},
+			}, conf.AdditionalFlags...),
 		},
 		HostConfig: &container.HostConfig{
 			Binds: []string{
@@ -815,10 +815,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.exposePort(RESTPort, testingdock.RandomPort(t))
 			nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
 
-			if nodeContainer.IsFlagSet("execution-data-sync-enabled") {
-				nodeContainer.exposePort(ExecutionStatePort, testingdock.RandomPort(t))
-				nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(ExecutionStatePort))
-			}
+			nodeContainer.exposePort(ExecutionStatePort, testingdock.RandomPort(t))
+			nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(ExecutionStatePort))
 
 			// uncomment line below to point the access node exclusively to a single collection node
 			// nodeContainer.AddFlag("static-collection-ingress-addr", "collection_1:9000")
