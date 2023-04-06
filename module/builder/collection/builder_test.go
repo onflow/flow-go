@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -75,6 +76,7 @@ func (suite *BuilderSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
+	log := zerolog.Nop()
 	all := sutil.StorageLayer(suite.T(), suite.db)
 	consumer := events.NewNoop()
 
@@ -103,7 +105,15 @@ func (suite *BuilderSuite) SetupTest() {
 	state, err := pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 	require.NoError(suite.T(), err)
 
-	suite.protoState, err = pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, consumer, util.MockBlockTimer())
+	suite.protoState, err = pbadger.NewFollowerState(
+		log,
+		tracer,
+		consumer,
+		state,
+		all.Index,
+		all.Payloads,
+		util.MockBlockTimer(),
+	)
 	require.NoError(suite.T(), err)
 
 	// add some transactions to transaction pool

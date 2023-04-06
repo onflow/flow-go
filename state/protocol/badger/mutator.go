@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -39,6 +40,7 @@ type FollowerState struct {
 	index      storage.Index
 	payloads   storage.Payloads
 	tracer     module.Tracer
+	logger     zerolog.Logger
 	consumer   protocol.Consumer
 	blockTimer protocol.BlockTimer
 }
@@ -58,11 +60,12 @@ var _ protocol.ParticipantState = (*ParticipantState)(nil)
 // NewFollowerState initializes a light-weight version of a mutable protocol
 // state. This implementation is suitable only for NON-Consensus nodes.
 func NewFollowerState(
+	logger zerolog.Logger,
+	tracer module.Tracer,
+	consumer protocol.Consumer,
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
-	tracer module.Tracer,
-	consumer protocol.Consumer,
 	blockTimer protocol.BlockTimer,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
@@ -70,6 +73,7 @@ func NewFollowerState(
 		index:      index,
 		payloads:   payloads,
 		tracer:     tracer,
+		logger:     logger,
 		consumer:   consumer,
 		blockTimer: blockTimer,
 	}
@@ -81,16 +85,25 @@ func NewFollowerState(
 // _entire_ block payload. Consensus nodes should use the FullConsensusState,
 // while other node roles can use the lighter FollowerState.
 func NewFullConsensusState(
+	logger zerolog.Logger,
+	tracer module.Tracer,
+	consumer protocol.Consumer,
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
-	tracer module.Tracer,
-	consumer protocol.Consumer,
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
 ) (*ParticipantState, error) {
-	followerState, err := NewFollowerState(state, index, payloads, tracer, consumer, blockTimer)
+	followerState, err := NewFollowerState(
+		logger,
+		tracer,
+		consumer,
+		state,
+		index,
+		payloads,
+		blockTimer,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)
 	}

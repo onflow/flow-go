@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -76,6 +77,7 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		consumer := events.NewNoop()
 		all := util.StorageLayer(t, db)
 		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
@@ -83,7 +85,7 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(state, all.Index, all.Payloads, tracer, consumer, mockTimer, receiptValidator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, receiptValidator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -92,6 +94,7 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snapshot, metrics module.ComplianceMetrics, f func(*badger.DB, *pbadger.ParticipantState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		consumer := events.NewNoop()
 		all := util.StorageLayer(t, db)
 		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
@@ -99,7 +102,7 @@ func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snap
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(state, all.Index, all.Payloads, tracer, consumer, mockTimer, receiptValidator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, receiptValidator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -109,13 +112,14 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Sn
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		consumer := events.NewNoop()
 		all := util.StorageLayer(t, db)
 		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(state, all.Index, all.Payloads, tracer, consumer, mockTimer, validator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, validator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -125,12 +129,13 @@ func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		consumer := events.NewNoop()
 		all := util.StorageLayer(t, db)
 		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		mockTimer := MockBlockTimer()
-		followerState, err := pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, consumer, mockTimer)
+		followerState, err := pbadger.NewFollowerState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer)
 		require.NoError(t, err)
 		f(db, followerState)
 	})
@@ -140,13 +145,14 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		all := util.StorageLayer(t, db)
 		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(state, all.Index, all.Payloads, tracer, consumer, mockTimer, receiptValidator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, receiptValidator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -155,13 +161,14 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot protocol.Snapshot, metrics module.ComplianceMetrics, consumer protocol.Consumer, f func(*badger.DB, *pbadger.ParticipantState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		all := util.StorageLayer(t, db)
 		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(state, all.Index, all.Payloads, tracer, consumer, mockTimer, receiptValidator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, receiptValidator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -171,12 +178,13 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		consumer := events.NewNoop()
 		all := util.StorageLayer(t, db)
 		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		mockTimer := MockBlockTimer()
-		followerState, err := pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, consumer, mockTimer)
+		followerState, err := pbadger.NewFollowerState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer)
 		require.NoError(t, err)
 		f(db, followerState, all.Headers, all.Index)
 	})

@@ -551,7 +551,9 @@ func (l *LongRunningVM) RunV2(
 	time.Sleep(l.duration)
 
 	snapshot := &state.ExecutionSnapshot{}
-	output := fvm.ProcedureOutput{}
+	output := fvm.ProcedureOutput{
+		Value: cadence.NewVoid(),
+	}
 	return snapshot, output, nil
 }
 

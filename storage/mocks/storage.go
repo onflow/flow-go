@@ -277,6 +277,21 @@ func (mr *MockHeadersMockRecorder) ByParentID(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByParentID", reflect.TypeOf((*MockHeaders)(nil).ByParentID), arg0)
 }
 
+// Exists mocks base method.
+func (m *MockHeaders) Exists(arg0 flow.Identifier) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Exists", arg0)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Exists indicates an expected call of Exists.
+func (mr *MockHeadersMockRecorder) Exists(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Exists", reflect.TypeOf((*MockHeaders)(nil).Exists), arg0)
+}
+
 // IDByChunkID mocks base method.
 func (m *MockHeaders) IDByChunkID(arg0 flow.Identifier) (flow.Identifier, error) {
 	m.ctrl.T.Helper()
