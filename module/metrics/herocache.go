@@ -32,6 +32,37 @@ type HeroCacheCollector struct {
 
 type HeroCacheMetricsRegistrationFunc func(uint64) module.HeroCacheMetrics
 
+// HeroCacheMetricsFactory is a factory method to create a new HeroCacheCollector for a specific cache
+// with a specific namespace and a specific name.
+// Args:
+// - namespace: the namespace of the cache
+// - cacheName: the name of the cache
+type HeroCacheMetricsFactory func(namespace string, cacheName string) module.HeroCacheMetrics
+
+// NewHeroCacheMetricsFactory creates a new HeroCacheMetricsFactory for the given registrar. It allows to defer the
+// registration of the metrics to the point where the cache is created without exposing the registrar to the cache.
+// Args:
+// - registrar: the prometheus registrar to register the metrics with
+// Returns:
+// - a HeroCacheMetricsFactory that can be used to create a new HeroCacheCollector for a specific cache
+func NewHeroCacheMetricsFactory(registrar prometheus.Registerer) HeroCacheMetricsFactory {
+	return func(namespace string, cacheName string) module.HeroCacheMetrics {
+		return NewHeroCacheCollector(namespace, cacheName, registrar)
+	}
+}
+
+// NewNoopHeroCacheMetricsFactory creates a new HeroCacheMetricsFactory that returns a noop collector.
+// This is useful for tests that don't want to register metrics.
+// Args:
+// - none
+// Returns:
+// - a HeroCacheMetricsFactory that returns a noop collector
+func NewNoopHeroCacheMetricsFactory() HeroCacheMetricsFactory {
+	return func(string, string) module.HeroCacheMetrics {
+		return NewNoopCollector()
+	}
+}
+
 func NetworkReceiveCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingReceiveCache, registrar)
 }
