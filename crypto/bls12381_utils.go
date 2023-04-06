@@ -162,8 +162,8 @@ func writeScalar(dest []byte, x *scalar) {
 }
 
 // writePointG2 writes a G2 point in a slice of bytes
-// The slice should be of size PubKeyLenBLSBLS12381 and the serialization will
-// follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
+// The slice should be of size PubKeyLenBLSBLS12381 and the serialization
+// follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func writePointG2(dest []byte, a *pointG2) {
 	C.ep2_write_bin_compact((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(a),
@@ -207,7 +207,7 @@ func readScalarFrStar(a *scalar, src []byte) error {
 // The slice is expected to be of size PubKeyLenBLSBLS12381 and the deserialization will
 // follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func readPointG2(a *pointG2, src []byte) error {
-	switch C.ep2_read_bin_compact((*C.ep2_st)(a),
+	switch C.G2_read_bytes((*C.ep2_st)(a),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src))) {
 	case valid:

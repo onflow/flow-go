@@ -36,8 +36,10 @@
 // Compressed and uncompressed points
 #define COMPRESSED      1
 #define UNCOMPRESSED    0
-#define G1_SERIALIZATION   COMPRESSED
-#define G2_SERIALIZATION   COMPRESSED
+#define G1_SERIALIZATION    (COMPRESSED)
+#define G2_SERIALIZATION    (COMPRESSED)
+#define G1_SER_BYTES        (G1_BYTES/(G1_SERIALIZATION+1))
+#define G2_SER_BYTES        (G2_BYTES/(G2_SERIALIZATION+1))
 
 // Subgroup membership check method
 #define EXP_ORDER 0
@@ -122,7 +124,7 @@ void     seed_relic(byte*, int);
 
 int         ep_read_bin_compact(ep_t, const byte *, const int);
 void        ep_write_bin_compact(byte *, const ep_t,  const int);
-int         ep2_read_bin_compact(ep2_t, const byte *,  const int);
+int         G2_read_bytes(ep2_t, const byte *,  const int);
 void        ep2_write_bin_compact(byte *, const ep2_t,  const int);
 
 
