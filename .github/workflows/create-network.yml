@@ -66,6 +66,25 @@ on:
           - 12
         default: 2
 
+      execution_nodes:
+        required: false
+        type: choice
+        description: 'Number of Execution Nodes to create (default: 2)'
+        options:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+          - 11
+          - 12
+        default: 2
+
       # Allows for the public or private repo to be used for deployment automation
       automation_repo:
         required: true
@@ -216,7 +235,7 @@ jobs:
       - self-hosted
       - flow-bn2
     env:
-      ARGS: NAMESPACE=benchnet ACCESS=${{ inputs.access_nodes }} COLLECTION=${{ inputs.collection_nodes }} CONSENSUS=${{ inputs.consensus_nodes }} EXECUTION=2 VERIFICATION=1 NETWORK_ID="${{ needs.networkId.outputs.networkId }}" OWNER=${{ github.actor }}
+      ARGS: NAMESPACE=benchnet ACCESS=${{ inputs.access_nodes }} COLLECTION=${{ inputs.collection_nodes }} CONSENSUS=${{ inputs.consensus_nodes }} EXECUTION=${{ inputs.execution_nodes }} VERIFICATION=1 NETWORK_ID="${{ needs.networkId.outputs.networkId }}" OWNER=${{ github.actor }}
     steps:
 
       - name: Fail if Network ID was unable to be retrieved or was not unique
