@@ -24,7 +24,7 @@ require (
 	github.com/onflow/flow-go-sdk v0.40.0
 	github.com/onflow/flow-go/crypto v0.24.7
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230330183547-d0dd18f6f20d
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230407005012-727d541fd5f8
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rs/zerolog v1.29.0
