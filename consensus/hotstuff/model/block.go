@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -52,6 +53,23 @@ func GenesisBlockFromFlow(header *flow.Header) *Block {
 type CertifiedBlock struct {
 	Block *Block
 	QC    *flow.QuorumCertificate
+}
+
+// NewCertifiedBlock constructs a new certified block. It checks the consistency
+// requirements and returns an exception otherwise:
+//
+//	Block.View == QC.View and Block.BlockID == QC.BlockID
+func NewCertifiedBlock(block *Block, qc *flow.QuorumCertificate) (CertifiedBlock, error) {
+	if block.View != qc.View {
+		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", block.View, qc.View)
+	}
+	if block.BlockID != qc.BlockID {
+		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", block.BlockID, qc.BlockID)
+	}
+	return CertifiedBlock{
+		Block: block,
+		QC:    qc,
+	}, nil
 }
 
 // ID returns unique identifier for the block.

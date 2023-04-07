@@ -44,12 +44,11 @@ type ActivePaceMakerTestSuite struct {
 	initialQC   *flow.QuorumCertificate
 	initialTC   *flow.TimeoutCertificate
 
-	notifier     *mocks.Consumer
-	persist      *mocks.Persister
-	paceMaker    *ActivePaceMaker
-	stop         context.CancelFunc
-	timeoutConf  timeout.Config
-	livenessData *hotstuff.LivenessData // should not be used by tests to determine expected values!
+	notifier    *mocks.Consumer
+	persist     *mocks.Persister
+	paceMaker   *ActivePaceMaker
+	stop        context.CancelFunc
+	timeoutConf timeout.Config
 }
 
 func (s *ActivePaceMakerTestSuite) SetupTest() {
@@ -75,12 +74,12 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 	// CAUTION: The Persister hands a pointer to `livenessData` to the PaceMaker, which means the PaceMaker
 	// could modify our struct in-place. `livenessData` should not be used by tests to determine expected values!
 	s.persist = mocks.NewPersister(s.T())
-	s.livenessData = &hotstuff.LivenessData{
+	livenessData := &hotstuff.LivenessData{
 		CurrentView: 3,
 		LastViewTC:  nil,
 		NewestQC:    s.initialQC,
 	}
-	s.persist.On("GetLivenessData").Return(s.livenessData, nil).Once()
+	s.persist.On("GetLivenessData").Return(livenessData, nil)
 
 	// init PaceMaker and start
 	s.paceMaker, err = New(timeout.NewController(s.timeoutConf), s.notifier, s.persist)
@@ -343,7 +342,6 @@ func (s *ActivePaceMakerTestSuite) Test_Initialization() {
 	})
 
 	// set up mocks
-	s.persist.On("GetLivenessData").Return(s.livenessData, nil)
 	s.persist.On("PutLivenessData", mock.Anything).Return(nil)
 
 	// test that the constructor finds the newest QC and TC
@@ -352,13 +350,13 @@ func (s *ActivePaceMakerTestSuite) Test_Initialization() {
 			timeout.NewController(s.timeoutConf), s.notifier, s.persist,
 			WithQCs(qcs...), WithTCs(tcs...),
 		)
-		s.Require().NoError(err)
+		require.NoError(s.T(), err)
 
-		s.Require().Equal(highestView+1, pm.CurView())
+		require.Equal(s.T(), highestView+1, pm.CurView())
 		if tc := pm.LastViewTC(); tc != nil {
-			s.Require().Equal(highestView, tc.View)
+			require.Equal(s.T(), highestView, tc.View)
 		} else {
-			s.Require().Equal(highestView, pm.NewestQC().View)
+			require.Equal(s.T(), highestView, pm.NewestQC().View)
 		}
 	})
 
@@ -372,14 +370,14 @@ func (s *ActivePaceMakerTestSuite) Test_Initialization() {
 			timeout.NewController(s.timeoutConf), s.notifier, s.persist,
 			WithTCs(tcs...), WithQCs(qcs...),
 		)
-		s.Require().NoError(err)
+		require.NoError(s.T(), err)
 
 		// * when observing tcs[17], which is newer than any other QC or TC, the pacemaker should enter view tcs[17].View + 1
 		// * when observing tcs[45], which is older than tcs[17], the PaceMaker should notice that the QC in tcs[45]
 		//   is newer than its local QC and update it
-		s.Require().Equal(tcs[17].View+1, pm.CurView())
-		s.Require().Equal(tcs[17], pm.LastViewTC())
-		s.Require().Equal(tcs[45].NewestQC, pm.NewestQC())
+		require.Equal(s.T(), tcs[17].View+1, pm.CurView())
+		require.Equal(s.T(), tcs[17], pm.LastViewTC())
+		require.Equal(s.T(), tcs[45].NewestQC, pm.NewestQC())
 	})
 
 	// Another edge case: a TC from a past view contains QC for the same view.
@@ -392,14 +390,38 @@ func (s *ActivePaceMakerTestSuite) Test_Initialization() {
 			timeout.NewController(s.timeoutConf), s.notifier, s.persist,
 			WithTCs(tcs...), WithQCs(qcs...),
 		)
-		s.Require().NoError(err)
+		require.NoError(s.T(), err)
 
 		// * when observing tcs[17], which is newer than any other QC or TC, the pacemaker should enter view tcs[17].View + 1
 		// * when observing tcs[45], which is older than tcs[17], the PaceMaker should notice that the QC in tcs[45]
 		//   is newer than its local QC and update it
-		s.Require().Equal(tcs[17].View+1, pm.CurView())
-		s.Require().Equal(tcs[17], pm.LastViewTC())
-		s.Require().Equal(tcs[45].NewestQC, pm.NewestQC())
+		require.Equal(s.T(), tcs[17].View+1, pm.CurView())
+		require.Equal(s.T(), tcs[17], pm.LastViewTC())
+		require.Equal(s.T(), tcs[45].NewestQC, pm.NewestQC())
+	})
+
+	// Verify that WithTCs still works correctly if no TCs are given:
+	// the list of TCs is empty or all contained TCs are nil
+	s.Run("Only nil TCs", func() {
+		pm, err := New(timeout.NewController(s.timeoutConf), s.notifier, s.persist, WithTCs())
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), s.initialView, pm.CurView())
+
+		pm, err = New(timeout.NewController(s.timeoutConf), s.notifier, s.persist, WithTCs(nil, nil, nil))
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), s.initialView, pm.CurView())
+	})
+
+	// Verify that WithQCs still works correctly if no QCs are given:
+	// the list of QCs is empty or all contained QCs are nil
+	s.Run("Only nil QCs", func() {
+		pm, err := New(timeout.NewController(s.timeoutConf), s.notifier, s.persist, WithQCs())
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), s.initialView, pm.CurView())
+
+		pm, err = New(timeout.NewController(s.timeoutConf), s.notifier, s.persist, WithQCs(nil, nil, nil))
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), s.initialView, pm.CurView())
 	})
 
 }

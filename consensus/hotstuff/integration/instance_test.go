@@ -378,7 +378,8 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		BlockID:       rootBlock.BlockID,
 		SignerIndices: signerIndices,
 	}
-	rootBlockQC := &model.CertifiedBlock{Block: rootBlock, QC: rootQC}
+	certifiedRootBlock, err := model.NewCertifiedBlock(rootBlock, rootQC)
+	require.NoError(t, err)
 
 	livenessData := &hotstuff.LivenessData{
 		CurrentView: rootQC.View + 1,
@@ -393,7 +394,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	require.NoError(t, err)
 
 	// initialize the forks handler
-	in.forks, err = forks.New(rootBlockQC, in.finalizer, notifier)
+	in.forks, err = forks.New(&certifiedRootBlock, in.finalizer, notifier)
 	require.NoError(t, err)
 
 	// initialize the validator

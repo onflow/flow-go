@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -168,20 +169,19 @@ func (p *ActivePaceMaker) Start(ctx context.Context) {
 // information as consistent with our already-present knowledge, i.e. as a no-op.
 type recoveryInformation func(p *ActivePaceMaker) error
 
-// WithQC informs the PaceMaker about the given QCs. Old and nil QCs are accepted (no-op).
+// WithQCs informs the PaceMaker about the given QCs. Old and nil QCs are accepted (no-op).
 func WithQCs(qcs ...*flow.QuorumCertificate) recoveryInformation {
 	// To avoid excessive data base writes during initialization, we pre-filter the newest QC
 	// here and only hand that one to the viewTracker. For recovery, we allow the special case
 	// of nil QCs, because the genesis block has no QC.
-	var newestQC *flow.QuorumCertificate
+	tracker := tracker.NewNewestQCTracker()
 	for _, qc := range qcs {
 		if qc == nil {
 			continue // no-op
 		}
-		if newestQC == nil || newestQC.View < qc.View {
-			newestQC = qc
-		}
+		tracker.Track(qc)
 	}
+	newestQC := tracker.NewestQC()
 	if newestQC == nil {
 		return func(p *ActivePaceMaker) error { return nil } // no-op
 	}
@@ -192,21 +192,19 @@ func WithQCs(qcs ...*flow.QuorumCertificate) recoveryInformation {
 	}
 }
 
-// WithTC informs the PaceMaker about the given TCs. Old and nil TCs are accepted (no-op).
+// WithTCs informs the PaceMaker about the given TCs. Old and nil TCs are accepted (no-op).
 func WithTCs(tcs ...*flow.TimeoutCertificate) recoveryInformation {
-	var newestTC *flow.TimeoutCertificate
-	var newestQC *flow.QuorumCertificate
+	qcTracker := tracker.NewNewestQCTracker()
+	tcTracker := tracker.NewNewestTCTracker()
 	for _, tc := range tcs {
 		if tc == nil {
 			continue // no-op
 		}
-		if newestTC == nil || newestTC.View < tc.View {
-			newestTC = tc
-		}
-		if newestQC == nil || newestQC.View < tc.NewestQC.View {
-			newestQC = tc.NewestQC
-		}
+		tcTracker.Track(tc)
+		qcTracker.Track(tc.NewestQC)
 	}
+	newestTC := tcTracker.NewestTC()
+	newestQC := qcTracker.NewestQC()
 	if newestTC == nil { // shortcut if no TCs provided
 		return func(p *ActivePaceMaker) error { return nil } // no-op
 	}
