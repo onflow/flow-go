@@ -22,7 +22,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine/ghost/client"
 	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/client"
 	"github.com/onflow/flow-go/model/bootstrap"
