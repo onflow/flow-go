@@ -187,7 +187,7 @@ func displayPortAssignments() {
 	}
 	fmt.Println()
 	for i := 0; i < observerCount; i++ {
-		fmt.Printf("Observer %d Flow API will be accessible at localhost:%d\n", i+1, (accessCount*2)+(AccessAPIPort)+2*i)
+		fmt.Printf("Observer %d Flow API will be accessible at localhost:%d\n", i+1, (accessCount*3)+(AccessAPIPort)+2*i)
 	}
 }
 
@@ -493,8 +493,8 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		// the same from the guest's perspective, the host port numbering accounts for the presence
 		// of multiple pairs of listeners on the host to avoid port collisions. Observer listener pairs
 		// are numbered just after the Access listeners on the host network by prior convention
-		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i), RPCPort),
-		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i)+1, SecuredRPCPort),
+		fmt.Sprintf("%d:%d", (accessCount*3)+AccessAPIPort+(2*i), RPCPort),
+		fmt.Sprintf("%d:%d", (accessCount*3)+AccessAPIPort+(2*i)+1, SecuredRPCPort),
 	}
 	return observerService
 }
