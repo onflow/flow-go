@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -40,7 +40,7 @@ func TestValidationInspector_SafetyThreshold(t *testing.T) {
 	// if GRAFT/PRUNE message count is lower than safety threshold the RPC validation should pass
 	safetyThreshold := uint64(10)
 	// create our RPC validation inspector
-	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
+	inspectorConfig := inspector.DefaultRPCValidationConfig()
 	inspectorConfig.NumberOfWorkers = 1
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = safetyThreshold
 	inspectorConfig.PruneValidationCfg.SafetyThreshold = safetyThreshold
@@ -112,7 +112,7 @@ func TestValidationInspector_DiscardThreshold(t *testing.T) {
 	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
 	discardThreshold := uint64(10)
 	// create our RPC validation inspector
-	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
+	inspectorConfig := inspector.DefaultRPCValidationConfig()
 	inspectorConfig.NumberOfWorkers = 1
 	inspectorConfig.GraftValidationCfg.DiscardThreshold = discardThreshold
 	inspectorConfig.PruneValidationCfg.DiscardThreshold = discardThreshold
@@ -180,7 +180,7 @@ func TestValidationInspector_RateLimitedPeer(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create our RPC validation inspector
-	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
+	inspectorConfig := inspector.DefaultRPCValidationConfig()
 	inspectorConfig.NumberOfWorkers = 1
 
 	// here we set the message count to the amount of flow channels
@@ -255,7 +255,7 @@ func TestValidationInspector_InvalidTopicID(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
-	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
+	inspectorConfig := inspector.DefaultRPCValidationConfig()
 	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
 	inspectorConfig.NumberOfWorkers = 1
