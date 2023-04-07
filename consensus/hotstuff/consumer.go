@@ -41,8 +41,6 @@ type BaseProtocolViolationConsumer interface {
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
 type FinalizationConsumer interface {
-	BaseProtocolViolationConsumer
-
 	// OnBlockIncorporated notifications are produced by the Finalization Logic
 	// whenever a block is incorporated into the consensus state.
 	// Prerequisites:
@@ -58,6 +56,16 @@ type FinalizationConsumer interface {
 	OnFinalizedBlock(*model.Block)
 }
 
+// ConsensusFollowerConsumer consumes outbound notifications produced by consensus followers(not participants).
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
+type ConsensusFollowerConsumer interface {
+	BaseProtocolViolationConsumer
+	FinalizationConsumer
+}
+
 // Consumer consumes outbound notifications produced by HotStuff and its components.
 // Notifications are consensus-internal state changes which are potentially relevant to
 // the larger node in which HotStuff is running. The notifications are emitted
@@ -68,7 +76,7 @@ type FinalizationConsumer interface {
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
 type Consumer interface {
-	FinalizationConsumer
+	ConsensusFollowerConsumer
 	CommunicatorConsumer
 
 	// OnEventProcessed notifications are produced by the EventHandler when it is done processing

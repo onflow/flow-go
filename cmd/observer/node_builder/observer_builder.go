@@ -170,7 +170,7 @@ type ObserverServiceBuilder struct {
 	FollowerState           stateprotocol.FollowerState
 	SyncCore                *chainsync.Core
 	RpcEng                  *rpc.Engine
-	FinalizationDistributor *pubsub.FinalizationDistributor
+	FinalizationDistributor *pubsub.FollowerDistributor
 	FinalizedHeader         *synceng.FinalizedHeaderCache
 	Committee               hotstuff.DynamicCommittee
 	Finalized               *flow.Header
@@ -567,7 +567,7 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 	anb := &ObserverServiceBuilder{
 		ObserverServiceConfig:   config,
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String()),
-		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
+		FinalizationDistributor: pubsub.NewFollowerDistributor(),
 	}
 	anb.FinalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses

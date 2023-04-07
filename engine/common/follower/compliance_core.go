@@ -38,17 +38,18 @@ const defaultPendingBlocksCacheCapacity = 1000
 // Generally is NOT concurrency safe but some functions can be used in concurrent setup.
 type ComplianceCore struct {
 	*component.ComponentManager
-	log                 zerolog.Logger
-	mempoolMetrics      module.MempoolMetrics
-	tracer              module.Tracer
-	pendingCache        *cache.Cache
-	pendingTree         *pending_tree.PendingTree
-	state               protocol.FollowerState
-	follower            module.HotStuffFollower
-	validator           hotstuff.Validator
-	sync                module.BlockRequester
-	certifiedRangesChan chan CertifiedBlocks // delivers ranges of certified blocks to main core worker
-	finalizedBlocksChan chan *flow.Header    // delivers finalized blocks to main core worker.
+	log                       zerolog.Logger
+	mempoolMetrics            module.MempoolMetrics
+	tracer                    module.Tracer
+	protocolViolationNotifier hotstuff.BaseProtocolViolationConsumer
+	pendingCache              *cache.Cache
+	pendingTree               *pending_tree.PendingTree
+	state                     protocol.FollowerState
+	follower                  module.HotStuffFollower
+	validator                 hotstuff.Validator
+	sync                      module.BlockRequester
+	certifiedRangesChan       chan CertifiedBlocks // delivers ranges of certified blocks to main core worker
+	finalizedBlocksChan       chan *flow.Header    // delivers finalized blocks to main core worker.
 }
 
 var _ complianceCore = (*ComplianceCore)(nil)
@@ -58,7 +59,7 @@ var _ complianceCore = (*ComplianceCore)(nil)
 func NewComplianceCore(log zerolog.Logger,
 	mempoolMetrics module.MempoolMetrics,
 	heroCacheCollector module.HeroCacheMetrics,
-	finalizationConsumer hotstuff.FinalizationConsumer,
+	followerConsumer hotstuff.ConsensusFollowerConsumer,
 	state protocol.FollowerState,
 	follower module.HotStuffFollower,
 	validator hotstuff.Validator,
@@ -66,7 +67,7 @@ func NewComplianceCore(log zerolog.Logger,
 	tracer module.Tracer,
 ) (*ComplianceCore, error) {
 	onEquivocation := func(block, otherBlock *flow.Block) {
-		finalizationConsumer.OnDoubleProposeDetected(model.BlockFromFlow(block.Header), model.BlockFromFlow(otherBlock.Header))
+		followerConsumer.OnDoubleProposeDetected(model.BlockFromFlow(block.Header), model.BlockFromFlow(otherBlock.Header))
 	}
 
 	finalizedBlock, err := state.Final().Head()
@@ -75,17 +76,18 @@ func NewComplianceCore(log zerolog.Logger,
 	}
 
 	c := &ComplianceCore{
-		log:                 log.With().Str("engine", "follower_core").Logger(),
-		mempoolMetrics:      mempoolMetrics,
-		state:               state,
-		pendingCache:        cache.NewCache(log, defaultPendingBlocksCacheCapacity, heroCacheCollector, onEquivocation),
-		pendingTree:         pending_tree.NewPendingTree(finalizedBlock),
-		follower:            follower,
-		validator:           validator,
-		sync:                sync,
-		tracer:              tracer,
-		certifiedRangesChan: make(chan CertifiedBlocks, defaultCertifiedRangeChannelCapacity),
-		finalizedBlocksChan: make(chan *flow.Header, defaultFinalizedBlocksChannelCapacity),
+		log:                       log.With().Str("engine", "follower_core").Logger(),
+		mempoolMetrics:            mempoolMetrics,
+		state:                     state,
+		protocolViolationNotifier: followerConsumer,
+		pendingCache:              cache.NewCache(log, defaultPendingBlocksCacheCapacity, heroCacheCollector, onEquivocation),
+		pendingTree:               pending_tree.NewPendingTree(finalizedBlock),
+		follower:                  follower,
+		validator:                 validator,
+		sync:                      sync,
+		tracer:                    tracer,
+		certifiedRangesChan:       make(chan CertifiedBlocks, defaultCertifiedRangeChannelCapacity),
+		finalizedBlocksChan:       make(chan *flow.Header, defaultFinalizedBlocksChannelCapacity),
 	}
 
 	// prune cache to latest finalized view
@@ -141,9 +143,9 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 		// 2. The QC within the block is valid. A valid QC proves validity of all ancestors.
 		err := c.validator.ValidateProposal(hotstuffProposal)
 		if err != nil {
-			if model.IsInvalidBlockError(err) {
-				// TODO potential slashing
-				log.Err(err).Msgf("received invalid block proposal (potential slashing evidence)")
+			if invalidBlockError, ok := model.AsInvalidBlockError(err); ok {
+				// TODO: potential slashing
+				c.protocolViolationNotifier.OnInvalidBlockDetected(*invalidBlockError)
 				return nil
 			}
 			if errors.Is(err, model.ErrViewForUnknownEpoch) {

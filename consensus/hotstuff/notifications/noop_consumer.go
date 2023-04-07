@@ -11,6 +11,7 @@ import (
 // NoopConsumer is an implementation of the notifications consumer that
 // doesn't do anything.
 type NoopConsumer struct {
+	NoopBaseProtocolViolationConsumer
 	NoopFinalizationConsumer
 	NoopPartialConsumer
 	NoopCommunicatorConsumer
@@ -67,9 +68,7 @@ func (*NoopPartialConsumer) OnInvalidTimeoutDetected(model.InvalidTimeoutError) 
 
 // no-op implementation of hotstuff.FinalizationConsumer
 
-type NoopFinalizationConsumer struct {
-	NoopBaseProtocolViolationConsumer
-}
+type NoopFinalizationConsumer struct{}
 
 var _ hotstuff.FinalizationConsumer = (*NoopFinalizationConsumer)(nil)
 
@@ -118,6 +117,6 @@ type NoopBaseProtocolViolationConsumer struct{}
 
 var _ hotstuff.BaseProtocolViolationConsumer = (*NoopBaseProtocolViolationConsumer)(nil)
 
-func (n NoopBaseProtocolViolationConsumer) OnInvalidBlockDetected(model.InvalidBlockError) {}
+func (*NoopBaseProtocolViolationConsumer) OnInvalidBlockDetected(model.InvalidBlockError) {}
 
-func (n NoopBaseProtocolViolationConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
+func (*NoopBaseProtocolViolationConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}

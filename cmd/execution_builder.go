@@ -128,7 +128,7 @@ type ExecutionNode struct {
 	computationManager      *computation.Manager
 	collectionRequester     *requester.Engine
 	ingestionEng            *ingestion.Engine
-	finalizationDistributor *pubsub.FinalizationDistributor
+	finalizationDistributor *pubsub.FollowerDistributor
 	finalizedHeader         *synchronization.FinalizedHeaderCache
 	checkAuthorizedAtBlock  func(blockID flow.Identifier) (bool, error)
 	diskWAL                 *wal.DiskWAL
@@ -273,7 +273,7 @@ func (exeNode *ExecutionNode) LoadExecutionReceiptsStorage(
 }
 
 func (exeNode *ExecutionNode) LoadFinalizationDistributor(node *NodeConfig) error {
-	exeNode.finalizationDistributor = pubsub.NewFinalizationDistributor()
+	exeNode.finalizationDistributor = pubsub.NewFollowerDistributor()
 	exeNode.finalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
 	return nil
 }

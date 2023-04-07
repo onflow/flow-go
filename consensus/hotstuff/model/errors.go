@@ -184,6 +184,17 @@ func IsInvalidBlockError(err error) bool {
 	return errors.As(err, &e)
 }
 
+// AsInvalidBlockError determines whether the given error is a InvalidBlockError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsInvalidBlockError(err error) (*InvalidBlockError, bool) {
+	var e InvalidBlockError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
+	}
+	return nil, false
+}
+
 func (e InvalidBlockError) Unwrap() error {
 	return e.Err
 }

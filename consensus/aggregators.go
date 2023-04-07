@@ -25,7 +25,7 @@ func NewVoteAggregator(
 	lowestRetainedView uint64,
 	notifier hotstuff.Consumer,
 	voteProcessorFactory hotstuff.VoteProcessorFactory,
-	distributor *pubsub.FinalizationDistributor,
+	distributor *pubsub.FollowerDistributor,
 ) (hotstuff.VoteAggregator, error) {
 
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)

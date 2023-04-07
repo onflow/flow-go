@@ -79,7 +79,7 @@ func main() {
 		clusterComplianceConfig modulecompliance.Config
 
 		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
-		finalizationDistributor *pubsub.FinalizationDistributor
+		finalizationDistributor *pubsub.FollowerDistributor
 		finalizedHeader         *consync.FinalizedHeaderCache
 
 		push              *pusher.Engine
@@ -172,7 +172,7 @@ func main() {
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
 		Module("finalization distributor", func(node *cmd.NodeConfig) error {
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
+			finalizationDistributor = pubsub.NewFollowerDistributor()
 			finalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
 			return nil
 		}).

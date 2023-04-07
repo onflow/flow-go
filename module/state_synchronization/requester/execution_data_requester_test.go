@@ -385,7 +385,7 @@ func generatePauseResume(pauseHeight uint64) (specialBlockGenerator, func()) {
 	return generate, resume
 }
 
-func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun) (state_synchronization.ExecutionDataRequester, *pubsub.FinalizationDistributor) {
+func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun) (state_synchronization.ExecutionDataRequester, *pubsub.FollowerDistributor) {
 	headers := synctest.MockBlockHeaderStorage(
 		synctest.WithByID(cfg.blocksByID),
 		synctest.WithByHeight(cfg.blocksByHeight),
@@ -400,7 +400,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 
 	suite.downloader = mockDownloader(cfg.executionDataEntries)
 
-	finalizationDistributor := pubsub.NewFinalizationDistributor()
+	finalizationDistributor := pubsub.NewFollowerDistributor()
 	processedHeight := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 	processedNotification := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterNotification)
 
@@ -428,7 +428,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	return edr, finalizationDistributor
 }
 
-func (suite *ExecutionDataRequesterSuite) runRequesterTestHalts(edr state_synchronization.ExecutionDataRequester, finalizationDistributor *pubsub.FinalizationDistributor, cfg *fetchTestRun) receivedExecutionData {
+func (suite *ExecutionDataRequesterSuite) runRequesterTestHalts(edr state_synchronization.ExecutionDataRequester, finalizationDistributor *pubsub.FollowerDistributor, cfg *fetchTestRun) receivedExecutionData {
 	// make sure test helper goroutines are cleaned up
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -457,7 +457,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestHalts(edr state_synchr
 	return fetchedExecutionData
 }
 
-func (suite *ExecutionDataRequesterSuite) runRequesterTestPauseResume(edr state_synchronization.ExecutionDataRequester, finalizationDistributor *pubsub.FinalizationDistributor, cfg *fetchTestRun, expectedDownloads int, resume func()) receivedExecutionData {
+func (suite *ExecutionDataRequesterSuite) runRequesterTestPauseResume(edr state_synchronization.ExecutionDataRequester, finalizationDistributor *pubsub.FollowerDistributor, cfg *fetchTestRun, expectedDownloads int, resume func()) receivedExecutionData {
 	// make sure test helper goroutines are cleaned up
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
@@ -493,7 +493,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestPauseResume(edr state_
 	return fetchedExecutionData
 }
 
-func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr state_synchronization.ExecutionDataRequester, finalizationDistributor *pubsub.FinalizationDistributor, cfg *fetchTestRun) receivedExecutionData {
+func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr state_synchronization.ExecutionDataRequester, finalizationDistributor *pubsub.FollowerDistributor, cfg *fetchTestRun) receivedExecutionData {
 	// make sure test helper goroutines are cleaned up
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
@@ -538,7 +538,7 @@ func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(cfg 
 	}
 }
 
-func (suite *ExecutionDataRequesterSuite) finalizeBlocks(cfg *fetchTestRun, finalizationDistributor *pubsub.FinalizationDistributor) {
+func (suite *ExecutionDataRequesterSuite) finalizeBlocks(cfg *fetchTestRun, finalizationDistributor *pubsub.FollowerDistributor) {
 	for i := cfg.StartHeight(); i <= cfg.endHeight; i++ {
 		b := cfg.blocksByHeight[i]
 

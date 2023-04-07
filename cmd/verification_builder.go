@@ -101,7 +101,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		verifierEng             *verifier.Engine  // the verifier engine
 		chunkConsumer           *chunkconsumer.ChunkConsumer
 		blockConsumer           *blockconsumer.BlockConsumer
-		finalizationDistributor *pubsub.FinalizationDistributor
+		finalizationDistributor *pubsub.FollowerDistributor
 		finalizedHeader         *commonsync.FinalizedHeaderCache
 
 		committee    *committees.Consensus
@@ -178,7 +178,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("finalization distributor", func(node *NodeConfig) error {
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
+			finalizationDistributor = pubsub.NewFollowerDistributor()
 			finalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
 			return nil
 		}).

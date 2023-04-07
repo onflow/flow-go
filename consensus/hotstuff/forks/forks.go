@@ -36,7 +36,7 @@ type ancestryChain struct {
 // https://developers.diem.com/papers/diem-consensus-state-machine-replication-in-the-diem-blockchain/2021-08-17.pdf
 // Forks is NOT safe for concurrent use by multiple goroutines.
 type Forks struct {
-	notifier hotstuff.FinalizationConsumer
+	notifier hotstuff.ConsensusFollowerConsumer
 	forest   forest.LevelledForest
 
 	finalizationCallback module.Finalizer
@@ -46,7 +46,7 @@ type Forks struct {
 
 var _ hotstuff.Forks = (*Forks)(nil)
 
-func New(trustedRoot *BlockQC, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Forks, error) {
+func New(trustedRoot *BlockQC, finalizationCallback module.Finalizer, notifier hotstuff.ConsensusFollowerConsumer) (*Forks, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.QC.BlockID) || (trustedRoot.Block.View != trustedRoot.QC.View) {
 		return nil, model.NewConfigurationErrorf("invalid root: root QC is not pointing to root block")
 	}

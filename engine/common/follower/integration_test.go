@@ -83,7 +83,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		consensusConsumer := pubsub.NewFinalizationDistributor()
+		consensusConsumer := pubsub.NewFollowerDistributor()
 		// use real consensus modules
 		forks, err := consensus.NewForks(rootHeader, all.Headers, finalizer, consensusConsumer, rootHeader, rootQC)
 		require.NoError(t, err)

@@ -108,7 +108,7 @@ type FollowerServiceBuilder struct {
 	LibP2PNode              p2p.LibP2PNode
 	FollowerState           protocol.FollowerState
 	SyncCore                *synchronization.Core
-	FinalizationDistributor *pubsub.FinalizationDistributor
+	FinalizationDistributor *pubsub.FollowerDistributor
 	FinalizedHeader         *synceng.FinalizedHeaderCache
 	Committee               hotstuff.DynamicCommittee
 	Finalized               *flow.Header
@@ -357,7 +357,7 @@ func FlowConsensusFollowerService(opts ...FollowerOption) *FollowerServiceBuilde
 		FollowerServiceConfig: config,
 		// TODO: using RoleAccess here for now. This should be refactored eventually to have its own role type
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
-		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
+		FinalizationDistributor: pubsub.NewFollowerDistributor(),
 	}
 	ret.FinalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(ret.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses

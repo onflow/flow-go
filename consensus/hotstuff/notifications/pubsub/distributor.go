@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -36,6 +37,24 @@ func (p *Distributor) AddConsumer(consumer hotstuff.Consumer) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.subscribers = append(p.subscribers, consumer)
+}
+
+// AddFollowerConsumer wraps
+func (p *Distributor) AddFollowerConsumer(consumer hotstuff.ConsensusFollowerConsumer) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	var wrappedConsumer hotstuff.Consumer = &struct {
+		notifications.NoopCommunicatorConsumer
+		notifications.NoopPartialConsumer
+		hotstuff.ConsensusFollowerConsumer
+	}{
+		notifications.NoopCommunicatorConsumer{},
+		notifications.NoopPartialConsumer{},
+		consumer,
+	}
+
+	p.subscribers = append(p.subscribers, wrappedConsumer)
 }
 
 func (p *Distributor) OnStart(currentView uint64) {

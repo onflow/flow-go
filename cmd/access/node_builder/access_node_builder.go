@@ -196,7 +196,7 @@ type FlowAccessNodeBuilder struct {
 	FollowerState              protocol.FollowerState
 	SyncCore                   *chainsync.Core
 	RpcEng                     *rpc.Engine
-	FinalizationDistributor    *consensuspubsub.FinalizationDistributor
+	FinalizationDistributor    *consensuspubsub.FollowerDistributor
 	FinalizedHeader            *synceng.FinalizedHeaderCache
 	CollectionRPC              access.AccessAPIClient
 	TransactionTimings         *stdmap.TransactionTimings
@@ -576,7 +576,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 }
 
 func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
-	dist := consensuspubsub.NewFinalizationDistributor()
+	dist := consensuspubsub.NewFollowerDistributor()
 	dist.AddConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
 	return &FlowAccessNodeBuilder{
 		AccessNodeConfig:        DefaultAccessNodeConfig(),

@@ -12,12 +12,12 @@ import (
 // HotstuffModules is a helper structure to encapsulate dependencies to create
 // a hotStuff participant.
 type HotstuffModules struct {
-	Committee                   hotstuff.DynamicCommittee       // consensus committee
-	Signer                      hotstuff.Signer                 // signer of proposal & votes
-	Persist                     hotstuff.Persister              // last state of consensus participant
-	Notifier                    *pubsub.Distributor             // observer for hotstuff events
-	FinalizationDistributor     *pubsub.FinalizationDistributor // observer for finalization events, used by compliance engine
-	QCCreatedDistributor        *pubsub.QCCreatedDistributor    // observer for qc created event, used by leader
+	Committee                   hotstuff.DynamicCommittee    // consensus committee
+	Signer                      hotstuff.Signer              // signer of proposal & votes
+	Persist                     hotstuff.Persister           // last state of consensus participant
+	Notifier                    *pubsub.Distributor          // observer for hotstuff events
+	FinalizationDistributor     *pubsub.FollowerDistributor  // observer for finalization events, used by compliance engine
+	QCCreatedDistributor        *pubsub.QCCreatedDistributor // observer for qc created event, used by leader
 	TimeoutCollectorDistributor *pubsub.TimeoutCollectorDistributor
 	Forks                       hotstuff.Forks             // information about multiple forks
 	Validator                   hotstuff.Validator         // validator of proposals & votes

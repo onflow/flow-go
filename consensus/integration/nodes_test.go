@@ -610,7 +610,7 @@ func createNode(
 	comp, err := compliance.NewEngine(log, me, compCore)
 	require.NoError(t, err)
 
-	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
+	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFollowerDistributor())
 	require.NoError(t, err)
 
 	identities, err := state.Final().Identities(filter.And(

@@ -115,7 +115,7 @@ func main() {
 		mainMetrics             module.HotstuffMetrics
 		receiptValidator        module.ReceiptValidator
 		chunkAssigner           *chmodule.ChunkAssigner
-		finalizationDistributor *pubsub.FinalizationDistributor
+		finalizationDistributor *pubsub.FollowerDistributor
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
@@ -365,7 +365,7 @@ func main() {
 			return err
 		}).
 		Module("finalization distributor", func(node *cmd.NodeConfig) error {
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
+			finalizationDistributor = pubsub.NewFollowerDistributor()
 			finalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
 			return nil
 		}).
@@ -560,7 +560,7 @@ func main() {
 				mainMetrics,
 			)
 
-			notifier.AddConsumer(finalizationDistributor)
+			notifier.AddFollowerConsumer(finalizationDistributor)
 
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
