@@ -66,10 +66,11 @@ type Suite struct {
 	execClient           *accessmock.ExecutionAPIClient
 	me                   *module.Local
 	rootBlock            *flow.Header
+	finalizedBlock       *flow.Header
 	chainID              flow.ChainID
 	metrics              *metrics.NoopCollector
 	backend              *backend.Backend
-	finalizedHeader      *synceng.FinalizedHeaderCache
+	finalizedHeaderCache *synceng.FinalizedHeaderCache
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -84,12 +85,20 @@ func (suite *Suite) SetupTest() {
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 
+	suite.rootBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
+	suite.finalizedBlock = unittest.BlockHeaderWithParentFixture(suite.rootBlock)
+
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
+	suite.snapshot.On("Head").Return(
+		func() *flow.Header {
+			return suite.finalizedBlock
+		},
+		nil,
+	).Maybe()
 
-	suite.rootBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	suite.params = new(protocol.Params)
 	suite.params.On("Root").Return(suite.rootBlock, nil)
 	suite.params.On("SporkRootBlockHeight").Return(suite.rootBlock.Height, nil)
@@ -113,8 +122,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
-	suite.finalizedHeader, _ = synceng.NewFinalizedHeaderCache(suite.log, suite.state, pubsub.NewFinalizationDistributor())
-
+	suite.finalizedHeaderCache, _ = synceng.NewFinalizedHeaderCache(suite.log, suite.state, pubsub.NewFinalizationDistributor())
 }
 
 func (suite *Suite) RunTest(
@@ -142,7 +150,7 @@ func (suite *Suite) RunTest(
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
 		)
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeader, access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
 		f(handler, db, all)
 	})
 }
@@ -317,7 +325,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeader)
+		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeaderCache)
 
 		// Send transaction 1
 		resp, err := handler.SendTransaction(context.Background(), sendReq1)
@@ -628,12 +636,12 @@ func (suite *Suite) TestGetSealedTransaction() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeader)
+		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeaderCache)
 
 		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, all.Blocks, all.Headers, collections, transactions, receipts,
 			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
 		require.NoError(suite.T(), err)
-		rpcEng, err := rpcEngBuilder.WithFinalizedHeaderCache(suite.finalizedHeader).WithLegacy().Build()
+		rpcEng, err := rpcEngBuilder.WithFinalizedHeaderCache(suite.finalizedHeaderCache).WithLegacy().Build()
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
@@ -721,7 +729,7 @@ func (suite *Suite) TestExecuteScript() {
 			backend.DefaultSnapshotHistoryLimit,
 		)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeader)
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache)
 
 		// initialize metrics related storage
 		metrics := metrics.NewNoopCollector()
@@ -847,6 +855,82 @@ func (suite *Suite) TestExecuteScript() {
 	})
 }
 
+// TestRpcEngineBuilderWithFinalizedHeaderCache tests the RpcEngineBuilder's WithFinalizedHeaderCache method to ensure
+// that the RPC engine is constructed correctly with the provided finalized header cache.
+func (suite *Suite) TestRpcEngineBuilderWithFinalizedHeaderCache() {
+	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+		all := util.StorageLayer(suite.T(), db)
+		results := bstorage.NewExecutionResults(suite.metrics, db)
+		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
+
+		// initialize storage
+		metrics := metrics.NewNoopCollector()
+		transactions := bstorage.NewTransactions(metrics, db)
+		collections := bstorage.NewCollections(db, transactions)
+
+		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, all.Blocks, all.Headers, collections, transactions, receipts,
+			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
+		require.NoError(suite.T(), err)
+
+		rpcEng, err := rpcEngBuilder.WithLegacy().WithBlockSignerDecoder(suite.signerIndicesDecoder).Build()
+		require.Error(suite.T(), err)
+		require.Nil(suite.T(), rpcEng)
+
+		rpcEng, err = rpcEngBuilder.WithFinalizedHeaderCache(suite.finalizedHeaderCache).Build()
+		require.NoError(suite.T(), err)
+	})
+}
+
+func (suite *Suite) TestLastFinalizedBlockHeightResult() {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+		// test block1 get by ID
+		block1 := unittest.BlockFixture()
+		// test block2 get by height
+		block2 := unittest.BlockFixture()
+		block2.Header.Height = 2
+
+		require.NoError(suite.T(), all.Blocks.Store(&block1))
+		require.NoError(suite.T(), all.Blocks.Store(&block2))
+
+		// the follower logic should update height index on the block storage when a block is finalized
+		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
+		require.NoError(suite.T(), err)
+
+		suite.snapshot.On("Head").Return(block1.Header, nil)
+
+		assertFinalizedBlockHeader := func(resp *accessproto.BlockHeaderResponse, err error) {
+			require.NoError(suite.T(), err)
+			require.NotNil(suite.T(), resp)
+
+			finalizedHeader := suite.finalizedHeaderCache.Get()
+			finalizedHeaderId := finalizedHeader.ID()
+
+			require.Equal(suite.T(), &entitiesproto.LastFinalizedBlock{
+				Id:     finalizedHeaderId[:],
+				Height: finalizedHeader.Height,
+			}, resp.LastFinalizedBlock)
+		}
+
+		suite.Run("Get block 1 header by ID and check returned finalized header", func() {
+			id := block1.ID()
+			req := &accessproto.GetBlockHeaderByIDRequest{
+				Id: id[:],
+			}
+
+			resp, err := handler.GetBlockHeaderByID(context.Background(), req)
+			assertFinalizedBlockHeader(resp, err)
+
+			suite.finalizedBlock.Height = 2
+
+			resp, err = handler.GetBlockHeaderByID(context.Background(), req)
+			assertFinalizedBlockHeader(resp, err)
+		})
+	})
+}
+
+// TestLastFinalizedBlockHeightResult tests on example of the GetBlockHeaderByID function that the LastFinalizedBlock
+// field in the response matches the finalized header from cache. It also tests that the LastFinalizedBlock field is
+// updated correctly when a block with a greater height is finalized.
 func (suite *Suite) createChain() (flow.Block, flow.Collection) {
 	collection := unittest.CollectionFixture(10)
 	refBlockID := unittest.IdentifierFixture()

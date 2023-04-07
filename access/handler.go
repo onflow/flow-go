@@ -544,6 +544,7 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 	}, nil
 }
 
+// buildLastFinalizedBlockResponse builds and returns the last finalized block's response object.
 func (h *Handler) buildLastFinalizedBlockResponse() *entities.LastFinalizedBlock {
 	lastFinalizedHeader := h.finalizedHeaderCache.Get()
 	blockId := lastFinalizedHeader.ID()
