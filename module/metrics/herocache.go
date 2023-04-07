@@ -95,26 +95,25 @@ func DisallowListNotificationQueueMetricFactory(registrar prometheus.Registerer)
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDisallowListNotificationQueue, registrar)
 }
 
-func GossipSubRPCInspectorQueueMetricFactory(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
-	return f(namespaceNetwork, ResourceNetworkingRpcInspectorQueue)
-func GossipSubRPCValidationInspectorQueueMetricFactory(publicNetwork bool, registrar prometheus.Registerer) *HeroCacheCollector {
+func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
 	if publicNetwork {
-		return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingPublicRpcValidationInspectorQueue, registrar)
+		return f(namespaceNetwork, ResourceNetworkingPublicRpcMetricsObserverInspectorQueue)
 	}
-	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcValidationInspectorQueue, registrar)
+	return f(namespaceNetwork, ResourceNetworkingRpcMetricsObserverInspectorQueue)
 }
 
-func RpcInspectorNotificationQueueMetricFactory(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
+func GossipSubRPCInspectorQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+	if publicNetwork {
+		return f(namespaceNetwork, ResourceNetworkingPublicRpcValidationInspectorQueue)
+	}
+	return f(namespaceNetwork, ResourceNetworkingRpcValidationInspectorQueue)
+}
+
+func RpcInspectorNotificationQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+	if publicNetwork {
+		return f(namespaceNetwork, ResourceNetworkingPublicRpcMetricsObserverInspectorQueue)
+	}
 	return f(namespaceNetwork, ResourceNetworkingRpcInspectorNotificationQueue)
-func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(publicNetwork bool, registrar prometheus.Registerer) *HeroCacheCollector {
-	if publicNetwork {
-		return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingPublicRpcMetricsObserverInspectorQueue, registrar)
-	}
-	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcMetricsObserverInspectorQueue, registrar)
-}
-
-func RpcInspectorNotificationQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcInspectorNotificationQueue, registrar)
 }
 
 func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer, epoch uint64) *HeroCacheCollector {

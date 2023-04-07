@@ -874,19 +874,14 @@ func (builder *ObserverServiceBuilder) initPublicLibP2PFactory(networkKey crypto
 			builder.IdentityProvider,
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
-		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubRPCInspectorsConfig, builder.GossipSubInspectorNotifDistributor)
-		rpcInspectors, err := rpcInspectorBuilder.
+		rpcInspectors, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector).
 			SetPublicNetwork(p2p.PublicNetworkEnabled).
-			SetMetrics(builder.Metrics.Network, builder.MetricsRegisterer).
-			SetMetricsEnabled(builder.MetricsEnabled).Build()
-		rpcValidationInspector, err := p2pbuilder.BuildGossipSubRpcInspector(
-			builder.Logger,
-			builder.SporkID,
-			builder.GossipSubConfig.RpcValidation,
-			builder.HeroCacheMetricsFactory())
+			SetMetrics(&p2pbuilder.MetricsConfig{
+				HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+				Metrics:          builder.Metrics.Network,
+			}).Build()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors: %w", err)
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspector: %w", err)
+			return nil, fmt.Errorf("could not initialize gossipsub inspectors for observer node: %w", err)
 		}
 
 		node, err := p2pbuilder.NewNodeBuilder(

@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -186,8 +185,6 @@ type NetworkConfig struct {
 	NetworkConnectionPruning bool
 	// GossipSubConfig core gossipsub configuration.
 	GossipSubConfig *p2pbuilder.GossipSubConfig
-	// GossipSubRPCInspectorsConfig configuration for all gossipsub RPC control message inspectors.
-	GossipSubRPCInspectorsConfig *inspectorbuilder.GossipSubRPCInspectorsConfig
 	// PreferredUnicastProtocols list of unicast protocols in preferred order
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
