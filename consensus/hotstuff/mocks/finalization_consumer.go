@@ -17,19 +17,9 @@ func (_m *FinalizationConsumer) OnBlockIncorporated(_a0 *model.Block) {
 	_m.Called(_a0)
 }
 
-// OnDoubleProposeDetected provides a mock function with given fields: _a0, _a1
-func (_m *FinalizationConsumer) OnDoubleProposeDetected(_a0 *model.Block, _a1 *model.Block) {
-	_m.Called(_a0, _a1)
-}
-
 // OnFinalizedBlock provides a mock function with given fields: _a0
 func (_m *FinalizationConsumer) OnFinalizedBlock(_a0 *model.Block) {
 	_m.Called(_a0)
-}
-
-// OnInvalidBlockDetected provides a mock function with given fields: err
-func (_m *FinalizationConsumer) OnInvalidBlockDetected(err model.InvalidBlockError) {
-	_m.Called(err)
 }
 
 type mockConstructorTestingTNewFinalizationConsumer interface {

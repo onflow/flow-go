@@ -664,7 +664,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig(), metrics.NewChainSyncCollector(genesisHead.ChainID), genesisHead.ChainID)
 	require.NoError(t, err)
 
-	finalizationDistributor := pubsub.NewFollowerDistributor()
+	followerDistributor := pubsub.NewFollowerDistributor()
 
 	latestExecutedHeight, _, err := execState.GetHighestExecutedBlockID(context.TODO())
 	require.NoError(t, err)
@@ -700,19 +700,19 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node.ProtocolEvents.AddConsumer(ingestionEngine)
 
-	followerCore, finalizer := createFollowerCore(t, &node, followerState, finalizationDistributor, rootHead, rootQC)
+	followerCore, finalizer := createFollowerCore(t, &node, followerState, followerDistributor, rootHead, rootQC)
 	// mock out hotstuff validator
 	validator := new(mockhotstuff.Validator)
 	validator.On("ValidateProposal", mock.Anything).Return(nil)
 
-	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
+	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, followerDistributor)
 	require.NoError(t, err)
 
 	core, err := follower.NewComplianceCore(
 		node.Log,
 		node.Metrics,
 		node.Metrics,
-		finalizationDistributor,
+		followerDistributor,
 		followerState,
 		followerCore,
 		validator,
@@ -849,7 +849,7 @@ func (s *RoundRobinLeaderSelection) DKG(_ uint64) (hotstuff.DKG, error) {
 	return nil, fmt.Errorf("error")
 }
 
-func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState *badgerstate.FollowerState, notifier hotstuff.FinalizationConsumer,
+func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState *badgerstate.FollowerState, notifier hotstuff.ConsensusFollowerConsumer,
 	rootHead *flow.Header, rootQC *flow.QuorumCertificate) (module.HotStuffFollower, *confinalizer.Finalizer) {
 
 	identities, err := node.State.AtHeight(0).Identities(filter.HasRole(flow.RoleConsensus))

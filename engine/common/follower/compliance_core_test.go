@@ -34,13 +34,13 @@ func TestFollowerCore(t *testing.T) {
 type CoreSuite struct {
 	suite.Suite
 
-	originID             flow.Identifier
-	finalizedBlock       *flow.Header
-	state                *protocol.FollowerState
-	follower             *module.HotStuffFollower
-	sync                 *module.BlockRequester
-	validator            *hotstuff.Validator
-	finalizationConsumer *hotstuff.FinalizationConsumer
+	originID         flow.Identifier
+	finalizedBlock   *flow.Header
+	state            *protocol.FollowerState
+	follower         *module.HotStuffFollower
+	sync             *module.BlockRequester
+	validator        *hotstuff.Validator
+	followerConsumer *hotstuff.ConsensusFollowerConsumer
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -53,7 +53,7 @@ func (s *CoreSuite) SetupTest() {
 	s.follower = module.NewHotStuffFollower(s.T())
 	s.validator = hotstuff.NewValidator(s.T())
 	s.sync = module.NewBlockRequester(s.T())
-	s.finalizationConsumer = hotstuff.NewFinalizationConsumer(s.T())
+	s.followerConsumer = hotstuff.NewConsensusFollowerConsumer(s.T())
 
 	s.originID = unittest.IdentifierFixture()
 	s.finalizedBlock = unittest.BlockHeaderFixture()
@@ -67,7 +67,7 @@ func (s *CoreSuite) SetupTest() {
 		unittest.Logger(),
 		metrics,
 		metrics,
-		s.finalizationConsumer,
+		s.followerConsumer,
 		s.state,
 		s.follower,
 		s.validator,
@@ -166,10 +166,12 @@ func (s *CoreSuite) TestProcessingInvalidBlock() {
 	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
 
 	invalidProposal := model.ProposalFromFlow(blocks[len(blocks)-1].Header)
-	s.validator.On("ValidateProposal", invalidProposal).Return(model.InvalidBlockError{
+	sentinelError := model.InvalidBlockError{
 		InvalidBlock: invalidProposal,
 		Err:          fmt.Errorf(""),
-	}).Once()
+	}
+	s.validator.On("ValidateProposal", invalidProposal).Return(sentinelError).Once()
+	s.followerConsumer.On("OnInvalidBlockDetected", sentinelError).Return().Once()
 	err := s.core.OnBlockRange(s.originID, blocks)
 	require.NoError(s.T(), err, "sentinel error has to be handled internally")
 
@@ -238,7 +240,7 @@ func (s *CoreSuite) TestDetectingProposalEquivocation() {
 	otherBlock.Header.View = block.Header.View
 
 	s.validator.On("ValidateProposal", mock.Anything).Return(nil).Times(2)
-	s.finalizationConsumer.On("OnDoubleProposeDetected", mock.Anything, mock.Anything).Return().Once()
+	s.followerConsumer.On("OnDoubleProposeDetected", mock.Anything, mock.Anything).Return().Once()
 
 	err := s.core.OnBlockRange(s.originID, []*flow.Block{block})
 	require.NoError(s.T(), err)
