@@ -19,9 +19,9 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -82,11 +82,6 @@ func mustFundAccounts(
 	execCtx fvm.Context,
 	accs *testAccounts,
 ) storage.SnapshotTree {
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
-	execCtx = fvm.NewContextFromParent(
-		execCtx,
-		fvm.WithDerivedBlockData(derivedBlockData))
-
 	var err error
 	for _, acc := range accs.accounts {
 		transferTx := testutil.CreateTokenTransferTransaction(chain, 1_000_000, acc.address, chain.ServiceAddress())
@@ -94,10 +89,10 @@ func mustFundAccounts(
 		require.NoError(b, err)
 		accs.seq++
 
-		tx := fvm.Transaction(
-			transferTx,
-			derivedBlockData.NextTxIndexForTestingOnly())
-		executionSnapshot, output, err := vm.Run(execCtx, tx, snapshotTree)
+		executionSnapshot, output, err := vm.Run(
+			execCtx,
+			fvm.Transaction(transferTx, 0),
+			snapshotTree)
 		require.NoError(b, err)
 		require.NoError(b, output.Err)
 		snapshotTree = snapshotTree.Append(executionSnapshot)
