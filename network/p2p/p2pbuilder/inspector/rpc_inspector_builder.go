@@ -79,7 +79,6 @@ type GossipSubInspectorBuilder struct {
 	sporkID          flow.Identifier
 	inspectorsConfig *GossipSubRPCInspectorsConfig
 	metricsCfg       *p2pconfig.MetricsConfig
-	metricsEnabled   bool
 	publicNetwork    bool
 }
 
