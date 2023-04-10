@@ -705,6 +705,7 @@ func main() {
 				node.Metrics.Mempool,
 				mainMetrics,
 				node.Metrics.Compliance,
+				followerDistributor,
 				node.Tracer,
 				node.Storage.Headers,
 				node.Storage.Payloads,
