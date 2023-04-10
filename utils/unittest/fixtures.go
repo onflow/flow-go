@@ -1524,8 +1524,10 @@ func SeedFixtures(m int, n int) [][]byte {
 }
 
 // BlockEventsFixture returns a block events model populated with random events of length n.
-func BlockEventsFixture(header *flow.Header, n int) flow.BlockEvents {
-	types := []flow.EventType{"A.0x1.Foo.Bar", "A.0x2.Zoo.Moo", "A.0x3.Goo.Hoo"}
+func BlockEventsFixture(header *flow.Header, n int, types ...flow.EventType) flow.BlockEvents {
+	if len(types) == 0 {
+		types = []flow.EventType{"A.0x1.Foo.Bar", "A.0x2.Zoo.Moo", "A.0x3.Goo.Hoo"}
+	}
 
 	events := make([]flow.Event, n)
 	for i := 0; i < n; i++ {
