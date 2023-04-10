@@ -26,8 +26,8 @@ var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestor")
 //	[b<-qc_b]  [b'<-qc_b']  [b*]
 type ancestryChain struct {
 	block    *BlockContainer
-	oneChain *BlockQC
-	twoChain *BlockQC
+	oneChain *model.CertifiedBlock
+	twoChain *model.CertifiedBlock
 }
 
 // Forks enforces structural validity of the consensus state and implements
@@ -40,13 +40,13 @@ type Forks struct {
 	forest   forest.LevelledForest
 
 	finalizationCallback module.Finalizer
-	newestView           uint64   // newestView is the highest view of block proposal stored in Forks
-	lastFinalized        *BlockQC // lastFinalized is the QC that POINTS TO the most recently finalized locked block
+	newestView           uint64                // newestView is the highest view of block proposal stored in Forks
+	lastFinalized        *model.CertifiedBlock // the most recently finalized block and the QC that certifies it
 }
 
 var _ hotstuff.Forks = (*Forks)(nil)
 
-func New(trustedRoot *BlockQC, finalizationCallback module.Finalizer, notifier hotstuff.ConsensusFollowerConsumer) (*Forks, error) {
+func New(trustedRoot *model.CertifiedBlock, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Forks, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.QC.BlockID) || (trustedRoot.Block.View != trustedRoot.QC.View) {
 		return nil, model.NewConfigurationErrorf("invalid root: root QC is not pointing to root block")
 	}
@@ -341,7 +341,7 @@ func (f *Forks) getTwoChain(blockContainer *BlockContainer) (*ancestryChain, err
 //   - model.MissingBlockError if the parent block does not exist in the forest
 //     (but is above the pruned view)
 //   - generic error in case of unexpected bug or internal state corruption
-func (f *Forks) getNextAncestryLevel(block *model.Block) (*BlockQC, error) {
+func (f *Forks) getNextAncestryLevel(block *model.Block) (*model.CertifiedBlock, error) {
 	// The finalizer prunes all blocks in forest which are below the most recently finalized block.
 	// Hence, we have a pruned ancestry if and only if either of the following conditions applies:
 	//    (a) if a block's parent view (i.e. block.QC.View) is below the most recently finalized block.
@@ -367,9 +367,11 @@ func (f *Forks) getNextAncestryLevel(block *model.Block) (*BlockQC, error) {
 			block.BlockID, block.View, block.QC.View, block.QC.BlockID, parentBlock.BlockID, parentBlock.View)
 	}
 
-	blockQC := BlockQC{Block: parentBlock, QC: block.QC}
-
-	return &blockQC, nil
+	certifiedBlock, err := model.NewCertifiedBlock(parentBlock, block.QC)
+	if err != nil {
+		return nil, fmt.Errorf("constructing certified block failed: %w", err)
+	}
+	return &certifiedBlock, nil
 }
 
 // finalizeUpToBlock finalizes all blocks up to (and including) the block pointed to by `qc`.
@@ -416,7 +418,10 @@ func (f *Forks) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 	}
 
 	// finalize block itself:
-	f.lastFinalized = &BlockQC{Block: block, QC: qc}
+	*f.lastFinalized, err = model.NewCertifiedBlock(block, qc)
+	if err != nil {
+		return fmt.Errorf("constructing certified block failed: %w", err)
+	}
 	err = f.forest.PruneUpToLevel(block.View)
 	if err != nil {
 		if mempool.IsBelowPrunedThresholdError(err) {

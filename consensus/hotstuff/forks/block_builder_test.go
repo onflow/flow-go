@@ -145,7 +145,7 @@ func makeBlockID(block *model.Block) flow.Identifier {
 	})
 }
 
-func makeGenesis() *BlockQC {
+func makeGenesis() *model.CertifiedBlock {
 	genesis := &model.Block{
 		View: 1,
 	}
@@ -155,9 +155,9 @@ func makeGenesis() *BlockQC {
 		View:    1,
 		BlockID: genesis.BlockID,
 	}
-	genesisBQ := &BlockQC{
-		Block: genesis,
-		QC:    genesisQC,
+	certifiedGenesisBlock, err := model.NewCertifiedBlock(genesis, genesisQC)
+	if err != nil {
+		panic(fmt.Sprintf("combining genesis block and genensis QC to certified block failed: %s", err.Error()))
 	}
-	return genesisBQ
+	return &certifiedGenesisBlock
 }
