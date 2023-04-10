@@ -149,6 +149,7 @@ func (a *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
 
 // Get returns the spam record of a peer from the cache.
 // Args:
+//
 //	-peerID: the peer ID of the peer in the GossipSub protocol.
 //
 // Returns:
