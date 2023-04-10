@@ -982,6 +982,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				nodeContainer.AddFlag("public-network-address", fmt.Sprintf("%s:%d", nodeContainer.Name(), AccessNodePublicNetworkPort))
 			}
 
+			// execution-sync is enabled by default
+			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
+
 			// nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
 			// nodeContainer.Ports[AccessNodeMetricsPort] = hostMetricsPort
 			// net.AccessPorts[AccessNodeMetricsPort] = hostMetricsPort

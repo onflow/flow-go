@@ -57,9 +57,8 @@ func (lists *sortableContractUpdates) Less(i, j int) bool {
 	}
 }
 
-// ContractUpdater handles all smart contracts modification. It also captures
-// all changes as deltas and only commit them when called so smart contract
-// updates can be delayed until end of the tx execution.
+// ContractUpdater handles all smart contracts modification. It captures
+// contract updates and defer the updates to the end of the txn execution.
 //
 // Note that scripts cannot modify smart contracts, but must expose the API in
 // compliance with the runtime environment interface.

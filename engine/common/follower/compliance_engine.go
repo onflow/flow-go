@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -27,6 +28,13 @@ type EngineOption func(*ComplianceEngine)
 func WithChannel(channel channels.Channel) EngineOption {
 	return func(e *ComplianceEngine) {
 		e.channel = channel
+	}
+}
+
+// WithComplianceConfigOpt applies compliance config opt to internal config
+func WithComplianceConfigOpt(opt compliance.Opt) EngineOption {
+	return func(e *ComplianceEngine) {
+		opt(&e.config)
 	}
 }
 
@@ -65,6 +73,7 @@ type ComplianceEngine struct {
 	me                         module.Local
 	engMetrics                 module.EngineMetrics
 	con                        network.Conduit
+	config                     compliance.Config
 	channel                    channels.Channel
 	headers                    storage.Headers
 	pendingProposals           *fifoqueue.FifoQueue        // queue for fresh proposals
@@ -106,6 +115,7 @@ func NewComplianceLayer(
 		log:                        log.With().Str("engine", "follower").Logger(),
 		me:                         me,
 		engMetrics:                 engMetrics,
+		config:                     compliance.DefaultConfig(),
 		channel:                    channels.ReceiveBlocks,
 		pendingProposals:           pendingBlocks,
 		syncedBlocks:               syncedBlocks,
@@ -325,6 +335,13 @@ func (e *ComplianceEngine) submitConnectedBatch(log zerolog.Logger, latestFinali
 	lastBlock := blocks[len(blocks)-1].Header
 	if lastBlock.View < latestFinalizedView {
 		log.Debug().Msgf("dropping range [%d, %d] below finalized view %d", blocks[0].Header.View, lastBlock.View, latestFinalizedView)
+		return
+	}
+	if lastBlock.View > latestFinalizedView+e.config.SkipNewProposalsThreshold {
+		log.Debug().
+			Uint64("skip_new_proposals_threshold", e.config.SkipNewProposalsThreshold).
+			Msgf("dropping range [%d, %d] too far ahead of locally finalized view %d",
+				blocks[0].Header.View, lastBlock.View, latestFinalizedView)
 		return
 	}
 	log.Debug().Msgf("submitting sub-range with views [%d, %d] for further processing", blocks[0].Header.View, lastBlock.View)

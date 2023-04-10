@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/follower/pending_tree"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/trace"
@@ -21,7 +20,7 @@ import (
 )
 
 // CertifiedBlocks is a connected list of certified blocks, in ascending height order.
-type CertifiedBlocks []pending_tree.CertifiedBlock
+type CertifiedBlocks []flow.CertifiedBlock
 
 // defaultCertifiedRangeChannelCapacity maximum capacity of buffered channel that is used to transfer ranges of
 // certified blocks to specific worker.
@@ -41,7 +40,6 @@ type ComplianceCore struct {
 	*component.ComponentManager
 	log                 zerolog.Logger
 	mempoolMetrics      module.MempoolMetrics
-	config              compliance.Config
 	tracer              module.Tracer
 	pendingCache        *cache.Cache
 	pendingTree         *pending_tree.PendingTree
@@ -66,15 +64,9 @@ func NewComplianceCore(log zerolog.Logger,
 	validator hotstuff.Validator,
 	sync module.BlockRequester,
 	tracer module.Tracer,
-	opts ...compliance.Opt,
 ) (*ComplianceCore, error) {
 	onEquivocation := func(block, otherBlock *flow.Block) {
 		finalizationConsumer.OnDoubleProposeDetected(model.BlockFromFlow(block.Header), model.BlockFromFlow(otherBlock.Header))
-	}
-
-	config := compliance.DefaultConfig()
-	for _, apply := range opts {
-		apply(&config)
 	}
 
 	finalizedBlock, err := state.Final().Head()
@@ -92,7 +84,6 @@ func NewComplianceCore(log zerolog.Logger,
 		validator:           validator,
 		sync:                sync,
 		tracer:              tracer,
-		config:              config,
 		certifiedRangesChan: make(chan CertifiedBlocks, defaultCertifiedRangeChannelCapacity),
 		finalizedBlocksChan: make(chan *flow.Header, defaultFinalizedBlocksChannelCapacity),
 	}
@@ -186,11 +177,15 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 	if len(certifiedBatch) < 1 {
 		return nil
 	}
+	certifiedRange, err := rangeToCertifiedBlocks(certifiedBatch, certifyingQC)
+	if err != nil {
+		return fmt.Errorf("converting the certified batch to list of certified blocks failed: %w", err)
+	}
 
 	// in case we have already stopped our worker, we use a select statement to avoid
 	// blocking since there is no active consumer for this channel
 	select {
-	case c.certifiedRangesChan <- rangeToCertifiedBlocks(certifiedBatch, certifyingQC):
+	case c.certifiedRangesChan <- certifiedRange:
 	case <-c.ComponentManager.ShutdownSignal():
 	}
 	return nil
@@ -303,8 +298,8 @@ func (c *ComplianceCore) processFinalizedBlock(ctx context.Context, finalized *f
 
 // rangeToCertifiedBlocks transform batch of connected blocks and a QC that certifies last block to a range of
 // certified and connected blocks.
-// Pure function.
-func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.QuorumCertificate) CertifiedBlocks {
+// Pure function (side-effect free). No errors expected during normal operations.
+func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.QuorumCertificate) (CertifiedBlocks, error) {
 	certifiedBlocks := make(CertifiedBlocks, 0, len(certifiedRange))
 	lastIndex := len(certifiedRange) - 1
 	for i, block := range certifiedRange {
@@ -314,10 +309,13 @@ func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.Quo
 		} else {
 			qc = certifyingQC
 		}
-		certifiedBlocks = append(certifiedBlocks, pending_tree.CertifiedBlock{
-			Block: block,
-			QC:    qc,
-		})
+
+		// bundle block and its certifying QC to `CertifiedBlock`:
+		certBlock, err := flow.NewCertifiedBlock(block, qc)
+		if err != nil {
+			return nil, fmt.Errorf("constructing certified root block failed: %w", err)
+		}
+		certifiedBlocks = append(certifiedBlocks, certBlock)
 	}
-	return certifiedBlocks
+	return certifiedBlocks, nil
 }
