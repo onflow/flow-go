@@ -112,7 +112,7 @@ type Procedure interface {
 
 // VM runs procedures
 type VM interface {
-	RunV2(
+	Run(
 		Context,
 		Procedure,
 		state.StorageSnapshot,
@@ -122,7 +122,6 @@ type VM interface {
 		error,
 	)
 
-	Run(Context, Procedure, state.View) error
 	GetAccount(Context, flow.Address, state.StorageSnapshot) (*flow.Account, error)
 }
 
@@ -136,8 +135,21 @@ func NewVirtualMachine() *VirtualMachine {
 	return &VirtualMachine{}
 }
 
-// Run runs a procedure against a ledger in the given context.
+// TODO(patrick): rm after updating emulator
 func (vm *VirtualMachine) RunV2(
+	ctx Context,
+	proc Procedure,
+	storageSnapshot state.StorageSnapshot,
+) (
+	*state.ExecutionSnapshot,
+	ProcedureOutput,
+	error,
+) {
+	return vm.Run(ctx, proc, storageSnapshot)
+}
+
+// Run runs a procedure against a ledger in the given context.
+func (vm *VirtualMachine) Run(
 	ctx Context,
 	proc Procedure,
 	storageSnapshot state.StorageSnapshot,
@@ -212,28 +224,6 @@ func (vm *VirtualMachine) RunV2(
 	}
 
 	return executionSnapshot, executor.Output(), nil
-}
-
-func (vm *VirtualMachine) Run(
-	ctx Context,
-	proc Procedure,
-	v state.View,
-) error {
-	executionSnapshot, output, err := vm.RunV2(
-		ctx,
-		proc,
-		state.NewPeekerStorageSnapshot(v))
-	if err != nil {
-		return err
-	}
-
-	err = v.Merge(executionSnapshot)
-	if err != nil {
-		return err
-	}
-
-	proc.SetOutput(output)
-	return nil
 }
 
 // GetAccount returns an account by address or an error if none exists.

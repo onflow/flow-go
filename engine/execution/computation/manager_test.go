@@ -508,7 +508,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 
 type PanickingVM struct{}
 
-func (p *PanickingVM) RunV2(
+func (p *PanickingVM) Run(
 	f fvm.Context,
 	procedure fvm.Procedure,
 	storageSnapshot state.StorageSnapshot,
@@ -517,10 +517,6 @@ func (p *PanickingVM) RunV2(
 	fvm.ProcedureOutput,
 	error,
 ) {
-	panic("panic, but expected with sentinel for test: Verunsicherung ")
-}
-
-func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
 
@@ -539,7 +535,7 @@ type LongRunningVM struct {
 	duration time.Duration
 }
 
-func (l *LongRunningVM) RunV2(
+func (l *LongRunningVM) Run(
 	f fvm.Context,
 	procedure fvm.Procedure,
 	storageSnapshot state.StorageSnapshot,
@@ -555,16 +551,6 @@ func (l *LongRunningVM) RunV2(
 		Value: cadence.NewVoid(),
 	}
 	return snapshot, output, nil
-}
-
-func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {
-	time.Sleep(l.duration)
-	// satisfy value marshaller
-	if scriptProcedure, is := procedure.(*fvm.ScriptProcedure); is {
-		scriptProcedure.Value = cadence.NewVoid()
-	}
-
-	return nil
 }
 
 func (l *LongRunningVM) GetAccount(

@@ -97,7 +97,7 @@ func mustFundAccounts(
 		tx := fvm.Transaction(
 			transferTx,
 			derivedBlockData.NextTxIndexForTestingOnly())
-		executionSnapshot, output, err := vm.RunV2(execCtx, tx, snapshotTree)
+		executionSnapshot, output, err := vm.Run(execCtx, tx, snapshotTree)
 		require.NoError(b, err)
 		require.NoError(b, output.Err)
 		snapshotTree = snapshotTree.Append(executionSnapshot)

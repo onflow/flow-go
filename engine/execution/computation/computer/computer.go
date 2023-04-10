@@ -385,7 +385,7 @@ func (e *blockComputer) executeTransaction(
 
 	txn.ctx = fvm.NewContextFromParent(txn.ctx, fvm.WithSpan(txSpan))
 
-	executionSnapshot, output, err := e.vm.RunV2(
+	executionSnapshot, output, err := e.vm.Run(
 		txn.ctx,
 		txn.TransactionProcedure,
 		storageSnapshot)

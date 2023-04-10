@@ -53,7 +53,7 @@ func (b *Bootstrapper) BootstrapLedger(
 		opts...,
 	)
 
-	executionSnapshot, _, err := vm.RunV2(ctx, bootstrap, storageSnapshot)
+	executionSnapshot, _, err := vm.Run(ctx, bootstrap, storageSnapshot)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}

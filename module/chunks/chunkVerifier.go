@@ -185,7 +185,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	var problematicTx flow.Identifier
 	// executes all transactions in this chunk
 	for i, tx := range transactions {
-		executionSnapshot, output, err := fcv.vm.RunV2(
+		executionSnapshot, output, err := fcv.vm.Run(
 			context,
 			tx,
 			snapshotTree)
