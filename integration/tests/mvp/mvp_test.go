@@ -65,7 +65,7 @@ func TestMVP_Bootstrap(t *testing.T) {
 
 	flowNetwork.Start(ctx)
 
-	client, err := flowNetwork.ContainerByName("access_1").TestnetClient()
+	client, err := flowNetwork.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(t, err)
 
 	t.Log("@@ running mvp test 1")
@@ -144,7 +144,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
 	chain := net.Root().Header.ChainID.Chain()
 
-	serviceAccountClient, err := net.ContainerByName("access_1").TestnetClient()
+	serviceAccountClient, err := net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(t, err)
 
 	latestBlockID, err := serviceAccountClient.GetLatestBlockID(ctx)
@@ -245,7 +245,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	t.Log(fundCreationTxRes)
 
 	accountClient, err := testnet.NewClientWithKey(
-		net.ContainerByName("access_1").Addr(testnet.GRPCPort),
+		net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort),
 		newAccountAddress,
 		accountPrivateKey,
 		chain,

@@ -35,9 +35,11 @@ type ObserverSuite struct {
 func (s *ObserverSuite) TearDownTest() {
 	if s.net != nil {
 		s.net.Remove()
+		s.net = nil
 	}
 	if s.cancel != nil {
 		s.cancel()
+		s.cancel = nil
 	}
 }
 
@@ -121,7 +123,7 @@ func (s *ObserverSuite) TestObserver() {
 	})
 
 	// stop the upstream access container
-	err = s.net.StopContainerByName(ctx, "access_1")
+	err = s.net.StopContainerByName(ctx, testnet.PrimaryAN)
 	require.NoError(t, err)
 
 	t.Run("HandledByUpstream", func(t *testing.T) {
@@ -156,7 +158,7 @@ func (s *ObserverSuite) TestObserver() {
 }
 
 func (s *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, error) {
-	return s.getClient(s.net.ContainerByName("access_1").Addr(testnet.GRPCPort))
+	return s.getClient(s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort))
 }
 
 func (s *ObserverSuite) getObserverClient() (accessproto.AccessAPIClient, error) {

@@ -41,14 +41,14 @@ func (s *Suite) Ghost() *client.GhostClient {
 
 // AccessClient returns a client to interact with the access node api on testnet.
 func (s *Suite) AccessClient() *testnet.Client {
-	client, err := s.net.ContainerByName("access_1").TestnetClient()
+	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(s.T(), err, "could not get access client")
 	return client
 }
 
 // AccessPort returns the port number of access node api on testnet.
 func (s *Suite) AccessPort() string {
-	return s.net.ContainerByName("access_1").Port(testnet.GRPCPort)
+	return s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.GRPCPort)
 }
 
 func (s *Suite) MetricsPort() string {

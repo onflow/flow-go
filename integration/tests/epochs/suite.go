@@ -113,7 +113,7 @@ func (s *Suite) SetupTest() {
 	s.Track(s.T(), s.ctx, s.Ghost())
 
 	// use AN1 for test-related queries - the AN join/leave test will replace AN2
-	client, err := s.net.ContainerByName("access_1").TestnetClient()
+	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(s.T(), err)
 
 	s.client = client

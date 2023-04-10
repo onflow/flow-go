@@ -97,6 +97,9 @@ const (
 	// DefaultFlowPort default gossip network port
 	DefaultFlowPort = 2137
 
+	// PrimaryAN is the container name for the primary access node to use for API requests
+	PrimaryAN = "access_1"
+
 	DefaultViewsInStakingAuction uint64 = 5
 	DefaultViewsInDKGPhase       uint64 = 50
 	DefaultViewsInEpoch          uint64 = 180
@@ -643,7 +646,7 @@ type ObserverConfig struct {
 
 func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 	if conf.BootstrapAccessName == "" {
-		conf.BootstrapAccessName = "access_1"
+		conf.BootstrapAccessName = PrimaryAN
 	}
 
 	// Setup directories

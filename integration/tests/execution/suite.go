@@ -38,7 +38,7 @@ func (s *Suite) Ghost() *client.GhostClient {
 }
 
 func (s *Suite) AccessClient() *testnet.Client {
-	client, err := s.net.ContainerByName("access_1").TestnetClient()
+	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(s.T(), err, "could not get access client")
 	return client
 }
@@ -94,7 +94,7 @@ func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, d
 }
 
 func (s *Suite) AccessPort() string {
-	return s.net.ContainerByName("access_1").Port(testnet.GRPCPort)
+	return s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.GRPCPort)
 }
 
 func (s *Suite) MetricsPort() string {

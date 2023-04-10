@@ -40,7 +40,7 @@ func (b *BaseSuite) Ghost() *client.GhostClient {
 
 // AccessClient returns a client to interact with the access node api on testnet.
 func (b *BaseSuite) AccessClient() *testnet.Client {
-	client, err := b.Net.ContainerByName("access_1").TestnetClient()
+	client, err := b.Net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(b.T(), err, "could not get access client")
 	return client
 }

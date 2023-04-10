@@ -462,13 +462,13 @@ func (suite *CommandRunnerSuite) TestTLS() {
 
 	suite.SetupCommandRunner(admin.WithTLS(serverConfig))
 
-	c := &http.Client{
+	httpClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: clientConfig,
 		},
 	}
 
-	adminClient := client.NewAdminClient(suite.httpAddress, client.WithTLS(true), client.WithHTTPClient(c))
+	adminClient := client.NewAdminClient(suite.httpAddress, client.WithTLS(true), client.WithHTTPClient(httpClient))
 
 	data := map[string]interface{}{"key": "value"}
 	resp, err := adminClient.RunCommand(context.Background(), "foo", data)

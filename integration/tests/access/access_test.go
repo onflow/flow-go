@@ -89,7 +89,7 @@ func (s *AccessSuite) SetupTest() {
 func (s *AccessSuite) TestAPIsAvailable() {
 
 	s.T().Run("TestHTTPProxyPortOpen", func(t *testing.T) {
-		httpProxyAddress := s.net.ContainerByName("access_1").Addr(testnet.GRPCWebPort)
+		httpProxyAddress := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCWebPort)
 
 		conn, err := net.DialTimeout("tcp", httpProxyAddress, 1*time.Second)
 		require.NoError(s.T(), err, "http proxy port not open on the access node")
@@ -101,7 +101,7 @@ func (s *AccessSuite) TestAPIsAvailable() {
 		ctx, cancel := context.WithTimeout(s.ctx, 1*time.Second)
 		defer cancel()
 
-		grpcAddress := s.net.ContainerByName("access_1").Addr(testnet.GRPCPort)
+		grpcAddress := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort)
 		conn, err := grpc.DialContext(ctx, grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		require.NoError(t, err, "failed to connect to access node")
 		defer conn.Close()

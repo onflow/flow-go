@@ -30,7 +30,6 @@ const (
 	DockerComposeFile        = "./docker-compose.nodes.yml"
 	DockerComposeFileVersion = "3.7"
 	PrometheusTargetsFile    = "./targets.nodes.json"
-	DefaultAccessGatewayName = "access_1"
 	DefaultObserverName      = "observer"
 	DefaultLogLevel          = "DEBUG"
 	DefaultGOMAXPROCS        = 8
@@ -468,9 +467,9 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 
 	observerService := defaultService(DefaultObserverName, dataDir, profilerDir, i)
 	observerService.Command = append(observerService.Command,
-		fmt.Sprintf("--bootstrap-node-addresses=%s:%d", DefaultAccessGatewayName, AccessPubNetworkPort),
+		fmt.Sprintf("--bootstrap-node-addresses=%s:%d", testnet.PrimaryAN, AccessPubNetworkPort),
 		fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
-		fmt.Sprintf("--upstream-node-addresses=%s:%d", DefaultAccessGatewayName, SecuredRPCPort),
+		fmt.Sprintf("--upstream-node-addresses=%s:%d", testnet.PrimaryAN, SecuredRPCPort),
 		fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
 		"--bind=0.0.0.0:0",
@@ -480,7 +479,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 	)
 
 	// observer services rely on the access gateway
-	observerService.DependsOn = append(observerService.DependsOn, DefaultAccessGatewayName)
+	observerService.DependsOn = append(observerService.DependsOn, testnet.PrimaryAN)
 	observerService.Ports = []string{
 		// Flow API ports come in pairs, open and secure. While the guest port is always
 		// the same from the guest's perspective, the host port numbering accounts for the presence
@@ -643,12 +642,12 @@ func openAndTruncate(filename string) (*os.File, error) {
 
 func getAccessGatewayPublicKey(flowNodeContainerConfigs []testnet.ContainerConfig) (string, error) {
 	for _, container := range flowNodeContainerConfigs {
-		if container.ContainerName == DefaultAccessGatewayName {
+		if container.ContainerName == testnet.PrimaryAN {
 			// remove the "0x"..0000 portion of the key
 			return container.NetworkPubKey().String()[2:], nil
 		}
 	}
-	return "", fmt.Errorf("Unable to find public key for Access Gateway expected in container '%s'", DefaultAccessGatewayName)
+	return "", fmt.Errorf("Unable to find public key for Access Gateway expected in container '%s'", testnet.PrimaryAN)
 }
 
 func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs []testnet.ContainerConfig) Services {
@@ -685,7 +684,7 @@ func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs [
 	}
 	fmt.Println()
 	fmt.Println("Observer services bootstrapping data generated...")
-	fmt.Printf("Access Gateway (%s) public network libp2p key: %s\n\n", DefaultAccessGatewayName, agPublicKey)
+	fmt.Printf("Access Gateway (%s) public network libp2p key: %s\n\n", testnet.PrimaryAN, agPublicKey)
 
 	return dockerServices
 }
