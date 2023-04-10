@@ -52,6 +52,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -353,17 +354,17 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	// setup unicast rate limiters
 	unicastRateLimiters := ratelimit.NewRateLimiters(unicastRateLimiterOpts...)
 
-	uniCfg := &p2pbuilder.UnicastConfig{
+	uniCfg := &p2pconfig.UnicastConfig{
 		StreamRetryInterval:    fnb.UnicastCreateStreamRetryDelay,
 		RateLimiterDistributor: fnb.UnicastRateLimiterDistributor,
 	}
 
-	connGaterCfg := &p2pbuilder.ConnectionGaterConfig{
+	connGaterCfg := &p2pconfig.ConnectionGaterConfig{
 		InterceptPeerDialFilters: connGaterPeerDialFilters,
 		InterceptSecuredFilters:  connGaterInterceptSecureFilters,
 	}
 
-	peerManagerCfg := &p2pbuilder.PeerManagerConfig{
+	peerManagerCfg := &p2pconfig.PeerManagerConfig{
 		ConnectionPruning: fnb.NetworkConnectionPruning,
 		UpdateInterval:    fnb.PeerUpdateInterval,
 	}

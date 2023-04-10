@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
@@ -104,11 +105,11 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	metricsCfg *MetricsConfig,
 	resolver madns.BasicResolver,
 	role string,
-	connGaterCfg *ConnectionGaterConfig,
-	peerManagerCfg *PeerManagerConfig,
+	connGaterCfg *p2pconfig.ConnectionGaterConfig,
+	peerManagerCfg *p2pconfig.PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
-	uniCfg *UnicastConfig,
+	uniCfg *p2pconfig.UnicastConfig,
 ) p2p.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		builder, err := DefaultNodeBuilder(log,
@@ -536,11 +537,11 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	metricsCfg *MetricsConfig,
 	resolver madns.BasicResolver,
 	role string,
-	connGaterCfg *ConnectionGaterConfig,
-	peerManagerCfg *PeerManagerConfig,
+	connGaterCfg *p2pconfig.ConnectionGaterConfig,
+	peerManagerCfg *p2pconfig.PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
-	uniCfg *UnicastConfig) (p2p.NodeBuilder, error) {
+	uniCfg *p2pconfig.UnicastConfig) (p2p.NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(log, metricsCfg.Metrics, connection.DefaultConnManagerConfig())
 	if err != nil {
