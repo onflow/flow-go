@@ -144,14 +144,16 @@ func (c *Cache) Has(entityID flow.Identifier) bool {
 	return ok
 }
 
-// Add adds the given entity to the backdata.
+// Add adds the given entity to the backdata and returns true if the entity was added or false if
+// a valid entity already exists for the provided ID.
 func (c *Cache) Add(entityID flow.Identifier, entity flow.Entity) bool {
 	defer c.logTelemetry()
 
 	return c.put(entityID, entity)
 }
 
-// Remove removes the entity with the given identifier.
+// Remove removes the entity with the given identifier and returns the removed entity and true if
+// the entity was removed or false if the entity was not found.
 func (c *Cache) Remove(entityID flow.Identifier) (flow.Entity, bool) {
 	defer c.logTelemetry()
 
