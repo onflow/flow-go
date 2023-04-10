@@ -14,7 +14,7 @@ validate:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
 	# multiple execution nodes are required to prevent seals being generated in case of execution forking.
 	$(error Number of Execution nodes should be no less than 2)
-ifeq ($(strip $(VALID_COLLECTION)), 1)
+else ifeq ($(strip $(VALID_COLLECTION)), 1)
 	$(error Number of Collection nodes should be no less than 2)
 else ifeq ($(strip $(NETWORK_ID)),)
 	$(error NETWORK_ID cannot be empty)
