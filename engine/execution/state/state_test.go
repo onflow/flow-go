@@ -84,7 +84,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view1.Set(registerID2, flow.RegisterValue("carrot"))
 		assert.NoError(t, err)
 
-		sc2, update, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2, update, err := state.CommitDelta(l, view1.Finalize(), sc1)
 		assert.NoError(t, err)
 
 		assert.Equal(t, sc1[:], update.RootHash[:])
@@ -142,7 +142,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		err = view1.Set(registerID1, []byte("apple"))
 		assert.NoError(t, err)
-		sc2, _, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2, _, err := state.CommitDelta(l, view1.Finalize(), sc1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
@@ -150,7 +150,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view2.Set(registerID1, []byte("orange"))
 		assert.NoError(t, err)
 
-		sc3, _, err := state.CommitDelta(l, view2.Delta(), sc2)
+		sc3, _, err := state.CommitDelta(l, view2.Finalize(), sc2)
 		assert.NoError(t, err)
 
 		// create a view for previous state version
@@ -182,7 +182,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view1.Set(registerID2, []byte("apple"))
 		assert.NoError(t, err)
 
-		sc2, _, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2, _, err := state.CommitDelta(l, view1.Finalize(), sc1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
@@ -190,7 +190,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view2.Set(registerID1, nil)
 		assert.NoError(t, err)
 
-		sc3, _, err := state.CommitDelta(l, view2.Delta(), sc2)
+		sc3, _, err := state.CommitDelta(l, view2.Finalize(), sc2)
 		assert.NoError(t, err)
 
 		// create a view for previous state version
@@ -222,11 +222,11 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view1.Set(registerID2, flow.RegisterValue("apple"))
 		assert.NoError(t, err)
 
-		sc2, _, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2, _, err := state.CommitDelta(l, view1.Finalize(), sc1)
 		assert.NoError(t, err)
 
 		// committing for the second time should be OK
-		sc2Same, _, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2Same, _, err := state.CommitDelta(l, view1.Finalize(), sc1)
 		assert.NoError(t, err)
 
 		require.Equal(t, sc2, sc2Same)
