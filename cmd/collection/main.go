@@ -78,9 +78,9 @@ func main() {
 		rpcConf                 rpc.Config
 		clusterComplianceConfig modulecompliance.Config
 
-		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
-		finalizationDistributor *pubsub.FollowerDistributor
-		finalizedHeader         *consync.FinalizedHeaderCache
+		pools               *epochpool.TransactionPools // epoch-scoped transaction pools
+		followerDistributor *pubsub.FollowerDistributor
+		finalizedHeader     *consync.FinalizedHeaderCache
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
@@ -171,9 +171,9 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
-		Module("finalization distributor", func(node *cmd.NodeConfig) error {
-			finalizationDistributor = pubsub.NewFollowerDistributor()
-			finalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
+		Module("follower distributor", func(node *cmd.NodeConfig) error {
+			followerDistributor = pubsub.NewFollowerDistributor()
+			followerDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
 			return nil
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
@@ -259,7 +259,7 @@ func main() {
 			return validator, err
 		}).
 		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			finalizedHeader, err = consync.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
+			finalizedHeader, err = consync.NewFinalizedHeaderCache(node.Logger, node.State, followerDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
 			}
@@ -292,7 +292,7 @@ func main() {
 				node.Storage.Headers,
 				finalizer,
 				verifier,
-				finalizationDistributor,
+				followerDistributor,
 				node.RootBlock.Header,
 				node.RootQC,
 				finalized,
@@ -319,7 +319,7 @@ func main() {
 				node.Logger,
 				node.Metrics.Mempool,
 				heroCacheCollector,
-				finalizationDistributor,
+				followerDistributor,
 				followerState,
 				followerCore,
 				validator,

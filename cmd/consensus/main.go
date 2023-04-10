@@ -364,7 +364,7 @@ func main() {
 			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
 			return err
 		}).
-		Module("finalization distributor", func(node *cmd.NodeConfig) error {
+		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
 			followerDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
 			return nil

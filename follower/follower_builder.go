@@ -105,16 +105,16 @@ type FollowerServiceBuilder struct {
 	*FollowerServiceConfig
 
 	// components
-	LibP2PNode              p2p.LibP2PNode
-	FollowerState           protocol.FollowerState
-	SyncCore                *synchronization.Core
-	FinalizationDistributor *pubsub.FollowerDistributor
-	FinalizedHeader         *synceng.FinalizedHeaderCache
-	Committee               hotstuff.DynamicCommittee
-	Finalized               *flow.Header
-	Pending                 []*flow.Header
-	FollowerCore            module.HotStuffFollower
-	Validator               hotstuff.Validator
+	LibP2PNode          p2p.LibP2PNode
+	FollowerState       protocol.FollowerState
+	SyncCore            *synchronization.Core
+	FollowerDistributor *pubsub.FollowerDistributor
+	FinalizedHeader     *synceng.FinalizedHeaderCache
+	Committee           hotstuff.DynamicCommittee
+	Finalized           *flow.Header
+	Pending             []*flow.Header
+	FollowerCore        module.HotStuffFollower
+	Validator           hotstuff.Validator
 	// for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -221,7 +221,7 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 		builder.Validator = hotstuffvalidator.New(builder.Committee, verifier)
 
 		followerCore, err := consensus.NewFollower(node.Logger, builder.Committee, node.Storage.Headers, final, verifier,
-			builder.FinalizationDistributor, node.RootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
+			builder.FollowerDistributor, node.RootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize follower core: %w", err)
 		}
@@ -244,7 +244,7 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 			node.Logger,
 			node.Metrics.Mempool,
 			heroCacheCollector,
-			builder.FinalizationDistributor,
+			builder.FollowerDistributor,
 			builder.FollowerState,
 			builder.FollowerCore,
 			builder.Validator,
@@ -278,7 +278,7 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 
 func (builder *FollowerServiceBuilder) buildFinalizedHeader() *FollowerServiceBuilder {
 	builder.Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FinalizationDistributor)
+		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FollowerDistributor)
 		if err != nil {
 			return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
 		}
@@ -356,10 +356,10 @@ func FlowConsensusFollowerService(opts ...FollowerOption) *FollowerServiceBuilde
 	ret := &FollowerServiceBuilder{
 		FollowerServiceConfig: config,
 		// TODO: using RoleAccess here for now. This should be refactored eventually to have its own role type
-		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
-		FinalizationDistributor: pubsub.NewFollowerDistributor(),
+		FlowNodeBuilder:     cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
+		FollowerDistributor: pubsub.NewFollowerDistributor(),
 	}
-	ret.FinalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(ret.Logger))
+	ret.FollowerDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(ret.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	ret.FlowNodeBuilder.SkipNwAddressBasedValidations = true

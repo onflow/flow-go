@@ -170,7 +170,7 @@ type ObserverServiceBuilder struct {
 	FollowerState           stateprotocol.FollowerState
 	SyncCore                *chainsync.Core
 	RpcEng                  *rpc.Engine
-	FinalizationDistributor *pubsub.FollowerDistributor
+	FollowerDistributor     *pubsub.FollowerDistributor
 	FinalizedHeader         *synceng.FinalizedHeaderCache
 	Committee               hotstuff.DynamicCommittee
 	Finalized               *flow.Header
@@ -340,7 +340,7 @@ func (builder *ObserverServiceBuilder) buildFollowerCore() *ObserverServiceBuild
 			node.Storage.Headers,
 			final,
 			verifier,
-			builder.FinalizationDistributor,
+			builder.FollowerDistributor,
 			node.RootBlock.Header,
 			node.RootQC,
 			builder.Finalized,
@@ -367,7 +367,7 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 			node.Logger,
 			node.Metrics.Mempool,
 			heroCacheCollector,
-			builder.FinalizationDistributor,
+			builder.FollowerDistributor,
 			builder.FollowerState,
 			builder.FollowerCore,
 			builder.Validator,
@@ -401,7 +401,7 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 
 func (builder *ObserverServiceBuilder) buildFinalizedHeader() *ObserverServiceBuilder {
 	builder.Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FinalizationDistributor)
+		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FollowerDistributor)
 		if err != nil {
 			return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
 		}
@@ -549,7 +549,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionDataRequester() *ObserverSe
 				builder.executionDataConfig,
 			)
 
-			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
 			return builder.ExecutionDataRequester, nil
 		})
@@ -565,11 +565,11 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 		opt(config)
 	}
 	anb := &ObserverServiceBuilder{
-		ObserverServiceConfig:   config,
-		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String()),
-		FinalizationDistributor: pubsub.NewFollowerDistributor(),
+		ObserverServiceConfig: config,
+		FlowNodeBuilder:       cmd.FlowNode(flow.RoleAccess.String()),
+		FollowerDistributor:   pubsub.NewFollowerDistributor(),
 	}
-	anb.FinalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
+	anb.FollowerDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	anb.FlowNodeBuilder.SkipNwAddressBasedValidations = true

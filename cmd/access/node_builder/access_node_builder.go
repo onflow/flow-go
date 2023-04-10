@@ -196,7 +196,7 @@ type FlowAccessNodeBuilder struct {
 	FollowerState              protocol.FollowerState
 	SyncCore                   *chainsync.Core
 	RpcEng                     *rpc.Engine
-	FinalizationDistributor    *consensuspubsub.FollowerDistributor
+	FollowerDistributor        *consensuspubsub.FollowerDistributor
 	FinalizedHeader            *synceng.FinalizedHeaderCache
 	CollectionRPC              access.AccessAPIClient
 	TransactionTimings         *stdmap.TransactionTimings
@@ -308,7 +308,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 			node.Storage.Headers,
 			final,
 			verifier,
-			builder.FinalizationDistributor,
+			builder.FollowerDistributor,
 			node.RootBlock.Header,
 			node.RootQC,
 			builder.Finalized,
@@ -336,7 +336,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			node.Logger,
 			node.Metrics.Mempool,
 			heroCacheCollector,
-			builder.FinalizationDistributor,
+			builder.FollowerDistributor,
 			builder.FollowerState,
 			builder.FollowerCore,
 			builder.Validator,
@@ -369,7 +369,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 
 func (builder *FlowAccessNodeBuilder) buildFinalizedHeader() *FlowAccessNodeBuilder {
 	builder.Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FinalizationDistributor)
+		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FollowerDistributor)
 		if err != nil {
 			return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
 		}
@@ -544,7 +544,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				builder.executionDataConfig,
 			)
 
-			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
 			return builder.ExecutionDataRequester, nil
 		})
@@ -579,9 +579,9 @@ func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
 	dist := consensuspubsub.NewFollowerDistributor()
 	dist.AddConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
 	return &FlowAccessNodeBuilder{
-		AccessNodeConfig:        DefaultAccessNodeConfig(),
-		FlowNodeBuilder:         nodeBuilder,
-		FinalizationDistributor: dist,
+		AccessNodeConfig:    DefaultAccessNodeConfig(),
+		FlowNodeBuilder:     nodeBuilder,
+		FollowerDistributor: dist,
 	}
 }
 
@@ -962,7 +962,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, err
 			}
 			builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
-			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
 
 			return builder.IngestEng, nil
 		}).
