@@ -3,7 +3,6 @@ package follower
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -166,10 +165,7 @@ func (s *CoreSuite) TestProcessingInvalidBlock() {
 	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
 
 	invalidProposal := model.ProposalFromFlow(blocks[len(blocks)-1].Header)
-	sentinelError := model.InvalidBlockError{
-		InvalidBlock: invalidProposal,
-		Err:          fmt.Errorf(""),
-	}
+	sentinelError := model.NewInvalidBlockErrorf(invalidProposal, "")
 	s.validator.On("ValidateProposal", invalidProposal).Return(sentinelError).Once()
 	s.followerConsumer.On("OnInvalidBlockDetected", sentinelError).Return().Once()
 	err := s.core.OnBlockRange(s.originID, blocks)

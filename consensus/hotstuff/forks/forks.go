@@ -46,7 +46,7 @@ type Forks struct {
 
 var _ hotstuff.Forks = (*Forks)(nil)
 
-func New(trustedRoot *model.CertifiedBlock, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Forks, error) {
+func New(trustedRoot *model.CertifiedBlock, finalizationCallback module.Finalizer, notifier hotstuff.ConsensusFollowerConsumer) (*Forks, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.QC.BlockID) || (trustedRoot.Block.View != trustedRoot.QC.View) {
 		return nil, model.NewConfigurationErrorf("invalid root: root QC is not pointing to root block")
 	}

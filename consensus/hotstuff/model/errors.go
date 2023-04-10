@@ -169,6 +169,13 @@ type InvalidBlockError struct {
 	Err          error
 }
 
+func NewInvalidBlockErrorf(proposal *Proposal, msg string, args ...interface{}) error {
+	return InvalidBlockError{
+		InvalidBlock: proposal,
+		Err:          fmt.Errorf(msg, args...),
+	}
+}
+
 func (e InvalidBlockError) Error() string {
 	return fmt.Sprintf(
 		"invalid block %x at view %d: %s",

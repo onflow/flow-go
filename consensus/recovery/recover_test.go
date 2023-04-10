@@ -1,7 +1,6 @@
 package recovery
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -39,10 +38,7 @@ func TestRecover(t *testing.T) {
 	validator.On("ValidateProposal", mock.Anything).Return(func(proposal *model.Proposal) error {
 		_, isInvalid := invalid[proposal.Block.BlockID]
 		if isInvalid {
-			return model.InvalidBlockError{
-				InvalidBlock: proposal,
-				Err:          fmt.Errorf(""),
-			}
+			return model.NewInvalidBlockErrorf(proposal, "")
 		}
 		return nil
 	})
