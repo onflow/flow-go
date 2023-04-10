@@ -52,7 +52,7 @@ func newSnapshotWithIncorporatedReferenceBlock(state *State, blockID flow.Identi
 	}
 }
 
-// NewFinalizedSnapshot instantiates a `FinalizedSnapshot`. 
+// NewFinalizedSnapshot instantiates a `FinalizedSnapshot`.
 // CAUTION: the header's ID _must_ match `blockID` (not checked)
 func NewFinalizedSnapshot(state *State, blockID flow.Identifier, header *flow.Header) *FinalizedSnapshot {
 	return &FinalizedSnapshot{
