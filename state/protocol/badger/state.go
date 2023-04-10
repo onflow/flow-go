@@ -770,6 +770,7 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 
 // populateCache is used after opening or bootstrapping the state to populate the cache.
 // The cache must be populated before the State receives any queries.
+// No errors expected during normal operations. 
 func (state *State) populateCache() error {
 	// cache the root height - fixed over the course of the database lifetime
 	var rootHeight uint64
