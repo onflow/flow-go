@@ -31,26 +31,7 @@ on:
       collection_nodes:
         required: false
         type: choice
-        description: 'Number of Collection Nodes to create (default: 6)'
-        options:
-          - 1
-          - 2
-          - 3
-          - 4
-          - 5
-          - 6
-          - 7
-          - 8
-          - 9
-          - 10
-          - 11
-          - 12
-        default: 6
-
-      consensus_nodes:
-        required: false
-        type: choice
-        description: 'Number of Consensus Nodes to create (default: 2)'
+        description: 'Number of Collection Nodes to create (default: 2)'
         options:
           - 1
           - 2
@@ -65,6 +46,25 @@ on:
           - 11
           - 12
         default: 2
+
+      consensus_nodes:
+        required: false
+        type: choice
+        description: 'Number of Consensus Nodes to create (default: 1)'
+        options:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+          - 11
+          - 12
+        default: 1
 
       execution_nodes:
         required: false
@@ -244,7 +244,7 @@ jobs:
       - self-hosted
       - flow-bn2
     env:
-      ARGS: NAMESPACE=benchnet ACCESS=${{ inputs.access_nodes }} COLLECTION=${{ inputs.collection_nodes }} CONSENSUS=${{ inputs.consensus_nodes }} EXECUTION=${{ inputs.execution_nodes }} VERIFICATION=${{ inputs.verification_nodes }} NETWORK_ID="${{ needs.networkId.outputs.networkId }}" OWNER=${{ github.actor }}
+      ARGS: NAMESPACE=benchnet ACCESS=${{ inputs.access_nodes }} COLLECTION=${{ inputs.collection_nodes }} CONSENSUS=${{ inputs.consensus_nodes }} EXECUTION=${{ inputs.execution_nodes }} VERIFICATION=${{ inputs.verification_nodes }} NETWORK_ID=${{ needs.networkId.outputs.networkId }} OWNER=${{ github.actor }}
     steps:
 
       - name: Fail if Network ID was unable to be retrieved or was not unique
