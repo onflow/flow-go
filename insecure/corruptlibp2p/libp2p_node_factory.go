@@ -49,7 +49,7 @@ func NewCorruptLibP2PNodeFactory(
 			flowKey,
 			sporkId,
 			idProvider,
-			&p2pbuilder.MetricsConfig{
+			&p2pconfig.MetricsConfig{
 				HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 				Metrics:          metricsCfg,
 			},

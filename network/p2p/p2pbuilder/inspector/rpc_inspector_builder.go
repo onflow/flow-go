@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 )
 
@@ -78,7 +78,7 @@ type GossipSubInspectorBuilder struct {
 	logger           zerolog.Logger
 	sporkID          flow.Identifier
 	inspectorsConfig *GossipSubRPCInspectorsConfig
-	metricsCfg       *p2pbuilder.MetricsConfig
+	metricsCfg       *p2pconfig.MetricsConfig
 	metricsEnabled   bool
 	publicNetwork    bool
 }
@@ -89,7 +89,7 @@ func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier
 		logger:           logger,
 		sporkID:          sporkID,
 		inspectorsConfig: inspectorsConfig,
-		metricsCfg: &p2pbuilder.MetricsConfig{
+		metricsCfg: &p2pconfig.MetricsConfig{
 			Metrics:          metrics.NewNoopCollector(),
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		},
@@ -98,7 +98,7 @@ func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier
 }
 
 // SetMetrics sets the network metrics and registry.
-func (b *GossipSubInspectorBuilder) SetMetrics(metricsCfg *p2pbuilder.MetricsConfig) *GossipSubInspectorBuilder {
+func (b *GossipSubInspectorBuilder) SetMetrics(metricsCfg *p2pconfig.MetricsConfig) *GossipSubInspectorBuilder {
 	b.metricsCfg = metricsCfg
 	return b
 }

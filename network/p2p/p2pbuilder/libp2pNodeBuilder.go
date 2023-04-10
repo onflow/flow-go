@@ -21,7 +21,6 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
@@ -90,11 +89,6 @@ type CreateNodeFunc func(logger zerolog.Logger,
 	peerManager *connection.PeerManager) p2p.LibP2PNode
 type GossipSubAdapterConfigFunc func(*p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig
 
-type MetricsConfig struct {
-	HeroCacheFactory metrics.HeroCacheMetricsFactory
-	Metrics          module.LibP2PMetrics
-}
-
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
 func DefaultLibP2PNodeFactory(log zerolog.Logger,
@@ -102,7 +96,7 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metricsCfg *MetricsConfig,
+	metricsCfg *p2pconfig.MetricsConfig,
 	resolver madns.BasicResolver,
 	role string,
 	connGaterCfg *p2pconfig.ConnectionGaterConfig,
@@ -534,7 +528,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metricsCfg *MetricsConfig,
+	metricsCfg *p2pconfig.MetricsConfig,
 	resolver madns.BasicResolver,
 	role string,
 	connGaterCfg *p2pconfig.ConnectionGaterConfig,
