@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 )
 
+// portConfig configures port ranges for all nodes within a particular role.
 type portConfig struct {
 	// start is the first port to use for this role
 	start int
