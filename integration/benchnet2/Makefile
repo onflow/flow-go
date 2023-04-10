@@ -4,7 +4,7 @@ DOCKER_REGISTRY := us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet
 # default values that callers can override when calling target
 ACCESS = 1
 COLLECTION = 1
-VALID_COLLECTION := $(shell test $(COLLECTION) -ge 1; echo $$?)
+VALID_COLLECTION := $(shell test $(COLLECTION) -ge 2; echo $$?)
 CONSENSUS = 1
 EXECUTION = 2
 VALID_EXECUTION := $(shell test $(EXECUTION) -ge 2; echo $$?)
@@ -14,6 +14,8 @@ validate:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
 	# multiple execution nodes are required to prevent seals being generated in case of execution forking.
 	$(error Number of Execution nodes should be no less than 2)
+ifeq ($(strip $(VALID_COLLECTION)), 1)
+	$(error Number of Collection nodes should be no less than 2)
 else ifeq ($(strip $(NETWORK_ID)),)
 	$(error NETWORK_ID cannot be empty)
 else ifeq ($(strip $(NAMESPACE)),)
