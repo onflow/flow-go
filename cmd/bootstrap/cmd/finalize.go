@@ -115,7 +115,7 @@ func addFinalizeCmdFlags() {
 	cmd.MarkFlagRequired(finalizeCmd, "protocol-version")
 
 	// optional parameters to influence various aspects of identity generation
-	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2, "number of collection clusters")
+	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 1, "number of collection clusters")
 
 	// these two flags are only used when setup a network from genesis
 	finalizeCmd.Flags().StringVar(&flagServiceAccountPublicKeyJSON, "service-account-public-key-json",
