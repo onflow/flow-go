@@ -39,9 +39,15 @@ type State struct {
 		commits  storage.EpochCommits
 		statuses storage.EpochStatuses
 	}
-	// cache the root height because it cannot change over the lifecycle of a protocol state instance
+	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
+	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
+	// larger than the height of the root block of the spork, (also cached below as
+	// `sporkRootBlockHeight`), for instance if the node joined in an epoch after the last spork.
 	rootHeight uint64
-	// cache the spork root block height because it cannot change over the lifecycle of a protocol state instance
+	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
+	// the state, because it cannot change over the lifecycle of a protocol state instance.
+	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
+	// know the spork's root block in full (though it will always know the height).
 	sporkRootBlockHeight uint64
 	// cache the latest finalized block
 	cachedFinal *atomic.Pointer[cachedHeader]
@@ -50,8 +56,8 @@ type State struct {
 var _ protocol.State = (*State)(nil)
 
 type BootstrapConfig struct {
-	// SkipNetworkAddressValidation flags allows skipping all the network address related validations not needed for
-	// an unstaked node
+	// SkipNetworkAddressValidation flags allows skipping all the network address related
+	// validations not needed for an unstaked node
 	SkipNetworkAddressValidation bool
 }
 
