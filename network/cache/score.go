@@ -14,32 +14,37 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
 
-// AppScoreCache is a cache for storing the application specific Score of a peer in the GossipSub protocol.
-// AppSpecificScore is a function that is called by the GossipSub protocol to determine the application specific Score of a peer.
-// The application specific Score part of the GossipSub Score a peer and contributes to the overall Score that
-// selects the peers to which the current peer will connect on a topic mesh.
-// Note that neither the GossipSub Score nor its application specific Score part are shared with the other peers.
-// Rather it is solely used by the current peer to select the peers to which it will connect on a topic mesh.
-type AppScoreCache struct {
-	c             *stdmap.Backend
-	preprocessFns []ReadPreprocessorFunc
+// GossipSubSpamRecordCache is a cache for storing the gossipsub spam records of peers.
+// The spam records of peers is used to calculate the application specific score, which is part of the GossipSub score of a peer.
+// Note that neither of the spam records, application specific score, and GossipSub score are shared publicly with other peers.
+// Rather they are solely used by the current peer to select the peers to which it will connect on a topic mesh.
+type GossipSubSpamRecordCache struct {
+	c *stdmap.Backend // the in-memory underlying cache.
+	// Optional: the pre-processors to be called upon reading or updating a record in the cache.
+	// The pre-processors are called in the order they are added to the cache.
+	// The pre-processors are used to perform any necessary pre-processing on the record before returning it.
+	// Primary use case is to perform decay operations on the record before reading or updating it. In this way, a
+	// record is only decayed when it is read or updated without the need to explicitly iterating over the cache.
+	preprocessFns []PreprocessorFunc
 }
 
-// ReadPreprocessorFunc is a function that is called by the cache upon reading an entry from the cache and before returning it.
-// It is used to perform any necessary pre-processing on the entry before returning it.
-// The effect of the pre-processing is that the entry is updated in the cache.
+// PreprocessorFunc is a function that is called by the cache upon reading or updating a record in the cache.
+// It is used to perform any necessary pre-processing on the record before returning it when reading or changing it when updating.
+// The effect of the pre-processing is that the record is updated in the cache.
 // If there are multiple pre-processors, they are called in the order they are added to the cache.
 // Args:
 //
-//	record: the entry to be pre-processed.
-//	lastUpdated: the last time the entry was updated.
+//	record: the record to be pre-processed.
+//	lastUpdated: the last time the record was updated.
 //
 // Returns:
 //
-//	AppScoreRecord: the pre-processed entry.
-type ReadPreprocessorFunc func(record AppScoreRecord, lastUpdated time.Time) (AppScoreRecord, error)
+//		GossipSubSpamRecord: the pre-processed record.
+//	 error: an error if the pre-processing failed. The error is considered irrecoverable (unless the parameters can be adjusted and the pre-processing can be retried). The caller is
+//	 advised to crash the node upon an error if failure to read or update the record is not acceptable.
+type PreprocessorFunc func(record GossipSubSpamRecord, lastUpdated time.Time) (GossipSubSpamRecord, error)
 
-// NewAppScoreCache returns a new HeroCache-based application specific Score cache.
+// NewGossipSubSpamRecordCache returns a new HeroCache-based application specific Penalty cache.
 // Args:
 //
 //	sizeLimit: the maximum number of entries that can be stored in the cache.
@@ -48,191 +53,181 @@ type ReadPreprocessorFunc func(record AppScoreRecord, lastUpdated time.Time) (Ap
 //
 // Returns:
 //
-//	*AppScoreCache: the newly created cache with a HeroCache-based backend.
-func NewAppScoreCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics, prFns ...ReadPreprocessorFunc) *AppScoreCache {
+//	*GossipSubSpamRecordCache: the newly created cache with a HeroCache-based backend.
+func NewGossipSubSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics, prFns ...PreprocessorFunc) *GossipSubSpamRecordCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
-		// we should not evict any entry from the cache,
-		// as it is used to store the application specific Score of a peer,
-		// so ejection is disabled to avoid throwing away the app specific Score of a peer.
+		// we should not evict any record from the cache,
+		// eviction will open the node to spam attacks by malicious peers to erase their application specific penalty.
 		heropool.NoEjection,
-		logger.With().Str("mempool", "gossipsub-app-Score-cache").Logger(),
+		logger.With().Str("mempool", "gossipsub-app-Penalty-cache").Logger(),
 		collector)
-	return &AppScoreCache{
+	return &GossipSubSpamRecordCache{
 		c:             stdmap.NewBackend(stdmap.WithBackData(backData)),
 		preprocessFns: prFns,
 	}
 }
 
-// Add adds the application specific Score of a peer to the cache if not already present, or
-// updates the application specific Score of a peer in the cache if already present.
+// Add adds the GossipSubSpamRecord of a peer to the cache.
 // Args:
-//
-//		PeerID: the peer ID of the peer in the GossipSub protocol.
-//		Decay: the Decay factor of the application specific Score of the peer. Must be in the range [0, 1].
-//	    Score: the application specific Score of the peer.
+// - peerID: the peer ID of the peer in the GossipSub protocol.
+// - record: the GossipSubSpamRecord of the peer.
 //
 // Returns:
-//
-//		error on illegal argument (e.g., invalid Decay) or if the application specific Score of the peer
-//	    could not be added or updated. The returned error  is irrecoverable and the caller should crash the node.
-//	    The returned error means either the cache is full or the cache is in an inconsistent state.
-//	    Either case, the caller should crash the node to avoid inconsistent state.
-//		If the update fails, the application specific Score of the peer will not be used
-//		and this makes the GossipSub protocol vulnerable if the peer is malicious. As when there is no record of
-//		the application specific Score of a peer, the GossipSub considers the peer to have a Score of 0, and
-//		this does not prevent the GossipSub protocol from connecting to the peer on a topic mesh.
-func (a *AppScoreCache) Add(peerId peer.ID, record AppScoreRecord) bool {
-	entityId := flow.HashToID([]byte(peerId)) // HeroCache uses hash of peer.ID as the unique identifier of the entry.
-	return a.c.Add(appScoreRecordEntity{
-		entityId:       entityId,
-		peerID:         peerId,
-		lastUpdated:    time.Now(),
-		AppScoreRecord: record,
+// - bool: true if the record was added successfully, false otherwise.
+// Note that an record is added successfully if the cache has enough space to store the record and no record exists for the peer in the cache.
+// In other words, the entries are deduplicated by the peer ID.
+func (a *GossipSubSpamRecordCache) Add(peerId peer.ID, record GossipSubSpamRecord) bool {
+	entityId := flow.HashToID([]byte(peerId)) // HeroCache uses hash of peer.ID as the unique identifier of the record.
+	return a.c.Add(gossipsubSpamRecordEntity{
+		entityId:            entityId,
+		peerID:              peerId,
+		lastUpdated:         time.Now(),
+		GossipSubSpamRecord: record,
 	})
 }
 
-// Adjust adjusts the application specific Score of a peer in the cache.
-// It first reads the entry from the cache, applies the update function to the entry, and then runs the pre-processing functions on the entry.
+// Adjust adjusts the GossipSub spam penalty of a peer in the cache. It assumes that a record already exists for the peer in the cache.
+// It first reads the record from the cache, applies the pre-processing functions to the record, and then applies the update function to the record.
 // The order of the pre-processing functions is the same as the order in which they were added to the cache.
 // Args:
 // - peerID: the peer ID of the peer in the GossipSub protocol.
-// - updateFn: the update function to be applied to the entry.
+// - updateFn: the update function to be applied to the record.
 // Returns:
-// - *AppScoreRecord: the updated entry.
-// - error on failure to update the entry. The returned error is irrecoverable and the caller should crash the node.
-// Note that if any of the pre-processing functions returns an error, the entry is reverted to its original state (prior to applying the update function).
-func (a *AppScoreCache) Adjust(peerID peer.ID, updateFn func(record AppScoreRecord) AppScoreRecord) (*AppScoreRecord, error) {
-	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the entry.
+// - *GossipSubSpamRecord: the updated record.
+// - error on failure to update the record. The returned error is irrecoverable and the caller should crash the node.
+// Note that if any of the pre-processing functions returns an error, the record is reverted to its original state (prior to applying the update function).
+func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn func(record GossipSubSpamRecord) GossipSubSpamRecord) (*GossipSubSpamRecord, error) {
+	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the record.
 	if !a.c.Has(entityId) {
-		return nil, fmt.Errorf("could not adjust app Score cache entry for peer %s, entry not found", peerID.String())
+		return nil, fmt.Errorf("could not adjust spam records for peer %s, record not found", peerID.String())
 	}
 
 	var err error
 	record, updated := a.c.Adjust(entityId, func(entry flow.Entity) flow.Entity {
-		e := entry.(appScoreRecordEntity)
+		e := entry.(gossipsubSpamRecordEntity)
 
-		currentRecord := e.AppScoreRecord
-		// apply the pre-processing functions to the entry.
+		currentRecord := e.GossipSubSpamRecord
+		// apply the pre-processing functions to the record.
 		for _, apply := range a.preprocessFns {
-			e.AppScoreRecord, err = apply(e.AppScoreRecord, e.lastUpdated)
+			e.GossipSubSpamRecord, err = apply(e.GossipSubSpamRecord, e.lastUpdated)
 			if err != nil {
-				e.AppScoreRecord = currentRecord
-				return e // return the original entry if the pre-processing fails (atomic abort).
+				e.GossipSubSpamRecord = currentRecord
+				return e // return the original record if the pre-processing fails (atomic abort).
 			}
 		}
 
-		// apply the update function to the entry.
-		e.AppScoreRecord = updateFn(e.AppScoreRecord)
+		// apply the update function to the record.
+		e.GossipSubSpamRecord = updateFn(e.GossipSubSpamRecord)
 
-		if e.AppScoreRecord != currentRecord {
+		if e.GossipSubSpamRecord != currentRecord {
 			e.lastUpdated = time.Now()
 		}
 		return e
 	})
 	if err != nil {
-		return nil, fmt.Errorf("could not adjust app Score cache entry for peer %s, error: %w", peerID.String(), err)
+		return nil, fmt.Errorf("could not adjust spam records for peer %s, error: %w", peerID.String(), err)
 	}
 	if !updated {
-		// this happens when the underlying HeroCache fails to update the entry.
+		// this happens when the underlying HeroCache fails to update the record.
 		return nil, fmt.Errorf("internal cache error for updating %s", peerID.String())
 	}
 
-	r := record.(appScoreRecordEntity).AppScoreRecord
+	r := record.(gossipsubSpamRecordEntity).GossipSubSpamRecord
 	return &r, nil
 }
 
-// Has returns true if the application specific Score of a peer is found in the cache, false otherwise.
+// Has returns true if the spam record of a peer is found in the cache, false otherwise.
 // Args:
 // - peerID: the peer ID of the peer in the GossipSub protocol.
 // Returns:
-// - true if the application specific Score of the peer is found in the cache, false otherwise.
-func (a *AppScoreCache) Has(peerID peer.ID) bool {
-	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the entry.
+// - true if the gossipsub spam record of the peer is found in the cache, false otherwise.
+func (a *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
+	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the record.
 	return a.c.Has(entityId)
 }
 
-// Get returns the application specific Score of a peer from the cache.
+// Get returns the spam record of a peer from the cache.
 // Args:
-//
-//	PeerID: the peer ID of the peer in the GossipSub protocol.
+//	-peerID: the peer ID of the peer in the GossipSub protocol.
 //
 // Returns:
 //   - the application specific score record of the peer.
-//   - error if the underlying HeroCache update fails, or any of the pre-processors fails. The error is considered irrecoverable, and
-//     the caller should crash the node.
-//   - true if the application specific Score of the peer is found in the cache, false otherwise.
-func (a *AppScoreCache) Get(peerID peer.ID) (*AppScoreRecord, error, bool) {
-	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the entry.
+//   - error if the underlying cache update fails, or any of the pre-processors fails. The error is considered irrecoverable, and
+//     the caller is advised to crash the node.
+//   - true if the record is found in the cache, false otherwise.
+func (a *GossipSubSpamRecordCache) Get(peerID peer.ID) (*GossipSubSpamRecord, error, bool) {
+	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the record.
 	if !a.c.Has(entityId) {
 		return nil, nil, false
 	}
 
 	var err error
 	record, updated := a.c.Adjust(entityId, func(entry flow.Entity) flow.Entity {
-		e := entry.(appScoreRecordEntity)
+		e := entry.(gossipsubSpamRecordEntity)
 
-		currentRecord := e.AppScoreRecord
+		currentRecord := e.GossipSubSpamRecord
 		for _, apply := range a.preprocessFns {
-			e.AppScoreRecord, err = apply(e.AppScoreRecord, e.lastUpdated)
+			e.GossipSubSpamRecord, err = apply(e.GossipSubSpamRecord, e.lastUpdated)
 			if err != nil {
-				e.AppScoreRecord = currentRecord
-				return e // return the original entry if the pre-processing fails (atomic abort).
+				e.GossipSubSpamRecord = currentRecord
+				return e // return the original record if the pre-processing fails (atomic abort).
 			}
 		}
-		if e.AppScoreRecord != currentRecord {
+		if e.GossipSubSpamRecord != currentRecord {
 			e.lastUpdated = time.Now()
 		}
 		return e
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error while applying pre-processing functions to cache entry for peer %s: %w", peerID.String(), err), false
+		return nil, fmt.Errorf("error while applying pre-processing functions to cache record for peer %s: %w", peerID.String(), err), false
 	}
 	if !updated {
-		return nil, fmt.Errorf("could not decay cache entry for peer %s", peerID.String()), false
+		return nil, fmt.Errorf("could not decay cache record for peer %s", peerID.String()), false
 	}
 
-	r := record.(appScoreRecordEntity).AppScoreRecord
+	r := record.(gossipsubSpamRecordEntity).GossipSubSpamRecord
 	return &r, nil, true
 }
 
-// AppScoreRecord represents the application specific Score of a peer in the GossipSub protocol.
-// It acts as a Score card for a peer in the GossipSub protocol that keeps the
-// application specific Score of the peer and its Decay factor.
-type AppScoreRecord struct {
-	// Decay factor of the app specific Score.
-	// the app specific Score is multiplied by the Decay factor every time the Score is updated if the Score is negative.
-	// this is to prevent the Score from being stuck at a negative value.
-	// each peer has its own Decay factor based on its behavior.
-	// value is in the range [0, 1].
+// GossipSubSpamRecord represents spam record of a peer in the GossipSub protocol.
+// It acts as a penalty card for a peer in the GossipSub protocol that keeps the
+// spam penalty of the peer as well as its decay factor.
+// GossipSubSpam record is used to calculate the application specific score of a peer in the GossipSub protocol.
+type GossipSubSpamRecord struct {
+	// Decay factor of gossipsub spam penalty.
+	// The Penalty is multiplied by the Decay factor every time the Penalty is updated.
+	// This is to prevent the Penalty from being stuck at a negative value.
+	// Each peer has its own Decay factor based on its behavior.
+	// Valid decay value is in the range [0, 1].
 	Decay float64
-	// Score is the application specific Score of the peer.
-	Score float64
+	// Penalty is the application specific Penalty of the peer.
+	Penalty float64
 }
 
-// AppScoreRecord represents an entry for the AppScoreCache.
-// It stores the application specific Score of a peer in the GossipSub protocol.
-type appScoreRecordEntity struct {
-	entityId flow.Identifier // the ID of the entry (used to identify the entry in the cache).
-	// lastUpdated is the time at which the entry was last updated.
+// GossipSubSpamRecord represents an Entity implementation GossipSubSpamRecord.
+// It is internally used by the HeroCache to store the GossipSubSpamRecord.
+type gossipsubSpamRecordEntity struct {
+	entityId flow.Identifier // the ID of the record (used to identify the record in the cache).
+	// lastUpdated is the time at which the record was last updated.
 	// the peer ID of the peer in the GossipSub protocol.
 	peerID      peer.ID
 	lastUpdated time.Time
-	AppScoreRecord
+	GossipSubSpamRecord
 }
 
-// In order to use HeroCache, the entry must implement the flow.Entity interface.
-var _ flow.Entity = (*appScoreRecordEntity)(nil)
+// In order to use HeroCache, the gossipsubSpamRecordEntity must implement the flow.Entity interface.
+var _ flow.Entity = (*gossipsubSpamRecordEntity)(nil)
 
-// ID returns the ID of the entry. As the ID is used to identify the entry in the cache, it must be unique.
-// Also, as the ID is used frequently in the cache, it is stored in the entry to avoid recomputing it.
+// ID returns the ID of the gossipsubSpamRecordEntity. As the ID is used to identify the record in the cache, it must be unique.
+// Also, as the ID is used frequently in the cache, it is stored in the record to avoid recomputing it.
 // ID is never exposed outside the cache.
-func (a appScoreRecordEntity) ID() flow.Identifier {
+func (a gossipsubSpamRecordEntity) ID() flow.Identifier {
 	return a.entityId
 }
 
 // Checksum returns the same value as ID. Checksum is implemented to satisfy the flow.Entity interface.
-// HeroCache does not use the checksum of the entry.
-func (a appScoreRecordEntity) Checksum() flow.Identifier {
+// HeroCache does not use the checksum of the gossipsubSpamRecordEntity.
+func (a gossipsubSpamRecordEntity) Checksum() flow.Identifier {
 	return a.entityId
 }
