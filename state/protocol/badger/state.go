@@ -770,46 +770,42 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 
 // populateCache is used after opening or bootstrapping the state to populate the cache.
 // The cache must be populated before the State receives any queries.
-// No errors expected during normal operations. 
+// No errors expected during normal operations.
 func (state *State) populateCache() error {
-	// cache the root height - fixed over the course of the database lifetime
-	var rootHeight uint64
-	err := state.db.View(operation.RetrieveRootHeight(&rootHeight))
-	if err != nil {
-		return fmt.Errorf("could not read root block to populate cache: %w", err)
-	}
-	state.rootHeight = rootHeight
-
-	// cache the spork root block height - fixed over the course of the database lifetime
-	sporkRootBlockHeight, err := state.Params().SporkRootBlockHeight()
-	if err != nil {
-		return fmt.Errorf("could not read spork root block height: %w", err)
-	}
-	state.sporkRootBlockHeight = sporkRootBlockHeight
 
 	// cache the initial value for finalized block
-	var finalID flow.Identifier
-	var finalHeader *flow.Header
-	err = state.db.View(func(tx *badger.Txn) error {
+	err := state.db.View(func(tx *badger.Txn) error {
+		// root height
+		err := state.db.View(operation.RetrieveRootHeight(&state.rootHeight))
+		if err != nil {
+			return fmt.Errorf("could not read root block to populate cache: %w", err)
+		}
+		// spork root block height
+		err = state.db.View(operation.RetrieveSporkRootBlockHeight(&state.sporkRootBlockHeight))
+		if err != nil {
+			return fmt.Errorf("could not get spork root block height: %w", err)
+		}
+		// finalized header
 		var height uint64
-		err := operation.RetrieveFinalizedHeight(&height)(tx)
+		err = operation.RetrieveFinalizedHeight(&height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup finalized height: %w", err)
 		}
-		err = operation.LookupBlockHeight(height, &finalID)(tx)
+		var cachedFinalHeader cachedHeader
+		err = operation.LookupBlockHeight(height, &cachedFinalHeader.id)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup finalized id (height=%d): %w", height, err)
 		}
-		finalHeader, err = state.headers.ByBlockID(finalID)
+		cachedFinalHeader.header, err = state.headers.ByBlockID(cachedFinalHeader.id)
 		if err != nil {
-			return fmt.Errorf("could not get finalized block (id=%x): %w", finalID, err)
+			return fmt.Errorf("could not get finalized block (id=%x): %w", cachedFinalHeader.id, err)
 		}
+		state.cachedFinal.Store(&cachedFinalHeader)
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("could not cache finalized header: %w", err)
 	}
-	state.cachedFinal.Store(&cachedHeader{finalID, finalHeader})
 
 	return nil
 }
