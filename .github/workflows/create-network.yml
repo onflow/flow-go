@@ -31,9 +31,30 @@ on:
       collection_nodes:
         required: false
         type: choice
-        description: 'Number of Collection Nodes to create (default: 2)'
+        description: 'Number of Collection Nodes to create (default: 6)'
         options:
-          - 1
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+          - 11
+          - 12
+          - 13
+          - 14
+          - 15
+          - 16
+          - 17
+          - 18
+          - 19
+          - 20
+        default: 6
+
+      consensus_nodes:
+        required: false
+        type: choice
+        description: 'Number of Consensus Nodes to create (default: 2)'
+        options:
           - 2
           - 3
           - 4
@@ -46,25 +67,6 @@ on:
           - 11
           - 12
         default: 2
-
-      consensus_nodes:
-        required: false
-        type: choice
-        description: 'Number of Consensus Nodes to create (default: 1)'
-        options:
-          - 1
-          - 2
-          - 3
-          - 4
-          - 5
-          - 6
-          - 7
-          - 8
-          - 9
-          - 10
-          - 11
-          - 12
-        default: 1
 
       execution_nodes:
         required: false
@@ -114,13 +116,13 @@ on:
       # Allows for the ref to be altered for testing automation changes
       automation_ref:
         type: string
-        description: 'AUTOMATION branch, tag, or commit to use for bootstrapping and deployment.'
+        description: 'AUTOMATION branch, tag, or commit to use for bootstrapping and deployment (onflow/flow-go repo)'
         required: false
         default: master
 
       flow_ref:
         type: string
-        description: 'FLOW tag, branch, or commit to build and deploy'
+        description: 'FLOW tag, branch, or commit to build and deploy (onflow/flow-go repo)'
         required: true
 
       # This flag allows us to skip builds for network ids that have been previously built
