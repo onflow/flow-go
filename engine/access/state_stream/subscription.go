@@ -50,10 +50,10 @@ type SubscriptionImpl struct {
 	closed bool
 }
 
-func NewSubscription() *SubscriptionImpl {
+func NewSubscription(bufferSize int) *SubscriptionImpl {
 	return &SubscriptionImpl{
 		id: uuid.New().String(),
-		ch: make(chan interface{}, DefaultSendBufferSize),
+		ch: make(chan interface{}, bufferSize),
 	}
 }
 
@@ -117,9 +117,9 @@ type HeightBasedSubscription struct {
 	getData    GetDataByHeightFunc
 }
 
-func NewHeightBasedSubscription(firstHeight uint64, getData GetDataByHeightFunc) *HeightBasedSubscription {
+func NewHeightBasedSubscription(bufferSize int, firstHeight uint64, getData GetDataByHeightFunc) *HeightBasedSubscription {
 	return &HeightBasedSubscription{
-		SubscriptionImpl: NewSubscription(),
+		SubscriptionImpl: NewSubscription(bufferSize),
 		nextHeight:       firstHeight,
 		getData:          getData,
 	}

@@ -3,6 +3,7 @@ package state_stream
 import (
 	"fmt"
 	"net"
+	"time"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
@@ -25,9 +26,29 @@ import (
 
 // Config defines the configurable options for the ingress server.
 type Config struct {
-	ListenAddr              string
-	MaxExecutionDataMsgSize uint // in bytes
-	RpcMetricsEnabled       bool // enable GRPC metrics
+	EventFilterConfig
+
+	// ListenAddr is the address the GRPC server will listen on as host:port
+	ListenAddr string
+
+	// MaxExecutionDataMsgSize is the max message size for block execution data API
+	MaxExecutionDataMsgSize uint
+
+	// RpcMetricsEnabled specifies whether to enable the GRPC metrics
+	RpcMetricsEnabled bool
+
+	// MaxGlobalStreams defines the global max number of streams that can be open at the same time.
+	MaxGlobalStreams uint32
+
+	// ExecutionDataCacheSize is the max number of objects for the execution data cache.
+	ExecutionDataCacheSize uint32
+
+	// ClientSendTimeout is the timeout for sending a message to the client. After the timeout,
+	// the stream is closed with an error.
+	ClientSendTimeout time.Duration
+
+	// ClientSendBufferSize is the size of the response buffer for sending messages to the client.
+	ClientSendBufferSize uint
 }
 
 // Engine exposes the server with the state stream API.
@@ -48,15 +69,15 @@ type Engine struct {
 	stateStreamGrpcAddress net.Addr
 }
 
-// New returns a new ingress server.
+// NewEng returns a new ingress server.
 func NewEng(
+	log zerolog.Logger,
 	config Config,
 	execDataStore execution_data.ExecutionDataStore,
 	state protocol.State,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
-	log zerolog.Logger,
 	chainID flow.ChainID,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, GetExecutionDataByBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, GetExecutionDataByBlockID->10
@@ -93,7 +114,7 @@ func NewEng(
 	server := grpc.NewServer(grpcOpts...)
 
 	execDataCache := herocache.NewCache(
-		DefaultCacheSize,
+		config.ExecutionDataCacheSize,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		logger,
@@ -102,7 +123,7 @@ func NewEng(
 
 	broadcaster := engine.NewBroadcaster()
 
-	backend, err := New(logger, state, headers, seals, results, execDataStore, execDataCache, broadcaster)
+	backend, err := New(logger, config, state, headers, seals, results, execDataStore, execDataCache, broadcaster)
 	if err != nil {
 		return nil, fmt.Errorf("could not create state stream backend: %w", err)
 	}
@@ -113,7 +134,7 @@ func NewEng(
 		server:              server,
 		chain:               chainID.Chain(),
 		config:              config,
-		handler:             NewHandler(backend, chainID.Chain()),
+		handler:             NewHandler(backend, chainID.Chain(), config.EventFilterConfig, config.MaxGlobalStreams),
 		execDataBroadcaster: broadcaster,
 		execDataCache:       execDataCache,
 	}
@@ -127,6 +148,7 @@ func NewEng(
 	return e, nil
 }
 
+// OnExecutionData is called to notify the engine when a new execution data is received.
 func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) {
 	e.log.Trace().
 		Hex("block_id", logging.ID(executionData.BlockID)).

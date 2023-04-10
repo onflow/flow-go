@@ -64,7 +64,7 @@ func TestContructor(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			filter, err := state_stream.NewEventFilter(chain, test.eventTypes, test.addresses, test.contracts)
+			filter, err := state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chain, test.eventTypes, test.addresses, test.contracts)
 			if test.err {
 				assert.Error(t, err)
 				assert.Equal(t, filter, state_stream.EventFilter{})
@@ -83,7 +83,7 @@ func TestFilter(t *testing.T) {
 
 	chain := flow.MonotonicEmulator.Chain()
 
-	filter, err := state_stream.NewEventFilter(chain, []string{"flow.AccountCreated", "A.0000000000000001.Contract1.EventA"}, nil, nil)
+	filter, err := state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chain, []string{"flow.AccountCreated", "A.0000000000000001.Contract1.EventA"}, nil, nil)
 	assert.NoError(t, err)
 
 	events := flow.EventsList{
@@ -169,7 +169,13 @@ func TestMatch(t *testing.T) {
 			for _, address := range test.addresses {
 				t.Log(flow.HexToAddress(address))
 			}
-			filter, err := state_stream.NewEventFilter(flow.MonotonicEmulator.Chain(), test.eventTypes, test.addresses, test.contracts)
+			filter, err := state_stream.NewEventFilter(
+				state_stream.DefaultEventFilterConfig,
+				flow.MonotonicEmulator.Chain(),
+				test.eventTypes,
+				test.addresses,
+				test.contracts,
+			)
 			assert.NoError(t, err)
 			for _, event := range events {
 				assert.Equal(t, test.matches[event.Type], filter.Match(event), "event type: %s", event.Type)

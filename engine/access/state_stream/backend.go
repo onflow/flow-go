@@ -20,6 +20,10 @@ import (
 )
 
 const (
+	// DefaultMaxGlobalStreams defines the default max number of streams that can be open at the same time.
+	DefaultMaxGlobalStreams = 1000
+
+	// DefaultCacheSize defines the default max number of objects for the execution data cache.
 	DefaultCacheSize = 100
 
 	// DefaultSendTimeout is the default timeout for sending a message to the client. After the timeout
@@ -48,11 +52,11 @@ type StateStreamBackend struct {
 	execDataStore execution_data.ExecutionDataStore
 	execDataCache *herocache.Cache
 	broadcaster   *engine.Broadcaster
-	sendTimeout   time.Duration
 }
 
 func New(
 	log zerolog.Logger,
+	config Config,
 	state protocol.State,
 	headers storage.Headers,
 	seals storage.Seals,
@@ -72,14 +76,14 @@ func New(
 		execDataStore: execDataStore,
 		execDataCache: execDataCache,
 		broadcaster:   broadcaster,
-		sendTimeout:   DefaultSendTimeout,
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
 		log:              logger,
 		headers:          headers,
 		broadcaster:      broadcaster,
-		sendTimeout:      DefaultSendTimeout,
+		sendTimeout:      config.ClientSendTimeout,
+		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
 		getStartHeight:   b.getStartHeight,
 	}
@@ -88,7 +92,8 @@ func New(
 		log:              logger,
 		headers:          headers,
 		broadcaster:      broadcaster,
-		sendTimeout:      DefaultSendTimeout,
+		sendTimeout:      config.ClientSendTimeout,
+		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
 		getStartHeight:   b.getStartHeight,
 	}

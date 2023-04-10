@@ -21,10 +21,11 @@ type EventsResponse struct {
 }
 
 type EventsBackend struct {
-	log         zerolog.Logger
-	headers     storage.Headers
-	broadcaster *engine.Broadcaster
-	sendTimeout time.Duration
+	log            zerolog.Logger
+	headers        storage.Headers
+	broadcaster    *engine.Broadcaster
+	sendTimeout    time.Duration
+	sendBufferSize int
 
 	getExecutionData GetExecutionDataFunc
 	getStartHeight   GetStartHeightFunc
@@ -33,7 +34,7 @@ type EventsBackend struct {
 func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) Subscription {
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
 	if err != nil {
-		sub := NewSubscription()
+		sub := NewSubscription(b.sendBufferSize)
 		if st, ok := status.FromError(err); ok {
 			sub.Fail(status.Errorf(st.Code(), "could not get start height: %s", st.Message()))
 			return sub
@@ -43,7 +44,7 @@ func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Id
 		return sub
 	}
 
-	sub := NewHeightBasedSubscription(nextHeight, b.getResponseFactory(filter))
+	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponseFactory(filter))
 
 	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, sub).Stream(ctx)
 

@@ -8,10 +8,29 @@ import (
 )
 
 const (
+	// DefaultMaxEventTypes is the default maximum number of event types that can be specified in a filter
 	DefaultMaxEventTypes = 1000
-	DefaultMaxAddresses  = 1000
-	DefaultMaxContracts  = 1000
+
+	// DefaultMaxAddresses is the default maximum number of addresses that can be specified in a filter
+	DefaultMaxAddresses = 1000
+
+	// DefaultMaxContracts is the default maximum number of contracts that can be specified in a filter
+	DefaultMaxContracts = 1000
 )
+
+// EventFilterConfig is used to configure the limits for EventFilters
+type EventFilterConfig struct {
+	MaxEventTypes int
+	MaxAddresses  int
+	MaxContracts  int
+}
+
+// DefaultEventFilterConfig is the default configuration for EventFilters
+var DefaultEventFilterConfig = EventFilterConfig{
+	MaxEventTypes: DefaultMaxEventTypes,
+	MaxAddresses:  DefaultMaxAddresses,
+	MaxContracts:  DefaultMaxContracts,
+}
 
 // EventFilter represents a filter applied to events for a given subscription
 type EventFilter struct {
@@ -22,6 +41,7 @@ type EventFilter struct {
 }
 
 func NewEventFilter(
+	config EventFilterConfig,
 	chain flow.Chain,
 	eventTypes []string,
 	addresses []string,
@@ -29,16 +49,16 @@ func NewEventFilter(
 ) (EventFilter, error) {
 	// put some reasonable limits on the number of filters. Lookups use a map so they are fast,
 	// this just puts a cap on the memory consumed per filter.
-	if len(eventTypes) > DefaultMaxEventTypes {
-		return EventFilter{}, fmt.Errorf("too many event types in filter (%d). use %d or fewer", len(eventTypes), DefaultMaxEventTypes)
+	if len(eventTypes) > config.MaxEventTypes {
+		return EventFilter{}, fmt.Errorf("too many event types in filter (%d). use %d or fewer", len(eventTypes), config.MaxEventTypes)
 	}
 
-	if len(addresses) > DefaultMaxAddresses {
-		return EventFilter{}, fmt.Errorf("too many addresses in filter (%d). use %d or fewer", len(addresses), DefaultMaxAddresses)
+	if len(addresses) > config.MaxAddresses {
+		return EventFilter{}, fmt.Errorf("too many addresses in filter (%d). use %d or fewer", len(addresses), config.MaxAddresses)
 	}
 
-	if len(contracts) > DefaultMaxContracts {
-		return EventFilter{}, fmt.Errorf("too many contracts in filter (%d). use %d or fewer", len(contracts), DefaultMaxContracts)
+	if len(contracts) > config.MaxContracts {
+		return EventFilter{}, fmt.Errorf("too many contracts in filter (%d). use %d or fewer", len(contracts), config.MaxContracts)
 	}
 
 	f := EventFilter{

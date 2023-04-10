@@ -2,6 +2,7 @@ package state_stream
 
 import (
 	"context"
+	"sync/atomic"
 
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	executiondata "github.com/onflow/flow/protobuf/go/flow/executiondata"
@@ -16,12 +17,20 @@ import (
 type Handler struct {
 	api   API
 	chain flow.Chain
+
+	eventFilterConfig EventFilterConfig
+
+	maxStreams  int32
+	streamCount atomic.Int32
 }
 
-func NewHandler(api API, chain flow.Chain) *Handler {
+func NewHandler(api API, chain flow.Chain, conf EventFilterConfig, maxGlobalStreams uint32) *Handler {
 	h := &Handler{
-		api:   api,
-		chain: chain,
+		api:               api,
+		chain:             chain,
+		eventFilterConfig: conf,
+		maxStreams:        int32(maxGlobalStreams),
+		streamCount:       atomic.Int32{},
 	}
 	return h
 }
@@ -46,6 +55,13 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *access
 }
 
 func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataRequest, stream access.ExecutionDataAPI_SubscribeExecutionDataServer) error {
+	// check if the maximum number of streams is reached
+	if h.streamCount.Load() >= h.maxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.streamCount.Add(1)
+	defer h.streamCount.Add(-1)
+
 	startBlockID := flow.ZeroID
 	if request.GetStartBlockId() != nil {
 		blockID, err := convert.BlockID(request.GetStartBlockId())
@@ -87,6 +103,13 @@ func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataR
 }
 
 func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream access.ExecutionDataAPI_SubscribeEventsServer) error {
+	// check if the maximum number of streams is reached
+	if h.streamCount.Load() >= h.maxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.streamCount.Add(1)
+	defer h.streamCount.Add(-1)
+
 	startBlockID := flow.ZeroID
 	if request.GetStartBlockId() != nil {
 		blockID, err := convert.BlockID(request.GetStartBlockId())
@@ -101,6 +124,7 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 		var err error
 		reqFilter := request.GetFilter()
 		filter, err = NewEventFilter(
+			h.eventFilterConfig,
 			h.chain,
 			reqFilter.GetEventType(),
 			reqFilter.GetAddress(),

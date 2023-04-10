@@ -23,10 +23,11 @@ type ExecutionDataResponse struct {
 }
 
 type ExecutionDataBackend struct {
-	log         zerolog.Logger
-	headers     storage.Headers
-	broadcaster *engine.Broadcaster
-	sendTimeout time.Duration
+	log            zerolog.Logger
+	headers        storage.Headers
+	broadcaster    *engine.Broadcaster
+	sendTimeout    time.Duration
+	sendBufferSize int
 
 	getExecutionData GetExecutionDataFunc
 	getStartHeight   GetStartHeightFunc
@@ -50,7 +51,7 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, bl
 func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) Subscription {
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
 	if err != nil {
-		sub := NewSubscription()
+		sub := NewSubscription(b.sendBufferSize)
 		if st, ok := status.FromError(err); ok {
 			sub.Fail(status.Errorf(st.Code(), "could not get start height: %s", st.Message()))
 			return sub
@@ -60,7 +61,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, start
 		return sub
 	}
 
-	sub := NewHeightBasedSubscription(nextHeight, b.getResponse)
+	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponse)
 
 	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, sub).Stream(ctx)
 

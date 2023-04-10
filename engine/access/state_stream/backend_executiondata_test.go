@@ -92,9 +92,15 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		metrics.NewNoopCollector(),
 	)
 
+	conf := Config{
+		ClientSendTimeout:    DefaultSendTimeout,
+		ClientSendBufferSize: DefaultSendBufferSize,
+	}
+
 	var err error
 	s.backend, err = New(
 		logger,
+		conf,
 		s.state,
 		s.headers,
 		s.seals,
