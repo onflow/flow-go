@@ -14,7 +14,7 @@ type ExecutionDataReceivedCallback func(*execution_data.BlockExecutionData)
 type ExecutionDataRequester interface {
 	component.Component
 
-	// OnBlockFinalized accepts block finalization notifications from the FinalizationDistributor
+	// OnBlockFinalized accepts block finalization notifications from the FollowerDistributor
 	OnBlockFinalized(*model.Block)
 
 	// AddOnExecutionDataFetchedConsumer adds a callback to be called when a new ExecutionData is received

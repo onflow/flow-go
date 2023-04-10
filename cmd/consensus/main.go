@@ -100,31 +100,31 @@ func main() {
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 
-		err                     error
-		mutableState            protocol.ParticipantState
-		beaconPrivateKey        *encodable.RandomBeaconPrivKey
-		guarantees              mempool.Guarantees
-		receipts                mempool.ExecutionTree
-		seals                   mempool.IncorporatedResultSeals
-		pendingReceipts         mempool.PendingReceipts
-		receiptRequester        *requester.Engine
-		syncCore                *chainsync.Core
-		comp                    *compliance.Engine
-		hot                     module.HotStuff
-		conMetrics              module.ConsensusMetrics
-		mainMetrics             module.HotstuffMetrics
-		receiptValidator        module.ReceiptValidator
-		chunkAssigner           *chmodule.ChunkAssigner
-		finalizationDistributor *pubsub.FollowerDistributor
-		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
-		blockTimer              protocol.BlockTimer
-		finalizedHeader         *synceng.FinalizedHeaderCache
-		committee               *committees.Consensus
-		epochLookup             *epochs.EpochLookup
-		hotstuffModules         *consensus.HotstuffModules
-		dkgState                *bstorage.DKGState
-		safeBeaconKeys          *bstorage.SafeBeaconPrivateKeys
-		getSealingConfigs       module.SealingConfigsGetter
+		err                 error
+		mutableState        protocol.ParticipantState
+		beaconPrivateKey    *encodable.RandomBeaconPrivKey
+		guarantees          mempool.Guarantees
+		receipts            mempool.ExecutionTree
+		seals               mempool.IncorporatedResultSeals
+		pendingReceipts     mempool.PendingReceipts
+		receiptRequester    *requester.Engine
+		syncCore            *chainsync.Core
+		comp                *compliance.Engine
+		hot                 module.HotStuff
+		conMetrics          module.ConsensusMetrics
+		mainMetrics         module.HotstuffMetrics
+		receiptValidator    module.ReceiptValidator
+		chunkAssigner       *chmodule.ChunkAssigner
+		followerDistributor *pubsub.FollowerDistributor
+		dkgBrokerTunnel     *dkgmodule.BrokerTunnel
+		blockTimer          protocol.BlockTimer
+		finalizedHeader     *synceng.FinalizedHeaderCache
+		committee           *committees.Consensus
+		epochLookup         *epochs.EpochLookup
+		hotstuffModules     *consensus.HotstuffModules
+		dkgState            *bstorage.DKGState
+		safeBeaconKeys      *bstorage.SafeBeaconPrivateKeys
+		getSealingConfigs   module.SealingConfigsGetter
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -365,8 +365,8 @@ func main() {
 			return err
 		}).
 		Module("finalization distributor", func(node *cmd.NodeConfig) error {
-			finalizationDistributor = pubsub.NewFollowerDistributor()
-			finalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
+			followerDistributor = pubsub.NewFollowerDistributor()
+			followerDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
 			return nil
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
@@ -432,8 +432,8 @@ func main() {
 			)
 
 			// subscribe for finalization events from hotstuff
-			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
-			finalizationDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
+			followerDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
+			followerDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
 
 			return e, err
 		}).
@@ -487,8 +487,8 @@ func main() {
 
 			// subscribe engine to inputs from other node-internal components
 			receiptRequester.WithHandle(e.HandleReceipt)
-			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
-			finalizationDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
+			followerDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
+			followerDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
 
 			return e, err
 		}).
@@ -560,7 +560,7 @@ func main() {
 				mainMetrics,
 			)
 
-			notifier.AddFollowerConsumer(finalizationDistributor)
+			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
@@ -594,7 +594,7 @@ func main() {
 				lowestViewForVoteProcessing,
 				notifier,
 				voteProcessorFactory,
-				finalizationDistributor)
+				followerDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}
@@ -627,7 +627,7 @@ func main() {
 				Signer:                      signer,
 				Persist:                     persist,
 				QCCreatedDistributor:        qcDistributor,
-				FinalizationDistributor:     finalizationDistributor,
+				FollowerDistributor:         followerDistributor,
 				TimeoutCollectorDistributor: timeoutCollectorDistributor,
 				Forks:                       forks,
 				Validator:                   validator,
@@ -731,7 +731,7 @@ func main() {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 
-			finalizationDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
+			followerDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
 
 			return comp, nil
 		}).
@@ -755,7 +755,7 @@ func main() {
 			return messageHub, nil
 		}).
 		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
+			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, followerDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
 			}

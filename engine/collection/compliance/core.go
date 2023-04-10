@@ -34,14 +34,15 @@ import (
 //   - The only exception is calls to `ProcessFinalizedView`, which is the only concurrency-safe
 //     method of compliance.Core
 type Core struct {
-	log               zerolog.Logger // used to log relevant actions with context
-	config            compliance.Config
-	engineMetrics     module.EngineMetrics
-	mempoolMetrics    module.MempoolMetrics
-	hotstuffMetrics   module.HotstuffMetrics
-	collectionMetrics module.CollectionMetrics
-	headers           storage.Headers
-	state             clusterkv.MutableState
+	log                       zerolog.Logger // used to log relevant actions with context
+	config                    compliance.Config
+	engineMetrics             module.EngineMetrics
+	mempoolMetrics            module.MempoolMetrics
+	hotstuffMetrics           module.HotstuffMetrics
+	collectionMetrics         module.CollectionMetrics
+	protocolViolationNotifier hotstuff.BaseProtocolViolationConsumer
+	headers                   storage.Headers
+	state                     clusterkv.MutableState
 	// track latest finalized view/height - used to efficiently drop outdated or too-far-ahead blocks
 	finalizedView     counters.StrictMonotonousCounter
 	finalizedHeight   counters.StrictMonotonousCounter
@@ -60,6 +61,7 @@ func NewCore(
 	mempool module.MempoolMetrics,
 	hotstuffMetrics module.HotstuffMetrics,
 	collectionMetrics module.CollectionMetrics,
+	protocolViolationNotifier hotstuff.BaseProtocolViolationConsumer,
 	headers storage.Headers,
 	state clusterkv.MutableState,
 	pending module.PendingClusterBlockBuffer,
@@ -77,20 +79,21 @@ func NewCore(
 	}
 
 	c := &Core{
-		log:               log.With().Str("cluster_compliance", "core").Logger(),
-		config:            config,
-		engineMetrics:     collector,
-		mempoolMetrics:    mempool,
-		hotstuffMetrics:   hotstuffMetrics,
-		collectionMetrics: collectionMetrics,
-		headers:           headers,
-		state:             state,
-		pending:           pending,
-		sync:              sync,
-		hotstuff:          hotstuff,
-		validator:         validator,
-		voteAggregator:    voteAggregator,
-		timeoutAggregator: timeoutAggregator,
+		log:                       log.With().Str("cluster_compliance", "core").Logger(),
+		config:                    config,
+		engineMetrics:             collector,
+		mempoolMetrics:            mempool,
+		hotstuffMetrics:           hotstuffMetrics,
+		collectionMetrics:         collectionMetrics,
+		protocolViolationNotifier: protocolViolationNotifier,
+		headers:                   headers,
+		state:                     state,
+		pending:                   pending,
+		sync:                      sync,
+		hotstuff:                  hotstuff,
+		validator:                 validator,
+		voteAggregator:            voteAggregator,
+		timeoutAggregator:         timeoutAggregator,
 	}
 
 	// initialize finalized boundary cache
@@ -312,7 +315,8 @@ func (c *Core) processBlockProposal(proposal *cluster.Block, parent *flow.Header
 	hotstuffProposal := model.ProposalFromFlow(header)
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
-		if model.IsInvalidBlockError(err) {
+		if invalidBlockErr, ok := model.AsInvalidBlockError(err); ok {
+			c.protocolViolationNotifier.OnInvalidBlockDetected(*invalidBlockErr)
 			return engine.NewInvalidInputErrorf("invalid block proposal: %w", err)
 		}
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {

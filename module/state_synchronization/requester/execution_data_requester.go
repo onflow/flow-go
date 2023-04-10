@@ -247,7 +247,7 @@ func New(
 	return e
 }
 
-// OnBlockFinalized accepts block finalization notifications from the FinalizationDistributor
+// OnBlockFinalized accepts block finalization notifications from the FollowerDistributor
 func (e *executionDataRequester) OnBlockFinalized(*model.Block) {
 	e.finalizationNotifier.Notify()
 }

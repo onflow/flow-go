@@ -163,7 +163,7 @@ func (f *HotStuffFactory) CreateModules(
 		TimeoutAggregator:           timeoutAggregator,
 		QCCreatedDistributor:        qcDistributor,
 		TimeoutCollectorDistributor: timeoutCollectorDistributor,
-		FinalizationDistributor:     followerDistributor,
+		FollowerDistributor:         followerDistributor,
 	}, metrics, nil
 }
 
