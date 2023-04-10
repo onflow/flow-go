@@ -16,7 +16,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
@@ -25,6 +24,7 @@ import (
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -1488,15 +1488,15 @@ func TestStorageUsed(t *testing.T) {
 	accountStatusId := flow.AccountStatusRegisterID(
 		flow.BytesToAddress(address))
 
-	simpleView := delta.NewDeltaView(nil)
 	status := environment.NewAccountStatus()
 	status.SetStorageUsed(5)
-	err = simpleView.Set(accountStatusId, status.ToBytes())
-	require.NoError(t, err)
 
-	script := fvm.Script(code)
-
-	_, output, err := vm.RunV2(ctx, script, simpleView)
+	_, output, err := vm.RunV2(
+		ctx,
+		fvm.Script(code),
+		state.MapStorageSnapshot{
+			accountStatusId: status.ToBytes(),
+		})
 	require.NoError(t, err)
 
 	require.Equal(t, cadence.NewUInt64(5), output.Value)
