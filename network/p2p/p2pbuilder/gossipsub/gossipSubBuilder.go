@@ -33,11 +33,11 @@ type Builder struct {
 	gossipSubScoreTracerInterval time.Duration // the interval at which the gossipsub score tracer logs the peer scores.
 	// gossipSubTracer is a callback interface that is called by the gossipsub implementation upon
 	// certain events. Currently, we use it to log and observe the local mesh of the node.
-	gossipSubTracer        p2p.PubSubTracer
-	scoreOptionConfig      *scoring.ScoreOptionConfig
-	idProvider             module.IdentityProvider
-	routingSystem          routing.Routing
-	rpcInspectors               []p2p.GossipSubRPCInspector
+	gossipSubTracer   p2p.PubSubTracer
+	scoreOptionConfig *scoring.ScoreOptionConfig
+	idProvider        module.IdentityProvider
+	routingSystem     routing.Routing
+	rpcInspectors     []p2p.GossipSubRPCInspector
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -151,7 +151,7 @@ func NewGossipSubBuilder(logger zerolog.Logger, metrics module.GossipSubMetrics)
 		gossipSubFactory:    defaultGossipSubFactory(),
 		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
 		scoreOptionConfig:   scoring.NewScoreOptionConfig(lg),
-		rpcInspectors:               make([]p2p.GossipSubRPCInspector, 0),
+		rpcInspectors:       make([]p2p.GossipSubRPCInspector, 0),
 	}
 }
 
