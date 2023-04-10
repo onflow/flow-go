@@ -459,7 +459,6 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		testnet.GRPCPort,
 		testnet.GRPCSecurePort,
 		testnet.GRPCWebPort,
-		testnet.AdminPort,
 	)
 
 	// observer services rely on the access gateway
