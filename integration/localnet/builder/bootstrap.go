@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"time"
 
 	"github.com/go-yaml/yaml"
@@ -30,10 +29,11 @@ const (
 	DockerComposeFile        = "./docker-compose.nodes.yml"
 	DockerComposeFileVersion = "3.7"
 	PrometheusTargetsFile    = "./targets.nodes.json"
-	DefaultObserverName      = "observer"
+	PortMapFile              = "./ports.nodes.json"
+	DefaultObserverRole      = "observer"
 	DefaultLogLevel          = "DEBUG"
 	DefaultGOMAXPROCS        = 8
-	DefaultMaxObservers      = 1000
+	DefaultMaxObservers      = 100
 	DefaultCollectionCount   = 3
 	DefaultConsensusCount    = 3
 	DefaultExecutionCount    = 1
@@ -48,15 +48,6 @@ const (
 	DefaultExtensiveTracing  = false
 	DefaultConsensusDelay    = 800 * time.Millisecond
 	DefaultCollectionDelay   = 950 * time.Millisecond
-	AccessAPIPort            = 3569
-	AccessPubNetworkPort     = 1234
-	ExecutionAPIPort         = 3600
-	MetricsPort              = 8080
-	RPCPort                  = 9000
-	SecuredRPCPort           = 9001
-	AdminToolPort            = 9002
-	AdminToolLocalPort       = 3700
-	HTTPPort                 = 8000
 )
 
 var (
@@ -78,6 +69,8 @@ var (
 	consensusDelay         time.Duration
 	collectionDelay        time.Duration
 	logLevel               string
+
+	ports *PortAllocator
 )
 
 func init() {
@@ -119,6 +112,9 @@ func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.Cont
 func main() {
 	flag.Parse()
 
+	// Allocate blocks of IPs for each node
+	ports = NewPortAllocator()
+
 	// Prepare test node configurations of each type, access, execution, verification, etc
 	flowNodes := prepareFlowNodes()
 
@@ -155,8 +151,12 @@ func main() {
 		panic(err)
 	}
 
+	if err = ports.WriteMappingConfig(); err != nil {
+		panic(err)
+	}
+
 	fmt.Print("Bootstrapping success!\n\n")
-	displayPortAssignments()
+	ports.Print()
 	fmt.Println()
 
 	fmt.Println("Run \"make start\" to re-build images and launch the network.")
@@ -169,20 +169,6 @@ func displayFlowNetworkConf(flowNetworkConf testnet.NetworkConfig) {
 	fmt.Printf("- Epoch Length: %d\n", flowNetworkConf.ViewsInEpoch)
 	fmt.Printf("- Staking Phase Length: %d\n", flowNetworkConf.ViewsInStakingAuction)
 	fmt.Printf("- DKG Phase Length: %d\n", flowNetworkConf.ViewsInDKGPhase)
-}
-
-func displayPortAssignments() {
-	for i := 0; i < accessCount; i++ {
-		fmt.Printf("Access %d Flow API will be accessible at localhost:%d\n", i+1, AccessAPIPort+i)
-		fmt.Printf("Access %d public libp2p access will be accessible at localhost:%d\n\n", i+1, AccessPubNetworkPort+i)
-	}
-	for i := 0; i < executionCount; i++ {
-		fmt.Printf("Execution API %d will be accessible at localhost:%d\n", i+1, ExecutionAPIPort+i)
-	}
-	fmt.Println()
-	for i := 0; i < observerCount; i++ {
-		fmt.Printf("Observer %d Flow API will be accessible at localhost:%d\n", i+1, (accessCount*2)+(AccessAPIPort)+2*i)
-	}
 }
 
 func prepareCommonHostFolders() {
@@ -245,6 +231,14 @@ type Service struct {
 	Volumes     []string
 	Ports       []string `yaml:"ports,omitempty"`
 	Labels      map[string]string
+
+	name string // don't export
+}
+
+func (s *Service) AddExposedPorts(containerPorts ...string) {
+	for _, port := range containerPorts {
+		s.Ports = append(s.Ports, fmt.Sprintf("%s:%s", ports.HostPort(s.name, port), port))
+	}
 }
 
 // Build ...
@@ -321,7 +315,7 @@ func prepareServiceDirs(role string, nodeId string) (string, string) {
 func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 	dataDir, profilerDir := prepareServiceDirs(container.Role.String(), container.NodeID.String())
 
-	service := defaultService(container.Role.String(), dataDir, profilerDir, i)
+	service := defaultService(container.ContainerName, container.Role.String(), dataDir, profilerDir, i)
 	service.Command = append(service.Command,
 		fmt.Sprintf("--nodeid=%s", container.NodeID),
 	)
@@ -341,8 +335,7 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, n int) Se
 	service := prepareService(container, i, n)
 
 	timeout := 1200*time.Millisecond + consensusDelay
-	service.Command = append(
-		service.Command,
+	service.Command = append(service.Command,
 		fmt.Sprintf("--block-rate-delay=%s", consensusDelay),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		"--chunk-alpha=1",
@@ -351,24 +344,15 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, n int) Se
 		"--access-node-ids=*",
 	)
 
-	service.Ports = []string{
-		fmt.Sprintf("%d:%d", AdminToolLocalPort+n, AdminToolPort),
-	}
-
 	return service
 }
 
 func prepareVerificationService(container testnet.ContainerConfig, i int, n int) Service {
 	service := prepareService(container, i, n)
 
-	service.Command = append(
-		service.Command,
+	service.Command = append(service.Command,
 		"--chunk-alpha=1",
 	)
-
-	service.Ports = []string{
-		fmt.Sprintf("%d:%d", AdminToolLocalPort+n, AdminToolPort),
-	}
 
 	return service
 }
@@ -378,18 +362,13 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, n int) S
 	service := prepareService(container, i, n)
 
 	timeout := 1200*time.Millisecond + collectionDelay
-	service.Command = append(
-		service.Command,
+	service.Command = append(service.Command,
 		fmt.Sprintf("--block-rate-delay=%s", collectionDelay),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
-		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
+		fmt.Sprintf("--ingress-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		"--insecure-access-api=false",
 		"--access-node-ids=*",
 	)
-
-	service.Ports = []string{
-		fmt.Sprintf("%d:%d", AdminToolLocalPort+n, AdminToolPort),
-	}
 
 	return service
 }
@@ -411,25 +390,19 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		panic(err)
 	}
 
-	service.Command = append(
-		service.Command,
+	service.Command = append(service.Command,
 		"--triedir=/trie",
-		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
+		fmt.Sprintf("--rpc-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
 		"--execution-data-dir=/data/execution-data",
 	)
 
-	service.Volumes = append(
-		service.Volumes,
+	service.Volumes = append(service.Volumes,
 		fmt.Sprintf("%s:/trie:z", trieDir),
 	)
 
-	service.Ports = []string{
-		fmt.Sprintf("%d:%d", ExecutionAPIPort+2*i, RPCPort),
-		fmt.Sprintf("%d:%d", ExecutionAPIPort+(2*i+1), SecuredRPCPort),
-		fmt.Sprintf("%d:%d", AdminToolLocalPort+n, AdminToolPort),
-	}
+	service.AddExposedPorts(testnet.GRPCPort)
 
 	return service
 }
@@ -438,12 +411,14 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 	service := prepareService(container, i, n)
 
 	service.Command = append(service.Command,
-		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
-		fmt.Sprintf("--secure-rpc-addr=%s:%d", container.ContainerName, SecuredRPCPort),
-		fmt.Sprintf("--http-addr=%s:%d", container.ContainerName, HTTPPort),
-		fmt.Sprintf("--collection-ingress-port=%d", RPCPort),
+		fmt.Sprintf("--rpc-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
+		fmt.Sprintf("--secure-rpc-addr=%s:%s", container.ContainerName, testnet.GRPCSecurePort),
+		fmt.Sprintf("--http-addr=%s:%s", container.ContainerName, testnet.GRPCWebPort),
+		fmt.Sprintf("--rest-addr=%s:%s", container.ContainerName, testnet.RESTPort),
+		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.ExecutionStatePort),
+		fmt.Sprintf("--collection-ingress-port=%s", testnet.GRPCPort),
 		"--supports-observer=true",
-		fmt.Sprintf("--public-network-address=%s:%d", container.ContainerName, AccessPubNetworkPort),
+		fmt.Sprintf("--public-network-address=%s:%s", container.ContainerName, testnet.PublicNetworkPort),
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",
 		"--log-tx-time-to-finalized-executed",
@@ -451,12 +426,14 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--execution-data-dir=/data/execution-data",
 	)
 
-	service.Ports = []string{
-		fmt.Sprintf("%d:%d", AccessPubNetworkPort+i, AccessPubNetworkPort),
-		fmt.Sprintf("%d:%d", AccessAPIPort+2*i, RPCPort),
-		fmt.Sprintf("%d:%d", AccessAPIPort+(2*i+1), SecuredRPCPort),
-		fmt.Sprintf("%d:%d", AdminToolLocalPort+n, AdminToolPort),
-	}
+	service.AddExposedPorts(
+		testnet.GRPCPort,
+		testnet.GRPCSecurePort,
+		testnet.GRPCWebPort,
+		testnet.RESTPort,
+		testnet.ExecutionStatePort,
+		testnet.PublicNetworkPort,
+	)
 
 	return service
 }
@@ -465,35 +442,41 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 	// Observers have a unique naming scheme omitting node id being on the public network
 	dataDir, profilerDir := prepareServiceDirs(observerName, "")
 
-	observerService := defaultService(DefaultObserverName, dataDir, profilerDir, i)
-	observerService.Command = append(observerService.Command,
-		fmt.Sprintf("--bootstrap-node-addresses=%s:%d", testnet.PrimaryAN, AccessPubNetworkPort),
+	service := defaultService(observerName, DefaultObserverRole, dataDir, profilerDir, i)
+	service.Command = append(service.Command,
+		fmt.Sprintf("--bootstrap-node-addresses=%s:%s", testnet.PrimaryAN, testnet.PublicNetworkPort),
 		fmt.Sprintf("--bootstrap-node-public-keys=%s", agPublicKey),
-		fmt.Sprintf("--upstream-node-addresses=%s:%d", testnet.PrimaryAN, SecuredRPCPort),
+		fmt.Sprintf("--upstream-node-addresses=%s:%s", testnet.PrimaryAN, testnet.GRPCSecurePort),
 		fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
 		"--bind=0.0.0.0:0",
-		fmt.Sprintf("--rpc-addr=%s:%d", observerName, RPCPort),
-		fmt.Sprintf("--secure-rpc-addr=%s:%d", observerName, SecuredRPCPort),
-		fmt.Sprintf("--http-addr=%s:%d", observerName, HTTPPort),
+		fmt.Sprintf("--rpc-addr=%s:%s", observerName, testnet.GRPCPort),
+		fmt.Sprintf("--secure-rpc-addr=%s:%s", observerName, testnet.GRPCSecurePort),
+		fmt.Sprintf("--http-addr=%s:%s", observerName, testnet.GRPCWebPort),
+	)
+
+	service.AddExposedPorts(
+		testnet.GRPCPort,
+		testnet.GRPCSecurePort,
+		testnet.GRPCWebPort,
+		testnet.AdminPort,
 	)
 
 	// observer services rely on the access gateway
-	observerService.DependsOn = append(observerService.DependsOn, testnet.PrimaryAN)
-	observerService.Ports = []string{
-		// Flow API ports come in pairs, open and secure. While the guest port is always
-		// the same from the guest's perspective, the host port numbering accounts for the presence
-		// of multiple pairs of listeners on the host to avoid port collisions. Observer listener pairs
-		// are numbered just after the Access listeners on the host network by prior convention
-		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i), RPCPort),
-		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i)+1, SecuredRPCPort),
-	}
-	return observerService
+	service.DependsOn = append(service.DependsOn, testnet.PrimaryAN)
+
+	return service
 }
 
-func defaultService(role, dataDir, profilerDir string, i int) Service {
+func defaultService(name, role, dataDir, profilerDir string, i int) Service {
+	err := ports.AllocatePorts(name, role)
+	if err != nil {
+		panic(err)
+	}
+
 	num := fmt.Sprintf("%03d", i+1)
 	service := Service{
+		name:  name,
 		Image: fmt.Sprintf("localnet-%s", role),
 		Command: []string{
 			"--bootstrapdir=/bootstrap",
@@ -505,7 +488,7 @@ func defaultService(role, dataDir, profilerDir string, i int) Service {
 			fmt.Sprintf("--tracer-enabled=%t", tracing),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",
-			fmt.Sprintf("--admin-addr=0.0.0.0:%d", AdminToolPort),
+			fmt.Sprintf("--admin-addr=0.0.0.0:%s", testnet.AdminPort),
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
@@ -524,6 +507,8 @@ func defaultService(role, dataDir, profilerDir string, i int) Service {
 			"com.dapperlabs.num":  num,
 		},
 	}
+
+	service.AddExposedPorts(testnet.AdminPort)
 
 	if i == 0 {
 		// only specify build config for first service of each role
@@ -553,6 +538,7 @@ func writeDockerComposeConfig(services Services) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 
 	network := Network{
 		Version:  DockerComposeFileVersion,
@@ -585,7 +571,7 @@ func prepareServiceDiscovery(containers []testnet.ContainerConfig) PrometheusSer
 	for _, container := range containers {
 		counters[container.Role]++
 		pt := PrometheusTarget{
-			Targets: []string{net.JoinHostPort(container.ContainerName, strconv.Itoa(MetricsPort))},
+			Targets: []string{net.JoinHostPort(container.ContainerName, testnet.MetricsPort)},
 			Labels: map[string]string{
 				"job":     "flow",
 				"role":    container.Role.String(),
@@ -604,6 +590,7 @@ func writePrometheusConfig(serviceDisc PrometheusServiceDiscovery) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 
 	enc := json.NewEncoder(f)
 
@@ -670,7 +657,7 @@ func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs [
 	}
 
 	for i := 0; i < observerCount; i++ {
-		observerName := fmt.Sprintf("%s_%d", DefaultObserverName, i+1)
+		observerName := fmt.Sprintf("%s_%d", DefaultObserverRole, i+1)
 		observerService := prepareObserverService(i, observerName, agPublicKey)
 
 		// Add a docker container for this named Observer
