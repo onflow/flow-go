@@ -44,6 +44,7 @@ func (f *FollowerLogic) FinalizedBlock() *model.Block {
 // AddBlock processes the given block proposal
 func (f *FollowerLogic) AddBlock(blockProposal *model.Proposal) error {
 	// validate the block. skip if the proposal is invalid
+	// TODO: this block was already validated by follower engine, to be refactored
 	err := f.validator.ValidateProposal(blockProposal)
 	if err != nil {
 		if model.IsInvalidBlockError(err) {

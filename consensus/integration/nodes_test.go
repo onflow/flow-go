@@ -594,6 +594,7 @@ func createNode(
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
+		notifier,
 		tracer,
 		headersDB,
 		payloadsDB,
