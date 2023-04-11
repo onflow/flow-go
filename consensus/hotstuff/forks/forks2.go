@@ -1,5 +1,6 @@
 package forks
 
+/*
 import (
 	"fmt"
 
@@ -555,3 +556,5 @@ func (f *Forks2) finalizationEventsUpToBlock(qc *flow.QuorumCertificate) error {
 	}
 	return nil
 }
+
+*/

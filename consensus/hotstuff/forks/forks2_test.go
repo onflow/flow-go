@@ -1,5 +1,6 @@
 package forks
 
+/*
 import (
 	"fmt"
 	"testing"
@@ -19,7 +20,7 @@ import (
  * A block is denoted as [(◄<qc_number>) <block_view_number>].               *
  * For example, [(◄1) 2] means: a block of view 2 that has a QC for view 1.  *
  *****************************************************************************/
-
+/*
 // TestFinalize_Direct1Chain tests adding a direct 1-chain.
 // receives [(◄1) 2] [(◄2) 3]
 // it should not finalize any block because there is no finalizable 2-chain.
@@ -795,3 +796,4 @@ func toCertifiedBlocks(t *testing.T, blocks ...*model.Block) []*model.CertifiedB
 	}
 	return certBlocks
 }
+*/
