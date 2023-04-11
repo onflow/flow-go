@@ -190,8 +190,6 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 			if err != nil {
 				lg.Error().
 					Err(err).
-					Str("peer_id", from.String()).
-					Str("ctrl_msg_type", string(ctrlMsgType)).
 					Msg("could not pre-process rpc, aborting")
 				return fmt.Errorf("could not pre-process rpc, aborting: %w", err)
 			}
