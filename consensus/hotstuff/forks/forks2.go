@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/forest"
-	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 // FinalityProof represents a finality proof for a Block. By convention, a FinalityProof
@@ -114,59 +113,6 @@ func (f *Forks2) GetBlocksForView(view uint64) []*model.Block {
 	return l
 }
 
-// AddCertifiedBlock appends the given certified block to the tree of pending blocks
-// and updates the latest finalized block (if finalization progressed). Unless the
-// parent is below the pruning threshold (latest finalized view), we require that
-// the parent is already stored in Forks.
-// We assume that all blocks are fully verified. A valid block must satisfy all
-// consistency requirements; otherwise we have a bug in the compliance layer.
-// Possible error returns:
-//   - model.MissingBlockError if the parent does not exist in the forest (but is above
-//     the pruned view). From the perspective of Forks, this error is benign.
-//   - model.ByzantineThresholdExceededError if conflicting QCs or conflicting finalized
-//     blocks have been detected. While Forks cannot recover from this exception, we still
-//     represent it as a sentinel error so it can be detected by the higher-level
-//     logic and escalated to the node operator.
-//   - All other errors are potential symptoms of bug or state corruption.
-func (f *Forks2) AddCertifiedBlock(certifiedBlock *model.CertifiedBlock) error {
-	// verify and add root block to levelled forest
-	err := f.EnsureBlockIsValidExtension(certifiedBlock.Block)
-	if err != nil {
-		return fmt.Errorf("validity check on block %v failed: %w", certifiedBlock.Block.BlockID, err)
-	}
-	err = f.UnverifiedAddCertifiedBlock(certifiedBlock)
-	if err != nil {
-		return fmt.Errorf("error storing certified block %v in Forks: %w", certifiedBlock.Block.BlockID, err)
-	}
-	return nil
-}
-
-// AddProposal appends the given certified block to the tree of pending blocks
-// and updates the latest finalized block (if finalization progressed). Unless the
-// parent is below the pruning threshold (latest finalized view), we require that
-// the parent is already stored in Forks.
-// We assume that all blocks are fully verified. A valid block must satisfy all
-// consistency requirements; otherwise we have a bug in the compliance layer.
-// Possible error returns:
-//   - model.MissingBlockError if the parent does not exist in the forest (but is above
-//     the pruned view). From the perspective of Forks, this error is benign.
-//   - model.ByzantineThresholdExceededError if conflicting QCs or conflicting finalized
-//     blocks have been detected. While Forks cannot recover from this exception, we still
-//     represent it as a sentinel error so it can be detected by the higher-level
-//     logic and escalated to the node operator.
-//   - All other errors are potential symptoms of bug or state corruption.
-func (f *Forks2) AddProposal(block *model.Block) error {
-	err := f.EnsureBlockIsValidExtension(block)
-	if err != nil {
-		return fmt.Errorf("validity check on block %v failed: %w", block.BlockID, err)
-	}
-	err = f.UnverifiedAddProposal(block)
-	if err != nil {
-		return fmt.Errorf("error storing block %v in Forks: %w", block.BlockID, err)
-	}
-	return nil
-}
-
 // IsKnownBlock checks whether block is known.
 // UNVALIDATED: expects block to pass Forks.EnsureBlockIsValidExtension(block)
 func (f *Forks2) IsKnownBlock(block *model.Block) bool {
@@ -188,72 +134,9 @@ func (f *Forks2) IsProcessingNeeded(block *model.Block) bool {
 	return true
 }
 
-// UnverifiedAddCertifiedBlock adds `proposal` to the consensus state and updates the
-// latest finalized block, if possible.
-// Calling this method with previously-processed blocks leaves the consensus state invariant
-// (though, it will potentially cause some duplicate processing).
-// UNVALIDATED: expects block to pass Forks.EnsureBlockIsValidExtension(block)
-// Error returns:
-// * model.ByzantineThresholdExceededError if proposal's QC conflicts with an existing QC.
-// * generic error in case of unexpected bug or internal state corruption
-func (f *Forks2) UnverifiedAddCertifiedBlock(certifiedBlock *model.CertifiedBlock) error {
-	if !f.IsProcessingNeeded(block) {
-		return nil
-	}
-	blockContainer := ToBlockContainer2(block)
-
-	err := f.checkForConflictingQCs(block.QC)
-	if err != nil {
-		return err
-	}
-	f.checkForDoubleProposal(block)
-	f.forest.AddVertex(blockContainer)
-	if f.newestView < block.View {
-		f.newestView = block.View
-	}
-
-	err = f.updateFinalizedBlockQC(blockContainer)
-	if err != nil {
-		return fmt.Errorf("updating consensus state failed: %w", err)
-	}
-	f.notifier.OnBlockIncorporated(block)
-	return nil
-}
-
-// UnverifiedAddProposal adds `block` to the consensus state and updates the
-// latest finalized block, if possible.
-// Calling this method with previously-processed blocks leaves the consensus state invariant
-// (though, it will potentially cause some duplicate processing).
-// UNVALIDATED: expects block to pass Forks.EnsureBlockIsValidExtension(block)
-// Error returns:
-// * model.ByzantineThresholdExceededError if proposal's QC conflicts with an existing QC.
-// * generic error in case of unexpected bug or internal state corruption
-func (f *Forks2) UnverifiedAddProposal(block *model.Block) error {
-	if !f.IsProcessingNeeded(block) {
-		return nil
-	}
-
-	err := f.checkForConflictingQCs(block.QC)
-	if err != nil {
-		return err
-	}
-	f.checkForDoubleProposal(block)
-	f.forest.AddVertex(ToBlockContainer2(block))
-	if f.newestView < block.View {
-		f.newestView = block.View
-	}
-	f.notifier.OnBlockIncorporated(block)
-
-	err = f.updateFinalizedBlockQC(blockContainer)
-	if err != nil {
-		return fmt.Errorf("updating consensus state failed: %w", err)
-	}
-	return nil
-}
-
 // EnsureBlockIsValidExtension checks that the given block is a valid extension to the tree
-// of blocks already stored. Specifically, the following condition are enforced, which
-// are critical to the correctness of Forks:
+// of blocks already stored (no state modifications). Specifically, the following condition
+// are enforced, which are critical to the correctness of Forks:
 //
 //  1. If block with the same ID is already stored, their views must be identical.
 //  2. The block's view must be strictly larger than the view of its parent.
@@ -275,11 +158,9 @@ func (f *Forks2) UnverifiedAddProposal(block *model.Block) error {
 // requirements; otherwise we have a bug in the compliance layer.
 //
 // Error returns:
-//   - model.MissingBlockError if the parent of the input proposal does not exist in the forest
-//     (but is above the pruned view). Represents violation of condition 3. From the perspective
-//     of Forks, this error is benign.
-//   - Violation of condition 1. or 2. results in an exception. This error is a critical failure,
-//     as Forks generally cannot handle invalid blocks, as they could lead to hidden state corruption.
+//   - model.MissingBlockError if the parent of the input proposal does not exist in the
+//     forest (but is above the pruned view). Represents violation of condition 3.
+//   - model.InvalidBlockError if the block violates condition 1. or 2.
 //   - generic error in case of unexpected bug or internal state corruption
 func (f *Forks2) EnsureBlockIsValidExtension(block *model.Block) error {
 	if block.View < f.forest.LowestLevel { // exclusion (i)
@@ -291,7 +172,7 @@ func (f *Forks2) EnsureBlockIsValidExtension(block *model.Block) error {
 	err := f.forest.VerifyVertex(blockContainer)
 	if err != nil {
 		if forest.IsInvalidVertexError(err) {
-			return fmt.Errorf("not a valid vertex for block tree: %w", irrecoverable.NewException(err))
+			return model.NewInvalidBlockError(block.BlockID, block.View, fmt.Errorf("not a valid vertex for block tree: %w", err))
 		}
 		return fmt.Errorf("block tree generated unexpected error validating vertex: %w", err)
 	}
@@ -313,6 +194,180 @@ func (f *Forks2) EnsureBlockIsValidExtension(block *model.Block) error {
 	return nil
 }
 
+// AddCertifiedBlock appends the given certified block to the tree of pending
+// blocks and updates the latest finalized block (if finalization progressed).
+// Unless the parent is below the pruning threshold (latest finalized view), we
+// require that he parent is already stored in Forks.
+// We assume that all blocks are fully verified. A valid block must satisfy all
+// consistency requirements; otherwise we have a bug in the compliance layer.
+// Possible error returns:
+//   - model.MissingBlockError if the parent does not exist in the forest (but is above
+//     the pruned view). From the perspective of Forks, this error is benign (no-op).
+//   - model.InvalidBlockError if the block is invalid (see `Forks.EnsureBlockIsValidExtension`
+//     for details). From the perspective of Forks, this error is benign (no-op).
+//   - model.ByzantineThresholdExceededError if conflicting QCs or conflicting finalized
+//     blocks have been detected (violating a foundational consensus guarantees). This
+//     indicates that there are 1/3+ Byzantine nodes (weighted by stake) in the network,
+//     breaking the safety guarantees of HotStuff (or there is a critical bug / data
+//     corruption). Forks cannot recover from this exception.
+//   - All other errors are potential symptoms of bugs or state corruption.
+func (f *Forks2) AddCertifiedBlock(certifiedBlock *model.CertifiedBlock) error {
+	// verify and add root block to levelled forest
+	err := f.EnsureBlockIsValidExtension(certifiedBlock.Block)
+	if err != nil {
+		return fmt.Errorf("validity check on block %v failed: %w", certifiedBlock.Block.BlockID, err)
+	}
+	err = f.UnverifiedAddCertifiedBlock(certifiedBlock)
+	if err != nil {
+		return fmt.Errorf("error storing certified block %v in Forks: %w", certifiedBlock.Block.BlockID, err)
+	}
+	return nil
+}
+
+// AddProposal appends the given block to the tree of pending
+// blocks and updates the latest finalized block (if applicable). Unless the parent is
+// below the pruning threshold (latest finalized view), we require that the parent is
+// already stored in Forks. Calling this method with previously processed blocks
+// leaves the consensus state invariant (though, it will potentially cause some
+// duplicate processing).
+// We assume that all blocks are fully verified. A valid block must satisfy all
+// consistency requirements; otherwise we have a bug in the compliance layer.
+// Notes:
+//   - Method `AddCertifiedBlock(..)` should be used preferably, if a QC certifying
+//     `block` is already known. This is generally the case for the consensus follower.
+//     Method `AddProposal` is intended for active consensus participants, which fully
+//     validate blocks (incl. payload), i.e. QCs are processed as part of validated proposals.
+//
+// Possible error returns:
+//   - model.MissingBlockError if the parent does not exist in the forest (but is above
+//     the pruned view). From the perspective of Forks, this error is benign (no-op).
+//   - model.InvalidBlockError if the block is invalid (see `Forks.EnsureBlockIsValidExtension`
+//     for details). From the perspective of Forks, this error is benign (no-op).
+//   - model.ByzantineThresholdExceededError if conflicting QCs or conflicting finalized
+//     blocks have been detected (violating a foundational consensus guarantees). This
+//     indicates that there are 1/3+ Byzantine nodes (weighted by stake) in the network,
+//     breaking the safety guarantees of HotStuff (or there is a critical bug / data
+//     corruption). Forks cannot recover from this exception.
+//   - All other errors are potential symptoms of bugs or state corruption.
+func (f *Forks2) AddProposal(proposal *model.Block) error {
+	err := f.EnsureBlockIsValidExtension(proposal)
+	if err != nil {
+		return fmt.Errorf("validity check on block %v failed: %w", proposal.BlockID, err)
+	}
+	err = f.UnverifiedAddProposal(proposal)
+	if err != nil {
+		return fmt.Errorf("error storing block %v in Forks: %w", proposal.BlockID, err)
+	}
+	return nil
+}
+
+// UnverifiedAddCertifiedBlock appends the given certified block to the tree of pending
+// blocks and updates the latest finalized block (if applicable). Unless the parent is
+// below the pruning threshold (latest finalized view), we require that the parent is
+// already stored in Forks. Calling this method with previously processed blocks
+// leaves the consensus state invariant (though, it will potentially cause some
+// duplicate processing).
+// We assume that all blocks are fully verified. A valid block must satisfy all
+// consistency requirements; otherwise we have a bug in the compliance layer.
+// Notes:
+//   - UNVALIDATED: expects block to pass `Forks.EnsureBlockIsValidExtension(..)`
+//
+// Error returns:
+//   - model.ByzantineThresholdExceededError if conflicting QCs or conflicting finalized
+//     blocks have been detected (violating a foundational consensus guarantees). This
+//     indicates that there are 1/3+ Byzantine nodes (weighted by stake) in the network,
+//     breaking the safety guarantees of HotStuff (or there is a critical bug / data
+//     corruption). Forks cannot recover from this exception.
+//   - All other errors are potential symptoms of bugs or state corruption.
+func (f *Forks2) UnverifiedAddCertifiedBlock(certifiedBlock *model.CertifiedBlock) error {
+	if !f.IsProcessingNeeded(certifiedBlock.Block) {
+		return nil
+	}
+	err := f.store(certifiedBlock.Block)
+	if err != nil {
+		return fmt.Errorf("storing block %v in Forks failed %w", certifiedBlock.Block.BlockID, err)
+	}
+
+	err = f.checkForAdvancingFinalization(certifiedBlock)
+	if err != nil {
+		return fmt.Errorf("updating finalization failed: %w", err)
+	}
+	return nil
+}
+
+// UnverifiedAddProposal appends the given certified block to the tree of pending
+// blocks and updates the latest finalized block (if applicable). Unless the parent is
+// below the pruning threshold (latest finalized view), we require that the parent is
+// already stored in Forks. Calling this method with previously processed blocks
+// leaves the consensus state invariant (though, it will potentially cause some
+// duplicate processing).
+// We assume that all blocks are fully verified. A valid block must satisfy all
+// consistency requirements; otherwise we have a bug in the compliance layer.
+// Notes:
+//   - Method `UnverifiedAddCertifiedBlock(..)` should be used preferably, if a QC certifying
+//     `block` is already known. This is generally the case for the consensus follower.
+//     Method `UnverifiedAddProposal` is intended for active consensus participants, which fully
+//     validate blocks (incl. payload), i.e. QCs are processed as part of validated proposals.
+//   - UNVALIDATED: expects block to pass `Forks.EnsureBlockIsValidExtension(..)`
+//
+// Error returns:
+//   - model.ByzantineThresholdExceededError if conflicting QCs or conflicting finalized
+//     blocks have been detected (violating a foundational consensus guarantees). This
+//     indicates that there are 1/3+ Byzantine nodes (weighted by stake) in the network,
+//     breaking the safety guarantees of HotStuff (or there is a critical bug / data
+//     corruption). Forks cannot recover from this exception.
+//   - All other errors are potential symptoms of bugs or state corruption.
+func (f *Forks2) UnverifiedAddProposal(block *model.Block) error {
+	if !f.IsProcessingNeeded(block) {
+		return nil
+	}
+	err := f.store(block)
+	if err != nil {
+		return fmt.Errorf("storing block %v in Forks failed %w", block.BlockID, err)
+	}
+
+	// Update finality status: In the implementation, our notion of finality is based on certified blocks.
+	// The certified parent essentially combines the parent, with the QC contained in block, to drive finalization.
+	parent, found := f.GetBlock(block.QC.BlockID)
+	if !found {
+		// Not finding the parent means it is already pruned; hence this block does not change the finalization state.
+		return nil
+	}
+	certifiedParent, err := model.NewCertifiedBlock(parent, block.QC)
+	if err != nil {
+		return fmt.Errorf("mismatching QC with parent (corrupted Forks state):%w", err)
+	}
+	err = f.checkForAdvancingFinalization(&certifiedParent)
+	if err != nil {
+		return fmt.Errorf("updating finalization failed: %w", err)
+	}
+	return nil
+}
+
+// store adds the given block to our internal `forest`, updates `newestView` (if applicable),
+// and emits an `OnBlockIncorporated` notifications. While repeated inputs yield result in
+// repeated notifications, this is of no concern, because notifications are idempotent.
+// UNVALIDATED: expects block to pass Forks.EnsureBlockIsValidExtension(block)
+// Error returns:
+//   - model.ByzantineThresholdExceededError if conflicting QCs have been detected.
+//     Forks cannot recover from this exception.
+//   - All other errors are potential symptoms of bugs or state corruption.
+func (f *Forks2) store(block *model.Block) error {
+	err := f.checkForConflictingQCs(block.QC)
+	if err != nil {
+		return fmt.Errorf("checking for conflicting QCs failed: %w", err)
+	}
+	f.checkForDoubleProposal(block)
+	f.forest.AddVertex(ToBlockContainer2(block))
+
+	// Update trackers for newly ingested blocks
+	if f.newestView < block.View {
+		f.newestView = block.View
+	}
+	f.notifier.OnBlockIncorporated(block)
+	return nil
+}
+
 // checkForConflictingQCs checks if QC conflicts with a stored Quorum Certificate.
 // In case a conflicting QC is found, an ByzantineThresholdExceededError is returned.
 //
@@ -321,10 +376,12 @@ func (f *Forks2) EnsureBlockIsValidExtension(block *model.Block) error {
 //   - q1.BlockID != q2.BlockID
 //
 // This means there are two Quorums for conflicting blocks at the same view.
-// Per 'Observation 1' from the Jolteon paper https://arxiv.org/pdf/2106.10362v1.pdf, two
-// conflicting QCs can exist if and only if the Byzantine threshold is exceeded.
+// Per 'Observation 1' from the Jolteon paper https://arxiv.org/pdf/2106.10362v1.pdf,
+// two conflicting QCs can exist if and only if the Byzantine threshold is exceeded.
 // Error returns:
-// * model.ByzantineThresholdExceededError if input QC conflicts with an existing QC.
+//   - model.ByzantineThresholdExceededError if conflicting QCs have been detected.
+//     Forks cannot recover from this exception.
+//   - All other errors are potential symptoms of bugs or state corruption.
 func (f *Forks2) checkForConflictingQCs(qc *flow.QuorumCertificate) error {
 	it := f.forest.GetVerticesAtLevel(qc.View)
 	for it.HasNext() {
@@ -363,21 +420,21 @@ func (f *Forks2) checkForDoubleProposal(block *model.Block) {
 	}
 }
 
-// updateFinalizedBlock updates the latest finalized block, if possible.
-// This function should be called every time a new block is added to Forks.
-// If the new block is the head of a 2-chain satisfying the finalization rule,
-// then we update `Forks.lastFinalized` to the new latest finalized block.
-// Calling this method with previously-processed blocks leaves the consensus state invariant.
+// checkForAdvancingFinalization checks whether observing certifiedBlock leads to progress of
+// finalization. This function should be called every time a new block is added to Forks. If the new
+// block is the head of a 2-chain satisfying the finalization rule, we update `Forks.lastFinalized` to
+// the new latest finalized block. Calling this method with previously-processed blocks leaves the
+// consensus state invariant.
 // UNVALIDATED: assumes that relevant block properties are consistent with previous blocks
 // Error returns:
-//   - model.ByzantineThresholdExceededError if we are finalizing a block which is invalid to finalize.
-//     This either indicates a critical internal bug / data corruption, or that the network Byzantine
-//     threshold was exceeded, breaking the safety guarantees of HotStuff. In either case, continuing
-//     operations is not an option.
-//   - model.MissingBlockError if the parent block does not exist in the forest
-//     (but is above the pruned view)
+//   - model.MissingBlockError if the parent does not exist in the forest (but is above
+//     the pruned view). From the perspective of Forks, this error is benign (no-op).
+//   - model.ByzantineThresholdExceededError in case observing a finalization fork (violating
+//     a foundational consensus guarantee). This indicates that there are 1/3+ Byzantine nodes
+//     (weighted by stake) in the network, breaking the safety guarantees of HotStuff (or there
+//     is a critical bug / data corruption). Forks cannot recover from this exception.
 //   - generic error in case of unexpected bug or internal state corruption
-func (f *Forks2) updateFinalizedBlock(certifiedBlock *model.CertifiedBlock) error {
+func (f *Forks2) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBlock) error {
 	// We prune all blocks in forest which are below the most recently finalized block.
 	// Hence, we have a pruned ancestry if and only if either of the following conditions applies:
 	//    (a) If a block's parent view (i.e. block.QC.View) is below the most recently finalized block.
@@ -414,8 +471,8 @@ func (f *Forks2) updateFinalizedBlock(certifiedBlock *model.CertifiedBlock) erro
 	//     parentBlock <- Block <~ certifyingQC    (i.e. a DIRECT 1-chain PLUS any 1-chain)
 	//                   ╰─────────────────────╯
 	//                       certifiedBlock
-	// Hence, we can finalize `parentBlock` as head of 2-chain, if and only the viewNumber
-	// of `Block` is exactly 1 higher than the view of `parentBlock`
+	// Hence, we can finalize `parentBlock` as head of a 2-chain,
+	// if and only if `Block.View` is exactly 1 higher than the view of `parentBlock`
 	if parentBlock.View+1 != certifiedBlock.View() {
 		return nil
 	}
@@ -426,10 +483,10 @@ func (f *Forks2) updateFinalizedBlock(certifiedBlock *model.CertifiedBlock) erro
 // Finalization starts with the child of `lastFinalizedBlockQC` (explicitly checked);
 // and calls OnFinalizedBlock on the newly finalized blocks in increasing height order.
 // Error returns:
-//   - model.ByzantineThresholdExceededError if we are finalizing a block which is invalid to finalize.
-//     This either indicates a critical internal bug / data corruption, or that the network Byzantine
-//     threshold was exceeded, breaking the safety guarantees of HotStuff. In either case, continuing
-//     operations is not an option.
+//   - model.ByzantineThresholdExceededError in case observing a finalization fork (violating
+//     a foundational consensus guarantee). This indicates that there are 1/3+ Byzantine nodes
+//     (weighted by stake) in the network, breaking the safety guarantees of HotStuff (or there
+//     is a critical bug / data corruption). Forks cannot recover from this exception.
 //   - generic error in case of bug or internal state corruption
 func (f *Forks2) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 
@@ -438,15 +495,15 @@ func (f *Forks2) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 	return nil
 }
 
-// finalizationNotificationsUpToBlock emits finalization events for all blocks up to (and including) the
-// block pointed to by `qc`. Finalization events start with the child of `lastFinalizedBlockQC`
+// finalizationNotificationsUpToBlock emits finalization events for all blocks up to (and including)
+// the block pointed to by `qc`. Finalization events start with the child of `lastFinalizedBlockQC`
 // (explicitly checked); and calls the `finalizationCallback` as well as `OnFinalizedBlock` for every
 // newly finalized block in increasing height order.
 // Error returns:
-//   - model.ByzantineThresholdExceededError if we are finalizing a block which is invalid to finalize.
-//     This either indicates a critical internal bug / data corruption, or that the network Byzantine
-//     threshold was exceeded, breaking the safety guarantees of HotStuff. In either case, continuing
-//     operations is not an option.
+//   - model.ByzantineThresholdExceededError in case observing a finalization fork (violating
+//     a foundational consensus guarantee). This indicates that there are 1/3+ Byzantine nodes
+//     (weighted by stake) in the network, breaking the safety guarantees of HotStuff (or there
+//     is a critical bug / data corruption). Forks cannot recover from this exception.
 //   - generic error in case of bug or internal state corruption
 func (f *Forks2) finalizationNotificationsUpToBlock(qc *flow.QuorumCertificate) error {
 	lastFinalizedView := f.lastFinalized.Block.View
@@ -469,8 +526,8 @@ func (f *Forks2) finalizationNotificationsUpToBlock(qc *flow.QuorumCertificate) 
 		qc = b.QC // move to parent
 	}
 
-	// qc should now point to the latest finalized block. Otherwise, the consensus committee
-	// is compromised (or we have a critical internal bug).
+	// qc should now point to the latest finalized block. Otherwise, the
+	// consensus committee is compromised (or we have a critical internal bug).
 	if qc.View < f.lastFinalized.Block.View {
 		return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
 			"finalizing block with view %d which is lower than previously finalized block at view %d",
