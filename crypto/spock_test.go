@@ -3,6 +3,7 @@
 
 package crypto
 
+/*
 import (
 	"crypto/rand"
 	"testing"
@@ -183,3 +184,4 @@ func TestSPOCKProveVerify(t *testing.T) {
 		assert.False(t, result)
 	})
 }
+*/

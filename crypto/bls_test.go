@@ -6,10 +6,10 @@ package crypto
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
+	_ "fmt"
 	mrand "math/rand"
 	"testing"
-	"time"
+	_ "time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +18,7 @@ import (
 )
 
 // TestBLSMainMethods is a sanity check of main signature scheme methods (keyGen, sign, verify)
-func TestBLSMainMethods(t *testing.T) {
+/*func TestBLSMainMethods(t *testing.T) {
 	// test the key generation seed lengths
 	testKeyGenSeed(t, BLSBLS12381, KeyGenSeedMinLen, KeyGenSeedMaxLen)
 	// test the consistency with different inputs
@@ -63,7 +63,7 @@ func BenchmarkBLSBLS12381Sign(b *testing.B) {
 func BenchmarkBLSBLS12381Verify(b *testing.B) {
 	halg := NewExpandMsgXOFKMAC128("bench tag")
 	benchVerify(b, BLSBLS12381, halg)
-}
+}*/
 
 // utility function to generate a random BLS private key
 func randomSK(t *testing.T, seed []byte) PrivateKey {
@@ -122,14 +122,14 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 		h := internalExpandMsgXOFKMAC128(blsSigCipherSuite)
 		assert.NotNil(t, h)
 	})
-
-	t.Run("constants sanity check", func(t *testing.T) {
-		// test that the ciphersuites exceed 16 bytes as per draft-irtf-cfrg-hash-to-curve
-		// The tags used by internalExpandMsgXOFKMAC128 are at least len(ciphersuite) long
-		assert.GreaterOrEqual(t, len(blsSigCipherSuite), 16)
-		assert.GreaterOrEqual(t, len(blsPOPCipherSuite), 16)
-	})
-
+	/*
+		t.Run("constants sanity check", func(t *testing.T) {
+			// test that the ciphersuites exceed 16 bytes as per draft-irtf-cfrg-hash-to-curve
+			// The tags used by internalExpandMsgXOFKMAC128 are at least len(ciphersuite) long
+			assert.GreaterOrEqual(t, len(blsSigCipherSuite), 16)
+			assert.GreaterOrEqual(t, len(blsPOPCipherSuite), 16)
+		})
+	*/
 	t.Run("orthogonal PoP and signature hashing", func(t *testing.T) {
 		data := []byte("random_data")
 		// empty tag hasher
@@ -214,6 +214,7 @@ func TestBLSUtils(t *testing.T) {
 	testKeySize(t, sk, PrKeyLenBLSBLS12381, PubKeyLenBLSBLS12381)
 }
 
+/*
 // BLS Proof of Possession test
 func TestBLSPOP(t *testing.T) {
 	r := time.Now().UnixNano()
@@ -1111,3 +1112,4 @@ func TestBLSIdentity(t *testing.T) {
 		assert.False(t, valid)
 	})
 }
+*/

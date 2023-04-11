@@ -3,6 +3,7 @@
 
 package crypto
 
+/*
 import (
 	"errors"
 	"fmt"
@@ -13,7 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto/hash"
 	_ "github.com/onflow/flow-go/crypto/hash"
-)
+)*/
 
 // BLS multi-signature using BLS12-381 curve
 // ([zcash]https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#bls12-381)
@@ -43,6 +44,7 @@ import "C"
 // used for signatures.
 var popKMAC = internalExpandMsgXOFKMAC128(blsPOPCipherSuite)
 
+/*
 // BLSGeneratePOP returns a proof of possession (PoP) for the receiver private key.
 //
 // The KMAC hasher used in the function is guaranteed to be orthogonal to all hashers used
@@ -193,13 +195,13 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	}
 
 	var sum pointG2
-	C.ep2_sum_vector((*C.ep2_st)(&sum), (*C.ep2_st)(&points[0]),
+	C.ep2_sum_vector((*C.G2)(&sum), (*C.G2)(&points[0]),
 		(C.int)(len(points)))
 
 	sumKey := newPubKeyBLSBLS12381(&sum)
 	return sumKey, nil
 }
-
+*/
 // IdentityBLSPublicKey returns an identity public key which corresponds to the point
 // at infinity in G2 (identity element of G2).
 // TODO: return a constant key instead of a newly allocated one
@@ -207,10 +209,12 @@ func IdentityBLSPublicKey() PublicKey {
 
 	identity := *newPubKeyBLSBLS12381(nil)
 	// set the point to infinity
-	C.ep2_set_infty((*C.ep2_st)(&identity.point))
+	C.E2_set_infty((*C.G2)(&identity.point))
 	identity.isIdentity = true
 	return &identity
 }
+
+/*
 
 // RemoveBLSPublicKeys removes multiple BLS public keys from a given (aggregated) public key.
 //
@@ -248,8 +252,8 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 	}
 
 	var resultPoint pointG2
-	C.ep2_subtract_vector((*C.ep2_st)(&resultPoint), (*C.ep2_st)(&aggPKBLS.point),
-		(*C.ep2_st)(&pointsToSubtract[0]), (C.int)(len(pointsToSubtract)))
+	C.ep2_subtract_vector((*C.G2)(&resultPoint), (*C.G2)(&aggPKBLS.point),
+		(*C.G2)(&pointsToSubtract[0]), (C.int)(len(pointsToSubtract)))
 
 	resultKey := newPubKeyBLSBLS12381(&resultPoint)
 	return resultKey, nil
@@ -403,7 +407,7 @@ func VerifyBLSSignatureManyMessages(
 			(*C.uchar)(&flatDistinctHashes[0]),
 			(*C.uint32_t)(&lenHashes[0]),
 			(*C.uint32_t)(&pkPerHash[0]),
-			(*C.ep2_st)(&allPks[0]),
+			(*C.G2)(&allPks[0]),
 		)
 
 	} else {
@@ -425,7 +429,7 @@ func VerifyBLSSignatureManyMessages(
 		verif = C.bls_verifyPerDistinctKey(
 			(*C.uchar)(&s[0]),
 			(C.int)(len(mapPerPk)),
-			(*C.ep2_st)(&distinctPks[0]),
+			(*C.G2)(&distinctPks[0]),
 			(*C.uint32_t)(&hashPerPk[0]),
 			(*C.uchar)(&flatHashes[0]),
 			(*C.uint32_t)(&lenHashes[0]))
@@ -521,7 +525,7 @@ func BatchVerifyBLSSignaturesOneMessage(
 	C.bls_batchVerify(
 		(C.int)(len(verifInt)),
 		(*C.uchar)(&verifInt[0]),
-		(*C.ep2_st)(&pkPoints[0]),
+		(*C.G2)(&pkPoints[0]),
 		(*C.uchar)(&flatSigs[0]),
 		(*C.uchar)(&h[0]),
 		(C.int)(len(h)),
@@ -570,3 +574,4 @@ var invalidSignatureError = errors.New("input signature does not deserialize to 
 func IsInvalidSignatureError(err error) bool {
 	return errors.Is(err, invalidSignatureError)
 }
+*/

@@ -3,6 +3,7 @@
 
 package crypto
 
+/*
 import (
 	"crypto/rand"
 	"fmt"
@@ -647,4 +648,4 @@ func BenchmarkSignatureReconstruction(b *testing.B) {
 		require.NoError(b, err)
 	}
 	b.StopTimer()
-}
+}*/

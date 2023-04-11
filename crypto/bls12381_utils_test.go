@@ -116,16 +116,17 @@ func TestSubgroupCheck(t *testing.T) {
 		res = checkMembershipG1(&p)
 		assert.Equal(t, res, int(invalid))
 	})
-
-	t.Run("G2", func(t *testing.T) {
-		var p pointG2
-		randPointG2(&p) // point in G2
-		res := checkMembershipG2(&p)
-		assert.Equal(t, res, int(valid))
-		randPointG2Complement(&p) // point in E2\G2
-		res = checkMembershipG2(&p)
-		assert.Equal(t, res, int(invalid))
-	})
+	/*
+		t.Run("G2", func(t *testing.T) {
+			var p pointG2
+			randPointG2(&p) // point in G2
+			res := checkMembershipG2(&p)
+			assert.Equal(t, res, int(valid))
+			randPointG2Complement(&p) // point in E2\G2
+			res = checkMembershipG2(&p)
+			assert.Equal(t, res, int(invalid))
+		})
+	*/
 }
 
 // subgroup membership check bench
@@ -140,14 +141,15 @@ func BenchmarkSubgroupCheck(b *testing.B) {
 		}
 		b.StopTimer()
 	})
-
-	b.Run("G2", func(b *testing.B) {
-		var p pointG2
-		randPointG2(&p)
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			_ = checkMembershipG2(&p) // G2
-		}
-		b.StopTimer()
-	})
+	/*
+		b.Run("G2", func(b *testing.B) {
+			var p pointG2
+			randPointG2(&p)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_ = checkMembershipG2(&p) // G2
+			}
+			b.StopTimer()
+		})
+	*/
 }

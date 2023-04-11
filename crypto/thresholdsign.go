@@ -1,5 +1,6 @@
 package crypto
 
+/*
 import (
 	"errors"
 	"fmt"
@@ -144,3 +145,4 @@ func IsNotEnoughSharesError(err error) bool {
 	var target *notEnoughSharesError
 	return errors.As(err, &target)
 }
+*/

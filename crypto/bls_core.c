@@ -40,10 +40,10 @@ int check_membership_G1(const ep_t p){
 // 
 // membership check in G2 is using a scalar multiplication by the group order.
 // TODO: switch to the faster Bowe check 
-int check_membership_G2(const ep2_t p){
+int G2_check_membership(const G2* p){
 #if MEMBERSHIP_CHECK
     // check p is on curve
-    if (!ep2_on_curve((ep2_st*)p))
+    if (!E2_affine_on_curve(p))  // TODO: remove and assume inputs are on curve?
         return INVALID;
     // check p is in G2
     #if MEMBERSHIP_CHECK_G2 == EXP_ORDER
@@ -84,7 +84,7 @@ void bls_sign(byte* s, const Fr* sk, const byte* data, const int len) {
 // and a message data.
 // The signature and public key are assumed to be in G1 and G2 respectively. This 
 // function only checks the pairing equality. 
-static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const int len) {     
+static int bls_verify_ep(const G2* pk, const ep_t s, const byte* data, const int len) {     
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
 
@@ -97,9 +97,11 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
     // hash to G1 
     map_to_G1(elemsG1[1], data, len); 
 
+    ep2_st* pk_tmp = E2_blst_to_relic(pk);
+
     // elemsG2[1] = pk
     ep2_new(elemsG2[1]);
-    ep2_copy(elemsG2[1], (ep2_st*)pk); 
+    ep2_copy(elemsG2[1], (ep2_st*)pk_tmp); 
 
 #if DOUBLE_PAIRING  
     // elemsG2[0] = -g2
@@ -126,6 +128,7 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
     ep_free(elemsG1[1]);
     ep2_free(elemsG2[0]);
     ep2_free(elemsG2[1]);
+    free(pk_tmp);
     
     if (core_get()->code == RLC_OK) {
         if (res == RLC_EQ) return VALID;
@@ -326,7 +329,7 @@ outG1:
 // membership check of the signature in G1 is verified.
 // membership check of pk in G2 is not verified in this function.
 // the membership check in G2 is separated to allow optimizing multiple verifications using the same key.
-int bls_verify(const ep2_t pk, const byte* sig, const byte* data, const int len) {  
+int bls_verify(const G2* pk, const byte* sig, const byte* data, const int len) {  
     ep_t s;
     ep_new(s);
     
@@ -343,6 +346,7 @@ int bls_verify(const ep2_t pk, const byte* sig, const byte* data, const int len)
     
     return bls_verify_ep(pk, s, data, len);
 }
+/*
 
 // binary tree structure to be used by bls_batch verify.
 // Each node contains a signature and a public key, the signature (resp. the public key) 
@@ -350,15 +354,15 @@ int bls_verify(const ep2_t pk, const byte* sig, const byte* data, const int len)
 // The leaves contain the initial signatures and public keys.
 typedef struct st_node { 
     ep_st* sig;
-    ep2_st* pk;  
+    G2* pk;  
     struct st_node* left; 
     struct st_node* right; 
 } node;
 
-static node* new_node(const ep2_st* pk, const ep_st* sig){
+static node* new_node(const G2* pk, const ep_st* sig){
     node* t = (node*) malloc(sizeof(node));
     if (t) {
-        t->pk = (ep2_st*)pk;
+        t->pk = (G2*)pk;
         t->sig = (ep_st*)sig;
         t->right = t->left = NULL;
     }
@@ -374,7 +378,6 @@ static void free_tree(node* root) {
                         //  the recursive build starts with the left side first
         // relic free 
         if (root->sig) ep_free(root->sig);
-        if (root->pk) ep2_free(root->pk);
         // pointer free
         free(root->sig);
         free(root->pk);
@@ -397,7 +400,7 @@ static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
     int left_len = len - right_len;
 
     // create a new node with new points
-    ep2_st* new_pk = (ep2_st*)malloc(sizeof(ep2_st));
+    G2* new_pk = (G2*)malloc(sizeof(G2));
     if (!new_pk) goto error;
     ep_st* new_sig = (ep_st*)malloc(sizeof(ep_st));
     if (!new_sig) goto error_sig;
@@ -405,7 +408,6 @@ static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
     node* t = new_node(new_pk, new_sig);
     if (!t) goto error_node;
     ep_new(t->sig);
-    ep2_new(t->pk);
 
     // build the tree in a top-down way
     t->left = build_tree(left_len, &pks[0], &sigs[0]);
@@ -415,7 +417,7 @@ static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
     if (!t->right) { free_tree(t); goto error; }
     // sum the children
     ep_add_jacob(t->sig, t->left->sig, t->right->sig);
-    ep2_add_projc(t->pk, t->left->pk, t->right->pk); 
+    E2_add(t->pk, t->left->pk, t->right->pk); 
     return t;
 
 error_node:
@@ -522,3 +524,4 @@ out:
 out_sigs:
     free(pks);
 }
+*/

@@ -211,7 +211,7 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 		return false, nil
 	}
 
-	verif := C.bls_verify((*C.ep2_st)(&pk.point),
+	verif := C.bls_verify((*C.G2)(&pk.point),
 		(*C.uchar)(&s[0]),
 		(*C.uchar)(&h[0]),
 		(C.int)(len(h)))
@@ -352,7 +352,7 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 	}
 
 	// membership check in G2
-	if C.check_membership_G2((*C.ep2_st)(&pk.point)) != valid {
+	if C.G2_check_membership((*C.G2)(&pk.point)) != valid {
 		return nil, invalidInputsErrorf("input key is infinity or does not encode a BLS12-381 point in the valid group")
 	}
 
@@ -498,15 +498,15 @@ func (a *pubKeyBLSBLS12381) EncodeCompressed() []byte {
 	if serializationG2 != compressed {
 		panic("library is not configured to use compressed public key serialization")
 	}
-	return a.Encode()
+	dest := make([]byte, pubKeyLengthBLSBLS12381)
+	writePointG2(dest, &a.point)
+	return dest
 }
 
 // Encode returns a byte encoding of the public key.
 // Since we use a compressed encoding by default, this delegates to EncodeCompressed
 func (a *pubKeyBLSBLS12381) Encode() []byte {
-	dest := make([]byte, pubKeyLengthBLSBLS12381)
-	writePointG2(dest, &a.point)
-	return dest
+	return a.EncodeCompressed()
 }
 
 // Equals checks is two public keys are equal

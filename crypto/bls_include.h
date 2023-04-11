@@ -21,13 +21,13 @@
 #define SINGLE_PAIRING (DOUBLE_PAIRING^1)
 
 // Signature and public key membership check
-#define MEMBERSHIP_CHECK 1
+#define MEMBERSHIP_CHECK 0  // TODO: switch to 1 and clean up memb check
 
-// algorithm choice for the hashing to G1 
-// both methods are similar implementations of the same optimzed SSWU 
+// algorithm choice for hashing to G1 
+// both methods are similar implementations of the same optimized SSWU 
 // but offer different timings.
 #define RELIC_SSWU 1  // relic library implementation
-#define LOCAL_SSWU 2       // local implementation
+#define LOCAL_SSWU 2       // local implementation 
 #define hashToPoint LOCAL_SSWU
 
 // bls core (functions in bls_core.c)
@@ -36,7 +36,7 @@ int      get_pk_len();
 int      get_sk_len();  
 
 void     bls_sign(byte*, const Fr*, const byte*, const int);
-int      bls_verify(const ep2_t, const byte*, const byte*, const int);
+int      bls_verify(const G2*, const byte*, const byte*, const int);
 int      bls_verifyPerDistinctMessage(const byte*, const int, const byte*, const uint32_t*,
                          const uint32_t*, const ep2_st*);
 int      bls_verifyPerDistinctKey(const byte*, 

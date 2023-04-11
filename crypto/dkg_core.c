@@ -1,7 +1,7 @@
 // +build relic
 
 #include "dkg_include.h"
-
+/*
 
 #define N_max 250
 #define N_bits_max 8  // log(250)  
@@ -69,12 +69,12 @@ void G2_polynomialImages(ep2_st *y, const int len_y, const ep2_st* A, const int 
 }
 
 // export an array of ep2_st into an array of bytes
-// the length matching is supposed to be checked
+// the array must be of length (len * G2_SER_BYTES)
 void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len) {
     const int size = (G2_BYTES/(G2_SERIALIZATION+1));
     byte* p = out;
     for (int i=0; i<len; i++){
-        ep2_write_bin_compact(p, &A[i], size);
+        E2_write_bytes(p, &A[i]);
         p += size;
     }
 }
@@ -84,15 +84,16 @@ void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len) {
 //
 // It returns RLC_OK if reading all the vector succeeded and RLC_ERR 
 // otherwise.
-int ep2_vector_read_bin(ep2_st* A, const byte* src, const int len){
+int G2_vector_read_bin(ep2_st* A, const byte* src, const int len){
     const int size = (G2_BYTES/(G2_SERIALIZATION+1));
     byte* p = (byte*) src;
     for (int i=0; i<len; i++){
-        int read_ret = G2_read_bytes(&A[i], p, size); // returns RLC_OK or RLC_ERR
-        if (read_ret != RLC_OK)
+        int read_ret = E2_read_bytes(&A[i], p, size);
+        if (read_ret != BLST_SUCCESS)
             return read_ret;
         p += size;
     }
+    // TODO: add G2 subgroup check
     return RLC_OK;
 }
 
@@ -107,3 +108,4 @@ int verifyshare(const Fr* x, const ep2_t y) {
     return (ep2_cmp(res, (ep2_st*)y) == RLC_EQ);
 }
 
+*/

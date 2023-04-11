@@ -3,6 +3,7 @@
 
 package crypto
 
+/*
 // #cgo CFLAGS:
 // #include "dkg_include.h"
 import "C"
@@ -456,6 +457,9 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 	}
 
 	s.y = make([]pointG2, s.size)
+	// compute all public keys
+	// TODO: could optimize to compute this step only to check complaint answers,
+	// and then for inputs from qualified leaders (at End call)
 	s.computePublicKeys()
 
 	// check the (already) registered complaints
@@ -506,7 +510,7 @@ func (s *feldmanVSSQualState) buildAndBroadcastComplaintAnswer(complainee index)
 func (s *feldmanVSSQualState) checkComplaint(complainer index, c *complaint) bool {
 	// check y[complainer] == share.G2
 	return C.verifyshare((*C.Fr)(&c.answer),
-		(*C.ep2_st)(&s.y[complainer])) == 0
+		(*C.G2)(&s.y[complainer])) == 0
 }
 
 // data = |complainee|
@@ -665,3 +669,4 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		}
 	}
 }
+*/

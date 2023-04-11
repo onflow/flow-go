@@ -3,6 +3,7 @@
 
 package crypto
 
+/*
 // SPoCK design based on the BLS signature scheme.
 // BLS is using BLS12-381 curve and the same settings in bls.go.
 
@@ -90,9 +91,9 @@ func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signatur
 	}
 
 	// verify the spock proof using the secret data
-	verif := C.bls_spock_verify((*C.ep2_st)(&blsPk1.point),
+	verif := C.bls_spock_verify((*C.G2)(&blsPk1.point),
 		(*C.uchar)(&proof1[0]),
-		(*C.ep2_st)(&blsPk2.point),
+		(*C.G2)(&blsPk2.point),
 		(*C.uchar)(&proof2[0]))
 
 	switch verif {
@@ -104,3 +105,4 @@ func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signatur
 		return false, fmt.Errorf("SPoCK verification failed")
 	}
 }
+*/

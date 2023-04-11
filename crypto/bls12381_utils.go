@@ -45,9 +45,10 @@ var invalid = C.get_invalid()
 
 // get some constants from the C layer
 // var blst_errors = C.blst_get_errors()
-var blst_valid = (int)(C.BLST_SUCCESS)             //int(blst_errors[0])
-var blst_bad_encoding = (int)(C.BLST_BAD_ENCODING) // int(blst_errors[0])
-var blst_bad_scalar = (int)(C.BLST_BAD_SCALAR)     // int(blst_errors[0])
+var blst_valid = (int)(C.BLST_SUCCESS)
+var blst_bad_encoding = (int)(C.BLST_BAD_ENCODING)
+var blst_bad_scalar = (int)(C.BLST_BAD_SCALAR)
+var blst_point_not_on_curve = (int)(C.BLST_POINT_NOT_ON_CURVE)
 
 // initContext sets relic B12_381 parameters and precomputes some data in the C layer
 func (ct *ctx) initContext() error {
@@ -107,7 +108,7 @@ func (x *scalar) equals(other *scalar) bool {
 
 // comparison in G2
 func (p *pointG2) equals(other *pointG2) bool {
-	return C.ep2_cmp((*C.ep2_st)(p), (*C.ep2_st)(other)) == valid
+	return C.E2_is_equal((*C.G2)(p), (*C.G2)(other)) != 0
 }
 
 // Comparison to zero in Fr.
@@ -118,7 +119,7 @@ func (x *scalar) isZero() bool {
 
 // Comparison to point at infinity in G2.
 func (p *pointG2) isInfinity() bool {
-	return C.ep2_is_infty((*C.ep2_st)(p)) == 1
+	return C.E2_is_infty((*C.G2)(p)) != 10
 }
 
 // returns a random element of Fr in input pointer
@@ -165,9 +166,8 @@ func writeScalar(dest []byte, x *scalar) {
 // The slice should be of size PubKeyLenBLSBLS12381 and the serialization
 // follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func writePointG2(dest []byte, a *pointG2) {
-	C.ep2_write_bin_compact((*C.uchar)(&dest[0]),
-		(*C.ep2_st)(a),
-		(C.int)(pubKeyLengthBLSBLS12381),
+	C.E2_write_bytes((*C.uchar)(&dest[0]),
+		(*C.G2)(a),
 	)
 }
 
@@ -207,13 +207,17 @@ func readScalarFrStar(a *scalar, src []byte) error {
 // The slice is expected to be of size PubKeyLenBLSBLS12381 and the deserialization will
 // follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func readPointG2(a *pointG2, src []byte) error {
-	switch C.G2_read_bytes((*C.ep2_st)(a),
+	read := C.E2_read_bytes((*C.G2)(a),
 		(*C.uchar)(&src[0]),
-		(C.int)(len(src))) {
-	case valid:
+		(C.int)(len(src)))
+
+	switch int(read) {
+	case blst_valid:
 		return nil
-	case invalid:
-		return invalidInputsErrorf("input is not a G2 point")
+	case blst_bad_encoding, blst_bad_scalar:
+		return invalidInputsErrorf("input could not deserialize to a G2 point")
+	case blst_point_not_on_curve:
+		return invalidInputsErrorf("input is not a point on curve E2")
 	default:
 		return errors.New("reading a G2 point failed")
 	}
@@ -244,7 +248,7 @@ func checkMembershipG1(pt *pointG1) int {
 // checkMembershipG2 wraps a call to a subgroup check in G2 since cgo can't be used
 // in go test files.
 func checkMembershipG2(pt *pointG2) int {
-	return int(C.check_membership_G2((*C.ep2_st)(pt)))
+	return int(C.G2_check_membership((*C.G2)(pt)))
 }
 
 // randPointG1 wraps a call to C since cgo can't be used in go test files.
@@ -259,17 +263,19 @@ func randPointG1Complement(pt *pointG1) {
 	C.ep_rand_G1complement((*C.ep_st)(pt))
 }
 
+/*
 // randPointG2 wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in G2 and stores it in input point.
 func randPointG2(pt *pointG2) {
-	C.ep2_rand_G2((*C.ep2_st)(pt))
+	C.ep2_rand_G2((*C.G2)(pt))
 }
 
 // randPointG1Complement wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in E2\G2 and stores it in input point.
 func randPointG2Complement(pt *pointG2) {
-	C.ep2_rand_G2complement((*C.ep2_st)(pt))
+	C.ep2_rand_G2complement((*C.G2)(pt))
 }
+*/
 
 // This is only a TEST function.
 // It hashes `data` to a G1 point using the tag `dst` and returns the G1 point serialization.

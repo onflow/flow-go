@@ -7,7 +7,9 @@
 // eventually this file would replace blst.h
 
 #include "point.h"
+#include "fields.h"
 #include "consts.h"
+#include "errors.h"
 #include "bls12381_utils.h"
 
 // types used by the Flow crypto library that are imported from BLST
@@ -55,16 +57,9 @@ typedef _Bool bool; /* it's assumed that cgo calls modern enough compiler */
 # define DEFNULL
 #endif
 
-typedef enum {
-    BLST_SUCCESS = 0,
-    BLST_BAD_ENCODING,
-    BLST_POINT_NOT_ON_CURVE,
-    BLST_POINT_NOT_IN_GROUP,
-    BLST_AGGR_TYPE_MISMATCH,
-    BLST_VERIFY_FAIL,
-    BLST_PK_IS_INFINITY,
-    BLST_BAD_SCALAR,
-} BLST_ERROR;
+// TODO: add sanity checks that BLST_PK_IS_INFINITY is indeed the last
+// enum value (eventually submit a fix to BLST)
+#define BLST_BAD_SCALAR ((BLST_PK_IS_INFINITY)+1)
 
 // field elements F_r
 // where `r` is the order of G1/G2.
@@ -72,7 +67,8 @@ typedef enum {
 // are represented as a little endian vector of limbs.
 // `Fr` is equivalent to type `vec256` (used internally by BLST for F_r elements).
 // `Fr` is defined as a struct to be exportable through cgo to the Go layer.
-typedef struct {limb_t limbs[Fr_LIMBS];} Fr;
+#define R_BITS
+typedef struct {limb_t limbs[(R_BITS+63)/64];} Fr; // TODO: use Fr_LIMBS
 
 // field elements F_p
 // F_p elements are represented as big numbers reduced modulo `p`. Big numbers
@@ -86,19 +82,23 @@ typedef vec384 Fp;
 // where x, y, x are elements of F_p (type `Fp`).
 // `G1` is equivelent to type `POINTonE1` (used internally by BLST for Jacobian E1 elements)
 // `G1` is defined as a struct to be exportable through cgo to the Go layer.
-typedef struct {Fp x,y,z} G1;
+typedef struct {Fp x,y,z;} G1;
 
 // field elements F_p^2
 // F_p^2 elements are represented as a vector of two F_p elements.
 // `Fp2` is equivalent to type `vec384x` (used internally by BLST for F_p^2 elements).
 // `Fp2` does not need to be exported to cgo.
-typedef vec384x Fp2;
+typedef vec384x Fp2;   
+// helpers to get "real" and "imaginary" Fp elements from Fp2 pointers
+#define real(p)  ((*(p))[0])  
+#define imag(p)  ((*(p))[1]) 
+
 
 // Subroup G2 in E2
 // G2 points are represented in Jacobian coordinates (x,y,z), 
 // where x, y, x are elements of F_p (type `Fp`).
 // `G2` is equivelent to type `POINTonE2` (used internally by BLST for Jacobian E1 elements)
 // `G2` is defined as a struct to be exportable through cgo to the Go layer.
-typedef struct {Fp2 x,y,z} G2;
+typedef struct {Fp2 x,y,z;} G2;
 
 #endif

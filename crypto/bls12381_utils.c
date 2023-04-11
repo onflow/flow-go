@@ -8,6 +8,8 @@
 #include "bls_include.h"
 #include "assert.h"
 
+#include "blst_src.c"
+
 // The functions are tested for ALLOC=AUTO (not for ALLOC=DYNAMIC)
 
 // return macro values to the upper Go Layer
@@ -81,8 +83,13 @@ void precomputed_data_set(const prec_st* p) {
     bls_prec = (prec_st*)p;
 }
 
+// Reads a prime field element from a digit vector in big endian format.
+// There is no conversion to Montgomery domain in this function.
+#define fp_read_raw(a, data_pointer) dv_copy((a), (data_pointer), Fp_LIMBS)
+
 // pre-compute some data required for curve BLS12-381
 prec_st* init_precomputed_data_BLS12_381() {
+
     bls_prec = &bls_prec_st;
     ctx_t* ctx = core_get();
 
@@ -375,21 +382,11 @@ void Fp_set_limb(Fp* a, const limb_t l){
     *((limb_t*)a) = l;
 }
 
-static bool check_Fp(byte *in) {
-    // use same method as in BLST internal function
-    // which seems the most efficient. The method uses the assembly-based 
-    // modular addition instead of limbs comparison
-    vec384 temp;
-    add_fp(temp, in, ZERO_384); 
-    return vec_is_equal(temp, in, Fp_BYTES);
-    // no need to clear `tmp` as no use-case involves sensitive data being passed as `in`
-}
-
 void Fp_copy(Fp* res, const Fp* a) {
     vec_copy((byte*)res, (byte*)a, Fp_BYTES);
 }
 
-void Fp_add(Fp *res, const Fp *a, const Fp *b) {
+static void Fp_add(Fp *res, const Fp *a, const Fp *b) {
     add_mod_384((limb_t*)res, (limb_t*)a, (limb_t*)b, BLS12_381_P);
 }
 
@@ -399,6 +396,16 @@ void Fp_sub(Fp *res, const Fp *a, const Fp *b) {
 
 void Fp_neg(Fp *res, const Fp *a) {
     cneg_mod_384((limb_t*)res, (limb_t*)a, 1, BLS12_381_P);
+}
+
+static bool check_Fp(const Fp* in) {
+    // use same method as in BLST internal function
+    // which seems the most efficient. The method uses the assembly-based 
+    // modular addition instead of limbs comparison
+    Fp temp;
+    Fp_add(&temp, in, &ZERO_384); 
+    return vec_is_equal(&temp, in, Fp_BYTES);
+    // no need to clear `tmp` as no use-case involves sensitive data being passed as `in`
 }
 
 // res = a*b*R^(-1)
@@ -439,6 +446,12 @@ BLST_ERROR Fp_read_bytes(Fp* a, const byte *bin, int len) {
     return BLST_SUCCESS;
 }
 
+
+// write Fp element to bin and assume `bin` has  `Fp_BYTES` allocated bytes.  
+void Fp_write_bytes(byte *bin, const Fp* a) {
+    be_bytes_from_limbs(bin, (limb_t*)a, Fp_BYTES);
+}
+
 // fp_read_bin_safe is a modified version of Relic's (void fp_read_bin).
 // It reads a field element from a buffer and makes sure the big number read can be 
 // written as a field element (is reduced modulo p). 
@@ -477,57 +490,59 @@ out:
     return ret;
 }
 
-// Reads a prime field element from a digit vector in big endian format.
-// There is no conversion to Montgomery domain in this function.
- #define fp_read_raw(a, data_pointer) dv_copy((a), (data_pointer), Fp_LIMBS)
-
 // returns the sign of y.
 // 1 if y > (p - 1)/2 and 0 otherwise.
 // y is in montgomery form
-static int Fp_get_sign(const fp_t y) {
-    sgn0_pty_mont_384(y, BLS12_381_P, p0);
+static limb_t Fp_get_sign(const fp_t y) {
+    return sgn0_pty_mont_384(y, BLS12_381_P, p0);
 }
 
 // ------------------- Fp^2 utilities
 
 // sets `a` to limb `l`
 void Fp2_set_limb(Fp2* a, const limb_t l){
-    Fp_set_limb(a[0], l);  // TODO: check!!
-    Fp_set_zero(a[1]);
+    Fp_set_limb(&real(a), l);  
+    Fp_set_zero(&imag(a));
 }
 
 void Fp2_add(Fp2 *res, const Fp2 *a, const Fp2 *b) {
-    add_mod_384x(res, a, b, BLS12_381_P);
+    add_mod_384x((vec384*)res, (vec384*)a, (vec384*)b, BLS12_381_P);
 }
 
 void Fp2_sub(Fp2 *res, const Fp2 *a, const Fp2 *b) {
-    sub_mod_384x(res, a, b, BLS12_381_P);
+    sub_mod_384x((vec384*)res, (vec384*)a, (vec384*)b, BLS12_381_P);
 }
 
 void Fp2_neg(Fp2 *res, const Fp2 *a) {
-    cneg_mod_384(res[0], a[0], 1, BLS12_381_P);
-    cneg_mod_384(res[1], a[1], 1, BLS12_381_P);
+    cneg_mod_384(real(res), real(a), 1, BLS12_381_P);
+    cneg_mod_384(imag(res), imag(a), 1, BLS12_381_P);
 }
 
 // res = a*b in montgomery form
 void Fp2_mul_montg(Fp2 *res, const Fp2 *a, const Fp2 *b) {
-    mul_mont_384x(res, a, b, BLS12_381_P, p0); 
+    mul_mont_384x((vec384*)res, (vec384*)a, (vec384*)b, BLS12_381_P, p0); 
 }
 
 // res = a^2 in montgomery form
 void Fp2_squ_montg(Fp2 *res, const Fp2 *a) {
-    sqr_mont_384x(res, a, BLS12_381_P, p0); 
+    sqr_mont_384x((vec384*)res, (vec384*)a, BLS12_381_P, p0); 
+}
+
+// checks if `a` is a quadratic residue in Fp^2. If yes, it computes 
+// the square root in `res`.
+static bool_t Fp2_sqrt(Fp2 *res, const Fp2* a) {
+   return sqrt_fp2((vec384*)res, (vec384*)a);
 }
 
 // returns the sign of y.
 // sign(y_0) if y_1 = 0, else sign(y_1)
 // y coordinates are in montgommery form
-static int Fp2_get_sign(fp2_t y) {
-    sgn0_pty_mont_384x(y, BLS12_381_P, p0);
+static limb_t Fp2_get_sign(Fp2* y) {
+    return sgn0_pty_mont_384x((vec384*)y, BLS12_381_P, p0);
 }
 
 // reads an Fp^2 element in `a`.
-// input is a serialization of a[1] concatenated to serializetion of a[0].
+// input is a serialization of real(a) concatenated to serializetion of imag(a).
 // a[i] are both Fp elements.
 // returns:
 //    - BLST_BAD_ENCODING if the length is invalid
@@ -537,15 +552,21 @@ static BLST_ERROR Fp2_read_bytes(Fp2* a, const byte *bin, int len) {
     if (len != Fp2_BYTES) {
         return BLST_BAD_ENCODING;
     }
-    BLST_ERROR ret = Fp_read_bytes(a[0], bin, Fp_BYTES);
+    BLST_ERROR ret = Fp_read_bytes(&real(a), bin, Fp_BYTES);
     if (ret != BLST_SUCCESS) {
         return ret;
     }
-    ret = Fp_read_bytes(a[1], bin + Fp_BYTES, Fp_BYTES);
+    ret = Fp_read_bytes(&imag(a), bin + Fp_BYTES, Fp_BYTES);
     if ( ret != BLST_SUCCESS) {
         return ret;
     }
     return BLST_SUCCESS;
+}
+
+// write Fp2 element to bin and assume `bin` has `Fp2_BYTES` allocated bytes.  
+void Fp2_write_bytes(byte *bin, const Fp2* a) {
+    Fp_write_bytes(bin, &real(a));
+    Fp_write_bytes(bin + Fp_BYTES, &imag(a));
 }
 
 // ------------------- G1 utilities
@@ -686,10 +707,101 @@ void ep_mult_generic_bench(ep_t res, const Fr* expo) {
     ep_mult(res, &core_get()->ep_g, expo);
 }
 
-// ------------------- G2 utilities
+// ------------------- E2 utilities
 
-// G2_read_bytes imports a point from a buffer in a compressed or uncompressed form.
-// The resulting point is guaranteed to be on curve E2.
+// TODO: to delete
+static int fp2_read_bin_safe(fp2_t a, const uint8_t *bin, int len) {
+    if (len != Fp2_BYTES) {
+        return RLC_ERR;
+    }
+    if (fp_read_bin_safe(a[0], bin, Fp_BYTES) != RLC_OK) {
+        return RLC_ERR;
+    }
+    if (fp_read_bin_safe(a[1], bin + Fp_BYTES, Fp_BYTES) != RLC_OK) {
+        return RLC_ERR;
+    }
+    return RLC_OK;
+}
+
+// TODO: to delete, only used by temporary E2_blst_to_relic
+static int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
+    // check the length
+    const int G2size = (G2_BYTES/(G2_SERIALIZATION+1));
+    if (len!=G2size) {
+        return RLC_ERR;
+    }
+
+    // check the compression bit
+    int compressed = bin[0] >> 7;
+    if ((compressed == 1) != (G2_SERIALIZATION == COMPRESSED)) {
+        return RLC_ERR;
+    } 
+
+    // check if the point in infinity
+    int is_infinity = bin[0] & 0x40;
+    if (is_infinity) {
+        // the remaining bits need to be cleared
+        if (bin[0] & 0x3F) {
+            return RLC_ERR;
+        }
+        for (int i=1; i<G2size-1; i++) {
+            if (bin[i]) {
+                return RLC_ERR;
+            } 
+        }
+		ep2_set_infty(a);
+		return RLC_OK;
+	} 
+
+    // read the sign bit and check for consistency
+    int y_sign = (bin[0] >> 5) & 1;
+    if (y_sign && (!compressed)) {
+        return RLC_ERR;
+    } 
+    
+	a->coord = BASIC;
+    fp2_set_dig(a->z, 1);   // a.z
+    // use a temporary buffer to mask the header bits and read a.x
+    byte temp[Fp2_BYTES];
+    memcpy(temp, bin, Fp2_BYTES);
+    temp[0] &= 0x1F;        // clear the header bits
+    if (fp2_read_bin_safe(a->x, temp, sizeof(temp)) != RLC_OK) {
+        return RLC_ERR;
+    }
+
+    if (G2_SERIALIZATION == UNCOMPRESSED) {
+        if (fp2_read_bin_safe(a->y, bin + Fp2_BYTES, Fp2_BYTES) != RLC_OK){ 
+            return RLC_ERR;
+        }
+        // check read point is on curve
+        if (!ep2_on_curve(a)) {
+            return RLC_ERR;
+        }
+        return RLC_OK;
+    }
+    
+    fp2_zero(a->y);
+    fp_set_bit(a->y[0], 0, y_sign);
+    fp_zero(a->y[1]);
+    if (ep2_upk(a, a) == 1) {
+        // resulting point is guaranteed to be on curve
+        return RLC_OK;
+    }
+    return RLC_ERR;
+}
+
+// TODO: temp utility function to delete
+ep2_st* E2_blst_to_relic(const G2* x) {
+    ep2_st* out = (ep2_st*)malloc(sizeof(ep2_st)); 
+    byte* data = (byte*)malloc(G2_SER_BYTES);
+    E2_write_bytes(data, x);
+    ep2_read_bin_compact(out, data, G2_SER_BYTES);
+    free(data);
+    return out;
+}
+
+// E2_read_bytes imports a point from a buffer in a compressed or uncompressed form.
+// The resulting point is guaranteed to be on curve E2 (no G2 check is included)
 //
 // reads a scalar in `a` and checks it is a valid Fp element (a < p).
 // input is bytes-big-endian.
@@ -699,8 +811,9 @@ void ep_mult_generic_bench(ep_t res, const Fr* expo) {
 //    - BLST_POINT_NOT_ON_CURVE if deserialized point isn't on E2
 //    - BLST_SUCCESS if deserialization is valid 
 
-// TODO: replace with POINTonE2_Deserialize_BE and POINTonE2_Uncompress_Z ?
-BLST_ERROR G2_read_bytes(G2* a, const byte *bin, const int len) {
+// TODO: replace with POINTonE2_Deserialize_BE and POINTonE2_Uncompress_Z, 
+//       and update logic with G2 subgroup check?
+BLST_ERROR E2_read_bytes(G2* a, const byte *bin, const int len) {
     // check the length
     if (len != G2_SER_BYTES) {
         return BLST_BAD_ENCODING;
@@ -724,7 +837,7 @@ BLST_ERROR G2_read_bytes(G2* a, const byte *bin, const int len) {
                 return BLST_BAD_ENCODING;
             } 
         }
-		G2_set_infty(a);
+		E2_set_infty(a);
 		return RLC_OK;
 	} 
 
@@ -738,92 +851,113 @@ BLST_ERROR G2_read_bytes(G2* a, const byte *bin, const int len) {
     byte temp[Fp2_BYTES];
     memcpy(temp, bin, Fp2_BYTES);
     temp[0] &= 0x1F;        // clear the header bits
-    BLST_ERROR ret = fp2_read_bytes(a->x, temp, sizeof(temp));
+    BLST_ERROR ret = Fp2_read_bytes(&a->x, temp, sizeof(temp));
     if (ret != BLST_SUCCESS) {
         return ret;
     }
 
     // set a.z to 1
-    Fp_copy(a->z[0], BLS12_381_pR);
-    Fp_set_zero(a->z[1]);   
+    Fp2* a_z = &(a->z);
+    Fp_copy(&real(a_z), &BLS12_381_pR);
+    Fp_set_zero(&imag(a_z));   
 
     if (G2_SERIALIZATION == UNCOMPRESSED) {
-        ret = fp2_read_bytes(a->y, bin + Fp2_BYTES, sizeof(a->y));
+        ret = Fp2_read_bytes(&(a->y), bin + Fp2_BYTES, sizeof(a->y));
         if (ret != BLST_SUCCESS){ 
             return ret;
         }
         // check read point is on curve
-        if (!G2_on_curve(a)) { 
+        if (!E2_affine_on_curve(a)) { 
             return BLST_POINT_NOT_ON_CURVE;
         }
         return BLST_SUCCESS;
     }
     
     // compute the possible square root
-    Fp_to_montg((a->x)[0], a->x[0]);
-    Fp_to_montg(a->x[1], a->x[1]);
+    Fp2* a_x = &(a->x);
+    Fp_to_montg(&real(a_x), &real(a_x));
+    Fp_to_montg(&imag(a_x), &imag(a_x));
 
-    Fp2_squ_montg(a->y, a->x);
-    Fp2_mul_montg(a->y, a->y, a->x);
-    Fp2_add(a->y, a->y, B_E2);                       
-    if (!sqrt_fp2(a->y, a->y))  // (y^2 = x^3+b) has no solution in y
+    Fp2* a_y = &(a->y);
+    Fp2_squ_montg(a_y, a_x);
+    Fp2_mul_montg(a_y, a_y, a_x);
+    Fp2_add(a_y, a_y, &B_E2);                       
+    if (!Fp2_sqrt(a_y, a_y))  // if (y^2 = x^3+b) has no solution in y
         return BLST_POINT_NOT_ON_CURVE; 
 
     // resulting (x,y) is guaranteed to be on curve
-    if (Fp2_get_sign(a->y) != y_sign) {
-        Fp2_neg(a->y, a->y); // flip y sign if needed
+    if (Fp2_get_sign(a_y) != y_sign) {
+        Fp2_neg(a_y, a_y); // flip y sign if needed
     }
     return BLST_SUCCESS;
 }
 
-// ep2_write_bin_compact exports a point in E(Fp^2) to a buffer in a compressed or uncompressed form.
-// len is the allocated size of the buffer bin.
-// The serialization is following:
+// E2_write_bytes exports a point in E(Fp^2) to a buffer in a compressed or uncompressed form.
+// It assumes buffer is of length G2_SER_BYTES
+// The serialization follows:
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
 // The code is a modified version of Relic ep2_write_bin 
-void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
-    ep2_t t;
-    ep2_null(t);
-    const int G2_size = (G2_BYTES/(G2_SERIALIZATION+1));
-
-    if (len!=G2_size) {
-        RLC_THROW(ERR_NO_BUFFER);
-        return;
-    }
- 
-    if (ep2_is_infty((ep2_st *)a)) {
+void E2_write_bytes(byte *bin, const G2* a) {
+    if (E2_is_infty(a)) {
             // set the infinity bit
             bin[0] = (G2_SERIALIZATION << 7) | 0x40;
-            memset(bin+1, 0, G2_size-1);
+            memset(bin+1, 0, G2_SER_BYTES-1);
             return;
     }
 
-    RLC_TRY {
-        ep2_new(t);
-        ep2_norm(t, (ep2_st *)a);
-        fp2_write_bin(bin, Fp2_BYTES, t->x, 0);
+    G2 tmp;
+    E2_to_affine(&tmp, a);
+    Fp2* t_x = &(tmp.x);
+    Fp_from_montg(&real(t_x), &real(t_x));
+    Fp_from_montg(&imag(t_x), &imag(t_x));
+    Fp2_write_bytes(bin, t_x);
 
-        if (G2_SERIALIZATION == COMPRESSED) {
-            bin[0] |= (Fp2_get_sign(t->y) << 5);
-        } else {
-            fp2_write_bin(bin + Fp2_BYTES, Fp2_BYTES, t->y, 0);
-        }
-    } RLC_CATCH_ANY {
-        RLC_THROW(ERR_CAUGHT);
+    Fp2* t_y = &(tmp.y);
+    if (G2_SERIALIZATION == COMPRESSED) {
+        bin[0] |= (Fp2_get_sign(t_y) << 5);
+    } else {
+        Fp2_write_bytes(bin + Fp2_BYTES, t_y);
     }
 
     bin[0] |= (G2_SERIALIZATION << 7);
-    ep_free(t);
 }
 
 // set p to infinity
-static void G2_set_infty(G2* p) {
+void E2_set_infty(G2* p) {
     vec_zero(p, G2_BYTES);
 }
 
-// checks p is on G2
-static bool G2_on_curve(G2* p) {
-    return POINTonE2_affine_on_curve(p) | vec_is_zero(p, sizeof(*p));
+// check if `p` is infinity
+bool_t E2_is_infty(const G2* p) {
+    return vec_is_zero(p, sizeof(*p));
+}
+
+// checks affine point `p` is in E2
+bool_t E2_affine_on_curve(const G2* p) {
+    // BLST's `POINTonE2_affine_on_curve` does not include the inifity case, 
+    // unlike what the function name means.
+    return POINTonE2_affine_on_curve((POINTonE2_affine*)p) | E2_is_infty(p);
+}
+
+// checks p1 == p2
+bool_t E2_is_equal(const G2* p1, const G2* p2) {
+    // `POINTonE2_is_equal` includes the infinity case
+    return POINTonE2_is_equal((const POINTonE2*)p1, (const POINTonE2*)p2);
+}
+
+// converts an E2 point from Jacobian into affine coordinates (z=1)
+void E2_to_affine(G2* res, const G2* p) {
+    // minor optimization in case coordinates are already affine
+    if (vec_is_equal(p->z, BLS12_381_Rx.p2, Fp2_BYTES)) {
+        vec_copy(res, p, G2_BYTES);
+        return;
+    }
+    // convert from Jacobian
+    POINTonE2_from_Jacobian((POINTonE2*)res, (const POINTonE2*)p);   
+}
+
+void E2_add(G2* res, const G2* a, const G2* b) {
+    POINTonE2_dadd((POINTonE2*)res, (POINTonE2*)a, (POINTonE2*)b, NULL); 
 }
 
 // Exponentiation of a generic point p in G2
@@ -838,7 +972,7 @@ void ep2_mult(ep2_t res, const ep2_t p, const Fr* expo) {
 void G2_mult_gen(G2* res, const Fr* expo) {
     pow256 tmp;
     pow256_from_Fr(tmp, expo);
-    POINTonE2_sign(res, &BLS12_381_G2, tmp);
+    POINTonE2_sign((POINTonE2*)res, &BLS12_381_G2, tmp);
 }
 
 // computes the sum of the G2 array elements y and writes the sum in jointy
