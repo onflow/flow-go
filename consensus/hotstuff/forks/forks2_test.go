@@ -341,9 +341,9 @@ func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 // TestDoubleProposal tests that the DoubleProposal notification is emitted when two different
 // proposals for the same view are added. We ingest the the following block tree:
 //
-//                / [(◄1) 2]
-//		[1]
-//                \ [(◄1) 2']
+//	               / [(◄1) 2]
+//			[1]
+//	               \ [(◄1) 2']
 //
 // which should result in a DoubleProposal event referencing the blocks [(◄1) 2] and [(◄1) 2']
 func TestDoubleProposal(t *testing.T) {
@@ -658,42 +658,6 @@ func TestNotification(t *testing.T) {
 		forks, err := NewForks2(builder.GenesisBlock(), finalizationCallback, notifier)
 		require.NoError(t, err)
 		require.NoError(t, addCertifiedBlocksToForks(forks, blocks))
-	})
-}
-
-// TestNewestView tests that Forks tracks the newest block view seen in received blocks.
-// receives [(◄1) 2] [(◄2) 3] [(◄3) 4]
-func TestNewestView(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 3)
-	builder.Add(3, 4)
-
-	blocks, err := builder.Blocks()
-	require.Nil(t, err)
-
-	t.Run("ingest proposals", func(t *testing.T) {
-		forks, _ := newForks(t)
-		require.Equal(t, forks.NewestView(), builder.GenesisBlock().Block.View) // initially newest view should be genesis block view
-
-		err = addProposalsToForks(forks, blocks)
-		require.NoError(t, err)
-		// after inserting new blocks, newest view should be greatest view of all added blocks
-		require.Equal(t, forks.NewestView(), uint64(4))
-	})
-
-	t.Run("ingest certified blocks", func(t *testing.T) {
-		forks, _ := newForks(t)
-		require.Equal(t, forks.NewestView(), builder.GenesisBlock().Block.View) // initially newest view should be genesis block view
-
-		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[0].Block))
-		require.Nil(t, err)
-		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[1].Block))
-		require.Nil(t, err)
-		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[2].Block))
-		require.Nil(t, err)
-		// after inserting new blocks, newest view should be greatest view of all added blocks
-		require.Equal(t, forks.NewestView(), uint64(4))
 	})
 }
 

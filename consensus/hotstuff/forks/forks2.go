@@ -29,7 +29,6 @@ type Forks2 struct {
 	forest   forest.LevelledForest
 
 	trustedRoot          *model.CertifiedBlock
-	newestView           uint64 // newestView is the highest view of block proposal stored in Forks
 	finalizationCallback module.Finalizer
 
 	// finalityProof holds the latest finalized block including the certified child as proof of finality.
@@ -52,7 +51,6 @@ func NewForks2(trustedRoot *model.CertifiedBlock, finalizationCallback module.Fi
 		notifier:             notifier,
 		finalizationCallback: finalizationCallback,
 		forest:               *forest.NewLevelledForest(trustedRoot.Block.View),
-		newestView:           trustedRoot.Block.View,
 		trustedRoot:          trustedRoot,
 		finalityProof:        nil,
 	}
@@ -89,9 +87,6 @@ func (f *Forks2) FinalizedBlock() *model.Block {
 func (f *Forks2) FinalityProof() (*FinalityProof, bool) {
 	return f.finalityProof, f.finalityProof == nil
 }
-
-// NewestView returns the largest view number of all proposals that were added to Forks.
-func (f *Forks2) NewestView() uint64 { return f.newestView }
 
 // GetBlock returns block for given ID
 func (f *Forks2) GetBlock(blockID flow.Identifier) (*model.Block, bool) {
@@ -183,7 +178,7 @@ func (f *Forks2) EnsureBlockIsValidExtension(block *model.Block) error {
 	if (block.View == f.forest.LowestLevel) || (block.QC.View < f.forest.LowestLevel) { // exclusion (ii) and (iii)
 		return nil
 	}
-	// for a block whose parent is _not_ below the pruning height, we expect the parent to be known.
+	// For a block whose parent is _not_ below the pruning height, we expect the parent to be known.
 	if _, isParentKnown := f.forest.GetVertex(block.QC.BlockID); !isParentKnown { // missing parent
 		return model.MissingBlockError{
 			View:    block.QC.View,
@@ -362,21 +357,15 @@ func (f *Forks2) store(block *model.Block) error {
 	}
 	f.checkForDoubleProposal(block)
 	f.forest.AddVertex(ToBlockContainer2(block))
-
-	// Update trackers for newly ingested blocks
-	if f.newestView < block.View {
-		f.newestView = block.View
-	}
 	f.notifier.OnBlockIncorporated(block)
 	return nil
 }
 
 // checkForConflictingQCs checks if QC conflicts with a stored Quorum Certificate.
 // In case a conflicting QC is found, an ByzantineThresholdExceededError is returned.
-//
 // Two Quorum Certificates q1 and q2 are defined as conflicting iff:
-//   - q1.View == q2.View AND
-//   - q1.BlockID != q2.BlockID
+//
+//	q1.View == q2.View AND q1.BlockID ≠ q2.BlockID
 //
 // This means there are two Quorums for conflicting blocks at the same view.
 // Per 'Observation 1' from the Jolteon paper https://arxiv.org/pdf/2106.10362v1.pdf,
