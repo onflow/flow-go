@@ -74,12 +74,25 @@ and then start the test network:
 make start
 ```
 
+Alternatively, this command will start the test network without re-building, using the most recently built image.
+```shell
+make start-cached
+```
+
+
 ## Stop the network
 
 The network needs to be stopped between each consecutive run to clear the chain state:
 
 ```sh
 make stop
+```
+
+## Build Localnet images
+
+To build images for Localnet, run this command.
+```shell
+make build-flow
 ```
 
 ## Logs
@@ -132,6 +145,64 @@ make load
 The command by default will load your localnet with 1 tps for 30s, then 10 tps for 30s, and finally 100 tps indefinitely.
 
 More about the loader can be found in the benchmark module.
+
+## Debugging
+It is possible to connect a debugger to a localnet instance to debug the code. To set this up, find the
+node you want to debug in `docker-compose.nodes.yml`, then make the following changes to its config:
+
+1. Set the build `target` setting to `debug`. This configures it to use the special `debug` image which
+   runs the node application within `dlv`.
+	```
+	build:
+		...
+		target: debug
+	```
+2. Expose the debugger ports to your host network
+	```
+	ports:
+		...
+		- "2345:2345"
+	```
+3. Rebuild the node. In these examples, we are rebuilding the `execution_1` node.
+	```
+	docker-compose -f docker-compose.nodes.yml build execution_1
+	```
+4. Stop and restart the node
+	```
+	docker-compose -f docker-compose.nodes.yml stop execution_1
+	docker-compose -f docker-compose.nodes.yml up -d execution_1
+	```
+5. Check the logs to make sure it's working
+	```
+	docker-compose -f docker-compose.nodes.yml logs -f execution_1
+
+	localnet-execution_1-1  | API server listening at: [::]:2345
+	```
+6. Configure your debugger client to connect. Here is a vscode launch config as an example:
+	```
+   {
+        "name": "Connect to container",
+        "type": "go",
+        "request": "attach",
+        "mode": "remote",
+        "debugAdapter": "dlv-dap",
+        "substitutePath": [
+            {
+                "from": "${workspaceFolder}",
+                "to": "/app",
+            },
+        ],
+        "port": 2345,
+        "trace": "verbose"
+    },
+	```
+
+Notes:
+* `JSON-rpc` only supports connecting to the headless server once. You will need to restart the
+node to connect again. `Debug Adaptor Protocol (DAP)` supports reconnecting.
+* The Dockerfile is configured to pause the application until the debugger connects. This ensures
+`JSON-rpc` clients can connect. If you are connecting with `DAP` and would like the node to start
+immediately, update the debug `ENTRYPOINT` in the Dockerfile to include `--continue=true`.
 
 ## Playing with Localnet
 

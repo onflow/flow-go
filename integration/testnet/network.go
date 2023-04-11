@@ -2,9 +2,9 @@ package testnet
 
 import (
 	"context"
+	crand "crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
 	gonet "net"
 	"os"
 	"path/filepath"
@@ -30,7 +30,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go-sdk/crypto"
-
 	crypto2 "github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
@@ -983,6 +982,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				nodeContainer.AddFlag("public-network-address", fmt.Sprintf("%s:%d", nodeContainer.Name(), AccessNodePublicNetworkPort))
 			}
 
+			// execution-sync is enabled by default
+			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
+
 			// nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
 			// nodeContainer.Ports[AccessNodeMetricsPort] = hostMetricsPort
 			// net.AccessPorts[AccessNodeMetricsPort] = hostMetricsPort
@@ -1146,7 +1148,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	//            this ordering defines the DKG participant's indices
 	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), order.Canonical)
 
-	dkg, err := runDKG(stakedConfs)
+	dkg, err := runBeaconKG(stakedConfs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
@@ -1236,7 +1238,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	}
 
 	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
-	_, err = rand.Read(randomSource)
+	_, err = crand.Read(randomSource)
 	if err != nil {
 		return nil, err
 	}
@@ -1383,17 +1385,16 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 	return confs, nil
 }
 
-// runDKG simulates the distributed key generation process for all consensus nodes
+// runBeaconKG simulates the distributed key generation process for all consensus nodes
 // and returns all DKG data. This includes the group private key, node indices,
 // and per-node public and private key-shares.
 // Only consensus nodes participate in the DKG.
-func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
+func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 
 	// filter by consensus nodes
 	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
 	nConsensusNodes := len(consensusNodes)
 
-	// run the core dkg algorithm
 	dkgSeed, err := getSeed()
 	if err != nil {
 		return dkgmod.DKGData{}, err
@@ -1402,15 +1403,6 @@ func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 	dkg, err := dkg.RunFastKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return dkgmod.DKGData{}, err
-	}
-
-	// sanity check
-	if nConsensusNodes != len(dkg.PrivKeyShares) {
-		return dkgmod.DKGData{}, fmt.Errorf(
-			"consensus node count does not match DKG participant count: nodes=%d, participants=%d",
-			nConsensusNodes,
-			len(dkg.PrivKeyShares),
-		)
 	}
 
 	return dkg, nil

@@ -1,4 +1,4 @@
-package rpc_inspector_test
+package rpc_inspector
 
 import (
 	"context"
@@ -25,14 +25,14 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestInspect_SafetyThreshold ensures that when RPC control message count is below the configured safety threshold the control message validation inspector
+// TestValidationInspector_SafetyThreshold ensures that when RPC control message count is below the configured safety threshold the control message validation inspector
 // does not return any errors and validation is skipped.
-func TestInspect_SafetyThreshold(t *testing.T) {
+func TestValidationInspector_SafetyThreshold(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
@@ -42,7 +42,7 @@ func TestInspect_SafetyThreshold(t *testing.T) {
 	// if GRAFT/PRUNE message count is lower than safety threshold the RPC validation should pass
 	safetyThreshold := uint64(10)
 	// create our RPC validation inspector
-	inspectorConfig := p2pbuilder.DefaultRPCValidationConfig()
+	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
 	inspectorConfig.NumberOfWorkers = 1
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = safetyThreshold
 	inspectorConfig.PruneValidationCfg.SafetyThreshold = safetyThreshold
@@ -103,9 +103,9 @@ func TestInspect_SafetyThreshold(t *testing.T) {
 	}, 2*time.Second, 10*time.Millisecond)
 }
 
-// TestInspect_DiscardThreshold ensures that when RPC control message count is above the configured discard threshold the control message validation inspector
+// TestValidationInspector_DiscardThreshold ensures that when RPC control message count is above the configured discard threshold the control message validation inspector
 // returns the expected error.
-func TestInspect_DiscardThreshold(t *testing.T) {
+func TestValidationInspector_DiscardThreshold(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
@@ -115,7 +115,7 @@ func TestInspect_DiscardThreshold(t *testing.T) {
 	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
 	discardThreshold := uint64(10)
 	// create our RPC validation inspector
-	inspectorConfig := p2pbuilder.DefaultRPCValidationConfig()
+	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
 	inspectorConfig.NumberOfWorkers = 1
 	inspectorConfig.GraftValidationCfg.DiscardThreshold = discardThreshold
 	inspectorConfig.PruneValidationCfg.DiscardThreshold = discardThreshold
@@ -174,9 +174,9 @@ func TestInspect_DiscardThreshold(t *testing.T) {
 	unittest.RequireCloseBefore(t, done, 2*time.Second, "failed to inspect RPC messages on time")
 }
 
-// TestInspect_DiscardThresholdIHave ensures that when the ihave RPC control message count is above the configured discard threshold the control message validation inspector
+// TestValidationInspector_DiscardThresholdIHave ensures that when the ihave RPC control message count is above the configured discard threshold the control message validation inspector
 // inspects a sample size of the ihave messages and returns the expected error when validation for a topic in that sample fails.
-func TestInspect_DiscardThresholdIHave(t *testing.T) {
+func TestValidationInspector_DiscardThresholdIHave(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
@@ -185,7 +185,7 @@ func TestInspect_DiscardThresholdIHave(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create our RPC validation inspector
-	inspectorConfig := p2pbuilder.DefaultRPCValidationConfig()
+	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
 	inspectorConfig.NumberOfWorkers = 1
 	inspectorConfig.IHaveValidationCfg.DiscardThreshold = 50
 	inspectorConfig.IHaveValidationCfg.IHaveInspectionMaxSampleSize = 100
@@ -250,8 +250,8 @@ func TestInspect_DiscardThresholdIHave(t *testing.T) {
 	unittest.RequireCloseBefore(t, done, 2*time.Second, "failed to inspect RPC messages on time")
 }
 
-// TestInspect_RateLimitedPeer ensures that the control message validation inspector rate limits peers per control message type as expected.
-func TestInspect_RateLimitedPeer(t *testing.T) {
+// TestValidationInspector_RateLimitedPeer ensures that the control message validation inspector rate limits peers per control message type as expected.
+func TestValidationInspector_RateLimitedPeer(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
@@ -260,7 +260,7 @@ func TestInspect_RateLimitedPeer(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create our RPC validation inspector
-	inspectorConfig := p2pbuilder.DefaultRPCValidationConfig()
+	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
 	inspectorConfig.NumberOfWorkers = 1
 
 	// here we set the message count to the amount of flow channels
@@ -327,8 +327,8 @@ func TestInspect_RateLimitedPeer(t *testing.T) {
 	unittest.RequireCloseBefore(t, done, 2*time.Second, "failed to inspect RPC messages on time")
 }
 
-// TestInspect_InvalidTopicID ensures that when an RPC control message contains an invalid topic ID the expected error is logged.
-func TestInspect_InvalidTopicID(t *testing.T) {
+// TestValidationInspector_InvalidTopicID ensures that when an RPC control message contains an invalid topic ID the expected error is logged.
+func TestValidationInspector_InvalidTopicID(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
@@ -337,7 +337,7 @@ func TestInspect_InvalidTopicID(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
-	inspectorConfig := p2pbuilder.DefaultRPCValidationConfig()
+	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
 	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
 
@@ -438,22 +438,4 @@ func TestInspect_InvalidTopicID(t *testing.T) {
 	spammer.SpamControlMessage(t, victimNode, iHaveCtlMsgsDuplicateTopic)
 
 	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
-}
-
-// StartNodesAndEnsureConnected starts the victim and spammer node and ensures they are both connected.
-func startNodesAndEnsureConnected(t *testing.T, ctx irrecoverable.SignalerContext, nodes []p2p.LibP2PNode, sporkID flow.Identifier) {
-	p2ptest.StartNodes(t, ctx, nodes, 5*time.Second)
-	// prior to the test we should ensure that spammer and victim connect.
-	// this is vital as the spammer will circumvent the normal pubsub subscription mechanism and send iHAVE messages directly to the victim.
-	// without a prior connection established, directly spamming pubsub messages may cause a race condition in the pubsub implementation.
-	p2ptest.EnsureConnected(t, ctx, nodes)
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkID)
-		return unittest.ProposalFixture(), blockTopic
-	})
-}
-
-func stopNodesAndInspector(t *testing.T, cancel context.CancelFunc, nodes []p2p.LibP2PNode, inspector *validation.ControlMsgValidationInspector) {
-	p2ptest.StopNodes(t, nodes, cancel, 5*time.Second)
-	unittest.RequireComponentsDoneBefore(t, time.Second, inspector)
 }

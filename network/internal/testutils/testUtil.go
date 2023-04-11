@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
@@ -39,9 +38,9 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/distributor"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -450,8 +449,8 @@ func generateLibP2PNode(t *testing.T,
 	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, connection.DefaultConnManagerConfig())
 	require.NoError(t, err)
 
-	defaultRPCValidationInpectorCfg := p2pbuilder.DefaultRPCValidationConfig()
-	rpcInspectorNotifDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(logger)
+	rpcInspectors, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(logger)).Build()
+	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
@@ -463,7 +462,7 @@ func generateLibP2PNode(t *testing.T,
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t)).
 		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
-		SetGossipSubValidationInspector(validation.NewControlMsgValidationInspector(logger, sporkID, defaultRPCValidationInpectorCfg, rpcInspectorNotifDistributor, noopMetrics))
+		SetGossipSubRPCInspectors(rpcInspectors...)
 
 	for _, opt := range opts {
 		opt(builder)
