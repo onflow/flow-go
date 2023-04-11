@@ -129,7 +129,7 @@ on:
       skip_builds:
         required: true
         type: boolean
-        description: Skip builds. ONLY use when images have been previously built and deployed to private registry.
+        description: Skip builds. ONLY use when images have been previously built and deployed to private registry with the specified network ID.
 
 env:
   GCP_PROJECT: "dl-flow-benchnet-automation"
@@ -154,6 +154,14 @@ jobs:
       - name: Print Network ID
         run: |
           echo ${{ steps.getNetworkId.outputs.networkId }}
+
+      - name: Print Automation Ref
+        run: |
+          echo ${{ inputs.automation_ref }}
+
+      - name: Print Flow Ref
+        run: |
+          echo ${{ inputs.flow_ref }}
 
       # This step is required to authenticate with the cluster and use HELM
       - name: Configure gcloud
