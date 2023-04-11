@@ -1,32 +1,22 @@
----
-name: Delete Benchnet Network
+name: BN2 - Delete Benchnet 2 Network
 
 on:
   workflow_dispatch:
     inputs:
-    
+
       # The network_id is the unique identifier for the network.
-      # This ID is used to clean up and delete all 
+      # This ID is used to clean up and delete all
       network_id:
         type: string
         required: true
-        description: Input the network ID for the deployment to be deleted
+        description: 'NETWORK ID for the deployment to delete.'
 
       # Allows for the ref to be altered for testing automation changes
       automation_ref:
         type: string
-        description: 'flow-go branch, commit, or tag to use for automation to use for bootstrapping and deployment'
+        description: 'AUTOMATION branch, tag, or commit to use for the deletion (onflow/flow-go repo)'
         required: false
         default: master
-
-      # Allows for the public or private repo to be used for deployment automation
-      automation_repo:
-        required: true
-        type: choice
-        description: Choose the repo to use the public or private repo for automation
-        options:
-          - onflow/flow-go
-          - dapperlabs/flow-go
 
 env:
   GCP_PROJECT: "dl-flow-benchnet-automation"
@@ -41,11 +31,14 @@ jobs:
       - self-hosted
       - flow-bn2
     steps:
+      - name: Print all input variables
+        run: echo '${{ toJson(inputs) }}' | jq
+
       - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
-          repository: ${{ inputs.automation_repo }}
+          repository: onflow/flow-go
           ref: ${{ inputs.automation_ref }}
 
       - name: Configure gcloud
@@ -68,3 +61,8 @@ jobs:
       - name: Delete Network using provided Network ID
         working-directory: integration/benchnet2/
         run: make remote-clean-all NAMESPACE=benchnet NETWORK_ID=${{ inputs.network_id }}
+
+      - name: Benchnet2 Deletion Summary
+        run: |
+          SUMMARY=$'# Benchnet2 Deletion Summary\n## Network ID deleted: `${{ inputs.network_id }}`\n * Repo Used for deletion: `onflow/flow-go` \n * Automation Ref: `${{ inputs.automation_ref }}`'
+          echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
