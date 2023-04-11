@@ -122,7 +122,7 @@ on:
 
       flow_ref:
         type: string
-        description: 'FLOW tag, branch, or commit to build Flow nodes (onflow/flow-go repo)'
+        description: 'FLOW tag, branch, or commit to build Flow nodes and bootstrap network deployment (onflow/flow-go repo)'
         required: true
 
       # This flag allows us to skip builds for network ids that have been previously built
