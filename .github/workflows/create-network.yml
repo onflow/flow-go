@@ -163,6 +163,9 @@ jobs:
         run: |
           echo ${{ inputs.flow_ref }}
 
+      - name: Print all input variables
+        run: echo '${{ toJson(inputs) }}' | jq
+
       # This step is required to authenticate with the cluster and use HELM
       - name: Configure gcloud
         uses: google-github-actions/setup-gcloud@v0.2.1
