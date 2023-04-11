@@ -473,7 +473,6 @@ docker-push-verification-latest: docker-push-verification
 docker-push-access:
 	docker push "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)"
-	docker push "$(CONTAINER_REGISTRY)/access:$(FLOW_GO_TAG)"
 
 .PHONY: docker-push-access-without-netgo
 docker-push-access-without-netgo:
