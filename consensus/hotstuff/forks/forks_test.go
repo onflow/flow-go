@@ -498,5 +498,5 @@ func requireLatestFinalizedBlock(t *testing.T, forks *forks.Forks, qcView int, v
 func requireNoBlocksFinalized(t *testing.T, f *forks.Forks) {
 	genesis := forks.NewBlockBuilder().GenesisBlock()
 	require.Equal(t, f.FinalizedBlock().View, genesis.Block.View)
-	require.Equal(t, f.FinalizedBlock().View, genesis.QC.View)
+	require.Equal(t, f.FinalizedBlock().View, genesis.CertifyingQC.View)
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -357,7 +356,7 @@ func TestDoubleProposal(t *testing.T) {
 
 	t.Run("ingest proposals", func(t *testing.T) {
 		forks, notifier := newForks(t)
-		notifier.On("OnDoubleProposeDetected", blocks[0].Block, blocks[1].Block).Once()
+		notifier.On("OnDoubleProposeDetected", blocks[1].Block, blocks[0].Block).Once()
 
 		err = addProposalsToForks(forks, blocks)
 		require.Nil(t, err)
@@ -365,7 +364,7 @@ func TestDoubleProposal(t *testing.T) {
 
 	t.Run("ingest certified blocks", func(t *testing.T) {
 		forks, notifier := newForks(t)
-		notifier.On("OnDoubleProposeDetected", blocks[4].Block, blocks[3].Block).Once()
+		notifier.On("OnDoubleProposeDetected", blocks[1].Block, blocks[0].Block).Once()
 
 		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[0].Block)) // add [(◄1) 2]  as certified block
 		require.Nil(t, err)
@@ -377,7 +376,7 @@ func TestDoubleProposal(t *testing.T) {
 // TestConflictingQCs checks that adding 2 conflicting QCs should return model.ByzantineThresholdExceededError
 // We ingest the the following block tree:
 //
-//	[(◄1) 2] [(◄2) 3]   [(◄3) 4]
+//	[(◄1) 2] [(◄2) 3]   [(◄3) 4]  [(◄4) 6]
 //	         [(◄2) 3']  [(◄3') 5]
 //
 // which should result in a `ByzantineThresholdExceededError`, because conflicting blocks 3 and 3' both have QCs
@@ -388,6 +387,7 @@ func TestConflictingQCs(t *testing.T) {
 	builder.Add(2, 3)                // [(◄2) 3]
 	builder.AddVersioned(2, 3, 0, 1) // [(◄2) 3']
 	builder.Add(3, 4)                // [(◄3) 4]
+	builder.Add(4, 6)                // [(◄4) 6]
 	builder.AddVersioned(3, 5, 1, 0) // [(◄3') 5]
 
 	blocks, err := builder.Blocks()
@@ -398,7 +398,6 @@ func TestConflictingQCs(t *testing.T) {
 		notifier.On("OnDoubleProposeDetected", blocks[2].Block, blocks[1].Block).Return(nil)
 
 		err = addProposalsToForks(forks, blocks)
-		require.NotNil(t, err)
 		assert.True(t, model.IsByzantineThresholdExceededError(err))
 	})
 
@@ -409,7 +408,6 @@ func TestConflictingQCs(t *testing.T) {
 		// As [(◄3') 5] is not certified, it will not be added to Forks. However, its QC (◄3') is
 		// delivered to Forks as part of the *certified* block [(◄2) 3'].
 		err = addCertifiedBlocksToForks(forks, blocks)
-		require.NotNil(t, err)
 		assert.True(t, model.IsByzantineThresholdExceededError(err))
 	})
 }
@@ -438,37 +436,39 @@ func TestConflictingFinalizedForks(t *testing.T) {
 	t.Run("ingest proposals", func(t *testing.T) {
 		forks, _ := newForks(t)
 		err = addProposalsToForks(forks, blocks)
-		require.Error(t, err)
 		assert.True(t, model.IsByzantineThresholdExceededError(err))
 	})
 
 	t.Run("ingest certified blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
 		err = addCertifiedBlocksToForks(forks, blocks)
-		require.Error(t, err)
 		assert.True(t, model.IsByzantineThresholdExceededError(err))
 	})
 }
 
 // TestAddUnconnectedProposal checks that adding a proposal which does not connect to the
 // latest finalized block returns a `model.MissingBlockError`
-// receives [(◄2) 3]
-// should return fatal error, because the proposal is invalid for addition to Forks
+//   - receives [(◄2) 3]
+//   - should return `model.MissingBlockError`, because the parent is above the pruning
+//     threshold, but Forks does not know its parent
 func TestAddUnconnectedProposal(t *testing.T) {
-	unconnectedProposal := helper.MakeProposal(
-		helper.WithBlock(helper.MakeBlock(
-			helper.WithBlockView(3),
-		)))
+	builder := NewBlockBuilder().
+		Add(1, 2). // we will skip this block [(◄1) 2]
+		Add(2, 3)  // [(◄2) 3]
+	blocks, err := builder.Blocks()
+	require.Nil(t, err)
 
 	t.Run("ingest proposals", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err := forks.AddProposal(unconnectedProposal.Block)
+		err := forks.AddProposal(blocks[1].Block)
+		require.Error(t, err)
 		assert.True(t, model.IsMissingBlockError(err))
 	})
 
 	t.Run("ingest certified blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err := forks.AddCertifiedBlock(toCertifiedBlock(t, unconnectedProposal.Block))
+		err := forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[1].Block))
+		require.Error(t, err)
 		assert.True(t, model.IsMissingBlockError(err))
 	})
 }
@@ -479,48 +479,55 @@ func TestAddUnconnectedProposal(t *testing.T) {
 // should finalize [(◄1) 2], then [(◄2) 3]
 func TestGetProposal(t *testing.T) {
 	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 3)
-	builder.Add(3, 4)
-	builder.Add(4, 5)
+	builder.Add(1, 2) // [(◄1) 2]
+	builder.Add(2, 3) // [(◄2) 3]
+	builder.Add(3, 4) // [(◄3) 4]
+	builder.Add(4, 5) // [(◄4) 5]
 
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
-	blocksAddedFirst := blocks[:3]    // [(◄1) 2] [(◄2) 3] [(◄3) 4]
-	remainingBlock := blocks[3].Block // [(◄4) 5]
 
 	t.Run("ingest proposals", func(t *testing.T) {
+		blocksAddedFirst := blocks[:3]    // [(◄1) 2] [(◄2) 3] [(◄3) 4]
+		remainingBlock := blocks[3].Block // [(◄4) 5]
 		forks, _ := newForks(t)
 
 		// should be unable to retrieve a block before it is added
 		_, ok := forks.GetBlock(blocks[0].Block.BlockID)
 		assert.False(t, ok)
 
-		// add first blocks - should finalize [(◄1) 2]
+		// add first 3 blocks - should finalize [(◄1) 2]
 		err = addProposalsToForks(forks, blocksAddedFirst)
 		require.Nil(t, err)
 
 		// should be able to retrieve all stored blocks
 		for _, proposal := range blocksAddedFirst {
-			got, ok := forks.GetBlock(proposal.Block.BlockID)
+			b, ok := forks.GetBlock(proposal.Block.BlockID)
 			assert.True(t, ok)
-			assert.Equal(t, proposal.Block, got)
+			assert.Equal(t, proposal.Block, b)
 		}
 
 		// add remaining block [(◄4) 5] - should finalize [(◄2) 3] and prune [(◄1) 2]
 		require.Nil(t, forks.AddProposal(remainingBlock))
 
 		// should be able to retrieve just added block
-		got, ok := forks.GetBlock(remainingBlock.BlockID)
+		b, ok := forks.GetBlock(remainingBlock.BlockID)
 		assert.True(t, ok)
-		assert.Equal(t, remainingBlock, got)
+		assert.Equal(t, remainingBlock, b)
 
 		// should be unable to retrieve pruned block
 		_, ok = forks.GetBlock(blocksAddedFirst[0].Block.BlockID)
 		assert.False(t, ok)
 	})
 
+	// Caution: finalization is driven by QCs. Therefore, we include the QC for block 3
+	// in the first batch of blocks that we add. This is analogous to previous test case,
+	// except that we are delivering the QC (◄3) as part of the certified block of view 2
+	//   [(◄2) 3] (◄3)
+	// while in the previous sub-test, the QC (◄3) was delivered as part of block [(◄3) 4]
 	t.Run("ingest certified blocks", func(t *testing.T) {
+		blocksAddedFirst := toCertifiedBlocks(t, toBlocks(blocks[:2])...) // [(◄1) 2] [(◄2) 3] (◄3)
+		remainingBlock := toCertifiedBlock(t, blocks[2].Block)            // [(◄3) 4] (◄4)
 		forks, _ := newForks(t)
 
 		// should be unable to retrieve a block before it is added
@@ -528,27 +535,25 @@ func TestGetProposal(t *testing.T) {
 		assert.False(t, ok)
 
 		// add first blocks - should finalize [(◄1) 2]
-		err := forks.AddCertifiedBlock(toCertifiedBlock(t, blocksAddedFirst[0].Block))
+		err := forks.AddCertifiedBlock(blocksAddedFirst[0])
 		require.Nil(t, err)
-		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocksAddedFirst[1].Block))
-		require.Nil(t, err)
-		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocksAddedFirst[2].Block))
+		err = forks.AddCertifiedBlock(blocksAddedFirst[1])
 		require.Nil(t, err)
 
 		// should be able to retrieve all stored blocks
 		for _, proposal := range blocksAddedFirst {
-			got, ok := forks.GetBlock(proposal.Block.BlockID)
+			b, ok := forks.GetBlock(proposal.Block.BlockID)
 			assert.True(t, ok)
-			assert.Equal(t, proposal.Block, got)
+			assert.Equal(t, proposal.Block, b)
 		}
 
 		// add remaining block [(◄4) 5] - should finalize [(◄2) 3] and prune [(◄1) 2]
-		require.Nil(t, forks.AddCertifiedBlock(toCertifiedBlock(t, remainingBlock)))
+		require.Nil(t, forks.AddCertifiedBlock(remainingBlock))
 
 		// should be able to retrieve just added block
-		got, ok := forks.GetBlock(remainingBlock.BlockID)
+		b, ok := forks.GetBlock(remainingBlock.Block.BlockID)
 		assert.True(t, ok)
-		assert.Equal(t, remainingBlock, got)
+		assert.Equal(t, remainingBlock.Block, b)
 
 		// should be unable to retrieve pruned block
 		_, ok = forks.GetBlock(blocksAddedFirst[0].Block.BlockID)
@@ -639,9 +644,7 @@ func TestNotification(t *testing.T) {
 
 		forks, err := NewForks2(builder.GenesisBlock(), finalizationCallback, notifier)
 		require.NoError(t, err)
-
-		err = addProposalsToForks(forks, blocks)
-		require.NoError(t, err)
+		require.NoError(t, addProposalsToForks(forks, blocks))
 	})
 
 	t.Run("ingest certified blocks", func(t *testing.T) {
@@ -654,13 +657,7 @@ func TestNotification(t *testing.T) {
 
 		forks, err := NewForks2(builder.GenesisBlock(), finalizationCallback, notifier)
 		require.NoError(t, err)
-
-		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[0].Block))
-		require.Nil(t, err)
-		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[1].Block))
-		require.Nil(t, err)
-		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[2].Block))
-		require.Nil(t, err)
+		require.NoError(t, addCertifiedBlocksToForks(forks, blocks))
 	})
 }
 
@@ -766,7 +763,7 @@ func requireLatestFinalizedBlock(t *testing.T, forks *Forks2, qcView int, view i
 func requireNoBlocksFinalized(t *testing.T, forks *Forks2) {
 	genesis := makeGenesis()
 	require.Equal(t, forks.FinalizedBlock().View, genesis.Block.View)
-	require.Equal(t, forks.FinalizedBlock().View, genesis.QC.View)
+	require.Equal(t, forks.FinalizedBlock().View, genesis.CertifyingQC.View)
 }
 
 // toBlocks converts the given proposals to slice of blocks
@@ -788,4 +785,13 @@ func toCertifiedBlock(t *testing.T, block *model.Block) *model.CertifiedBlock {
 	cb, err := model.NewCertifiedBlock(block, qc)
 	require.Nil(t, err)
 	return &cb
+}
+
+// toCertifiedBlocks generates a QC for the given block and returns their combination as a certified blocks
+func toCertifiedBlocks(t *testing.T, blocks ...*model.Block) []*model.CertifiedBlock {
+	certBlocks := make([]*model.CertifiedBlock, 0, len(blocks))
+	for _, b := range blocks {
+		certBlocks = append(certBlocks, toCertifiedBlock(t, b))
+	}
+	return certBlocks
 }

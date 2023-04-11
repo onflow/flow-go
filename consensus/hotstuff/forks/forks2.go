@@ -44,7 +44,7 @@ type Forks2 struct {
 // var _ hotstuff.Forks = (*Forks2)(nil)
 
 func NewForks2(trustedRoot *model.CertifiedBlock, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Forks2, error) {
-	if (trustedRoot.Block.BlockID != trustedRoot.QC.BlockID) || (trustedRoot.Block.View != trustedRoot.QC.View) {
+	if (trustedRoot.Block.BlockID != trustedRoot.CertifyingQC.BlockID) || (trustedRoot.Block.View != trustedRoot.CertifyingQC.View) {
 		return nil, model.NewConfigurationErrorf("invalid root: root QC is not pointing to root block")
 	}
 
@@ -286,6 +286,10 @@ func (f *Forks2) UnverifiedAddCertifiedBlock(certifiedBlock *model.CertifiedBloc
 	err := f.store(certifiedBlock.Block)
 	if err != nil {
 		return fmt.Errorf("storing block %v in Forks failed %w", certifiedBlock.Block.BlockID, err)
+	}
+	err = f.checkForConflictingQCs(certifiedBlock.CertifyingQC)
+	if err != nil {
+		return fmt.Errorf("certifying QC for block %v failed check for conflicts: %w", certifiedBlock.Block.BlockID, err)
 	}
 
 	err = f.checkForAdvancingFinalization(certifiedBlock)

@@ -42,16 +42,17 @@ func NewBlockBuilder() *BlockBuilder {
 	}
 }
 
-// Add adds a block with the given qcView and blockView.
-func (f *BlockBuilder) Add(qcView uint64, blockView uint64) {
-	f.blockViews = append(f.blockViews, &BlockView{
+// Add adds a block with the given qcView and blockView. Returns self-reference for chaining.
+func (bb *BlockBuilder) Add(qcView uint64, blockView uint64) *BlockBuilder {
+	bb.blockViews = append(bb.blockViews, &BlockView{
 		View:   blockView,
 		QCView: qcView,
 	})
+	return bb
 }
 
 // GenesisBlock returns the genesis block, which is always finalized.
-func (f *BlockBuilder) GenesisBlock() *model.CertifiedBlock {
+func (bb *BlockBuilder) GenesisBlock() *model.CertifiedBlock {
 	return makeGenesis()
 }
 
@@ -63,30 +64,32 @@ func (f *BlockBuilder) GenesisBlock() *model.CertifiedBlock {
 // [(◄3) 4'] denotes a block of view 4 that is different than [(◄3) 4], with a qc for view 3
 // [(◄3) 4'] can be created by AddVersioned(3, 4, 0, 1)
 // [(◄3') 4] can be created by AddVersioned(3, 4, 1, 0)
-func (f *BlockBuilder) AddVersioned(qcView uint64, blockView uint64, qcVersion int, blockVersion int) {
-	f.blockViews = append(f.blockViews, &BlockView{
+// Returns self-reference for chaining.
+func (bb *BlockBuilder) AddVersioned(qcView uint64, blockView uint64, qcVersion int, blockVersion int) *BlockBuilder {
+	bb.blockViews = append(bb.blockViews, &BlockView{
 		View:         blockView,
 		QCView:       qcView,
 		BlockVersion: blockVersion,
 		QCVersion:    qcVersion,
 	})
+	return bb
 }
 
 // Blocks returns a list of all blocks added to the BlockBuilder.
 // Returns an error if the blocks do not form a connected tree rooted at genesis.
-func (f *BlockBuilder) Blocks() ([]*model.Proposal, error) {
-	blocks := make([]*model.Proposal, 0, len(f.blockViews))
+func (bb *BlockBuilder) Blocks() ([]*model.Proposal, error) {
+	blocks := make([]*model.Proposal, 0, len(bb.blockViews))
 
 	genesisBlock := makeGenesis()
 	genesisBV := &BlockView{
 		View:   genesisBlock.Block.View,
-		QCView: genesisBlock.QC.View,
+		QCView: genesisBlock.CertifyingQC.View,
 	}
 
 	qcs := make(map[string]*flow.QuorumCertificate)
-	qcs[genesisBV.QCIndex()] = genesisBlock.QC
+	qcs[genesisBV.QCIndex()] = genesisBlock.CertifyingQC
 
-	for _, bv := range f.blockViews {
+	for _, bv := range bb.blockViews {
 		qc, ok := qcs[bv.QCIndex()]
 		if !ok {
 			return nil, fmt.Errorf("test fail: no qc found for qc index: %v", bv.QCIndex())
