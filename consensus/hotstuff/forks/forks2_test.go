@@ -15,11 +15,11 @@ import (
 )
 
 // NOTATION:
-// A block is denoted as [<qc_number>, <block_view_number>].
-// For example, [1,2] means: a block of view 2 has a QC for view 1.
+// A block is denoted as [(◄<qc_number>) <block_view_number>].
+// For example, [(◄1) 2] means: a block of view 2 that has a QC for view 1.
 
 // TestFinalize_Direct1Chain tests adding a direct 1-chain.
-// receives [1,2] [2,3]
+// receives [(◄1) 2] [(◄2) 3]
 // it should not finalize any block because there is no finalizable 2-chain.
 func TestFinalize_Direct1Chain(t *testing.T) {
 	builder := NewBlockBuilder()
@@ -38,8 +38,8 @@ func TestFinalize_Direct1Chain(t *testing.T) {
 }
 
 // TestFinalize_Direct2Chain tests adding a direct 1-chain on a direct 1-chain (direct 2-chain).
-// receives [1,2] [2,3] [3,4]
-// it should finalize [1,2]
+// receives [(◄1) 2] [(◄2) 3] [(◄3) 4]
+// it should finalize [(◄1) 2]
 func TestFinalize_Direct2Chain(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
@@ -58,8 +58,8 @@ func TestFinalize_Direct2Chain(t *testing.T) {
 }
 
 // TestFinalize_DirectIndirect2Chain tests adding an indirect 1-chain on a direct 1-chain.
-// receives [1,2] [2,3] [3,5]
-// it should finalize [1,2]
+// receives [(◄1) 2] [(◄2) 3] [(◄3) 5]
+// it should finalize [(◄1) 2]
 func TestFinalize_DirectIndirect2Chain(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
@@ -78,7 +78,7 @@ func TestFinalize_DirectIndirect2Chain(t *testing.T) {
 }
 
 // TestFinalize_IndirectDirect2Chain tests adding a direct 1-chain on an indirect 1-chain.
-// receives [1,2] [2,4] [4,5]
+// receives [(◄1) 2] [(◄2) 4] [(◄4) 5]
 // it should not finalize any blocks because there is no finalizable 2-chain.
 func TestFinalize_IndirectDirect2Chain(t *testing.T) {
 	builder := NewBlockBuilder()
@@ -99,8 +99,8 @@ func TestFinalize_IndirectDirect2Chain(t *testing.T) {
 
 // TestFinalize_Direct2ChainOnIndirect tests adding a direct 2-chain on an indirect 2-chain.
 // The head of highest 2-chain should be finalized.
-// receives [1,3] [3,5] [5,6] [6,7] [7,8]
-// it should finalize [5,6]
+// receives [(◄1) 3] [(◄3) 5] [(◄5) 6] [(◄6) 7] [(◄7) 8]
+// it should finalize [(◄5) 6]
 func TestFinalize_Direct2ChainOnIndirect(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 3)
@@ -122,8 +122,8 @@ func TestFinalize_Direct2ChainOnIndirect(t *testing.T) {
 
 // TestFinalize_Direct2ChainOnDirect tests adding a sequence of direct 2-chains.
 // The head of highest 2-chain should be finalized.
-// receives [1,2] [2,3] [3,4] [4,5] [5,6]
-// it should finalize [3,4]
+// receives [(◄1) 2] [(◄2) 3] [(◄3) 4] [(◄4) 5] [(◄5) 6]
+// it should finalize [(◄3) 4]
 func TestFinalize_Direct2ChainOnDirect(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
@@ -145,8 +145,8 @@ func TestFinalize_Direct2ChainOnDirect(t *testing.T) {
 
 // TestFinalize_Multiple2Chains tests the case where a block can be finalized
 // by different 2-chains.
-// receives [1,2] [2,3] [3,5] [3,6] [3,7]
-// it should finalize [1,2]
+// receives [(◄1) 2] [(◄2) 3] [(◄3) 5] [(◄3) 6] [(◄3) 7]
+// it should finalize [(◄1) 2]
 func TestFinalize_Multiple2Chains(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
@@ -168,8 +168,8 @@ func TestFinalize_Multiple2Chains(t *testing.T) {
 
 // TestFinalize_OrphanedFork tests that we can finalize a block which causes
 // a conflicting fork to be orphaned.
-// receives [1,2] [2,3] [2,4] [4,5] [5,6]
-// it should finalize [2,4]
+// receives [(◄1) 2] [(◄2) 3] [(◄2) 4] [(◄4) 5] [(◄5) 6]
+// it should finalize [(◄2) 4]
 func TestFinalize_OrphanedFork(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
@@ -191,8 +191,8 @@ func TestFinalize_OrphanedFork(t *testing.T) {
 
 // TestDuplication tests that delivering the same block/qc multiple times has
 // the same end state as delivering the block/qc once.
-// receives [1,2] [2,3] [2,3] [3,4] [3,4] [4,5] [4,5]
-// it should finalize [2,3]
+// receives [(◄1) 2] [(◄2) 3] [(◄2) 3] [(◄3) 4] [(◄3) 4] [(◄4) 5] [(◄4) 5]
+// it should finalize [(◄2) 3]
 func TestDuplication(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
@@ -215,8 +215,8 @@ func TestDuplication(t *testing.T) {
 }
 
 // TestIgnoreBlocksBelowFinalizedView tests that blocks below finalized view are ignored.
-// receives [1,2] [2,3] [3,4] [1,5]
-// it should finalize [1,2]
+// receives [(◄1) 2] [(◄2) 3] [(◄3) 4] [(◄1) 5]
+// it should finalize [(◄1) 2]
 func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
@@ -236,9 +236,14 @@ func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 }
 
 // TestDoubleProposal tests that the DoubleProposal notification is emitted when two different
-// proposals for the same view are added.
-// receives [1,2] [2,3] [3,4] [4,5] [3,5']
-// it should finalize block [2,3], and emits an DoubleProposal event with ([3,5'], [4,5])
+// proposals for the same view are added. We ingest the the following block tree:
+//
+//	[(◄1) 2] [(◄2) 3] [(◄3) 4] [(◄4) 5]
+//	                           [(◄3) 5']
+//
+// which should result in:
+//   - finalize block [(◄2) 3]
+//   - emit a DoubleProposal event with referencing the blocks [(◄3) 5'] and [(◄4) 5])
 func TestDoubleProposal(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
@@ -260,8 +265,12 @@ func TestDoubleProposal(t *testing.T) {
 }
 
 // TestConflictingQCs checks that adding 2 conflicting QCs should return model.ByzantineThresholdExceededError
-// receives [1,2] [2,3] [2,3'] [3,4] [3',5]
-// it should return fatal error, because conflicting blocks 3 and 3' both received enough votes for QC
+// We ingest the the following block tree:
+//
+//	[(◄1) 2] [(◄2) 3]   [(◄3) 4]
+//	         [(◄2) 3']  [(◄3') 5]
+//
+// which should result in a `ByzantineThresholdExceededError`, because conflicting blocks 3 and 3' both have QCs
 func TestConflictingQCs(t *testing.T) {
 	builder := NewBlockBuilder()
 
@@ -283,7 +292,7 @@ func TestConflictingQCs(t *testing.T) {
 }
 
 // TestConflictingFinalizedForks checks that finalizing 2 conflicting forks should return model.ByzantineThresholdExceededError
-// receives [1,2] [2,3] [2,6] [3,4] [4,5] [6,7] [7,8]
+// receives [(◄1) 2] [(◄2) 3] [(◄2) 6] [(◄3) 4] [(◄4) 5] [(◄6) 7] [(◄7) 8]
 // It should return fatal error, because 2 conflicting forks were finalized
 func TestConflictingFinalizedForks(t *testing.T) {
 	builder := NewBlockBuilder()
@@ -307,7 +316,7 @@ func TestConflictingFinalizedForks(t *testing.T) {
 
 // TestAddUnconnectedProposal checks that adding a proposal which does not connect to the
 // latest finalized block returns an exception.
-// receives [2,3]
+// receives [(◄2) 3]
 // should return fatal error, because the proposal is invalid for addition to Forks
 func TestAddUnconnectedProposal(t *testing.T) {
 	unconnectedProposal := helper.MakeProposal(
@@ -325,8 +334,8 @@ func TestAddUnconnectedProposal(t *testing.T) {
 
 // TestGetProposal tests that we can retrieve stored proposals.
 // Attempting to retrieve nonexistent or pruned proposals should fail.
-// receives [1,2] [2,3] [3,4], then [4,5]
-// should finalize [1,2], then [2,3]
+// receives [(◄1) 2] [(◄2) 3] [(◄3) 4], then [(◄4) 5]
+// should finalize [(◄1) 2], then [(◄2) 3]
 func TestGetProposal(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
@@ -336,8 +345,8 @@ func TestGetProposal(t *testing.T) {
 
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
-	blocksAddedFirst := blocks[:3]  // [1,2] [2,3] [3,4]
-	blocksAddedSecond := blocks[3:] // [4,5]
+	blocksAddedFirst := blocks[:3]  // [(◄1) 2] [(◄2) 3] [(◄3) 4]
+	blocksAddedSecond := blocks[3:] // [(◄4) 5]
 
 	forks, _ := newForks(t)
 
@@ -345,7 +354,7 @@ func TestGetProposal(t *testing.T) {
 	_, ok := forks.GetBlock(blocks[0].Block.BlockID)
 	assert.False(t, ok)
 
-	// add first blocks - should finalize [1,2]
+	// add first blocks - should finalize [(◄1) 2]
 	err = addBlocksToForks(forks, blocksAddedFirst)
 	require.Nil(t, err)
 
@@ -356,7 +365,7 @@ func TestGetProposal(t *testing.T) {
 		assert.Equal(t, proposal, got)
 	}
 
-	// add second blocks - should finalize [2,3] and prune [1,2]
+	// add second blocks - should finalize [(◄2) 3] and prune [(◄1) 2]
 	err = addBlocksToForks(forks, blocksAddedSecond)
 	require.Nil(t, err)
 
@@ -371,7 +380,7 @@ func TestGetProposal(t *testing.T) {
 }
 
 // TestGetProposalsForView tests retrieving proposals for a view.
-// receives [1,2] [2,4] [2,4']
+// receives [(◄1) 2] [(◄2) 4] [(◄2) 4']
 func TestGetProposalsForView(t *testing.T) {
 
 	builder := NewBlockBuilder()
@@ -404,8 +413,8 @@ func TestGetProposalsForView(t *testing.T) {
 }
 
 // TestNotification tests that notifier gets correct notifications when incorporating block as well as finalization events.
-// receives [1,2] [2,3] [3,4]
-// should finalize [1,2]
+// receives [(◄1) 2] [(◄2) 3] [(◄3) 4]
+// should finalize [(◄1) 2]
 func TestNotification(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
@@ -432,7 +441,7 @@ func TestNotification(t *testing.T) {
 }
 
 // TestNewestView tests that Forks tracks the newest block view seen in received blocks.
-// receives [1,2] [2,3] [3,4]
+// receives [(◄1) 2] [(◄2) 3] [(◄3) 4]
 func TestNewestView(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)

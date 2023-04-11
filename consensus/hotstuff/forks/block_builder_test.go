@@ -59,10 +59,10 @@ func (f *BlockBuilder) GenesisBlock() *model.CertifiedBlock {
 // In addition, the version identifier of the QC embedded within the block
 // is specified by `qcVersion`. The version identifier for the block itself
 // (primarily for emulating different payloads) is specified by `blockVersion`.
-// [3,4] denotes a block of view 4, with a qc of view 3
-// [3,4'] denotes a block of view 4, with a qc of view 3, but has a different BlockID than [3,4]
-// [3,4'] can be created by AddVersioned(3, 4, 0, 1)
-// [3',4] can be created by AddVersioned(3, 4, 1, 0)
+// [(◄3) 4] denotes a block of view 4, with a qc for view 3
+// [(◄3) 4'] denotes a block of view 4 that is different than [(◄3) 4], with a qc for view 3
+// [(◄3) 4'] can be created by AddVersioned(3, 4, 0, 1)
+// [(◄3') 4] can be created by AddVersioned(3, 4, 1, 0)
 func (f *BlockBuilder) AddVersioned(qcView uint64, blockView uint64, qcVersion int, blockVersion int) {
 	f.blockViews = append(f.blockViews, &BlockView{
 		View:         blockView,
