@@ -31,6 +31,9 @@ jobs:
       - self-hosted
       - flow-bn2
     steps:
+      - name: Print all input variables
+        run: echo '${{ toJson(inputs) }}' | jq
+
       - name: Checkout
         uses: actions/checkout@v2
         with:
