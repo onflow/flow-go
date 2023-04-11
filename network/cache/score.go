@@ -92,12 +92,12 @@ func (a *GossipSubSpamRecordCache) Add(peerId peer.ID, record GossipSubSpamRecor
 // The order of the pre-processing functions is the same as the order in which they were added to the cache.
 // Args:
 // - peerID: the peer ID of the peer in the GossipSub protocol.
-// - updateFn: the update function to be applied to the record.
+// - adjustFn: the adjust function to be applied to the record.
 // Returns:
 // - *GossipSubSpamRecord: the updated record.
 // - error on failure to update the record. The returned error is irrecoverable and the caller should crash the node.
 // Note that if any of the pre-processing functions returns an error, the record is reverted to its original state (prior to applying the update function).
-func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn func(record GossipSubSpamRecord) GossipSubSpamRecord) (*GossipSubSpamRecord, error) {
+func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, adjustFn func(record GossipSubSpamRecord) GossipSubSpamRecord) (*GossipSubSpamRecord, error) {
 	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the record.
 	if !a.c.Has(entityId) {
 		return nil, fmt.Errorf("could not adjust spam records for peer %s, record not found", peerID.String())
@@ -118,7 +118,7 @@ func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn func(record G
 		}
 
 		// apply the update function to the record.
-		e.GossipSubSpamRecord = updateFn(e.GossipSubSpamRecord)
+		e.GossipSubSpamRecord = adjustFn(e.GossipSubSpamRecord)
 
 		if e.GossipSubSpamRecord != currentRecord {
 			e.lastUpdated = time.Now()
