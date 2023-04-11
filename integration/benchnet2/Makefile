@@ -29,7 +29,7 @@ endif
 gen-bootstrap: validate
 	make crypto_setup_gopath
 	cd cmd/bootstrap && go run -tags relic . genconfig --address-format "%s%d-${NETWORK_ID}.${NAMESPACE}:3569" --access $(ACCESS) --collection $(COLLECTION) --consensus $(CONSENSUS) --execution $(EXECUTION) --verification $(VERIFICATION) --weight 100 -o ./ --config ../../../bootstrap/conf/node-config.json
-	cd /cmd/bootstrap && go run -tags relic . keygen --machine-account --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/keys
+	cd cmd/bootstrap && go run -tags relic . keygen --machine-account --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/keys
 	echo {} > ./bootstrap/conf/partner-stakes.json
 	mkdir ./bootstrap/partner-nodes
 	cd cmd/bootstrap && go run -tags relic . rootblock  --root-chain bench --root-height 0 --root-parent 0000000000000000000000000000000000000000000000000000000000000000 --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/ --fast-kg --partner-dir ../../../bootstrap/partner-nodes --partner-weights ../../../bootstrap/conf/partner-stakes.json --internal-priv-dir ../../../bootstrap/keys/private-root-information
