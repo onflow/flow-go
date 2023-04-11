@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/stretchr/testify/suite"
+	"time"
 )
 
 import (
@@ -53,24 +54,27 @@ import (
 
 type Suite struct {
 	suite.Suite
-	state                *protocol.State
-	snapshot             *protocol.Snapshot
-	epochQuery           *protocol.EpochQuery
-	params               *protocol.Params
-	signerIndicesDecoder *hsmock.BlockSignerDecoder
-	signerIds            flow.IdentifierList
-	log                  zerolog.Logger
-	net                  *mocknetwork.Network
-	request              *module.Requester
-	collClient           *accessmock.AccessAPIClient
-	execClient           *accessmock.ExecutionAPIClient
-	me                   *module.Local
-	rootBlock            *flow.Header
-	finalizedBlock       *flow.Header
-	chainID              flow.ChainID
-	metrics              *metrics.NoopCollector
-	backend              *backend.Backend
-	finalizedHeaderCache *synceng.FinalizedHeaderCache
+	state                   *protocol.State
+	sealedSnapshot          *protocol.Snapshot
+	finalSnapshot           *protocol.Snapshot
+	epochQuery              *protocol.EpochQuery
+	params                  *protocol.Params
+	signerIndicesDecoder    *hsmock.BlockSignerDecoder
+	signerIds               flow.IdentifierList
+	log                     zerolog.Logger
+	net                     *mocknetwork.Network
+	request                 *module.Requester
+	collClient              *accessmock.AccessAPIClient
+	execClient              *accessmock.ExecutionAPIClient
+	me                      *module.Local
+	rootBlock               *flow.Header
+	sealedBlock             *flow.Header
+	finalizedBlock          *flow.Header
+	chainID                 flow.ChainID
+	metrics                 *metrics.NoopCollector
+	backend                 *backend.Backend
+	finalizationDistributor *pubsub.FinalizationDistributor
+	finalizedHeaderCache    *synceng.FinalizedHeaderCache
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -83,16 +87,24 @@ func (suite *Suite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr)
 	suite.net = new(mocknetwork.Network)
 	suite.state = new(protocol.State)
-	suite.snapshot = new(protocol.Snapshot)
+	suite.finalSnapshot = new(protocol.Snapshot)
+	suite.sealedSnapshot = new(protocol.Snapshot)
 
 	suite.rootBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
-	suite.finalizedBlock = unittest.BlockHeaderWithParentFixture(suite.rootBlock)
+	suite.sealedBlock = suite.rootBlock
+	suite.finalizedBlock = unittest.BlockHeaderWithParentFixture(suite.sealedBlock)
 
 	suite.epochQuery = new(protocol.EpochQuery)
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
-	suite.snapshot.On("Head").Return(
+	suite.state.On("Sealed").Return(suite.sealedSnapshot, nil).Maybe()
+	suite.state.On("Final").Return(suite.finalSnapshot, nil).Maybe()
+	suite.finalSnapshot.On("Epochs").Return(suite.epochQuery).Maybe()
+	suite.sealedSnapshot.On("Head").Return(
+		func() *flow.Header {
+			return suite.sealedBlock
+		},
+		nil,
+	).Maybe()
+	suite.finalSnapshot.On("Head").Return(
 		func() *flow.Header {
 			return suite.finalizedBlock
 		},
@@ -122,7 +134,15 @@ func (suite *Suite) SetupTest() {
 
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
-	suite.finalizedHeaderCache, _ = synceng.NewFinalizedHeaderCache(suite.log, suite.state, pubsub.NewFinalizationDistributor())
+
+	suite.finalizationDistributor = pubsub.NewFinalizationDistributor()
+	suite.finalizedHeaderCache, _ = synceng.NewFinalizedHeaderCache(suite.log, suite.state, suite.finalizationDistributor)
+
+	unittest.RequireCloseBefore(suite.T(), suite.finalizedHeaderCache.Ready(), time.Second, "expect to start before timeout")
+}
+
+func (suite *Suite) TearDownTest() {
+	unittest.RequireCloseBefore(suite.T(), suite.finalizedHeaderCache.Done(), time.Second, "expect to stop before timeout")
 }
 
 func (suite *Suite) RunTest(
@@ -172,7 +192,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 			Return(referenceBlock, nil).
 			Twice()
 
-		suite.snapshot.
+		suite.finalSnapshot.
 			On("Head").
 			Return(referenceBlock, nil).
 			Once()
@@ -210,14 +230,13 @@ func (suite *Suite) TestSendAndGetTransaction() {
 
 func (suite *Suite) TestSendExpiredTransaction() {
 	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.All) {
-		referenceBlock := unittest.BlockHeaderFixture()
-
-		// create latest block that is past the expiry window
-		latestBlock := unittest.BlockHeaderFixture()
-		latestBlock.Height = referenceBlock.Height + flow.DefaultTransactionExpiry*2
+		referenceBlock := suite.finalizedBlock
 
 		transaction := unittest.TransactionFixture()
 		transaction.SetReferenceBlockID(referenceBlock.ID())
+		// create latest block that is past the expiry window
+		latestBlock := unittest.BlockHeaderFixture()
+		latestBlock.Height = referenceBlock.Height + flow.DefaultTransactionExpiry*2
 
 		refSnapshot := new(protocol.Snapshot)
 
@@ -230,10 +249,8 @@ func (suite *Suite) TestSendExpiredTransaction() {
 			Return(referenceBlock, nil).
 			Twice()
 
-		suite.snapshot.
-			On("Head").
-			Return(latestBlock, nil).
-			Once()
+		//Advancing final state to expire ref block
+		suite.finalizedBlock = latestBlock
 
 		req := &accessproto.SendTransactionRequest{
 			Transaction: convert.TransactionToMessage(transaction.TransactionBody),
@@ -258,9 +275,9 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		transaction := unittest.TransactionFixture()
 		transaction.SetReferenceBlockID(referenceBlock.ID())
 
-		// setup the state and snapshot mock expectations
-		suite.state.On("AtBlockID", referenceBlock.ID()).Return(suite.snapshot, nil)
-		suite.snapshot.On("Head").Return(referenceBlock, nil)
+		// setup the state and finalSnapshot mock expectations
+		suite.state.On("AtBlockID", referenceBlock.ID()).Return(suite.finalSnapshot, nil)
+		suite.finalSnapshot.On("Head").Return(referenceBlock, nil)
 
 		// create storage
 		metrics := metrics.NewNoopCollector()
@@ -409,7 +426,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.Equal(suite.T(), expectedMessage, actual)
 		}
 
-		suite.snapshot.On("Head").Return(block1.Header, nil)
+		suite.finalSnapshot.On("Head").Return(block1.Header, nil)
 		suite.Run("get header 1 by ID", func() {
 			// get header by ID
 			id := block1.ID()
@@ -572,7 +589,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-		enNodeIDs := flow.IdentifierList(enIdentities.NodeIDs())
+		enNodeIDs := enIdentities.NodeIDs()
 
 		// create block -> collection -> transactions
 		block, collection := suite.createChain()
@@ -584,19 +601,17 @@ func (suite *Suite) TestGetSealedTransaction() {
 			Once()
 		suite.request.On("Request", mock.Anything, mock.Anything).Return()
 
-		suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 		allIdentities := append(colIdentities, enIdentities...)
 
-		suite.snapshot.On("Identities", mock.Anything).Return(allIdentities, nil).Once()
+		suite.finalSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil).Once()
 
 		exeEventResp := execproto.GetTransactionResultResponse{
 			Events: nil,
 		}
 
 		// generate receipts
-		executionReceipts := unittest.ReceiptsForBlockFixture(&block, enNodeIDs)
+		executionReceipts := unittest.ReceiptsForBlockFixture(block, enNodeIDs)
 
 		// assume execution node returns an empty list of events
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&exeEventResp, nil)
@@ -650,9 +665,9 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
-		err = all.Blocks.Store(&block)
+		err = all.Blocks.Store(block)
 		require.NoError(suite.T(), err)
-		suite.snapshot.On("Head").Return(block.Header, nil).Twice()
+		suite.sealedBlock = block.Header
 
 		background, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -670,9 +685,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// 3. Request engine is used to request missing collection
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
-
 		// 4. Ingest engine receives the requested collection and all the execution receipts
-		ingestEng.OnCollection(originID, &collection)
+		ingestEng.OnCollection(originID, collection)
 
 		for _, r := range executionReceipts {
 			err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
@@ -703,7 +717,8 @@ func (suite *Suite) TestExecuteScript() {
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
 
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-		suite.snapshot.On("Identities", mock.Anything).Return(identities, nil)
+		suite.sealedSnapshot.On("Identities", mock.Anything).Return(identities, nil)
+		suite.finalSnapshot.On("Identities", mock.Anything).Return(identities, nil)
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
@@ -748,33 +763,32 @@ func (suite *Suite) TestExecuteScript() {
 			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil)
 		require.NoError(suite.T(), err)
 
+		// create another block as a predecessor of the block created earlier
+		prevBlock := unittest.BlockWithParentFixture(suite.finalizedBlock)
+
 		// create a block and a seal pointing to that block
-		lastBlock := unittest.BlockFixture()
-		lastBlock.Header.Height = 2
-		err = all.Blocks.Store(&lastBlock)
+		lastBlock := unittest.BlockWithParentFixture(prevBlock.Header)
+		err = all.Blocks.Store(lastBlock)
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
-		suite.snapshot.On("Head").Return(lastBlock.Header, nil).Once()
-
+		//update latest sealed block
+		suite.sealedBlock = lastBlock.Header
 		// create execution receipts for each of the execution node and the last block
-		executionReceipts := unittest.ReceiptsForBlockFixture(&lastBlock, identities.NodeIDs())
+		executionReceipts := unittest.ReceiptsForBlockFixture(lastBlock, identities.NodeIDs())
 		// notify the ingest engine about the receipts
 		for _, r := range executionReceipts {
 			err = ingestEng.ProcessLocal(r)
 			require.NoError(suite.T(), err)
 		}
 
-		// create another block as a predecessor of the block created earlier
-		prevBlock := unittest.BlockFixture()
-		prevBlock.Header.Height = lastBlock.Header.Height - 1
-		err = all.Blocks.Store(&prevBlock)
+		err = all.Blocks.Store(prevBlock)
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
 		require.NoError(suite.T(), err)
 
 		// create execution receipts for each of the execution node and the previous block
-		executionReceipts = unittest.ReceiptsForBlockFixture(&prevBlock, identities.NodeIDs())
+		executionReceipts = unittest.ReceiptsForBlockFixture(prevBlock, identities.NodeIDs())
 		// notify the ingest engine about the receipts
 		for _, r := range executionReceipts {
 			err = ingestEng.ProcessLocal(r)
@@ -811,10 +825,9 @@ func (suite *Suite) TestExecuteScript() {
 		}
 
 		suite.Run("execute script at latest block", func() {
-			suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 			suite.state.
 				On("AtBlockID", lastBlock.ID()).
-				Return(suite.snapshot, nil)
+				Return(suite.sealedSnapshot, nil)
 
 			expectedResp := setupExecClientMock(lastBlock.ID())
 			req := accessproto.ExecuteScriptAtLatestBlockRequest{
@@ -827,7 +840,7 @@ func (suite *Suite) TestExecuteScript() {
 		suite.Run("execute script at block id", func() {
 			suite.state.
 				On("AtBlockID", prevBlock.ID()).
-				Return(suite.snapshot, nil)
+				Return(suite.sealedSnapshot, nil)
 
 			expectedResp := setupExecClientMock(prevBlock.ID())
 			id := prevBlock.ID()
@@ -842,7 +855,7 @@ func (suite *Suite) TestExecuteScript() {
 		suite.Run("execute script at block height", func() {
 			suite.state.
 				On("AtBlockID", prevBlock.ID()).
-				Return(suite.snapshot, nil)
+				Return(suite.sealedSnapshot, nil)
 
 			expectedResp := setupExecClientMock(prevBlock.ID())
 			req := accessproto.ExecuteScriptAtBlockHeightRequest{
@@ -855,8 +868,8 @@ func (suite *Suite) TestExecuteScript() {
 	})
 }
 
-// TestRpcEngineBuilderWithFinalizedHeaderCache tests the RpcEngineBuilder's WithFinalizedHeaderCache method to ensure
-// that the RPC engine is constructed correctly with the provided finalized header cache.
+// TestRpcEngineBuilderWithFinalizedHeaderCache test checks whether the RPC builder can construct the engine correctly
+// only when the WithFinalizedHeaderCache method has been called.
 func (suite *Suite) TestRpcEngineBuilderWithFinalizedHeaderCache() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 		all := util.StorageLayer(suite.T(), db)
@@ -881,57 +894,50 @@ func (suite *Suite) TestRpcEngineBuilderWithFinalizedHeaderCache() {
 	})
 }
 
+// TestLastFinalizedBlockHeightResult test checks whether the response from a GetBlockHeaderByID request contains
+// the finalized block height and ID even when the finalized block height has been changed.
 func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
-		// test block1 get by ID
-		block1 := unittest.BlockFixture()
-		// test block2 get by height
-		block2 := unittest.BlockFixture()
-		block2.Header.Height = 2
+		block := unittest.BlockWithParentFixture(suite.finalizedBlock)
+		newFinalizedBlock := unittest.BlockWithParentFixture(block.Header)
 
-		require.NoError(suite.T(), all.Blocks.Store(&block1))
-		require.NoError(suite.T(), all.Blocks.Store(&block2))
-
-		// the follower logic should update height index on the block storage when a block is finalized
-		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
-		require.NoError(suite.T(), err)
-
-		suite.snapshot.On("Head").Return(block1.Header, nil)
+		// store new block
+		require.NoError(suite.T(), all.Blocks.Store(block))
 
 		assertFinalizedBlockHeader := func(resp *accessproto.BlockHeaderResponse, err error) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 
-			finalizedHeader := suite.finalizedHeaderCache.Get()
-			finalizedHeaderId := finalizedHeader.ID()
+			finalizedHeaderId := suite.finalizedBlock.ID()
 
 			require.Equal(suite.T(), &entitiesproto.LastFinalizedBlock{
 				Id:     finalizedHeaderId[:],
-				Height: finalizedHeader.Height,
+				Height: suite.finalizedBlock.Height,
 			}, resp.LastFinalizedBlock)
 		}
 
-		suite.Run("Get block 1 header by ID and check returned finalized header", func() {
-			id := block1.ID()
-			req := &accessproto.GetBlockHeaderByIDRequest{
-				Id: id[:],
-			}
+		id := block.ID()
+		req := &accessproto.GetBlockHeaderByIDRequest{
+			Id: id[:],
+		}
 
-			resp, err := handler.GetBlockHeaderByID(context.Background(), req)
-			assertFinalizedBlockHeader(resp, err)
+		resp, err := handler.GetBlockHeaderByID(context.Background(), req)
+		assertFinalizedBlockHeader(resp, err)
 
-			suite.finalizedBlock.Height = 2
+		suite.finalizedBlock = newFinalizedBlock.Header
+		// report new finalized block to finalized blocks cache
+		suite.finalizationDistributor.OnFinalizedBlock(model.BlockFromFlow(suite.finalizedBlock))
+		time.Sleep(time.Millisecond * 100) // give enough time to process async event
 
-			resp, err = handler.GetBlockHeaderByID(context.Background(), req)
-			assertFinalizedBlockHeader(resp, err)
-		})
+		resp, err = handler.GetBlockHeaderByID(context.Background(), req)
+		assertFinalizedBlockHeader(resp, err)
 	})
 }
 
 // TestLastFinalizedBlockHeightResult tests on example of the GetBlockHeaderByID function that the LastFinalizedBlock
 // field in the response matches the finalized header from cache. It also tests that the LastFinalizedBlock field is
 // updated correctly when a block with a greater height is finalized.
-func (suite *Suite) createChain() (flow.Block, flow.Collection) {
+func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 	collection := unittest.CollectionFixture(10)
 	refBlockID := unittest.IdentifierFixture()
 	// prepare cluster committee members
@@ -946,9 +952,8 @@ func (suite *Suite) createChain() (flow.Block, flow.Collection) {
 		ReferenceBlockID: refBlockID,
 		SignerIndices:    indices,
 	}
-	block := unittest.BlockFixture()
-	block.Payload.Guarantees = []*flow.CollectionGuarantee{guarantee}
-	block.Header.PayloadHash = block.Payload.Hash()
+	block := unittest.BlockWithParentFixture(suite.finalizedBlock)
+	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee, nil)
@@ -956,13 +961,12 @@ func (suite *Suite) createChain() (flow.Block, flow.Collection) {
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
 	epochs.On("Current").Return(epoch)
-	snap := protocol.NewSnapshot(suite.T())
+	snap := new(protocol.Snapshot)
 	snap.On("Epochs").Return(epochs).Maybe()
 	snap.On("Params").Return(suite.params).Maybe()
 	snap.On("Head").Return(block.Header, nil).Maybe()
 
-	suite.state.On("AtBlockID", mock.Anything).Return(snap).Once() // initial height lookup in ingestion engine
 	suite.state.On("AtBlockID", refBlockID).Return(snap)
 
-	return block, collection
+	return block, &collection
 }
