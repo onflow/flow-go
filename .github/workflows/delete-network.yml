@@ -14,18 +14,9 @@ on:
       # Allows for the ref to be altered for testing automation changes
       automation_ref:
         type: string
-        description: 'AUTOMATION branch, tag, or commit to use for the deletion.'
+        description: 'AUTOMATION branch, tag, or commit to use for the deletion (onflow/flow-go repo)'
         required: false
         default: master
-
-      # Allows for the public or private repo to be used for deployment automation
-      automation_repo:
-        required: true
-        type: choice
-        description: 'AUTOMATION REPO'
-        options:
-          - onflow/flow-go
-          - dapperlabs/flow-go
 
 env:
   GCP_PROJECT: "dl-flow-benchnet-automation"
@@ -44,7 +35,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
-          repository: ${{ inputs.automation_repo }}
+          repository: onflow/flow-go
           ref: ${{ inputs.automation_ref }}
 
       - name: Configure gcloud
