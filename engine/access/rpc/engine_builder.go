@@ -59,6 +59,14 @@ func (builder *RPCEngineBuilder) WithNewHandler(handler accessproto.AccessAPISer
 	return builder
 }
 
+// WithFinalizedHeaderCache method specifies that the newly created `AccessAPIServer` should use
+// the given `FinalizedHeaderCache` to retrieve information about the finalized block that will be included
+// in the server's responses.
+// Caution:
+// When injecting `BlockSignerDecoder` (via the WithBlockSignerDecoder method), you must also inject
+// the `FinalizedHeaderCache` or the builder will error during the build step.
+//
+// The method returns a self-reference for chaining.
 func (builder *RPCEngineBuilder) WithFinalizedHeaderCache(cache *synceng.FinalizedHeaderCache) *RPCEngineBuilder {
 	builder.finalizedHeaderCache = cache
 	return builder
