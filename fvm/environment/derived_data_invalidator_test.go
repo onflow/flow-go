@@ -301,7 +301,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		require.Equal(t, expected, invalidator.MeterParamOverridesUpdated)
 	}
 
-	executionSnapshot, err = nestedTxn.FinalizeMainTransaction()
+	executionSnapshot, err = txnState.FinalizeMainTransaction()
 	require.NoError(t, err)
 
 	for _, registerId := range executionSnapshot.AllRegisterIDs() {
