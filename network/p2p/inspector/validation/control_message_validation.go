@@ -173,8 +173,8 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 			continue
 		}
 
-		switch {
-		case ctrlMsgType == p2p.CtrlMsgGraft || ctrlMsgType == p2p.CtrlMsgPrune:
+		switch ctrlMsgType {
+		case p2p.CtrlMsgGraft, p2p.CtrlMsgPrune:
 			// normal pre-processing
 			err := c.blockingPreprocessingRpc(from, validationConfig, control)
 			if err != nil {
