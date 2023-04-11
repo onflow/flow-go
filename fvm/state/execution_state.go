@@ -21,7 +21,7 @@ const (
 // it holds draft of updates and captures
 // all register touches
 type ExecutionState struct {
-	// NOTE: A finalized view is no longer accessible.  It can however be
+	// NOTE: A finalized state is no longer accessible.  It can however be
 	// re-attached to another transaction and be committed (for cached result
 	// bookkeeping purpose).
 	finalized bool
@@ -144,7 +144,7 @@ func (state *ExecutionState) BytesWritten() uint64 {
 
 func (state *ExecutionState) DropChanges() error {
 	if state.finalized {
-		return fmt.Errorf("cannot DropChanges on a finalized view")
+		return fmt.Errorf("cannot DropChanges on a finalized state")
 	}
 
 	return state.view.DropChanges()
@@ -153,7 +153,7 @@ func (state *ExecutionState) DropChanges() error {
 // Get returns a register value given owner and key
 func (state *ExecutionState) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	if state.finalized {
-		return nil, fmt.Errorf("cannot Get on a finalized view")
+		return nil, fmt.Errorf("cannot Get on a finalized state")
 	}
 
 	var value []byte
@@ -179,7 +179,7 @@ func (state *ExecutionState) Get(id flow.RegisterID) (flow.RegisterValue, error)
 // Set updates state delta with a register update
 func (state *ExecutionState) Set(id flow.RegisterID, value flow.RegisterValue) error {
 	if state.finalized {
-		return fmt.Errorf("cannot Set on a finalized view")
+		return fmt.Errorf("cannot Set on a finalized state")
 	}
 
 	if state.enforceLimits {
@@ -201,7 +201,7 @@ func (state *ExecutionState) Set(id flow.RegisterID, value flow.RegisterValue) e
 // MeterComputation meters computation usage
 func (state *ExecutionState) MeterComputation(kind common.ComputationKind, intensity uint) error {
 	if state.finalized {
-		return fmt.Errorf("cannot MeterComputation on a finalized view")
+		return fmt.Errorf("cannot MeterComputation on a finalized state")
 	}
 
 	if state.enforceLimits {
@@ -228,7 +228,7 @@ func (state *ExecutionState) TotalComputationLimit() uint {
 // MeterMemory meters memory usage
 func (state *ExecutionState) MeterMemory(kind common.MemoryKind, intensity uint) error {
 	if state.finalized {
-		return fmt.Errorf("cannot MeterMemory on a finalized view")
+		return fmt.Errorf("cannot MeterMemory on a finalized state")
 	}
 
 	if state.enforceLimits {
@@ -255,7 +255,7 @@ func (state *ExecutionState) TotalMemoryLimit() uint {
 
 func (state *ExecutionState) MeterEmittedEvent(byteSize uint64) error {
 	if state.finalized {
-		return fmt.Errorf("cannot MeterEmittedEvent on a finalized view")
+		return fmt.Errorf("cannot MeterEmittedEvent on a finalized state")
 	}
 
 	if state.enforceLimits {
@@ -279,7 +279,7 @@ func (state *ExecutionState) Finalize() *ExecutionSnapshot {
 // MergeState the changes from a the given view to this view.
 func (state *ExecutionState) Merge(other *ExecutionSnapshot) error {
 	if state.finalized {
-		return fmt.Errorf("cannot Merge on a finalized view")
+		return fmt.Errorf("cannot Merge on a finalized state")
 	}
 
 	err := state.view.Merge(other)

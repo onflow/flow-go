@@ -568,5 +568,5 @@ func TestFinalizeMainTransaction(t *testing.T) {
 
 	// Sanity check state is no longer accessible after FinalizeMainTransaction.
 	_, err = txn.Get(registerId)
-	require.ErrorContains(t, err, "cannot Get on a finalized view")
+	require.ErrorContains(t, err, "cannot Get on a finalized state")
 }
