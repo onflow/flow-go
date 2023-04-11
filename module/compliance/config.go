@@ -6,9 +6,9 @@ const MinSkipNewProposalsThreshold = 1000
 // the consensus follower engine.
 type Config struct {
 	// SkipNewProposalsThreshold defines the threshold for dropping blocks that are too far in
-	// the future. Formally, let `H` be the height of the latest finalized block known to this
+	// the future. Formally, let `H` be the view of the latest finalized block known to this
 	// node. A new block `B` is dropped without further processing, if
-	//   B.Height > H + SkipNewProposalsThreshold
+	//   B.View > H + SkipNewProposalsThreshold
 	SkipNewProposalsThreshold uint64
 }
 

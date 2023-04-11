@@ -189,22 +189,27 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 
 // IdentitiesByBlock returns the identities of all authorized consensus participants at the given block.
 // The order of the identities is the canonical order.
-// No errors are expected during normal operation.
+// ERROR conditions:
+//   - state.ErrUnknownSnapshotReference if the blockID is for an unknown block
 func (c *Consensus) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error) {
 	il, err := c.state.AtBlockID(blockID).Identities(filter.IsVotingConsensusCommitteeMember)
-	return il, err
+	if err != nil {
+		return nil, fmt.Errorf("could not identities at block %x: %w", blockID, err) // state.ErrUnknownSnapshotReference or exception
+	}
+	return il, nil
 }
 
 // IdentityByBlock returns the identity of the node with the given node ID at the given block.
 // ERROR conditions:
 //   - model.InvalidSignerError if participantID does NOT correspond to an authorized HotStuff participant at the specified block.
+//   - state.ErrUnknownSnapshotReference if the blockID is for an unknown block
 func (c *Consensus) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 	identity, err := c.state.AtBlockID(blockID).Identity(nodeID)
 	if err != nil {
 		if protocol.IsIdentityNotFound(err) {
 			return nil, model.NewInvalidSignerErrorf("id %v is not a valid node id: %w", nodeID, err)
 		}
-		return nil, fmt.Errorf("could not get identity for node ID %x: %w", nodeID, err)
+		return nil, fmt.Errorf("could not get identity for node ID %x: %w", nodeID, err) // state.ErrUnknownSnapshotReference or exception
 	}
 	if !filter.IsVotingConsensusCommitteeMember(identity) {
 		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff voting participant", nodeID)

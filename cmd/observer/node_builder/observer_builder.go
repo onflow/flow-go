@@ -35,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
-	followereng "github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/protocol"
 	"github.com/onflow/flow-go/model/encodable"
@@ -185,7 +184,7 @@ type ObserverServiceBuilder struct {
 	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
-	FollowerEng *followereng.ComplianceEngine
+	FollowerEng *follower.ComplianceEngine
 	SyncEng     *synceng.Engine
 
 	// Public network
@@ -270,7 +269,15 @@ func (builder *ObserverServiceBuilder) buildFollowerState() *ObserverServiceBuil
 			return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 		}
 
-		followerState, err := badgerState.NewFollowerState(state, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
+		followerState, err := badgerState.NewFollowerState(
+			node.Logger,
+			node.Tracer,
+			node.ProtocolEvents,
+			state,
+			node.Storage.Index,
+			node.Storage.Payloads,
+			blocktimer.DefaultBlockTimer,
+		)
 		builder.FollowerState = followerState
 
 		return err
@@ -356,7 +363,7 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 		if node.HeroCacheMetricsEnable {
 			heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 		}
-		core, err := followereng.NewComplianceCore(
+		core, err := follower.NewComplianceCore(
 			node.Logger,
 			node.Metrics.Mempool,
 			heroCacheCollector,
@@ -366,13 +373,12 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 			builder.Validator,
 			builder.SyncCore,
 			node.Tracer,
-			compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower core: %w", err)
 		}
 
-		builder.FollowerEng, err = followereng.NewComplianceLayer(
+		builder.FollowerEng, err = follower.NewComplianceLayer(
 			node.Logger,
 			node.Network,
 			node.Me,
@@ -380,6 +386,7 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 			node.Storage.Headers,
 			builder.Finalized,
 			core,
+			follower.WithComplianceConfigOpt(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
 			follower.WithChannel(channels.PublicReceiveBlocks),
 		)
 		if err != nil {
@@ -559,7 +566,7 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 	}
 	anb := &ObserverServiceBuilder{
 		ObserverServiceConfig:   config,
-		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String()),
+		FlowNodeBuilder:         cmd.FlowNode("observer"),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
 	anb.FinalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))

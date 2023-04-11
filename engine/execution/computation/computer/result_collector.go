@@ -77,7 +77,7 @@ type resultCollector struct {
 	blockStats     module.ExecutionResultStats
 
 	currentCollectionStartTime time.Time
-	currentCollectionView      *delta.View
+	currentCollectionView      state.View
 	currentCollectionStats     module.ExecutionResultStats
 }
 
