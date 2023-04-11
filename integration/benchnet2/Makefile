@@ -3,9 +3,10 @@ DOCKER_REGISTRY := us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet
 
 # default values that callers can override when calling target
 ACCESS = 1
-COLLECTION = 1
-VALID_COLLECTION := $(shell test $(COLLECTION) -ge 1; echo $$?)
-CONSENSUS = 1
+COLLECTION = 6
+VALID_COLLECTION := $(shell test $(COLLECTION) -ge 6; echo $$?)
+CONSENSUS = 2
+VALID_CONSENSUS := $(shell test $(CONSENSUS) -ge 2; echo $$?)
 EXECUTION = 2
 VALID_EXECUTION := $(shell test $(EXECUTION) -ge 2; echo $$?)
 VERIFICATION = 1
@@ -16,6 +17,10 @@ ifeq ($(strip $(VALID_EXECUTION)), 1)
 	$(error Number of Execution nodes should be no less than 2)
 else ifeq ($(strip $(NETWORK_ID)),)
 	$(error NETWORK_ID cannot be empty)
+else ifeq ($(strip $(VALID_CONSENSUS)), 1)
+	$(error Number of Consensus nodes should be no less than 2)
+else ifeq ($(strip $(VALID_COLLECTION)), 1)
+	$(error Number of Collection nodes should be no less than 6)
 else ifeq ($(strip $(NAMESPACE)),)
 	$(error NAMESPACE cannot be empty)
 endif
