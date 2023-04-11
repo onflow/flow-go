@@ -3,8 +3,9 @@ DOCKER_REGISTRY := us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet
 
 # default values that callers can override when calling target
 ACCESS = 1
-COLLECTION = 1
+COLLECTION = 6
 VALID_COLLECTION := $(shell test $(COLLECTION) -ge 6; echo $$?)
+CONSENSUS = 2
 VALID_CONSENSUS := $(shell test $(CONSENSUS) -ge 2; echo $$?)
 EXECUTION = 2
 VALID_EXECUTION := $(shell test $(EXECUTION) -ge 2; echo $$?)
