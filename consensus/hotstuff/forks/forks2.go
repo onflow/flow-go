@@ -32,9 +32,9 @@ type Forks2 struct {
 	newestView           uint64 // newestView is the highest view of block proposal stored in Forks
 	finalizationCallback module.Finalizer
 
-	// lastFinalized holds the latest finalized block including the certified child as proof of finality.
+	// finalityProof holds the latest finalized block including the certified child as proof of finality.
 	// CAUTION: is nil, when Forks has not yet finalized any blocks beyond the finalized root block it was initialized with
-	lastFinalized *FinalityProof //
+	finalityProof *FinalityProof //
 }
 
 // TODO:
@@ -54,7 +54,7 @@ func NewForks2(trustedRoot *model.CertifiedBlock, finalizationCallback module.Fi
 		forest:               *forest.NewLevelledForest(trustedRoot.Block.View),
 		newestView:           trustedRoot.Block.View,
 		trustedRoot:          trustedRoot,
-		lastFinalized:        nil,
+		finalityProof:        nil,
 	}
 
 	// verify and add root block to levelled forest
@@ -68,18 +68,18 @@ func NewForks2(trustedRoot *model.CertifiedBlock, finalizationCallback module.Fi
 
 // FinalizedView returns the largest view number that has been finalized so far
 func (f *Forks2) FinalizedView() uint64 {
-	if f.lastFinalized == nil {
+	if f.finalityProof == nil {
 		return f.trustedRoot.Block.View
 	}
-	return f.lastFinalized.Block.View
+	return f.finalityProof.Block.View
 }
 
 // FinalizedBlock returns the finalized block with the largest view number
 func (f *Forks2) FinalizedBlock() *model.Block {
-	if f.lastFinalized == nil {
+	if f.finalityProof == nil {
 		return f.trustedRoot.Block
 	}
-	return f.lastFinalized.Block
+	return f.finalityProof.Block
 }
 
 // FinalityProof returns the latest finalized block and a certified child from
@@ -87,7 +87,7 @@ func (f *Forks2) FinalizedBlock() *model.Block {
 // CAUTION: method returns (nil, false), when Forks has not yet finalized any
 // blocks beyond the finalized root block it was initialized with.
 func (f *Forks2) FinalityProof() (*FinalityProof, bool) {
-	return f.lastFinalized, f.lastFinalized == nil
+	return f.finalityProof, f.finalityProof == nil
 }
 
 // NewestView returns the largest view number of all proposals that were added to Forks.
@@ -128,7 +128,7 @@ func (f *Forks2) IsKnownBlock(block *model.Block) bool {
 //
 // UNVALIDATED: expects block to pass Forks.EnsureBlockIsValidExtension(block)
 func (f *Forks2) IsProcessingNeeded(block *model.Block) bool {
-	if block.View < f.lastFinalized.Block.View || f.IsKnownBlock(block) {
+	if block.View < f.FinalizedView() || f.IsKnownBlock(block) {
 		return false
 	}
 	return true
@@ -422,7 +422,7 @@ func (f *Forks2) checkForDoubleProposal(block *model.Block) {
 
 // checkForAdvancingFinalization checks whether observing certifiedBlock leads to progress of
 // finalization. This function should be called every time a new block is added to Forks. If the new
-// block is the head of a 2-chain satisfying the finalization rule, we update `Forks.lastFinalized` to
+// block is the head of a 2-chain satisfying the finalization rule, we update `Forks.finalityProof` to
 // the new latest finalized block. Calling this method with previously-processed blocks leaves the
 // consensus state invariant.
 // UNVALIDATED: assumes that relevant block properties are consistent with previous blocks
@@ -445,7 +445,8 @@ func (f *Forks2) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBl
 	//   The root block is specified and trusted by the node operator. If the root block is the
 	//   genesis block, it might not contain a QC pointing to a parent (as there is no parent).
 	//   In this case, condition (a) cannot be evaluated.
-	if (certifiedBlock.View() <= f.lastFinalized.Block.View) || (certifiedBlock.Block.QC.View < f.lastFinalized.Block.View) {
+	lastFinalizedView := f.FinalizedView()
+	if (certifiedBlock.View() <= lastFinalizedView) || (certifiedBlock.Block.QC.View < lastFinalizedView) {
 		// Repeated blocks are expected during normal operations. We enter this code block if and only
 		// if the parent's view is _below_ the last finalized block. It is straight forward to show:
 		// Lemma: Let B be a block whose 2-chain reaches beyond the last finalized block
@@ -477,7 +478,7 @@ func (f *Forks2) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBl
 		return nil
 	}
 	// parentBlock is finalized:
-	f.lastFinalized = &FinalityProof{Block: parentBlock, CertifiedChild: *certifiedBlock}
+	f.finalityProof = &FinalityProof{Block: parentBlock, CertifiedChild: *certifiedBlock}
 	err := f.finalizationEventsUpToBlock(qcForParent)
 	if err != nil {
 		return fmt.Errorf("emitting finalization events up to block %v failed: %w", qcForParent.BlockID, err)
@@ -487,7 +488,7 @@ func (f *Forks2) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBl
 }
 
 // finalizationEventsUpToBlock emits finalization events for all blocks up to (and including)
-// the block pointed to by `qc`. Finalization events start with the child of `lastFinalizedBlockQC`
+// the block pointed to by `qc`. Finalization events start with the child of `FinalizedBlock()`
 // (explicitly checked); and calls the `finalizationCallback` as well as `OnFinalizedBlock` for every
 // newly finalized block in increasing height order.
 // Error returns:
@@ -497,18 +498,18 @@ func (f *Forks2) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBl
 //     is a critical bug / data corruption). Forks cannot recover from this exception.
 //   - generic error in case of bug or internal state corruption
 func (f *Forks2) finalizationEventsUpToBlock(qc *flow.QuorumCertificate) error {
-	lastFinalizedView := f.lastFinalized.Block.View
-	if qc.View < lastFinalizedView {
+	lastFinalized := f.FinalizedBlock()
+	if qc.View < lastFinalized.View {
 		return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
 			"finalizing block with view %d which is lower than previously finalized block at view %d",
-			qc.View, f.lastFinalized.Block.View,
+			qc.View, lastFinalized.View,
 		)}
 	}
 
 	// collect all blocks that should be finalized in slice
 	// Caution: the blocks in the slice are listed from highest to lowest block
-	blocksToBeFinalized := make([]*model.Block, 0, lastFinalizedView-qc.View)
-	for qc.View > lastFinalizedView {
+	blocksToBeFinalized := make([]*model.Block, 0, lastFinalized.View-qc.View)
+	for qc.View > lastFinalized.View {
 		b, ok := f.GetBlock(qc.BlockID)
 		if !ok {
 			return fmt.Errorf("failed to get finalized block (view=%d, blockID=%x)", qc.View, qc.BlockID)
@@ -519,16 +520,16 @@ func (f *Forks2) finalizationEventsUpToBlock(qc *flow.QuorumCertificate) error {
 
 	// qc should now point to the latest finalized block. Otherwise, the
 	// consensus committee is compromised (or we have a critical internal bug).
-	if qc.View < f.lastFinalized.Block.View {
+	if qc.View < lastFinalized.View {
 		return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
 			"finalizing block with view %d which is lower than previously finalized block at view %d",
-			qc.View, f.lastFinalized.Block.View,
+			qc.View, lastFinalized.View,
 		)}
 	}
-	if qc.View == f.lastFinalized.Block.View && f.lastFinalized.Block.BlockID != qc.BlockID {
+	if qc.View == lastFinalized.View && lastFinalized.BlockID != qc.BlockID {
 		return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
 			"finalizing blocks with view %d at conflicting forks: %x and %x",
-			qc.View, qc.BlockID, f.lastFinalized.Block.BlockID,
+			qc.View, qc.BlockID, lastFinalized.BlockID,
 		)}
 	}
 

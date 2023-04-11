@@ -317,7 +317,7 @@ func TestAddUnconnectedProposal(t *testing.T) {
 
 	forks, _ := newForks(t)
 
-	err := forks.AddProposal(unconnectedProposal)
+	err := forks.AddProposal(unconnectedProposal.Block)
 	require.Error(t, err)
 	// adding a disconnected block is an internal error, should return generic error
 	assert.False(t, model.IsByzantineThresholdExceededError(err))
@@ -342,7 +342,7 @@ func TestGetProposal(t *testing.T) {
 	forks, _ := newForks(t)
 
 	// should be unable to retrieve a block before it is added
-	_, ok := forks.GetProposal(blocks[0].Block.BlockID)
+	_, ok := forks.GetBlock(blocks[0].Block.BlockID)
 	assert.False(t, ok)
 
 	// add first blocks - should finalize [1,2]
@@ -351,7 +351,7 @@ func TestGetProposal(t *testing.T) {
 
 	// should be able to retrieve all stored blocks
 	for _, proposal := range blocksAddedFirst {
-		got, ok := forks.GetProposal(proposal.Block.BlockID)
+		got, ok := forks.GetBlock(proposal.Block.BlockID)
 		assert.True(t, ok)
 		assert.Equal(t, proposal, got)
 	}
@@ -361,12 +361,12 @@ func TestGetProposal(t *testing.T) {
 	require.Nil(t, err)
 
 	// should be able to retrieve just added block
-	got, ok := forks.GetProposal(blocksAddedSecond[0].Block.BlockID)
+	got, ok := forks.GetBlock(blocksAddedSecond[0].Block.BlockID)
 	assert.True(t, ok)
 	assert.Equal(t, blocksAddedSecond[0], got)
 
 	// should be unable to retrieve pruned block
-	_, ok = forks.GetProposal(blocksAddedFirst[0].Block.BlockID)
+	_, ok = forks.GetBlock(blocksAddedFirst[0].Block.BlockID)
 	assert.False(t, ok)
 }
 
@@ -389,17 +389,17 @@ func TestGetProposalsForView(t *testing.T) {
 	require.Nil(t, err)
 
 	// 1 proposal at view 2
-	proposals := forks.GetProposalsForView(2)
+	proposals := forks.GetBlocksForView(2)
 	assert.Len(t, proposals, 1)
 	assert.Equal(t, blocks[0], proposals[0])
 
 	// 2 proposals at view 4
-	proposals = forks.GetProposalsForView(4)
+	proposals = forks.GetBlocksForView(4)
 	assert.Len(t, proposals, 2)
 	assert.ElementsMatch(t, blocks[1:], proposals)
 
 	// 0 proposals at view 3
-	proposals = forks.GetProposalsForView(3)
+	proposals = forks.GetBlocksForView(3)
 	assert.Len(t, proposals, 0)
 }
 
@@ -424,7 +424,7 @@ func TestNotification(t *testing.T) {
 
 	genesisBQ := makeGenesis()
 
-	forks, err := New(genesisBQ, finalizationCallback, notifier)
+	forks, err := NewForks2(genesisBQ, finalizationCallback, notifier)
 	require.NoError(t, err)
 
 	err = addBlocksToForks(forks, blocks)
@@ -476,7 +476,7 @@ func newForks(t *testing.T) (*Forks2, *mocks.Consumer) {
 // If any errors occur, returns the first one.
 func addBlocksToForks(forks *Forks2, proposals []*model.Proposal) error {
 	for _, proposal := range proposals {
-		err := forks.AddProposal(proposal)
+		err := forks.AddProposal(proposal.Block)
 		if err != nil {
 			return fmt.Errorf("test case failed at adding proposal: %v: %w", proposal.Block.View, err)
 		}
