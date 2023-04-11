@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/common/worker"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
@@ -69,6 +70,9 @@ func (c *ControlMsgMetricsInspector) ObserveRPC(req *ObserveRPCMetricsRequest) e
 func (c *ControlMsgMetricsInspector) Name() string {
 	return rpcInspectorComponentName
 }
+
+// SetClusterIDSProvider no-op func, metrics inspector does not utilize cluster ID information during inspection.
+func (c *ControlMsgMetricsInspector) SetClusterIDSProvider(_ module.ClusterIDSProvider) {}
 
 // NewControlMsgMetricsInspector returns a new *ControlMsgMetricsInspector
 func NewControlMsgMetricsInspector(logger zerolog.Logger, metricsObserver p2p.GossipSubControlMetricsObserver, numberOfWorkers int, heroStoreOpts ...queue.HeroStoreConfigOption) *ControlMsgMetricsInspector {

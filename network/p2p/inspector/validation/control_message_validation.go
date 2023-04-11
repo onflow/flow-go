@@ -2,6 +2,7 @@ package validation
 
 import (
 	"fmt"
+	"sync"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
@@ -26,7 +28,8 @@ const (
 	// DefaultControlMsgValidationInspectorQueueCacheSize is the default size of the inspect message queue.
 	DefaultControlMsgValidationInspectorQueueCacheSize = 100
 	// rpcInspectorComponentName the rpc inspector component name.
-	rpcInspectorComponentName = "gossipsub_rpc_validation_inspector"
+	rpcInspectorComponentName      = "gossipsub_rpc_validation_inspector"
+	clusterIDProviderNotSetWarning = "failed to validate control message with cluster pre-fixed topic cluster ids provider is not set"
 )
 
 // InspectMsgRequest represents a short digest of an RPC control message. It is used for further message inspection by component workers.
@@ -75,6 +78,11 @@ type ControlMsgValidationInspector struct {
 	component.Component
 	logger  zerolog.Logger
 	sporkID flow.Identifier
+	// lock RW mutex used to synchronize access to the  clusterIDSProvider.
+	lock sync.RWMutex
+	// clusterIDSProvider the cluster IDS providers provides active cluster IDs for cluster Topic validation. The
+	// clusterIDSProvider must be configured for LN nodes to validate control message with cluster prefixed topics.
+	clusterIDSProvider module.ClusterIDSProvider
 	// config control message validation configurations.
 	config *ControlMsgValidationInspectorConfig
 	// distributor used to disseminate invalid RPC message notifications.
@@ -192,6 +200,14 @@ func (c *ControlMsgValidationInspector) Name() string {
 	return rpcInspectorComponentName
 }
 
+func (c *ControlMsgValidationInspector) SetClusterIDSProvider(provider module.ClusterIDSProvider) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.clusterIDSProvider == nil {
+		c.clusterIDSProvider = provider
+	}
+}
+
 // blockingPreprocessingRpc ensures the RPC control message count does not exceed the configured discard threshold.
 func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
 	lg := c.logger.With().
@@ -280,7 +296,7 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 			return NewIDuplicateTopicErr(topic)
 		}
 		seen[topic] = struct{}{}
-		err := c.validateTopic(topic)
+		err := c.validateTopic(topic, ctrlMsgType)
 		if err != nil {
 			return err
 		}
@@ -309,8 +325,42 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 
 // validateTopic the topic is a valid flow topic/channel.
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) validateTopic(topic channels.Topic) error {
+func (c *ControlMsgValidationInspector) validateTopic(topic channels.Topic, ctrlMsgType p2p.ControlMessageType) error {
+	channel, ok := channels.ChannelFromTopic(topic)
+	if !ok {
+		return NewInvalidTopicErr(topic, fmt.Errorf("failed to get channel from topic"))
+	}
+
+	// handle cluster prefixed topics
+	if channels.IsClusterChannel(channel) {
+		return c.validateClusterPrefixedTopic(topic, ctrlMsgType)
+	}
+
+	// non cluster prefixed topic validation
 	err := channels.IsValidFlowTopic(topic, c.sporkID)
+	if err != nil {
+		return NewInvalidTopicErr(topic, err)
+	}
+	return nil
+}
+
+// validateClusterPrefixedTopic validates cluster prefixed topics.
+func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(topic channels.Topic, ctrlMsgType p2p.ControlMessageType) error {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	if c.clusterIDSProvider == nil {
+		c.logger.Warn().
+			Str("topic", topic.String()).
+			Str("ctrl_msg_type", string(ctrlMsgType)).
+			Msg(clusterIDProviderNotSetWarning)
+		return nil
+	}
+	activeClusterIDS, err := c.clusterIDSProvider.ActiveClusterIDS()
+	if err != nil {
+		return fmt.Errorf("failed to get active cluster IDS: %w", err)
+	}
+
+	err = channels.IsValidFlowClusterTopic(topic, activeClusterIDS)
 	if err != nil {
 		return NewInvalidTopicErr(topic, err)
 	}

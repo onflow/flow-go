@@ -66,6 +66,7 @@ type Engine struct {
 
 var _ component.Component = (*Engine)(nil)
 var _ protocol.Consumer = (*Engine)(nil)
+var _ module.ClusterIDSProvider = (*Engine)(nil)
 
 func New(
 	log zerolog.Logger,
@@ -511,4 +512,19 @@ func (e *Engine) removeEpoch(counter uint64) {
 	e.mu.Lock()
 	delete(e.epochs, counter)
 	e.mu.Unlock()
+}
+
+// ActiveClusterIDS returns the active canonical cluster ID's for the assigned collection clusters.
+func (e *Engine) ActiveClusterIDS() ([]string, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	clusterIDs := make([]string, 0)
+	for _, epoch := range e.epochs {
+		chainID, err := epoch.state.Params().ChainID()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get active cluster ids: %w", err)
+		}
+		clusterIDs = append(clusterIDs, chainID.String())
+	}
+	return clusterIDs, nil
 }

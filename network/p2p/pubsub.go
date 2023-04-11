@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 )
 
@@ -86,6 +87,12 @@ type GossipSubRPCInspector interface {
 	// on ever RPC message received before the message is processed by libp2p.
 	// If this func returns any error the RPC message will be dropped.
 	Inspect(peer.ID, *pubsub.RPC) error
+
+	// SetClusterIDSProvider sets the cluster IDs provider that is used to provider cluster ID information
+	// about active clusters for collection nodes. This func will be a no-op for inspectors which don't use
+	// the ClusterIDSProvider during inspection.// This method should only be called once, and subsequent calls
+	// should be a no-op.
+	SetClusterIDSProvider(module.ClusterIDSProvider)
 }
 
 // Topic is the abstraction of the underlying pubsub topic that is used by the Flow network.

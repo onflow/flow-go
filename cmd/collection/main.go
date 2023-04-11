@@ -573,6 +573,12 @@ func main() {
 			// register the manager for protocol events
 			node.ProtocolEvents.AddConsumer(manager)
 
+			// for collection nodes RPC inspectors must validate cluster prefixed topics
+			// using the ClusterIDSProvider methods implemented by the epoch manager.
+			for _, rpcInspector := range nodeBuilder.GossipSubConfig.RPCInspectors {
+				rpcInspector.SetClusterIDSProvider(manager)
+			}
+
 			return manager, err
 		})
 

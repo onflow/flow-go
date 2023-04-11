@@ -277,13 +277,24 @@ func ChannelFromTopic(topic Topic) (Channel, bool) {
 	return "", false
 }
 
-// SporkIDFromTopic returns the spork ID from a topic.
+// sporkIDFromTopic returns the pre-pended spork ID for the topic.
 // All errors returned from this function can be considered benign.
-func SporkIDFromTopic(topic Topic) (flow.Identifier, error) {
+func sporkIDFromTopic(topic Topic) (string, error) {
 	if index := strings.LastIndex(topic.String(), "/"); index != -1 {
-		return flow.HexStringToIdentifier(string(topic)[index+1:])
+		return string(topic)[index+1:], nil
 	}
-	return flow.Identifier{}, fmt.Errorf("spork ID is missing")
+	return "", fmt.Errorf("spork id missing from topic")
+}
+
+// prependedIDFromTopic returns the pre-pended cluster ID for the cluster prefixed topic.
+// All errors returned from this function can be considered benign.
+func clusterIDFromTopic(topic Topic) (string, error) {
+	for prefix := range clusterChannelPrefixRoleMap {
+		if strings.HasPrefix(topic.String(), prefix) {
+			return strings.TrimPrefix(topic.String(), fmt.Sprintf("%s-", prefix)), nil
+		}
+	}
+	return "", fmt.Errorf("failed to get cluster ID from topic %s", topic)
 }
 
 // ConsensusCluster returns a dynamic cluster consensus channel based on
@@ -298,12 +309,50 @@ func SyncCluster(clusterID flow.ChainID) Channel {
 	return Channel(fmt.Sprintf("%s-%s", SyncClusterPrefix, clusterID))
 }
 
-// IsValidFlowTopic ensures the topic is a valid Flow network topic.
-// A valid Topic has the following properties:
-// - A Channel can be derived from the Topic and that channel exists.
-// - The sporkID part of the Topic is equal to the current network sporkID.
+// IsValidFlowTopic ensures the topic is a valid Flow network topic and
+// ensures the sporkID part of the Topic is equal to the current network sporkID.
 // All errors returned from this function can be considered benign.
 func IsValidFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
+	sporkID, err := sporkIDFromTopic(topic)
+	if err != nil {
+		return fmt.Errorf("failed to get spork ID from topic: %w", err)
+	}
+
+	if sporkID != expectedSporkID.String() {
+		return fmt.Errorf("invalid flow topic mismatch spork ID expected spork ID %s actual spork ID %s", expectedSporkID, sporkID)
+	}
+
+	return isValidFlowTopic(topic)
+}
+
+// IsValidFlowClusterTopic ensures the topic is a valid Flow network topic and
+// ensures the cluster ID part of the Topic is equal to one of the provided active cluster IDs.
+// All errors returned from this function can be considered benign.
+func IsValidFlowClusterTopic(topic Topic, activeClusterIDS []string) error {
+	err := isValidFlowTopic(topic)
+	if err != nil {
+		return err
+	}
+
+	clusterID, err := clusterIDFromTopic(topic)
+	if err != nil {
+		return fmt.Errorf("failed to get cluster ID from topic: %w", err)
+	}
+
+	for _, activeClusterID := range activeClusterIDS {
+		if clusterID == activeClusterID {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid flow topic contains cluster ID (%s) not in active cluster IDs list %s", clusterID, activeClusterIDS)
+}
+
+// isValidFlowTopic ensures the topic is a valid Flow network topic.
+// A valid Topic has the following properties:
+// - A Channel can be derived from the Topic and that channel exists.
+// All errors returned from this function can be considered benign.
+func isValidFlowTopic(topic Topic) error {
 	channel, ok := ChannelFromTopic(topic)
 	if !ok {
 		return fmt.Errorf("invalid topic: failed to get channel from topic")
@@ -311,18 +360,6 @@ func IsValidFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
 	err := IsValidFlowChannel(channel)
 	if err != nil {
 		return fmt.Errorf("invalid topic: %w", err)
-	}
-
-	if IsClusterChannel(channel) {
-		return nil
-	}
-
-	sporkID, err := SporkIDFromTopic(topic)
-	if err != nil {
-		return err
-	}
-	if sporkID != expectedSporkID {
-		return fmt.Errorf("invalid topic: wrong spork ID %s the current spork ID is %s", sporkID, expectedSporkID)
 	}
 
 	return nil
