@@ -183,7 +183,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 					Msg("could not pre-process rpc, aborting")
 				return fmt.Errorf("could not pre-process rpc, aborting: %w", err)
 			}
-		case ctrlMsgType == p2p.CtrlMsgIHave:
+		case p2p.CtrlMsgIHave:
 			// iHave specific pre-processing
 			sampleSize := c.iHaveSampleSize(len(control.GetIhave()), validationConfig.IHaveInspectionMaxSampleSize, validationConfig.IHaveSyncInspectSampleSizePercentage)
 			err := c.blockingIHaveSamplePreprocessing(from, validationConfig, control, sampleSize)
