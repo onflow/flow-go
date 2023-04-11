@@ -151,18 +151,6 @@ jobs:
         run: |
           if [[ ${{ inputs.network_id }} =~ ^[a-z][a-z0-9-]{0,18}[a-z0-9]$ ]]; then echo "networkId=${{ inputs.network_id }}" >> $GITHUB_OUTPUT; else echo "network_id does not meet criteria."; exit 1; fi;
 
-      - name: Print Network ID
-        run: |
-          echo ${{ steps.getNetworkId.outputs.networkId }}
-
-      - name: Print Automation Ref
-        run: |
-          echo ${{ inputs.automation_ref }}
-
-      - name: Print Flow Ref
-        run: |
-          echo ${{ inputs.flow_ref }}
-
       - name: Print all input variables
         run: echo '${{ toJson(inputs) }}' | jq
 
