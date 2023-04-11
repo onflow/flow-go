@@ -200,6 +200,9 @@ func (c *ControlMsgValidationInspector) Name() string {
 	return rpcInspectorComponentName
 }
 
+// SetClusterIDSProvider sets the cluster IDs provider that is used to provider cluster ID information
+// about active clusters for collection nodes. This method should only be called once, and subsequent calls
+// will be a no-op.
 func (c *ControlMsgValidationInspector) SetClusterIDSProvider(provider module.ClusterIDSProvider) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
