@@ -476,26 +476,17 @@ func (f *Forks2) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBl
 	if parentBlock.View+1 != certifiedBlock.View() {
 		return nil
 	}
-	return f.finalizeUpToBlock(qcForParent)
-}
-
-// finalizeUpToBlock finalizes all blocks up to (and including) the block pointed to by `qc`.
-// Finalization starts with the child of `lastFinalizedBlockQC` (explicitly checked);
-// and calls OnFinalizedBlock on the newly finalized blocks in increasing height order.
-// Error returns:
-//   - model.ByzantineThresholdExceededError in case observing a finalization fork (violating
-//     a foundational consensus guarantee). This indicates that there are 1/3+ Byzantine nodes
-//     (weighted by stake) in the network, breaking the safety guarantees of HotStuff (or there
-//     is a critical bug / data corruption). Forks cannot recover from this exception.
-//   - generic error in case of bug or internal state corruption
-func (f *Forks2) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
-
-	panic("implememnt me")
+	// parentBlock is finalized:
+	f.lastFinalized = &FinalityProof{Block: parentBlock, CertifiedChild: *certifiedBlock}
+	err := f.finalizationEventsUpToBlock(qcForParent)
+	if err != nil {
+		return fmt.Errorf("emitting finalization events up to block %v failed: %w", qcForParent.BlockID, err)
+	}
 
 	return nil
 }
 
-// finalizationNotificationsUpToBlock emits finalization events for all blocks up to (and including)
+// finalizationEventsUpToBlock emits finalization events for all blocks up to (and including)
 // the block pointed to by `qc`. Finalization events start with the child of `lastFinalizedBlockQC`
 // (explicitly checked); and calls the `finalizationCallback` as well as `OnFinalizedBlock` for every
 // newly finalized block in increasing height order.
@@ -505,7 +496,7 @@ func (f *Forks2) finalizeUpToBlock(qc *flow.QuorumCertificate) error {
 //     (weighted by stake) in the network, breaking the safety guarantees of HotStuff (or there
 //     is a critical bug / data corruption). Forks cannot recover from this exception.
 //   - generic error in case of bug or internal state corruption
-func (f *Forks2) finalizationNotificationsUpToBlock(qc *flow.QuorumCertificate) error {
+func (f *Forks2) finalizationEventsUpToBlock(qc *flow.QuorumCertificate) error {
 	lastFinalizedView := f.lastFinalized.Block.View
 	if qc.View < lastFinalizedView {
 		return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
