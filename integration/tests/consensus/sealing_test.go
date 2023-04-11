@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/ghost/client"
 	verUtils "github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
@@ -41,22 +40,19 @@ type SealingSuite struct {
 }
 
 func (ss *SealingSuite) Execution() *client.GhostClient {
-	ghost := ss.net.ContainerByID(ss.exeID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := ss.net.ContainerByID(ss.exeID).GhostClient()
 	require.NoError(ss.T(), err, "could not get ghost client")
 	return client
 }
 
 func (ss *SealingSuite) Execution2() *client.GhostClient {
-	ghost := ss.net.ContainerByID(ss.exe2ID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := ss.net.ContainerByID(ss.exe2ID).GhostClient()
 	require.NoError(ss.T(), err, "could not get ghost client")
 	return client
 }
 
 func (ss *SealingSuite) Verification() *client.GhostClient {
-	ghost := ss.net.ContainerByID(ss.verID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := ss.net.ContainerByID(ss.verID).GhostClient()
 	require.NoError(ss.T(), err, "could not get ghost client")
 	return client
 }

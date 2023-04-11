@@ -48,6 +48,7 @@ func TestFollowerHappyPath(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
+		log := unittest.Logger()
 		consumer := events.NewNoop()
 		all := storageutil.StorageLayer(t, db)
 
@@ -57,7 +58,15 @@ func TestFollowerHappyPath(t *testing.T) {
 		mockTimer := util.MockBlockTimer()
 
 		// create follower state
-		followerState, err := pbadger.NewFollowerState(state, all.Index, all.Payloads, tracer, consumer, mockTimer)
+		followerState, err := pbadger.NewFollowerState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			mockTimer,
+		)
 		require.NoError(t, err)
 		finalizer := moduleconsensus.NewFinalizer(db, all.Headers, followerState, tracer)
 		rootHeader, err := rootSnapshot.Head()

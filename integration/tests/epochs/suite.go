@@ -113,10 +113,7 @@ func (s *Suite) SetupTest() {
 	s.Track(s.T(), s.ctx, s.Ghost())
 
 	// use AN1 for test-related queries - the AN join/leave test will replace AN2
-	port, ok := s.net.AccessPortsByContainerName["access_1"]
-	require.True(s.T(), ok)
-	addr := fmt.Sprintf(":%s", port)
-	client, err := testnet.NewClient(addr, s.net.Root().Header.ChainID.Chain())
+	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(s.T(), err)
 
 	s.client = client
@@ -126,8 +123,7 @@ func (s *Suite) SetupTest() {
 }
 
 func (s *Suite) Ghost() *client.GhostClient {
-	ghost := s.net.ContainerByID(s.ghostID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := s.net.ContainerByID(s.ghostID).GhostClient()
 	require.NoError(s.T(), err, "could not get ghost client")
 	return client
 }
@@ -576,8 +572,7 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 
 	// get snapshot directly from new AN and compare head with head from the
 	// snapshot that was used to bootstrap the node
-	clientAddr := fmt.Sprintf(":%s", s.net.AccessPortsByContainerName[info.ContainerName])
-	client, err := testnet.NewClient(clientAddr, s.net.Root().Header.ChainID.Chain())
+	client, err := s.net.ContainerByName(info.ContainerName).TestnetClient()
 	require.NoError(s.T(), err)
 
 	// overwrite client to point to the new AN (since we have stopped the initial AN at this point)
