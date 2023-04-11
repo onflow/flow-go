@@ -27,12 +27,12 @@ import (
 // 5. score is negative and below the skipDecayThreshold and lastUpdated is too old. In this case, the score should be decayed.
 func TestDefaultDecayFunction(t *testing.T) {
 	type args struct {
-		record      netcache.GossipSubSpamRecord
+		record      p2p.GossipSubSpamRecord
 		lastUpdated time.Time
 	}
 
 	type want struct {
-		record netcache.GossipSubSpamRecord
+		record p2p.GossipSubSpamRecord
 	}
 
 	tests := []struct {
@@ -44,14 +44,14 @@ func TestDefaultDecayFunction(t *testing.T) {
 			// 1. score is non-negative and should not be decayed.
 			name: "score is non-negative",
 			args: args{
-				record: netcache.GossipSubSpamRecord{
+				record: p2p.GossipSubSpamRecord{
 					Penalty: 5,
 					Decay:   0.8,
 				},
 				lastUpdated: time.Now(),
 			},
 			want: want{
-				record: netcache.GossipSubSpamRecord{
+				record: p2p.GossipSubSpamRecord{
 					Penalty: 5,
 					Decay:   0.8,
 				},
@@ -61,14 +61,14 @@ func TestDefaultDecayFunction(t *testing.T) {
 			// since less than a second has passed since last update.
 			name: "score is negative and but above skipDecayThreshold and lastUpdated is too recent",
 			args: args{
-				record: netcache.GossipSubSpamRecord{
+				record: p2p.GossipSubSpamRecord{
 					Penalty: -0.09, // -0.09 is above skipDecayThreshold of -0.1
 					Decay:   0.8,
 				},
 				lastUpdated: time.Now(),
 			},
 			want: want{
-				record: netcache.GossipSubSpamRecord{
+				record: p2p.GossipSubSpamRecord{
 					Penalty: 0, // score is set to 0
 					Decay:   0.8,
 				},
@@ -79,14 +79,14 @@ func TestDefaultDecayFunction(t *testing.T) {
 			// since score is between [skipDecayThreshold, 0] and more than a second has passed since last update.
 			name: "score is negative and but above skipDecayThreshold and lastUpdated is too old",
 			args: args{
-				record: netcache.GossipSubSpamRecord{
+				record: p2p.GossipSubSpamRecord{
 					Penalty: -0.09, // -0.09 is above skipDecayThreshold of -0.1
 					Decay:   0.8,
 				},
 				lastUpdated: time.Now().Add(-10 * time.Second),
 			},
 			want: want{
-				record: netcache.GossipSubSpamRecord{
+				record: p2p.GossipSubSpamRecord{
 					Penalty: 0, // score is set to 0
 					Decay:   0.8,
 				},
@@ -97,14 +97,14 @@ func TestDefaultDecayFunction(t *testing.T) {
 			// since less than a second has passed since last update.
 			name: "score is negative and below skipDecayThreshold but lastUpdated is too recent",
 			args: args{
-				record: netcache.GossipSubSpamRecord{
+				record: p2p.GossipSubSpamRecord{
 					Penalty: -5,
 					Decay:   0.8,
 				},
 				lastUpdated: time.Now(),
 			},
 			want: want{
-				record: netcache.GossipSubSpamRecord{
+				record: p2p.GossipSubSpamRecord{
 					Penalty: -5,
 					Decay:   0.8,
 				},
@@ -114,14 +114,14 @@ func TestDefaultDecayFunction(t *testing.T) {
 			// 5. score is negative and below the skipDecayThreshold and lastUpdated is too old. In this case, the score should be decayed.
 			name: "score is negative and below skipDecayThreshold but lastUpdated is too old",
 			args: args{
-				record: netcache.GossipSubSpamRecord{
+				record: p2p.GossipSubSpamRecord{
 					Penalty: -15,
 					Decay:   0.8,
 				},
 				lastUpdated: time.Now().Add(-10 * time.Second),
 			},
 			want: want{
-				record: netcache.GossipSubSpamRecord{
+				record: p2p.GossipSubSpamRecord{
 					Penalty: -15 * math.Pow(0.8, 10),
 					Decay:   0.8,
 				},
@@ -362,8 +362,8 @@ func TestDecayToZero(t *testing.T) {
 		Collector:     metrics.NewNoopCollector(),
 		DecayFunction: scoring.DefaultDecayFunction(),
 		Penalty:       penaltyValueFixtures(),
-	}, scoring.WithScoreCache(cache), scoring.WithRecordInit(func() netcache.GossipSubSpamRecord {
-		return netcache.GossipSubSpamRecord{
+	}, scoring.WithScoreCache(cache), scoring.WithRecordInit(func() p2p.GossipSubSpamRecord {
+		return p2p.GossipSubSpamRecord{
 			Decay:   0.02, // we choose a small decay value to speed up the test.
 			Penalty: 0,
 		}

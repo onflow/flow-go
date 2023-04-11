@@ -19,3 +19,58 @@ type ProtocolPeerCache interface {
 	// GetPeers returns a copy of the set of peers that support the given protocol.
 	GetPeers(pid protocol.ID) map[peer.ID]struct{}
 }
+
+// GossipSubSpamRecordCache is a cache for storing the gossipsub spam records of peers.
+// The spam records of peers is used to calculate the application specific score, which is part of the GossipSub score of a peer.
+// Note that neither of the spam records, application specific score, and GossipSub score are shared publicly with other peers.
+// Rather they are solely used by the current peer to select the peers to which it will connect on a topic mesh.
+type GossipSubSpamRecordCache interface {
+	// Add adds the GossipSubSpamRecord of a peer to the cache.
+	// Args:
+	// - peerID: the peer ID of the peer in the GossipSub protocol.
+	// - record: the GossipSubSpamRecord of the peer.
+	//
+	// Returns:
+	// - bool: true if the record was added successfully, false otherwise.
+	Add(peerId peer.ID, record GossipSubSpamRecord) bool
+
+	// Get returns the GossipSubSpamRecord of a peer from the cache.
+	// Args:
+	// - peerID: the peer ID of the peer in the GossipSub protocol.
+	// Returns:
+	// - *GossipSubSpamRecord: the GossipSubSpamRecord of the peer.
+	// - error on failure to retrieve the record. The returned error is irrecoverable and the caller should crash the node.
+	// - bool: true if the record was retrieved successfully, false otherwise.
+	Get(peerID peer.ID) (*GossipSubSpamRecord, error, bool)
+
+	// Adjust adjusts the GossipSub spam penalty of a peer in the cache using the given adjust function.
+	// Args:
+	// - peerID: the peer ID of the peer in the GossipSub protocol.
+	// - adjustFn: the adjust function to be applied to the record.
+	// Returns:
+	// - *GossipSubSpamRecord: the updated record.
+	// - error on failure to update the record. The returned error is irrecoverable and the caller should crash the node.
+	Adjust(peerID peer.ID, adjustFn func(record GossipSubSpamRecord) GossipSubSpamRecord) (*GossipSubSpamRecord, error)
+
+	// Has returns true if the cache contains the GossipSubSpamRecord of the given peer.
+	// Args:
+	// - peerID: the peer ID of the peer in the GossipSub protocol.
+	// Returns:
+	// - bool: true if the cache contains the GossipSubSpamRecord of the given peer, false otherwise.
+	Has(peerID peer.ID) bool
+}
+
+// GossipSubSpamRecord represents spam record of a peer in the GossipSub protocol.
+// It acts as a penalty card for a peer in the GossipSub protocol that keeps the
+// spam penalty of the peer as well as its decay factor.
+// GossipSubSpam record is used to calculate the application specific score of a peer in the GossipSub protocol.
+type GossipSubSpamRecord struct {
+	// Decay factor of gossipsub spam penalty.
+	// The Penalty is multiplied by the Decay factor every time the Penalty is updated.
+	// This is to prevent the Penalty from being stuck at a negative value.
+	// Each peer has its own Decay factor based on its behavior.
+	// Valid decay value is in the range [0, 1].
+	Decay float64
+	// Penalty is the application specific Penalty of the peer.
+	Penalty float64
+}

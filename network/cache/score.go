@@ -12,6 +12,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // GossipSubSpamRecordCache is a cache for storing the gossipsub spam records of peers.
@@ -28,6 +29,8 @@ type GossipSubSpamRecordCache struct {
 	preprocessFns []PreprocessorFunc
 }
 
+var _ p2p.GossipSubSpamRecordCache = (*GossipSubSpamRecordCache)(nil)
+
 // PreprocessorFunc is a function that is called by the cache upon reading or updating a record in the cache.
 // It is used to perform any necessary pre-processing on the record before returning it when reading or changing it when updating.
 // The effect of the pre-processing is that the record is updated in the cache.
@@ -42,7 +45,7 @@ type GossipSubSpamRecordCache struct {
 //		GossipSubSpamRecord: the pre-processed record.
 //	 error: an error if the pre-processing failed. The error is considered irrecoverable (unless the parameters can be adjusted and the pre-processing can be retried). The caller is
 //	 advised to crash the node upon an error if failure to read or update the record is not acceptable.
-type PreprocessorFunc func(record GossipSubSpamRecord, lastUpdated time.Time) (GossipSubSpamRecord, error)
+type PreprocessorFunc func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error)
 
 // NewGossipSubSpamRecordCache returns a new HeroCache-based application specific Penalty cache.
 // Args:
@@ -75,9 +78,9 @@ func NewGossipSubSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collec
 //
 // Returns:
 // - bool: true if the record was added successfully, false otherwise.
-// Note that an record is added successfully if the cache has enough space to store the record and no record exists for the peer in the cache.
+// Note that a record is added successfully if the cache has enough space to store the record and no record exists for the peer in the cache.
 // In other words, the entries are deduplicated by the peer ID.
-func (a *GossipSubSpamRecordCache) Add(peerId peer.ID, record GossipSubSpamRecord) bool {
+func (a *GossipSubSpamRecordCache) Add(peerId peer.ID, record p2p.GossipSubSpamRecord) bool {
 	entityId := flow.HashToID([]byte(peerId)) // HeroCache uses hash of peer.ID as the unique identifier of the record.
 	return a.c.Add(gossipsubSpamRecordEntity{
 		entityId:            entityId,
@@ -97,7 +100,7 @@ func (a *GossipSubSpamRecordCache) Add(peerId peer.ID, record GossipSubSpamRecor
 // - *GossipSubSpamRecord: the updated record.
 // - error on failure to update the record. The returned error is irrecoverable and the caller should crash the node.
 // Note that if any of the pre-processing functions returns an error, the record is reverted to its original state (prior to applying the update function).
-func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, adjustFn func(record GossipSubSpamRecord) GossipSubSpamRecord) (*GossipSubSpamRecord, error) {
+func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, adjustFn func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord) (*p2p.GossipSubSpamRecord, error) {
 	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the record.
 	if !a.c.Has(entityId) {
 		return nil, fmt.Errorf("could not adjust spam records for peer %s, record not found", peerID.String())
@@ -157,7 +160,7 @@ func (a *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
 //   - error if the underlying cache update fails, or any of the pre-processors fails. The error is considered irrecoverable, and
 //     the caller is advised to crash the node.
 //   - true if the record is found in the cache, false otherwise.
-func (a *GossipSubSpamRecordCache) Get(peerID peer.ID) (*GossipSubSpamRecord, error, bool) {
+func (a *GossipSubSpamRecordCache) Get(peerID peer.ID) (*p2p.GossipSubSpamRecord, error, bool) {
 	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the record.
 	if !a.c.Has(entityId) {
 		return nil, nil, false
@@ -191,21 +194,6 @@ func (a *GossipSubSpamRecordCache) Get(peerID peer.ID) (*GossipSubSpamRecord, er
 	return &r, nil, true
 }
 
-// GossipSubSpamRecord represents spam record of a peer in the GossipSub protocol.
-// It acts as a penalty card for a peer in the GossipSub protocol that keeps the
-// spam penalty of the peer as well as its decay factor.
-// GossipSubSpam record is used to calculate the application specific score of a peer in the GossipSub protocol.
-type GossipSubSpamRecord struct {
-	// Decay factor of gossipsub spam penalty.
-	// The Penalty is multiplied by the Decay factor every time the Penalty is updated.
-	// This is to prevent the Penalty from being stuck at a negative value.
-	// Each peer has its own Decay factor based on its behavior.
-	// Valid decay value is in the range [0, 1].
-	Decay float64
-	// Penalty is the application specific Penalty of the peer.
-	Penalty float64
-}
-
 // GossipSubSpamRecord represents an Entity implementation GossipSubSpamRecord.
 // It is internally used by the HeroCache to store the GossipSubSpamRecord.
 type gossipsubSpamRecordEntity struct {
@@ -214,7 +202,7 @@ type gossipsubSpamRecordEntity struct {
 	// the peer ID of the peer in the GossipSub protocol.
 	peerID      peer.ID
 	lastUpdated time.Time
-	GossipSubSpamRecord
+	p2p.GossipSubSpamRecord
 }
 
 // In order to use HeroCache, the gossipsubSpamRecordEntity must implement the flow.Entity interface.

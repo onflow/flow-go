@@ -73,7 +73,7 @@ type GossipSubAppSpecificScoreRegistry struct {
 	spamScoreCache *netcache.GossipSubSpamRecordCache
 	penalty        GossipSubCtrlMsgPenaltyValue
 	// initial application specific score record, used to initialize the score cache entry.
-	init      func() netcache.GossipSubSpamRecord
+	init      func() p2p.GossipSubSpamRecord
 	validator *SubscriptionValidator
 	mu        sync.Mutex
 }
@@ -85,7 +85,7 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	Collector     module.HeroCacheMetrics
 	DecayFunction netcache.PreprocessorFunc
 	Penalty       GossipSubCtrlMsgPenaltyValue
-	Init          func() netcache.GossipSubSpamRecord
+	Init          func() p2p.GossipSubSpamRecord
 }
 
 func WithGossipSubAppSpecificScoreRegistryPenalty(penalty GossipSubCtrlMsgPenaltyValue) func(registry *GossipSubAppSpecificScoreRegistry) {
@@ -100,7 +100,7 @@ func WithScoreCache(cache *netcache.GossipSubSpamRecordCache) func(registry *Gos
 	}
 }
 
-func WithRecordInit(init func() netcache.GossipSubSpamRecord) func(registry *GossipSubAppSpecificScoreRegistry) {
+func WithRecordInit(init func() p2p.GossipSubSpamRecord) func(registry *GossipSubAppSpecificScoreRegistry) {
 	return func(registry *GossipSubAppSpecificScoreRegistry) {
 		registry.init = init
 	}
@@ -231,7 +231,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	initialized := r.spamScoreCache.Add(notification.PeerID, r.init())
 	lg.Trace().Bool("initialized", initialized).Msg("initialization attempt for application specific")
 
-	record, err := r.spamScoreCache.Adjust(notification.PeerID, func(record netcache.GossipSubSpamRecord) netcache.GossipSubSpamRecord {
+	record, err := r.spamScoreCache.Adjust(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		switch notification.MsgType {
 		case p2p.CtrlMsgGraft:
 			record.Penalty += r.penalty.Graft
@@ -263,7 +263,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 // It is used if no decay function is provided in the configuration.
 // It decays the application specific score of a peer if it is negative.
 func DefaultDecayFunction() netcache.PreprocessorFunc {
-	return func(record netcache.GossipSubSpamRecord, lastUpdated time.Time) (netcache.GossipSubSpamRecord, error) {
+	return func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 		if record.Penalty >= 0 {
 			// no need to decay the score if it is positive, the reason is currently the app specific score
 			// is only used to penalize peers. Hence, when there is no reward, there is no need to decay the positive score, as
@@ -287,8 +287,8 @@ func DefaultDecayFunction() netcache.PreprocessorFunc {
 	}
 }
 
-func InitAppScoreRecordState() netcache.GossipSubSpamRecord {
-	return netcache.GossipSubSpamRecord{
+func InitAppScoreRecordState() p2p.GossipSubSpamRecord {
+	return p2p.GossipSubSpamRecord{
 		Decay:   defaultDecay,
 		Penalty: 0,
 	}

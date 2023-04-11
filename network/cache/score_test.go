@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -23,27 +24,27 @@ func TestGossipSubSpamRecordCache_Add(t *testing.T) {
 	cache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopCollector())
 
 	// tests adding a new record to the cache.
-	require.True(t, cache.Add("peer0", netcache.GossipSubSpamRecord{
+	require.True(t, cache.Add("peer0", p2p.GossipSubSpamRecord{
 		Decay:   0.1,
 		Penalty: 0.5,
 	}))
 
 	// tests updating an existing record in the cache.
-	require.False(t, cache.Add("peer0", netcache.GossipSubSpamRecord{
+	require.False(t, cache.Add("peer0", p2p.GossipSubSpamRecord{
 		Decay:   0.1,
 		Penalty: 0.5,
 	}))
 
 	// makes the cache full.
 	for i := 1; i < 100; i++ {
-		require.True(t, cache.Add(peer.ID(fmt.Sprintf("peer%d", i)), netcache.GossipSubSpamRecord{
+		require.True(t, cache.Add(peer.ID(fmt.Sprintf("peer%d", i)), p2p.GossipSubSpamRecord{
 			Decay:   0.1,
 			Penalty: 0.5,
 		}))
 	}
 
 	// adding a new record to the cache should fail.
-	require.False(t, cache.Add("peer101", netcache.GossipSubSpamRecord{
+	require.False(t, cache.Add("peer101", p2p.GossipSubSpamRecord{
 		Decay:   0.1,
 		Penalty: 0.5,
 	}))
@@ -59,7 +60,7 @@ func TestGossipSubSpamRecordCache_Add(t *testing.T) {
 	}
 
 	// yet attempting on adding an existing record should fail.
-	require.False(t, cache.Add("peer1", netcache.GossipSubSpamRecord{
+	require.False(t, cache.Add("peer1", p2p.GossipSubSpamRecord{
 		Decay:   0.2,
 		Penalty: 0.8,
 	}))
@@ -83,7 +84,7 @@ func TestGossipSubSpamRecordCache_Concurrent_Add(t *testing.T) {
 		go func(num int) {
 			defer wg.Done()
 			peerID := fmt.Sprintf("peer%d", num)
-			added := cache.Add(peer.ID(peerID), netcache.GossipSubSpamRecord{
+			added := cache.Add(peer.ID(peerID), p2p.GossipSubSpamRecord{
 				Decay:   0.1 * float64(num),
 				Penalty: float64(num),
 			})
@@ -117,11 +118,11 @@ func TestGossipSubSpamRecordCache_Adjust(t *testing.T) {
 	peerID := "peer1"
 
 	// tests adjusting the penalty of an existing record.
-	require.True(t, cache.Add(peer.ID(peerID), netcache.GossipSubSpamRecord{
+	require.True(t, cache.Add(peer.ID(peerID), p2p.GossipSubSpamRecord{
 		Decay:   0.1,
 		Penalty: 0.5,
 	}))
-	record, err := cache.Adjust(peer.ID(peerID), func(record netcache.GossipSubSpamRecord) netcache.GossipSubSpamRecord {
+	record, err := cache.Adjust(peer.ID(peerID), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		record.Penalty = 0.7
 		return record
 	})
@@ -129,7 +130,7 @@ func TestGossipSubSpamRecordCache_Adjust(t *testing.T) {
 	require.Equal(t, 0.7, record.Penalty) // checks if the penalty is adjusted correctly.
 
 	// tests adjusting the penalty of a non-existing record.
-	record, err = cache.Adjust(peer.ID("peer2"), func(record netcache.GossipSubSpamRecord) netcache.GossipSubSpamRecord {
+	record, err = cache.Adjust(peer.ID("peer2"), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		require.Fail(t, "the function should not be called for a non-existing record")
 		return record
 	})
@@ -148,7 +149,7 @@ func TestGossipSubSpamRecordCache_Concurrent_Adjust(t *testing.T) {
 	// adds all records to the cache, sequentially.
 	for i := 0; i < numRecords; i++ {
 		peerID := fmt.Sprintf("peer%d", i)
-		err := cache.Add(peer.ID(peerID), netcache.GossipSubSpamRecord{
+		err := cache.Add(peer.ID(peerID), p2p.GossipSubSpamRecord{
 			Decay:   0.1 * float64(i),
 			Penalty: float64(i),
 		})
@@ -164,7 +165,7 @@ func TestGossipSubSpamRecordCache_Concurrent_Adjust(t *testing.T) {
 		go func(num int) {
 			defer wg.Done()
 			peerID := fmt.Sprintf("peer%d", num)
-			_, err := cache.Adjust(peer.ID(peerID), func(record netcache.GossipSubSpamRecord) netcache.GossipSubSpamRecord {
+			_, err := cache.Adjust(peer.ID(peerID), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 				record.Penalty = 0.7 * float64(num)
 				record.Decay = 0.1 * float64(num)
 				return record
@@ -199,23 +200,23 @@ func TestGossipSubSpamRecordCache_Adjust_With_Preprocess(t *testing.T) {
 	cache := netcache.NewGossipSubSpamRecordCache(200,
 		unittest.Logger(),
 		metrics.NewNoopCollector(),
-		func(record netcache.GossipSubSpamRecord, lastUpdated time.Time) (netcache.GossipSubSpamRecord, error) {
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 			record.Penalty += 1.5
 			return record, nil
-		}, func(record netcache.GossipSubSpamRecord, lastUpdated time.Time) (netcache.GossipSubSpamRecord, error) {
+		}, func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 			record.Penalty *= 2
 			return record, nil
 		})
 
 	peerID := "peer1"
 	// adds a record to the cache.
-	require.True(t, cache.Add(peer.ID(peerID), netcache.GossipSubSpamRecord{
+	require.True(t, cache.Add(peer.ID(peerID), p2p.GossipSubSpamRecord{
 		Decay:   0.1,
 		Penalty: 0.5,
 	}))
 
 	// tests adjusting the penalty of an existing record.
-	record, err := cache.Adjust(peer.ID(peerID), func(record netcache.GossipSubSpamRecord) netcache.GossipSubSpamRecord {
+	record, err := cache.Adjust(peer.ID(peerID), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		record.Penalty += 0.7
 		return record
 	})
@@ -233,11 +234,11 @@ func TestGossipSubSpamRecordCache_Adjust_Preprocess_Error(t *testing.T) {
 		unittest.Logger(),
 		metrics.NewNoopCollector(),
 		// the first preprocessor function does not return an error.
-		func(record netcache.GossipSubSpamRecord, lastUpdated time.Time) (netcache.GossipSubSpamRecord, error) {
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 			return record, nil
 		},
 		// the second preprocessor function returns an error on the first call and nil on the second call onwards.
-		func(record netcache.GossipSubSpamRecord, lastUpdated time.Time) (netcache.GossipSubSpamRecord, error) {
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 			if !secondPreprocessorCalled {
 				secondPreprocessorCalled = true
 				return record, fmt.Errorf("error")
@@ -247,13 +248,13 @@ func TestGossipSubSpamRecordCache_Adjust_Preprocess_Error(t *testing.T) {
 
 	peerID := "peer1"
 	// adds a record to the cache.
-	require.True(t, cache.Add(peer.ID(peerID), netcache.GossipSubSpamRecord{
+	require.True(t, cache.Add(peer.ID(peerID), p2p.GossipSubSpamRecord{
 		Decay:   0.1,
 		Penalty: 0.5,
 	}))
 
 	// tests adjusting the penalty of an existing record.
-	record, err := cache.Adjust(peer.ID(peerID), func(record netcache.GossipSubSpamRecord) netcache.GossipSubSpamRecord {
+	record, err := cache.Adjust(peer.ID(peerID), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		record.Penalty = 0.7
 		return record
 	})
@@ -279,7 +280,7 @@ func TestGossipSubSpamRecordCache_ByValue(t *testing.T) {
 	cache := netcache.NewGossipSubSpamRecordCache(200, unittest.Logger(), metrics.NewNoopCollector())
 
 	peerID := "peer1"
-	added := cache.Add(peer.ID(peerID), netcache.GossipSubSpamRecord{
+	added := cache.Add(peer.ID(peerID), p2p.GossipSubSpamRecord{
 		Decay:   0.1,
 		Penalty: 0.5,
 	})
@@ -309,18 +310,18 @@ func TestGossipSubSpamRecordCache_ByValue(t *testing.T) {
 func TestGossipSubSpamRecordCache_Get_With_Preprocessors(t *testing.T) {
 	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector(),
 		// first preprocessor: adds 1 to the penalty.
-		func(record netcache.GossipSubSpamRecord, lastUpdated time.Time) (netcache.GossipSubSpamRecord, error) {
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 			record.Penalty++
 			return record, nil
 		},
 		// second preprocessor: multiplies the penalty by 2
-		func(record netcache.GossipSubSpamRecord, lastUpdated time.Time) (netcache.GossipSubSpamRecord, error) {
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 			record.Penalty *= 2
 			return record, nil
 		},
 	)
 
-	record := netcache.GossipSubSpamRecord{
+	record := p2p.GossipSubSpamRecord{
 		Decay:   0.5,
 		Penalty: 1,
 	}
@@ -349,30 +350,30 @@ func TestGossipSubSpamRecordCache_Get_Preprocessor_Error(t *testing.T) {
 
 	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector(),
 		// first preprocessor: adds 1 to the penalty.
-		func(record netcache.GossipSubSpamRecord, lastUpdated time.Time) (netcache.GossipSubSpamRecord, error) {
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 			record.Penalty++
 			return record, nil
 		},
 		// second preprocessor: multiplies the penalty by 2 (this preprocessor returns an error on the second call)
-		func(record netcache.GossipSubSpamRecord, lastUpdated time.Time) (netcache.GossipSubSpamRecord, error) {
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 			secondPreprocessorCalledCount++
 			if secondPreprocessorCalledCount < 2 {
 				// on the first call, the preprocessor is successful
 				return record, nil
 			} else {
 				// on the second call, the preprocessor returns an error
-				return netcache.GossipSubSpamRecord{}, fmt.Errorf("error in preprocessor")
+				return p2p.GossipSubSpamRecord{}, fmt.Errorf("error in preprocessor")
 			}
 		},
 		// since second preprocessor returns an error on the second call, the third preprocessor should not be called more than once..
-		func(record netcache.GossipSubSpamRecord, lastUpdated time.Time) (netcache.GossipSubSpamRecord, error) {
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 			thirdPreprocessorCalledCount++
 			require.Less(t, secondPreprocessorCalledCount, 2)
 			return record, nil
 		},
 	)
 
-	record := netcache.GossipSubSpamRecord{
+	record := p2p.GossipSubSpamRecord{
 		Decay:   0.5,
 		Penalty: 1,
 	}
@@ -403,7 +404,7 @@ func TestGossipSubSpamRecordCache_Get_Preprocessor_Error(t *testing.T) {
 func TestGossipSubSpamRecordCache_Get_Without_Preprocessors(t *testing.T) {
 	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector())
 
-	record := netcache.GossipSubSpamRecord{
+	record := p2p.GossipSubSpamRecord{
 		Decay:   0.5,
 		Penalty: 1,
 	}
@@ -424,7 +425,7 @@ func TestGossipSubSpamRecordCache_Get_Without_Preprocessors(t *testing.T) {
 func TestGossipSubSpamRecordCache_Duplicate_Add_Sequential(t *testing.T) {
 	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector())
 
-	record := netcache.GossipSubSpamRecord{
+	record := p2p.GossipSubSpamRecord{
 		Decay:   0.5,
 		Penalty: 1,
 	}
@@ -449,12 +450,12 @@ func TestGossipSubSpamRecordCache_Duplicate_Add_Concurrent(t *testing.T) {
 	successAdd := atomic.Int32{}
 	successAdd.Store(0)
 
-	record1 := netcache.GossipSubSpamRecord{
+	record1 := p2p.GossipSubSpamRecord{
 		Decay:   0.5,
 		Penalty: 1,
 	}
 
-	record2 := netcache.GossipSubSpamRecord{
+	record2 := p2p.GossipSubSpamRecord{
 		Decay:   0.5,
 		Penalty: 2,
 	}
@@ -462,7 +463,7 @@ func TestGossipSubSpamRecordCache_Duplicate_Add_Concurrent(t *testing.T) {
 	wg := sync.WaitGroup{} // wait group to wait for all goroutines to finish.
 	wg.Add(2)
 	// adds a record to the cache concurrently.
-	add := func(record netcache.GossipSubSpamRecord) {
+	add := func(record p2p.GossipSubSpamRecord) {
 		added := cache.Add("peerA", record)
 		if added {
 			successAdd.Inc()
