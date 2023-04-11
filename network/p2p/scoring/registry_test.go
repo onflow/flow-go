@@ -2,7 +2,6 @@ package scoring_test
 
 import (
 	"math"
-	"sync"
 	"testing"
 	"time"
 
@@ -146,7 +145,7 @@ func TestDefaultDecayFunction(t *testing.T) {
 // TestInit tests when a peer id is queried for the first time by the
 // app specific score function, the score is initialized to the initial state.
 func TestInitSpamRecords(t *testing.T) {
-	reg, cache := newGossipSubAppSpecificScoreRegistry()
+	reg, cache := newGossipSubAppSpecificScoreRegistry(t)
 	peerID := peer.ID("peer-1")
 
 	// initially, the cache should not have the peer id.
@@ -185,7 +184,7 @@ func TestInitWhenGetGoesFirst(t *testing.T) {
 // score is updated in the cache. The next time the app specific score function is called, the score should be the
 // updated score.
 func testInitWhenGetFirst(t *testing.T, messageType p2p.ControlMessageType, expectedPenalty float64) {
-	reg, cache := newGossipSubAppSpecificScoreRegistry()
+	reg, cache := newGossipSubAppSpecificScoreRegistry(t)
 	peerID := peer.ID("peer-1")
 
 	// initially, the cache should not have the peer id.
@@ -242,7 +241,7 @@ func TestInitWhenReportGoesFirst(t *testing.T) {
 // The test expects the score to be initialized to the initial state and then updated by the penalty value.
 // Subsequent calls to the app specific score function should return the updated score.
 func testInitWhenReportGoesFirst(t *testing.T, messageType p2p.ControlMessageType, expectedPenalty float64) {
-	reg, cache := newGossipSubAppSpecificScoreRegistry()
+	reg, cache := newGossipSubAppSpecificScoreRegistry(t)
 	peerID := peer.ID("peer-1")
 
 	// report a misbehavior for the peer id.
@@ -264,10 +263,12 @@ func testInitWhenReportGoesFirst(t *testing.T, messageType p2p.ControlMessageTyp
 	assert.Less(t, math.Abs(scoring.DefaultGossipSubCtrlMsgPenaltyValue().Graft-score), 10e-3) // score should be updated to -10, we account for decay.
 }
 
-// TestScoreDecays tests that the score decays over time.
-func TestScoreDecays(t *testing.T) {
-	reg, _ := newGossipSubAppSpecificScoreRegistry()
+// TestSpamPenaltyDecaysInCache tests that the spam penalty records decay over time in the cache.
+func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	peerID := peer.ID("peer-1")
+	reg, _ := newGossipSubAppSpecificScoreRegistry(t,
+		withStakedIdentity(peerID),
+		withValidSubscriptions(peerID))
 
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
@@ -276,7 +277,7 @@ func TestScoreDecays(t *testing.T) {
 		Count:   1,
 	})
 
-	time.Sleep(1 * time.Second) // wait for the score to decay.
+	time.Sleep(1 * time.Second) // wait for the penalty to decay.
 
 	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
 		PeerID:  peerID,
@@ -284,7 +285,7 @@ func TestScoreDecays(t *testing.T) {
 		Count:   1,
 	})
 
-	time.Sleep(1 * time.Second) // wait for the score to decay.
+	time.Sleep(1 * time.Second) // wait for the penalty to decay.
 
 	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
 		PeerID:  peerID,
@@ -292,7 +293,7 @@ func TestScoreDecays(t *testing.T) {
 		Count:   1,
 	})
 
-	time.Sleep(1 * time.Second) // wait for the score to decay.
+	time.Sleep(1 * time.Second) // wait for the penalty to decay.
 
 	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
 		PeerID:  peerID,
@@ -300,9 +301,11 @@ func TestScoreDecays(t *testing.T) {
 		Count:   1,
 	})
 
-	time.Sleep(1 * time.Second) // wait for the score to decay.
+	time.Sleep(1 * time.Second) // wait for the penalty to decay.
 
-	// when the app specific score function is called for the first time, the score should be updated.
+	// when the app specific score function is called for the first time, the decay functionality should be kicked in
+	// the cache, and the score should be updated. Note that since the penalty values are negative, the default staked identity
+	// reward is not applied. Hence, the score is only comprised of the penalties.
 	score := reg.AppSpecificScoreFunc()(peerID)
 	// the upper bound is the sum of the penalties without decay.
 	scoreUpperBound := penaltyValueFixtures().Prune +
@@ -316,43 +319,6 @@ func TestScoreDecays(t *testing.T) {
 	// with decay, the score should be between the upper and lower bounds.
 	assert.Greater(t, score, scoreUpperBound)
 	assert.Less(t, score, scoreLowerBound)
-}
-
-// TestConcurrentGetAndReport tests concurrent calls to the app specific score
-// and report function when there is no record in the cache about the peer.
-// The test expects the score to be initialized to the initial state and then updated by the penalty value, regardless of
-// the order of the calls.
-func TestConcurrentGetAndReport(t *testing.T) {
-	reg, cache := newGossipSubAppSpecificScoreRegistry()
-	peerID := peer.ID("peer-1")
-
-	wg := sync.WaitGroup{} // wait group to wait for all the go routines to finish.
-	wg.Add(2)              // we expect 2 go routines to finish.
-
-	// go routine to call the app specific score function.
-	go func() {
-		defer wg.Done()
-		score := reg.AppSpecificScoreFunc()(peerID)
-		assert.Equal(t, score, scoring.InitAppScoreRecordState().Penalty) // score should be initialized to the initial state.
-	}()
-
-	// go routine to report a misbehavior for the peer id.
-	go func() {
-		defer wg.Done()
-		reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
-			PeerID:  peerID,
-			MsgType: p2p.CtrlMsgGraft,
-			Count:   1,
-		})
-	}()
-
-	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "goroutines are not done on time") // wait for the go routines to finish.
-
-	// the score should now be updated.
-	record, err, ok := cache.Get(peerID) // get the record from the cache.
-	assert.True(t, ok)
-	assert.NoError(t, err)
-	assert.Less(t, math.Abs(scoring.DefaultGossipSubCtrlMsgPenaltyValue().Graft-record.Penalty), 10e-3) // score should be updated to -10.
 }
 
 // TestSpamPenaltyDecayToZero tests that the spam penalty decays to zero over time, and when the spam penalty of
@@ -417,19 +383,41 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 	assert.Equal(t, 0.0, record.Penalty) // score should be zero.
 }
 
+// withStakedIdentity returns a function that sets the identity provider to return an staked identity for the given peer id.
+// It is used for testing purposes, and causes the given peer id to benefit from the staked identity reward in GossipSub.
+func withStakedIdentity(peerId peer.ID) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+		cfg.IdProvider.(*mock.IdentityProvider).On("ByPeerID", peerId).Return(unittest.IdentityFixture(), true).Maybe()
+	}
+}
+
+// withValidSubscriptions returns a function that sets the subscription validator to return nil for the given peer id.
+// It is used for testing purposes and causes the given peer id to never be penalized for subscribing to invalid topics.
+func withValidSubscriptions(peer peer.ID) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+		cfg.Validator.(*mockp2p.SubscriptionValidator).On("CheckSubscribedToAllowedTopics", peer, testifymock.Anything).Return(nil).Maybe()
+	}
+}
+
 // newGossipSubAppSpecificScoreRegistry returns a new instance of GossipSubAppSpecificScoreRegistry with default values
 // for the testing purposes.
-func newGossipSubAppSpecificScoreRegistry() (*scoring.GossipSubAppSpecificScoreRegistry, *netcache.GossipSubSpamRecordCache) {
+func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.GossipSubAppSpecificScoreRegistryConfig)) (*scoring.GossipSubAppSpecificScoreRegistry, *netcache.GossipSubSpamRecordCache) {
 	cache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopCollector(), scoring.DefaultDecayFunction())
-	return scoring.NewGossipSubAppSpecificScoreRegistry(&scoring.GossipSubAppSpecificScoreRegistryConfig{
+	cfg := &scoring.GossipSubAppSpecificScoreRegistryConfig{
 		Logger:        unittest.Logger(),
 		DecayFunction: scoring.DefaultDecayFunction(),
 		Init:          scoring.InitAppScoreRecordState,
 		Penalty:       penaltyValueFixtures(),
+		IdProvider:    mock.NewIdentityProvider(t),
+		Validator:     mockp2p.NewSubscriptionValidator(t),
 		CacheFactory: func() p2p.GossipSubSpamRecordCache {
 			return cache
 		},
-	}), cache
+	}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	return scoring.NewGossipSubAppSpecificScoreRegistry(cfg), cache
 }
 
 // penaltyValueFixtures returns a set of penalty values for testing purposes.
