@@ -224,7 +224,10 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 	}
 
 	if scoreOpt != nil {
-		scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(g.logger, gossipSub))
+		err := scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(g.logger, gossipSub))
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not set subscription provider: %w", err)
+		}
 	}
 
 	return gossipSub, scoreTracer, nil

@@ -86,7 +86,7 @@ type ScoreOption struct {
 
 	peerScoreParams     *pubsub.PeerScoreParams
 	peerThresholdParams *pubsub.PeerScoreThresholds
-	validator           *SubscriptionValidator
+	validator           p2p.SubscriptionValidator
 	appScoreFunc        func(peer.ID) float64
 }
 
@@ -193,8 +193,8 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 	return s
 }
 
-func (s *ScoreOption) SetSubscriptionProvider(provider *SubscriptionProvider) {
-	s.validator.RegisterSubscriptionProvider(provider)
+func (s *ScoreOption) SetSubscriptionProvider(provider *SubscriptionProvider) error {
+	return s.validator.RegisterSubscriptionProvider(provider)
 }
 
 func (s *ScoreOption) BuildFlowPubSubScoreOption() pubsub.Option {
