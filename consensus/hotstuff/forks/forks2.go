@@ -478,10 +478,14 @@ func (f *Forks2) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBl
 		return nil
 	}
 	// parentBlock is finalized:
-	f.finalityProof = &FinalityProof{Block: parentBlock, CertifiedChild: *certifiedBlock}
 	err := f.finalizationEventsUpToBlock(qcForParent)
 	if err != nil {
 		return fmt.Errorf("emitting finalization events up to block %v failed: %w", qcForParent.BlockID, err)
+	}
+	f.finalityProof = &FinalityProof{Block: parentBlock, CertifiedChild: *certifiedBlock}
+	err = f.forest.PruneUpToLevel(f.FinalizedView())
+	if err != nil {
+		return fmt.Errorf("pruning levelled forest failed unexpectedly: %w", err)
 	}
 
 	return nil
@@ -508,7 +512,7 @@ func (f *Forks2) finalizationEventsUpToBlock(qc *flow.QuorumCertificate) error {
 
 	// collect all blocks that should be finalized in slice
 	// Caution: the blocks in the slice are listed from highest to lowest block
-	blocksToBeFinalized := make([]*model.Block, 0, lastFinalized.View-qc.View)
+	blocksToBeFinalized := make([]*model.Block, 0, qc.View-lastFinalized.View)
 	for qc.View > lastFinalized.View {
 		b, ok := f.GetBlock(qc.BlockID)
 		if !ok {

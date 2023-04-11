@@ -292,17 +292,22 @@ func TestConflictingQCs(t *testing.T) {
 }
 
 // TestConflictingFinalizedForks checks that finalizing 2 conflicting forks should return model.ByzantineThresholdExceededError
-// receives [(◄1) 2] [(◄2) 3] [(◄2) 6] [(◄3) 4] [(◄4) 5] [(◄6) 7] [(◄7) 8]
-// It should return fatal error, because 2 conflicting forks were finalized
+// We ingest the the following block tree:
+//
+//	[(◄1) 2] [(◄2) 3] [(◄3) 4] [(◄4) 5]
+//	         [(◄2) 6] [(◄6) 7] [(◄7) 8]
+//
+// Here, both blocks [(◄2) 3] and [(◄2) 6] satisfy the finalization condition, i.e. we have a fork
+// in the finalized blocks, which should result in a model.ByzantineThresholdExceededError exception.
 func TestConflictingFinalizedForks(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 3)
 	builder.Add(3, 4)
-	builder.Add(4, 5) // finalizes (2,3)
+	builder.Add(4, 5) // finalizes [(◄2) 3]
 	builder.Add(2, 6)
 	builder.Add(6, 7)
-	builder.Add(7, 8) // finalizes (2,6) conflicts with (2,3)
+	builder.Add(7, 8) // finalizes [(◄2) 6], conflicting with conflicts with [(◄2) 3]
 
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
@@ -362,7 +367,7 @@ func TestGetProposal(t *testing.T) {
 	for _, proposal := range blocksAddedFirst {
 		got, ok := forks.GetBlock(proposal.Block.BlockID)
 		assert.True(t, ok)
-		assert.Equal(t, proposal, got)
+		assert.Equal(t, proposal.Block, got)
 	}
 
 	// add second blocks - should finalize [(◄2) 3] and prune [(◄1) 2]
@@ -372,7 +377,7 @@ func TestGetProposal(t *testing.T) {
 	// should be able to retrieve just added block
 	got, ok := forks.GetBlock(blocksAddedSecond[0].Block.BlockID)
 	assert.True(t, ok)
-	assert.Equal(t, blocksAddedSecond[0], got)
+	assert.Equal(t, blocksAddedSecond[0].Block, got)
 
 	// should be unable to retrieve pruned block
 	_, ok = forks.GetBlock(blocksAddedFirst[0].Block.BlockID)
@@ -400,12 +405,12 @@ func TestGetProposalsForView(t *testing.T) {
 	// 1 proposal at view 2
 	proposals := forks.GetBlocksForView(2)
 	assert.Len(t, proposals, 1)
-	assert.Equal(t, blocks[0], proposals[0])
+	assert.Equal(t, blocks[0].Block, proposals[0])
 
 	// 2 proposals at view 4
 	proposals = forks.GetBlocksForView(4)
 	assert.Len(t, proposals, 2)
-	assert.ElementsMatch(t, blocks[1:], proposals)
+	assert.ElementsMatch(t, toBlocks(blocks[1:]), proposals)
 
 	// 0 proposals at view 3
 	proposals = forks.GetBlocksForView(3)
@@ -505,4 +510,12 @@ func requireNoBlocksFinalized(t *testing.T, forks *Forks2) {
 	genesis := makeGenesis()
 	require.Equal(t, forks.FinalizedBlock().View, genesis.Block.View)
 	require.Equal(t, forks.FinalizedBlock().View, genesis.QC.View)
+}
+
+func toBlocks(proposals []*model.Proposal) []*model.Block {
+	blocks := make([]*model.Block, 0, len(proposals))
+	for _, b := range proposals {
+		blocks = append(blocks, b.Block)
+	}
+	return blocks
 }
