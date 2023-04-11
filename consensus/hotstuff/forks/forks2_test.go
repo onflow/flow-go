@@ -11,12 +11,15 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 )
 
-// NOTATION:
-// A block is denoted as [(◄<qc_number>) <block_view_number>].
-// For example, [(◄1) 2] means: a block of view 2 that has a QC for view 1.
+/*****************************************************************************
+ * NOTATION:                                                                 *
+ * A block is denoted as [(◄<qc_number>) <block_view_number>].               *
+ * For example, [(◄1) 2] means: a block of view 2 that has a QC for view 1.  *
+ *****************************************************************************/
 
 // TestFinalize_Direct1Chain tests adding a direct 1-chain.
 // receives [(◄1) 2] [(◄2) 3]
@@ -29,12 +32,19 @@ func TestFinalize_Direct1Chain(t *testing.T) {
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, _ := newForks(t)
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addProposalsToForks(forks, blocks)
+		require.Nil(t, err)
+		requireNoBlocksFinalized(t, forks)
+	})
 
-	err = addBlocksToForks(forks, blocks)
-	require.Nil(t, err)
-
-	requireNoBlocksFinalized(t, forks)
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addCertifiedBlocksToForks(forks, blocks)
+		require.Nil(t, err)
+		requireNoBlocksFinalized(t, forks)
+	})
 }
 
 // TestFinalize_Direct2Chain tests adding a direct 1-chain on a direct 1-chain (direct 2-chain).
@@ -49,12 +59,19 @@ func TestFinalize_Direct2Chain(t *testing.T) {
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, _ := newForks(t)
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addProposalsToForks(forks, blocks)
+		require.Nil(t, err)
+		requireLatestFinalizedBlock(t, forks, 1, 2)
+	})
 
-	err = addBlocksToForks(forks, blocks)
-	require.Nil(t, err)
-
-	requireLatestFinalizedBlock(t, forks, 1, 2)
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addCertifiedBlocksToForks(forks, blocks)
+		require.Nil(t, err)
+		requireLatestFinalizedBlock(t, forks, 1, 2)
+	})
 }
 
 // TestFinalize_DirectIndirect2Chain tests adding an indirect 1-chain on a direct 1-chain.
@@ -69,12 +86,19 @@ func TestFinalize_DirectIndirect2Chain(t *testing.T) {
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, _ := newForks(t)
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addProposalsToForks(forks, blocks)
+		require.Nil(t, err)
+		requireLatestFinalizedBlock(t, forks, 1, 2)
+	})
 
-	err = addBlocksToForks(forks, blocks)
-	require.Nil(t, err)
-
-	requireLatestFinalizedBlock(t, forks, 1, 2)
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addCertifiedBlocksToForks(forks, blocks)
+		require.Nil(t, err)
+		requireLatestFinalizedBlock(t, forks, 1, 2)
+	})
 }
 
 // TestFinalize_IndirectDirect2Chain tests adding a direct 1-chain on an indirect 1-chain.
@@ -89,18 +113,24 @@ func TestFinalize_IndirectDirect2Chain(t *testing.T) {
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, _ := newForks(t)
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addProposalsToForks(forks, blocks)
+		require.Nil(t, err)
+		requireNoBlocksFinalized(t, forks)
+	})
 
-	err = addBlocksToForks(forks, blocks)
-	require.Nil(t, err)
-
-	requireNoBlocksFinalized(t, forks)
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addCertifiedBlocksToForks(forks, blocks)
+		require.Nil(t, err)
+		requireNoBlocksFinalized(t, forks)
+	})
 }
 
-// TestFinalize_Direct2ChainOnIndirect tests adding a direct 2-chain on an indirect 2-chain.
-// The head of highest 2-chain should be finalized.
-// receives [(◄1) 3] [(◄3) 5] [(◄5) 6] [(◄6) 7] [(◄7) 8]
-// it should finalize [(◄5) 6]
+// TestFinalize_Direct2ChainOnIndirect tests adding a direct 2-chain on an indirect 2-chain:
+//   - ingesting [(◄1) 3] [(◄3) 5] [(◄5) 6] [(◄6) 7] [(◄7) 8]
+//   - should result in finalization of [(◄5) 6]
 func TestFinalize_Direct2ChainOnIndirect(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 3)
@@ -112,18 +142,24 @@ func TestFinalize_Direct2ChainOnIndirect(t *testing.T) {
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, _ := newForks(t)
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addProposalsToForks(forks, blocks)
+		require.Nil(t, err)
+		requireLatestFinalizedBlock(t, forks, 5, 6)
+	})
 
-	err = addBlocksToForks(forks, blocks)
-	require.Nil(t, err)
-
-	requireLatestFinalizedBlock(t, forks, 5, 6)
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addCertifiedBlocksToForks(forks, blocks)
+		require.Nil(t, err)
+		requireLatestFinalizedBlock(t, forks, 5, 6)
+	})
 }
 
-// TestFinalize_Direct2ChainOnDirect tests adding a sequence of direct 2-chains.
-// The head of highest 2-chain should be finalized.
-// receives [(◄1) 2] [(◄2) 3] [(◄3) 4] [(◄4) 5] [(◄5) 6]
-// it should finalize [(◄3) 4]
+// TestFinalize_Direct2ChainOnDirect tests adding a sequence of direct 2-chains:
+//   - ingesting [(◄1) 2] [(◄2) 3] [(◄3) 4] [(◄4) 5] [(◄5) 6]
+//   - should result in finalization of [(◄3) 4]
 func TestFinalize_Direct2ChainOnDirect(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
@@ -135,18 +171,24 @@ func TestFinalize_Direct2ChainOnDirect(t *testing.T) {
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, _ := newForks(t)
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addProposalsToForks(forks, blocks)
+		require.Nil(t, err)
+		requireLatestFinalizedBlock(t, forks, 3, 4)
+	})
 
-	err = addBlocksToForks(forks, blocks)
-	require.Nil(t, err)
-
-	requireLatestFinalizedBlock(t, forks, 3, 4)
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addCertifiedBlocksToForks(forks, blocks)
+		require.Nil(t, err)
+		requireLatestFinalizedBlock(t, forks, 3, 4)
+	})
 }
 
-// TestFinalize_Multiple2Chains tests the case where a block can be finalized
-// by different 2-chains.
-// receives [(◄1) 2] [(◄2) 3] [(◄3) 5] [(◄3) 6] [(◄3) 7]
-// it should finalize [(◄1) 2]
+// TestFinalize_Multiple2Chains tests the case where a block can be finalized by different 2-chains.
+//   - ingesting [(◄1) 2] [(◄2) 3] [(◄3) 5] [(◄3) 6] [(◄3) 7]
+//   - should result in finalization of [(◄1) 2]
 func TestFinalize_Multiple2Chains(t *testing.T) {
 	builder := NewBlockBuilder()
 	builder.Add(1, 2)
@@ -158,35 +200,54 @@ func TestFinalize_Multiple2Chains(t *testing.T) {
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, _ := newForks(t)
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addProposalsToForks(forks, blocks)
+		require.Nil(t, err)
+		requireLatestFinalizedBlock(t, forks, 1, 2)
+	})
 
-	err = addBlocksToForks(forks, blocks)
-	require.Nil(t, err)
-
-	requireLatestFinalizedBlock(t, forks, 1, 2)
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addCertifiedBlocksToForks(forks, blocks)
+		require.Nil(t, err)
+		requireLatestFinalizedBlock(t, forks, 1, 2)
+	})
 }
 
-// TestFinalize_OrphanedFork tests that we can finalize a block which causes
-// a conflicting fork to be orphaned.
-// receives [(◄1) 2] [(◄2) 3] [(◄2) 4] [(◄4) 5] [(◄5) 6]
-// it should finalize [(◄2) 4]
+// TestFinalize_OrphanedFork tests that we can finalize a block which causes a conflicting fork to be orphaned.
+// We ingest the the following block tree:
+//
+//	[(◄1) 2] [(◄2) 3]
+//	         [(◄2) 4] [(◄4) 5] [(◄5) 6]
+//
+// which should result in finalization of [(◄2) 4] and pruning of [(◄2) 3]
 func TestFinalize_OrphanedFork(t *testing.T) {
 	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 3)
-	builder.Add(2, 4)
-	builder.Add(4, 5)
-	builder.Add(5, 6)
+	builder.Add(1, 2) // [(◄1) 2]
+	builder.Add(2, 3) // [(◄2) 3], should eventually be pruned
+	builder.Add(2, 4) // [(◄2) 4]
+	builder.Add(4, 5) // [(◄4) 5]
+	builder.Add(5, 6) // [(◄5) 6]
 
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, _ := newForks(t)
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addProposalsToForks(forks, blocks)
+		require.Nil(t, err)
+		requireLatestFinalizedBlock(t, forks, 2, 4)
+		require.False(t, forks.IsKnownBlock(blocks[1].Block.BlockID))
+	})
 
-	err = addBlocksToForks(forks, blocks)
-	require.Nil(t, err)
-
-	requireLatestFinalizedBlock(t, forks, 2, 4)
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addCertifiedBlocksToForks(forks, blocks)
+		require.Nil(t, err)
+		requireLatestFinalizedBlock(t, forks, 2, 4)
+		require.False(t, forks.IsKnownBlock(blocks[1].Block.BlockID))
+	})
 }
 
 // TestDuplication tests that delivering the same block/qc multiple times has
@@ -206,12 +267,19 @@ func TestDuplication(t *testing.T) {
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, _ := newForks(t)
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addProposalsToForks(forks, blocks)
+		require.Nil(t, err)
+		requireLatestFinalizedBlock(t, forks, 2, 3)
+	})
 
-	err = addBlocksToForks(forks, blocks)
-	require.Nil(t, err)
-
-	requireLatestFinalizedBlock(t, forks, 2, 3)
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addCertifiedBlocksToForks(forks, blocks)
+		require.Nil(t, err)
+		requireLatestFinalizedBlock(t, forks, 2, 3)
+	})
 }
 
 // TestIgnoreBlocksBelowFinalizedView tests that blocks below finalized view are ignored.
@@ -219,49 +287,91 @@ func TestDuplication(t *testing.T) {
 // it should finalize [(◄1) 2]
 func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 3)
-	builder.Add(3, 4)
-	builder.Add(1, 5)
+	builder.Add(1, 2) // [(◄1) 2]
+	builder.Add(2, 3) // [(◄2) 3]
+	builder.Add(3, 4) // [(◄3) 4]
+	builder.Add(1, 5) // [(◄1) 5]
 
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, _ := newForks(t)
+	t.Run("ingest proposals", func(t *testing.T) {
+		// initialize forks and add first 3 blocks:
+		//  * block [(◄1) 2] should then be finalized
+		//  * and block [1] should be pruned
+		forks, _ := newForks(t)
+		err = addProposalsToForks(forks, blocks[:3])
+		require.Nil(t, err)
+		// sanity checks to confirm correct test setup
+		requireLatestFinalizedBlock(t, forks, 1, 2)
+		require.False(t, forks.IsKnownBlock(builder.GenesisBlock().ID()))
 
-	err = addBlocksToForks(forks, blocks)
-	require.Nil(t, err)
+		// adding block [(◄1) 5]: note that QC is _below_ the pruning threshold, i.e. cannot resolve the parent
+		// * Forks should store block, despite the parent already being pruned
+		// * finalization should not change
+		orphanedBlock := blocks[3].Block
+		err = forks.AddProposal(orphanedBlock)
+		require.Nil(t, err)
+		require.True(t, forks.IsKnownBlock(orphanedBlock.BlockID))
+		requireLatestFinalizedBlock(t, forks, 1, 2)
+	})
 
-	requireLatestFinalizedBlock(t, forks, 1, 2)
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		// initialize forks and add first 3 blocks:
+		//  * block [(◄1) 2] should then be finalized
+		//  * and block [1] should be pruned
+		forks, _ := newForks(t)
+		err = addCertifiedBlocksToForks(forks, blocks[:3])
+		require.Nil(t, err)
+		// sanity checks to confirm correct test setup
+		requireLatestFinalizedBlock(t, forks, 1, 2)
+		require.False(t, forks.IsKnownBlock(builder.GenesisBlock().ID()))
+
+		// adding block [(◄1) 5]: note that QC is _below_ the pruning threshold, i.e. cannot resolve the parent
+		// * Forks should store block, despite the parent already being pruned
+		// * finalization should not change
+		certBlockWithUnknownParent := toCertifiedBlock(t, blocks[3].Block)
+		err = forks.AddCertifiedBlock(certBlockWithUnknownParent)
+		require.Nil(t, err)
+		require.True(t, forks.IsKnownBlock(certBlockWithUnknownParent.Block.BlockID))
+		requireLatestFinalizedBlock(t, forks, 1, 2)
+
+	})
 }
 
 // TestDoubleProposal tests that the DoubleProposal notification is emitted when two different
 // proposals for the same view are added. We ingest the the following block tree:
 //
-//	[(◄1) 2] [(◄2) 3] [(◄3) 4] [(◄4) 5]
-//	                           [(◄3) 5']
+//		    / [(◄1) 2]
+//		[1]
+//	       \ [(◄1) 2']
 //
-// which should result in:
-//   - finalize block [(◄2) 3]
-//   - emit a DoubleProposal event with referencing the blocks [(◄3) 5'] and [(◄4) 5])
+// which should result in a DoubleProposal event referencing the blocks [(◄1) 2] and [(◄1) 2']
 func TestDoubleProposal(t *testing.T) {
 	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 3)
-	builder.Add(3, 4)
-	builder.Add(4, 5)
-	builder.AddVersioned(3, 5, 0, 1)
+	builder.Add(1, 2)                // [(◄1) 2]
+	builder.AddVersioned(1, 2, 0, 1) // [(◄1) 2']
 
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, notifier := newForks(t)
-	notifier.On("OnDoubleProposeDetected", blocks[4].Block, blocks[3].Block).Once()
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, notifier := newForks(t)
+		notifier.On("OnDoubleProposeDetected", blocks[0].Block, blocks[1].Block).Once()
 
-	err = addBlocksToForks(forks, blocks)
-	require.Nil(t, err)
+		err = addProposalsToForks(forks, blocks)
+		require.Nil(t, err)
+	})
 
-	requireLatestFinalizedBlock(t, forks, 2, 3)
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, notifier := newForks(t)
+		notifier.On("OnDoubleProposeDetected", blocks[4].Block, blocks[3].Block).Once()
+
+		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[0].Block)) // add [(◄1) 2]  as certified block
+		require.Nil(t, err)
+		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[1].Block)) // add [(◄1) 2']  as certified block
+		require.Nil(t, err)
+	})
 }
 
 // TestConflictingQCs checks that adding 2 conflicting QCs should return model.ByzantineThresholdExceededError
@@ -274,21 +384,34 @@ func TestDoubleProposal(t *testing.T) {
 func TestConflictingQCs(t *testing.T) {
 	builder := NewBlockBuilder()
 
-	builder.Add(1, 2)
-	builder.Add(2, 3)
-	builder.AddVersioned(2, 3, 0, 1) // make a conflicting proposal at view 3
-	builder.Add(3, 4)                // creates a QC for 3
-	builder.AddVersioned(3, 5, 1, 0) // creates a QC for 3'
+	builder.Add(1, 2)                // [(◄1) 2]
+	builder.Add(2, 3)                // [(◄2) 3]
+	builder.AddVersioned(2, 3, 0, 1) // [(◄2) 3']
+	builder.Add(3, 4)                // [(◄3) 4]
+	builder.AddVersioned(3, 5, 1, 0) // [(◄3') 5]
 
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, notifier := newForks(t)
-	notifier.On("OnDoubleProposeDetected", blocks[2].Block, blocks[1].Block).Return(nil)
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, notifier := newForks(t)
+		notifier.On("OnDoubleProposeDetected", blocks[2].Block, blocks[1].Block).Return(nil)
 
-	err = addBlocksToForks(forks, blocks)
-	require.NotNil(t, err)
-	assert.True(t, model.IsByzantineThresholdExceededError(err))
+		err = addProposalsToForks(forks, blocks)
+		require.NotNil(t, err)
+		assert.True(t, model.IsByzantineThresholdExceededError(err))
+	})
+
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, notifier := newForks(t)
+		notifier.On("OnDoubleProposeDetected", blocks[2].Block, blocks[1].Block).Return(nil)
+
+		// As [(◄3') 5] is not certified, it will not be added to Forks. However, its QC (◄3') is
+		// delivered to Forks as part of the *certified* block [(◄2) 3'].
+		err = addCertifiedBlocksToForks(forks, blocks)
+		require.NotNil(t, err)
+		assert.True(t, model.IsByzantineThresholdExceededError(err))
+	})
 }
 
 // TestConflictingFinalizedForks checks that finalizing 2 conflicting forks should return model.ByzantineThresholdExceededError
@@ -312,15 +435,23 @@ func TestConflictingFinalizedForks(t *testing.T) {
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, _ := newForks(t)
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addProposalsToForks(forks, blocks)
+		require.Error(t, err)
+		assert.True(t, model.IsByzantineThresholdExceededError(err))
+	})
 
-	err = addBlocksToForks(forks, blocks)
-	require.Error(t, err)
-	assert.True(t, model.IsByzantineThresholdExceededError(err))
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err = addCertifiedBlocksToForks(forks, blocks)
+		require.Error(t, err)
+		assert.True(t, model.IsByzantineThresholdExceededError(err))
+	})
 }
 
 // TestAddUnconnectedProposal checks that adding a proposal which does not connect to the
-// latest finalized block returns an exception.
+// latest finalized block returns a `model.MissingBlockError`
 // receives [(◄2) 3]
 // should return fatal error, because the proposal is invalid for addition to Forks
 func TestAddUnconnectedProposal(t *testing.T) {
@@ -329,12 +460,17 @@ func TestAddUnconnectedProposal(t *testing.T) {
 			helper.WithBlockView(3),
 		)))
 
-	forks, _ := newForks(t)
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err := forks.AddProposal(unconnectedProposal.Block)
+		assert.True(t, model.IsMissingBlockError(err))
+	})
 
-	err := forks.AddProposal(unconnectedProposal.Block)
-	require.Error(t, err)
-	// adding a disconnected block is an internal error, should return generic error
-	assert.False(t, model.IsByzantineThresholdExceededError(err))
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, _ := newForks(t)
+		err := forks.AddCertifiedBlock(toCertifiedBlock(t, unconnectedProposal.Block))
+		assert.True(t, model.IsMissingBlockError(err))
+	})
 }
 
 // TestGetProposal tests that we can retrieve stored proposals.
@@ -350,71 +486,135 @@ func TestGetProposal(t *testing.T) {
 
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
-	blocksAddedFirst := blocks[:3]  // [(◄1) 2] [(◄2) 3] [(◄3) 4]
-	blocksAddedSecond := blocks[3:] // [(◄4) 5]
+	blocksAddedFirst := blocks[:3]    // [(◄1) 2] [(◄2) 3] [(◄3) 4]
+	remainingBlock := blocks[3].Block // [(◄4) 5]
 
-	forks, _ := newForks(t)
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, _ := newForks(t)
 
-	// should be unable to retrieve a block before it is added
-	_, ok := forks.GetBlock(blocks[0].Block.BlockID)
-	assert.False(t, ok)
+		// should be unable to retrieve a block before it is added
+		_, ok := forks.GetBlock(blocks[0].Block.BlockID)
+		assert.False(t, ok)
 
-	// add first blocks - should finalize [(◄1) 2]
-	err = addBlocksToForks(forks, blocksAddedFirst)
-	require.Nil(t, err)
+		// add first blocks - should finalize [(◄1) 2]
+		err = addProposalsToForks(forks, blocksAddedFirst)
+		require.Nil(t, err)
 
-	// should be able to retrieve all stored blocks
-	for _, proposal := range blocksAddedFirst {
-		got, ok := forks.GetBlock(proposal.Block.BlockID)
+		// should be able to retrieve all stored blocks
+		for _, proposal := range blocksAddedFirst {
+			got, ok := forks.GetBlock(proposal.Block.BlockID)
+			assert.True(t, ok)
+			assert.Equal(t, proposal.Block, got)
+		}
+
+		// add remaining block [(◄4) 5] - should finalize [(◄2) 3] and prune [(◄1) 2]
+		require.Nil(t, forks.AddProposal(remainingBlock))
+
+		// should be able to retrieve just added block
+		got, ok := forks.GetBlock(remainingBlock.BlockID)
 		assert.True(t, ok)
-		assert.Equal(t, proposal.Block, got)
-	}
+		assert.Equal(t, remainingBlock, got)
 
-	// add second blocks - should finalize [(◄2) 3] and prune [(◄1) 2]
-	err = addBlocksToForks(forks, blocksAddedSecond)
-	require.Nil(t, err)
+		// should be unable to retrieve pruned block
+		_, ok = forks.GetBlock(blocksAddedFirst[0].Block.BlockID)
+		assert.False(t, ok)
+	})
 
-	// should be able to retrieve just added block
-	got, ok := forks.GetBlock(blocksAddedSecond[0].Block.BlockID)
-	assert.True(t, ok)
-	assert.Equal(t, blocksAddedSecond[0].Block, got)
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, _ := newForks(t)
 
-	// should be unable to retrieve pruned block
-	_, ok = forks.GetBlock(blocksAddedFirst[0].Block.BlockID)
-	assert.False(t, ok)
+		// should be unable to retrieve a block before it is added
+		_, ok := forks.GetBlock(blocks[0].Block.BlockID)
+		assert.False(t, ok)
+
+		// add first blocks - should finalize [(◄1) 2]
+		err := forks.AddCertifiedBlock(toCertifiedBlock(t, blocksAddedFirst[0].Block))
+		require.Nil(t, err)
+		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocksAddedFirst[1].Block))
+		require.Nil(t, err)
+		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocksAddedFirst[2].Block))
+		require.Nil(t, err)
+
+		// should be able to retrieve all stored blocks
+		for _, proposal := range blocksAddedFirst {
+			got, ok := forks.GetBlock(proposal.Block.BlockID)
+			assert.True(t, ok)
+			assert.Equal(t, proposal.Block, got)
+		}
+
+		// add remaining block [(◄4) 5] - should finalize [(◄2) 3] and prune [(◄1) 2]
+		require.Nil(t, forks.AddCertifiedBlock(toCertifiedBlock(t, remainingBlock)))
+
+		// should be able to retrieve just added block
+		got, ok := forks.GetBlock(remainingBlock.BlockID)
+		assert.True(t, ok)
+		assert.Equal(t, remainingBlock, got)
+
+		// should be unable to retrieve pruned block
+		_, ok = forks.GetBlock(blocksAddedFirst[0].Block.BlockID)
+		assert.False(t, ok)
+	})
 }
 
-// TestGetProposalsForView tests retrieving proposals for a view.
+// TestGetProposalsForView tests retrieving proposals for a view (also including double proposals).
 // receives [(◄1) 2] [(◄2) 4] [(◄2) 4']
 func TestGetProposalsForView(t *testing.T) {
 
 	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 4)
-	builder.AddVersioned(2, 4, 0, 1)
+	builder.Add(1, 2)                // [(◄1) 2]
+	builder.Add(2, 4)                // [(◄2) 4]
+	builder.AddVersioned(2, 4, 0, 1) // [(◄2) 4']
 
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, notifier := newForks(t)
-	notifier.On("OnDoubleProposeDetected", blocks[2].Block, blocks[1].Block).Once()
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, notifier := newForks(t)
+		notifier.On("OnDoubleProposeDetected", blocks[2].Block, blocks[1].Block).Once()
 
-	err = addBlocksToForks(forks, blocks)
-	require.Nil(t, err)
+		err = addProposalsToForks(forks, blocks)
+		require.Nil(t, err)
 
-	// 1 proposal at view 2
-	proposals := forks.GetBlocksForView(2)
-	assert.Len(t, proposals, 1)
-	assert.Equal(t, blocks[0].Block, proposals[0])
+		// expect 1 proposal at view 2
+		proposals := forks.GetBlocksForView(2)
+		assert.Len(t, proposals, 1)
+		assert.Equal(t, blocks[0].Block, proposals[0])
 
-	// 2 proposals at view 4
-	proposals = forks.GetBlocksForView(4)
-	assert.Len(t, proposals, 2)
-	assert.ElementsMatch(t, toBlocks(blocks[1:]), proposals)
+		// expect 2 proposals at view 4
+		proposals = forks.GetBlocksForView(4)
+		assert.Len(t, proposals, 2)
+		assert.ElementsMatch(t, toBlocks(blocks[1:]), proposals)
 
-	// 0 proposals at view 3
-	proposals = forks.GetBlocksForView(3)
-	assert.Len(t, proposals, 0)
+		// expect 0 proposals at view 3
+		proposals = forks.GetBlocksForView(3)
+		assert.Len(t, proposals, 0)
+	})
+
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, notifier := newForks(t)
+		notifier.On("OnDoubleProposeDetected", blocks[2].Block, blocks[1].Block).Once()
+
+		err := forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[0].Block))
+		require.Nil(t, err)
+		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[1].Block))
+		require.Nil(t, err)
+		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[2].Block))
+		require.Nil(t, err)
+
+		// expect 1 proposal at view 2
+		proposals := forks.GetBlocksForView(2)
+		assert.Len(t, proposals, 1)
+		assert.Equal(t, blocks[0].Block, proposals[0])
+
+		// expect 2 proposals at view 4
+		proposals = forks.GetBlocksForView(4)
+		assert.Len(t, proposals, 2)
+		assert.ElementsMatch(t, toBlocks(blocks[1:]), proposals)
+
+		// expect 0 proposals at view 3
+		proposals = forks.GetBlocksForView(3)
+		assert.Len(t, proposals, 0)
+	})
 }
 
 // TestNotification tests that notifier gets correct notifications when incorporating block as well as finalization events.
@@ -429,20 +629,39 @@ func TestNotification(t *testing.T) {
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	notifier := &mocks.Consumer{}
-	// 4 blocks including the genesis are incorporated
-	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Times(4)
-	notifier.On("OnFinalizedBlock", blocks[0].Block).Return(nil).Once()
-	finalizationCallback := mockmodule.NewFinalizer(t)
-	finalizationCallback.On("MakeFinal", blocks[0].Block.BlockID).Return(nil).Once()
+	t.Run("ingest proposals", func(t *testing.T) {
+		notifier := &mocks.Consumer{}
+		// 4 blocks including the genesis are incorporated
+		notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Times(4)
+		notifier.On("OnFinalizedBlock", blocks[0].Block).Return(nil).Once()
+		finalizationCallback := mockmodule.NewFinalizer(t)
+		finalizationCallback.On("MakeFinal", blocks[0].Block.BlockID).Return(nil).Once()
 
-	genesisBQ := makeGenesis()
+		forks, err := NewForks2(builder.GenesisBlock(), finalizationCallback, notifier)
+		require.NoError(t, err)
 
-	forks, err := NewForks2(genesisBQ, finalizationCallback, notifier)
-	require.NoError(t, err)
+		err = addProposalsToForks(forks, blocks)
+		require.NoError(t, err)
+	})
 
-	err = addBlocksToForks(forks, blocks)
-	require.NoError(t, err)
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		notifier := &mocks.Consumer{}
+		// 4 blocks including the genesis are incorporated
+		notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Times(4)
+		notifier.On("OnFinalizedBlock", blocks[0].Block).Return(nil).Once()
+		finalizationCallback := mockmodule.NewFinalizer(t)
+		finalizationCallback.On("MakeFinal", blocks[0].Block.BlockID).Return(nil).Once()
+
+		forks, err := NewForks2(builder.GenesisBlock(), finalizationCallback, notifier)
+		require.NoError(t, err)
+
+		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[0].Block))
+		require.Nil(t, err)
+		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[1].Block))
+		require.Nil(t, err)
+		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[2].Block))
+		require.Nil(t, err)
+	})
 }
 
 // TestNewestView tests that Forks tracks the newest block view seen in received blocks.
@@ -456,17 +675,29 @@ func TestNewestView(t *testing.T) {
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
-	forks, _ := newForks(t)
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, _ := newForks(t)
+		require.Equal(t, forks.NewestView(), builder.GenesisBlock().Block.View) // initially newest view should be genesis block view
 
-	genesis := makeGenesis()
+		err = addProposalsToForks(forks, blocks)
+		require.NoError(t, err)
+		// after inserting new blocks, newest view should be greatest view of all added blocks
+		require.Equal(t, forks.NewestView(), uint64(4))
+	})
 
-	// initially newest view should be genesis block view
-	require.Equal(t, forks.NewestView(), genesis.Block.View)
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, _ := newForks(t)
+		require.Equal(t, forks.NewestView(), builder.GenesisBlock().Block.View) // initially newest view should be genesis block view
 
-	err = addBlocksToForks(forks, blocks)
-	require.NoError(t, err)
-	// after inserting new blocks, newest view should be greatest view of all added blocks
-	require.Equal(t, forks.NewestView(), uint64(4))
+		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[0].Block))
+		require.Nil(t, err)
+		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[1].Block))
+		require.Nil(t, err)
+		err = forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[2].Block))
+		require.Nil(t, err)
+		// after inserting new blocks, newest view should be greatest view of all added blocks
+		require.Equal(t, forks.NewestView(), uint64(4))
+	})
 }
 
 // ========== internal functions ===============
@@ -486,13 +717,39 @@ func newForks(t *testing.T) (*Forks2, *mocks.Consumer) {
 	return forks, notifier
 }
 
-// addBlocksToForks adds all the given blocks to Forks, in order.
+// addProposalsToForks adds all the given blocks to Forks, in order.
 // If any errors occur, returns the first one.
-func addBlocksToForks(forks *Forks2, proposals []*model.Proposal) error {
+func addProposalsToForks(forks *Forks2, proposals []*model.Proposal) error {
 	for _, proposal := range proposals {
 		err := forks.AddProposal(proposal.Block)
 		if err != nil {
-			return fmt.Errorf("test case failed at adding proposal: %v: %w", proposal.Block.View, err)
+			return fmt.Errorf("test failed to add proposal for view %d: %w", proposal.Block.View, err)
+		}
+	}
+	return nil
+}
+
+// addCertifiedBlocksToForks iterates over all proposals, caches them locally in a map,
+// constructs certified blocks whenever possible and adds the certified blocks to forks,
+// If any errors occur, returns the first one.
+func addCertifiedBlocksToForks(forks *Forks2, proposals []*model.Proposal) error {
+	uncertifiedBlocks := make(map[flow.Identifier]*model.Block)
+	for _, proposal := range proposals {
+		uncertifiedBlocks[proposal.Block.BlockID] = proposal.Block
+		parentID := proposal.Block.QC.BlockID
+		parent, found := uncertifiedBlocks[parentID]
+		if !found {
+			continue
+		}
+		delete(uncertifiedBlocks, parentID)
+
+		certParent, err := model.NewCertifiedBlock(parent, proposal.Block.QC)
+		if err != nil {
+			return fmt.Errorf("test failed to creat certified block for view %d: %w", certParent.Block.View, err)
+		}
+		err = forks.AddCertifiedBlock(&certParent)
+		if err != nil {
+			return fmt.Errorf("test failed to add certified block for view %d: %w", certParent.Block.View, err)
 		}
 	}
 
@@ -512,10 +769,23 @@ func requireNoBlocksFinalized(t *testing.T, forks *Forks2) {
 	require.Equal(t, forks.FinalizedBlock().View, genesis.QC.View)
 }
 
+// toBlocks converts the given proposals to slice of blocks
+// TODO: change `BlockBuilder` to generate model.Blocks instead of model.Proposals and then remove this method
 func toBlocks(proposals []*model.Proposal) []*model.Block {
 	blocks := make([]*model.Block, 0, len(proposals))
 	for _, b := range proposals {
 		blocks = append(blocks, b.Block)
 	}
 	return blocks
+}
+
+// toCertifiedBlock generates a QC for the given block and returns their combination as a certified block
+func toCertifiedBlock(t *testing.T, block *model.Block) *model.CertifiedBlock {
+	qc := &flow.QuorumCertificate{
+		View:    block.View,
+		BlockID: block.BlockID,
+	}
+	cb, err := model.NewCertifiedBlock(block, qc)
+	require.Nil(t, err)
+	return &cb
 }

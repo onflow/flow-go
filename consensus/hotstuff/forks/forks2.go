@@ -115,8 +115,8 @@ func (f *Forks2) GetBlocksForView(view uint64) []*model.Block {
 
 // IsKnownBlock checks whether block is known.
 // UNVALIDATED: expects block to pass Forks.EnsureBlockIsValidExtension(block)
-func (f *Forks2) IsKnownBlock(block *model.Block) bool {
-	_, hasBlock := f.forest.GetVertex(block.BlockID)
+func (f *Forks2) IsKnownBlock(blockID flow.Identifier) bool {
+	_, hasBlock := f.forest.GetVertex(blockID)
 	return hasBlock
 }
 
@@ -128,7 +128,7 @@ func (f *Forks2) IsKnownBlock(block *model.Block) bool {
 //
 // UNVALIDATED: expects block to pass Forks.EnsureBlockIsValidExtension(block)
 func (f *Forks2) IsProcessingNeeded(block *model.Block) bool {
-	if block.View < f.FinalizedView() || f.IsKnownBlock(block) {
+	if block.View < f.FinalizedView() || f.IsKnownBlock(block.BlockID) {
 		return false
 	}
 	return true
