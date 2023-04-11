@@ -278,4 +278,4 @@ require (
 	nhooyr.io/websocket v1.8.6 // indirect
 )
 
-replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221202093946-932d1c70e288 => github.com/Guitarheroua/flow/protobuf/go/flow v0.0.0-20230405165342-e64fe27dc268
+replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221202093946-932d1c70e288 => github.com/Guitarheroua/flow/protobuf/go/flow v0.0.0-20230411103158-2ff6318e94f0
