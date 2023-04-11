@@ -1,4 +1,4 @@
-package netcache_test
+package cache_test
 
 import (
 	"fmt"
@@ -12,8 +12,8 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/module/metrics"
-	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p"
+	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

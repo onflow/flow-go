@@ -10,6 +10,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
+	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -159,13 +161,14 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 		})
 	validator := NewSubscriptionValidator()
 	scoreRegistry := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
-		SizeLimit:     cfg.cacheSize,
 		Logger:        logger,
-		Collector:     cfg.cacheMetrics,
 		DecayFunction: DefaultDecayFunction(),
 		Penalty:       DefaultGossipSubCtrlMsgPenaltyValue(),
 		Validator:     validator,
 		Init:          InitAppScoreRecordState,
+		CacheFactory: func() p2p.GossipSubSpamRecordCache {
+			return netcache.NewGossipSubSpamRecordCache(cfg.cacheSize, cfg.logger, cfg.cacheMetrics, DefaultDecayFunction())
+		},
 	})
 	s := &ScoreOption{
 		logger:          logger,

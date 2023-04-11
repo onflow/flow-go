@@ -10,8 +10,8 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p"
+	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -70,7 +70,7 @@ type GossipSubAppSpecificScoreRegistry struct {
 	logger     zerolog.Logger
 	idProvider module.IdentityProvider
 	// spamScoreCache currently only holds the control message misbehaviour score (spam related score).
-	spamScoreCache *netcache.GossipSubSpamRecordCache
+	spamScoreCache p2p.GossipSubSpamRecordCache
 	penalty        GossipSubCtrlMsgPenaltyValue
 	// initial application specific score record, used to initialize the score cache entry.
 	init      func() p2p.GossipSubSpamRecord
@@ -79,13 +79,12 @@ type GossipSubAppSpecificScoreRegistry struct {
 }
 
 type GossipSubAppSpecificScoreRegistryConfig struct {
-	SizeLimit     uint32
 	Logger        zerolog.Logger
 	Validator     *SubscriptionValidator
-	Collector     module.HeroCacheMetrics
 	DecayFunction netcache.PreprocessorFunc
 	Penalty       GossipSubCtrlMsgPenaltyValue
 	Init          func() p2p.GossipSubSpamRecord
+	CacheFactory  func() p2p.GossipSubSpamRecordCache
 }
 
 func WithGossipSubAppSpecificScoreRegistryPenalty(penalty GossipSubCtrlMsgPenaltyValue) func(registry *GossipSubAppSpecificScoreRegistry) {
@@ -107,10 +106,9 @@ func WithRecordInit(init func() p2p.GossipSubSpamRecord) func(registry *GossipSu
 }
 
 func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig, opts ...func(registry *GossipSubAppSpecificScoreRegistry)) *GossipSubAppSpecificScoreRegistry {
-	cache := netcache.NewGossipSubSpamRecordCache(config.SizeLimit, config.Logger, config.Collector, config.DecayFunction)
 	reg := &GossipSubAppSpecificScoreRegistry{
 		logger:         config.Logger.With().Str("module", "app_score_registry").Logger(),
-		spamScoreCache: cache,
+		spamScoreCache: config.CacheFactory(),
 		penalty:        config.Penalty,
 		init:           config.Init,
 	}

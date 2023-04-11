@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
-	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p"
+	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -357,9 +357,7 @@ func TestConcurrentGetAndReport(t *testing.T) {
 func TestDecayToZero(t *testing.T) {
 	cache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopCollector(), scoring.DefaultDecayFunction())
 	reg := scoring.NewGossipSubAppSpecificScoreRegistry(&scoring.GossipSubAppSpecificScoreRegistryConfig{
-		SizeLimit:     100,
 		Logger:        unittest.Logger(),
-		Collector:     metrics.NewNoopCollector(),
 		DecayFunction: scoring.DefaultDecayFunction(),
 		Penalty:       penaltyValueFixtures(),
 	}, scoring.WithScoreCache(cache), scoring.WithRecordInit(func() p2p.GossipSubSpamRecord {
@@ -403,13 +401,14 @@ func TestDecayToZero(t *testing.T) {
 func newGossipSubAppSpecificScoreRegistry() (*scoring.GossipSubAppSpecificScoreRegistry, *netcache.GossipSubSpamRecordCache) {
 	cache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopCollector(), scoring.DefaultDecayFunction())
 	return scoring.NewGossipSubAppSpecificScoreRegistry(&scoring.GossipSubAppSpecificScoreRegistryConfig{
-		SizeLimit:     100,
 		Logger:        unittest.Logger(),
-		Collector:     metrics.NewNoopCollector(),
 		DecayFunction: scoring.DefaultDecayFunction(),
 		Init:          scoring.InitAppScoreRecordState,
 		Penalty:       penaltyValueFixtures(),
-	}, scoring.WithScoreCache(cache)), cache
+		CacheFactory: func() p2p.GossipSubSpamRecordCache {
+			return cache
+		},
+	}), cache
 }
 
 // penaltyValueFixtures returns a set of penalty values for testing purposes.
