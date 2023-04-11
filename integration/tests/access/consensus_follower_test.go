@@ -121,7 +121,7 @@ func (suite *ConsensusFollowerSuite) buildNetworkConfig() {
 	stakedConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithID(suite.stakedID),
-		testnet.SupportsUnstakedNodes(),
+		testnet.WithAdditionalFlag("--supports-observer=true"),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	)
 
