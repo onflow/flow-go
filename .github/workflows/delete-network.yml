@@ -58,3 +58,8 @@ jobs:
       - name: Delete Network using provided Network ID
         working-directory: integration/benchnet2/
         run: make remote-clean-all NAMESPACE=benchnet NETWORK_ID=${{ inputs.network_id }}
+
+      - name: Benchnet2 Deletion Summary
+        run: |
+          SUMMARY=$'# Benchnet2 Deletion Summary\n## Network ID deleted: `${{ inputs.network_id }}`\n * Repo Used for deletion: `onflow/flow-go` \n * Automation Ref: `${{ inputs.automation_ref }}`'
+          echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY

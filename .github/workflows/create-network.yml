@@ -319,7 +319,7 @@ jobs:
 
       - name: Benchnet2 Deployment Summary
         run: |
-          SUMMARY=$'# Benchnet2 Deployment Summary\n## Your Network ID is ${{ needs.networkId.outputs.networkId }}\n This Network was built using the following inputs: \n * Network ID: `${{ inputs.network_id }}` \n * Your network is accessible at: `flow blocks get latest --host access1-${{ inputs.network_id }}.benchnet.onflow.org:80` \n * Repo Used for Image Build, Automation: `onflow/flow-go` \n * Automation Ref: `${{ inputs.automation_ref }}` \n * Flow Ref: `${{ inputs.flow_ref }}` \n * Skip builds: `${{ inputs.skip_builds }}`'
+          SUMMARY=$'# Benchnet2 Deployment Summary\n## Your Network ID is ${{ needs.networkId.outputs.networkId }}\n Network built using the following inputs: \n * Network ID: `${{ inputs.network_id }}` \n * Your network is accessible at: `flow blocks get latest --host access1-${{ inputs.network_id }}.benchnet.onflow.org:80` \n * Repo Used for Image Build, Automation: `onflow/flow-go` \n * Automation Ref: `${{ inputs.automation_ref }}` \n * Flow Ref: `${{ inputs.flow_ref }}` \n * Skip builds: `${{ inputs.skip_builds }}`'
           echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
 
       - name: Clean working directory to reduce files filling disk
