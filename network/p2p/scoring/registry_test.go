@@ -8,11 +8,14 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
+	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
+	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -352,22 +355,35 @@ func TestConcurrentGetAndReport(t *testing.T) {
 	assert.Less(t, math.Abs(scoring.DefaultGossipSubCtrlMsgPenaltyValue().Graft-record.Penalty), 10e-3) // score should be updated to -10.
 }
 
-// TestDecayToZero tests that the score decays to zero. The test expects the score to be updated to the penalty value
-// and then decay to zero over time.
-func TestDecayToZero(t *testing.T) {
+// TestSpamPenaltyDecayToZero tests that the spam penalty decays to zero over time, and when the spam penalty of
+// a peer is set back to zero, its app specific score is also reset to the initial state.
+func TestSpamPenaltyDecayToZero(t *testing.T) {
 	cache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopCollector(), scoring.DefaultDecayFunction())
+
+	// mocks peer has an staked identity and is subscribed to the allowed topics.
+	idProvider := mock.NewIdentityProvider(t)
+	peerID := peer.ID("peer-1")
+	idProvider.On("ByPeerID", peerID).Return(unittest.IdentityFixture(), true).Maybe()
+
+	validator := mockp2p.NewSubscriptionValidator(t)
+	validator.On("CheckSubscribedToAllowedTopics", peerID, testifymock.Anything).Return(nil).Maybe()
+
 	reg := scoring.NewGossipSubAppSpecificScoreRegistry(&scoring.GossipSubAppSpecificScoreRegistryConfig{
 		Logger:        unittest.Logger(),
 		DecayFunction: scoring.DefaultDecayFunction(),
 		Penalty:       penaltyValueFixtures(),
-	}, scoring.WithScoreCache(cache), scoring.WithRecordInit(func() p2p.GossipSubSpamRecord {
-		return p2p.GossipSubSpamRecord{
-			Decay:   0.02, // we choose a small decay value to speed up the test.
-			Penalty: 0,
-		}
-	}))
-
-	peerID := peer.ID("peer-1")
+		Validator:     validator,
+		IdProvider:    idProvider,
+		CacheFactory: func() p2p.GossipSubSpamRecordCache {
+			return cache
+		},
+		Init: func() p2p.GossipSubSpamRecord {
+			return p2p.GossipSubSpamRecord{
+				Decay:   0.02, // we choose a small decay value to speed up the test.
+				Penalty: 0,
+			}
+		},
+	})
 
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
@@ -383,10 +399,15 @@ func TestDecayToZero(t *testing.T) {
 	require.Less(t, score, float64(0))                      // the score should be less than zero.
 	require.Greater(t, score, penaltyValueFixtures().Graft) // the score should be less than the penalty value due to decay.
 
-	// wait for the score to decay to zero.
 	require.Eventually(t, func() bool {
-		score := reg.AppSpecificScoreFunc()(peerID)
-		return score == 0 // the score should eventually decay to zero.
+		// the spam penalty should eventually decay to zero.
+		r, err, ok := cache.Get(peerID)
+		return ok && err == nil && r.Penalty == 0.0
+	}, 5*time.Second, 100*time.Millisecond)
+
+	require.Eventually(t, func() bool {
+		// when the spam penalty is decayed to zero, the app specific score of the node should reset back to its initial state (i.e., max reward).
+		return reg.AppSpecificScoreFunc()(peerID) == scoring.MaxAppSpecificReward
 	}, 5*time.Second, 100*time.Millisecond)
 
 	// the score should now be zero.

@@ -74,47 +74,28 @@ type GossipSubAppSpecificScoreRegistry struct {
 	penalty        GossipSubCtrlMsgPenaltyValue
 	// initial application specific score record, used to initialize the score cache entry.
 	init      func() p2p.GossipSubSpamRecord
-	validator *SubscriptionValidator
+	validator p2p.SubscriptionValidator
 	mu        sync.Mutex
 }
 
 type GossipSubAppSpecificScoreRegistryConfig struct {
 	Logger        zerolog.Logger
-	Validator     *SubscriptionValidator
+	Validator     p2p.SubscriptionValidator
 	DecayFunction netcache.PreprocessorFunc
 	Penalty       GossipSubCtrlMsgPenaltyValue
+	IdProvider    module.IdentityProvider
 	Init          func() p2p.GossipSubSpamRecord
 	CacheFactory  func() p2p.GossipSubSpamRecordCache
 }
 
-func WithGossipSubAppSpecificScoreRegistryPenalty(penalty GossipSubCtrlMsgPenaltyValue) func(registry *GossipSubAppSpecificScoreRegistry) {
-	return func(registry *GossipSubAppSpecificScoreRegistry) {
-		registry.penalty = penalty
-	}
-}
-
-func WithScoreCache(cache *netcache.GossipSubSpamRecordCache) func(registry *GossipSubAppSpecificScoreRegistry) {
-	return func(registry *GossipSubAppSpecificScoreRegistry) {
-		registry.spamScoreCache = cache
-	}
-}
-
-func WithRecordInit(init func() p2p.GossipSubSpamRecord) func(registry *GossipSubAppSpecificScoreRegistry) {
-	return func(registry *GossipSubAppSpecificScoreRegistry) {
-		registry.init = init
-	}
-}
-
-func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig, opts ...func(registry *GossipSubAppSpecificScoreRegistry)) *GossipSubAppSpecificScoreRegistry {
+func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig) *GossipSubAppSpecificScoreRegistry {
 	reg := &GossipSubAppSpecificScoreRegistry{
 		logger:         config.Logger.With().Str("module", "app_score_registry").Logger(),
 		spamScoreCache: config.CacheFactory(),
 		penalty:        config.Penalty,
 		init:           config.Init,
-	}
-
-	for _, opt := range opts {
-		opt(reg)
+		validator:      config.Validator,
+		idProvider:     config.IdProvider,
 	}
 
 	return reg
