@@ -17,12 +17,6 @@ const (
 	SafetyThresholdMapKey = "safetythreshold"
 	// RateLimitMapKey key used to set the rate limit config limit.
 	RateLimitMapKey = "ratelimit"
-	// IHaveSyncInspectSampleSizeDivisorMapKey key used to set iHave synchronous inspection sample size divisor.
-	IHaveSyncInspectSampleSizeDivisorMapKey = "ihaveSyncInspectSampleSizeDivisor"
-	// IHaveAsyncInspectSampleSizeDivisorMapKey key used to set iHave asynchronous inspection sample size divisor.
-	IHaveAsyncInspectSampleSizeDivisorMapKey = "ihaveAsyncInspectSampleSizeDivisor"
-	// IHaveInspectionMaxSampleSizeMapKey the max number of ihave messages in a sample to be inspected.
-	IHaveInspectionMaxSampleSizeMapKey = "ihaveInspectionMaxSampleSize"
 	// DefaultGraftDiscardThreshold upper bound for graft messages, RPC control messages with a count
 	// above the discard threshold are automatically discarded.
 	DefaultGraftDiscardThreshold = 30

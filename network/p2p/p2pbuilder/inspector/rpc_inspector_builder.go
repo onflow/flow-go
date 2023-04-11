@@ -3,76 +3,20 @@ package inspector
 import (
 	"fmt"
 
-	"github.com/rs/zerolog"
-
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 )
 
 type metricsCollectorFactory func() *metrics.HeroCacheCollector
-
-// GossipSubRPCValidationInspectorConfigs validation limits used for gossipsub RPC control message inspection.
-type GossipSubRPCValidationInspectorConfigs struct {
-	// NumberOfWorkers number of worker pool workers.
-	NumberOfWorkers int
-	// CacheSize size of the queue used by worker pool for the control message validation inspector.
-	CacheSize uint32
-	// GraftLimits GRAFT control message validation limits.
-	GraftLimits map[string]int
-	// PruneLimits PRUNE control message validation limits.
-	PruneLimits map[string]int
-}
-
-// GossipSubRPCMetricsInspectorConfigs rpc metrics observer inspector configuration.
-type GossipSubRPCMetricsInspectorConfigs struct {
-	// NumberOfWorkers number of worker pool workers.
-	NumberOfWorkers int
-	// CacheSize size of the queue used by worker pool for the control message metrics inspector.
-	CacheSize uint32
-}
-
-// GossipSubRPCInspectorsConfig encompasses configuration related to gossipsub RPC message inspectors.
-type GossipSubRPCInspectorsConfig struct {
-	// GossipSubRPCInspectorNotificationCacheSize size of the queue for notifications about invalid RPC messages.
-	GossipSubRPCInspectorNotificationCacheSize uint32
-	// ValidationInspectorConfigs control message validation inspector validation configuration and limits.
-	ValidationInspectorConfigs *GossipSubRPCValidationInspectorConfigs
-	// MetricsInspectorConfigs control message metrics inspector configuration.
-	MetricsInspectorConfigs *GossipSubRPCMetricsInspectorConfigs
-}
-
-func DefaultGossipSubRPCInspectorsConfig() *GossipSubRPCInspectorsConfig {
-	return &GossipSubRPCInspectorsConfig{
-		GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
-		ValidationInspectorConfigs: &GossipSubRPCValidationInspectorConfigs{
-			NumberOfWorkers: validation.DefaultNumberOfWorkers,
-			CacheSize:       validation.DefaultControlMsgValidationInspectorQueueCacheSize,
-			GraftLimits: map[string]int{
-				validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
-				validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
-				validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
-			},
-			PruneLimits: map[string]int{
-				validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
-				validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
-				validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
-			},
-		},
-		MetricsInspectorConfigs: &GossipSubRPCMetricsInspectorConfigs{
-			NumberOfWorkers: inspector.DefaultControlMsgMetricsInspectorNumberOfWorkers,
-			CacheSize:       inspector.DefaultControlMsgMetricsInspectorQueueCacheSize,
-		},
-	}
-}
 
 // GossipSubInspectorBuilder builder that constructs all rpc inspectors used by gossip sub. The following
 // rpc inspectors are created with this builder.
@@ -163,13 +107,17 @@ func (b *GossipSubInspectorBuilder) validationInspectorConfig(validationConfigs 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
 	}
-
+	iHaveValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgIHave, validationConfigs.IHaveLimitsConfig.IHaveLimits, validationConfigs.IHaveLimitsConfig.IhaveConfigurationOpts()...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
+	}
 	// setup gossip sub RPC control message inspector config
 	controlMsgRPCInspectorCfg := &validation.ControlMsgValidationInspectorConfig{
 		NumberOfWorkers:     validationConfigs.NumberOfWorkers,
 		InspectMsgStoreOpts: opts,
 		GraftValidationCfg:  graftValidationCfg,
 		PruneValidationCfg:  pruneValidationCfg,
+		IHaveValidationCfg:  iHaveValidationCfg,
 	}
 	return controlMsgRPCInspectorCfg, nil
 }
@@ -181,7 +129,7 @@ func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.Gos
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
 	}
-	rpcValidationInspector := validation.NewControlMsgValidationInspector(b.logger, b.sporkID, controlMsgRPCInspectorCfg, b.distributor)
+	rpcValidationInspector := validation.NewControlMsgValidationInspector(b.logger, b.sporkID, controlMsgRPCInspectorCfg, b.distributor, b.netMetrics)
 	return rpcValidationInspector, nil
 }
 
@@ -195,25 +143,4 @@ func (b *GossipSubInspectorBuilder) Build() ([]p2p.GossipSubRPCInspector, error)
 		return nil, err
 	}
 	return []p2p.GossipSubRPCInspector{metricsInspector, validationInspector}, nil
-}
-
-// DefaultRPCValidationConfig returns default RPC control message inspector config.
-func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation.ControlMsgValidationInspectorConfig {
-	graftCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, validation.CtrlMsgValidationLimits{
-		validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
-		validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
-		validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
-	})
-	pruneCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgPrune, validation.CtrlMsgValidationLimits{
-		validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
-		validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
-		validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
-	})
-
-	return &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:     validation.DefaultNumberOfWorkers,
-		InspectMsgStoreOpts: opts,
-		GraftValidationCfg:  graftCfg,
-		PruneValidationCfg:  pruneCfg,
-	}
 }
