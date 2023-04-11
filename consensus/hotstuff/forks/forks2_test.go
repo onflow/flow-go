@@ -341,9 +341,9 @@ func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 // TestDoubleProposal tests that the DoubleProposal notification is emitted when two different
 // proposals for the same view are added. We ingest the the following block tree:
 //
-//		    / [(◄1) 2]
+//                / [(◄1) 2]
 //		[1]
-//	       \ [(◄1) 2']
+//                \ [(◄1) 2']
 //
 // which should result in a DoubleProposal event referencing the blocks [(◄1) 2] and [(◄1) 2']
 func TestDoubleProposal(t *testing.T) {

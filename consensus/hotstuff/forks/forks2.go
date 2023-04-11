@@ -34,7 +34,7 @@ type Forks2 struct {
 
 	// finalityProof holds the latest finalized block including the certified child as proof of finality.
 	// CAUTION: is nil, when Forks has not yet finalized any blocks beyond the finalized root block it was initialized with
-	finalityProof *FinalityProof //
+	finalityProof *FinalityProof
 }
 
 // TODO:
@@ -105,16 +105,15 @@ func (f *Forks2) GetBlock(blockID flow.Identifier) (*model.Block, bool) {
 // GetBlocksForView returns all known blocks for the given view
 func (f *Forks2) GetBlocksForView(view uint64) []*model.Block {
 	vertexIterator := f.forest.GetVerticesAtLevel(view)
-	l := make([]*model.Block, 0, 1) // in the vast majority of cases, there will only be one proposal for a particular view
+	blocks := make([]*model.Block, 0, 1) // in the vast majority of cases, there will only be one proposal for a particular view
 	for vertexIterator.HasNext() {
 		v := vertexIterator.NextVertex()
-		l = append(l, v.(*BlockContainer2).Block())
+		blocks = append(blocks, v.(*BlockContainer2).Block())
 	}
-	return l
+	return blocks
 }
 
 // IsKnownBlock checks whether block is known.
-// UNVALIDATED: expects block to pass Forks.EnsureBlockIsValidExtension(block)
 func (f *Forks2) IsKnownBlock(blockID flow.Identifier) bool {
 	_, hasBlock := f.forest.GetVertex(blockID)
 	return hasBlock
@@ -135,10 +134,10 @@ func (f *Forks2) IsProcessingNeeded(block *model.Block) bool {
 }
 
 // EnsureBlockIsValidExtension checks that the given block is a valid extension to the tree
-// of blocks already stored (no state modifications). Specifically, the following condition
+// of blocks already stored (no state modifications). Specifically, the following conditions
 // are enforced, which are critical to the correctness of Forks:
 //
-//  1. If block with the same ID is already stored, their views must be identical.
+//  1. If a block with the same ID is already stored, their views must be identical.
 //  2. The block's view must be strictly larger than the view of its parent.
 //  3. The parent must already be stored (or below the pruning height).
 //
@@ -150,7 +149,7 @@ func (f *Forks2) IsProcessingNeeded(block *model.Block) bool {
 //	      compatible (principle of vacuous truth), i.e. we skip checking 1, 2, 3.
 //	 (ii) If block.View == F, we do not inspect the QC / parent at all (skip 2 and 3).
 //	      This exception is important for compatability with genesis or spork-root blocks,
-//	      which not contain a QCs.
+//	      which do not contain a QC.
 //	(iii) If block.View > F, but block.QC.View < F the parent has already been pruned. In
 //	      this case, we omit rule 3. (principle of vacuous truth applied to the parent)
 //
@@ -184,7 +183,7 @@ func (f *Forks2) EnsureBlockIsValidExtension(block *model.Block) error {
 	if (block.View == f.forest.LowestLevel) || (block.QC.View < f.forest.LowestLevel) { // exclusion (ii) and (iii)
 		return nil
 	}
-	// for block whose parents are _not_ below the pruning height, we expect the parent to be known.
+	// for a block whose parent is _not_ below the pruning height, we expect the parent to be known.
 	if _, isParentKnown := f.forest.GetVertex(block.QC.BlockID); !isParentKnown { // missing parent
 		return model.MissingBlockError{
 			View:    block.QC.View,
@@ -197,7 +196,7 @@ func (f *Forks2) EnsureBlockIsValidExtension(block *model.Block) error {
 // AddCertifiedBlock appends the given certified block to the tree of pending
 // blocks and updates the latest finalized block (if finalization progressed).
 // Unless the parent is below the pruning threshold (latest finalized view), we
-// require that he parent is already stored in Forks.
+// require that the parent is already stored in Forks.
 // We assume that all blocks are fully verified. A valid block must satisfy all
 // consistency requirements; otherwise we have a bug in the compliance layer.
 // Possible error returns:
@@ -349,7 +348,7 @@ func (f *Forks2) UnverifiedAddProposal(block *model.Block) error {
 }
 
 // store adds the given block to our internal `forest`, updates `newestView` (if applicable),
-// and emits an `OnBlockIncorporated` notifications. While repeated inputs yield result in
+// and emits an `OnBlockIncorporated` notifications. While repeated inputs result in
 // repeated notifications, this is of no concern, because notifications are idempotent.
 // UNVALIDATED: expects block to pass Forks.EnsureBlockIsValidExtension(block)
 // Error returns:
@@ -376,7 +375,7 @@ func (f *Forks2) store(block *model.Block) error {
 // In case a conflicting QC is found, an ByzantineThresholdExceededError is returned.
 //
 // Two Quorum Certificates q1 and q2 are defined as conflicting iff:
-//   - q1.View == q2.View
+//   - q1.View == q2.View AND
 //   - q1.BlockID != q2.BlockID
 //
 // This means there are two Quorums for conflicting blocks at the same view.
@@ -416,7 +415,7 @@ func (f *Forks2) checkForConflictingQCs(qc *flow.QuorumCertificate) error {
 func (f *Forks2) checkForDoubleProposal(block *model.Block) {
 	it := f.forest.GetVerticesAtLevel(block.View)
 	for it.HasNext() {
-		otherVertex := it.NextVertex() // by construction, must have same view as parentView
+		otherVertex := it.NextVertex() // by construction, must have same view as block
 		otherBlock := otherVertex.(*BlockContainer2).Block()
 		if block.BlockID != otherBlock.BlockID {
 			f.notifier.OnDoubleProposeDetected(block, otherBlock)
@@ -467,7 +466,7 @@ func (f *Forks2) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBl
 	parentBlock := parentVertex.(*BlockContainer2).Block()
 
 	// Note: we assume that all stored blocks pass Forks.EnsureBlockIsValidExtension(block);
-	//       specifically, that Proposal's ViewNumber is strictly monotonously
+	//       specifically, that Proposal's ViewNumber is strictly monotonically
 	//       increasing which is enforced by LevelledForest.VerifyVertex(...)
 	// We denote:
 	//  * a DIRECT 1-chain as '<-'

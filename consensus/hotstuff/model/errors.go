@@ -172,7 +172,7 @@ type InvalidBlockError struct {
 
 // NewInvalidBlockError instantiates an `InvalidBlockError`. Input `err` cannot be nil.
 func NewInvalidBlockError(blockID flow.Identifier, view uint64, err error) error {
-	return &InvalidBlockError{BlockID: blockID, View: view, Err: err}
+	return InvalidBlockError{BlockID: blockID, View: view, Err: err}
 }
 
 func (e InvalidBlockError) Error() string {
