@@ -90,7 +90,7 @@ type GossipSubRPCInspector interface {
 
 	// SetClusterIDSProvider sets the cluster IDs provider that is used to provider cluster ID information
 	// about active clusters for collection nodes. This func will be a no-op for inspectors which don't use
-	// the ClusterIDSProvider during inspection.// This method should only be called once, and subsequent calls
+	// the ClusterIDSProvider during inspection. This method should only be called once, and subsequent calls
 	// should be a no-op.
 	SetClusterIDSProvider(module.ClusterIDSProvider)
 }
