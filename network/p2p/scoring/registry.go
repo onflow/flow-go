@@ -106,7 +106,8 @@ var _ p2p.GossipSubInvalidControlMessageNotificationConsumer = (*GossipSubAppSpe
 // AppSpecificScoreFunc returns the application specific penalty function that is called by the GossipSub protocol to determine the application specific penalty of a peer.
 func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID) float64 {
 	return func(pid peer.ID) float64 {
-		// penalty of a peer is composed of 3 parts: (1) spam penalty (2) staking penalty (3) subscription penalty.
+		appSpecificScore := float64(0)
+
 		lg := r.logger.With().Str("peer_id", pid.String()).Logger()
 		// (1) spam penalty: the penalty is applied to the application specific penalty when a peer conducts a spamming misbehaviour.
 		spamRecord, err, spamRecordExists := r.spamScoreCache.Get(pid)
@@ -114,43 +115,42 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 			// the error is considered fatal as it means the cache is not working properly.
 			// we should not continue with the execution as it may lead to routing attack vulnerability.
 			r.logger.Fatal().Str("peer_id", pid.String()).Err(err).Msg("could not get application specific penalty for peer")
-			return 0 // unreachable, but added to avoid proceeding with the execution if log level is changed.
+			return appSpecificScore // unreachable, but added to avoid proceeding with the execution if log level is changed.
 		}
-
-		// (2) staking penalty: the staking penalty is the penalty of a peer based on its role.
-		// If node is not staked, it will have a negative penalty.
-		stakingScore, flowId, role := r.stakingScore(pid)
-
-		// (3) subscription penalty: the subscription penalty is applied to the application specific penalty when a
-		// peer is subscribed to a topic that it is not allowed to subscribe to based on its role.
-		subscriptionPenalty := r.subscriptionPenalty(pid, flowId, role)
-
-		// to compute application specific penalty, we apply the following rules:
-		// 1. if the peer has no penalty on spamming and subscription, we apply the staking penalty as it is (it can be reward or staking penalty).
-		// 2. if the peer has a penalty on spamming or subscription, we only apply the penalty and include the staking penalty if it is negative (penalty).
-		// In other words, we only apply the positive staking penalty if the peer has no penalty on spamming and subscription.
-		appSpecificScore := subscriptionPenalty
-		if spamRecordExists {
-			appSpecificScore += spamRecord.Penalty
-		}
-		if appSpecificScore == float64(0) {
-			// if the peer has no penalty on spamming and subscription, we apply the staking penalty as it is.
-			appSpecificScore = stakingScore
-		} else if stakingScore < 0 {
-			// if the peer already has a penalty on spamming or subscription, we only apply the staking penalty if it is negative (penalty).
-			appSpecificScore += stakingScore
-		}
-
-		lg = lg.With().
-			Float64("subscription_penalty", subscriptionPenalty).
-			Float64("staking_score", stakingScore).
-			Float64("total_app_specific_score", appSpecificScore).Logger()
 
 		if spamRecordExists {
 			lg = lg.With().Float64("spam_penalty", spamRecord.Penalty).Logger()
+			appSpecificScore += spamRecord.Penalty
 		}
 
-		lg.Trace().Msg("application specific penalty computed")
+		// (2) staking score: for staked peers, a default positive reward is applied only if the peer has no penalty on spamming and subscription.
+		// for unknown peers a negative penalty is applied.
+		stakingScore, flowId, role := r.stakingScore(pid)
+		if stakingScore < 0 {
+			lg = lg.With().Float64("staking_penalty", stakingScore).Logger()
+			// staking penalty is applied rightaway.
+			appSpecificScore += stakingScore
+		}
+
+		if stakingScore > 0 {
+			// (3) subscription penalty: the subscription penalty is applied to the application specific penalty when a
+			// peer is subscribed to a topic that it is not allowed to subscribe to based on its role.
+			subscriptionPenalty := r.subscriptionPenalty(pid, flowId, role)
+			lg = lg.With().Float64("subscription_penalty", subscriptionPenalty).Logger()
+			if subscriptionPenalty < 0 {
+				appSpecificScore += subscriptionPenalty
+			}
+		}
+
+		// (4) staking reward: for staked peers, a default positive reward is applied only if the peer has no penalty on spamming and subscription.
+		if stakingScore > 0 && appSpecificScore == float64(0) {
+			lg = lg.With().Float64("staking_reward", stakingScore).Logger()
+			appSpecificScore += stakingScore
+		}
+
+		lg.Trace().
+			Float64("total_app_specific_score", appSpecificScore).
+			Msg("application specific penalty computed")
 
 		return appSpecificScore
 	}
