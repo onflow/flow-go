@@ -128,13 +128,15 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 		stakingScore, flowId, role := r.stakingScore(pid)
 		if stakingScore < 0 {
 			lg = lg.With().Float64("staking_penalty", stakingScore).Logger()
-			// staking penalty is applied rightaway.
+			// staking penalty is applied right away.
 			appSpecificScore += stakingScore
 		}
 
-		if stakingScore > 0 {
+		if stakingScore >= 0 {
 			// (3) subscription penalty: the subscription penalty is applied to the application specific penalty when a
 			// peer is subscribed to a topic that it is not allowed to subscribe to based on its role.
+			// Note: subscription penalty can be considered only for staked peers, for non-staked peers, we cannot
+			// determine the role of the peer.
 			subscriptionPenalty := r.subscriptionPenalty(pid, flowId, role)
 			lg = lg.With().Float64("subscription_penalty", subscriptionPenalty).Logger()
 			if subscriptionPenalty < 0 {
@@ -166,7 +168,7 @@ func (r *GossipSubAppSpecificScoreRegistry) stakingScore(pid peer.ID) (float64, 
 			Err(err).
 			Bool(logging.KeySuspicious, true).
 			Msg("invalid peer identity, penalizing peer")
-		return MaxAppSpecificPenalty, flow.Identifier{}, 0
+		return DefaultUnknownIdentityPenalty, flow.Identifier{}, 0
 	}
 
 	lg = lg.With().
@@ -185,7 +187,7 @@ func (r *GossipSubAppSpecificScoreRegistry) stakingScore(pid peer.ID) (float64, 
 	lg.Trace().
 		Msg("rewarding well-behaved non-access node peer with maximum reward value")
 
-	return MaxAppSpecificReward, flowId.NodeID, flowId.Role
+	return DefaultStakedIdentityReward, flowId.NodeID, flowId.Role
 }
 
 func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flowId flow.Identifier, role flow.Role) float64 {
@@ -196,7 +198,7 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 			Hex("flow_id", logging.ID(flowId)).
 			Bool(logging.KeySuspicious, true).
 			Msg("invalid subscription detected, penalizing peer")
-		return MaxAppSpecificPenalty
+		return DefaultInvalidSubscriptionPenalty
 	}
 
 	return 0

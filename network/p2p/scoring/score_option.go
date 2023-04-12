@@ -17,9 +17,22 @@ import (
 
 const (
 	DefaultAppSpecificScoreWeight = 1
-	MaxAppSpecificPenalty         = -100
+	MaxAppSpecificPenalty         = float64(-100)
 	MinAppSpecificPenalty         = -1
 	MaxAppSpecificReward          = float64(100)
+
+	// DefaultStakedIdentityReward is the default reward for staking peers. It is applied to the peer's score when
+	// the peer does not have any misbehavior record, e.g., invalid subscription, invalid message, etc.
+	// The purpose is to reward the staking peers for their contribution to the network and prioritize them in neighbor selection.
+	DefaultStakedIdentityReward = MaxAppSpecificReward
+
+	// DefaultUnknownIdentityPenalty is the default penalty for unknown identity. It is applied to the peer's score when
+	// the peer is not in the identity list.
+	DefaultUnknownIdentityPenalty = MaxAppSpecificPenalty
+
+	// DefaultInvalidSubscriptionPenalty is the default penalty for invalid subscription. It is applied to the peer's score when
+	// the peer subscribes to a topic that it is not authorized to subscribe to.
+	DefaultInvalidSubscriptionPenalty = MaxAppSpecificPenalty
 
 	// DefaultGossipThreshold when a peer's penalty drops below this threshold,
 	// no gossip is emitted towards that peer and gossip from that peer is ignored.
