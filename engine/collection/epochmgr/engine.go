@@ -520,7 +520,7 @@ func (e *Engine) ActiveClusterIDS() ([]string, error) {
 	defer e.mu.RUnlock()
 	clusterIDs := make([]string, 0)
 	for _, epoch := range e.epochs {
-		chainID, err := epoch.state.Params().ChainID()
+		chainID, err := epoch.state.Params().ChainID() // cached, does not hit database
 		if err != nil {
 			return nil, fmt.Errorf("failed to get active cluster ids: %w", err)
 		}
