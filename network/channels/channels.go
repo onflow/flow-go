@@ -315,11 +315,11 @@ func SyncCluster(clusterID flow.ChainID) Channel {
 func IsValidFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
 	sporkID, err := sporkIDFromTopic(topic)
 	if err != nil {
-		return fmt.Errorf("failed to get spork ID from topic: %w", err)
+		return NewInvalidTopicErr(topic, fmt.Errorf("failed to get spork ID from topic: %w", err))
 	}
 
 	if sporkID != expectedSporkID.String() {
-		return fmt.Errorf("invalid flow topic mismatch spork ID expected spork ID %s actual spork ID %s", expectedSporkID, sporkID)
+		return NewInvalidTopicErr(topic, fmt.Errorf("invalid flow topic mismatch spork ID expected spork ID %s actual spork ID %s", expectedSporkID, sporkID))
 	}
 
 	return isValidFlowTopic(topic)
@@ -336,7 +336,7 @@ func IsValidFlowClusterTopic(topic Topic, activeClusterIDS []string) error {
 
 	clusterID, err := clusterIDFromTopic(topic)
 	if err != nil {
-		return fmt.Errorf("failed to get cluster ID from topic: %w", err)
+		return NewInvalidTopicErr(topic, fmt.Errorf("failed to get cluster ID from topic: %w", err))
 	}
 
 	for _, activeClusterID := range activeClusterIDS {
@@ -345,7 +345,7 @@ func IsValidFlowClusterTopic(topic Topic, activeClusterIDS []string) error {
 		}
 	}
 
-	return fmt.Errorf("invalid flow topic contains cluster ID (%s) not in active cluster IDs list %s", clusterID, activeClusterIDS)
+	return NewInvalidTopicErr(topic, fmt.Errorf("invalid flow topic contains cluster ID (%s) not in active cluster IDs list %s", clusterID, activeClusterIDS))
 }
 
 // isValidFlowTopic ensures the topic is a valid Flow network topic.
@@ -355,13 +355,12 @@ func IsValidFlowClusterTopic(topic Topic, activeClusterIDS []string) error {
 func isValidFlowTopic(topic Topic) error {
 	channel, ok := ChannelFromTopic(topic)
 	if !ok {
-		return fmt.Errorf("invalid topic: failed to get channel from topic")
+		return NewInvalidTopicErr(topic, fmt.Errorf("invalid topic: failed to get channel from topic"))
 	}
 	err := IsValidFlowChannel(channel)
 	if err != nil {
-		return fmt.Errorf("invalid topic: %w", err)
+		return NewInvalidTopicErr(topic, fmt.Errorf("invalid topic: %w", err))
 	}
-
 	return nil
 }
 

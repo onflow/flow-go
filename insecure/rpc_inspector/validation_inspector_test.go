@@ -293,7 +293,7 @@ func TestValidationInspector_InvalidTopicID(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvalidControlMessageNotification)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			require.True(t, validation.IsErrInvalidTopic(notification.Err) || validation.IsErrDuplicateTopic(notification.Err))
+			require.True(t, channels.IsErrInvalidTopic(notification.Err) || validation.IsErrDuplicateTopic(notification.Err))
 			require.True(t, messageCount == notification.Count || notification.Count == 3)
 			require.True(t, notification.MsgType == p2p.CtrlMsgGraft || notification.MsgType == p2p.CtrlMsgPrune)
 			if count.Load() == int64(expectedNumOfNotif) {

@@ -156,6 +156,9 @@ func NewControlMsgValidationInspector(
 // errors returned:
 //
 //	ErrDiscardThreshold - if the message count for the control message type exceeds the discard threshold.
+//
+// This func returns an exception in case of unexpected bug or state corruption the violation distributor
+// fails to distribute invalid control message notification or a new inspect message request can't be created.
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	control := rpc.GetControl()
 	for _, ctrlMsgType := range p2p.ControlMessageTypes() {
@@ -212,6 +215,8 @@ func (c *ControlMsgValidationInspector) SetClusterIDSProvider(provider module.Cl
 }
 
 // blockingPreprocessingRpc ensures the RPC control message count does not exceed the configured discard threshold.
+// Expected error returns during normal operations:
+//   - ErrDiscardThreshold: if control message count exceeds the configured discard threshold.
 func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
 	lg := c.logger.With().
 		Str("peer_id", from.String()).
@@ -291,7 +296,9 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 }
 
 // validateTopics ensures all topics in the specified control message are valid flow topic/channel and no duplicate topics exist.
-// All errors returned from this function can be considered benign.
+// Expected error returns during normal operations:
+//   - channels.ErrInvalidTopic: if topic is invalid.
+//   - ErrDuplicateTopic: if a duplicate topic ID is encountered.
 func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
 	seen := make(map[channels.Topic]struct{})
 	validateTopic := func(topic channels.Topic) error {
@@ -326,12 +333,16 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 	return nil
 }
 
-// validateTopic the topic is a valid flow topic/channel.
-// All errors returned from this function can be considered benign.
+// validateTopic ensures the topic is a valid flow topic/channel.
+// Expected error returns during normal operations:
+//   - channels.ErrInvalidTopic: if topic is invalid.
+//
+// This func returns an exception in case of unexpected bug or state corruption if cluster prefixed topic validation
+// fails due to unexpected error returned when getting the active cluster IDS.
 func (c *ControlMsgValidationInspector) validateTopic(topic channels.Topic, ctrlMsgType p2p.ControlMessageType) error {
 	channel, ok := channels.ChannelFromTopic(topic)
 	if !ok {
-		return NewInvalidTopicErr(topic, fmt.Errorf("failed to get channel from topic"))
+		return channels.NewInvalidTopicErr(topic, fmt.Errorf("failed to get channel from topic"))
 	}
 
 	// handle cluster prefixed topics
@@ -342,12 +353,17 @@ func (c *ControlMsgValidationInspector) validateTopic(topic channels.Topic, ctrl
 	// non cluster prefixed topic validation
 	err := channels.IsValidFlowTopic(topic, c.sporkID)
 	if err != nil {
-		return NewInvalidTopicErr(topic, err)
+		return err
 	}
 	return nil
 }
 
 // validateClusterPrefixedTopic validates cluster prefixed topics.
+// Expected error returns during normal operations:
+//   - channels.ErrInvalidTopic: if topic is invalid.
+//
+// This func returns an exception in case of unexpected bug or state corruption if cluster prefixed topic validation
+// fails due to unexpected error returned when getting the active cluster IDS.
 func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(topic channels.Topic, ctrlMsgType p2p.ControlMessageType) error {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -365,7 +381,7 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(topic chann
 
 	err = channels.IsValidFlowClusterTopic(topic, activeClusterIDS)
 	if err != nil {
-		return NewInvalidTopicErr(topic, err)
+		return err
 	}
 	return nil
 }
