@@ -11,6 +11,9 @@ import (
 )
 
 const (
+	// corruptENs is the number of corrupt execution nodes to create
+	corruptENs int = 2
+
 	// corruptVNs is the number of corrupt verification nodes to create
 	corruptVNs int = 2
 )
@@ -40,6 +43,7 @@ func (s *Suite) SetupSuite() {
 		return n.Role != flow.RoleExecution && n.Role != flow.RoleVerification
 	})
 
+	// generate corrupt verification nodes
 	s.verIDs = make([]flow.Identifier, corruptVNs)
 	for i := range s.verIDs {
 		s.verIDs[i] = unittest.IdentifierFixture()
@@ -50,20 +54,19 @@ func (s *Suite) SetupSuite() {
 		s.NodeConfigs = append(s.NodeConfigs, verConfig)
 	}
 
-	// generates two corrupted execution nodes
-	s.exe1ID = unittest.IdentifierFixture()
-	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
-		testnet.WithID(s.exe1ID),
-		testnet.WithLogLevel(zerolog.ErrorLevel),
-		testnet.AsCorrupted())
-	s.NodeConfigs = append(s.NodeConfigs, exe1Config)
+	// generate corrupt execution nodes
+	s.exeIDs = make([]flow.Identifier, corruptENs)
+	for i := range s.exeIDs {
+		s.exeIDs[i] = unittest.IdentifierFixture()
+		exeConfig := testnet.NewNodeConfig(flow.RoleExecution,
+			testnet.WithID(s.exeIDs[i]),
+			testnet.WithLogLevel(zerolog.ErrorLevel),
+			testnet.AsCorrupted())
+		s.NodeConfigs = append(s.NodeConfigs, exeConfig)
+	}
 
-	s.exe2ID = unittest.IdentifierFixture()
-	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
-		testnet.WithID(s.exe2ID),
-		testnet.WithLogLevel(zerolog.ErrorLevel),
-		testnet.AsCorrupted())
-	s.NodeConfigs = append(s.NodeConfigs, exe2Config)
+	s.exe1ID = s.exeIDs[0]
+	s.exe2ID = s.exeIDs[1]
 
 	s.BaseSuite.StartCorruptedNetwork(
 		"bft_passthrough_test",

@@ -94,6 +94,7 @@ func (s *Suite) SetupSuite() {
 	s.log.Info().Msg("before adding verification nodes (VNs); VNs=" + fmt.Sprint(VNs))
 	s.verIDs = make([]flow.Identifier, VNs)
 
+	// generate verification nodes
 	for i := range s.verIDs {
 		s.verIDs[i] = unittest.IdentifierFixture()
 		verConfig := testnet.NewNodeConfig(flow.RoleVerification,
@@ -106,22 +107,22 @@ func (s *Suite) SetupSuite() {
 	}
 	s.log.Info().Msg("after adding verification nodes (VNs)")
 
-	// generates two execution nodes
-	s.exe1ID = unittest.IdentifierFixture()
-	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
-		testnet.WithID(s.exe1ID),
-		testnet.WithLogLevel(zerolog.InfoLevel),
-		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
-	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
+	s.log.Info().Msg("before adding execution nodes (ENs); ENs=" + fmt.Sprint(ENs))
+	s.exeIDs = make([]flow.Identifier, ENs)
 
-	s.exe2ID = unittest.IdentifierFixture()
-	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
-		testnet.WithID(s.exe2ID),
-		testnet.WithLogLevel(zerolog.InfoLevel),
-		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
-	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
+	// generate execution nodes
+	for i := range s.exeIDs {
+		s.exeIDs[i] = unittest.IdentifierFixture()
+		exeConfig := testnet.NewNodeConfig(flow.RoleExecution,
+			testnet.WithID(s.exeIDs[i]),
+			testnet.WithLogLevel(zerolog.InfoLevel),
+			// only verification and execution nodes run with preferred unicast protocols
+			testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
+		s.nodeConfigs = append(s.nodeConfigs, exeConfig)
+	}
+
+	s.exe1ID = s.exeIDs[0]
+	s.exe2ID = s.exeIDs[1]
 
 	// generates two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
