@@ -33,6 +33,6 @@ func (v *VerificationTestSuite) TestSealingAndVerificationHappyPath() {
 		v.exe2ID,
 		v.verID,
 		v.ver2ID,
-		nil,
+		v.verIDs,
 		v.net.Root().ID())
 }

@@ -89,36 +89,20 @@ func (s *Suite) SetupSuite() {
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
 
-	//s.verIDs = make([]flow.Identifier, VNs)
-	//for i, _ := range s.verIDs {
-	//	s.verIDs[i] = unittest.IdentifierFixture()
-	//	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
-	//		testnet.WithID(s.verIDs[i]),
-	//		testnet.WithLogLevel(zerolog.WarnLevel),
-	//		// only verification and execution nodes run with preferred unicast protocols
-	//		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
-	//	s.nodeConfigs = append(s.nodeConfigs, verConfig)
-	//}
+	s.log.Info().Msg("before adding verification nodes (VNs); VNs=" + fmt.Sprint(VNs))
+	s.verIDs = make([]flow.Identifier, VNs)
 
-	// generates two verification node
-	s.verID = unittest.IdentifierFixture()
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
-		testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.WarnLevel),
-		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
-	s.nodeConfigs = append(s.nodeConfigs, verConfig)
-
-	s.ver2ID = unittest.IdentifierFixture()
-	ver2Config := testnet.NewNodeConfig(flow.RoleVerification,
-		testnet.WithID(s.ver2ID),
-		testnet.WithLogLevel(zerolog.WarnLevel),
-		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
-	s.nodeConfigs = append(s.nodeConfigs, ver2Config)
-
-	//s.verID = s.verIDs[0]
-	//s.ver2ID = s.verIDs[1]
+	for i, _ := range s.verIDs {
+		s.verIDs[i] = unittest.IdentifierFixture()
+		verConfig := testnet.NewNodeConfig(flow.RoleVerification,
+			testnet.WithID(s.verIDs[i]),
+			testnet.WithLogLevel(zerolog.WarnLevel),
+			// only verification and execution nodes run with preferred unicast protocols
+			testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
+		s.log.Info().Msg("================> adding verConfig[" + fmt.Sprint(i) + "]=" + s.verIDs[i].String())
+		s.nodeConfigs = append(s.nodeConfigs, verConfig)
+	}
+	s.log.Info().Msg("after adding verification nodes (VNs)")
 
 	// generates two execution nodes
 	s.exe1ID = unittest.IdentifierFixture()
