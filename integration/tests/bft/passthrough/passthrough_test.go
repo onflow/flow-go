@@ -35,6 +35,7 @@ func (p *PassThroughTestSuite) TestSealingAndVerificationPassThrough() {
 		p.AccessClient(),
 		p.exe1ID,
 		p.exe2ID,
+		p.exeIDs,
 		p.verIDs,
 		p.Net.Root().ID())
 

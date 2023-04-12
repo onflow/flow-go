@@ -21,6 +21,7 @@ type Suite struct {
 	bft.BaseSuite
 	exe1ID       flow.Identifier     // corrupted execution node 1
 	exe2ID       flow.Identifier     // corrupted execution node 2
+	exeIDs       flow.IdentifierList // corrupt execution nodes
 	verIDs       flow.IdentifierList // corrupt verification nodes list
 	Orchestrator *orchestrator
 }

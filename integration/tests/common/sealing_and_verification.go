@@ -29,6 +29,7 @@ func SealingAndVerificationHappyPathTest(
 	accessClient *testnet.Client,
 	exe1Id flow.Identifier,
 	exe2Id flow.Identifier,
+	exeIds flow.IdentifierList,
 	verIds flow.IdentifierList,
 	rootBlockId flow.Identifier) ([]*flow.ExecutionReceipt, []*flow.ResultApproval) {
 

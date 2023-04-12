@@ -16,6 +16,9 @@ import (
 )
 
 const (
+	// ENs is the number of execution nodes to create
+	ENs int = 2
+
 	// VNs is the number of verification nodes to create
 	VNs int = 2
 )
@@ -33,6 +36,7 @@ type Suite struct {
 	ghostID                 flow.Identifier      // represents id of ghost node
 	exe1ID                  flow.Identifier
 	exe2ID                  flow.Identifier
+	exeIDs                  flow.IdentifierList // execution nodes list
 	verIDs                  flow.IdentifierList // verification nodes list
 	PreferredUnicasts       string              // preferred unicast protocols between execution and verification nodes.
 }
