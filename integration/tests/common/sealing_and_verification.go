@@ -15,8 +15,8 @@ import (
 
 // SealingAndVerificationHappyPathTest evaluates the health of the happy path of verification and sealing. It
 // deploys a transaction into the testnet hence causing an execution result with more than
-// one chunk, assigns all chunks to the same single verification node in this testnet, and then verifies whether verification node
-// generates a result approval for all chunks of that execution result.
+// one chunk, assigns all chunks to the same list of verification nodes in this testnet, and then verifies whether all verification nodes
+// generate a result approval for all chunks of that execution result.
 // It also enables sealing based on result approvals and verifies whether the block of that specific multi-chunk execution result is sealed
 // affected by the emitted result approvals.
 //
@@ -27,8 +27,6 @@ func SealingAndVerificationHappyPathTest(
 	receiptState *lib.ReceiptState,
 	approvalState *lib.ResultApprovalState,
 	accessClient *testnet.Client,
-	exe1Id flow.Identifier,
-	exe2Id flow.Identifier,
 	exeIds flow.IdentifierList,
 	verIds flow.IdentifierList,
 	rootBlockId flow.Identifier) ([]*flow.ExecutionReceipt, []*flow.ResultApproval) {

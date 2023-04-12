@@ -29,8 +29,6 @@ func (v *VerificationTestSuite) TestSealingAndVerificationHappyPath() {
 		v.ReceiptState,
 		v.ApprovalState,
 		v.AccessClient(),
-		v.exe1ID,
-		v.exe2ID,
 		v.exeIDs,
 		v.verIDs,
 		v.net.Root().ID())

@@ -34,11 +34,9 @@ type Suite struct {
 	nodeConfigs             []testnet.NodeConfig // used to keep configuration of nodes in testnet
 	nodeIDs                 []flow.Identifier    // used to keep identifier of nodes in testnet
 	ghostID                 flow.Identifier      // represents id of ghost node
-	exe1ID                  flow.Identifier
-	exe2ID                  flow.Identifier
-	exeIDs                  flow.IdentifierList // execution nodes list
-	verIDs                  flow.IdentifierList // verification nodes list
-	PreferredUnicasts       string              // preferred unicast protocols between execution and verification nodes.
+	exeIDs                  flow.IdentifierList  // execution nodes list
+	verIDs                  flow.IdentifierList  // verification nodes list
+	PreferredUnicasts       string               // preferred unicast protocols between execution and verification nodes.
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -120,9 +118,6 @@ func (s *Suite) SetupSuite() {
 			testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
 		s.nodeConfigs = append(s.nodeConfigs, exeConfig)
 	}
-
-	s.exe1ID = s.exeIDs[0]
-	s.exe2ID = s.exeIDs[1]
 
 	// generates two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,

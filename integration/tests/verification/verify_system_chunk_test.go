@@ -28,12 +28,12 @@ func (suite *VerifySystemChunkSuite) TestSystemChunkIDsShouldBeDifferent() {
 	suite.T().Logf("blockB generated, height: %v ID: %v\n", blockB.Header.Height, blockB.Header.ID())
 
 	// waits for execution receipt for blockA from execution node, called receiptA.
-	receiptA := suite.ReceiptState.WaitForReceiptFrom(suite.T(), blockA.Header.ID(), suite.exe1ID)
+	receiptA := suite.ReceiptState.WaitForReceiptFrom(suite.T(), blockA.Header.ID(), suite.exeIDs[0])
 	resultAId := receiptA.ExecutionResult.ID()
 	suite.T().Logf("receipt for blockA generated: result ID: %x\n", resultAId)
 
 	// waits for execution receipt for blockB from execution node, called receiptB.
-	receiptB := suite.ReceiptState.WaitForReceiptFrom(suite.T(), blockB.Header.ID(), suite.exe1ID)
+	receiptB := suite.ReceiptState.WaitForReceiptFrom(suite.T(), blockB.Header.ID(), suite.exeIDs[0])
 	resultBId := receiptB.ExecutionResult.ID()
 	suite.T().Logf("receipt for blockB generated: result ID: %x\n", resultBId)
 

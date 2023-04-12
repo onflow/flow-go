@@ -22,8 +22,6 @@ const (
 // happy path of Corrupted Conduit Framework (CCF) for BFT testing.
 type Suite struct {
 	bft.BaseSuite
-	exe1ID       flow.Identifier     // corrupted execution node 1
-	exe2ID       flow.Identifier     // corrupted execution node 2
 	exeIDs       flow.IdentifierList // corrupt execution nodes
 	verIDs       flow.IdentifierList // corrupt verification nodes list
 	Orchestrator *orchestrator
@@ -64,9 +62,6 @@ func (s *Suite) SetupSuite() {
 			testnet.AsCorrupted())
 		s.NodeConfigs = append(s.NodeConfigs, exeConfig)
 	}
-
-	s.exe1ID = s.exeIDs[0]
-	s.exe2ID = s.exeIDs[1]
 
 	s.BaseSuite.StartCorruptedNetwork(
 		"bft_passthrough_test",
