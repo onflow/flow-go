@@ -133,6 +133,7 @@ func (suite *Suite) RunTest(
 			nil,
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
+			"",
 		)
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
@@ -308,6 +309,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			nil,
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
+			"",
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
@@ -619,12 +621,13 @@ func (suite *Suite) TestGetSealedTransaction() {
 			enNodeIDs.Strings(),
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
+			"",
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
 
 		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, all.Blocks, all.Headers, collections, transactions, receipts,
-			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
+			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil, "")
 		require.NoError(suite.T(), err)
 		rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 		require.NoError(suite.T(), err)
@@ -712,6 +715,7 @@ func (suite *Suite) TestExecuteScript() {
 			flow.IdentifierList(identities.NodeIDs()).Strings(),
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
+			"",
 		)
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
