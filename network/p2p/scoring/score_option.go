@@ -19,7 +19,7 @@ const (
 	DefaultAppSpecificScoreWeight = 1
 	MaxAppSpecificPenalty         = -100
 	MinAppSpecificPenalty         = -1
-	MaxAppSpecificReward          = 100
+	MaxAppSpecificReward          = float64(100)
 
 	// DefaultGossipThreshold when a peer's penalty drops below this threshold,
 	// no gossip is emitted towards that peer and gossip from that peer is ignored.
