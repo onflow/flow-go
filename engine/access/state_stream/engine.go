@@ -17,8 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
-	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -64,7 +63,7 @@ type Engine struct {
 	handler *Handler
 
 	execDataBroadcaster *engine.Broadcaster
-	execDataCache       *herocache.Cache
+	execDataCache       *herocache.BlockExecutionData
 
 	stateStreamGrpcAddress net.Addr
 }
@@ -113,13 +112,7 @@ func NewEng(
 
 	server := grpc.NewServer(grpcOpts...)
 
-	execDataCache := herocache.NewCache(
-		config.ExecutionDataCacheSize,
-		herocache.DefaultOversizeFactor,
-		heropool.LRUEjection,
-		logger,
-		heroCacheMetrics,
-	)
+	execDataCache := herocache.NewBlockExecutionData(config.ExecutionDataCacheSize, logger, heroCacheMetrics)
 
 	broadcaster := engine.NewBroadcaster()
 
@@ -154,7 +147,7 @@ func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDat
 		Hex("block_id", logging.ID(executionData.BlockID)).
 		Msg("received execution data")
 
-	_ = e.execDataCache.Add(executionData.BlockID, executionData)
+	_ = e.execDataCache.Add(executionData)
 	e.execDataBroadcaster.Publish()
 }
 

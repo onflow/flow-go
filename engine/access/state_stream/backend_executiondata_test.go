@@ -1,7 +1,6 @@
 package state_stream
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"math/rand"
@@ -18,13 +17,10 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
-	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -52,7 +48,7 @@ type BackendExecutionDataSuite struct {
 	eds                 execution_data.ExecutionDataStore
 	broadcaster         *engine.Broadcaster
 	execDataDistributor *requester.ExecutionDataDistributor
-	execDataCache       *herocache.Cache
+	execDataCache       *herocache.BlockExecutionData
 	backend             *StateStreamBackend
 
 	blocks      []*flow.Block
@@ -84,13 +80,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.broadcaster = engine.NewBroadcaster()
 	s.execDataDistributor = requester.NewExecutionDataDistributor()
 
-	s.execDataCache = herocache.NewCache(
-		DefaultCacheSize,
-		herocache.DefaultOversizeFactor,
-		heropool.LRUEjection,
-		logger,
-		metrics.NewNoopCollector(),
-	)
+	s.execDataCache = herocache.NewBlockExecutionData(DefaultCacheSize, logger, metrics.NewNoopCollector())
 
 	conf := Config{
 		ClientSendTimeout:    DefaultSendTimeout,
@@ -135,7 +125,25 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		seal := unittest.BlockSealsFixture(1)[0]
 		result := unittest.ExecutionResultFixture()
 		blockEvents := unittest.BlockEventsFixture(block.Header, (i%len(testEventTypes))*3+1, testEventTypes...)
-		execData := blockExecutionDataFixture(s.T(), block, blockEvents.Events)
+
+		numChunks := 5
+		chunkDatas := make([]*execution_data.ChunkExecutionData, 0, numChunks)
+		for i := 0; i < numChunks; i++ {
+			var events flow.EventsList
+			switch {
+			case i >= len(blockEvents.Events):
+				events = flow.EventsList{}
+			case i == numChunks-1:
+				events = blockEvents.Events[i:]
+			default:
+				events = flow.EventsList{blockEvents.Events[i]}
+			}
+			chunkDatas = append(chunkDatas, unittest.ChunkExecutionDataFixture(s.T(), 5*execution_data.DefaultMaxBlobSize, unittest.WithChunkEvents(events)))
+		}
+		execData := unittest.BlockExecutionDataFixture(s.T(),
+			unittest.WithBlockExecutionDataBlockID(block.ID()),
+			unittest.WithChunkExecutionDatas(chunkDatas...),
+		)
 
 		result.ExecutionDataID, err = s.eds.AddExecutionData(context.TODO(), execData)
 		assert.NoError(s.T(), err)
@@ -246,58 +254,6 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 		assert.Nil(s.T(), execDataRes)
 		assert.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
-}
-
-func blockExecutionDataFixture(t *testing.T, block *flow.Block, events []flow.Event) *execution_data.BlockExecutionData {
-	numChunks := 5
-	minSerializedSize := 5 * execution_data.DefaultMaxBlobSize
-
-	chunks := make([]*execution_data.ChunkExecutionData, numChunks)
-
-	for i := 0; i < numChunks; i++ {
-		var e flow.EventsList
-		switch {
-		case i >= len(events):
-			e = flow.EventsList{}
-		case i == numChunks-1:
-			e = events[i:]
-		default:
-			e = flow.EventsList{events[i]}
-		}
-		chunks[i] = chunkExecutionDataFixture(t, uint64(minSerializedSize), e)
-	}
-
-	return &execution_data.BlockExecutionData{
-		BlockID:             block.ID(),
-		ChunkExecutionDatas: chunks,
-	}
-}
-
-func chunkExecutionDataFixture(t *testing.T, minSerializedSize uint64, events []flow.Event) *execution_data.ChunkExecutionData {
-	ced := &execution_data.ChunkExecutionData{
-		TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
-		Events:     events,
-	}
-
-	size := 1
-
-	for {
-		buf := &bytes.Buffer{}
-		require.NoError(t, execution_data.DefaultSerializer.Serialize(buf, ced))
-		if buf.Len() >= int(minSerializedSize) {
-			return ced
-		}
-
-		v := make([]byte, size)
-		_, err := rand.Read(v)
-		require.NoError(t, err)
-
-		k, err := ced.TrieUpdate.Payloads[0].Key()
-		require.NoError(t, err)
-
-		ced.TrieUpdate.Payloads[0] = ledger.NewPayload(k, v)
-		size *= 2
-	}
 }
 
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
