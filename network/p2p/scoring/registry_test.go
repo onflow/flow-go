@@ -19,49 +19,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestInit tests when a peer id is queried for the first time by the
-// app specific penalty function, the penalty is initialized to the initial state.
-func TestInitSpamRecords(t *testing.T) {
-	reg, cache := newGossipSubAppSpecificScoreRegistry(t)
-	peerID := peer.ID("peer-1")
-
-	// initially, the cache should not have the peer id.
-	assert.False(t, cache.Has(peerID))
-
-	// when the app specific penalty function is called for the first time, the penalty should be initialized to the initial state.
-	score := reg.AppSpecificScoreFunc()(peerID)
-	assert.Equal(t, score, scoring.InitAppScoreRecordState().Penalty) // penalty should be initialized to the initial state.
-
-	// the cache should now have the peer id.
-	assert.True(t, cache.Has(peerID))
-	record, err, ok := cache.Get(peerID) // get the record from the cache.
-	assert.True(t, ok)
-	assert.NoError(t, err)
-	assert.Equal(t, record.Penalty, scoring.InitAppScoreRecordState().Penalty) // penalty should be initialized to the initial state.
-	assert.Equal(t, record.Decay, scoring.InitAppScoreRecordState().Decay)     // decay should be initialized to the initial state.
-}
-
-func TestInitWhenGetGoesFirst(t *testing.T) {
-	t.Run("graft", func(t *testing.T) {
-		testInitWhenGetFirst(t, p2p.CtrlMsgGraft, penaltyValueFixtures().Graft)
-	})
-	t.Run("prune", func(t *testing.T) {
-		testInitWhenGetFirst(t, p2p.CtrlMsgPrune, penaltyValueFixtures().Prune)
-	})
-	t.Run("ihave", func(t *testing.T) {
-		testInitWhenGetFirst(t, p2p.CtrlMsgIHave, penaltyValueFixtures().IHave)
-	})
-	t.Run("iwant", func(t *testing.T) {
-		testInitWhenGetFirst(t, p2p.CtrlMsgIWant, penaltyValueFixtures().IWant)
-	})
-}
-
-// testInitWhenGetFirst tests the state of the app specific penalty transition of the node in this order:
-// (1) initially, there is no spam record for the peer id in the cache.
-// (2) the app specific penalty function is called for the first time for the peer id, and the spam record is initialized in cache.
-// (3) a spam violation is reported for the peer id, causing the spam record to be updated in cache.
-// (4) the app specific penalty function is called for the second time for the peer id, and the updated spam record is retrieved from cache.
-func testInitWhenGetFirst(t *testing.T, messageType p2p.ControlMessageType, expectedPenalty float64) {
+// TestNoPenaltyRecord tests that if there is no penalty record for a peer id, the app specific score should be the max
+// app specific reward. This is the default reward for a staked peer that has valid subscriptions and has not been
+// penalized.
+func TestNoPenaltyRecord(t *testing.T) {
 	peerID := peer.ID("peer-1")
 	reg, cache := newGossipSubAppSpecificScoreRegistry(
 		t,
@@ -71,17 +32,48 @@ func testInitWhenGetFirst(t *testing.T, messageType p2p.ControlMessageType, expe
 	// initially, the cache should not have the peer id.
 	assert.False(t, cache.Has(peerID))
 
-	// when the app specific penalty function is called for the first time, the penalty should be initialized to the initial state.
 	score := reg.AppSpecificScoreFunc()(peerID)
-	assert.Equal(t, score, scoring.InitAppScoreRecordState().Penalty) // penalty should be initialized to the initial state.
+	// since the peer id does not have a spam record, the app specific score should be the max app specific reward, which
+	// is the default reward for a staked peer that has valid subscriptions.
+	assert.Equal(t, scoring.MaxAppSpecificReward, score)
 
-	// the cache should now have the peer id.
-	assert.True(t, cache.Has(peerID))
-	record, err, ok := cache.Get(peerID) // get the record from the cache.
-	assert.True(t, ok)
-	assert.NoError(t, err)
-	assert.Equal(t, record.Penalty, scoring.InitAppScoreRecordState().Penalty) // penalty should be initialized to the initial state.
-	assert.Equal(t, record.Decay, scoring.InitAppScoreRecordState().Decay)     // decay should be initialized to the initial state.
+	// still the cache should not have the peer id (as there is no spam record for the peer id).
+	assert.False(t, cache.Has(peerID))
+}
+
+// TestPeerWithSpamRecord tests the app specific penalty computation of the node when there is a spam record for the peer id.
+// It tests the state that a staked peer with a valid role and valid subscriptions has spam records.
+// Since the peer has spam records, it should be deprived of the default reward for its staked role, and only have the
+// penalty value as the app specific score.
+func TestPeerWithSpamRecord(t *testing.T) {
+	t.Run("graft", func(t *testing.T) {
+		testPeerWithSpamRecord(t, p2p.CtrlMsgGraft, penaltyValueFixtures().Graft)
+	})
+	t.Run("prune", func(t *testing.T) {
+		testPeerWithSpamRecord(t, p2p.CtrlMsgPrune, penaltyValueFixtures().Prune)
+	})
+	t.Run("ihave", func(t *testing.T) {
+		testPeerWithSpamRecord(t, p2p.CtrlMsgIHave, penaltyValueFixtures().IHave)
+	})
+	t.Run("iwant", func(t *testing.T) {
+		testPeerWithSpamRecord(t, p2p.CtrlMsgIWant, penaltyValueFixtures().IWant)
+	})
+}
+
+func testPeerWithSpamRecord(t *testing.T, messageType p2p.ControlMessageType, expectedPenalty float64) {
+	peerID := peer.ID("peer-1")
+	reg, cache := newGossipSubAppSpecificScoreRegistry(
+		t,
+		withStakedIdentity(peerID),
+		withValidSubscriptions(peerID))
+
+	// initially, the cache should not have the peer id.
+	assert.False(t, cache.Has(peerID))
+
+	// since the peer id does not have a spam record, the app specific score should be the max app specific reward, which
+	// is the default reward for a staked peer that has valid subscriptions.
+	score := reg.AppSpecificScoreFunc()(peerID)
+	assert.Equal(t, scoring.MaxAppSpecificReward, score)
 
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
@@ -90,19 +82,20 @@ func testInitWhenGetFirst(t *testing.T, messageType p2p.ControlMessageType, expe
 		Count:   1,
 	})
 
-	// the penalty should now be updated.
-	record, err, ok = cache.Get(peerID) // get the record from the cache.
+	// the penalty should now be updated in the cache
+	record, err, ok := cache.Get(peerID) // get the record from the cache.
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)        // penalty should be updated to -10.
 	assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
 
-	// when the app specific penalty function is called again, the penalty should be updated.
+	// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
+	// and the peer should be deprived of the default reward for its valid staked role.
 	score = reg.AppSpecificScoreFunc()(peerID)
-	assert.Less(t, math.Abs(expectedPenalty-score), 10e-3) // penalty should be updated to -10.
+	assert.Less(t, math.Abs(expectedPenalty-score), 10e-3)
 }
 
-func TestInitWhenReportGoesFirst(t *testing.T) {
+func TestSpamRecord_With_UnknownIdentity(t *testing.T) {
 	t.Run("graft", func(t *testing.T) {
 		testInitWhenReportGoesFirst(t, p2p.CtrlMsgGraft, penaltyValueFixtures().Graft)
 	})
