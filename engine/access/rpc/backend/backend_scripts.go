@@ -163,7 +163,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		// return if it's just a script failure as opposed to an EN failure and skip trying other ENs
 		if status.Code(err) == codes.InvalidArgument {
 			b.log.Debug().Err(err).
-				Str("execution_node", execNode.String()).
+				Str("script_executor", executor).
 				Hex("block_id", blockID[:]).
 				Hex("script_hash", insecureScriptHash[:]).
 				Str("script", string(script)).
