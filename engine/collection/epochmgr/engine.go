@@ -515,6 +515,7 @@ func (e *Engine) removeEpoch(counter uint64) {
 }
 
 // ActiveClusterIDS returns the active canonical cluster ID's for the assigned collection clusters.
+// No errors are expected during normal operation. 
 func (e *Engine) ActiveClusterIDS() ([]string, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
