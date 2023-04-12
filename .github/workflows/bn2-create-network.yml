@@ -1,5 +1,4 @@
----
-name: Create Benchnet Network
+name: BN2 - Create Benchnet 2 Network
 
 on:
   workflow_dispatch:
@@ -10,42 +9,127 @@ on:
       network_id:
         required: true
         type: string
-        description: ID for network. Must be unique, have only alphanumerirc characters, and be 10 or fewer characters in length.
+        description: 'NETWORK ID for the new deployment. Must be unique, have only alphanumeric characters (can''t start with a digit, no UPPERCASE) and dashes (can''t start or end with a dash), and be 20 or fewer characters in length.'
+
+      access_nodes:
+        required: false
+        type: choice
+        description: 'Number of Access Nodes to create (default: 1)'
+        options:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+        default: 1
+
+      collection_nodes:
+        required: false
+        type: choice
+        description: 'Number of Collection Nodes to create (default: 6)'
+        options:
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+          - 11
+          - 12
+          - 13
+          - 14
+          - 15
+          - 16
+          - 17
+          - 18
+          - 19
+          - 20
+        default: 6
+
+      consensus_nodes:
+        required: false
+        type: choice
+        description: 'Number of Consensus Nodes to create (default: 2)'
+        options:
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+          - 11
+          - 12
+        default: 2
+
+      execution_nodes:
+        required: false
+        type: choice
+        description: 'Number of Execution Nodes to create (default: 2)'
+        options:
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+          - 11
+          - 12
+        default: 2
+
+      verification_nodes:
+        required: false
+        type: choice
+        description: 'Number of Verification Nodes to create (default: 1)'
+        options:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+          - 11
+          - 12
+          - 13
+          - 14
+          - 15
+          - 16
+          - 17
+          - 18
+          - 19
+          - 20
+        default: 1
 
       # Allows for the ref to be altered for testing automation changes
       automation_ref:
         type: string
-        description: 'flow-go branch, tag, or commit to use for automation to use for bootstrapping and deployment'
+        description: 'AUTOMATION branch, tag, or commit for network bootstrapping and deployment (onflow/flow-go repo)'
         required: false
         default: master
 
-      # Allows for the public or private repo to be used for deployment automation
-      automation_repo:
-        required: true
-        type: choice
-        description: Choose the repo to use the public or private repo for automation
-        options:
-          - onflow/flow-go
-          - dapperlabs/flow-go
-    
-      ref_to_build_and_deploy:
+      flow_ref:
         type: string
-        description: 'flow-go tag, branch, or commit to build and deploy'
+        description: 'FLOW tag, branch, or commit to build Flow nodes and bootstrap network deployment (onflow/flow-go repo)'
         required: true
-
-      repo_to_use_for_build:
-        required: true
-        type: choice
-        description: Choose the repo to use the public or private repo for builds
-        options:
-          # We currently only support the public repo as we are running the bootstrap command in a container which downloads the codebase
-          - onflow/flow-go
 
       # This flag allows us to skip builds for network ids that have been previously built
       skip_builds:
         required: true
         type: boolean
-        description: Skip builds. ONLY use when images have been previously built and deployed to private registry.
+        description: Skip builds. ONLY use when images have been previously built and deployed to private registry with the specified network ID.
 
 env:
   GCP_PROJECT: "dl-flow-benchnet-automation"
@@ -63,13 +147,12 @@ jobs:
     steps:
       - name: Set Network ID
         id: getNetworkId
-        # Set Network ID to input provided 
+        # Set Network ID to input provided
         run: |
-          if [[ ${{ inputs.network_id }} =~ ^[a-z,1-9]{1,10}$ ]]; then echo "networkId=${{ inputs.network_id }}" >> $GITHUB_OUTPUT; else echo "network_id does not meet criteria."; exit 1; fi;
+          if [[ ${{ inputs.network_id }} =~ ^[a-z][a-z0-9-]{0,18}[a-z0-9]$ ]]; then echo "networkId=${{ inputs.network_id }}" >> $GITHUB_OUTPUT; else echo "network_id does not meet criteria."; exit 1; fi;
 
-      - name: Print Network ID
-        run: |
-          echo ${{ steps.getNetworkId.outputs.networkId }}
+      - name: Print all input variables
+        run: echo '${{ toJson(inputs) }}' | jq
 
       # This step is required to authenticate with the cluster and use HELM
       - name: Configure gcloud
@@ -108,7 +191,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        role: 
+        role:
           - access
           - collection
           - consensus
@@ -123,8 +206,8 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          repository: ${{ inputs.repo_to_use_for_build }}
-          ref: ${{ inputs.ref_to_build_and_deploy }}
+          repository: onflow/flow-go
+          ref: ${{ inputs.flow_ref }}
 
       - name: Configure gcloud
         uses: google-github-actions/setup-gcloud@v0.2.1
@@ -142,7 +225,7 @@ jobs:
         # The SHORT_COMMIT and CONTAINER_REGISTRY variabls are overwritten so that the tag and docker repository is defined at runtime rather than in the Makefile
         run: |
           make docker-build-${{ matrix.role }} CONTAINER_REGISTRY=${{ env.REPO }} SHORT_COMMIT=${{needs.networkId.outputs.networkId}}
-  
+
       - name: Push Container Image
         # The SHORT_COMMIT and CONTAINER_REGISTRY variabls are overwritten so that the tag and docker repository is defined at runtime rather than in the Makefile
         run: |
@@ -162,13 +245,13 @@ jobs:
       - self-hosted
       - flow-bn2
     env:
-      ARGS: NAMESPACE=benchnet ACCESS=1 COLLECTION=6 CONSENSUS=2 EXECUTION=2 VERIFICATION=1 NETWORK_ID=${{ needs.networkId.outputs.networkId }} OWNER=${{ github.actor }}
+      ARGS: NAMESPACE=benchnet ACCESS=${{ inputs.access_nodes }} COLLECTION=${{ inputs.collection_nodes }} CONSENSUS=${{ inputs.consensus_nodes }} EXECUTION=${{ inputs.execution_nodes }} VERIFICATION=${{ inputs.verification_nodes }} NETWORK_ID=${{ needs.networkId.outputs.networkId }} OWNER=${{ github.actor }}
     steps:
 
       - name: Fail if Network ID was unable to be retrieved or was not unique
         if: ${{ contains(needs.*.result, 'failure') }}
         run: exit 1
-  
+
       - name: Fail if Network ID is empty
         if: ${{ needs.networkId.outputs.networkId == '' }}
         run: exit 1
@@ -177,13 +260,13 @@ jobs:
       # As we run containers as root, if the files are not removed by root or chowned, the following git checkout will fail
       - name: Run Clean Up to ensure file ownerhip is configured correctly
         run: |
-           docker run -v ${GITHUB_WORKSPACE}:/app ubuntu /bin/bash -c "rm -rf /app/*"
+          docker run -v ${GITHUB_WORKSPACE}:/app ubuntu /bin/bash -c "rm -rf /app/*"
 
       - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
-          repository: ${{ inputs.automation_repo }}
+          repository: onflow/flow-go
           ref: ${{ inputs.automation_ref }}
 
       - name: Configure gcloud
@@ -209,25 +292,25 @@ jobs:
         # This allows us to install tools inside the image without concern of permissions on the host
         run: |
           docker build -t bootstrap -f ./cmd/Dockerfile .
-      
+
       - name: Run Bootstrap in Container
         # When running the container, the container is run as root. This allows us to install what we need and not worry about permissions.
         # As a result, files that are written to disk are owned by root.
         # As a final step, we need to chown the files to the 1001 user which is the runner user for the host
         run: |
-          docker run -v ${GITHUB_WORKSPACE}:/app -i bootstrap /bin/bash -c "cd /app/integration/benchnet2 && make ${{ env.ARGS }} REF_FOR_BOOTSTRAP=${{ inputs.ref_to_build_and_deploy }} gen-helm-values && chown -R 1001 /app || chown -R 1001 /app"
+          docker run -v ${GITHUB_WORKSPACE}:/app -i bootstrap /bin/bash -c "cd /app/integration/benchnet2 && make ${{ env.ARGS }} REF_FOR_BOOTSTRAP=${{ inputs.flow_ref }} gen-helm-values && chown -R 1001 /app || chown -R 1001 /app"
 
       - name: Create Bootstrap Secrets
         working-directory: integration/benchnet2/
         run: make k8s-secrets-create ${{ env.ARGS }}
-        
+
       - name: Deploy Helm Chart
         working-directory: integration/benchnet2/
         run: make helm-deploy ${{ env.ARGS }}
 
       - name: Benchnet2 Deployment Summary
         run: |
-          SUMMARY=$'# Benchnet2 Deployment Summary\n## Your Network ID is ${{ needs.networkId.outputs.networkId }}\n This Network was built using the following inputs \n * Network ID ${{ inputs.network_id }} \n * Your network is accessible at access1-${{ inputs.network_id }}.benchnet.onflow.org \n * Repo Used for Build ${{ inputs.repo_to_use_for_build }} \n * Ref Used for Build ${{ inputs.ref_to_build_and_deploy }} \n * Ref Used for Automation ${{ inputs.automation_ref }} \n * Repo Used for automation ${{ inputs.automation_repo }} \n * Skip builds ${{ inputs.skip_builds }}'
+          SUMMARY=$'# Benchnet2 Deployment Summary\n## Your Network ID is ${{ needs.networkId.outputs.networkId }}\n Network built using the following inputs: \n * Network ID: `${{ inputs.network_id }}` \n * Your network is accessible at: `flow blocks get latest --host access1-${{ inputs.network_id }}.benchnet.onflow.org:80` \n * Repo Used for Image Build, Automation: `onflow/flow-go` \n * Automation Ref: `${{ inputs.automation_ref }}` \n * Flow Ref: `${{ inputs.flow_ref }}` \n * Skip builds: `${{ inputs.skip_builds }}`'
           echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
 
       - name: Clean working directory to reduce files filling disk

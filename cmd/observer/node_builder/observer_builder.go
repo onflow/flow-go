@@ -567,7 +567,7 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 	}
 	anb := &ObserverServiceBuilder{
 		ObserverServiceConfig:   config,
-		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String()),
+		FlowNodeBuilder:         cmd.FlowNode("observer"),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
 	anb.FinalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
