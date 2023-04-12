@@ -14,7 +14,6 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
@@ -124,22 +123,6 @@ func ReadCounter(ctx context.Context, client *testnet.Client, address sdk.Addres
 	}
 
 	return res.(cadence.Int).Int(), nil
-}
-
-func GetGhostClient(ghostContainer *testnet.Container) (*client.GhostClient, error) {
-
-	if !ghostContainer.Config.Ghost {
-		return nil, fmt.Errorf("container is a not a ghost node container")
-	}
-
-	ghostPort, ok := ghostContainer.Ports[testnet.GhostNodeAPIPort]
-	if !ok {
-		return nil, fmt.Errorf("ghost node API port not found")
-	}
-
-	addr := fmt.Sprintf(":%s", ghostPort)
-
-	return client.NewGhostClient(addr)
 }
 
 // GetAccount returns a new account address, key, and signer.

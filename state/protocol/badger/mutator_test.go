@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -90,6 +91,7 @@ func TestExtendValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		all := storeutil.StorageLayer(t, db)
 
 		distributor := events.NewDistributor()
@@ -104,8 +106,17 @@ func TestExtendValid(t *testing.T) {
 		state, err := protocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 
-		fullState, err := protocol.NewFullConsensusState(state, all.Index, all.Payloads, tracer, consumer, util.MockBlockTimer(),
-			util.MockReceiptValidator(), util.MockSealValidator(all.Seals))
+		fullState, err := protocol.NewFullConsensusState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			util.MockBlockTimer(),
+			util.MockReceiptValidator(),
+			util.MockSealValidator(all.Seals),
+		)
 		require.NoError(t, err)
 
 		// insert block1 on top of the root block
@@ -626,13 +637,23 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
 
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		all := storeutil.StorageLayer(t, db)
 		protoState, err := protocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		receiptValidator := util.MockReceiptValidator()
 		sealValidator := util.MockSealValidator(all.Seals)
-		state, err := protocol.NewFullConsensusState(protoState, all.Index, all.Payloads, tracer, consumer,
-			util.MockBlockTimer(), receiptValidator, sealValidator)
+		state, err := protocol.NewFullConsensusState(
+			log,
+			tracer,
+			consumer,
+			protoState,
+			all.Index,
+			all.Payloads,
+			util.MockBlockTimer(),
+			receiptValidator,
+			sealValidator,
+		)
 		require.NoError(t, err)
 
 		head, err := rootSnapshot.Head()
@@ -1700,6 +1721,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		all := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
@@ -1747,8 +1769,17 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			}).
 			Times(3)
 
-		fullState, err := protocol.NewFullConsensusState(state, all.Index, all.Payloads, tracer, consumer,
-			util.MockBlockTimer(), util.MockReceiptValidator(), sealValidator)
+		fullState, err := protocol.NewFullConsensusState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			util.MockBlockTimer(),
+			util.MockReceiptValidator(),
+			sealValidator,
+		)
 		require.NoError(t, err)
 
 		err = fullState.Extend(context.Background(), block1)
@@ -2205,6 +2236,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
 		all := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
@@ -2223,8 +2255,17 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		blockTimer := &mockprotocol.BlockTimer{}
 		blockTimer.On("Validate", mock.Anything, mock.Anything).Return(realprotocol.NewInvalidBlockTimestamp(""))
 
-		fullState, err := protocol.NewFullConsensusState(state, all.Index, all.Payloads, tracer, consumer, blockTimer,
-			util.MockReceiptValidator(), util.MockSealValidator(all.Seals))
+		fullState, err := protocol.NewFullConsensusState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			blockTimer,
+			util.MockReceiptValidator(),
+			util.MockSealValidator(all.Seals),
+		)
 		require.NoError(t, err)
 
 		extend := unittest.BlockWithParentFixture(block.Header)

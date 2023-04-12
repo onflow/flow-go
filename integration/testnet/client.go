@@ -24,7 +24,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// AccessClient is a GRPC client of the Access API exposed by the Flow network.
+// Client is a GRPC client of the Access API exposed by the Flow network.
 // NOTE: we use integration/client rather than sdk/client as a stopgap until
 // the SDK client is updated with the latest protobuf definitions.
 type Client struct {
@@ -222,6 +222,11 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 	fmt.Printf("(Wait for Seal) Transaction %s sealed\n", id)
 
 	return result, err
+}
+
+// Ping sends a ping request to the node
+func (c *Client) Ping(ctx context.Context) error {
+	return c.client.Ping(ctx)
 }
 
 // GetLatestProtocolSnapshot returns the latest protocol state snapshot.

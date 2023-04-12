@@ -146,11 +146,12 @@ func NewReusableCadenceRuntimePool(
 
 func NewCustomReusableCadenceRuntimePool(
 	poolSize int,
+	config runtime.Config,
 	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
 	return newReusableCadenceRuntimePool(
 		poolSize,
-		runtime.Config{},
+		config,
 		newCustomRuntime,
 	)
 }

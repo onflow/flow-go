@@ -286,7 +286,7 @@ func sporkIDFromTopic(topic Topic) (string, error) {
 	return "", fmt.Errorf("spork id missing from topic")
 }
 
-// prependedIDFromTopic returns the pre-pended cluster ID for the cluster prefixed topic.
+// clusterIDFromTopic returns the pre-pended cluster ID for the cluster prefixed topic.
 // All errors returned from this function can be considered benign.
 func clusterIDFromTopic(topic Topic) (string, error) {
 	for prefix := range clusterChannelPrefixRoleMap {

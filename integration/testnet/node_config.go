@@ -18,15 +18,15 @@ type NodeConfigFilter func(n NodeConfig) bool
 // NodeConfig defines the input config for a particular node, specified prior
 // to network creation.
 type NodeConfig struct {
-	Role                  flow.Role
-	Corrupted             bool
-	Weight                uint64
-	Identifier            flow.Identifier
-	LogLevel              zerolog.Level
-	Ghost                 bool
-	AdditionalFlags       []string
-	Debug                 bool
-	SupportsUnstakedNodes bool // only applicable to Access node
+	Role                flow.Role
+	Corrupted           bool
+	Weight              uint64
+	Identifier          flow.Identifier
+	LogLevel            zerolog.Level
+	Ghost               bool
+	AdditionalFlags     []string
+	Debug               bool
+	EnableMetricsServer bool
 }
 
 func (n NodeConfigs) Filter(filters ...NodeConfigFilter) NodeConfigs {
@@ -131,12 +131,6 @@ func AsGhost() func(config *NodeConfig) {
 			panic("a node cannot be both corrupted and ghost at the same time")
 		}
 		config.Ghost = true
-	}
-}
-
-func SupportsUnstakedNodes() func(config *NodeConfig) {
-	return func(config *NodeConfig) {
-		config.SupportsUnstakedNodes = true
 	}
 }
 

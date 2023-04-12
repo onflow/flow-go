@@ -3,10 +3,10 @@ package wal
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
@@ -87,7 +87,10 @@ func createSimpleTrie(t *testing.T) []*trie.MTrie {
 
 func randPathPayload() (ledger.Path, ledger.Payload) {
 	var path ledger.Path
-	rand.Read(path[:])
+	_, err := rand.Read(path[:])
+	if err != nil {
+		panic("randomness failed")
+	}
 	payload := testutils.RandomPayload(1, 100)
 	return path, *payload
 }
@@ -220,10 +223,16 @@ func TestEncodeSubTrie(t *testing.T) {
 
 func randomNode() *node.Node {
 	var randomPath ledger.Path
-	rand.Read(randomPath[:])
+	_, err := rand.Read(randomPath[:])
+	if err != nil {
+		panic("randomness failed")
+	}
 
 	var randomHashValue hash.Hash
-	rand.Read(randomHashValue[:])
+	_, err = rand.Read(randomHashValue[:])
+	if err != nil {
+		panic("randomness failed")
+	}
 
 	return node.NewNode(256, nil, nil, randomPath, nil, randomHashValue)
 }

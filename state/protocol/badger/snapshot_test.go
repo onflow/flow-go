@@ -31,6 +31,52 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// TestUnknownReferenceBlock tests queries for snapshots which should be unknown.
+// We use this fixture:
+//   - Root height: 100
+//   - Heights [100, 110] are finalized
+//   - Height 111 is unfinalized
+func TestUnknownReferenceBlock(t *testing.T) {
+	rootHeight := uint64(100)
+	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	rootSnapshot := unittest.RootSnapshotFixture(participants, func(block *flow.Block) {
+		block.Header.Height = rootHeight
+	})
+
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		// build some finalized non-root blocks (heights 101-110)
+		head := rootSnapshot.Encodable().Head
+		const nBlocks = 10
+		for i := 0; i < nBlocks; i++ {
+			next := unittest.BlockWithParentFixture(head)
+			buildFinalizedBlock(t, state, next)
+			head = next.Header
+		}
+		// build an unfinalized block (height 111)
+		buildBlock(t, state, unittest.BlockWithParentFixture(head))
+
+		finalizedHeader, err := state.Final().Head()
+		require.NoError(t, err)
+
+		t.Run("below root height", func(t *testing.T) {
+			_, err := state.AtHeight(rootHeight - 1).Head()
+			assert.ErrorIs(t, err, statepkg.ErrUnknownSnapshotReference)
+		})
+		t.Run("above finalized height, non-existent height", func(t *testing.T) {
+			_, err := state.AtHeight(finalizedHeader.Height + 100).Head()
+			assert.ErrorIs(t, err, statepkg.ErrUnknownSnapshotReference)
+		})
+		t.Run("above finalized height, existent height", func(t *testing.T) {
+			_, err := state.AtHeight(finalizedHeader.Height + 1).Head()
+			assert.ErrorIs(t, err, statepkg.ErrUnknownSnapshotReference)
+		})
+		t.Run("unknown block ID", func(t *testing.T) {
+			_, err := state.AtBlockID(unittest.IdentifierFixture()).Head()
+			assert.ErrorIs(t, err, statepkg.ErrUnknownSnapshotReference)
+		})
+	})
+}
+
 func TestHead(t *testing.T) {
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
