@@ -10,6 +10,11 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const (
+	// VNs is the number of corrupt verification nodes to create
+	corruptVNs int = 2
+)
+
 // Suite represents a test suite evaluating the integration of the testnet against
 // happy path of Corrupted Conduit Framework (CCF) for BFT testing.
 type Suite struct {
@@ -18,6 +23,7 @@ type Suite struct {
 	exe2ID       flow.Identifier // corrupted execution node 2
 	verID        flow.Identifier // corrupted verification node
 	ver2ID       flow.Identifier // corrupted verification node 2
+	verIDs       flow.IdentifierList
 	Orchestrator *orchestrator
 }
 
@@ -35,20 +41,18 @@ func (s *Suite) SetupSuite() {
 		return n.Role != flow.RoleExecution && n.Role != flow.RoleVerification
 	})
 
-	// generates two corrupted verification nodes
-	s.verID = unittest.IdentifierFixture()
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
-		testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.AsCorrupted())
-	s.NodeConfigs = append(s.NodeConfigs, verConfig)
+	verIDs := make([]flow.Identifier, corruptVNs)
+	for i, _ := range verIDs {
+		verIDs[i] = unittest.IdentifierFixture()
+		verConfig := testnet.NewNodeConfig(flow.RoleVerification,
+			testnet.WithID(verIDs[i]),
+			testnet.WithLogLevel(zerolog.InfoLevel),
+			testnet.AsCorrupted())
+		s.NodeConfigs = append(s.NodeConfigs, verConfig)
+	}
 
-	s.ver2ID = unittest.IdentifierFixture()
-	ver2Config := testnet.NewNodeConfig(flow.RoleVerification,
-		testnet.WithID(s.ver2ID),
-		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.AsCorrupted())
-	s.NodeConfigs = append(s.NodeConfigs, ver2Config)
+	s.verID = verIDs[0]
+	s.ver2ID = verIDs[1]
 
 	// generates two corrupted execution nodes
 	s.exe1ID = unittest.IdentifierFixture()
