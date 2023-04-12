@@ -21,17 +21,17 @@ const (
 	MinAppSpecificPenalty         = -1
 	MaxAppSpecificReward          = 100
 
-	// DefaultGossipThreshold when a peer's score drops below this threshold,
+	// DefaultGossipThreshold when a peer's penalty drops below this threshold,
 	// no gossip is emitted towards that peer and gossip from that peer is ignored.
 	//
 	// Validation Constraint: GossipThreshold >= PublishThreshold && GossipThreshold < 0
 	//
 	// How we use it:
 	// As current max penalty is -100, we set the threshold to -99 so that all gossips
-	// to and from peers with score -100 are ignored.
+	// to and from peers with penalty -100 are ignored.
 	DefaultGossipThreshold = -99
 
-	// DefaultPublishThreshold when a peer's score drops below this threshold,
+	// DefaultPublishThreshold when a peer's penalty drops below this threshold,
 	// self-published messages are not propagated towards this peer.
 	//
 	// Validation Constraint:
@@ -42,7 +42,7 @@ const (
 	// receiving any published messages.
 	DefaultPublishThreshold = -99
 
-	// DefaultGraylistThreshold when a peer's score drops below this threshold, the peer is graylisted, i.e.,
+	// DefaultGraylistThreshold when a peer's penalty drops below this threshold, the peer is graylisted, i.e.,
 	// incoming RPCs from the peer are ignored.
 	//
 	// Validation Constraint:
@@ -53,7 +53,7 @@ const (
 	DefaultGraylistThreshold = -99
 
 	// DefaultAcceptPXThreshold when a peer sends us PX information with a prune, we only accept it and connect to the supplied
-	// peers if the originating peer's score exceeds this threshold.
+	// peers if the originating peer's penalty exceeds this threshold.
 	//
 	// Validation Constraint: must be non-negative.
 	//
@@ -62,8 +62,8 @@ const (
 	// well-behaved peers.
 	DefaultAcceptPXThreshold = 99
 
-	// DefaultOpportunisticGraftThreshold when the median peer score in the mesh drops below this value,
-	// the peer may select more peers with score above the median to opportunistically graft on the mesh.
+	// DefaultOpportunisticGraftThreshold when the median peer penalty in the mesh drops below this value,
+	// the peer may select more peers with penalty above the median to opportunistically graft on the mesh.
 	//
 	// Validation Constraint: must be non-negative.
 	//
@@ -76,7 +76,7 @@ const (
 	// this threshold are dropped.
 	MaxDebugLogs = 50
 
-	// defaultScoreCacheSize is the default size of the cache used to store the app specific score of peers.
+	// defaultScoreCacheSize is the default size of the cache used to store the app specific penalty of peers.
 	defaultScoreCacheSize = 1000
 )
 
@@ -108,48 +108,48 @@ func NewScoreOptionConfig(logger zerolog.Logger) *ScoreOptionConfig {
 	}
 }
 
-// SetProvider sets the identity provider for the score option.
-// It is used to retrieve the identity of a peer when calculating the app specific score.
-// If the provider is not set, the score registry will crash. This is a required field.
+// SetProvider sets the identity provider for the penalty option.
+// It is used to retrieve the identity of a peer when calculating the app specific penalty.
+// If the provider is not set, the penalty registry will crash. This is a required field.
 // It is safe to call this method multiple times, the last call will be used.
 func (c *ScoreOptionConfig) SetProvider(provider module.IdentityProvider) {
 	c.provider = provider
 }
 
-// SetCacheSize sets the size of the cache used to store the app specific score of peers.
+// SetCacheSize sets the size of the cache used to store the app specific penalty of peers.
 // If the cache size is not set, the default value will be used.
 // It is safe to call this method multiple times, the last call will be used.
 func (c *ScoreOptionConfig) SetCacheSize(size uint32) {
 	c.cacheSize = size
 }
 
-// SetCacheMetrics sets the cache metrics collector for the score option.
-// It is used to collect metrics for the app specific score cache. If the cache metrics collector is not set,
+// SetCacheMetrics sets the cache metrics collector for the penalty option.
+// It is used to collect metrics for the app specific penalty cache. If the cache metrics collector is not set,
 // a no-op collector will be used.
 // It is safe to call this method multiple times, the last call will be used.
 func (c *ScoreOptionConfig) SetCacheMetrics(metrics module.HeroCacheMetrics) {
 	c.cacheMetrics = metrics
 }
 
-// SetAppSpecificScoreFunction sets the app specific score function for the score option.
-// It is used to calculate the app specific score of a peer.
-// If the app specific score function is not set, the default one is used.
+// SetAppSpecificScoreFunction sets the app specific penalty function for the penalty option.
+// It is used to calculate the app specific penalty of a peer.
+// If the app specific penalty function is not set, the default one is used.
 // Note that it is always safer to use the default one, unless you know what you are doing.
 // It is safe to call this method multiple times, the last call will be used.
 func (c *ScoreOptionConfig) SetAppSpecificScoreFunction(appSpecificScoreFunction func(peer.ID) float64) {
 	c.appScoreFunc = appSpecificScoreFunction
 }
 
-// SetTopicScoreParams adds the topic score parameters to the peer score parameters.
-// It is used to configure the topic score parameters for the pubsub system.
-// If there is already a topic score parameter for the given topic, the last call will be used.
+// SetTopicScoreParams adds the topic penalty parameters to the peer penalty parameters.
+// It is used to configure the topic penalty parameters for the pubsub system.
+// If there is already a topic penalty parameter for the given topic, the last call will be used.
 func (c *ScoreOptionConfig) SetTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) {
 	c.topicParams = append(c.topicParams, func(topics map[string]*pubsub.TopicScoreParams) {
 		topics[topic.String()] = topicScoreParams
 	})
 }
 
-// NewScoreOption creates a new score option with the given configuration.
+// NewScoreOption creates a new penalty option with the given configuration.
 func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 	throttledSampler := logging.BurstSampler(MaxDebugLogs, time.Second)
 	logger := cfg.logger.With().
@@ -175,8 +175,8 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 		peerScoreParams: defaultPeerScoreParams(),
 	}
 
-	// set the app specific score function for the score option
-	// if the app specific score function is not set, use the default one
+	// set the app specific penalty function for the penalty option
+	// if the app specific penalty function is not set, use the default one
 	if cfg.appScoreFunc == nil {
 		s.appScoreFunc = scoreRegistry.AppSpecificScoreFunc()
 	} else {
@@ -185,7 +185,7 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 
 	s.peerScoreParams.AppSpecificScore = s.appScoreFunc
 
-	// apply the topic score parameters if any.
+	// apply the topic penalty parameters if any.
 	for _, topicParams := range cfg.topicParams {
 		topicParams(s.peerScoreParams.Topics)
 	}
@@ -206,7 +206,7 @@ func (s *ScoreOption) BuildFlowPubSubScoreOption() pubsub.Option {
 		Float64("graylist_threshold", s.peerThresholdParams.GraylistThreshold).
 		Float64("accept_px_threshold", s.peerThresholdParams.AcceptPXThreshold).
 		Float64("opportunistic_graft_threshold", s.peerThresholdParams.OpportunisticGraftThreshold).
-		Msg("peer score thresholds configured")
+		Msg("peer penalty thresholds configured")
 
 	return pubsub.WithPeerScore(
 		s.peerScoreParams,
@@ -231,7 +231,7 @@ func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 		// atomic validation fails initialization if any parameter is not set.
 		SkipAtomicValidation: true,
 		// DecayInterval is the interval over which we decay the effect of past behavior. So that
-		// a good or bad behavior will not have a permanent effect on the score.
+		// a good or bad behavior will not have a permanent effect on the penalty.
 		DecayInterval: time.Hour,
 		// DecayToZero defines the maximum value below which a peer scoring counter is reset to zero.
 		// This is to prevent the counter from decaying to a very small value.
@@ -239,7 +239,7 @@ func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 		// When a counter hits the DecayToZero threshold, it means that the peer did not exhibit the behavior
 		// for a long time, and we can reset the counter.
 		DecayToZero: 0.01,
-		// AppSpecificWeight is the weight of the application specific score.
+		// AppSpecificWeight is the weight of the application specific penalty.
 		AppSpecificWeight: DefaultAppSpecificScoreWeight,
 	}
 }
@@ -253,7 +253,7 @@ func (s *ScoreOption) BuildGossipSubScoreOption() pubsub.Option {
 		Float64("graylist_threshold", s.peerThresholdParams.GraylistThreshold).
 		Float64("accept_px_threshold", s.peerThresholdParams.AcceptPXThreshold).
 		Float64("opportunistic_graft_threshold", s.peerThresholdParams.OpportunisticGraftThreshold).
-		Msg("peer score thresholds configured")
+		Msg("peer penalty thresholds configured")
 
 	return pubsub.WithPeerScore(
 		s.peerScoreParams,
