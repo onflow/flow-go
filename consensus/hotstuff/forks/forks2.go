@@ -378,7 +378,7 @@ func (f *Forks2) checkForDoubleProposal(block *model.Block) {
 // Error returns:
 //   - model.MissingBlockError if the parent does not exist in the forest (but is above
 //     the pruned view). From the perspective of Forks, this error is benign (no-op).
-//   - model.ByzantineThresholdExceededError in case observing a finalization fork (violating
+//   - model.ByzantineThresholdExceededError in case we detect a finalization fork (violating
 //     a foundational consensus guarantee). This indicates that there are 1/3+ Byzantine nodes
 //     (weighted by stake) in the network, breaking the safety guarantees of HotStuff (or there
 //     is a critical bug / data corruption). Forks cannot recover from this exception.
@@ -464,7 +464,7 @@ func (f *Forks2) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBl
 // collectBlocksForFinalization collects and returns all newly finalized blocks up to (and including)
 // the block pointed to by `qc`. The blocks are listed in order of increasing height.
 // Error returns:
-//   - model.ByzantineThresholdExceededError in case observing a finalization fork (violating
+//   - model.ByzantineThresholdExceededError in case we detect a finalization fork (violating
 //     a foundational consensus guarantee). This indicates that there are 1/3+ Byzantine nodes
 //     (weighted by stake) in the network, breaking the safety guarantees of HotStuff (or there
 //     is a critical bug / data corruption). Forks cannot recover from this exception.
