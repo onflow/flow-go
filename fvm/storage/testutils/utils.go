@@ -1,7 +1,6 @@
 package testutils
 
 import (
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
@@ -20,7 +19,7 @@ func NewSimpleTransaction(
 
 	return &storage.SerialTransaction{
 		NestedTransaction: state.NewTransactionState(
-			delta.NewDeltaView(snapshot),
+			state.NewSpockState(snapshot),
 			state.DefaultParameters()),
 		DerivedTransactionCommitter: derivedTxnData,
 	}
