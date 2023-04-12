@@ -44,6 +44,7 @@ type Config struct {
 	MaxHeightRange            uint                             // max size of height range requests
 	PreferredExecutionNodeIDs []string                         // preferred list of upstream execution node IDs
 	FixedExecutionNodeIDs     []string                         // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
+	ArchiveAddress            string                           // the archive node address to send script executions. when configured, script executions will be all sent to the archive node
 }
 
 // Engine exposes the server with a simplified version of the Access API.
@@ -87,7 +88,6 @@ func NewBuilder(log zerolog.Logger,
 	rpcMetricsEnabled bool,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
-	archiveAddress string,
 ) (*RPCEngineBuilder, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -182,7 +182,7 @@ func NewBuilder(log zerolog.Logger,
 		config.FixedExecutionNodeIDs,
 		log,
 		backend.DefaultSnapshotHistoryLimit,
-		archiveAddress,
+		config.ArchiveAddress,
 	)
 
 	eng := &Engine{
