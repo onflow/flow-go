@@ -179,12 +179,14 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 		Penalty:       DefaultGossipSubCtrlMsgPenaltyValue(),
 		Validator:     validator,
 		Init:          InitAppScoreRecordState,
+		IdProvider:    cfg.provider,
 		CacheFactory: func() p2p.GossipSubSpamRecordCache {
 			return netcache.NewGossipSubSpamRecordCache(cfg.cacheSize, cfg.logger, cfg.cacheMetrics, DefaultDecayFunction())
 		},
 	})
 	s := &ScoreOption{
 		logger:          logger,
+		validator:       validator,
 		peerScoreParams: defaultPeerScoreParams(),
 	}
 

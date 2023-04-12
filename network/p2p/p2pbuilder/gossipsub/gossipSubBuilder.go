@@ -118,6 +118,7 @@ func (g *Builder) SetIDProvider(idProvider module.IdentityProvider) {
 	}
 
 	g.idProvider = idProvider
+	g.scoreOptionConfig.SetProvider(idProvider)
 }
 
 // SetRoutingSystem sets the routing system of the builder.
