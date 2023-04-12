@@ -24,14 +24,14 @@ import (
 const uniqueScriptLoggingTimeWindow = 10 * time.Minute
 
 type backendScripts struct {
-	headers           storage.Headers
-	executionReceipts storage.ExecutionReceipts
-	state             protocol.State
-	connFactory       ConnectionFactory
-	log               zerolog.Logger
-	metrics           module.BackendScriptsMetrics
-	loggedScripts     *lru.Cache
-	archiveAddress    string
+	headers            storage.Headers
+	executionReceipts  storage.ExecutionReceipts
+	state              protocol.State
+	connFactory        ConnectionFactory
+	log                zerolog.Logger
+	metrics            module.BackendScriptsMetrics
+	loggedScripts      *lru.Cache
+	archiveAddressList []string
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -82,20 +82,16 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 	return b.executeScriptOnExecutionNode(ctx, blockID, script, arguments)
 }
 
-func findScriptExecutors(
+func (b *backendScripts) findScriptExecutors(
 	ctx context.Context,
-	archiveAddress string,
 	blockID flow.Identifier,
-	executionReceipts storage.ExecutionReceipts,
-	state protocol.State,
-	log zerolog.Logger,
 ) ([]string, error) {
 	// send script queries to archive nodes if archive addres is configured
-	if archiveAddress != "" {
-		return []string{archiveAddress}, nil
+	if len(b.archiveAddressList) > 0 {
+		return b.archiveAddressList, nil
 	}
 
-	executors, err := executionNodesForBlockID(ctx, blockID, executionReceipts, state, log)
+	executors, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +119,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	}
 
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
-	scriptExecutors, err := findScriptExecutors(ctx, b.archiveAddress, blockID, b.executionReceipts, b.state, b.log)
+	scriptExecutors, err := b.findScriptExecutors(ctx, blockID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to find script executors at blockId %v: %v", blockID.String(), err)
 	}
@@ -135,15 +131,15 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	// try each of the execution nodes found
 	var errors *multierror.Error
 	// try to execute the script on one of the execution nodes
-	for _, executor := range scriptExecutors {
+	for _, executorAddress := range scriptExecutors {
 		execStartTime := time.Now() // record start time
-		result, err := b.tryExecuteScript(ctx, executor, execReq)
+		result, err := b.tryExecuteScript(ctx, executorAddress, execReq)
 		if err == nil {
 			if b.log.GetLevel() == zerolog.DebugLevel {
 				executionTime := time.Now()
 				if b.shouldLogScript(executionTime, insecureScriptHash) {
 					b.log.Debug().
-						Str("script_executor", executor).
+						Str("script_executor_addr", executorAddress).
 						Hex("block_id", blockID[:]).
 						Hex("script_hash", insecureScriptHash[:]).
 						Str("script", string(script)).
@@ -163,7 +159,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		// return if it's just a script failure as opposed to an EN failure and skip trying other ENs
 		if status.Code(err) == codes.InvalidArgument {
 			b.log.Debug().Err(err).
-				Str("script_executor", executor).
+				Str("script_executor_addr", executorAddress).
 				Hex("block_id", blockID[:]).
 				Hex("script_hash", insecureScriptHash[:]).
 				Str("script", string(script)).
