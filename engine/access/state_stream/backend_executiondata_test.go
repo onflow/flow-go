@@ -140,7 +140,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 			}
 			chunkDatas = append(chunkDatas, unittest.ChunkExecutionDataFixture(s.T(), 5*execution_data.DefaultMaxBlobSize, unittest.WithChunkEvents(events)))
 		}
-		execData := unittest.BlockExecutionDataFixture(s.T(),
+		execData := unittest.BlockExecutionDataFixture(
 			unittest.WithBlockExecutionDataBlockID(block.ID()),
 			unittest.WithChunkExecutionDatas(chunkDatas...),
 		)

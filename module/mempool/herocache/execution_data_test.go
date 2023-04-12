@@ -15,8 +15,8 @@ import (
 )
 
 func TestBlockExecutionDataPool(t *testing.T) {
-	ed1 := unittest.BlockExecutionDatEntityFixture(t)
-	ed2 := unittest.BlockExecutionDatEntityFixture(t)
+	ed1 := unittest.BlockExecutionDatEntityFixture()
+	ed2 := unittest.BlockExecutionDatEntityFixture()
 
 	cache := herocache.NewBlockExecutionData(1000, unittest.Logger(), metrics.NewNoopCollector())
 
@@ -62,7 +62,7 @@ func TestBlockExecutionDataPool(t *testing.T) {
 // TestConcurrentWriteAndRead checks correctness of cache mempool under concurrent read and write.
 func TestBlockExecutionDataConcurrentWriteAndRead(t *testing.T) {
 	total := 100
-	execDatas := unittest.BlockExecutionDatEntityListFixture(t, total)
+	execDatas := unittest.BlockExecutionDatEntityListFixture(total)
 	cache := herocache.NewBlockExecutionData(uint32(total), unittest.Logger(), metrics.NewNoopCollector())
 
 	wg := sync.WaitGroup{}
@@ -98,7 +98,7 @@ func TestBlockExecutionDataConcurrentWriteAndRead(t *testing.T) {
 // cache in the same order as they are returned.
 func TestBlockExecutionDataAllReturnsInOrder(t *testing.T) {
 	total := 100
-	execDatas := unittest.BlockExecutionDatEntityListFixture(t, total)
+	execDatas := unittest.BlockExecutionDatEntityListFixture(total)
 	cache := herocache.NewBlockExecutionData(uint32(total), unittest.Logger(), metrics.NewNoopCollector())
 
 	// storing all cache

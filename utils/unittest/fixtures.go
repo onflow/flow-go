@@ -2202,7 +2202,7 @@ func WithChunkExecutionDatas(chunks ...*execution_data.ChunkExecutionData) func(
 	}
 }
 
-func BlockExecutionDataFixture(t *testing.T, opts ...func(*execution_data.BlockExecutionData)) *execution_data.BlockExecutionData {
+func BlockExecutionDataFixture(opts ...func(*execution_data.BlockExecutionData)) *execution_data.BlockExecutionData {
 	bed := &execution_data.BlockExecutionData{
 		BlockID:             IdentifierFixture(),
 		ChunkExecutionDatas: []*execution_data.ChunkExecutionData{},
@@ -2215,15 +2215,15 @@ func BlockExecutionDataFixture(t *testing.T, opts ...func(*execution_data.BlockE
 	return bed
 }
 
-func BlockExecutionDatEntityFixture(t *testing.T, opts ...func(*execution_data.BlockExecutionData)) *execution_data.BlockExecutionDataEntity {
-	execData := BlockExecutionDataFixture(t, opts...)
+func BlockExecutionDatEntityFixture(opts ...func(*execution_data.BlockExecutionData)) *execution_data.BlockExecutionDataEntity {
+	execData := BlockExecutionDataFixture(opts...)
 	return execution_data.NewBlockExecutionDataEntity(IdentifierFixture(), execData)
 }
 
-func BlockExecutionDatEntityListFixture(t *testing.T, n int) []*execution_data.BlockExecutionDataEntity {
+func BlockExecutionDatEntityListFixture(n int) []*execution_data.BlockExecutionDataEntity {
 	l := make([]*execution_data.BlockExecutionDataEntity, n)
 	for i := 0; i < n; i++ {
-		l[i] = BlockExecutionDatEntityFixture(t)
+		l[i] = BlockExecutionDatEntityFixture()
 	}
 
 	return l
