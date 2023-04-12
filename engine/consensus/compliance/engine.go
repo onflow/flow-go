@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/events"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
@@ -51,6 +52,7 @@ func NewEngine(
 	log zerolog.Logger,
 	me module.Local,
 	core *Core,
+	actor *events.FinalizationActor,
 ) (*Engine, error) {
 
 	// Inbound FIFO queue for `messages.BlockProposal`s
@@ -81,7 +83,7 @@ func NewEngine(
 	// create the component manager and worker threads
 	eng.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(eng.processBlocksLoop).
-		AddWorker(eng.finalizationProcessingLoop).
+		AddWorker(actor.CreateWorker(eng.handleFinalizedBlock)).
 		Build()
 
 	return eng, nil
@@ -175,23 +177,11 @@ func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]
 	}
 }
 
-// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
-func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
-	doneSignal := ctx.Done()
-	blockFinalizedSignal := e.finalizedBlockNotifier.Channel()
-	for {
-		select {
-		case <-doneSignal:
-			return
-		case <-blockFinalizedSignal:
-			// retrieve the latest finalized header, so we know the height
-			finalHeader, err := e.headers.ByBlockID(e.finalizedBlockTracker.NewestBlock().BlockID)
-			if err != nil { // no expected errors
-				ctx.Throw(err)
-			}
-			e.core.ProcessFinalizedBlock(finalHeader)
-		}
+func (e *Engine) handleFinalizedBlock(block *model.Block) error {
+	header, err := e.headers.ByBlockID(block.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not get finalized block %x: %w", block.BlockID, err)
 	}
+	e.core.ProcessFinalizedBlock(header)
+	return nil
 }

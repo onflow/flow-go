@@ -139,6 +139,13 @@ func NoopWorker(ctx irrecoverable.SignalerContext, ready ReadyFunc) {
 	<-ctx.Done()
 }
 
+// FatalWorker returns a worker routine which immediately throws the given error.
+func FatalWorker(err error) ComponentWorker {
+	return func(ctx irrecoverable.SignalerContext, ready ReadyFunc) {
+		ctx.Throw(err)
+	}
+}
+
 // ComponentManagerBuilder provides a mechanism for building a ComponentManager
 type ComponentManagerBuilder interface {
 	// AddWorker adds a worker routine for the ComponentManager

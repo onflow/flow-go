@@ -51,6 +51,7 @@ import (
 	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/module/events"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
@@ -725,6 +726,7 @@ func main() {
 				logger,
 				node.Me,
 				complianceCore,
+				events.NewFinalizationActor(finalizationDistributor),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
