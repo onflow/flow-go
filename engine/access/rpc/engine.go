@@ -44,7 +44,7 @@ type Config struct {
 	MaxHeightRange            uint                             // max size of height range requests
 	PreferredExecutionNodeIDs []string                         // preferred list of upstream execution node IDs
 	FixedExecutionNodeIDs     []string                         // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
-	ArchiveAddress            string                           // the archive node address to send script executions. when configured, script executions will be all sent to the archive node
+	ArchiveAddressList        []string                         // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
 }
 
 // Engine exposes the server with a simplified version of the Access API.
@@ -182,7 +182,7 @@ func NewBuilder(log zerolog.Logger,
 		config.FixedExecutionNodeIDs,
 		log,
 		backend.DefaultSnapshotHistoryLimit,
-		config.ArchiveAddress,
+		config.ArchiveAddressList,
 	)
 
 	eng := &Engine{
