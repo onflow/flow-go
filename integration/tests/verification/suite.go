@@ -90,7 +90,7 @@ func (s *Suite) SetupSuite() {
 	s.log.Info().Msg("before adding verification nodes (VNs); VNs=" + fmt.Sprint(VNs))
 	s.verIDs = make([]flow.Identifier, VNs)
 
-	for i, _ := range s.verIDs {
+	for i := range s.verIDs {
 		s.verIDs[i] = unittest.IdentifierFixture()
 		verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 			testnet.WithID(s.verIDs[i]),

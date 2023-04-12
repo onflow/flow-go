@@ -40,7 +40,7 @@ func (s *Suite) SetupSuite() {
 	})
 
 	s.verIDs = make([]flow.Identifier, corruptVNs)
-	for i, _ := range s.verIDs {
+	for i := range s.verIDs {
 		s.verIDs[i] = unittest.IdentifierFixture()
 		verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 			testnet.WithID(s.verIDs[i]),
