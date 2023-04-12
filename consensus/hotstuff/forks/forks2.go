@@ -426,71 +426,31 @@ func (f *Forks2) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBl
 	if parentBlock.View+1 != certifiedBlock.View() {
 		return nil
 	}
-	// parentBlock is finalized:
-	err := f.finalizationEventsUpToBlock(qcForParent)
+
+	// `parentBlock` is now finalized:
+	//  * While Forks is single-threaded, there is still the possibility of reentrancy. Specifically, the
+	//    consumers of our finalization events are served by the goroutine executing Forks. It is conceivable
+	//    that a consumer might access Forks and query the latest finalization proof. This would be legal, if
+	//    the component supplying the goroutine to Forks also consumes the notifications.
+	//  * Therefore, for API safety, we want to first update Fork's `finalityProof` before we emit any notifications.
+
+	// Advancing finalization step (i): we collect all blocks for finalization (no notifications are emitted)
+	blocksToBeFinalized, err := f.collectBlocksForFinalization(qcForParent)
 	if err != nil {
-		return fmt.Errorf("emitting finalization events up to block %v failed: %w", qcForParent.BlockID, err)
+		return fmt.Errorf("advancing finalization to block %v from view %d failed: %w", qcForParent.BlockID, qcForParent.View, err)
 	}
+
+	// Advancing finalization step (ii): update `finalityProof` and prune `LevelledForest`
 	f.finalityProof = &FinalityProof{Block: parentBlock, CertifiedChild: *certifiedBlock}
 	err = f.forest.PruneUpToLevel(f.FinalizedView())
 	if err != nil {
 		return fmt.Errorf("pruning levelled forest failed unexpectedly: %w", err)
 	}
 
-	return nil
-}
-
-// finalizationEventsUpToBlock emits finalization events for all blocks up to (and including)
-// the block pointed to by `qc`. Finalization events start with the child of `FinalizedBlock()`
-// (explicitly checked); and calls the `finalizationCallback` as well as `OnFinalizedBlock` for every
-// newly finalized block in increasing height order.
-// Error returns:
-//   - model.ByzantineThresholdExceededError in case observing a finalization fork (violating
-//     a foundational consensus guarantee). This indicates that there are 1/3+ Byzantine nodes
-//     (weighted by stake) in the network, breaking the safety guarantees of HotStuff (or there
-//     is a critical bug / data corruption). Forks cannot recover from this exception.
-//   - generic error in case of bug or internal state corruption
-func (f *Forks2) finalizationEventsUpToBlock(qc *flow.QuorumCertificate) error {
-	lastFinalized := f.FinalizedBlock()
-	if qc.View < lastFinalized.View {
-		return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
-			"finalizing block with view %d which is lower than previously finalized block at view %d",
-			qc.View, lastFinalized.View,
-		)}
-	}
-
-	// collect all blocks that should be finalized in slice
-	// Caution: the blocks in the slice are listed from highest to lowest block
-	blocksToBeFinalized := make([]*model.Block, 0, qc.View-lastFinalized.View)
-	for qc.View > lastFinalized.View {
-		b, ok := f.GetBlock(qc.BlockID)
-		if !ok {
-			return fmt.Errorf("failed to get finalized block (view=%d, blockID=%x)", qc.View, qc.BlockID)
-		}
-		blocksToBeFinalized = append(blocksToBeFinalized, b)
-		qc = b.QC // move to parent
-	}
-
-	// qc should now point to the latest finalized block. Otherwise, the
-	// consensus committee is compromised (or we have a critical internal bug).
-	if qc.View < lastFinalized.View {
-		return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
-			"finalizing block with view %d which is lower than previously finalized block at view %d",
-			qc.View, lastFinalized.View,
-		)}
-	}
-	if qc.View == lastFinalized.View && lastFinalized.BlockID != qc.BlockID {
-		return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
-			"finalizing blocks with view %d at conflicting forks: %x and %x",
-			qc.View, qc.BlockID, lastFinalized.BlockID,
-		)}
-	}
-
-	// emit finalization events
-	for i := len(blocksToBeFinalized) - 1; i >= 0; i-- {
-		b := blocksToBeFinalized[i]
-		// notify other critical components about finalized block - all errors returned are considered critical
-		err := f.finalizationCallback.MakeFinal(b.BlockID)
+	// Advancing finalization step (iii): iterate over the blocks from (i) and emit finalization events
+	for _, b := range blocksToBeFinalized {
+		// first notify other critical components about finalized block - all errors returned here are fatal exceptions
+		err = f.finalizationCallback.MakeFinal(b.BlockID)
 		if err != nil {
 			return fmt.Errorf("finalization error in other component: %w", err)
 		}
@@ -499,4 +459,61 @@ func (f *Forks2) finalizationEventsUpToBlock(qc *flow.QuorumCertificate) error {
 		f.notifier.OnFinalizedBlock(b)
 	}
 	return nil
+}
+
+// collectBlocksForFinalization collects and returns all newly finalized blocks up to (and including)
+// the block pointed to by `qc`. The blocks are listed in order of increasing height.
+// Error returns:
+//   - model.ByzantineThresholdExceededError in case observing a finalization fork (violating
+//     a foundational consensus guarantee). This indicates that there are 1/3+ Byzantine nodes
+//     (weighted by stake) in the network, breaking the safety guarantees of HotStuff (or there
+//     is a critical bug / data corruption). Forks cannot recover from this exception.
+//   - generic error in case of bug or internal state corruption
+func (f *Forks2) collectBlocksForFinalization(qc *flow.QuorumCertificate) ([]*model.Block, error) {
+	lastFinalized := f.FinalizedBlock()
+	if qc.View < lastFinalized.View {
+		return nil, model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
+			"finalizing block with view %d which is lower than previously finalized block at view %d",
+			qc.View, lastFinalized.View,
+		)}
+	}
+	if qc.View == lastFinalized.View { // no new blocks to be finalized
+		return nil, nil
+	}
+
+	// Collect all blocks that are pending finalization in slice. While we crawl the blocks starting
+	// from the newest finalized block backwards (decreasing views), we would like to return them in
+	// order of _increasing_ view. Therefore, we fill the slice starting with the highest index.
+	l := qc.View - lastFinalized.View // l is an upper limit to the number of blocks that can be maximally finalized
+	blocksToBeFinalized := make([]*model.Block, l)
+	for qc.View > lastFinalized.View {
+		b, ok := f.GetBlock(qc.BlockID)
+		if !ok {
+			return nil, fmt.Errorf("failed to get block (view=%d, blockID=%x) for finalization", qc.View, qc.BlockID)
+		}
+		l--
+		blocksToBeFinalized[l] = b
+		qc = b.QC // move to parent
+	}
+	// Now, `l` is the index where we stored the oldest block that should be finalized. Note that `l`
+	// might be larger than zero, if some views have no finalized blocks. Hence, `blocksToBeFinalized`
+	// might start with nil entries, which we remove:
+	blocksToBeFinalized = blocksToBeFinalized[l:]
+
+	// qc should now point to the latest finalized block. Otherwise, the
+	// consensus committee is compromised (or we have a critical internal bug).
+	if qc.View < lastFinalized.View {
+		return nil, model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
+			"finalizing block with view %d which is lower than previously finalized block at view %d",
+			qc.View, lastFinalized.View,
+		)}
+	}
+	if qc.View == lastFinalized.View && lastFinalized.BlockID != qc.BlockID {
+		return nil, model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
+			"finalizing blocks with view %d at conflicting forks: %x and %x",
+			qc.View, qc.BlockID, lastFinalized.BlockID,
+		)}
+	}
+
+	return blocksToBeFinalized, nil
 }
