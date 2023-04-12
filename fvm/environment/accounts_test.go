@@ -23,8 +23,11 @@ func TestAccounts_Create(t *testing.T) {
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
 
+		snapshot, err := txnState.FinalizeMainTransaction()
+		require.NoError(t, err)
+
 		// account status
-		require.Equal(t, len(txnState.Finalize().AllRegisterIDs()), 1)
+		require.Equal(t, len(snapshot.AllRegisterIDs()), 1)
 	})
 
 	t.Run("Fails if account exists", func(t *testing.T) {

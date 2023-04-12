@@ -130,7 +130,7 @@ func TestExecutionState_ChildMergeFunctionality(t *testing.T) {
 		require.NoError(t, err)
 
 		// now should be part of the ledger
-		v, err := view.Get(key)
+		v, err := st.Get(key)
 		require.NoError(t, err)
 		require.Equal(t, v, value)
 	})

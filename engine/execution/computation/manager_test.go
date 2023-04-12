@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	state2 "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
@@ -211,17 +210,13 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		derivedChainData: derivedChainData,
 	}
 
-	view := delta.NewDeltaView(
-		state2.NewLedgerStorageSnapshot(
-			ledger,
-			flow.StateCommitment(ledger.InitialState())))
-	blockView := view.NewChild()
-
 	_, err = manager.ComputeBlock(
 		context.Background(),
 		unittest.IdentifierFixture(),
 		computationResult.ExecutableBlock,
-		blockView)
+		state2.NewLedgerStorageSnapshot(
+			ledger,
+			flow.StateCommitment(ledger.InitialState())))
 	require.NoError(t, err)
 }
 
@@ -913,7 +908,8 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		cadence.NewPath("storage", "x"),
 	)
 
-	// the save should not update account storage by writing the delta from the child view back to the parent
+	// the save should not update account storage by writing the updates
+	// back to the snapshotTree
 	require.NoError(t, err)
 	require.Equal(t, nil, v)
 }
