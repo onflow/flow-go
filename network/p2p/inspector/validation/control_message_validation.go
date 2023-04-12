@@ -28,8 +28,7 @@ const (
 	// DefaultControlMsgValidationInspectorQueueCacheSize is the default size of the inspect message queue.
 	DefaultControlMsgValidationInspectorQueueCacheSize = 100
 	// rpcInspectorComponentName the rpc inspector component name.
-	rpcInspectorComponentName      = "gossipsub_rpc_validation_inspector"
-	clusterIDProviderNotSetWarning = "failed to validate control message with cluster pre-fixed topic cluster ids provider is not set"
+	rpcInspectorComponentName = "gossipsub_rpc_validation_inspector"
 )
 
 // InspectMsgRequest represents a short digest of an RPC control message. It is used for further message inspection by component workers.
@@ -371,7 +370,7 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(topic chann
 		c.logger.Warn().
 			Str("topic", topic.String()).
 			Str("ctrl_msg_type", string(ctrlMsgType)).
-			Msg(clusterIDProviderNotSetWarning)
+			Msg("failed to validate control message with cluster pre-fixed topic cluster ids provider is not set")
 		return nil
 	}
 	activeClusterIDS, err := c.clusterIDSProvider.ActiveClusterIDS()
