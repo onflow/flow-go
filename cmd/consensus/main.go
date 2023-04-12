@@ -118,7 +118,6 @@ func main() {
 		finalizationDistributor *pubsub.FinalizationDistributor
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
-		finalizedHeader         *synceng.FinalizedHeaderCache
 		committee               *committees.Consensus
 		epochLookup             *epochs.EpochLookup
 		hotstuffModules         *consensus.HotstuffModules
@@ -754,24 +753,16 @@ func main() {
 			hotstuffModules.Notifier.AddConsumer(messageHub)
 			return messageHub, nil
 		}).
-		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
-			if err != nil {
-				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-			}
-
-			return finalizedHeader, nil
-		}).
 		Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
+				node.State,
 				node.Storage.Blocks,
 				comp,
 				syncCore,
-				finalizedHeader,
 				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {

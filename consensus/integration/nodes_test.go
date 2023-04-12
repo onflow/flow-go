@@ -610,9 +610,6 @@ func createNode(
 	comp, err := compliance.NewEngine(log, me, compCore)
 	require.NoError(t, err)
 
-	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
-	require.NoError(t, err)
-
 	identities, err := state.Final().Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(me.NodeID())),
@@ -626,10 +623,10 @@ func createNode(
 		metricsCollector,
 		net,
 		me,
+		state,
 		blocksDB,
 		comp,
 		syncCore,
-		finalizedHeader,
 		idProvider,
 		func(cfg *synceng.Config) {
 			// use a small pool and scan interval for sync engine

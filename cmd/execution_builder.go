@@ -129,7 +129,6 @@ type ExecutionNode struct {
 	collectionRequester     *requester.Engine
 	ingestionEng            *ingestion.Engine
 	finalizationDistributor *pubsub.FinalizationDistributor
-	finalizedHeader         *synchronization.FinalizedHeaderCache
 	checkAuthorizedAtBlock  func(blockID flow.Identifier) (bool, error)
 	diskWAL                 *wal.DiskWAL
 	blockDataUploader       *uploader.Manager
@@ -1003,10 +1002,10 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 		node.Metrics.Engine,
 		node.Network,
 		node.Me,
+		node.State,
 		node.Storage.Blocks,
 		exeNode.followerEng,
 		exeNode.syncCore,
-		exeNode.finalizedHeader,
 		node.SyncEngineIdentifierProvider,
 	)
 	if err != nil {

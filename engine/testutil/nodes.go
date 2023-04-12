@@ -738,10 +738,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Metrics,
 		node.Net,
 		node.Me,
+		node.State,
 		node.Blocks,
 		followerEng,
 		syncCore,
-		finalizedHeader,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
