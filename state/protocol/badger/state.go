@@ -630,7 +630,7 @@ func (state *State) Sealed() protocol.Snapshot {
 func (state *State) Final() protocol.Snapshot {
 	cached := state.cachedFinal.Load()
 	if cached == nil {
-		invalid.NewSnapshotf("internal inconsistency: no cached final header")
+		return invalid.NewSnapshotf("internal inconsistency: no cached final header")
 	}
 	return NewFinalizedSnapshot(state, cached.id, cached.header)
 }
