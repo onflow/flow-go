@@ -19,14 +19,6 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// TODO(patrick): rm once emulator is updated.
-type TransactionInvoker struct {
-}
-
-func NewTransactionInvoker() *TransactionInvoker {
-	return &TransactionInvoker{}
-}
-
 type TransactionExecutorParams struct {
 	AuthorizationChecksEnabled bool
 

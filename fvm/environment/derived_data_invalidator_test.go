@@ -247,7 +247,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	ctx := fvm.NewContext(fvm.WithChain(flow.Testnet.Chain()))
 
 	vm := fvm.NewVirtualMachine()
-	executionSnapshot, _, err := vm.RunV2(
+	executionSnapshot, _, err := vm.Run(
 		ctx,
 		fvm.Bootstrap(
 			unittest.ServiceAccountPublicKey,

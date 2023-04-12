@@ -159,7 +159,7 @@ func (e *QueryExecutor) ExecuteScript(
 	}()
 
 	var output fvm.ProcedureOutput
-	_, output, err = e.vm.RunV2(
+	_, output, err = e.vm.Run(
 		fvm.NewContextFromParent(
 			e.vmCtx,
 			fvm.WithBlockHeader(blockHeader),

@@ -305,7 +305,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(0, 0, rag)
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
-		vm.On("RunV2", mock.Anything, mock.Anything, mock.Anything).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(
 				&state.ExecutionSnapshot{},
 				fvm.ProcedureOutput{},
@@ -367,7 +367,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		}
 		bootstrapOpts := append(baseBootstrapOpts, bootstrapOptions...)
-		executionSnapshot, _, err := vm.RunV2(
+		executionSnapshot, _, err := vm.Run(
 			ctx,
 			fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
 			snapshotTree)
@@ -1171,7 +1171,7 @@ type testVM struct {
 	err       fvmErrors.CodedError
 }
 
-func (vm *testVM) RunV2(
+func (vm *testVM) Run(
 	ctx fvm.Context,
 	proc fvm.Procedure,
 	storageSnapshot state.StorageSnapshot,
@@ -1198,10 +1198,6 @@ func (vm *testVM) RunV2(
 	}
 
 	return snapshot, output, nil
-}
-
-func (testVM) Run(_ fvm.Context, _ fvm.Procedure, _ state.View) error {
-	panic("not implemented")
 }
 
 func (testVM) GetAccount(
