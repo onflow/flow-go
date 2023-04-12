@@ -26,12 +26,12 @@ type VerificationStreamNegotiationSuite struct {
 // happy path of successfully issuing a result approval for the first chunk of the first block of the testnet.
 // Note that gzip stream compression is enabled between verification and execution nodes.
 func (suite *VerificationStreamNegotiationSuite) TestVerificationNodeHappyPath() {
-	testVerificationNodeHappyPath(suite.T(), suite.exe1ID, suite.verID, suite.BlockState, suite.ReceiptState, suite.ApprovalState)
+	testVerificationNodeHappyPath(suite.T(), suite.exe1ID, suite.verIDs, suite.BlockState, suite.ReceiptState, suite.ApprovalState)
 }
 
 func testVerificationNodeHappyPath(t *testing.T,
 	exeID flow.Identifier,
-	verID flow.Identifier,
+	verIDs flow.IdentifierList,
 	blocks *lib.BlockState,
 	receipts *lib.ReceiptState,
 	approvals *lib.ResultApprovalState,
@@ -48,5 +48,5 @@ func testVerificationNodeHappyPath(t *testing.T,
 	t.Logf("receipt for blockA generated: result ID: %x\n", resultID)
 
 	// wait for a result approval from verification node
-	approvals.WaitForResultApproval(t, verID, resultID, uint64(0))
+	approvals.WaitForTotalApprovalsFrom(t, verIDs, resultID, uint64(0), 1)
 }

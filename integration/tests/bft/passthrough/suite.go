@@ -19,11 +19,9 @@ const (
 // happy path of Corrupted Conduit Framework (CCF) for BFT testing.
 type Suite struct {
 	bft.BaseSuite
-	exe1ID       flow.Identifier // corrupted execution node 1
-	exe2ID       flow.Identifier // corrupted execution node 2
-	verID        flow.Identifier // corrupted verification node
-	ver2ID       flow.Identifier // corrupted verification node 2
-	verIDs       flow.IdentifierList
+	exe1ID       flow.Identifier     // corrupted execution node 1
+	exe2ID       flow.Identifier     // corrupted execution node 2
+	verIDs       flow.IdentifierList // corrupt verification nodes list
 	Orchestrator *orchestrator
 }
 

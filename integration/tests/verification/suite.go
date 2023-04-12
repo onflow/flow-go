@@ -33,10 +33,8 @@ type Suite struct {
 	ghostID                 flow.Identifier      // represents id of ghost node
 	exe1ID                  flow.Identifier
 	exe2ID                  flow.Identifier
-	verID                   flow.Identifier // represents id of verification node
-	ver2ID                  flow.Identifier // 2nd verification node
-	verIDs                  flow.IdentifierList
-	PreferredUnicasts       string // preferred unicast protocols between execution and verification nodes.
+	verIDs                  flow.IdentifierList // verification nodes list
+	PreferredUnicasts       string              // preferred unicast protocols between execution and verification nodes.
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -66,7 +64,7 @@ func (s *Suite) MetricsPort() string {
 // - Two collector nodes
 // - Four consensus nodes
 // - two execution node
-// - One verification node
+// - List of verification nodes
 // - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
