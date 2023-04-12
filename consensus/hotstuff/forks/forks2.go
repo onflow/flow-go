@@ -216,7 +216,7 @@ func (f *Forks2) AddCertifiedBlock(certifiedBlock *model.CertifiedBlock) error {
 	// we have to additionally check here, whether the certifying QC conflicts with any known QCs.
 	err := f.checkForByzantineEvidence(certifiedBlock.Block)
 	if err != nil {
-		return fmt.Errorf("cannot store certified block %v: %w", certifiedBlock.Block.BlockID, err)
+		return fmt.Errorf("cannot check for Byzantine evidence in certified block %v: %w", certifiedBlock.Block.BlockID, err)
 	}
 	err = f.checkForConflictingQCs(certifiedBlock.CertifyingQC)
 	if err != nil {
@@ -266,7 +266,7 @@ func (f *Forks2) AddProposal(proposal *model.Block) error {
 	// Check proposal for byzantine evidence, store it and emit `OnBlockIncorporated` notification:
 	err := f.checkForByzantineEvidence(proposal)
 	if err != nil {
-		return fmt.Errorf("cannot store block %v: %w", proposal.BlockID, err)
+		return fmt.Errorf("cannot check Byzantine evidence for block %v: %w", proposal.BlockID, err)
 	}
 	f.forest.AddVertex(ToBlockContainer2(proposal))
 	f.notifier.OnBlockIncorporated(proposal)
