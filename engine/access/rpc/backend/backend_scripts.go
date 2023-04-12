@@ -31,6 +31,7 @@ type backendScripts struct {
 	log               zerolog.Logger
 	metrics           module.BackendScriptsMetrics
 	loggedScripts     *lru.Cache
+	archiveAddress    string
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -81,6 +82,31 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 	return b.executeScriptOnExecutionNode(ctx, blockID, script, arguments)
 }
 
+func findScriptExecutors(
+	ctx context.Context,
+	archiveAddress string,
+	blockID flow.Identifier,
+	executionReceipts storage.ExecutionReceipts,
+	state protocol.State,
+	log zerolog.Logger,
+) ([]string, error) {
+	// send script queries to archive nodes if archive addres is configured
+	if archiveAddress != "" {
+		return []string{archiveAddress}, nil
+	}
+
+	executors, err := executionNodesForBlockID(ctx, blockID, executionReceipts, state, log)
+	if err != nil {
+		return nil, err
+	}
+
+	executorAddrs := make([]string, 0, len(executors))
+	for _, executor := range executors {
+		executorAddrs = append(executorAddrs, executor.Address)
+	}
+	return executorAddrs, nil
+}
+
 // executeScriptOnExecutionNode forwards the request to the execution node using the execution node
 // grpc client and converts the response back to the access node api response format
 func (b *backendScripts) executeScriptOnExecutionNode(
@@ -97,9 +123,9 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	}
 
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	scriptExecutors, err := findScriptExecutors(ctx, b.archiveAddress, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to find execution nodes at blockId %v: %v", blockID.String(), err)
+		return nil, status.Errorf(codes.Internal, "failed to find script executors at blockId %v: %v", blockID.String(), err)
 	}
 	// encode to MD5 as low compute/memory lookup key
 	// CAUTION: cryptographically insecure md5 is used here, but only to de-duplicate logs.
@@ -109,15 +135,15 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	// try each of the execution nodes found
 	var errors *multierror.Error
 	// try to execute the script on one of the execution nodes
-	for _, execNode := range execNodes {
+	for _, executor := range scriptExecutors {
 		execStartTime := time.Now() // record start time
-		result, err := b.tryExecuteScript(ctx, execNode, execReq)
+		result, err := b.tryExecuteScript(ctx, executor, execReq)
 		if err == nil {
 			if b.log.GetLevel() == zerolog.DebugLevel {
 				executionTime := time.Now()
 				if b.shouldLogScript(executionTime, insecureScriptHash) {
 					b.log.Debug().
-						Str("execution_node", execNode.String()).
+						Str("script_executor", executor).
 						Hex("block_id", blockID[:]).
 						Hex("script_hash", insecureScriptHash[:]).
 						Str("script", string(script)).
@@ -167,19 +193,19 @@ func (b *backendScripts) shouldLogScript(execTime time.Time, scriptHash [16]byte
 	}
 }
 
-func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Identity, req *execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {
-	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+func (b *backendScripts) tryExecuteScript(ctx context.Context, executorAddress string, req *execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(executorAddress)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v", execNode.String(), err)
+		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v", executorAddress, err)
 	}
 	defer closer.Close()
 
 	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
-			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+			b.connFactory.InvalidateExecutionAPIClient(executorAddress)
 		}
-		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", execNode.String(), err)
+		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", executorAddress, err)
 	}
 	return execResp.GetValue(), nil
 }

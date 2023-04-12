@@ -87,6 +87,7 @@ func NewBuilder(log zerolog.Logger,
 	rpcMetricsEnabled bool,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
+	archiveAddress string,
 ) (*RPCEngineBuilder, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -181,6 +182,7 @@ func NewBuilder(log zerolog.Logger,
 		config.FixedExecutionNodeIDs,
 		log,
 		backend.DefaultSnapshotHistoryLimit,
+		archiveAddress,
 	)
 
 	eng := &Engine{
