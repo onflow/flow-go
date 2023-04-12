@@ -16,14 +16,14 @@ import (
 )
 
 const (
-	// skipDecayThreshold is the threshold for which when the negative score is above this value, the decay function will not be called.
-	// instead, the score will be set to 0. This is to prevent the score from keeping a small negative value for a long time.
+	// skipDecayThreshold is the threshold for which when the negative penalty is above this value, the decay function will not be called.
+	// instead, the penalty will be set to 0. This is to prevent the penalty from keeping a small negative value for a long time.
 	skipDecayThreshold = -0.1
-	// defaultDecay is the default decay value for the application specific score.
+	// defaultDecay is the default decay value for the application specific penalty.
 	// this value is used when no custom decay value is provided.
-	// this value decays the score by 1% every second.
-	// assume that the score is -100 (the maximum application specific score is -100) and the skipDecayThreshold is -0.1,
-	// it takes around 459 seconds for the score to decay to reach greater than -0.1 and turn into 0.
+	// this value decays the penalty by 1% every second.
+	// assume that the penalty is -100 (the maximum application specific penalty is -100) and the skipDecayThreshold is -0.1,
+	// it takes around 459 seconds for the penalty to decay to reach greater than -0.1 and turn into 0.
 	// x * 0.99^n > -0.1 (assuming negative x).
 	// 0.99^n > -0.1 / x
 	// Now we can take the logarithm of both sides (with any base, but let's use base 10 for simplicity).
@@ -37,14 +37,14 @@ const (
 	// n > log(0.001) / log(0.99)
 	// n > -3 / log(0.99)
 	// n >  458.22
-	defaultDecay = 0.99 // default decay value for the application specific score.
-	// graftMisbehaviourPenalty is the penalty applied to the application specific score when a peer conducts a graft misbehaviour.
+	defaultDecay = 0.99 // default decay value for the application specific penalty.
+	// graftMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a graft misbehaviour.
 	graftMisbehaviourPenalty = -10
-	// pruneMisbehaviourPenalty is the penalty applied to the application specific score when a peer conducts a prune misbehaviour.
+	// pruneMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a prune misbehaviour.
 	pruneMisbehaviourPenalty = -10
-	// iHaveMisbehaviourPenalty is the penalty applied to the application specific score when a peer conducts a iHave misbehaviour.
+	// iHaveMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a iHave misbehaviour.
 	iHaveMisbehaviourPenalty = -10
-	// iWantMisbehaviourPenalty is the penalty applied to the application specific score when a peer conducts a iWant misbehaviour.
+	// iWantMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a iWant misbehaviour.
 	iWantMisbehaviourPenalty = -10
 )
 
@@ -69,10 +69,10 @@ func DefaultGossipSubCtrlMsgPenaltyValue() GossipSubCtrlMsgPenaltyValue {
 type GossipSubAppSpecificScoreRegistry struct {
 	logger     zerolog.Logger
 	idProvider module.IdentityProvider
-	// spamScoreCache currently only holds the control message misbehaviour score (spam related score).
+	// spamScoreCache currently only holds the control message misbehaviour penalty (spam related penalty).
 	spamScoreCache p2p.GossipSubSpamRecordCache
 	penalty        GossipSubCtrlMsgPenaltyValue
-	// initial application specific score record, used to initialize the score cache entry.
+	// initial application specific penalty record, used to initialize the penalty cache entry.
 	init      func() p2p.GossipSubSpamRecord
 	validator p2p.SubscriptionValidator
 	mu        sync.Mutex
@@ -103,50 +103,56 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 
 var _ p2p.GossipSubInvalidControlMessageNotificationConsumer = (*GossipSubAppSpecificScoreRegistry)(nil)
 
-// AppSpecificScoreFunc returns the application specific score function that is called by the GossipSub protocol to determine the application specific score of a peer.
+// AppSpecificScoreFunc returns the application specific penalty function that is called by the GossipSub protocol to determine the application specific penalty of a peer.
 func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID) float64 {
 	return func(pid peer.ID) float64 {
-		// score of a peer is composed of 3 parts: (1) spam penalty (2) staking score (3) subscription penalty.
+		// penalty of a peer is composed of 3 parts: (1) spam penalty (2) staking penalty (3) subscription penalty.
 		lg := r.logger.With().Str("peer_id", pid.String()).Logger()
-		// (1) spam penalty: the penalty is applied to the application specific score when a peer conducts a spamming misbehaviour.
-		spamRecord, err, ok := r.spamScoreCache.Get(pid)
+		// (1) spam penalty: the penalty is applied to the application specific penalty when a peer conducts a spamming misbehaviour.
+		spamRecord, err, spamRecordExists := r.spamScoreCache.Get(pid)
 		if err != nil {
 			// the error is considered fatal as it means the cache is not working properly.
 			// we should not continue with the execution as it may lead to routing attack vulnerability.
-			r.logger.Fatal().Str("peer_id", pid.String()).Err(err).Msg("could not get application specific score for peer")
+			r.logger.Fatal().Str("peer_id", pid.String()).Err(err).Msg("could not get application specific penalty for peer")
 			return 0 // unreachable, but added to avoid proceeding with the execution if log level is changed.
 		}
-		if !ok {
-			init := r.init()
-			initialized := r.spamScoreCache.Add(pid, init)
-			r.logger.Trace().
-				Bool("initialized", initialized).
-				Str("peer_id", pid.String()).
-				Msg("initialization attempt for application specific")
-			return init.Penalty
-		}
 
-		// (2) staking score: the staking score is the score of a peer based on its role.
-		// staking score is applied only if the peer is a staked node and does not have a negative penalty on spamming.
-		// it is meant to reward well-behaved staked nodes.
+		// (2) staking penalty: the staking penalty is the penalty of a peer based on its role.
+		// If node is not staked, it will have a negative penalty.
 		stakingScore, flowId, role := r.stakingScore(pid)
-		if stakingScore > 0 && spamRecord.Penalty < 0 {
-			// if the peer is a staked node but has a negative penalty on spamming, we do not apply the
-			// staking score and only apply the penalty.
-			return spamRecord.Penalty
-		}
 
-		// (3) subscription penalty: the subscription penalty is applied to the application specific score when a
+		// (3) subscription penalty: the subscription penalty is applied to the application specific penalty when a
 		// peer is subscribed to a topic that it is not allowed to subscribe to based on its role.
 		subscriptionPenalty := r.subscriptionPenalty(pid, flowId, role)
-		appSpecificScore := stakingScore + subscriptionPenalty + spamRecord.Penalty
-		lg.Trace().
+
+		// to compute application specific penalty, we apply the following rules:
+		// 1. if the peer has no penalty on spamming and subscription, we apply the staking penalty as it is (it can be reward or staking penalty).
+		// 2. if the peer has a penalty on spamming or subscription, we only apply the penalty and include the staking penalty if it is negative (penalty).
+		// In other words, we only apply the positive staking penalty if the peer has no penalty on spamming and subscription.
+		appSpecificScore := subscriptionPenalty
+		if spamRecordExists {
+			appSpecificScore += spamRecord.Penalty
+		}
+		if appSpecificScore == float64(0) {
+			// if the peer has no penalty on spamming and subscription, we apply the staking penalty as it is.
+			appSpecificScore = stakingScore
+		} else if stakingScore < 0 {
+			// if the peer already has a penalty on spamming or subscription, we only apply the staking penalty if it is negative (penalty).
+			appSpecificScore += stakingScore
+		}
+
+		lg = lg.With().
 			Float64("subscription_penalty", subscriptionPenalty).
 			Float64("staking_score", stakingScore).
-			Float64("spam_penalty", spamRecord.Penalty).
-			Float64("total_app_specific_score", appSpecificScore).
-			Msg("subscription penalty applied")
-		return stakingScore + subscriptionPenalty + spamRecord.Penalty
+			Float64("total_app_specific_score", appSpecificScore).Logger()
+
+		if spamRecordExists {
+			lg = lg.With().Float64("spam_penalty", spamRecord.Penalty).Logger()
+		}
+
+		lg.Trace().Msg("application specific penalty computed")
+
+		return appSpecificScore
 	}
 }
 
@@ -204,8 +210,8 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		Str("peer_id", notification.PeerID.String()).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
 
-	// try initializing the application specific score for the peer if it is not yet initialized.
-	// this is done to avoid the case where the peer is not yet cached and the application specific score is not yet initialized.
+	// try initializing the application specific penalty for the peer if it is not yet initialized.
+	// this is done to avoid the case where the peer is not yet cached and the application specific penalty is not yet initialized.
 	// initialization is gone successful only if the peer is not yet cached.
 	initialized := r.spamScoreCache.Add(notification.PeerID, r.init())
 	lg.Trace().Bool("initialized", initialized).Msg("initialization attempt for application specific")
@@ -230,36 +236,36 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 
 	if err != nil {
 		// any returned error from adjust is non-recoverable and fatal, we crash the node.
-		lg.Fatal().Err(err).Msg("could not adjust application specific score for peer")
+		lg.Fatal().Err(err).Msg("could not adjust application specific penalty for peer")
 	}
 
 	lg.Debug().
 		Float64("app_specific_score", record.Penalty).
-		Msg("applied misbehaviour penalty and updated application specific score")
+		Msg("applied misbehaviour penalty and updated application specific penalty")
 }
 
-// DefaultDecayFunction is the default decay function that is used to decay the application specific score of a peer.
+// DefaultDecayFunction is the default decay function that is used to decay the application specific penalty of a peer.
 // It is used if no decay function is provided in the configuration.
-// It decays the application specific score of a peer if it is negative.
+// It decays the application specific penalty of a peer if it is negative.
 func DefaultDecayFunction() netcache.PreprocessorFunc {
 	return func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 		if record.Penalty >= 0 {
-			// no need to decay the score if it is positive, the reason is currently the app specific score
-			// is only used to penalize peers. Hence, when there is no reward, there is no need to decay the positive score, as
-			// no node can accumulate a positive score.
+			// no need to decay the penalty if it is positive, the reason is currently the app specific penalty
+			// is only used to penalize peers. Hence, when there is no reward, there is no need to decay the positive penalty, as
+			// no node can accumulate a positive penalty.
 			return record, nil
 		}
 
 		if record.Penalty > skipDecayThreshold {
-			// score is negative but greater than the threshold, we set it to 0.
+			// penalty is negative but greater than the threshold, we set it to 0.
 			record.Penalty = 0
 			return record, nil
 		}
 
-		// score is negative and below the threshold, we decay it.
+		// penalty is negative and below the threshold, we decay it.
 		score, err := GeometricDecay(record.Penalty, record.Decay, lastUpdated)
 		if err != nil {
-			return record, fmt.Errorf("could not decay application specific score: %w", err)
+			return record, fmt.Errorf("could not decay application specific penalty: %w", err)
 		}
 		record.Penalty = score
 		return record, nil
