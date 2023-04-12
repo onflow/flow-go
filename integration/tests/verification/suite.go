@@ -15,6 +15,11 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const (
+	// VNs is the number of verification nodes to create
+	VNs int = 2
+)
+
 // Suite represents a test suite evaluating the integration of the test net
 // against happy path of verification nodes.
 type Suite struct {
@@ -30,7 +35,8 @@ type Suite struct {
 	exe2ID                  flow.Identifier
 	verID                   flow.Identifier // represents id of verification node
 	ver2ID                  flow.Identifier // 2nd verification node
-	PreferredUnicasts       string          // preferred unicast protocols between execution and verification nodes.
+	verIDs                  flow.IdentifierList
+	PreferredUnicasts       string // preferred unicast protocols between execution and verification nodes.
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -83,6 +89,17 @@ func (s *Suite) SetupSuite() {
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
 
+	//s.verIDs = make([]flow.Identifier, VNs)
+	//for i, _ := range s.verIDs {
+	//	s.verIDs[i] = unittest.IdentifierFixture()
+	//	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
+	//		testnet.WithID(s.verIDs[i]),
+	//		testnet.WithLogLevel(zerolog.WarnLevel),
+	//		// only verification and execution nodes run with preferred unicast protocols
+	//		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
+	//	s.nodeConfigs = append(s.nodeConfigs, verConfig)
+	//}
+
 	// generates two verification node
 	s.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
@@ -99,6 +116,9 @@ func (s *Suite) SetupSuite() {
 		// only verification and execution nodes run with preferred unicast protocols
 		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, ver2Config)
+
+	//s.verID = s.verIDs[0]
+	//s.ver2ID = s.verIDs[1]
 
 	// generates two execution nodes
 	s.exe1ID = unittest.IdentifierFixture()

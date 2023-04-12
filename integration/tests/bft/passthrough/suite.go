@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	// VNs is the number of corrupt verification nodes to create
+	// corruptVNs is the number of corrupt verification nodes to create
 	corruptVNs int = 2
 )
 
@@ -50,9 +50,6 @@ func (s *Suite) SetupSuite() {
 			testnet.AsCorrupted())
 		s.NodeConfigs = append(s.NodeConfigs, verConfig)
 	}
-
-	s.verID = s.verIDs[0]
-	s.ver2ID = s.verIDs[1]
 
 	// generates two corrupted execution nodes
 	s.exe1ID = unittest.IdentifierFixture()
