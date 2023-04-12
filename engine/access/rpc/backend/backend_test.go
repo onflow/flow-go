@@ -2217,7 +2217,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 
 	suite.Run("happy path script execution success", func() {
 		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(execRes, nil).Once()
-		res, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		res, err := backend.tryExecuteScript(ctx, executionNode.Address, execReq)
 		suite.execClient.AssertExpectations(suite.T())
 		suite.checkResponse(res, err)
 	})
@@ -2225,7 +2225,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	suite.Run("script execution failure returns status OK", func() {
 		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).
 			Return(nil, status.Error(codes.InvalidArgument, "execution failure!")).Once()
-		_, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		_, err := backend.tryExecuteScript(ctx, executionNode.Address, execReq)
 		suite.execClient.AssertExpectations(suite.T())
 		suite.Require().Error(err)
 		suite.Require().Equal(status.Code(err), codes.InvalidArgument)
@@ -2234,7 +2234,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	suite.Run("execution node internal failure returns status code Internal", func() {
 		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).
 			Return(nil, status.Error(codes.Internal, "execution node internal error!")).Once()
-		_, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		_, err := backend.tryExecuteScript(ctx, executionNode.Address, execReq)
 		suite.execClient.AssertExpectations(suite.T())
 		suite.Require().Error(err)
 		suite.Require().Equal(status.Code(err), codes.Internal)
