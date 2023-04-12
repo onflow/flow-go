@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
@@ -78,7 +79,7 @@ func addFinalizeCmdFlags() {
 		"containing the output from the `keygen` command for internal nodes")
 	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", "path to directory "+
 		"containing one JSON file starting with node-info.pub.<NODE_ID>.json for every partner node (fields "+
-		" in the JSON file: Role, Address, NodeID, NetworkPubKey, StakingPubKey)")
+		" in the JSON file: Role, Address, NodeID, NetworkPubKey, StakingPubKey, StakingKeyPoP)")
 	// Deprecated: remove this flag
 	finalizeCmd.Flags().StringVar(&deprecatedFlagPartnerStakes, "partner-stakes", "", "deprecated: use partner-weights instead")
 	finalizeCmd.Flags().StringVar(&flagPartnerWeights, "partner-weights", "", "path to a JSON file containing "+
@@ -346,7 +347,7 @@ func readPartnerNodeInfos() []model.NodeInfo {
 		// validate every single partner node
 		nodeID := validateNodeID(partner.NodeID)
 		networkPubKey := validateNetworkPubKey(partner.NetworkPubKey)
-		stakingPubKey := validateStakingPubKey(partner.StakingPubKey)
+		stakingPubKey, stakingPoP := validateStakingPubKey(partner.StakingPubKey, partner.StakingPoP)
 		weight, valid := validateWeight(weights[partner.NodeID])
 		if !valid {
 			log.Error().Msgf("weights: %v", weights)
@@ -363,6 +364,7 @@ func readPartnerNodeInfos() []model.NodeInfo {
 			weight,
 			networkPubKey.PublicKey,
 			stakingPubKey.PublicKey,
+			stakingPoP,
 		)
 		nodes = append(nodes, node)
 	}
@@ -416,14 +418,17 @@ func readInternalNodeInfos() []model.NodeInfo {
 			log.Warn().Msgf("internal node (id=%x) has non-default weight (%d != %d)", internal.NodeID, weight, flow.DefaultInitialWeight)
 		}
 
-		node := model.NewPrivateNodeInfo(
+		node, err := model.NewPrivateNodeInfo(
 			nodeID,
 			internal.Role,
 			internal.Address,
 			weight,
 			internal.NetworkPrivKey,
-			internal.StakingPrivKey,
+			internal.StakingPrivKey.PrivateKey,
 		)
+		if err != nil {
+			log.Fatal().Err(err).Msg("creating the node info failed")
+		}
 
 		nodes = append(nodes, node)
 	}
@@ -556,11 +561,23 @@ func validateNetworkPubKey(key encodable.NetworkPubKey) encodable.NetworkPubKey 
 	return key
 }
 
-func validateStakingPubKey(key encodable.StakingPubKey) encodable.StakingPubKey {
+func validateStakingPubKey(key encodable.StakingPubKey, pop []byte) (encodable.StakingPubKey, []byte) {
 	if key.PublicKey == nil {
 		log.Fatal().Msg("StakingPubKey must not be nil")
 	}
-	return key
+	if pop == nil {
+		log.Fatal().Msg("staking key proof of possession must not be nil")
+	}
+
+	valid, err := crypto.BLSVerifyPOP(key.PublicKey, pop)
+	if err != nil {
+		log.Fatal().Err(err).Msg("verifying staking key PoP failed")
+	}
+	if !valid {
+		log.Fatal().Err(err).Msg("saking key PoP is invalid")
+	}
+
+	return key, pop
 }
 
 func validateWeight(weight uint64) (uint64, bool) {

@@ -70,7 +70,7 @@ func createSignerData(t *testing.T, n int) *ParticipantData {
 		participantLookup[identity.NodeID] = lookupParticipant
 
 		// add to participant list
-		nodeInfo := bootstrap.NewPrivateNodeInfo(
+		nodeInfo, err := bootstrap.NewPrivateNodeInfo(
 			identity.NodeID,
 			identity.Role,
 			identity.Address,
@@ -78,6 +78,7 @@ func createSignerData(t *testing.T, n int) *ParticipantData {
 			networkingKeys[i],
 			stakingKeys[i],
 		)
+		require.NoError(t, err)
 		participants[i] = Participant{
 			NodeInfo:            nodeInfo,
 			RandomBeaconPrivKey: randomBSKs[i],

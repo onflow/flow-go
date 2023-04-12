@@ -52,7 +52,8 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 	return model.Sort(internalNodes, order.Canonical)
 }
 
-func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto.PrivateKey) model.NodeInfo {
+func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto.PrivateKey,
+) model.NodeInfo {
 	var err error
 	nodeID, found := getNameID()
 	if !found {
@@ -63,11 +64,11 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 	}
 
 	log.Debug().
-		Str("networkPubKey", pubKeyToString(networkKey.PublicKey())).
-		Str("stakingPubKey", pubKeyToString(stakingKey.PublicKey())).
+		Str("networkPubKey", networkKey.PublicKey().String()).
+		Str("stakingPubKey", stakingKey.PublicKey().String()).
 		Msg("encoded public staking and network keys")
 
-	nodeInfo := model.NewPrivateNodeInfo(
+	nodeInfo, err := model.NewPrivateNodeInfo(
 		nodeID,
 		nodeConfig.Role,
 		nodeConfig.Address,
@@ -75,6 +76,9 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 		networkKey,
 		stakingKey,
 	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("creating node info failed")
+	}
 
 	return nodeInfo
 }

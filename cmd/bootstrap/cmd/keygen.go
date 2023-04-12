@@ -91,7 +91,10 @@ var keygenCmd = &cobra.Command{
 		}
 
 		log.Info().Msg("generating node public information")
-		genNodePubInfo(nodes)
+		err = genNodePubInfo(nodes)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to generate nodes public info")
+		}
 	},
 }
 
@@ -122,10 +125,15 @@ func isEmptyDir(path string) (bool, error) {
 	return false, err // Either not empty or error, suits both cases
 }
 
-func genNodePubInfo(nodes []model.NodeInfo) {
+func genNodePubInfo(nodes []model.NodeInfo) error {
 	pubNodes := make([]model.NodeInfoPub, 0, len(nodes))
 	for _, node := range nodes {
-		pubNodes = append(pubNodes, node.Public())
+		pub, err := node.Public()
+		if err != nil {
+			return fmt.Errorf("failed to read public info: %w", err)
+		}
+		pubNodes = append(pubNodes, pub)
 	}
 	writeJSON(model.PathInternalNodeInfosPub, pubNodes)
+	return nil
 }
