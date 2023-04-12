@@ -37,6 +37,7 @@ func (p *PassThroughTestSuite) TestSealingAndVerificationPassThrough() {
 		p.exe2ID,
 		p.verID,
 		p.ver2ID,
+		p.verIDs,
 		p.Net.Root().ID())
 
 	// identifier of chunks involved in the sealing and verification test.

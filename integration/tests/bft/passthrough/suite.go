@@ -41,18 +41,18 @@ func (s *Suite) SetupSuite() {
 		return n.Role != flow.RoleExecution && n.Role != flow.RoleVerification
 	})
 
-	verIDs := make([]flow.Identifier, corruptVNs)
-	for i, _ := range verIDs {
-		verIDs[i] = unittest.IdentifierFixture()
+	s.verIDs = make([]flow.Identifier, corruptVNs)
+	for i, _ := range s.verIDs {
+		s.verIDs[i] = unittest.IdentifierFixture()
 		verConfig := testnet.NewNodeConfig(flow.RoleVerification,
-			testnet.WithID(verIDs[i]),
+			testnet.WithID(s.verIDs[i]),
 			testnet.WithLogLevel(zerolog.InfoLevel),
 			testnet.AsCorrupted())
 		s.NodeConfigs = append(s.NodeConfigs, verConfig)
 	}
 
-	s.verID = verIDs[0]
-	s.ver2ID = verIDs[1]
+	s.verID = s.verIDs[0]
+	s.ver2ID = s.verIDs[1]
 
 	// generates two corrupted execution nodes
 	s.exe1ID = unittest.IdentifierFixture()

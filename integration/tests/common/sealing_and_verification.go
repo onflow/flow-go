@@ -31,6 +31,7 @@ func SealingAndVerificationHappyPathTest(
 	exe2Id flow.Identifier,
 	verId flow.Identifier,
 	ver2Id flow.Identifier,
+	verIds flow.IdentifierList,
 	rootBlockId flow.Identifier) ([]*flow.ExecutionReceipt, []*flow.ResultApproval) {
 
 	// wait for next height finalized (potentially first height), called blockA, just to make sure consensus progresses.
@@ -64,7 +65,7 @@ func SealingAndVerificationHappyPathTest(
 	// waits till result approval emits for all chunks of resultB
 	approvals := make([]*flow.ResultApproval, 0)
 	for i := 0; i < len(resultB.Chunks); i++ {
-		vnApprovals := approvalState.WaitForTotalApprovalsFrom(t, flow.IdentifierList{verId, ver2Id}, resultBId, uint64(i), 1)
+		vnApprovals := approvalState.WaitForTotalApprovalsFrom(t, verIds, resultBId, uint64(i), 1)
 		approvals = append(approvals, vnApprovals[0])
 	}
 
