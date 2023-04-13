@@ -11,7 +11,7 @@ import (
 // NoopConsumer is an implementation of the notifications consumer that
 // doesn't do anything.
 type NoopConsumer struct {
-	NoopBaseProtocolViolationConsumer
+	NoopProtocolViolationConsumer
 	NoopFinalizationConsumer
 	NoopPartialConsumer
 	NoopCommunicatorConsumer
@@ -113,10 +113,10 @@ func (*NoopQCCreatedConsumer) OnQcConstructedFromVotes(*flow.QuorumCertificate) 
 
 // no-op implementation of hotstuff.ProtocolViolationConsumer
 
-type NoopBaseProtocolViolationConsumer struct{}
+type NoopProtocolViolationConsumer struct{}
 
-var _ hotstuff.ProtocolViolationConsumer = (*NoopBaseProtocolViolationConsumer)(nil)
+var _ hotstuff.ProtocolViolationConsumer = (*NoopProtocolViolationConsumer)(nil)
 
-func (*NoopBaseProtocolViolationConsumer) OnInvalidBlockDetected(model.InvalidBlockError) {}
+func (*NoopProtocolViolationConsumer) OnInvalidBlockDetected(model.InvalidBlockError) {}
 
-func (*NoopBaseProtocolViolationConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
+func (*NoopProtocolViolationConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
