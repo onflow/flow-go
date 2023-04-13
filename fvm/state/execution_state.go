@@ -26,7 +26,7 @@ type ExecutionState struct {
 	// bookkeeping purpose).
 	finalized bool
 
-	view  View
+	*spockState
 	meter *meter.Meter
 
 	// NOTE: parent and child state shares the same limits controller
@@ -99,16 +99,15 @@ func (controller *limitsController) RunWithAllLimitsDisabled(f func()) {
 	controller.enforceLimits = current
 }
 
-func (state *ExecutionState) View() View {
-	return state.view
-}
-
 // NewExecutionState constructs a new state
-func NewExecutionState(view View, params StateParameters) *ExecutionState {
+func NewExecutionState(
+	snapshot StorageSnapshot,
+	params StateParameters,
+) *ExecutionState {
 	m := meter.NewMeter(params.MeterParameters)
 	return &ExecutionState{
 		finalized:        false,
-		view:             view,
+		spockState:       newSpockState(snapshot),
 		meter:            m,
 		limitsController: newLimitsController(params),
 	}
@@ -121,7 +120,7 @@ func (state *ExecutionState) NewChildWithMeterParams(
 ) *ExecutionState {
 	return &ExecutionState{
 		finalized:        false,
-		view:             state.view.NewChild(),
+		spockState:       state.spockState.NewChild(),
 		meter:            meter.NewMeter(params),
 		limitsController: state.limitsController,
 	}
@@ -147,7 +146,7 @@ func (state *ExecutionState) DropChanges() error {
 		return fmt.Errorf("cannot DropChanges on a finalized state")
 	}
 
-	return state.view.DropChanges()
+	return state.spockState.DropChanges()
 }
 
 // Get returns a register value given owner and key
@@ -165,7 +164,7 @@ func (state *ExecutionState) Get(id flow.RegisterID) (flow.RegisterValue, error)
 		}
 	}
 
-	if value, err = state.view.Get(id); err != nil {
+	if value, err = state.spockState.Get(id); err != nil {
 		// wrap error into a fatal error
 		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
@@ -188,7 +187,7 @@ func (state *ExecutionState) Set(id flow.RegisterID, value flow.RegisterValue) e
 		}
 	}
 
-	if err := state.view.Set(id, value); err != nil {
+	if err := state.spockState.Set(id, value); err != nil {
 		// wrap error into a fatal error
 		setError := errors.NewLedgerFailure(err)
 		// wrap with more info
@@ -271,18 +270,18 @@ func (state *ExecutionState) TotalEmittedEventBytes() uint64 {
 
 func (state *ExecutionState) Finalize() *ExecutionSnapshot {
 	state.finalized = true
-	snapshot := state.view.Finalize()
+	snapshot := state.spockState.Finalize()
 	snapshot.Meter = state.meter
 	return snapshot
 }
 
-// MergeState the changes from a the given view to this view.
+// MergeState the changes from a the given execution snapshot to this state.
 func (state *ExecutionState) Merge(other *ExecutionSnapshot) error {
 	if state.finalized {
 		return fmt.Errorf("cannot Merge on a finalized state")
 	}
 
-	err := state.view.Merge(other)
+	err := state.spockState.Merge(other)
 	if err != nil {
 		return errors.NewStateMergeFailure(err)
 	}

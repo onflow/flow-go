@@ -5,15 +5,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 )
 
 func TestUUIDs_GetAndSetUUID(t *testing.T) {
-	txnState := state.NewTransactionState(
-		delta.NewDeltaView(nil),
-		state.DefaultParameters())
+	txnState := state.NewTransactionState(nil, state.DefaultParameters())
 	uuidsA := NewUUIDGenerator(
 		tracing.NewTracerSpan(),
 		NewMeter(txnState),
@@ -38,9 +35,7 @@ func TestUUIDs_GetAndSetUUID(t *testing.T) {
 }
 
 func Test_GenerateUUID(t *testing.T) {
-	txnState := state.NewTransactionState(
-		delta.NewDeltaView(nil),
-		state.DefaultParameters())
+	txnState := state.NewTransactionState(nil, state.DefaultParameters())
 	genA := NewUUIDGenerator(
 		tracing.NewTracerSpan(),
 		NewMeter(txnState),

@@ -6,7 +6,6 @@ import (
 
 	"github.com/onflow/cadence"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -182,9 +181,8 @@ func (vm *VirtualMachine) Run(
 			err)
 	}
 
-	// TODO(patrick): initialize view inside TransactionState
 	nestedTxn := state.NewTransactionState(
-		delta.NewDeltaView(storageSnapshot),
+		storageSnapshot,
 		state.DefaultParameters().
 			WithMeterParameters(getBasicMeterParameters(ctx, proc)).
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
@@ -231,8 +229,7 @@ func (vm *VirtualMachine) GetAccount(
 	error,
 ) {
 	nestedTxn := state.NewTransactionState(
-		// TODO(patrick): initialize view inside TransactionState
-		delta.NewDeltaView(storageSnapshot),
+		storageSnapshot,
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).

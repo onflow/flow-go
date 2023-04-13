@@ -9,7 +9,7 @@ import (
 
 // TOOD(patrick): rm View interface after delta view is deleted.
 type View interface {
-	NewChild() View
+	NewChild() *ExecutionState
 
 	Finalize() *ExecutionSnapshot
 	Merge(child *ExecutionSnapshot) error

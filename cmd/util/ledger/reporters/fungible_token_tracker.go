@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
@@ -142,8 +141,9 @@ func (r *FungibleTokenTracker) worker(
 	wg *sync.WaitGroup) {
 	for j := range jobs {
 
-		view := delta.NewDeltaView(NewStorageSnapshotFromPayload(j.payloads))
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := state.NewTransactionState(
+			NewStorageSnapshotFromPayload(j.payloads),
+			state.DefaultParameters())
 		accounts := environment.NewAccounts(txnState)
 		storage := cadenceRuntime.NewStorage(
 			&migrations.AccountsAtreeLedger{Accounts: accounts},
