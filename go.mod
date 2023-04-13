@@ -277,3 +277,5 @@ require (
 	lukechampine.com/blake3 v1.1.7 // indirect
 	nhooyr.io/websocket v1.8.6 // indirect
 )
+
+replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230330183547-d0dd18f6f20d => github.com/Guitarheroua/flow/protobuf/go/flow v0.0.0-20230413123230-836f4b113f09

@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/cmd/build"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -224,6 +225,26 @@ func (b *Backend) Ping(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error) {
+	stateParams := b.state.Params()
+	sporkId, err := stateParams.SporkID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read spork ID: %w", err)
+	}
+
+	protocolVersion, err := stateParams.ProtocolVersion()
+	if err != nil {
+		return nil, fmt.Errorf("faild to read protocol version: %w", err)
+	}
+
+	return &access.NodeVersionInfo{
+		Semver:          build.Semver(),
+		Commit:          build.Commit(),
+		SporkId:         sporkId,
+		ProtocolVersion: protocolVersion,
+	}, nil
 }
 
 func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*flow.LightCollection, error) {

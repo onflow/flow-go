@@ -46,6 +46,22 @@ func (h *Handler) Ping(ctx context.Context, _ *access.PingRequest) (*access.Ping
 	return &access.PingResponse{}, nil
 }
 
+func (h *Handler) GetNodeVersionInfo(ctx context.Context, _ *access.GetNodeVersionInfoRequest) (*access.GetNodeVersionInfoResponce, error) {
+	nodeVersionInfo, err := h.api.GetNodeVersionInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.GetNodeVersionInfoResponce{
+		Info: &entities.NodeVersionInfo{
+			Semver:          nodeVersionInfo.Semver,
+			Commit:          nodeVersionInfo.Commit,
+			SporkId:         nodeVersionInfo.SporkId[:],
+			ProtocolVersion: uint32(nodeVersionInfo.ProtocolVersion),
+		},
+	}, nil
+}
+
 func (h *Handler) GetNetworkParameters(
 	ctx context.Context,
 	_ *access.GetNetworkParametersRequest,
