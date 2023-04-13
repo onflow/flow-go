@@ -180,12 +180,12 @@ require (
 	github.com/multiformats/go-multistream v0.3.3 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/onflow/atree v0.5.0 // indirect
-	github.com/onflow/cadence v0.38.0 // indirect
+	github.com/onflow/cadence v0.38.1 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.12.1 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.12.1 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
 	github.com/onflow/flow-go-sdk v0.40.0 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221202093946-932d1c70e288 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230330183547-d0dd18f6f20d // indirect
 	github.com/onflow/go-bitswap v0.0.0-20221017184039-808c5791a8a8 // indirect
 	github.com/onflow/sdks v0.5.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.6.1 // indirect
@@ -259,7 +259,7 @@ require (
 	google.golang.org/api v0.114.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4 // indirect
-	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0 // indirect
+	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

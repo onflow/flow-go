@@ -3,8 +3,8 @@ package environment
 import (
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/model/flow"
 )
 

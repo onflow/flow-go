@@ -8,11 +8,11 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -247,7 +247,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	ctx := fvm.NewContext(fvm.WithChain(flow.Testnet.Chain()))
 
 	vm := fvm.NewVirtualMachine()
-	executionSnapshot, _, err := vm.RunV2(
+	executionSnapshot, _, err := vm.Run(
 		ctx,
 		fvm.Bootstrap(
 			unittest.ServiceAccountPublicKey,
@@ -301,7 +301,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		require.Equal(t, expected, invalidator.MeterParamOverridesUpdated)
 	}
 
-	executionSnapshot, err = nestedTxn.FinalizeMainTransaction()
+	executionSnapshot, err = txnState.FinalizeMainTransaction()
 	require.NoError(t, err)
 
 	for _, registerId := range executionSnapshot.AllRegisterIDs() {

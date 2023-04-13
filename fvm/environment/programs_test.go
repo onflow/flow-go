@@ -11,10 +11,10 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -150,7 +150,7 @@ func Test_Programs(t *testing.T) {
 		require.Empty(t, retrievedContractA)
 
 		// deploy contract A0
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
 				contractDeployTx("A", contractA0Code, addressA),
@@ -169,7 +169,7 @@ func Test_Programs(t *testing.T) {
 		require.Equal(t, contractA0Code, string(retrievedContractA))
 
 		// deploy contract A
-		executionSnapshot, output, err = vm.RunV2(
+		executionSnapshot, output, err = vm.Run(
 			context,
 			fvm.Transaction(
 				updateContractTx("A", contractACode, addressA),
@@ -206,7 +206,7 @@ func Test_Programs(t *testing.T) {
 				return mainSnapshot.Get(id)
 			})
 
-		executionSnapshotA, output, err := vm.RunV2(
+		executionSnapshotA, output, err := vm.Run(
 			context,
 			fvm.Transaction(
 				callTx("A", addressA),
@@ -250,7 +250,7 @@ func Test_Programs(t *testing.T) {
 				return mainSnapshot.Get(id)
 			})
 
-		executionSnapshotA2, output, err := vm.RunV2(
+		executionSnapshotA2, output, err := vm.Run(
 			context,
 			fvm.Transaction(
 				callTx("A", addressA),
@@ -270,7 +270,7 @@ func Test_Programs(t *testing.T) {
 
 	t.Run("deploying another contract invalidates dependant programs", func(t *testing.T) {
 		// deploy contract B
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
 				contractDeployTx("B", contractBCode, addressB),
@@ -301,7 +301,7 @@ func Test_Programs(t *testing.T) {
 
 		// run a TX using contract B
 
-		executionSnapshotB, output, err := vm.RunV2(
+		executionSnapshotB, output, err := vm.Run(
 			context,
 			fvm.Transaction(
 				callTx("B", addressB),
@@ -355,7 +355,7 @@ func Test_Programs(t *testing.T) {
 				return mainSnapshot.Get(id)
 			})
 
-		executionSnapshotB2, output, err := vm.RunV2(
+		executionSnapshotB2, output, err := vm.Run(
 			context,
 			fvm.Transaction(
 				callTx("B", addressB),
@@ -373,7 +373,7 @@ func Test_Programs(t *testing.T) {
 
 	t.Run("deploying new contract A2 invalidates B because of * imports", func(t *testing.T) {
 		// deploy contract B
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
 				contractDeployTx("A2", contractA2Code, addressA),
@@ -403,7 +403,7 @@ func Test_Programs(t *testing.T) {
 
 		// run a TX using contract B
 
-		executionSnapshotB, output, err := vm.RunV2(
+		executionSnapshotB, output, err := vm.Run(
 			context,
 			fvm.Transaction(
 				callTx("B", addressB),
@@ -463,7 +463,7 @@ func Test_Programs(t *testing.T) {
 				return mainSnapshot.Get(id)
 			})
 
-		executionSnapshotB2, output, err := vm.RunV2(
+		executionSnapshotB2, output, err := vm.Run(
 			context,
 			fvm.Transaction(
 				callTx("B", addressB),
@@ -494,7 +494,7 @@ func Test_Programs(t *testing.T) {
 			})
 
 		// run a TX using contract A
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
 				callTx("A", addressA),
@@ -514,7 +514,7 @@ func Test_Programs(t *testing.T) {
 		require.NotNil(t, contractBSnapshot)
 
 		// deploy contract C
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
 				contractDeployTx("C", contractCCode, addressC),
@@ -540,7 +540,7 @@ func Test_Programs(t *testing.T) {
 	})
 
 	t.Run("importing C should chain-import B and A", func(t *testing.T) {
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
 				callTx("C", addressC),
@@ -597,7 +597,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 
 	t.Run("deploy contracts and ensure cache is empty", func(t *testing.T) {
 		// deploy contract A
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
 				contractDeployTx("A", contractACode, addressA),
@@ -609,7 +609,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		// deploy contract B
-		executionSnapshot, output, err = vm.RunV2(
+		executionSnapshot, output, err = vm.Run(
 			context,
 			fvm.Transaction(
 				contractDeployTx("B", contractBCode, addressB),
@@ -621,7 +621,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		// deploy contract C
-		executionSnapshot, output, err = vm.RunV2(
+		executionSnapshot, output, err = vm.Run(
 			context,
 			fvm.Transaction(
 				contractDeployTx("C", contractCCode, addressC),
@@ -633,7 +633,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		// deploy contract A2 last to clear any cache so far
-		executionSnapshot, output, err = vm.RunV2(
+		executionSnapshot, output, err = vm.Run(
 			context,
 			fvm.Transaction(
 				contractDeployTx("A2", contractA2Code, addressA),
@@ -674,7 +674,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 				)),
 			derivedBlockData.NextTxIndexForTestingOnly())
 
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			context,
 			procCallC,
 			snapshotTree)

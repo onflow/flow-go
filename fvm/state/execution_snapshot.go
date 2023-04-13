@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TOOD(patrick): rm View interface after delta view is deleted.
 type View interface {
 	NewChild() View
 
@@ -16,6 +17,7 @@ type View interface {
 	Storage
 }
 
+// TOOD(patrick): rm Storage interface after delta view is deleted.
 // Storage is the storage interface used by the virtual machine to read and
 // write register values.
 type Storage interface {
