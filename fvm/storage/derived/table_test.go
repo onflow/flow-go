@@ -1089,7 +1089,10 @@ func TestDerivedDataTableGetOrCompute(t *testing.T) {
 		assert.Equal(t, value, val)
 		assert.True(t, computer.called)
 
-		_, found := view.Finalize().ReadSet[key]
+		snapshot, err := txnState.FinalizeMainTransaction()
+		assert.NoError(t, err)
+
+		_, found := snapshot.ReadSet[key]
 		assert.True(t, found)
 
 		// Commit to setup the next test.
@@ -1112,7 +1115,10 @@ func TestDerivedDataTableGetOrCompute(t *testing.T) {
 		assert.Equal(t, value, val)
 		assert.False(t, computer.called)
 
-		_, found := view.Finalize().ReadSet[key]
+		snapshot, err := txnState.FinalizeMainTransaction()
+		assert.NoError(t, err)
+
+		_, found := snapshot.ReadSet[key]
 		assert.True(t, found)
 	})
 }

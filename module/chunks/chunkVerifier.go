@@ -13,9 +13,9 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/partial"
 	chmodels "github.com/onflow/flow-go/model/chunks"
@@ -185,7 +185,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	var problematicTx flow.Identifier
 	// executes all transactions in this chunk
 	for i, tx := range transactions {
-		executionSnapshot, output, err := fcv.vm.RunV2(
+		executionSnapshot, output, err := fcv.vm.Run(
 			context,
 			tx,
 			snapshotTree)
