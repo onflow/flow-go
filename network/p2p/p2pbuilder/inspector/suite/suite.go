@@ -25,20 +25,15 @@ func NewGossipSubInspectorSuite(inspectors []p2p.GossipSubRPCInspector, ctrlMsgI
 
 	builder := component.NewComponentManagerBuilder()
 	for _, inspector := range inspectors {
+		inspector := inspector // capture loop variable
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
 			inspector.Start(ctx)
+			<-inspector.Ready()
+			ready()
 
 			<-inspector.Done()
 		})
 	}
-
-	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		ctrlMsgInspectDistributor.Start(ctx)
-		ready()
-
-		<-ctrlMsgInspectDistributor.Done()
-	})
 
 	s.Component = builder.Build()
 	return s

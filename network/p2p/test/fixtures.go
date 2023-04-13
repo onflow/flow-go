@@ -55,10 +55,16 @@ func NodeFixture(
 	dhtPrefix string,
 	opts ...NodeFixtureParameterOption,
 ) (p2p.LibP2PNode, flow.Identity) {
-	// default parameters
+
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
-	rpcInspectors, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig()).Build()
+
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(
+		logger,
+		sporkID,
+		inspectorbuilder.DefaultGossipSubRPCInspectorsConfig()).
+		Build()
 	require.NoError(t, err)
+
 	parameters := &NodeFixtureParameters{
 		HandlerFunc:                      func(network.Stream) {},
 		Unicasts:                         nil,
@@ -70,7 +76,7 @@ func NodeFixture(
 		Metrics:                          metrics.NewNoopCollector(),
 		ResourceManager:                  testutils.NewResourceManager(t),
 		GossipSubPeerScoreTracerInterval: 0, // disabled by default
-		GossipSubRPCInspector:            rpcInspectors,
+		GossipSubRPCInspector:            rpcInspectorSuite,
 	}
 
 	for _, opt := range opts {
