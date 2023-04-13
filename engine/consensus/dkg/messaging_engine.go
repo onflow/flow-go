@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,12 +10,16 @@ import (
 	"github.com/sethvargo/go-retry"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/dkg"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // retryMax is the maximum number of times the engine will attempt to forward
@@ -29,158 +34,190 @@ const retryBaseWait = 1 * time.Second
 // retryJitterPct is the percent jitter to add to each inter-retry wait.
 const retryJitterPct = 25
 
-// MessagingEngine is a network engine that enables DKG nodes to exchange
-// private messages over the network.
+const nWorkers = 100
+
+type MessagingEngineConfig struct {
+	RetryMax           uint
+	RetryBaseWait      time.Time
+	RetryJitterPercent uint
+}
+
+//func DefaultMessagingEngineConfig
+
+// MessagingEngine is an engine which sends and receives all DKG private messages.
+// The same engine instance is used for the lifetime of a node and will be used
+// for different DKG instances. The ReactorEngine is responsible for the lifecycle
+// of components which are scoped one DKG instance, for example the DKGController.
+// The dkg.BrokerTunnel handles routing messages to/from the current DKG instance.
 type MessagingEngine struct {
-	unit    *engine.Unit
 	log     zerolog.Logger
 	me      module.Local      // local object to identify the node
 	conduit network.Conduit   // network conduit for sending and receiving private messages
 	tunnel  *dkg.BrokerTunnel // tunnel for relaying private messages to and from controllers
+
+	messageHandler *engine.MessageHandler // encapsulates enqueueing messages from network
+	notifier       engine.Notifier        // notifies inbound messages available for forwarding
+	inbound        *fifoqueue.FifoQueue   // messages from the network, to be processed by DKG Controller
+
+	component.Component
+	cm *component.ComponentManager
 }
+
+var _ network.MessageProcessor = (*MessagingEngine)(nil)
+var _ component.Component = (*MessagingEngine)(nil)
 
 // NewMessagingEngine returns a new engine.
 func NewMessagingEngine(
-	logger zerolog.Logger,
+	log zerolog.Logger,
 	net network.Network,
 	me module.Local,
-	tunnel *dkg.BrokerTunnel) (*MessagingEngine, error) {
+	tunnel *dkg.BrokerTunnel,
+) (*MessagingEngine, error) {
+	log = log.With().Str("engine", "dkg.messaging").Logger()
 
-	log := logger.With().Str("engine", "dkg-processor").Logger()
-
-	eng := MessagingEngine{
-		unit:   engine.NewUnit(),
-		log:    log,
-		me:     me,
-		tunnel: tunnel,
+	// TODO length observer metrics
+	inbound, err := fifoqueue.NewFifoQueue(1000)
+	if err != nil {
+		return nil, fmt.Errorf("could not create inbound fifoqueue: %w", err)
 	}
 
-	var err error
-	eng.conduit, err = net.Register(channels.DKGCommittee, &eng)
+	notifier := engine.NewNotifier()
+	messageHandler := engine.NewMessageHandler(log, notifier, engine.Pattern{
+		Match: engine.MatchType[*msg.DKGMessage],
+		Store: &engine.FifoMessageStore{FifoQueue: inbound},
+	})
+
+	eng := MessagingEngine{
+		log:            log,
+		me:             me,
+		tunnel:         tunnel,
+		messageHandler: messageHandler,
+		notifier:       notifier,
+		inbound:        inbound,
+	}
+
+	conduit, err := net.Register(channels.DKGCommittee, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register dkg network engine: %w", err)
 	}
+	eng.conduit = conduit
 
-	eng.unit.Launch(eng.forwardOutgoingMessages)
+	eng.cm = component.NewComponentManagerBuilder().
+		AddWorker(eng.forwardInboundMessagesWorker).
+		AddWorker(eng.forwardOutboundMessagesWorker).
+		Build()
+	eng.Component = eng.cm
 
 	return &eng, nil
 }
 
-// Ready implements the module ReadyDoneAware interface. It returns a channel
-// that will close when the engine has successfully
-// started.
-func (e *MessagingEngine) Ready() <-chan struct{} {
-	return e.unit.Ready()
-}
-
-// Done implements the module ReadyDoneAware interface. It returns a channel
-// that will close when the engine has successfully stopped.
-func (e *MessagingEngine) Done() <-chan struct{} {
-	return e.unit.Done()
-}
-
-// SubmitLocal implements the network Engine interface
-func (e *MessagingEngine) SubmitLocal(event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(e.me.NodeID(), event)
-		if err != nil {
-			e.log.Fatal().Err(err).Str("origin", e.me.NodeID().String()).Msg("failed to submit local message")
+// Process processes messages from the networking layer.
+// No errors are expected during normal operation.
+func (e *MessagingEngine) Process(channel channels.Channel, originID flow.Identifier, message any) error {
+	err := e.messageHandler.Process(originID, message)
+	if err != nil {
+		if errors.Is(err, engine.IncompatibleInputTypeError) {
+			e.log.Warn().Bool(logging.KeySuspicious, true).Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
+			return nil
 		}
-	})
-}
-
-// Submit implements the network Engine interface
-func (e *MessagingEngine) Submit(_ channels.Channel, originID flow.Identifier, event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(originID, event)
-		if engine.IsInvalidInputError(err) {
-			e.log.Error().Err(err).Str("origin", originID.String()).Msg("failed to submit dropping invalid input message")
-		} else if err != nil {
-			e.log.Fatal().Err(err).Str("origin", originID.String()).Msg("failed to submit message unknown error")
-		}
-	})
-}
-
-// ProcessLocal implements the network Engine interface
-func (e *MessagingEngine) ProcessLocal(event interface{}) error {
-	return e.unit.Do(func() error {
-		err := e.process(e.me.NodeID(), event)
-		if err != nil {
-			e.log.Fatal().Err(err).Str("origin", e.me.NodeID().String()).Msg("failed to process local message")
-		}
-
-		return nil
-	})
-}
-
-// Process implements the network Engine interface
-func (e *MessagingEngine) Process(_ channels.Channel, originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
-}
-
-func (e *MessagingEngine) process(originID flow.Identifier, event interface{}) error {
-	switch v := event.(type) {
-	case *msg.DKGMessage:
-		// messages are forwarded async rather than sync, because otherwise the message queue
-		// might get full when it's slow to process DKG messages synchronously and impact
-		// block rate.
-		e.forwardInboundMessageAsync(originID, v)
-		return nil
-	default:
-		return engine.NewInvalidInputErrorf("expecting input with type msg.DKGMessage, but got %T", event)
+		// TODO add comment about Process errors...
+		return fmt.Errorf("unexpected failure to process inbound dkg message")
 	}
+	return nil
 }
 
-// forwardInboundMessageAsync forwards a private DKG message from another DKG
-// participant to the DKG controller.
-func (e *MessagingEngine) forwardInboundMessageAsync(originID flow.Identifier, message *msg.DKGMessage) {
-	e.unit.Launch(func() {
-		e.tunnel.SendIn(
-			msg.PrivDKGMessageIn{
-				DKGMessage: *message,
-				OriginID:   originID,
-			},
-		)
-	})
-}
+func (e *MessagingEngine) forwardInboundMessagesWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
 
-func (e *MessagingEngine) forwardOutgoingMessages() {
+	done := ctx.Done()
+	wake := e.notifier.Channel()
 	for {
 		select {
-		case msg := <-e.tunnel.MsgChOut:
-			e.forwardOutboundMessageAsync(msg)
-		case <-e.unit.Quit():
+		case <-done:
 			return
+		case <-wake:
+			e.forwardInboundMessagesWhileAvailable(ctx)
 		}
 	}
 }
 
-// forwardOutboundMessageAsync asynchronously attempts to forward a private
-// DKG message to a single other DKG participant, on a best effort basis.
-func (e *MessagingEngine) forwardOutboundMessageAsync(message msg.PrivDKGMessageOut) {
-	e.unit.Launch(func() {
-		backoff := retry.NewExponential(retryBaseWait)
-		backoff = retry.WithMaxRetries(retryMax, backoff)
-		backoff = retry.WithJitterPercent(retryJitterPct, backoff)
+func (e *MessagingEngine) popNextInboundMessage() (msg.PrivDKGMessageIn, bool) {
+	nextMessage, ok := e.inbound.Pop()
+	if !ok {
+		return msg.PrivDKGMessageIn{}, false
+	}
 
-		attempts := 1
-		err := retry.Do(e.unit.Ctx(), backoff, func(ctx context.Context) error {
-			err := e.conduit.Unicast(&message.DKGMessage, message.DestID)
-			if err != nil {
-				e.log.Warn().Err(err).Msgf("error sending dkg message retrying (%d)", attempts)
-			}
+	asEngineWrapper := nextMessage.(*engine.Message)
+	asDKGMsg := asEngineWrapper.Payload.(*msg.DKGMessage)
+	originID := asEngineWrapper.OriginID
 
-			attempts++
-			return retry.RetryableError(err)
-		})
+	message := msg.PrivDKGMessageIn{
+		DKGMessage: *asDKGMsg,
+		OriginID:   originID,
+	}
+	return message, true
+}
 
-		// Various network conditions can result in errors while forwarding outbound messages.
-		// Because the overall DKG is resilient to individual message failures most of time.
-		// it is acceptable to log the error and move on.
-		if err != nil {
-			e.log.Error().Err(err).Msgf("error sending private dkg message after %d attempts", attempts)
+func (e *MessagingEngine) forwardInboundMessagesWhileAvailable(ctx context.Context) {
+	for {
+		message, ok := e.popNextInboundMessage()
+		if !ok {
+			return
 		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case e.tunnel.MsgChIn <- message:
+			continue
+		}
+	}
+}
+
+func (e *MessagingEngine) forwardOutboundMessagesWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	done := ctx.Done()
+	for {
+		select {
+		case <-done:
+			return
+		case message := <-e.tunnel.MsgChOut:
+			go e.forwardOutboundMessage(ctx, message)
+		}
+	}
+}
+
+// forwardOutboundMessage asynchronously attempts to forward a private
+// DKG message to a single other DKG participant, on a best effort basis.
+// Must be invoked as a goroutine.
+func (e *MessagingEngine) forwardOutboundMessage(ctx context.Context, message msg.PrivDKGMessageOut) {
+	backoff := retry.NewExponential(retryBaseWait)
+	backoff = retry.WithMaxRetries(retryMax, backoff)
+	backoff = retry.WithJitterPercent(retryJitterPct, backoff)
+
+	log := e.log.With().Str("target", message.DestID.String()).Logger()
+
+	attempts := 1
+	err := retry.Do(ctx, backoff, func(ctx context.Context) error {
+		err := e.conduit.Unicast(&message.DKGMessage, message.DestID)
+		// TODO Unicast fails to document expected errors, therefore we treat all errors as benign networking failures here
+		if err != nil {
+			log.Warn().
+				Err(err).
+				Int("attempt", attempts).
+				Msgf("error sending dkg message on attempt %d - will retry...", attempts)
+		}
+
+		attempts++
+		return retry.RetryableError(err)
 	})
+
+	// TODO Unicast fails to document expected errors, therefore we treat all errors as benign networking failures here
+	if err != nil {
+		log.Error().
+			Err(err).
+			Int("attempt", attempts).
+			Msgf("failed to send private dkg message after %d attempts - will not retry", attempts)
+	}
 }

@@ -60,7 +60,7 @@ func NewReactorEngine(
 ) *ReactorEngine {
 
 	logger := log.With().
-		Str("engine", "dkg_reactor").
+		Str("engine", "dkg.reactor").
 		Logger()
 
 	return &ReactorEngine{

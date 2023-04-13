@@ -1,15 +1,16 @@
 package dkg
 
 import (
+	"context"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/dkg"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -19,19 +20,19 @@ import (
 // Helper function to initialise an engine.
 func createTestEngine(t *testing.T) *MessagingEngine {
 	// setup mock conduit
-	conduit := &mocknetwork.Conduit{}
-	network := new(mocknetwork.Network)
+	conduit := mocknetwork.NewConduit(t)
+	network := mocknetwork.NewNetwork(t)
 	network.On("Register", mock.Anything, mock.Anything).
 		Return(conduit, nil).
 		Once()
 
 	// setup local with nodeID
 	nodeID := unittest.IdentifierFixture()
-	me := new(module.Local)
+	me := module.NewLocal(t)
 	me.On("NodeID").Return(nodeID)
 
 	engine, err := NewMessagingEngine(
-		zerolog.Logger{},
+		unittest.Logger(),
 		network,
 		me,
 		dkg.NewBrokerTunnel(),
@@ -46,6 +47,8 @@ func createTestEngine(t *testing.T) *MessagingEngine {
 func TestForwardOutgoingMessages(t *testing.T) {
 	// sender engine
 	engine := createTestEngine(t)
+	ctx := irrecoverable.NewMockSignalerContext(t, context.Background())
+	engine.Start(ctx)
 
 	// expected DKGMessage
 	destinationID := unittest.IdentifierFixture()
@@ -54,25 +57,21 @@ func TestForwardOutgoingMessages(t *testing.T) {
 		"dkg-123",
 	)
 
-	// override the conduit to check that the Unicast call matches the expected
-	// message and destination ID
-	conduit := &mocknetwork.Conduit{}
-	conduit.On("Unicast", &expectedMsg, destinationID).
+	done := make(chan struct{})
+	engine.conduit.(*mocknetwork.Conduit).On("Unicast", &expectedMsg, destinationID).
+		Run(func(_ mock.Arguments) { close(done) }).
 		Return(nil).
 		Once()
-	engine.conduit = conduit
 
 	engine.tunnel.SendOut(msg.PrivDKGMessageOut{
 		DKGMessage: expectedMsg,
 		DestID:     destinationID,
 	})
 
-	time.Sleep(5 * time.Millisecond)
-
-	conduit.AssertExpectations(t)
+	unittest.RequireCloseBefore(t, done, time.Second, "message not sent")
 }
 
-// TestForwardIncomingMessages checks that the engine correclty forwards
+// TestForwardIncomingMessages checks that the engine correctly forwards
 // messages from the conduit to the tunnel's In channel.
 func TestForwardIncomingMessages(t *testing.T) {
 	// sender engine
