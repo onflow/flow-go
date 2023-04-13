@@ -20,56 +20,90 @@ import (
  * For example, [(◄1) 2] means: a block of view 2 that has a QC for view 1.  *
  *****************************************************************************/
 
-// TestFinalize_Direct1Chain tests adding a direct 1-chain.
-// receives [(◄1) 2] [(◄2) 3]
-// it should not finalize any block because there is no finalizable 2-chain.
-func TestFinalize_Direct1Chain(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 3)
+// TestInitialization verifies that at initialization, Forks reports:
+//   - the root / genesis block as finalized
+//   - it has no finalization proof for the root / genesis block (block and its finaization is trusted)
+func TestInitialization(t *testing.T) {
+	forks, _ := newForks(t)
+	requireOnlyGenesisBlockFinalized(t, forks)
+	_, hasProof := forks.FinalityProof()
+	require.False(t, hasProof)
+}
 
+// TestFinalize_Direct1Chain tests adding a direct 1-chain on top of the genesis block:
+//   - receives [(◄1) 2] [(◄2) 5]
+//
+// Expected behaviour:
+//   - On the one hand, Forks should not finalize any _additional_ blocks, because there is
+//     no finalizable 2-chain for [(◄1) 2]. Hence, finalization no events should be emitted.
+//   - On the other hand, after adding the two blocks, Forks has enough knowledge to construct
+//     a FinalityProof for the genesis block.
+func TestFinalize_Direct1Chain(t *testing.T) {
+	builder := NewBlockBuilder().
+		Add(1, 2).
+		Add(2, 3)
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
 	t.Run("ingest proposals", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addProposalsToForks(forks, blocks)
-		require.Nil(t, err)
-		requireNoBlocksFinalized(t, forks)
+
+		// adding block [(◄1) 2] should not finalize anything
+		// as the genesis block is trusted, there should be no FinalityProof available for it
+		require.NoError(t, forks.AddProposal(blocks[0].Block))
+		requireOnlyGenesisBlockFinalized(t, forks)
+		_, hasProof := forks.FinalityProof()
+		require.False(t, hasProof)
+
+		// After adding block [(◄2) 3], Forks has enough knowledge to construct a FinalityProof for the
+		// genesis block. However, finalization remains at the genesis block, so no events should be emitted.
+		expectedFinalityProof := makeFinalityProof(t, builder.GenesisBlock().Block, blocks[0].Block, blocks[1].Block.QC)
+		require.NoError(t, forks.AddProposal(blocks[1].Block))
+		requireLatestFinalizedBlock(t, forks, builder.GenesisBlock().Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 
 	t.Run("ingest certified blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addCertifiedBlocksToForks(forks, blocks)
-		require.Nil(t, err)
-		requireNoBlocksFinalized(t, forks)
+
+		// After adding CertifiedBlock [(◄1) 2] (◄2), Forks has enough knowledge to construct a FinalityProof for
+		// the genesis block. However, finalization remains at the genesis block, so no events should be emitted.
+		expectedFinalityProof := makeFinalityProof(t, builder.GenesisBlock().Block, blocks[0].Block, blocks[1].Block.QC)
+		c, err := model.NewCertifiedBlock(blocks[0].Block, blocks[1].Block.QC)
+		require.NoError(t, err)
+
+		require.NoError(t, forks.AddCertifiedBlock(&c))
+		requireLatestFinalizedBlock(t, forks, builder.GenesisBlock().Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 }
 
 // TestFinalize_Direct2Chain tests adding a direct 1-chain on a direct 1-chain (direct 2-chain).
-// receives [(◄1) 2] [(◄2) 3] [(◄3) 4]
-// it should finalize [(◄1) 2]
+//   - receives [(◄1) 2] [(◄2) 3] [(◄3) 4]
+//   - Forks should finalize [(◄1) 2]
 func TestFinalize_Direct2Chain(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 3)
-	builder.Add(3, 4)
-
-	blocks, err := builder.Blocks()
+	blocks, err := NewBlockBuilder().
+		Add(1, 2).
+		Add(2, 3).
+		Add(3, 4).
+		Blocks()
 	require.Nil(t, err)
+	expectedFinalityProof := makeFinalityProof(t, blocks[0].Block, blocks[1].Block, blocks[2].Block.QC)
 
 	t.Run("ingest proposals", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addProposalsToForks(forks, blocks)
-		require.Nil(t, err)
-		requireLatestFinalizedBlock(t, forks, 1, 2)
+		require.Nil(t, addProposalsToForks(forks, blocks))
+
+		requireLatestFinalizedBlock(t, forks, blocks[0].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 
 	t.Run("ingest certified blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addCertifiedBlocksToForks(forks, blocks)
-		require.Nil(t, err)
-		requireLatestFinalizedBlock(t, forks, 1, 2)
+		require.Nil(t, addCertifiedBlocksToForks(forks, blocks))
+
+		requireLatestFinalizedBlock(t, forks, blocks[0].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 }
 
@@ -77,53 +111,58 @@ func TestFinalize_Direct2Chain(t *testing.T) {
 // receives [(◄1) 2] [(◄2) 3] [(◄3) 5]
 // it should finalize [(◄1) 2]
 func TestFinalize_DirectIndirect2Chain(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 3)
-	builder.Add(3, 5)
-
-	blocks, err := builder.Blocks()
+	blocks, err := NewBlockBuilder().
+		Add(1, 2).
+		Add(2, 3).
+		Add(3, 5).
+		Blocks()
 	require.Nil(t, err)
+	expectedFinalityProof := makeFinalityProof(t, blocks[0].Block, blocks[1].Block, blocks[2].Block.QC)
 
 	t.Run("ingest proposals", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addProposalsToForks(forks, blocks)
-		require.Nil(t, err)
-		requireLatestFinalizedBlock(t, forks, 1, 2)
+		require.Nil(t, addProposalsToForks(forks, blocks))
+
+		requireLatestFinalizedBlock(t, forks, blocks[0].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 
 	t.Run("ingest certified blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addCertifiedBlocksToForks(forks, blocks)
-		require.Nil(t, err)
-		requireLatestFinalizedBlock(t, forks, 1, 2)
+		require.Nil(t, addCertifiedBlocksToForks(forks, blocks))
+
+		requireLatestFinalizedBlock(t, forks, blocks[0].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 }
 
 // TestFinalize_IndirectDirect2Chain tests adding a direct 1-chain on an indirect 1-chain.
-// receives [(◄1) 2] [(◄2) 4] [(◄4) 5]
-// it should not finalize any blocks because there is no finalizable 2-chain.
+//   - Forks receives [(◄1) 3] [(◄3) 5] [(◄7) 7]
+//   - it should not finalize any blocks because there is no finalizable 2-chain.
 func TestFinalize_IndirectDirect2Chain(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 4)
-	builder.Add(4, 5)
-
-	blocks, err := builder.Blocks()
+	blocks, err := NewBlockBuilder().
+		Add(1, 3).
+		Add(3, 5).
+		Add(5, 7).
+		Blocks()
 	require.Nil(t, err)
 
 	t.Run("ingest proposals", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addProposalsToForks(forks, blocks)
-		require.Nil(t, err)
-		requireNoBlocksFinalized(t, forks)
+		require.Nil(t, addProposalsToForks(forks, blocks))
+
+		requireOnlyGenesisBlockFinalized(t, forks)
+		_, hasProof := forks.FinalityProof()
+		require.False(t, hasProof)
 	})
 
 	t.Run("ingest certified blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addCertifiedBlocksToForks(forks, blocks)
-		require.Nil(t, err)
-		requireNoBlocksFinalized(t, forks)
+		require.Nil(t, addCertifiedBlocksToForks(forks, blocks))
+
+		requireOnlyGenesisBlockFinalized(t, forks)
+		_, hasProof := forks.FinalityProof()
+		require.False(t, hasProof)
 	})
 }
 
@@ -131,28 +170,30 @@ func TestFinalize_IndirectDirect2Chain(t *testing.T) {
 //   - ingesting [(◄1) 3] [(◄3) 5] [(◄5) 6] [(◄6) 7] [(◄7) 8]
 //   - should result in finalization of [(◄5) 6]
 func TestFinalize_Direct2ChainOnIndirect(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 3)
-	builder.Add(3, 5)
-	builder.Add(5, 6)
-	builder.Add(6, 7)
-	builder.Add(7, 8)
-
-	blocks, err := builder.Blocks()
+	blocks, err := NewBlockBuilder().
+		Add(1, 3).
+		Add(3, 5).
+		Add(5, 6).
+		Add(6, 7).
+		Add(7, 8).
+		Blocks()
 	require.Nil(t, err)
+	expectedFinalityProof := makeFinalityProof(t, blocks[2].Block, blocks[3].Block, blocks[4].Block.QC)
 
 	t.Run("ingest proposals", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addProposalsToForks(forks, blocks)
-		require.Nil(t, err)
-		requireLatestFinalizedBlock(t, forks, 5, 6)
+		require.Nil(t, addProposalsToForks(forks, blocks))
+
+		requireLatestFinalizedBlock(t, forks, blocks[2].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 
 	t.Run("ingest certified blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addCertifiedBlocksToForks(forks, blocks)
-		require.Nil(t, err)
-		requireLatestFinalizedBlock(t, forks, 5, 6)
+		require.Nil(t, addCertifiedBlocksToForks(forks, blocks))
+
+		requireLatestFinalizedBlock(t, forks, blocks[2].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 }
 
@@ -160,28 +201,30 @@ func TestFinalize_Direct2ChainOnIndirect(t *testing.T) {
 //   - ingesting [(◄1) 2] [(◄2) 3] [(◄3) 4] [(◄4) 5] [(◄5) 6]
 //   - should result in finalization of [(◄3) 4]
 func TestFinalize_Direct2ChainOnDirect(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 3)
-	builder.Add(3, 4)
-	builder.Add(4, 5)
-	builder.Add(5, 6)
-
-	blocks, err := builder.Blocks()
+	blocks, err := NewBlockBuilder().
+		Add(1, 2).
+		Add(2, 3).
+		Add(3, 4).
+		Add(4, 5).
+		Add(5, 6).
+		Blocks()
 	require.Nil(t, err)
+	expectedFinalityProof := makeFinalityProof(t, blocks[2].Block, blocks[3].Block, blocks[4].Block.QC)
 
 	t.Run("ingest proposals", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addProposalsToForks(forks, blocks)
-		require.Nil(t, err)
-		requireLatestFinalizedBlock(t, forks, 3, 4)
+		require.Nil(t, addProposalsToForks(forks, blocks))
+
+		requireLatestFinalizedBlock(t, forks, blocks[2].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 
 	t.Run("ingest certified blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addCertifiedBlocksToForks(forks, blocks)
-		require.Nil(t, err)
-		requireLatestFinalizedBlock(t, forks, 3, 4)
+		require.Nil(t, addCertifiedBlocksToForks(forks, blocks))
+
+		requireLatestFinalizedBlock(t, forks, blocks[2].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 }
 
@@ -189,28 +232,30 @@ func TestFinalize_Direct2ChainOnDirect(t *testing.T) {
 //   - ingesting [(◄1) 2] [(◄2) 3] [(◄3) 5] [(◄3) 6] [(◄3) 7]
 //   - should result in finalization of [(◄1) 2]
 func TestFinalize_Multiple2Chains(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 3)
-	builder.Add(3, 5)
-	builder.Add(3, 6)
-	builder.Add(3, 7)
-
-	blocks, err := builder.Blocks()
+	blocks, err := NewBlockBuilder().
+		Add(1, 2).
+		Add(2, 3).
+		Add(3, 5).
+		Add(3, 6).
+		Add(3, 7).
+		Blocks()
 	require.Nil(t, err)
+	expectedFinalityProof := makeFinalityProof(t, blocks[0].Block, blocks[1].Block, blocks[2].Block.QC)
 
 	t.Run("ingest proposals", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addProposalsToForks(forks, blocks)
-		require.Nil(t, err)
-		requireLatestFinalizedBlock(t, forks, 1, 2)
+		require.Nil(t, addProposalsToForks(forks, blocks))
+
+		requireLatestFinalizedBlock(t, forks, blocks[0].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 
 	t.Run("ingest certified blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addCertifiedBlocksToForks(forks, blocks)
-		require.Nil(t, err)
-		requireLatestFinalizedBlock(t, forks, 1, 2)
+		require.Nil(t, addCertifiedBlocksToForks(forks, blocks))
+
+		requireLatestFinalizedBlock(t, forks, blocks[0].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 }
 
@@ -222,97 +267,102 @@ func TestFinalize_Multiple2Chains(t *testing.T) {
 //
 // which should result in finalization of [(◄2) 4] and pruning of [(◄2) 3]
 func TestFinalize_OrphanedFork(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 2) // [(◄1) 2]
-	builder.Add(2, 3) // [(◄2) 3], should eventually be pruned
-	builder.Add(2, 4) // [(◄2) 4]
-	builder.Add(4, 5) // [(◄4) 5]
-	builder.Add(5, 6) // [(◄5) 6]
-
-	blocks, err := builder.Blocks()
+	blocks, err := NewBlockBuilder().
+		Add(1, 2). // [(◄1) 2]
+		Add(2, 3). // [(◄2) 3], should eventually be pruned
+		Add(2, 4). // [(◄2) 4], should eventually be finalized
+		Add(4, 5). // [(◄4) 5]
+		Add(5, 6). // [(◄5) 6]
+		Blocks()
 	require.Nil(t, err)
+	expectedFinalityProof := makeFinalityProof(t, blocks[2].Block, blocks[3].Block, blocks[4].Block.QC)
 
 	t.Run("ingest proposals", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addProposalsToForks(forks, blocks)
-		require.Nil(t, err)
-		requireLatestFinalizedBlock(t, forks, 2, 4)
+		require.Nil(t, addProposalsToForks(forks, blocks))
+
 		require.False(t, forks.IsKnownBlock(blocks[1].Block.BlockID))
+		requireLatestFinalizedBlock(t, forks, blocks[2].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 
 	t.Run("ingest certified blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addCertifiedBlocksToForks(forks, blocks)
-		require.Nil(t, err)
-		requireLatestFinalizedBlock(t, forks, 2, 4)
+		require.Nil(t, addCertifiedBlocksToForks(forks, blocks))
+
 		require.False(t, forks.IsKnownBlock(blocks[1].Block.BlockID))
+		requireLatestFinalizedBlock(t, forks, blocks[2].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 }
 
 // TestDuplication tests that delivering the same block/qc multiple times has
 // the same end state as delivering the block/qc once.
-// receives [(◄1) 2] [(◄2) 3] [(◄2) 3] [(◄3) 4] [(◄3) 4] [(◄4) 5] [(◄4) 5]
-// it should finalize [(◄2) 3]
+//   - Forks receives [(◄1) 2] [(◄2) 3] [(◄2) 3] [(◄3) 4] [(◄3) 4] [(◄4) 5] [(◄4) 5]
+//   - it should finalize [(◄2) 3]
 func TestDuplication(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 3)
-	builder.Add(2, 3)
-	builder.Add(3, 4)
-	builder.Add(3, 4)
-	builder.Add(4, 5)
-	builder.Add(4, 5)
-
-	blocks, err := builder.Blocks()
+	blocks, err := NewBlockBuilder().
+		Add(1, 2).
+		Add(2, 3).
+		Add(2, 3).
+		Add(3, 4).
+		Add(3, 4).
+		Add(4, 5).
+		Add(4, 5).
+		Blocks()
 	require.Nil(t, err)
+	expectedFinalityProof := makeFinalityProof(t, blocks[1].Block, blocks[3].Block, blocks[5].Block.QC)
 
 	t.Run("ingest proposals", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addProposalsToForks(forks, blocks)
-		require.Nil(t, err)
-		requireLatestFinalizedBlock(t, forks, 2, 3)
+		require.Nil(t, addProposalsToForks(forks, blocks))
+
+		requireLatestFinalizedBlock(t, forks, blocks[1].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 
 	t.Run("ingest certified blocks", func(t *testing.T) {
 		forks, _ := newForks(t)
-		err = addCertifiedBlocksToForks(forks, blocks)
-		require.Nil(t, err)
-		requireLatestFinalizedBlock(t, forks, 2, 3)
+		require.Nil(t, addCertifiedBlocksToForks(forks, blocks))
+
+		requireLatestFinalizedBlock(t, forks, blocks[1].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 }
 
 // TestIgnoreBlocksBelowFinalizedView tests that blocks below finalized view are ignored.
-// receives [(◄1) 2] [(◄2) 3] [(◄3) 4] [(◄1) 5]
-// it should finalize [(◄1) 2]
+//   - Forks receives [(◄1) 2] [(◄2) 3] [(◄3) 4] [(◄1) 5]
+//   - it should finalize [(◄1) 2]
 func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 2) // [(◄1) 2]
-	builder.Add(2, 3) // [(◄2) 3]
-	builder.Add(3, 4) // [(◄3) 4]
-	builder.Add(1, 5) // [(◄1) 5]
-
+	builder := NewBlockBuilder().
+		Add(1, 2). // [(◄1) 2]
+		Add(2, 3). // [(◄2) 3]
+		Add(3, 4). // [(◄3) 4]
+		Add(1, 5)  // [(◄1) 5]
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
+	expectedFinalityProof := makeFinalityProof(t, blocks[0].Block, blocks[1].Block, blocks[2].Block.QC)
 
 	t.Run("ingest proposals", func(t *testing.T) {
 		// initialize forks and add first 3 blocks:
 		//  * block [(◄1) 2] should then be finalized
 		//  * and block [1] should be pruned
 		forks, _ := newForks(t)
-		err = addProposalsToForks(forks, blocks[:3])
-		require.Nil(t, err)
+		require.Nil(t, addProposalsToForks(forks, blocks[:3]))
+
 		// sanity checks to confirm correct test setup
-		requireLatestFinalizedBlock(t, forks, 1, 2)
+		requireLatestFinalizedBlock(t, forks, blocks[0].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 		require.False(t, forks.IsKnownBlock(builder.GenesisBlock().ID()))
 
 		// adding block [(◄1) 5]: note that QC is _below_ the pruning threshold, i.e. cannot resolve the parent
 		// * Forks should store block, despite the parent already being pruned
 		// * finalization should not change
 		orphanedBlock := blocks[3].Block
-		err = forks.AddProposal(orphanedBlock)
-		require.Nil(t, err)
+		require.Nil(t, forks.AddProposal(orphanedBlock))
 		require.True(t, forks.IsKnownBlock(orphanedBlock.BlockID))
-		requireLatestFinalizedBlock(t, forks, 1, 2)
+		requireLatestFinalizedBlock(t, forks, blocks[0].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 
 	t.Run("ingest certified blocks", func(t *testing.T) {
@@ -320,21 +370,20 @@ func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 		//  * block [(◄1) 2] should then be finalized
 		//  * and block [1] should be pruned
 		forks, _ := newForks(t)
-		err = addCertifiedBlocksToForks(forks, blocks[:3])
-		require.Nil(t, err)
+		require.Nil(t, addCertifiedBlocksToForks(forks, blocks[:3]))
 		// sanity checks to confirm correct test setup
-		requireLatestFinalizedBlock(t, forks, 1, 2)
+		requireLatestFinalizedBlock(t, forks, blocks[0].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 		require.False(t, forks.IsKnownBlock(builder.GenesisBlock().ID()))
 
 		// adding block [(◄1) 5]: note that QC is _below_ the pruning threshold, i.e. cannot resolve the parent
 		// * Forks should store block, despite the parent already being pruned
 		// * finalization should not change
 		certBlockWithUnknownParent := toCertifiedBlock(t, blocks[3].Block)
-		err = forks.AddCertifiedBlock(certBlockWithUnknownParent)
-		require.Nil(t, err)
+		require.Nil(t, forks.AddCertifiedBlock(certBlockWithUnknownParent))
 		require.True(t, forks.IsKnownBlock(certBlockWithUnknownParent.Block.BlockID))
-		requireLatestFinalizedBlock(t, forks, 1, 2)
-
+		requireLatestFinalizedBlock(t, forks, blocks[0].Block)
+		requireFinalityProof(t, forks, expectedFinalityProof)
 	})
 }
 
@@ -347,11 +396,10 @@ func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 //
 // which should result in a DoubleProposal event referencing the blocks [(◄1) 2] and [(◄1) 2']
 func TestDoubleProposal(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 2)                // [(◄1) 2]
-	builder.AddVersioned(1, 2, 0, 1) // [(◄1) 2']
-
-	blocks, err := builder.Blocks()
+	blocks, err := NewBlockBuilder().
+		Add(1, 2).                // [(◄1) 2]
+		AddVersioned(1, 2, 0, 1). // [(◄1) 2']
+		Blocks()
 	require.Nil(t, err)
 
 	t.Run("ingest proposals", func(t *testing.T) {
@@ -381,16 +429,14 @@ func TestDoubleProposal(t *testing.T) {
 //
 // which should result in a `ByzantineThresholdExceededError`, because conflicting blocks 3 and 3' both have QCs
 func TestConflictingQCs(t *testing.T) {
-	builder := NewBlockBuilder()
-
-	builder.Add(1, 2)                // [(◄1) 2]
-	builder.Add(2, 3)                // [(◄2) 3]
-	builder.AddVersioned(2, 3, 0, 1) // [(◄2) 3']
-	builder.Add(3, 4)                // [(◄3) 4]
-	builder.Add(4, 6)                // [(◄4) 6]
-	builder.AddVersioned(3, 5, 1, 0) // [(◄3') 5]
-
-	blocks, err := builder.Blocks()
+	blocks, err := NewBlockBuilder().
+		Add(1, 2).                // [(◄1) 2]
+		Add(2, 3).                // [(◄2) 3]
+		AddVersioned(2, 3, 0, 1). // [(◄2) 3']
+		Add(3, 4).                // [(◄3) 4]
+		Add(4, 6).                // [(◄4) 6]
+		AddVersioned(3, 5, 1, 0). // [(◄3') 5]
+		Blocks()
 	require.Nil(t, err)
 
 	t.Run("ingest proposals", func(t *testing.T) {
@@ -421,16 +467,15 @@ func TestConflictingQCs(t *testing.T) {
 // Here, both blocks [(◄2) 3] and [(◄2) 6] satisfy the finalization condition, i.e. we have a fork
 // in the finalized blocks, which should result in a model.ByzantineThresholdExceededError exception.
 func TestConflictingFinalizedForks(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 3)
-	builder.Add(3, 4)
-	builder.Add(4, 5) // finalizes [(◄2) 3]
-	builder.Add(2, 6)
-	builder.Add(6, 7)
-	builder.Add(7, 8) // finalizes [(◄2) 6], conflicting with conflicts with [(◄2) 3]
-
-	blocks, err := builder.Blocks()
+	blocks, err := NewBlockBuilder().
+		Add(1, 2).
+		Add(2, 3).
+		Add(3, 4).
+		Add(4, 5). // finalizes [(◄2) 3]
+		Add(2, 6).
+		Add(6, 7).
+		Add(7, 8). // finalizes [(◄2) 6], conflicting with conflicts with [(◄2) 3]
+		Blocks()
 	require.Nil(t, err)
 
 	t.Run("ingest proposals", func(t *testing.T) {
@@ -452,10 +497,10 @@ func TestConflictingFinalizedForks(t *testing.T) {
 //   - should return `model.MissingBlockError`, because the parent is above the pruning
 //     threshold, but Forks does not know its parent
 func TestAddUnconnectedProposal(t *testing.T) {
-	builder := NewBlockBuilder().
+	blocks, err := NewBlockBuilder().
 		Add(1, 2). // we will skip this block [(◄1) 2]
-		Add(2, 3)  // [(◄2) 3]
-	blocks, err := builder.Blocks()
+		Add(2, 3). // [(◄2) 3]
+		Blocks()
 	require.Nil(t, err)
 
 	t.Run("ingest proposals", func(t *testing.T) {
@@ -473,18 +518,17 @@ func TestAddUnconnectedProposal(t *testing.T) {
 	})
 }
 
-// TestGetProposal tests that we can retrieve stored proposals.
-// Attempting to retrieve nonexistent or pruned proposals should fail.
-// receives [(◄1) 2] [(◄2) 3] [(◄3) 4], then [(◄4) 5]
-// should finalize [(◄1) 2], then [(◄2) 3]
+// TestGetProposal tests that we can retrieve stored proposals. Here, we test that
+// attempting to retrieve nonexistent or pruned proposals fails without causing an exception.
+//   - Forks receives [(◄1) 2] [(◄2) 3] [(◄3) 4], then [(◄4) 5]
+//   - should finalize [(◄1) 2], then [(◄2) 3]
 func TestGetProposal(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 2) // [(◄1) 2]
-	builder.Add(2, 3) // [(◄2) 3]
-	builder.Add(3, 4) // [(◄3) 4]
-	builder.Add(4, 5) // [(◄4) 5]
-
-	blocks, err := builder.Blocks()
+	blocks, err := NewBlockBuilder().
+		Add(1, 2). // [(◄1) 2]
+		Add(2, 3). // [(◄2) 3]
+		Add(3, 4). // [(◄3) 4]
+		Add(4, 5). // [(◄4) 5]
+		Blocks()
 	require.Nil(t, err)
 
 	t.Run("ingest proposals", func(t *testing.T) {
@@ -562,15 +606,19 @@ func TestGetProposal(t *testing.T) {
 }
 
 // TestGetProposalsForView tests retrieving proposals for a view (also including double proposals).
-// receives [(◄1) 2] [(◄2) 4] [(◄2) 4']
+//   - Forks receives [(◄1) 2] [(◄2) 4] [(◄2) 4'],
+//     where [(◄2) 4'] is a double proposal, because it has the same view as [(◄2) 4]
+//
+// Expected behaviour:
+//   - Forks should store all the blocks
+//   - Forks should emit a `OnDoubleProposeDetected` notification
+//   - we can retrieve all blocks, including the double proposal
 func TestGetProposalsForView(t *testing.T) {
-
-	builder := NewBlockBuilder()
-	builder.Add(1, 2)                // [(◄1) 2]
-	builder.Add(2, 4)                // [(◄2) 4]
-	builder.AddVersioned(2, 4, 0, 1) // [(◄2) 4']
-
-	blocks, err := builder.Blocks()
+	blocks, err := NewBlockBuilder().
+		Add(1, 2).                // [(◄1) 2]
+		Add(2, 4).                // [(◄2) 4]
+		AddVersioned(2, 4, 0, 1). // [(◄2) 4']
+		Blocks()
 	require.Nil(t, err)
 
 	t.Run("ingest proposals", func(t *testing.T) {
@@ -622,15 +670,17 @@ func TestGetProposalsForView(t *testing.T) {
 	})
 }
 
-// TestNotification tests that notifier gets correct notifications when incorporating block as well as finalization events.
-// receives [(◄1) 2] [(◄2) 3] [(◄3) 4]
-// should finalize [(◄1) 2]
-func TestNotification(t *testing.T) {
-	builder := NewBlockBuilder()
-	builder.Add(1, 2)
-	builder.Add(2, 3)
-	builder.Add(3, 4)
-
+// TestNotifications tests that Forks emits the expected events:
+//   - Forks receives [(◄1) 2] [(◄2) 3] [(◄3) 4]
+//
+// Expected Behaviour:
+//   - Each of the ingested blocks should result in an `OnBlockIncorporated` notification
+//   - Forks should finalize [(◄1) 2], resulting in a `MakeFinal` event and an `OnFinalizedBlock` event
+func TestNotifications(t *testing.T) {
+	builder := NewBlockBuilder().
+		Add(1, 2).
+		Add(2, 3).
+		Add(3, 4)
 	blocks, err := builder.Blocks()
 	require.Nil(t, err)
 
@@ -638,7 +688,7 @@ func TestNotification(t *testing.T) {
 		notifier := &mocks.Consumer{}
 		// 4 blocks including the genesis are incorporated
 		notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Times(4)
-		notifier.On("OnFinalizedBlock", blocks[0].Block).Return(nil).Once()
+		notifier.On("OnFinalizedBlock", blocks[0].Block).Once()
 		finalizationCallback := mockmodule.NewFinalizer(t)
 		finalizationCallback.On("MakeFinal", blocks[0].Block.BlockID).Return(nil).Once()
 
@@ -651,7 +701,7 @@ func TestNotification(t *testing.T) {
 		notifier := &mocks.Consumer{}
 		// 4 blocks including the genesis are incorporated
 		notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Times(4)
-		notifier.On("OnFinalizedBlock", blocks[0].Block).Return(nil).Once()
+		notifier.On("OnFinalizedBlock", blocks[0].Block).Once()
 		finalizationCallback := mockmodule.NewFinalizer(t)
 		finalizationCallback.On("MakeFinal", blocks[0].Block.BlockID).Return(nil).Once()
 
@@ -661,12 +711,118 @@ func TestNotification(t *testing.T) {
 	})
 }
 
-// ========== internal functions ===============
+// TestFinalizingMultipleBlocks tests that `OnFinalizedBlock` notifications are emitted in correct order
+// when there are multiple blocks finalized by adding a _single_ block.
+//   - receiving [(◄1) 3] [(◄3) 5] [(◄5) 7] [(◄7) 11] [(◄11) 12] should not finalize any blocks,
+//     because there is no 2-chain with the first chain link being a _direct_ 1-chain
+//   - adding [(◄12) 22] should finalize up to block [(◄6) 11]
+//
+// This test verifies the following expected properties:
+//  1. Safety under reentrancy:
+//     While Forks is single-threaded, there is still the possibility of reentrancy. Specifically, the
+//     consumers of our finalization events are served by the goroutine executing Forks. It is conceivable
+//     that a consumer might access Forks and query the latest finalization proof. This would be legal, if
+//     the component supplying the goroutine to Forks also consumes the notifications. Therefore, for API
+//     safety, we require forks to _first update_ its `FinalityProof()` before it emits _any_ events.
+//  2. For each finalized block, `finalizationCallback` event is executed _before_ `OnFinalizedBlock` notifications.
+//  3. Blocks are finalized in order of increasing height (without skipping any blocks).
+func TestFinalizingMultipleBlocks(t *testing.T) {
+	builder := NewBlockBuilder().
+		Add(1, 3).   // index 0: [(◄1) 2]
+		Add(3, 5).   // index 1: [(◄2) 4]
+		Add(5, 7).   // index 2: [(◄4) 6]
+		Add(7, 11).  // index 3: [(◄6) 11] -- expected to be finalized
+		Add(11, 12). // index 4: [(◄11) 12]
+		Add(12, 22)  // index 5: [(◄12) 22]
+	blocks, err := builder.Blocks()
+	require.Nil(t, err)
+
+	// The Finality Proof should right away point to the _latest_ finalized block. Subsequently emitting
+	// Finalization events for lower blocks is fine, because notifications are guaranteed to be
+	// _eventually_ arriving. I.e. consumers expect notifications / events to be potentially lagging behind.
+	expectedFinalityProof := makeFinalityProof(t, blocks[3].Block, blocks[4].Block, blocks[5].Block.QC)
+
+	setupForksAndAssertions := func() (*Forks2, *mockmodule.Finalizer, *mocks.Consumer) {
+		// initialize Forks with custom event consumers so we can check order of emitted events
+		notifier := &mocks.Consumer{}
+		finalizationCallback := mockmodule.NewFinalizer(t)
+		notifier.On("OnBlockIncorporated", mock.Anything).Return(nil)
+		forks, err := NewForks2(builder.GenesisBlock(), finalizationCallback, notifier)
+		require.NoError(t, err)
+
+		// expecting finalization of [(◄1) 2] [(◄2) 4] [(◄4) 6] [(◄6) 11] in this order
+		blocksAwaitingFinalization := toBlockAwaitingFinalization(toBlocks(blocks[:4]))
+
+		finalizationCallback.On("MakeFinal", mock.Anything).Run(func(args mock.Arguments) {
+			requireFinalityProof(t, forks, expectedFinalityProof) // Requirement 1: forks should _first update_ its `FinalityProof()` before it emits _any_ events
+
+			// Requirement 3: finalized in order of increasing height (without skipping any blocks).
+			expectedNextFinalizationEvents := blocksAwaitingFinalization[0]
+			require.Equal(t, expectedNextFinalizationEvents.Block.BlockID, args[0])
+
+			// Requirement 2: finalized block, `finalizationCallback` event is executed _before_ `OnFinalizedBlock` notifications.
+			// no duplication of events under normal operations expected
+			require.False(t, expectedNextFinalizationEvents.MakeFinalCalled)
+			require.False(t, expectedNextFinalizationEvents.OnFinalizedBlockEmitted)
+			expectedNextFinalizationEvents.MakeFinalCalled = true
+		}).Return(nil).Times(4)
+
+		notifier.On("OnFinalizedBlock", mock.Anything).Run(func(args mock.Arguments) {
+			requireFinalityProof(t, forks, expectedFinalityProof) // Requirement 1: forks should _first update_ its `FinalityProof()` before it emits _any_ events
+
+			// Requirement 3: finalized in order of increasing height (without skipping any blocks).
+			expectedNextFinalizationEvents := blocksAwaitingFinalization[0]
+			require.Equal(t, expectedNextFinalizationEvents.Block, args[0])
+
+			// Requirement 2: finalized block, `finalizationCallback` event is executed _before_ `OnFinalizedBlock` notifications.
+			// no duplication of events under normal operations expected
+			require.True(t, expectedNextFinalizationEvents.MakeFinalCalled)
+			require.False(t, expectedNextFinalizationEvents.OnFinalizedBlockEmitted)
+			expectedNextFinalizationEvents.OnFinalizedBlockEmitted = true
+
+			// At this point, `MakeFinal` and `OnFinalizedBlock` have both been emitted for the block, so we are done with it
+			blocksAwaitingFinalization = blocksAwaitingFinalization[1:]
+		}).Times(4)
+
+		return forks, finalizationCallback, notifier
+	}
+
+	t.Run("ingest proposals", func(t *testing.T) {
+		forks, finalizationCallback, notifier := setupForksAndAssertions()
+		err = addProposalsToForks(forks, blocks[:5]) // adding [(◄1) 2] [(◄2) 4] [(◄4) 6] [(◄6) 11] [(◄11) 12]
+		require.Nil(t, err)
+		requireOnlyGenesisBlockFinalized(t, forks) // finalization should still be at the genesis block
+
+		require.NoError(t, forks.AddProposal(blocks[5].Block)) // adding [(◄12) 22] should trigger finalization events
+		requireFinalityProof(t, forks, expectedFinalityProof)
+		finalizationCallback.AssertExpectations(t)
+		notifier.AssertExpectations(t)
+	})
+
+	t.Run("ingest certified blocks", func(t *testing.T) {
+		forks, finalizationCallback, notifier := setupForksAndAssertions()
+		// adding [(◄1) 2] [(◄2) 4] [(◄4) 6] [(◄6) 11] (◄11)
+		require.NoError(t, forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[0].Block)))
+		require.NoError(t, forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[1].Block)))
+		require.NoError(t, forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[2].Block)))
+		require.NoError(t, forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[3].Block)))
+		require.Nil(t, err)
+		requireOnlyGenesisBlockFinalized(t, forks) // finalization should still be at the genesis block
+
+		// adding certified block [(◄11) 12] (◄12) should trigger finalization events
+		require.NoError(t, forks.AddCertifiedBlock(toCertifiedBlock(t, blocks[4].Block)))
+		requireFinalityProof(t, forks, expectedFinalityProof)
+		finalizationCallback.AssertExpectations(t)
+		notifier.AssertExpectations(t)
+	})
+}
+
+//* ************************************* internal functions ************************************* */
 
 func newForks(t *testing.T) (*Forks2, *mocks.Consumer) {
 	notifier := mocks.NewConsumer(t)
 	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Maybe()
-	notifier.On("OnFinalizedBlock", mock.Anything).Return(nil).Maybe()
+	notifier.On("OnFinalizedBlock", mock.Anything).Maybe()
 	finalizationCallback := mockmodule.NewFinalizer(t)
 	finalizationCallback.On("MakeFinal", mock.Anything).Return(nil).Maybe()
 
@@ -692,6 +848,10 @@ func addProposalsToForks(forks *Forks2, proposals []*model.Proposal) error {
 
 // addCertifiedBlocksToForks iterates over all proposals, caches them locally in a map,
 // constructs certified blocks whenever possible and adds the certified blocks to forks,
+// Note: if proposals is a single fork, the _last block_ in the slice will not be added,
+//
+//	because there is no qc for it
+//
 // If any errors occur, returns the first one.
 func addCertifiedBlocksToForks(forks *Forks2, proposals []*model.Proposal) error {
 	uncertifiedBlocks := make(map[flow.Identifier]*model.Block)
@@ -718,16 +878,32 @@ func addCertifiedBlocksToForks(forks *Forks2, proposals []*model.Proposal) error
 }
 
 // requireLatestFinalizedBlock asserts that the latest finalized block has the given view and qc view.
-func requireLatestFinalizedBlock(t *testing.T, forks *Forks2, qcView int, view int) {
-	require.Equal(t, forks.FinalizedBlock().View, uint64(view), "finalized block has wrong view")
-	require.Equal(t, forks.FinalizedBlock().QC.View, uint64(qcView), "finalized block has wrong qc")
+func requireLatestFinalizedBlock(t *testing.T, forks *Forks2, expectedFinalized *model.Block) {
+	require.Equal(t, expectedFinalized, forks.FinalizedBlock(), "finalized block is not as expected")
+	require.Equal(t, forks.FinalizedView(), uint64(expectedFinalized.View), "FinalizedView returned wrong value")
+}
+
+// requireOnlyGenesisBlockFinalized asserts that no blocks have been finalized beyond the genesis block.
+// Caution: does not inspect output of `forks.FinalityProof()`
+func requireOnlyGenesisBlockFinalized(t *testing.T, forks *Forks2) {
+	genesis := makeGenesis()
+	require.Equal(t, forks.FinalizedBlock(), genesis.Block, "finalized block is not the genesis block")
+	require.Equal(t, forks.FinalizedBlock().View, genesis.Block.View)
+	require.Equal(t, forks.FinalizedBlock().View, genesis.CertifyingQC.View)
+	require.Equal(t, forks.FinalizedView(), genesis.Block.View, "finalized block has wrong qc")
+
+	finalityProof, isKnown := forks.FinalityProof()
+	require.Nil(t, finalityProof, "expecting finality proof to be nil for genesis block at initialization")
+	require.False(t, isKnown, "no finality proof should be known for genesis block at initialization")
 }
 
 // requireNoBlocksFinalized asserts that no blocks have been finalized (genesis is latest finalized block).
-func requireNoBlocksFinalized(t *testing.T, forks *Forks2) {
-	genesis := makeGenesis()
-	require.Equal(t, forks.FinalizedBlock().View, genesis.Block.View)
-	require.Equal(t, forks.FinalizedBlock().View, genesis.CertifyingQC.View)
+func requireFinalityProof(t *testing.T, forks *Forks2, expectedFinalityProof *FinalityProof) {
+	finalityProof, isKnown := forks.FinalityProof()
+	require.True(t, isKnown)
+	require.Equal(t, expectedFinalityProof, finalityProof)
+	require.Equal(t, forks.FinalizedBlock(), expectedFinalityProof.Block)
+	require.Equal(t, forks.FinalizedView(), expectedFinalityProof.Block.View)
 }
 
 // toBlocks converts the given proposals to slice of blocks
@@ -758,4 +934,27 @@ func toCertifiedBlocks(t *testing.T, blocks ...*model.Block) []*model.CertifiedB
 		certBlocks = append(certBlocks, toCertifiedBlock(t, b))
 	}
 	return certBlocks
+}
+
+func makeFinalityProof(t *testing.T, block *model.Block, directChild *model.Block, qcCertifyingChild *flow.QuorumCertificate) *FinalityProof {
+	c, err := model.NewCertifiedBlock(directChild, qcCertifyingChild) // certified child of FinalizedBlock
+	require.NoError(t, err)
+	return &FinalityProof{block, c}
+}
+
+// blockAwaitingFinalization is intended for tracking finalization events and their order for a specific block
+type blockAwaitingFinalization struct {
+	Block                   *model.Block
+	MakeFinalCalled         bool // indicates whether `Finalizer.MakeFinal` was called
+	OnFinalizedBlockEmitted bool // indicates whether `OnFinalizedBlockCalled` notification was emitted
+}
+
+// toBlockAwaitingFinalization creates a `blockAwaitingFinalization` tracker for each input block
+func toBlockAwaitingFinalization(blocks []*model.Block) []*blockAwaitingFinalization {
+	trackers := make([]*blockAwaitingFinalization, 0, len(blocks))
+	for _, b := range blocks {
+		tracker := &blockAwaitingFinalization{b, false, false}
+		trackers = append(trackers, tracker)
+	}
+	return trackers
 }

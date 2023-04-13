@@ -25,11 +25,10 @@ type FinalityProof struct {
 // https://developers.diem.com/papers/diem-consensus-state-machine-replication-in-the-diem-blockchain/2021-08-17.pdf
 // Forks is NOT safe for concurrent use by multiple goroutines.
 type Forks2 struct {
-	notifier hotstuff.FinalizationConsumer
-	forest   forest.LevelledForest
-
-	trustedRoot          *model.CertifiedBlock
 	finalizationCallback module.Finalizer
+	notifier             hotstuff.FinalizationConsumer
+	forest               forest.LevelledForest
+	trustedRoot          *model.CertifiedBlock
 
 	// finalityProof holds the latest finalized block including the certified child as proof of finality.
 	// CAUTION: is nil, when Forks has not yet finalized any blocks beyond the finalized root block it was initialized with
@@ -48,8 +47,8 @@ func NewForks2(trustedRoot *model.CertifiedBlock, finalizationCallback module.Fi
 	}
 
 	forks := Forks2{
-		notifier:             notifier,
 		finalizationCallback: finalizationCallback,
+		notifier:             notifier,
 		forest:               *forest.NewLevelledForest(trustedRoot.Block.View),
 		trustedRoot:          trustedRoot,
 		finalityProof:        nil,
@@ -85,7 +84,7 @@ func (f *Forks2) FinalizedBlock() *model.Block {
 // CAUTION: method returns (nil, false), when Forks has not yet finalized any
 // blocks beyond the finalized root block it was initialized with.
 func (f *Forks2) FinalityProof() (*FinalityProof, bool) {
-	return f.finalityProof, f.finalityProof == nil
+	return f.finalityProof, f.finalityProof != nil
 }
 
 // GetBlock returns block for given ID
