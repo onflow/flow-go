@@ -89,8 +89,8 @@ func (s *PendingTreeSuite) TestAllConnectedForksAreCollected() {
 	B2.Header.View = longestFork[len(longestFork)-1].Block.Header.View + 1
 	B3 := unittest.BlockWithParentFixture(B2.Header)
 	shortFork := []flow.CertifiedBlock{{
-		Block: B2,
-		QC:    B3.Header.QuorumCertificate(),
+		Block:        B2,
+		CertifyingQC: B3.Header.QuorumCertificate(),
 	}, certifiedBlockFixture(B3)}
 
 	connectedBlocks, err := s.pendingTree.AddBlocks(shortFork)
@@ -180,8 +180,8 @@ func (s *PendingTreeSuite) TestResolveBlocksAfterFinalization() {
 	B2.Header.View = longestFork[len(longestFork)-1].Block.Header.View + 1
 	B3 := unittest.BlockWithParentFixture(B2.Header)
 	shortFork := []flow.CertifiedBlock{{
-		Block: B2,
-		QC:    B3.Header.QuorumCertificate(),
+		Block:        B2,
+		CertifyingQC: B3.Header.QuorumCertificate(),
 	}, certifiedBlockFixture(B3)}
 
 	connectedBlocks, err := s.pendingTree.AddBlocks(shortFork)

@@ -7,9 +7,9 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/tracing"
 )
@@ -139,24 +139,6 @@ func newFacadeEnvironment(
 	env.Runtime.SetEnvironment(env)
 
 	return env
-}
-
-// TODO(patrick): remove once emulator is updated.
-func NewScriptEnvironment(
-	ctx context.Context,
-	tracer tracing.TracerSpan,
-	params EnvironmentParams,
-	nestedTxn state.NestedTransaction,
-	derivedTxn derived.DerivedTransactionCommitter,
-) *facadeEnvironment {
-	return NewScriptEnv(
-		ctx,
-		tracer,
-		params,
-		storage.SerialTransaction{
-			NestedTransaction:           nestedTxn,
-			DerivedTransactionCommitter: derivedTxn,
-		})
 }
 
 // This is mainly used by command line tools, the emulator, and cadence tools

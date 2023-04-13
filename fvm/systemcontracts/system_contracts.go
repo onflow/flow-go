@@ -23,12 +23,12 @@ const (
 
 	// Unqualified names of system smart contracts (not including address prefix)
 
-	ContractNameEpoch      = "FlowEpoch"
-	ContractNameClusterQC  = "FlowClusterQC"
-	ContractNameDKG        = "FlowDKG"
-	ContractServiceAccount = "FlowServiceAccount"
-	ContractNameFlowFees   = "FlowFees"
-	ContractStorageFees    = "FlowStorageFees"
+	ContractNameEpoch          = "FlowEpoch"
+	ContractNameClusterQC      = "FlowClusterQC"
+	ContractNameDKG            = "FlowDKG"
+	ContractNameServiceAccount = "FlowServiceAccount"
+	ContractNameFlowFees       = "FlowFees"
+	ContractNameStorageFees    = "FlowStorageFees"
 
 	// Unqualified names of service events (not including address prefix or contract name)
 
