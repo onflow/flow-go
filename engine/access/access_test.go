@@ -812,8 +812,15 @@ func (suite *Suite) TestExecuteScript() {
 
 			suite.execClient.On("ExecuteScriptAtBlockID", ctx, &executionReq).Return(&executionResp, nil).Once()
 
+			finalizedHeader := suite.finalizedHeaderCache.Get()
+			finalizedHeaderId := finalizedHeader.ID()
+
 			expectedResp := accessproto.ExecuteScriptResponse{
 				Value: executionResp.GetValue(),
+				Metadata: &entitiesproto.Metadata{
+					LatestFinalizedBlockId: finalizedHeaderId[:],
+					LatestFinalizedHeight:  finalizedHeader.Height,
+				},
 			}
 			return &expectedResp
 		}
@@ -910,10 +917,10 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 
 			finalizedHeaderId := suite.finalizedBlock.ID()
 
-			require.Equal(suite.T(), &entitiesproto.LastFinalizedBlock{
-				Id:     finalizedHeaderId[:],
-				Height: suite.finalizedBlock.Height,
-			}, resp.LastFinalizedBlock)
+			require.Equal(suite.T(), &entitiesproto.Metadata{
+				LatestFinalizedBlockId: finalizedHeaderId[:],
+				LatestFinalizedHeight:  suite.finalizedBlock.Height,
+			}, resp.Metadata)
 		}
 
 		id := block.ID()

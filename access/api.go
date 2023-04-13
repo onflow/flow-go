@@ -70,11 +70,11 @@ func TransactionResultToMessage(result *TransactionResult) *access.TransactionRe
 		BlockId:       result.BlockID[:],
 		TransactionId: result.TransactionID[:],
 		CollectionId:  result.CollectionID[:],
-		BlockHeight:   uint64(result.BlockHeight),
+		BlockHeight:   result.BlockHeight,
 	}
 }
 
-func TransactionResultsToMessage(results []*TransactionResult) *access.TransactionResultsResponse {
+func TransactionResultsToMessage(results []*TransactionResult, metadata *entities.Metadata) *access.TransactionResultsResponse {
 	messages := make([]*access.TransactionResultResponse, len(results))
 	for i, result := range results {
 		messages[i] = TransactionResultToMessage(result)
@@ -82,6 +82,7 @@ func TransactionResultsToMessage(results []*TransactionResult) *access.Transacti
 
 	return &access.TransactionResultsResponse{
 		TransactionResults: messages,
+		Metadata:           metadata,
 	}
 }
 

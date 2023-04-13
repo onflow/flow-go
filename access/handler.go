@@ -163,8 +163,8 @@ func (h *Handler) GetCollectionByID(
 	}
 
 	return &access.CollectionResponse{
-		Collection:         colMsg,
-		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
+		Collection: colMsg,
+		Metadata:   h.buildMetadataResponse(),
 	}, nil
 }
 
@@ -188,7 +188,8 @@ func (h *Handler) SendTransaction(
 	txID := tx.ID()
 
 	return &access.SendTransactionResponse{
-		Id: txID[:],
+		Id:       txID[:],
+		Metadata: h.buildMetadataResponse(),
 	}, nil
 }
 
@@ -208,8 +209,8 @@ func (h *Handler) GetTransaction(
 	}
 
 	return &access.TransactionResponse{
-		Transaction:        convert.TransactionToMessage(*tx),
-		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
+		Transaction: convert.TransactionToMessage(*tx),
+		Metadata:    h.buildMetadataResponse(),
 	}, nil
 }
 
@@ -228,7 +229,10 @@ func (h *Handler) GetTransactionResult(
 		return nil, err
 	}
 
-	return TransactionResultToMessage(result), nil
+	message := TransactionResultToMessage(result)
+	message.Metadata = h.buildMetadataResponse()
+
+	return message, nil
 }
 
 func (h *Handler) GetTransactionResultsByBlockID(
@@ -245,7 +249,7 @@ func (h *Handler) GetTransactionResultsByBlockID(
 		return nil, err
 	}
 
-	return TransactionResultsToMessage(results), nil
+	return TransactionResultsToMessage(results, h.buildMetadataResponse()), nil
 }
 
 func (h *Handler) GetTransactionsByBlockID(
@@ -263,8 +267,8 @@ func (h *Handler) GetTransactionsByBlockID(
 	}
 
 	return &access.TransactionsResponse{
-		Transactions:       convert.TransactionsToMessages(transactions),
-		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
+		Transactions: convert.TransactionsToMessages(transactions),
+		Metadata:     h.buildMetadataResponse(),
 	}, nil
 }
 
@@ -284,7 +288,10 @@ func (h *Handler) GetTransactionResultByIndex(
 		return nil, err
 	}
 
-	return TransactionResultToMessage(result), nil
+	message := TransactionResultToMessage(result)
+	message.Metadata = h.buildMetadataResponse()
+
+	return message, nil
 }
 
 // GetAccount returns an account by address at the latest sealed block.
@@ -305,8 +312,8 @@ func (h *Handler) GetAccount(
 	}
 
 	return &access.GetAccountResponse{
-		Account:            accountMsg,
-		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
+		Account:  accountMsg,
+		Metadata: h.buildMetadataResponse(),
 	}, nil
 }
 
@@ -331,8 +338,8 @@ func (h *Handler) GetAccountAtLatestBlock(
 	}
 
 	return &access.AccountResponse{
-		Account:            accountMsg,
-		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
+		Account:  accountMsg,
+		Metadata: h.buildMetadataResponse(),
 	}, nil
 }
 
@@ -356,8 +363,8 @@ func (h *Handler) GetAccountAtBlockHeight(
 	}
 
 	return &access.AccountResponse{
-		Account:            accountMsg,
-		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
+		Account:  accountMsg,
+		Metadata: h.buildMetadataResponse(),
 	}, nil
 }
 
@@ -375,7 +382,8 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 	}
 
 	return &access.ExecuteScriptResponse{
-		Value: value,
+		Value:    value,
+		Metadata: h.buildMetadataResponse(),
 	}, nil
 }
 
@@ -394,7 +402,8 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 	}
 
 	return &access.ExecuteScriptResponse{
-		Value: value,
+		Value:    value,
+		Metadata: h.buildMetadataResponse(),
 	}, nil
 }
 
@@ -413,7 +422,8 @@ func (h *Handler) ExecuteScriptAtBlockID(
 	}
 
 	return &access.ExecuteScriptResponse{
-		Value: value,
+		Value:    value,
+		Metadata: h.buildMetadataResponse(),
 	}, nil
 }
 
@@ -440,8 +450,8 @@ func (h *Handler) GetEventsForHeightRange(
 		return nil, err
 	}
 	return &access.EventsResponse{
-		Results:            resultEvents,
-		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
+		Results:  resultEvents,
+		Metadata: h.buildMetadataResponse(),
 	}, nil
 }
 
@@ -471,8 +481,8 @@ func (h *Handler) GetEventsForBlockIDs(
 	}
 
 	return &access.EventsResponse{
-		Results:            resultEvents,
-		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
+		Results:  resultEvents,
+		Metadata: h.buildMetadataResponse(),
 	}, nil
 }
 
@@ -485,7 +495,7 @@ func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *acces
 
 	return &access.ProtocolStateSnapshotResponse{
 		SerializedSnapshot: snapshot,
-		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
+		Metadata:           h.buildMetadataResponse(),
 	}, nil
 }
 
@@ -500,7 +510,7 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 		return nil, err
 	}
 
-	return executionResultToMessages(result, h.buildLastFinalizedBlockResponse())
+	return executionResultToMessages(result, h.buildMetadataResponse())
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {
@@ -520,9 +530,9 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flo
 	}
 
 	return &access.BlockResponse{
-		Block:              msg,
-		BlockStatus:        entities.BlockStatus(status),
-		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
+		Block:       msg,
+		BlockStatus: entities.BlockStatus(status),
+		Metadata:    h.buildMetadataResponse(),
 	}, nil
 }
 
@@ -538,30 +548,30 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 	}
 
 	return &access.BlockHeaderResponse{
-		Block:              msg,
-		BlockStatus:        entities.BlockStatus(status),
-		LastFinalizedBlock: h.buildLastFinalizedBlockResponse(),
+		Block:       msg,
+		BlockStatus: entities.BlockStatus(status),
+		Metadata:    h.buildMetadataResponse(),
 	}, nil
 }
 
-// buildLastFinalizedBlockResponse builds and returns the last finalized block's response object.
-func (h *Handler) buildLastFinalizedBlockResponse() *entities.LastFinalizedBlock {
+// buildMetadataResponse builds and returns the metadata response object.
+func (h *Handler) buildMetadataResponse() *entities.Metadata {
 	lastFinalizedHeader := h.finalizedHeaderCache.Get()
 	blockId := lastFinalizedHeader.ID()
-	return &entities.LastFinalizedBlock{
-		Id:     blockId[:],
-		Height: lastFinalizedHeader.Height,
+	return &entities.Metadata{
+		LatestFinalizedBlockId: blockId[:],
+		LatestFinalizedHeight:  lastFinalizedHeader.Height,
 	}
 }
 
-func executionResultToMessages(er *flow.ExecutionResult, lastFinalizedBlock *entities.LastFinalizedBlock) (*access.ExecutionResultForBlockIDResponse, error) {
+func executionResultToMessages(er *flow.ExecutionResult, metadata *entities.Metadata) (*access.ExecutionResultForBlockIDResponse, error) {
 	execResult, err := convert.ExecutionResultToMessage(er)
 	if err != nil {
 		return nil, err
 	}
 	return &access.ExecutionResultForBlockIDResponse{
-		ExecutionResult:    execResult,
-		LastFinalizedBlock: lastFinalizedBlock,
+		ExecutionResult: execResult,
+		Metadata:        metadata,
 	}, nil
 }
 
