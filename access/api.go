@@ -100,16 +100,6 @@ func MessageToTransactionResult(message *access.TransactionResultResponse) *Tran
 	}
 }
 
-func MessageToNodeVersionInfo(message *access.GetNodeVersionInfoResponce) *NodeVersionInfo {
-	nodeVersionInfoMessage := message.Info
-	return &NodeVersionInfo{
-		Semver:          nodeVersionInfoMessage.Semver,
-		Commit:          nodeVersionInfoMessage.Commit,
-		SporkId:         flow.HashToID(nodeVersionInfoMessage.SporkId),
-		ProtocolVersion: uint(nodeVersionInfoMessage.ProtocolVersion),
-	}
-}
-
 // NetworkParameters contains the network-wide parameters for the Flow blockchain.
 type NetworkParameters struct {
 	ChainID flow.ChainID
