@@ -100,7 +100,6 @@ type ScoreOption struct {
 	peerScoreParams     *pubsub.PeerScoreParams
 	peerThresholdParams *pubsub.PeerScoreThresholds
 	validator           p2p.SubscriptionValidator
-	registry            *GossipSubAppSpecificScoreRegistry
 	appScoreFunc        func(peer.ID) float64
 }
 
