@@ -119,7 +119,7 @@ func (x *scalar) isZero() bool {
 
 // Comparison to point at infinity in G2.
 func (p *pointG2) isInfinity() bool {
-	return C.E2_is_infty((*C.G2)(p)) != 10
+	return C.E2_is_infty((*C.G2)(p)) != 0
 }
 
 // returns a random element of Fr in input pointer

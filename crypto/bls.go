@@ -348,7 +348,7 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 	var pk pubKeyBLSBLS12381
 	err := readPointG2(&pk.point, publicKeyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("decode public key failed %w", err)
+		return nil, fmt.Errorf("decode public key failed: %w", err)
 	}
 
 	// membership check in G2

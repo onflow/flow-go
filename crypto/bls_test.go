@@ -18,7 +18,7 @@ import (
 )
 
 // TestBLSMainMethods is a sanity check of main signature scheme methods (keyGen, sign, verify)
-/*func TestBLSMainMethods(t *testing.T) {
+func TestBLSMainMethods(t *testing.T) {
 	// test the key generation seed lengths
 	testKeyGenSeed(t, BLSBLS12381, KeyGenSeedMinLen, KeyGenSeedMaxLen)
 	// test the consistency with different inputs
@@ -63,7 +63,7 @@ func BenchmarkBLSBLS12381Sign(b *testing.B) {
 func BenchmarkBLSBLS12381Verify(b *testing.B) {
 	halg := NewExpandMsgXOFKMAC128("bench tag")
 	benchVerify(b, BLSBLS12381, halg)
-}*/
+}
 
 // utility function to generate a random BLS private key
 func randomSK(t *testing.T, seed []byte) PrivateKey {

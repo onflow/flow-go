@@ -101,7 +101,7 @@ static int bls_verify_ep(const G2* pk, const ep_t s, const byte* data, const int
 
     // elemsG2[1] = pk
     ep2_new(elemsG2[1]);
-    ep2_copy(elemsG2[1], (ep2_st*)pk_tmp); 
+    ep2_copy(elemsG2[1], pk_tmp); 
 
 #if DOUBLE_PAIRING  
     // elemsG2[0] = -g2
@@ -336,11 +336,13 @@ int bls_verify(const G2* pk, const byte* sig, const byte* data, const int len) {
     // deserialize the signature into a curve point
     int read_ret = ep_read_bin_compact(s, sig, SIGNATURE_LEN);
     if (read_ret != RLC_OK) {
+        printf("HHH1\n");
         return read_ret;
     }
 
     // check s is in G1
     if (check_membership_G1(s) != VALID) { // only enabled if MEMBERSHIP_CHECK==1
+        printf("HHH2\n");
         return INVALID;
     }
     

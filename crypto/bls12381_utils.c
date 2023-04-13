@@ -493,7 +493,7 @@ out:
 // returns the sign of y.
 // 1 if y > (p - 1)/2 and 0 otherwise.
 // y is in montgomery form
-static limb_t Fp_get_sign(const fp_t y) {
+static byte Fp_get_sign(const fp_t y) {
     return sgn0_pty_mont_384(y, BLS12_381_P, p0);
 }
 
@@ -530,15 +530,19 @@ void Fp2_squ_montg(Fp2 *res, const Fp2 *a) {
 
 // checks if `a` is a quadratic residue in Fp^2. If yes, it computes 
 // the square root in `res`.
+// 
+// The boolean output is valid whether `a` is in Montgomery form or not,
+// since montgomery constant `R` is a quadratic residue.
+// However, the square root is valid only if `a` is in montgomery form.
 static bool_t Fp2_sqrt(Fp2 *res, const Fp2* a) {
    return sqrt_fp2((vec384*)res, (vec384*)a);
 }
 
 // returns the sign of y.
 // sign(y_0) if y_1 = 0, else sign(y_1)
-// y coordinates are in montgommery form
-static limb_t Fp2_get_sign(Fp2* y) {
-    return sgn0_pty_mont_384x((vec384*)y, BLS12_381_P, p0);
+// y coordinates must be in montgomery form
+static byte Fp2_get_sign(Fp2* y) {
+    return (sgn0_pty_mont_384x((vec384*)y, BLS12_381_P, p0)>>1) & 1;
 }
 
 // reads an Fp^2 element in `a`.
@@ -595,7 +599,7 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     } 
 
     // check if the point is infinity
-    int is_infinity = bin[0] & 0x40;
+    int is_infinity = bin[0] & (1<<6);
     if (is_infinity) {
         // check if the remaining bits are cleared
         if (bin[0] & 0x3F) {
@@ -645,6 +649,15 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     return RLC_ERR;
 }
 
+
+// TODO: delete aftet deleting ep_write_bin_compact
+static int fp_get_sign(const fp_t y) {
+    bn_t bn_y;
+    bn_new(bn_y);
+    fp_prime_back(bn_y, y);
+    return bn_cmp(bn_y, &bls_prec->p_1div2) == RLC_GT;		
+}
+
 // ep_write_bin_compact exports a point a in E(Fp) to a buffer bin in a compressed or uncompressed form.
 // len is the allocated size of the buffer bin.
 // The serialization is following:
@@ -660,7 +673,7 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
  
     if (ep_is_infty(a)) {
             // set the infinity bit
-            bin[0] = (G1_SERIALIZATION << 7) | 0x40;
+            bin[0] = (G1_SERIALIZATION << 7) | (1<<6);
             memset(bin+1, 0, G1_size-1);
             return;
     }
@@ -673,7 +686,7 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
         fp_write_bin(bin, Fp_BYTES, t->x);
 
         if (G1_SERIALIZATION == COMPRESSED) {
-            bin[0] |= (Fp_get_sign(t->y) << 5);
+            bin[0] |= (fp_get_sign(t->y) << 5);
         } else {
             fp_write_bin(bin + Fp_BYTES, Fp_BYTES, t->y);
         }
@@ -881,11 +894,11 @@ BLST_ERROR E2_read_bytes(G2* a, const byte *bin, const int len) {
     Fp2* a_y = &(a->y);
     Fp2_squ_montg(a_y, a_x);
     Fp2_mul_montg(a_y, a_y, a_x);
-    Fp2_add(a_y, a_y, &B_E2);                       
-    if (!Fp2_sqrt(a_y, a_y))  // if (y^2 = x^3+b) has no solution in y
+    Fp2_add(a_y, a_y, &B_E2);          // B_E2 is already in Montg form             
+    if (!Fp2_sqrt(a_y, a_y))    // check whether x^3+b is a quadratic residue
         return BLST_POINT_NOT_ON_CURVE; 
 
-    // resulting (x,y) is guaranteed to be on curve
+    // resulting (x,y) is guaranteed to be on curve (y is already in Montg form)
     if (Fp2_get_sign(a_y) != y_sign) {
         Fp2_neg(a_y, a_y); // flip y sign if needed
     }
@@ -900,13 +913,13 @@ BLST_ERROR E2_read_bytes(G2* a, const byte *bin, const int len) {
 void E2_write_bytes(byte *bin, const G2* a) {
     if (E2_is_infty(a)) {
             // set the infinity bit
-            bin[0] = (G2_SERIALIZATION << 7) | 0x40;
+            bin[0] = (G2_SERIALIZATION << 7) | (1 << 6);
             memset(bin+1, 0, G2_SER_BYTES-1);
             return;
     }
-
     G2 tmp;
     E2_to_affine(&tmp, a);
+
     Fp2* t_x = &(tmp.x);
     Fp_from_montg(&real(t_x), &real(t_x));
     Fp_from_montg(&imag(t_x), &imag(t_x));
@@ -916,6 +929,8 @@ void E2_write_bytes(byte *bin, const G2* a) {
     if (G2_SERIALIZATION == COMPRESSED) {
         bin[0] |= (Fp2_get_sign(t_y) << 5);
     } else {
+        Fp_from_montg(&real(t_y), &real(t_y));
+        Fp_from_montg(&imag(t_y), &imag(t_y));
         Fp2_write_bytes(bin + Fp2_BYTES, t_y);
     }
 
@@ -1274,6 +1289,36 @@ void Fr_print_(char* s, Fr* a) {
     for (int i=0; i<Fr_LIMBS; i++) 
         printf("%16llx", *(--p));
     printf("\n");
+}
+
+void Fp_print_(char* s, Fp* a) {
+    printf("[%s]:\n", s);
+    limb_t* p = (limb_t*)(a) + Fp_LIMBS;
+    for (int i=0; i<Fp_LIMBS; i++) 
+        printf("%16llx", *(--p));
+    printf("\n");
+}
+
+void Fp2_print_(char* s, const Fp2* a) {
+    printf("[%s]:\n", s);
+    Fp tmp;
+    Fp_from_montg(&tmp, &real(a));
+    limb_t* p = (limb_t*)(&tmp) + Fp_LIMBS;
+    for (int i=0; i<Fp_LIMBS; i++) 
+        printf("%16llx", *(--p));
+    printf("\n");
+    Fp_from_montg(&tmp, &imag(a));
+    p = (limb_t*)(&tmp) + Fp_LIMBS;
+    for (int i=0; i<Fp_LIMBS; i++) 
+        printf("%16llx", *(--p));
+    printf("\n");
+}
+
+void E2_print_(char* s, const G2* a) {
+      printf("[%s]:\n", s);
+      Fp2_print_(".x", &(a->x));
+      Fp2_print_(".y", &(a->y));
+      Fp2_print_(".z", &(a->z));
 }
  
 
