@@ -31,7 +31,10 @@ var ValidChainIds = map[string]bool{
 	flow.MonotonicEmulator.String(): true,
 }
 
-func MessageToTransaction(m *entities.Transaction, chain flow.Chain) (flow.TransactionBody, error) {
+func MessageToTransaction(
+	m *entities.Transaction,
+	chain flow.Chain,
+) (flow.TransactionBody, error) {
 	if m == nil {
 		return flow.TransactionBody{}, ErrEmptyMessage
 	}
@@ -141,7 +144,10 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	}
 }
 
-func BlockHeaderToMessage(h *flow.Header, signerIDs flow.IdentifierList) (*entities.BlockHeader, error) {
+func BlockHeaderToMessage(
+	h *flow.Header,
+	signerIDs flow.IdentifierList,
+) (*entities.BlockHeader, error) {
 	id := h.ID()
 
 	t := timestamppb.New(h.Timestamp)
@@ -267,7 +273,10 @@ func MessagesToBlockSeals(m []*entities.BlockSeal) ([]*flow.Seal, error) {
 	return seals, nil
 }
 
-func ExecutionResultsToMessages(e []*flow.ExecutionResult) ([]*entities.ExecutionResult, error) {
+func ExecutionResultsToMessages(e []*flow.ExecutionResult) (
+	[]*entities.ExecutionResult,
+	error,
+) {
 	execResults := make([]*entities.ExecutionResult, len(e))
 	for i, execRes := range e {
 		parsedExecResult, err := ExecutionResultToMessage(execRes)
@@ -279,7 +288,10 @@ func ExecutionResultsToMessages(e []*flow.ExecutionResult) ([]*entities.Executio
 	return execResults, nil
 }
 
-func MessagesToExecutionResults(m []*entities.ExecutionResult) ([]*flow.ExecutionResult, error) {
+func MessagesToExecutionResults(m []*entities.ExecutionResult) (
+	[]*flow.ExecutionResult,
+	error,
+) {
 	execResults := make([]*flow.ExecutionResult, len(m))
 	for i, e := range m {
 		parsedExecResult, err := MessageToExecutionResult(e)
@@ -291,7 +303,10 @@ func MessagesToExecutionResults(m []*entities.ExecutionResult) ([]*flow.Executio
 	return execResults, nil
 }
 
-func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (*entities.Block, error) {
+func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
+	*entities.Block,
+	error,
+) {
 
 	id := h.ID()
 
@@ -723,7 +738,10 @@ func MessagesToChunkList(m []*entities.Chunk) (flow.ChunkList, error) {
 	return parsedChunks, nil
 }
 
-func MessagesToServiceEventList(m []*entities.ServiceEvent) (flow.ServiceEventList, error) {
+func MessagesToServiceEventList(m []*entities.ServiceEvent) (
+	flow.ServiceEventList,
+	error,
+) {
 	parsedServiceEvents := make(flow.ServiceEventList, len(m))
 	for i, serviceEvent := range m {
 		parsedServiceEvent, err := MessageToServiceEvent(serviceEvent)
@@ -735,7 +753,10 @@ func MessagesToServiceEventList(m []*entities.ServiceEvent) (flow.ServiceEventLi
 	return parsedServiceEvents, nil
 }
 
-func MessageToExecutionResult(m *entities.ExecutionResult) (*flow.ExecutionResult, error) {
+func MessageToExecutionResult(m *entities.ExecutionResult) (
+	*flow.ExecutionResult,
+	error,
+) {
 	// convert Chunks
 	parsedChunks, err := MessagesToChunkList(m.Chunks)
 	if err != nil {
@@ -755,7 +776,10 @@ func MessageToExecutionResult(m *entities.ExecutionResult) (*flow.ExecutionResul
 	}, nil
 }
 
-func ExecutionResultToMessage(er *flow.ExecutionResult) (*entities.ExecutionResult, error) {
+func ExecutionResultToMessage(er *flow.ExecutionResult) (
+	*entities.ExecutionResult,
+	error,
+) {
 
 	chunks := make([]*entities.Chunk, len(er.Chunks))
 
@@ -813,6 +837,13 @@ func MessageToServiceEvent(m *entities.ServiceEvent) (*flow.ServiceEvent, error)
 			return nil, fmt.Errorf("failed to marshal to EpochCommit event: %w", err)
 		}
 		event = commit
+	case flow.ServiceEventVersionBeacon:
+		versionBeacon := new(flow.VersionBeacon)
+		err := json.Unmarshal(rawEvent, versionBeacon)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal to VersionBeacon event: %w", err)
+		}
+		event = versionBeacon
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", m.Type)
 	}
@@ -859,7 +890,10 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 	}, nil
 }
 
-func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (*entities.BlockExecutionData, error) {
+func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (
+	*entities.BlockExecutionData,
+	error,
+) {
 	chunkExecutionDatas := make([]*entities.ChunkExecutionData, len(data.ChunkExecutionDatas))
 	for i, chunk := range data.ChunkExecutionDatas {
 		chunkMessage, err := ChunkExecutionDataToMessage(chunk)
@@ -874,7 +908,10 @@ func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (*enti
 	}, nil
 }
 
-func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (*entities.ChunkExecutionData, error) {
+func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (
+	*entities.ChunkExecutionData,
+	error,
+) {
 	collection := &entities.ExecutionDataCollection{}
 	if data.Collection != nil {
 		collection = &entities.ExecutionDataCollection{
@@ -927,7 +964,10 @@ func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (*enti
 	}, nil
 }
 
-func MessageToBlockExecutionData(m *entities.BlockExecutionData, chain flow.Chain) (*execution_data.BlockExecutionData, error) {
+func MessageToBlockExecutionData(
+	m *entities.BlockExecutionData,
+	chain flow.Chain,
+) (*execution_data.BlockExecutionData, error) {
 	if m == nil {
 		return nil, ErrEmptyMessage
 	}
@@ -946,7 +986,10 @@ func MessageToBlockExecutionData(m *entities.BlockExecutionData, chain flow.Chai
 	}, nil
 }
 
-func MessageToChunkExecutionData(m *entities.ChunkExecutionData, chain flow.Chain) (*execution_data.ChunkExecutionData, error) {
+func MessageToChunkExecutionData(
+	m *entities.ChunkExecutionData,
+	chain flow.Chain,
+) (*execution_data.ChunkExecutionData, error) {
 	collection, err := messageToTrustedCollection(m.GetCollection(), chain)
 	if err != nil {
 		return nil, err
@@ -972,7 +1015,10 @@ func MessageToChunkExecutionData(m *entities.ChunkExecutionData, chain flow.Chai
 	}, nil
 }
 
-func messageToTrustedCollection(m *entities.ExecutionDataCollection, chain flow.Chain) (*flow.Collection, error) {
+func messageToTrustedCollection(
+	m *entities.ExecutionDataCollection,
+	chain flow.Chain,
+) (*flow.Collection, error) {
 	messages := m.GetTransactions()
 	transactions := make([]*flow.TransactionBody, len(messages))
 	for i, message := range messages {
@@ -993,7 +1039,10 @@ func messageToTrustedCollection(m *entities.ExecutionDataCollection, chain flow.
 // messageToTrustedTransaction converts a transaction message to a transaction body.
 // This is useful when converting transactions from trusted state like BlockExecutionData which
 // contain service transactions that do not conform to external transaction format.
-func messageToTrustedTransaction(m *entities.Transaction, chain flow.Chain) (flow.TransactionBody, error) {
+func messageToTrustedTransaction(
+	m *entities.Transaction,
+	chain flow.Chain,
+) (flow.TransactionBody, error) {
 	if m == nil {
 		return flow.TransactionBody{}, ErrEmptyMessage
 	}
