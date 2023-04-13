@@ -108,7 +108,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			testutil.RootBootstrappedLedger(vm, ctx))
@@ -139,7 +139,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			testutil.RootBootstrappedLedger(vm, ctx))
@@ -161,7 +161,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			testutil.RootBootstrappedLedger(vm, ctx))
@@ -185,7 +185,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			testutil.RootBootstrappedLedger(vm, ctx))
@@ -236,7 +236,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -273,7 +273,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -311,7 +311,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		_, output, err = vm.RunV2(
+		_, output, err = vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -349,7 +349,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -393,7 +393,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -427,7 +427,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 		require.NoError(t, err)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -474,7 +474,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 
@@ -516,7 +516,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -551,7 +551,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -568,7 +568,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		_, output, err = vm.RunV2(
+		_, output, err = vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -604,7 +604,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -621,7 +621,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		_, output, err = vm.RunV2(
+		_, output, err = vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -662,7 +662,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -684,7 +684,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		_, output, err = vm.RunV2(
+		_, output, err = vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -720,7 +720,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(authTxBody, 0),
 			snapshotTree)
@@ -737,7 +737,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		_, output, err = vm.RunV2(
+		_, output, err = vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -830,7 +830,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			_, output, err := vm.RunV2(
+			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				testutil.RootBootstrappedLedger(vm, ctx))
@@ -908,7 +908,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			_, output, err := vm.RunV2(
+			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				testutil.RootBootstrappedLedger(vm, ctx))
@@ -981,7 +981,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 					unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				_, output, err := vm.RunV2(
+				_, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1045,7 +1045,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 					unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				_, output, err := vm.RunV2(
+				_, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1118,7 +1118,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 					unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				executionSnapshot, output, err := vm.RunV2(
+				executionSnapshot, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1147,7 +1147,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				_, output, err = vm.RunV2(
+				_, output, err = vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1195,7 +1195,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 					unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				_, output, err := vm.RunV2(
+				_, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1242,7 +1242,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				_, output, err := vm.RunV2(
+				_, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1279,7 +1279,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
             }
         `)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Script(code),
 			testutil.RootBootstrappedLedger(vm, ctx))
@@ -1296,7 +1296,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
             }
         `)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Script(code),
 			testutil.RootBootstrappedLedger(vm, ctx))
@@ -1314,7 +1314,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
             }
         `)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Script(code),
 			testutil.RootBootstrappedLedger(vm, ctx))
@@ -1379,7 +1379,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -1401,7 +1401,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			address.String(),
 		))
 
-		_, output, err = vm.RunV2(ctx, fvm.Script(code), snapshotTree)
+		_, output, err = vm.Run(ctx, fvm.Script(code), snapshotTree)
 		require.NoError(t, err)
 
 		require.NoError(t, output.Err)
@@ -1450,7 +1450,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			blockCtx,
 			fvm.Transaction(txBody, 0),
 			testutil.RootBootstrappedLedger(vm, ctx))
@@ -1493,7 +1493,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
             }
         `)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			blockCtx,
 			fvm.Script(code),
 			testutil.RootBootstrappedLedger(vm, ctx))
@@ -1538,7 +1538,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		err := testutil.SignTransactionAsServiceAccount(tx, 0, chain)
 		require.NoError(t, err)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			blockCtx,
 			fvm.Transaction(tx, 0),
 			testutil.RootBootstrappedLedger(vm, ctx))
@@ -1554,7 +1554,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
             }
         `)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			blockCtx,
 			fvm.Script(script),
 			testutil.RootBootstrappedLedger(vm, ctx))
@@ -1599,7 +1599,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		// execute the transaction
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -1692,7 +1692,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			testutil.RootBootstrappedLedger(vm, ctx))
@@ -1724,7 +1724,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 	require.NoError(t, err)
 
-	_, output, err := vm.RunV2(
+	_, output, err := vm.Run(
 		ctx,
 		fvm.Transaction(txBody, 0),
 		testutil.RootBootstrappedLedger(vm, ctx))
@@ -1769,7 +1769,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			jsoncdc.MustEncode(cadence.NewAddress(address)),
 		)
 
-		_, output, err := vm.RunV2(ctx, script, storageSnapshot)
+		_, output, err := vm.Run(ctx, script, storageSnapshot)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 		return output.Value.ToGoValue().(uint64)
@@ -1816,7 +1816,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 			require.NoError(t, err)
 
-			executionSnapshot, output, err := vm.RunV2(
+			executionSnapshot, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -1882,7 +1882,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 			require.NoError(t, err)
 
-			executionSnapshot, output, err := vm.RunV2(
+			executionSnapshot, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -1938,7 +1938,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				_, output, err := vm.RunV2(
+				_, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1997,7 +1997,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
-				executionSnapshot, output, err := vm.RunV2(
+				executionSnapshot, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -2008,7 +2008,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				require.True(t, errors.IsCadenceRuntimeError(output.Err))
 
 				// send it again
-				_, output, err = vm.RunV2(
+				_, output, err = vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)

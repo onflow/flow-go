@@ -10,22 +10,14 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/module/trace"
 )
-
-// TODO(patrick): rm once emulator is updated.
-type TransactionInvoker struct {
-}
-
-func NewTransactionInvoker() *TransactionInvoker {
-	return &TransactionInvoker{}
-}
 
 type TransactionExecutorParams struct {
 	AuthorizationChecksEnabled bool
