@@ -57,7 +57,7 @@ func createAccount(
 		SetScript([]byte(createAccountTransaction)).
 		AddAuthorizer(chain.ServiceAddress())
 
-	executionSnapshot, output, err := vm.RunV2(
+	executionSnapshot, output, err := vm.Run(
 		ctx,
 		fvm.Transaction(txBody, 0),
 		snapshotTree)
@@ -114,7 +114,7 @@ func addAccountKey(
 		AddArgument(cadencePublicKey).
 		AddAuthorizer(address)
 
-	executionSnapshot, output, err := vm.RunV2(
+	executionSnapshot, output, err := vm.Run(
 		ctx,
 		fvm.Transaction(txBody, 0),
 		snapshotTree)
@@ -145,7 +145,7 @@ func addAccountCreator(
 		SetScript(script).
 		AddAuthorizer(chain.ServiceAddress())
 
-	executionSnapshot, output, err := vm.RunV2(
+	executionSnapshot, output, err := vm.Run(
 		ctx,
 		fvm.Transaction(txBody, 0),
 		snapshotTree)
@@ -175,7 +175,7 @@ func removeAccountCreator(
 		SetScript(script).
 		AddAuthorizer(chain.ServiceAddress())
 
-	executionSnapshot, output, err := vm.RunV2(
+	executionSnapshot, output, err := vm.Run(
 		ctx,
 		fvm.Transaction(txBody, 0),
 		snapshotTree)
@@ -395,7 +395,7 @@ func TestCreateAccount(t *testing.T) {
 					SetScript([]byte(createAccountTransaction)).
 					AddAuthorizer(payer)
 
-				executionSnapshot, output, err := vm.RunV2(
+				executionSnapshot, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -434,7 +434,7 @@ func TestCreateAccount(t *testing.T) {
 					SetScript([]byte(createMultipleAccountsTransaction)).
 					AddAuthorizer(payer)
 
-				executionSnapshot, output, err := vm.RunV2(
+				executionSnapshot, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -487,7 +487,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 					SetScript([]byte(createAccountTransaction)).
 					AddAuthorizer(payer)
 
-				_, output, err := vm.RunV2(
+				_, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -505,7 +505,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 					SetScript([]byte(createAccountTransaction)).
 					AddAuthorizer(chain.ServiceAddress())
 
-				_, output, err := vm.RunV2(
+				_, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -538,7 +538,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 					SetPayer(payer).
 					AddAuthorizer(payer)
 
-				_, output, err := vm.RunV2(
+				_, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -570,7 +570,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 					SetScript([]byte(createAccountTransaction)).
 					AddAuthorizer(payer)
 
-				executionSnapshot, output, err := vm.RunV2(
+				executionSnapshot, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -587,7 +587,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 					snapshotTree,
 					payer)
 
-				_, output, err = vm.RunV2(
+				_, output, err = vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -649,7 +649,7 @@ func TestAddAccountKey(t *testing.T) {
 						AddArgument(cadencePublicKey).
 						AddAuthorizer(address)
 
-					executionSnapshot, output, err := vm.RunV2(
+					executionSnapshot, output, err := vm.Run(
 						ctx,
 						fvm.Transaction(txBody, 0),
 						snapshotTree)
@@ -705,7 +705,7 @@ func TestAddAccountKey(t *testing.T) {
 						AddArgument(publicKey2Arg).
 						AddAuthorizer(address)
 
-					executionSnapshot, output, err := vm.RunV2(
+					executionSnapshot, output, err := vm.Run(
 						ctx,
 						fvm.Transaction(txBody, 0),
 						snapshotTree)
@@ -754,7 +754,7 @@ func TestAddAccountKey(t *testing.T) {
 						AddArgument(invalidPublicKeyArg).
 						AddAuthorizer(address)
 
-					executionSnapshot, output, err := vm.RunV2(
+					executionSnapshot, output, err := vm.Run(
 						ctx,
 						fvm.Transaction(txBody, 0),
 						snapshotTree)
@@ -814,7 +814,7 @@ func TestAddAccountKey(t *testing.T) {
 						AddArgument(publicKey2Arg).
 						AddAuthorizer(address)
 
-					executionSnapshot, output, err := vm.RunV2(
+					executionSnapshot, output, err := vm.Run(
 						ctx,
 						fvm.Transaction(txBody, 0),
 						snapshotTree)
@@ -885,7 +885,7 @@ func TestAddAccountKey(t *testing.T) {
 							AddArgument(publicKeyArg).
 							AddAuthorizer(address)
 
-						executionSnapshot, output, err := vm.RunV2(
+						executionSnapshot, output, err := vm.Run(
 							ctx,
 							fvm.Transaction(txBody, 0),
 							snapshotTree)
@@ -974,7 +974,7 @@ func TestRemoveAccountKey(t *testing.T) {
 							AddArgument(keyIndexArg).
 							AddAuthorizer(address)
 
-						executionSnapshot, output, err := vm.RunV2(
+						executionSnapshot, output, err := vm.Run(
 							ctx,
 							fvm.Transaction(txBody, 0),
 							snapshotTree)
@@ -1034,7 +1034,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						AddArgument(keyIndexArg).
 						AddAuthorizer(address)
 
-					executionSnapshot, output, err := vm.RunV2(
+					executionSnapshot, output, err := vm.Run(
 						ctx,
 						fvm.Transaction(txBody, 0),
 						snapshotTree)
@@ -1098,7 +1098,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						AddArgument(keyIndexArg).
 						AddAuthorizer(address)
 
-					executionSnapshot, output, err := vm.RunV2(
+					executionSnapshot, output, err := vm.Run(
 						ctx,
 						fvm.Transaction(txBody, 0),
 						snapshotTree)
@@ -1171,7 +1171,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						txBody.AddArgument(keyIndexArg)
 					}
 
-					executionSnapshot, output, err := vm.RunV2(
+					executionSnapshot, output, err := vm.Run(
 						ctx,
 						fvm.Transaction(txBody, 0),
 						snapshotTree)
@@ -1235,7 +1235,7 @@ func TestGetAccountKey(t *testing.T) {
 						AddArgument(keyIndexArg).
 						AddAuthorizer(address)
 
-					executionSnapshot, output, err := vm.RunV2(
+					executionSnapshot, output, err := vm.Run(
 						ctx,
 						fvm.Transaction(txBody, 0),
 						snapshotTree)
@@ -1286,7 +1286,7 @@ func TestGetAccountKey(t *testing.T) {
 					AddArgument(keyIndexArg).
 					AddAuthorizer(address)
 
-				_, output, err := vm.RunV2(
+				_, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1350,7 +1350,7 @@ func TestGetAccountKey(t *testing.T) {
 					AddArgument(keyIndexArg).
 					AddAuthorizer(address)
 
-				_, output, err := vm.RunV2(
+				_, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1415,7 +1415,7 @@ func TestGetAccountKey(t *testing.T) {
 					txBody.AddArgument(keyIndexArg)
 				}
 
-				_, output, err := vm.RunV2(
+				_, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1472,7 +1472,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
-				executionSnapshot, output, err := vm.RunV2(
+				executionSnapshot, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1488,7 +1488,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, account.Hex())))
 
-				_, output, err = vm.RunV2(ctx, script, snapshotTree)
+				_, output, err = vm.Run(ctx, script, snapshotTree)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
@@ -1518,7 +1518,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, nonExistentAddress)))
 
-				_, output, err := vm.RunV2(ctx, script, snapshotTree)
+				_, output, err := vm.Run(ctx, script, snapshotTree)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
@@ -1554,7 +1554,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					owner:        address,
 				}
 
-				_, _, err := vm.RunV2(ctx, script, snapshot)
+				_, _, err := vm.Run(ctx, script, snapshot)
 				require.ErrorContains(
 					t,
 					err,
@@ -1586,7 +1586,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
-				executionSnapshot, output, err := vm.RunV2(
+				executionSnapshot, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1602,7 +1602,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, account.Hex())))
 
-				_, output, err = vm.RunV2(ctx, script, snapshotTree)
+				_, output, err = vm.Run(ctx, script, snapshotTree)
 				assert.NoError(t, err)
 				assert.NoError(t, output.Err)
 				assert.Equal(t, cadence.UFix64(9999_3120), output.Value)
@@ -1629,7 +1629,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, nonExistentAddress)))
 
-				_, output, err := vm.RunV2(ctx, script, snapshotTree)
+				_, output, err := vm.Run(ctx, script, snapshotTree)
 				assert.NoError(t, err)
 				assert.Error(t, output.Err)
 			}),
@@ -1659,7 +1659,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
-				executionSnapshot, output, err := vm.RunV2(
+				executionSnapshot, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1675,7 +1675,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					}
 				`, account.Hex())))
 
-				_, output, err = vm.RunV2(ctx, script, snapshotTree)
+				_, output, err = vm.Run(ctx, script, snapshotTree)
 				assert.NoError(t, err)
 				assert.NoError(t, output.Err)
 
@@ -1710,7 +1710,7 @@ func TestGetStorageCapacity(t *testing.T) {
 					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
-				executionSnapshot, output, err := vm.RunV2(
+				executionSnapshot, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1726,7 +1726,7 @@ func TestGetStorageCapacity(t *testing.T) {
 					}
 				`, account)))
 
-				_, output, err = vm.RunV2(ctx, script, snapshotTree)
+				_, output, err = vm.Run(ctx, script, snapshotTree)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
@@ -1755,7 +1755,7 @@ func TestGetStorageCapacity(t *testing.T) {
 					}
 				`, nonExistentAddress)))
 
-				_, output, err := vm.RunV2(ctx, script, snapshotTree)
+				_, output, err := vm.Run(ctx, script, snapshotTree)
 
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
@@ -1788,7 +1788,7 @@ func TestGetStorageCapacity(t *testing.T) {
 					snapshotTree: snapshotTree,
 				}
 
-				_, _, err := vm.RunV2(ctx, script, storageSnapshot)
+				_, _, err := vm.Run(ctx, script, storageSnapshot)
 				require.ErrorContains(
 					t,
 					err,

@@ -136,7 +136,7 @@ type executionDataRequester struct {
 	notificationConsumer *jobqueue.ComponentConsumer
 
 	// List of callbacks to call when ExecutionData is successfully fetched for a block
-	consumers []state_synchronization.ExecutionDataReceivedCallback
+	consumers []state_synchronization.OnExecutionDataReceivedConsumer
 
 	consumerMu sync.RWMutex
 }
@@ -252,12 +252,12 @@ func (e *executionDataRequester) OnBlockFinalized(*model.Block) {
 	e.finalizationNotifier.Notify()
 }
 
-// AddOnExecutionDataFetchedConsumer adds a callback to be called when a new ExecutionData is received
+// AddOnExecutionDataReceivedConsumer adds a callback to be called when a new ExecutionData is received
 // Callback Implementations must:
 //   - be concurrency safe
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
-func (e *executionDataRequester) AddOnExecutionDataFetchedConsumer(fn state_synchronization.ExecutionDataReceivedCallback) {
+func (e *executionDataRequester) AddOnExecutionDataReceivedConsumer(fn state_synchronization.OnExecutionDataReceivedConsumer) {
 	e.consumerMu.Lock()
 	defer e.consumerMu.Unlock()
 
@@ -447,7 +447,7 @@ func (e *executionDataRequester) processNotificationJob(ctx irrecoverable.Signal
 	jobComplete()
 }
 
-func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerContext, height uint64, executionData *execution_data.BlockExecutionData) {
+func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerContext, height uint64, executionData *execution_data.BlockExecutionDataEntity) {
 	e.log.Debug().Msgf("notifying for block %d", height)
 
 	// send notifications
@@ -456,7 +456,7 @@ func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerC
 	e.metrics.NotificationSent(height)
 }
 
-func (e *executionDataRequester) notifyConsumers(executionData *execution_data.BlockExecutionData) {
+func (e *executionDataRequester) notifyConsumers(executionData *execution_data.BlockExecutionDataEntity) {
 	e.consumerMu.RLock()
 	defer e.consumerMu.RUnlock()
 
