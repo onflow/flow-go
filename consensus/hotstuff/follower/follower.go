@@ -1,14 +1,12 @@
 package follower
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 // FollowerLogic runs in non-consensus nodes. It informs other components within the node
@@ -43,38 +41,7 @@ func (f *FollowerLogic) FinalizedBlock() *model.Block {
 
 // AddBlock processes the given block proposal
 func (f *FollowerLogic) AddBlock(blockProposal *model.Proposal) error {
-	// validate the block. skip if the proposal is invalid
-	// TODO: this block was already validated by follower engine, to be refactored
-	err := f.validator.ValidateProposal(blockProposal)
-	if err != nil {
-		if model.IsInvalidBlockError(err) {
-			f.log.Warn().Err(err).
-				Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
-				Msg("invalid proposal")
-			return nil
-		} else if errors.Is(err, model.ErrViewForUnknownEpoch) {
-			f.log.Warn().Err(err).
-				Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
-				Hex("qc_block_id", logging.ID(blockProposal.Block.QC.BlockID)).
-				Uint64("block_view", blockProposal.Block.View).
-				Msg("proposal for unknown epoch")
-			return nil
-		} else if errors.Is(err, model.ErrUnverifiableBlock) {
-			f.log.Warn().Err(err).
-				Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
-				Hex("qc_block_id", logging.ID(blockProposal.Block.QC.BlockID)).
-				Uint64("block_view", blockProposal.Block.View).
-				Msg("unverifiable proposal")
-			// even if the block is unverifiable because the QC has been
-			// pruned, it still needs to be added to the forks, otherwise,
-			// a new block with a QC to this block will fail to be added
-			// to forks and crash the event loop.
-		} else if err != nil {
-			return fmt.Errorf("cannot validate block proposal %x: %w", blockProposal.Block.BlockID, err)
-		}
-	}
-
-	err = f.finalizationLogic.AddProposal(blockProposal)
+	err := f.finalizationLogic.AddProposal(blockProposal)
 	if err != nil {
 		return fmt.Errorf("finalization logic cannot process block proposal %x: %w", blockProposal.Block.BlockID, err)
 	}

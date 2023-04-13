@@ -52,7 +52,7 @@ type CommonSuite struct {
 	state                     *clusterstate.MutableState
 	snapshot                  *clusterstate.Snapshot
 	metrics                   *metrics.NoopCollector
-	protocolViolationNotifier *hotstuff.BaseProtocolViolationConsumer
+	protocolViolationNotifier *hotstuff.ProtocolViolationConsumer
 	headers                   *storage.Headers
 	pending                   *module.PendingClusterBlockBuffer
 	hotstuff                  *module.HotStuff
@@ -168,7 +168,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.metrics = metrics.NewNoopCollector()
 
 	// set up notifier for reporting protocol violations
-	cs.protocolViolationNotifier = hotstuff.NewBaseProtocolViolationConsumer(cs.T())
+	cs.protocolViolationNotifier = hotstuff.NewProtocolViolationConsumer(cs.T())
 
 	// initialize the engine
 	core, err := NewCore(

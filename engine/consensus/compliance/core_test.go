@@ -71,7 +71,7 @@ type CommonSuite struct {
 	pending                   *module.PendingBlockBuffer
 	hotstuff                  *module.HotStuff
 	sync                      *module.BlockRequester
-	protocolViolationNotifier *hotstuff.BaseProtocolViolationConsumer
+	protocolViolationNotifier *hotstuff.ProtocolViolationConsumer
 	validator                 *hotstuff.Validator
 	voteAggregator            *hotstuff.VoteAggregator
 	timeoutAggregator         *hotstuff.TimeoutAggregator
@@ -246,7 +246,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.tracer = trace.NewNoopTracer()
 
 	// set up notifier for reporting protocol violations
-	cs.protocolViolationNotifier = hotstuff.NewBaseProtocolViolationConsumer(cs.T())
+	cs.protocolViolationNotifier = hotstuff.NewProtocolViolationConsumer(cs.T())
 
 	// initialize the engine
 	e, err := NewCore(

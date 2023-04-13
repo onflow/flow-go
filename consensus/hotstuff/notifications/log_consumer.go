@@ -48,6 +48,7 @@ func (lc *LogConsumer) OnFinalizedBlock(block *model.Block) {
 func (lc *LogConsumer) OnInvalidBlockDetected(err model.InvalidBlockError) {
 	invalidBlock := err.InvalidBlock.Block
 	lc.log.Warn().
+		Str(logging.KeySuspicious, "true").
 		Uint64("block_view", invalidBlock.View).
 		Hex("proposer_id", invalidBlock.ProposerID[:]).
 		Hex("block_id", invalidBlock.BlockID[:]).
@@ -58,6 +59,7 @@ func (lc *LogConsumer) OnInvalidBlockDetected(err model.InvalidBlockError) {
 
 func (lc *LogConsumer) OnDoubleProposeDetected(block *model.Block, alt *model.Block) {
 	lc.log.Warn().
+		Str(logging.KeySuspicious, "true").
 		Uint64("block_view", block.View).
 		Hex("block_id", block.BlockID[:]).
 		Hex("alt_id", alt.BlockID[:]).
