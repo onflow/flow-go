@@ -42,7 +42,7 @@ type Core struct {
 	mempoolMetrics            module.MempoolMetrics
 	hotstuffMetrics           module.HotstuffMetrics
 	complianceMetrics         module.ComplianceMetrics
-	protocolViolationNotifier hotstuff.BaseProtocolViolationConsumer
+	protocolViolationNotifier hotstuff.ProtocolViolationConsumer
 	tracer                    module.Tracer
 	headers                   storage.Headers
 	payloads                  storage.Payloads
@@ -65,7 +65,7 @@ func NewCore(
 	mempool module.MempoolMetrics,
 	hotstuffMetrics module.HotstuffMetrics,
 	complianceMetrics module.ComplianceMetrics,
-	protocolViolationNotifier hotstuff.BaseProtocolViolationConsumer,
+	protocolViolationNotifier hotstuff.ProtocolViolationConsumer,
 	tracer module.Tracer,
 	headers storage.Headers,
 	payloads storage.Payloads,

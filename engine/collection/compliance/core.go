@@ -40,7 +40,7 @@ type Core struct {
 	mempoolMetrics            module.MempoolMetrics
 	hotstuffMetrics           module.HotstuffMetrics
 	collectionMetrics         module.CollectionMetrics
-	protocolViolationNotifier hotstuff.BaseProtocolViolationConsumer
+	protocolViolationNotifier hotstuff.ProtocolViolationConsumer
 	headers                   storage.Headers
 	state                     clusterkv.MutableState
 	// track latest finalized view/height - used to efficiently drop outdated or too-far-ahead blocks
@@ -61,7 +61,7 @@ func NewCore(
 	mempool module.MempoolMetrics,
 	hotstuffMetrics module.HotstuffMetrics,
 	collectionMetrics module.CollectionMetrics,
-	protocolViolationNotifier hotstuff.BaseProtocolViolationConsumer,
+	protocolViolationNotifier hotstuff.ProtocolViolationConsumer,
 	headers storage.Headers,
 	state clusterkv.MutableState,
 	pending module.PendingClusterBlockBuffer,

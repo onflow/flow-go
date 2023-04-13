@@ -41,7 +41,7 @@ type ComplianceCore struct {
 	log                       zerolog.Logger
 	mempoolMetrics            module.MempoolMetrics
 	tracer                    module.Tracer
-	protocolViolationNotifier hotstuff.BaseProtocolViolationConsumer
+	protocolViolationNotifier hotstuff.ProtocolViolationConsumer
 	pendingCache              *cache.Cache
 	pendingTree               *pending_tree.PendingTree
 	state                     protocol.FollowerState

@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// BaseProtocolViolationConsumer consumes outbound notifications produced by compliance.
+// ProtocolViolationConsumer consumes outbound notifications produced by compliance.
 // Notifications can be produced by consensus participants and followers.
 // Notifications are meant to report protocol violations that can be observed by executing compliance checks.
 //
@@ -15,7 +15,7 @@ import (
 //   - be concurrency safe
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
-type BaseProtocolViolationConsumer interface {
+type ProtocolViolationConsumer interface {
 	// OnInvalidBlockDetected notifications are produced by components that have detected
 	// that a block proposal is invalid and need to report it.
 	// Most of the time such block can be detected by calling Validator.ValidateProposal.
@@ -62,7 +62,7 @@ type FinalizationConsumer interface {
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
 type ConsensusFollowerConsumer interface {
-	BaseProtocolViolationConsumer
+	ProtocolViolationConsumer
 	FinalizationConsumer
 }
 

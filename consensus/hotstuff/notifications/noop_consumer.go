@@ -111,11 +111,11 @@ var _ hotstuff.QCCreatedConsumer = (*NoopQCCreatedConsumer)(nil)
 
 func (*NoopQCCreatedConsumer) OnQcConstructedFromVotes(*flow.QuorumCertificate) {}
 
-// no-op implementation of hotstuff.BaseProtocolViolationConsumer
+// no-op implementation of hotstuff.ProtocolViolationConsumer
 
 type NoopBaseProtocolViolationConsumer struct{}
 
-var _ hotstuff.BaseProtocolViolationConsumer = (*NoopBaseProtocolViolationConsumer)(nil)
+var _ hotstuff.ProtocolViolationConsumer = (*NoopBaseProtocolViolationConsumer)(nil)
 
 func (*NoopBaseProtocolViolationConsumer) OnInvalidBlockDetected(model.InvalidBlockError) {}
 
