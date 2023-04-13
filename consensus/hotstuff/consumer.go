@@ -25,6 +25,7 @@ type ProtocolViolationConsumer interface {
 	OnInvalidBlockDetected(err model.InvalidBlockError)
 	// OnDoubleProposeDetected notifications are produced by the Finalization Logic
 	// whenever a double block proposal (equivocation) was detected.
+	// Equivocation occurs when the same leader proposes two different blocks for the same view.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
@@ -56,7 +57,8 @@ type FinalizationConsumer interface {
 	OnFinalizedBlock(*model.Block)
 }
 
-// ConsensusFollowerConsumer consumes outbound notifications produced by consensus followers(not participants).
+// ConsensusFollowerConsumer consumes outbound notifications produced by consensus followers.
+// It is a subset of the notifications produced by consensus participants.
 // Implementations must:
 //   - be concurrency safe
 //   - be non-blocking
@@ -66,7 +68,7 @@ type ConsensusFollowerConsumer interface {
 	FinalizationConsumer
 }
 
-// Consumer consumes outbound notifications produced by HotStuff and its components.
+// Consumer consumes outbound notifications produced by consensus participants.
 // Notifications are consensus-internal state changes which are potentially relevant to
 // the larger node in which HotStuff is running. The notifications are emitted
 // in the order in which the HotStuff algorithm makes the respective steps.

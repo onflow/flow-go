@@ -39,7 +39,7 @@ func (p *Distributor) AddConsumer(consumer hotstuff.Consumer) {
 	p.subscribers = append(p.subscribers, consumer)
 }
 
-// AddFollowerConsumer wraps
+// AddFollowerConsumer registers the input `consumer` to be notified on ConsensusFollowerConsumer events.
 func (p *Distributor) AddFollowerConsumer(consumer hotstuff.ConsensusFollowerConsumer) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
