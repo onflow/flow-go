@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"fmt"
-	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -11,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 )
 
 type RPCEngineBuilder struct {

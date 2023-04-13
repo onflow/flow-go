@@ -1,17 +1,11 @@
 package access_test
 
 import (
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-	"github.com/stretchr/testify/suite"
-	"time"
-)
-
-import (
 	"context"
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/google/go-cmp/cmp"
@@ -22,11 +16,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/onflow/flow-go/access"
 	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
@@ -34,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	factorymock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -898,6 +895,7 @@ func (suite *Suite) TestRpcEngineBuilderWithFinalizedHeaderCache() {
 
 		rpcEng, err = rpcEngBuilder.WithFinalizedHeaderCache(suite.finalizedHeaderCache).Build()
 		require.NoError(suite.T(), err)
+		require.NotNil(suite.T(), rpcEng)
 	})
 }
 
