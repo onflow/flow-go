@@ -399,6 +399,20 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
 	}
 
+	block99452067, err := flow.HexStringToIdentifier("02ac1a3aa578864798b200f64fbb3bbd7d609d6eb2d5169d9402d7c4cca89970")
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("failed to parse block ID")
+	}
+
+	block99452068, err := flow.HexStringToIdentifier("db63b9123d59aa9e06672e31d21539b07461fa24154e56b65a7ae72e3eda3d23")
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("failed to parse block ID")
+	}
+
+	batches = append(batches, chainsync.Batch{
+		BlockIDs: []flow.Identifier{block99452067, block99452068},
+	})
+
 	for _, batch := range batches {
 		req := &messages.BatchRequest{
 			Nonce:    rand.Uint64(),

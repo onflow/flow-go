@@ -86,26 +86,26 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	status := c.getRequestStatus(header.Height, header.ID())
+	// status := c.getRequestStatus(header.Height, header.ID())
 
-	// if we never asked for this block, discard it
-	if !status.WasQueued() {
-		log.Debug().Msg("discarding not queued block")
-		return false
-	}
-	// if we have already received this block, exit
-	if status.WasReceived() {
-		log.Debug().Msg("discarding not received block")
-		return false
-	}
+	// // if we never asked for this block, discard it
+	// if !status.WasQueued() {
+	// 	log.Debug().Msg("discarding not queued block")
+	// 	return false
+	// }
+	// // if we have already received this block, exit
+	// if status.WasReceived() {
+	// 	log.Debug().Msg("discarding not received block")
+	// 	return false
+	// }
 
-	// this is a new block, remember that we've seen it
-	status.Header = header
-	status.Received = time.Now()
+	// // this is a new block, remember that we've seen it
+	// status.Header = header
+	// status.Received = time.Now()
 
-	// track it by ID and by height so we don't accidentally request it again
-	c.blockIDs[header.ID()] = status
-	c.heights[header.Height] = status
+	// // track it by ID and by height so we don't accidentally request it again
+	// c.blockIDs[header.ID()] = status
+	// c.heights[header.Height] = status
 
 	log.Debug().Msg("handled block")
 	return true
