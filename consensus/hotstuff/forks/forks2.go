@@ -26,7 +26,7 @@ type FinalityProof struct {
 // Forks is NOT safe for concurrent use by multiple goroutines.
 type Forks2 struct {
 	finalizationCallback module.Finalizer
-	notifier             hotstuff.FinalizationConsumer
+	notifier             hotstuff.ConsensusFollowerConsumer
 	forest               forest.LevelledForest
 	trustedRoot          *model.CertifiedBlock
 
@@ -41,7 +41,7 @@ type Forks2 struct {
 // As the result, the following should apply again
 // var _ hotstuff.Forks = (*Forks2)(nil)
 
-func NewForks2(trustedRoot *model.CertifiedBlock, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Forks2, error) {
+func NewForks2(trustedRoot *model.CertifiedBlock, finalizationCallback module.Finalizer, notifier hotstuff.ConsensusFollowerConsumer) (*Forks2, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.CertifyingQC.BlockID) || (trustedRoot.Block.View != trustedRoot.CertifyingQC.View) {
 		return nil, model.NewConfigurationErrorf("invalid root: root QC is not pointing to root block")
 	}
@@ -165,7 +165,7 @@ func (f *Forks2) EnsureBlockIsValidExtension(block *model.Block) error {
 	err := f.forest.VerifyVertex(blockContainer)
 	if err != nil {
 		if forest.IsInvalidVertexError(err) {
-			return model.NewInvalidBlockError(block.BlockID, block.View, fmt.Errorf("not a valid vertex for block tree: %w", err))
+			return fmt.Errorf("not a valid vertex for block tree: %w", err)
 		}
 		return fmt.Errorf("block tree generated unexpected error validating vertex: %w", err)
 	}

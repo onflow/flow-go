@@ -169,16 +169,11 @@ type InvalidBlockError struct {
 	Err          error
 }
 
-func NewInvalidBlockErrorf(proposal *Proposal, msg string, args ...interface{}) error {
+func NewInvalidBlockErrorf(block *Proposal, msg string, args ...interface{}) error {
 	return InvalidBlockError{
-		InvalidBlock: proposal,
+		InvalidBlock: block,
 		Err:          fmt.Errorf(msg, args...),
 	}
-}
-
-// NewInvalidBlockError instantiates an `InvalidBlockError`. Input `err` cannot be nil.
-func NewInvalidBlockError(blockID flow.Identifier, view uint64, err error) error {
-	return InvalidBlockError{BlockID: blockID, View: view, Err: err}
 }
 
 func (e InvalidBlockError) Error() string {
