@@ -37,7 +37,7 @@ type Builder struct {
 	scoreOptionConfig *scoring.ScoreOptionConfig
 	idProvider        module.IdentityProvider
 	routingSystem     routing.Routing
-	rpcInspectors     []p2p.GossipSubRPCInspector
+	rpcInspectorSuite p2p.GossipSubInspectorSuite
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -139,9 +139,11 @@ func (g *Builder) SetAppSpecificScoreParams(f func(peer.ID) float64) {
 	g.scoreOptionConfig.SetAppSpecificScoreFunction(f)
 }
 
-// SetGossipSubRPCInspectors sets the gossipsub rpc inspectors.
-func (g *Builder) SetGossipSubRPCInspectors(inspectors ...p2p.GossipSubRPCInspector) {
-	g.rpcInspectors = inspectors
+// SetGossipSubRPCInspectorSuite sets the gossipsub rpc inspector suite of the builder. It contains the
+// inspector function that is injected into the gossipsub rpc layer, as well as the notification distributors that
+// are used to notify the app specific scoring mechanism of misbehaving peers..
+func (g *Builder) SetGossipSubRPCInspectorSuite(inspectorSuite p2p.GossipSubInspectorSuite) {
+	g.rpcInspectorSuite = inspectorSuite
 }
 
 func NewGossipSubBuilder(logger zerolog.Logger, metrics module.GossipSubMetrics) *Builder {
@@ -152,7 +154,6 @@ func NewGossipSubBuilder(logger zerolog.Logger, metrics module.GossipSubMetrics)
 		gossipSubFactory:    defaultGossipSubFactory(),
 		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
 		scoreOptionConfig:   scoring.NewScoreOptionConfig(lg),
-		rpcInspectors:       make([]p2p.GossipSubRPCInspector, 0),
 	}
 }
 
@@ -193,9 +194,17 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 		gossipSubConfigs.WithSubscriptionFilter(g.subscriptionFilter)
 	}
 
+	if g.rpcInspectorSuite != nil {
+		gossipSubConfigs.WithInspectorSuite(g.rpcInspectorSuite)
+	}
+
 	var scoreOpt *scoring.ScoreOption
 	var scoreTracer p2p.PeerScoreTracer
 	if g.gossipSubPeerScoring {
+		if g.rpcInspectorSuite != nil {
+			g.scoreOptionConfig.SetRegisterNotificationConsumerFunc(g.rpcInspectorSuite.AddInvalidCtrlMsgNotificationConsumer)
+		}
+
 		scoreOpt = scoring.NewScoreOption(g.scoreOptionConfig)
 		gossipSubConfigs.WithScoreOption(scoreOpt)
 
@@ -207,9 +216,8 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 				g.gossipSubScoreTracerInterval)
 			gossipSubConfigs.WithScoreTracer(scoreTracer)
 		}
-	}
 
-	gossipSubConfigs.WithAppSpecificRpcInspectors(g.rpcInspectors...)
+	}
 
 	if g.gossipSubTracer != nil {
 		gossipSubConfigs.WithTracer(g.gossipSubTracer)

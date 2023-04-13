@@ -7,17 +7,17 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	discoveryrouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/inspector"
 )
 
 // GossipSubAdapterConfig is a wrapper around libp2p pubsub options that
 // implements the PubSubAdapterConfig interface for the Flow network.
 type GossipSubAdapterConfig struct {
-	options      []pubsub.Option
-	inspectors   []p2p.GossipSubRPCInspector
-	scoreTracer  p2p.PeerScoreTracer
-	pubsubTracer p2p.PubSubTracer
+	options        []pubsub.Option
+	scoreTracer    p2p.PeerScoreTracer
+	pubsubTracer   p2p.PubSubTracer
+	inspectorSuite p2p.GossipSubInspectorSuite // currently only used to manage the lifecycle.
 }
 
 var _ p2p.PubSubAdapterConfig = (*GossipSubAdapterConfig)(nil)
@@ -46,10 +46,9 @@ func (g *GossipSubAdapterConfig) WithMessageIdFunction(f func([]byte) string) {
 	}))
 }
 
-func (g *GossipSubAdapterConfig) WithAppSpecificRpcInspectors(inspectors ...p2p.GossipSubRPCInspector) {
-	g.inspectors = inspectors
-	aggregator := inspector.NewAggregateRPCInspector(inspectors...)
-	g.options = append(g.options, pubsub.WithAppSpecificRpcInspector(aggregator.Inspect))
+func (g *GossipSubAdapterConfig) WithInspectorSuite(suite p2p.GossipSubInspectorSuite) {
+	g.options = append(g.options, pubsub.WithAppSpecificRpcInspector(suite.InspectFunc()))
+	g.inspectorSuite = suite
 }
 
 func (g *GossipSubAdapterConfig) WithTracer(tracer p2p.PubSubTracer) {
@@ -65,8 +64,9 @@ func (g *GossipSubAdapterConfig) PubSubTracer() p2p.PubSubTracer {
 	return g.pubsubTracer
 }
 
-func (g *GossipSubAdapterConfig) RPCInspectors() []p2p.GossipSubRPCInspector {
-	return g.inspectors
+// InspectorSuiteComponent returns the component that manages the lifecycle of the inspector suite.
+func (g *GossipSubAdapterConfig) InspectorSuiteComponent() component.Component {
+	return g.inspectorSuite
 }
 
 func (g *GossipSubAdapterConfig) WithScoreTracer(tracer p2p.PeerScoreTracer) {

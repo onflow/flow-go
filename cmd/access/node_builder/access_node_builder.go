@@ -1160,7 +1160,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibP2PFactory(networkKey crypto.
 
 		// setup RPC inspectors
 		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector)
-		rpcInspectors, err := rpcInspectorBuilder.
+		rpcInspectorSuite, err := rpcInspectorBuilder.
 			SetPublicNetwork(p2p.PublicNetworkEnabled).
 			SetMetrics(&p2pconfig.MetricsConfig{
 				HeroCacheFactory: builder.HeroCacheMetricsFactory(),
@@ -1199,7 +1199,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibP2PFactory(networkKey crypto.
 			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
 			SetGossipSubTracer(meshTracer).
 			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
-			SetGossipSubRPCInspectors(rpcInspectors...).
+			SetGossipSubRpcInspectorSuite(rpcInspectorSuite).
 			Build()
 
 		if err != nil {

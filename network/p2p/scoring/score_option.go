@@ -100,16 +100,18 @@ type ScoreOption struct {
 	peerScoreParams     *pubsub.PeerScoreParams
 	peerThresholdParams *pubsub.PeerScoreThresholds
 	validator           p2p.SubscriptionValidator
+	registry            *GossipSubAppSpecificScoreRegistry
 	appScoreFunc        func(peer.ID) float64
 }
 
 type ScoreOptionConfig struct {
-	logger       zerolog.Logger
-	provider     module.IdentityProvider
-	cacheSize    uint32
-	cacheMetrics module.HeroCacheMetrics
-	appScoreFunc func(peer.ID) float64
-	topicParams  []func(map[string]*pubsub.TopicScoreParams)
+	logger                           zerolog.Logger
+	provider                         module.IdentityProvider
+	cacheSize                        uint32
+	cacheMetrics                     module.HeroCacheMetrics
+	appScoreFunc                     func(peer.ID) float64
+	topicParams                      []func(map[string]*pubsub.TopicScoreParams)
+	registerNotificationConsumerFunc func(p2p.GossipSubInvalidControlMessageNotificationConsumer)
 }
 
 func NewScoreOptionConfig(logger zerolog.Logger) *ScoreOptionConfig {
@@ -162,6 +164,13 @@ func (c *ScoreOptionConfig) SetTopicScoreParams(topic channels.Topic, topicScore
 	})
 }
 
+// SetRegisterNotificationConsumerFunc sets the function to register the notification consumer for the penalty option.
+// ScoreOption uses this function to register the notification consumer for the pubsub system so that it can receive
+// notifications of invalid control messages.
+func (c *ScoreOptionConfig) SetRegisterNotificationConsumerFunc(f func(p2p.GossipSubInvalidControlMessageNotificationConsumer)) {
+	c.registerNotificationConsumerFunc = f
+}
+
 // NewScoreOption creates a new penalty option with the given configuration.
 func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 	throttledSampler := logging.BurstSampler(MaxDebugLogs, time.Second)
@@ -196,6 +205,11 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 		s.appScoreFunc = scoreRegistry.AppSpecificScoreFunc()
 	} else {
 		s.appScoreFunc = cfg.appScoreFunc
+	}
+
+	// registers the score registry as the consumer of the invalid control message notifications
+	if cfg.registerNotificationConsumerFunc != nil {
+		cfg.registerNotificationConsumerFunc(scoreRegistry)
 	}
 
 	s.peerScoreParams.AppSpecificScore = s.appScoreFunc

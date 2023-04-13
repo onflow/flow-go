@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -111,4 +112,20 @@ type GossipSubInvalidControlMessageNotificationConsumer interface {
 	// Any error on consuming event must handle internally.
 	// The implementation must be concurrency safe, but can be blocking.
 	OnInvalidControlMessageNotification(*InvalidControlMessageNotification)
+}
+
+// GossipSubInspectorSuite is the interface for the GossipSub inspector suite.
+// It encapsulates the rpc inspectors and the notification distributors.
+type GossipSubInspectorSuite interface {
+	component.Component
+	// InspectFunc returns the inspect function that is used to inspect the gossipsub rpc messages.
+	// This function follows a dependency injection pattern, where the inspect function is injected into the gossipsu, and
+	// is called whenever a gossipsub rpc message is received.
+	InspectFunc() func(peer.ID, *pubsub.RPC) error
+
+	// AddInvalidCtrlMsgNotificationConsumer adds a consumer to the invalid control message notification distributor.
+	// This consumer is notified when a misbehaving peer regarding gossipsub control messages is detected. This follows a pub/sub
+	// pattern where the consumer is notified when a new notification is published.
+	// A consumer is only notified once for each notification, and only receives notifications that were published after it was added.
+	AddInvalidCtrlMsgNotificationConsumer(GossipSubInvalidControlMessageNotificationConsumer)
 }

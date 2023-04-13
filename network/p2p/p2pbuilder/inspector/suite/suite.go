@@ -1,0 +1,60 @@
+package suite
+
+import (
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/p2p"
+)
+
+// GossipSubInspectorSuite encapsulates what is exposed to the libp2p node regarding the gossipsub RPC inspectors as
+// well as their notification distributors.
+type GossipSubInspectorSuite struct {
+	component.Component
+	aggregatedInspector       *AggregateRPCInspector
+	ctrlMsgInspectDistributor p2p.GossipSubInspectorNotificationDistributor
+}
+
+func NewGossipSubInspectorSuite(inspectors []p2p.GossipSubRPCInspector, ctrlMsgInspectDistributor p2p.GossipSubInspectorNotificationDistributor) *GossipSubInspectorSuite {
+	s := &GossipSubInspectorSuite{
+		ctrlMsgInspectDistributor: ctrlMsgInspectDistributor,
+		aggregatedInspector:       NewAggregateRPCInspector(inspectors...),
+	}
+
+	builder := component.NewComponentManagerBuilder()
+	for _, inspector := range inspectors {
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			inspector.Start(ctx)
+
+			<-inspector.Done()
+		})
+	}
+
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		ctrlMsgInspectDistributor.Start(ctx)
+		ready()
+
+		<-ctrlMsgInspectDistributor.Done()
+	})
+
+	s.Component = builder.Build()
+	return s
+}
+
+// InspectFunc returns the inspect function that is used to inspect the gossipsub rpc messages.
+// This function follows a dependency injection pattern, where the inspect function is injected into the gossipsu, and
+// is called whenever a gossipsub rpc message is received.
+func (s *GossipSubInspectorSuite) InspectFunc() func(peer.ID, *pubsub.RPC) error {
+	return s.aggregatedInspector.Inspect
+}
+
+// AddInvalidCtrlMsgNotificationConsumer adds a consumer to the invalid control message notification distributor.
+// This consumer is notified when a misbehaving peer regarding gossipsub control messages is detected. This follows a pub/sub
+// pattern where the consumer is notified when a new notification is published.
+// A consumer is only notified once for each notification, and only receives notifications that were published after it was added.
+func (s *GossipSubInspectorSuite) AddInvalidCtrlMsgNotificationConsumer(c p2p.GossipSubInvalidControlMessageNotificationConsumer) {
+	s.ctrlMsgInspectDistributor.AddConsumer(c)
+}

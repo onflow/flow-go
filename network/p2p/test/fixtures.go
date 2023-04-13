@@ -70,7 +70,7 @@ func NodeFixture(
 		Metrics:                          metrics.NewNoopCollector(),
 		ResourceManager:                  testutils.NewResourceManager(t),
 		GossipSubPeerScoreTracerInterval: 0, // disabled by default
-		GossipSubRPCInspectors:           rpcInspectors,
+		GossipSubRPCInspector:            rpcInspectors,
 	}
 
 	for _, opt := range opts {
@@ -106,7 +106,7 @@ func NodeFixture(
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
 		SetStreamCreationRetryInterval(parameters.CreateStreamRetryDelay).
 		SetResourceManager(parameters.ResourceManager).
-		SetGossipSubRPCInspectors(parameters.GossipSubRPCInspectors...)
+		SetGossipSubRpcInspectorSuite(parameters.GossipSubRPCInspector)
 
 	if parameters.ResourceManager != nil {
 		builder.SetResourceManager(parameters.ResourceManager)
@@ -182,7 +182,13 @@ type NodeFixtureParameters struct {
 	PubSubTracer                     p2p.PubSubTracer
 	GossipSubPeerScoreTracerInterval time.Duration // intervals at which the peer score is updated and logged.
 	CreateStreamRetryDelay           time.Duration
-	GossipSubRPCInspectors           []p2p.GossipSubRPCInspector
+	GossipSubRPCInspector            p2p.GossipSubInspectorSuite
+}
+
+func WithGossipSubRpcInspectorSuite(inspectorSuite p2p.GossipSubInspectorSuite) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.GossipSubRPCInspector = inspectorSuite
+	}
 }
 
 func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {

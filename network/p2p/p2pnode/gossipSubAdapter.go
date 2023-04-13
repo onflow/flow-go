@@ -67,17 +67,15 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 		})
 	}
 
-	for _, inspector := range gossipSubConfig.RPCInspectors() {
-		rpcInspector := inspector
+	if inspectorSuite := gossipSubConfig.InspectorSuiteComponent(); inspectorSuite != nil {
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
-			componentName := rpcInspector.Name()
-			a.logger.Debug().Str("component", componentName).Msg("starting rpc inspector")
-			rpcInspector.Start(ctx)
-			a.logger.Debug().Str("component", componentName).Msg("rpc inspector started")
+			a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("starting inspector suite")
+			inspectorSuite.Start(ctx)
+			a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("inspector suite started")
 
-			<-rpcInspector.Done()
-			a.logger.Debug().Str("component", componentName).Msg("rpc inspector stopped")
+			<-inspectorSuite.Done()
+			a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("inspector suite stopped")
 		})
 	}
 

@@ -448,7 +448,7 @@ func generateLibP2PNode(t *testing.T,
 	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, connection.DefaultConnManagerConfig())
 	require.NoError(t, err)
 
-	rpcInspectors, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig()).Build()
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig()).Build()
 	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
@@ -461,7 +461,7 @@ func generateLibP2PNode(t *testing.T,
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t)).
 		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
-		SetGossipSubRPCInspectors(rpcInspectors...)
+		SetGossipSubRpcInspectorSuite(rpcInspectorSuite)
 
 	for _, opt := range opts {
 		opt(builder)

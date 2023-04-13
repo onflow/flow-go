@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector/suite"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 )
 
@@ -148,34 +149,37 @@ func (b *GossipSubInspectorBuilder) validationInspectorConfig(validationConfigs 
 }
 
 // buildGossipSubValidationInspector builds the gossipsub rpc validation inspector.
-func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.GossipSubRPCInspector, error) {
+func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.GossipSubRPCInspector, *distributor.GossipSubInspectorNotificationDistributor, error) {
 	controlMsgRPCInspectorCfg, err := b.validationInspectorConfig(b.inspectorsConfig.ValidationInspectorConfigs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
+		return nil, nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
 	}
+
+	notificationDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(
+		b.logger,
+		[]queue.HeroStoreConfigOption{
+			queue.WithHeroStoreSizeLimit(b.inspectorsConfig.GossipSubRPCInspectorNotificationCacheSize),
+			queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.publicNetwork))}...)
 
 	rpcValidationInspector := validation.NewControlMsgValidationInspector(
 		b.logger,
 		b.sporkID,
 		controlMsgRPCInspectorCfg,
-		distributor.DefaultGossipSubInspectorNotificationDistributor(
-			b.logger,
-			[]queue.HeroStoreConfigOption{
-				queue.WithHeroStoreSizeLimit(b.inspectorsConfig.GossipSubRPCInspectorNotificationCacheSize),
-				queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.publicNetwork))}...))
-	return rpcValidationInspector, nil
+		notificationDistributor,
+	)
+	return rpcValidationInspector, notificationDistributor, nil
 }
 
 // Build builds the rpc inspectors used by gossipsub.
 // Any returned error from this func indicates a problem setting up rpc inspectors.
 // In libp2p node setup, the returned error should be treated as a fatal error.
-func (b *GossipSubInspectorBuilder) Build() ([]p2p.GossipSubRPCInspector, error) {
+func (b *GossipSubInspectorBuilder) Build() (p2p.GossipSubInspectorSuite, error) {
 	metricsInspector := b.buildGossipSubMetricsInspector()
-	validationInspector, err := b.buildGossipSubValidationInspector()
+	validationInspector, notificationDistributor, err := b.buildGossipSubValidationInspector()
 	if err != nil {
 		return nil, err
 	}
-	return []p2p.GossipSubRPCInspector{metricsInspector, validationInspector}, nil
+	return suite.NewGossipSubInspectorSuite([]p2p.GossipSubRPCInspector{metricsInspector, validationInspector}, notificationDistributor), nil
 }
 
 // DefaultRPCValidationConfig returns default RPC control message inspector config.
