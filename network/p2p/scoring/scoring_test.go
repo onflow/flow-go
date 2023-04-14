@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -112,7 +111,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	}
 
 	// checks no GossipSub message exchange should no longer happen between node1 and node2.
-	p2pfixtures.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{node1}, []p2p.LibP2PNode{node2}, func() (interface{}, channels.Topic) {
+	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{node1}, []p2p.LibP2PNode{node2}, func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 		return unittest.ProposalFixture(), blockTopic
 	})

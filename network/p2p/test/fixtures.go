@@ -464,3 +464,57 @@ func PeerIdFixture(t *testing.T) peer.ID {
 
 	return peer.ID(h)
 }
+
+// EnsureNotConnectedBetweenGroups ensures no connection exists between the given groups of nodes.
+func EnsureNotConnectedBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
+	// ensure no connection from group A to group B
+	p2pfixtures.EnsureNotConnected(t, ctx, groupA, groupB)
+	// ensure no connection from group B to group A
+	p2pfixtures.EnsureNotConnected(t, ctx, groupB, groupA)
+}
+
+// EnsureNoPubsubMessageExchange ensures that the no pubsub message is exchanged "from" the given nodes "to" the given nodes.
+func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
+	_, topic := messageFactory()
+
+	subs := make([]p2p.Subscription, len(to))
+	tv := validator.TopicValidator(
+		unittest.Logger(),
+		unittest.AllowAllPeerFilter())
+	var err error
+	for _, node := range from {
+		_, err = node.Subscribe(topic, tv)
+		require.NoError(t, err)
+	}
+
+	for i, node := range to {
+		s, err := node.Subscribe(topic, tv)
+		require.NoError(t, err)
+		subs[i] = s
+	}
+
+	// let subscriptions propagate
+	time.Sleep(1 * time.Second)
+
+	for _, node := range from {
+		// creates a unique message to be published by the node.
+		msg, _ := messageFactory()
+		channel, ok := channels.ChannelFromTopic(topic)
+		require.True(t, ok)
+		data := p2pfixtures.MustEncodeEvent(t, msg, channel)
+
+		// ensure the message is NOT received by any of the nodes.
+		require.NoError(t, node.Publish(ctx, topic, data))
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx, subs)
+		cancel()
+	}
+}
+
+// EnsureNoPubsubExchangeBetweenGroups ensures that no pubsub message is exchanged between the given groups of nodes.
+func EnsureNoPubsubExchangeBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
+	// ensure no message exchange from group A to group B
+	EnsureNoPubsubMessageExchange(t, ctx, groupA, groupB, messageFactory)
+	// ensure no message exchange from group B to group A
+	EnsureNoPubsubMessageExchange(t, ctx, groupB, groupA, messageFactory)
+}
