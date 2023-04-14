@@ -128,27 +128,6 @@ type NestedTransaction interface {
 		error,
 	)
 
-	// PauseNestedTransaction detaches the current nested transaction from the
-	// parent transaction, and returns the paused nested transaction state.
-	// The paused nested transaction may be resume via Resume.
-	//
-	// WARNING: Pause and Resume are intended for implementing continuation
-	// passing style behavior for the transaction executor, with the assumption
-	// that the states accessed prior to pausing remain valid after resumption.
-	// The paused nested transaction should not be reused across transactions.
-	// IT IS NOT SAFE TO PAUSE A NESTED TRANSACTION IN GENERAL SINCE THAT
-	// COULD LEAD TO PHANTOM READS.
-	PauseNestedTransaction(
-		expectedId NestedTransactionId,
-	) (
-		*ExecutionState,
-		error,
-	)
-
-	// ResumeNestedTransaction attaches the paused nested transaction (state)
-	// to the current transaction.
-	ResumeNestedTransaction(pausedState *ExecutionState)
-
 	// AttachAndCommitNestedTransaction commits the changes from the cached
 	// nested transaction execution snapshot to the current (nested)
 	// transaction.
@@ -371,30 +350,6 @@ func (txnState *transactionState) CommitParseRestrictedNestedTransaction(
 	}
 
 	return txnState.mergeIntoParent()
-}
-
-func (txnState *transactionState) PauseNestedTransaction(
-	expectedId NestedTransactionId,
-) (
-	*ExecutionState,
-	error,
-) {
-	if !txnState.IsCurrent(expectedId) {
-		return nil, fmt.Errorf(
-			"cannot pause unexpected nested transaction: id mismatch",
-		)
-	}
-
-	if txnState.IsParseRestricted() {
-		return nil, fmt.Errorf(
-			"cannot Pause parse restricted nested transaction")
-	}
-
-	return txnState.pop("pause")
-}
-
-func (txnState *transactionState) ResumeNestedTransaction(pausedState *ExecutionState) {
-	txnState.push(pausedState, nil)
 }
 
 func (txnState *transactionState) AttachAndCommitNestedTransaction(
