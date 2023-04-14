@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/follower"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/recovery"
 	"github.com/onflow/flow-go/model/flow"
@@ -16,9 +15,16 @@ import (
 
 // TODO: this needs to be integrated with proper configuration and bootstrapping.
 
-func NewFollower(log zerolog.Logger, committee hotstuff.DynamicCommittee, headers storage.Headers, updater module.Finalizer,
-	verifier hotstuff.Verifier, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header,
-	rootQC *flow.QuorumCertificate, finalized *flow.Header, pending []*flow.Header,
+func NewFollower(log zerolog.Logger,
+	committee hotstuff.DynamicCommittee,
+	headers storage.Headers,
+	updater module.Finalizer,
+	verifier hotstuff.Verifier,
+	notifier hotstuff.FinalizationConsumer,
+	rootHeader *flow.Header,
+	rootQC *flow.QuorumCertificate,
+	finalized *flow.Header,
+	pending []*flow.Header,
 ) (*hotstuff.FollowerLoop, error) {
 
 	forks, err := NewForks(finalized, headers, updater, notifier, rootHeader, rootQC)
@@ -35,14 +41,8 @@ func NewFollower(log zerolog.Logger, committee hotstuff.DynamicCommittee, header
 		return nil, fmt.Errorf("could not recover hotstuff follower state: %w", err)
 	}
 
-	// initialize the follower logic
-	logic, err := follower.New(log, validator, forks)
-	if err != nil {
-		return nil, fmt.Errorf("could not create follower logic: %w", err)
-	}
-
 	// initialize the follower loop
-	loop, err := hotstuff.NewFollowerLoop(log, logic)
+	loop, err := hotstuff.NewFollowerLoop(log, forks)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower loop: %w", err)
 	}

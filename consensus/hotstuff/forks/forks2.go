@@ -10,15 +10,6 @@ import (
 	"github.com/onflow/flow-go/module/forest"
 )
 
-// FinalityProof represents a finality proof for a Block. By convention, a FinalityProof
-// is immutable. Finality in Jolteon/HotStuff is determined by the 2-chain rule:
-//
-//	There exists a _certified_ block C, such that Block.View + 1 = C.View
-type FinalityProof struct {
-	Block          *model.Block
-	CertifiedChild model.CertifiedBlock
-}
-
 // Forks enforces structural validity of the consensus state and implements
 // finalization rules as defined in Jolteon consensus https://arxiv.org/abs/2106.10362
 // The same approach has later been adopted by the Diem team resulting in DiemBFT v4:
@@ -32,14 +23,15 @@ type Forks2 struct {
 
 	// finalityProof holds the latest finalized block including the certified child as proof of finality.
 	// CAUTION: is nil, when Forks has not yet finalized any blocks beyond the finalized root block it was initialized with
-	finalityProof *FinalityProof
+	finalityProof *hotstuff.FinalityProof
 }
 
 // TODO:
-//  • update `hotstuff.Forks` interface to represent Forks2
-//  • update business logic to of consensus participant and follower to use Forks2
+//   - update `hotstuff.Forks` interface to represent Forks2
+//   - update business logic to of consensus participant and follower to use Forks2
+//
 // As the result, the following should apply again
-// var _ hotstuff.Forks = (*Forks2)(nil)
+var _ hotstuff.Forks = (*Forks2)(nil)
 
 func NewForks2(trustedRoot *model.CertifiedBlock, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Forks2, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.CertifyingQC.BlockID) || (trustedRoot.Block.View != trustedRoot.CertifyingQC.View) {
@@ -63,7 +55,7 @@ func NewForks2(trustedRoot *model.CertifiedBlock, finalizationCallback module.Fi
 	return &forks, nil
 }
 
-// FinalizedView returns the largest view number that has been finalized so far
+// FinalizedView returns the largest view number where a finalized block is known
 func (f *Forks2) FinalizedView() uint64 {
 	if f.finalityProof == nil {
 		return f.trustedRoot.Block.View
@@ -83,11 +75,12 @@ func (f *Forks2) FinalizedBlock() *model.Block {
 // the subsequent view, which proves finality.
 // CAUTION: method returns (nil, false), when Forks has not yet finalized any
 // blocks beyond the finalized root block it was initialized with.
-func (f *Forks2) FinalityProof() (*FinalityProof, bool) {
+func (f *Forks2) FinalityProof() (*hotstuff.FinalityProof, bool) {
 	return f.finalityProof, f.finalityProof != nil
 }
 
-// GetBlock returns block for given ID
+// GetBlock returns (BlockProposal, true) if the block with the specified
+// id was found and (nil, false) otherwise.
 func (f *Forks2) GetBlock(blockID flow.Identifier) (*model.Block, bool) {
 	blockContainer, hasBlock := f.forest.GetVertex(blockID)
 	if !hasBlock {
@@ -190,7 +183,9 @@ func (f *Forks2) EnsureBlockIsValidExtension(block *model.Block) error {
 // AddCertifiedBlock appends the given certified block to the tree of pending
 // blocks and updates the latest finalized block (if finalization progressed).
 // Unless the parent is below the pruning threshold (latest finalized view), we
-// require that the parent is already stored in Forks.
+// require that the parent is already stored in Forks. Calling this method with
+// previously processed blocks leaves the consensus state invariant (though,
+// it will potentially cause some duplicate processing).
 //
 // Possible error returns:
 //   - model.MissingBlockError if the parent does not exist in the forest (but is above
@@ -440,7 +435,7 @@ func (f *Forks2) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBl
 	}
 
 	// Advancing finalization step (ii): update `finalityProof` and prune `LevelledForest`
-	f.finalityProof = &FinalityProof{Block: parentBlock, CertifiedChild: *certifiedBlock}
+	f.finalityProof = &hotstuff.FinalityProof{Block: parentBlock, CertifiedChild: *certifiedBlock}
 	err = f.forest.PruneUpToLevel(f.FinalizedView())
 	if err != nil {
 		return fmt.Errorf("pruning levelled forest failed unexpectedly: %w", err)

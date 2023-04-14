@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -898,7 +899,7 @@ func requireOnlyGenesisBlockFinalized(t *testing.T, forks *Forks2) {
 }
 
 // requireNoBlocksFinalized asserts that no blocks have been finalized (genesis is latest finalized block).
-func requireFinalityProof(t *testing.T, forks *Forks2, expectedFinalityProof *FinalityProof) {
+func requireFinalityProof(t *testing.T, forks *Forks2, expectedFinalityProof *hotstuff.FinalityProof) {
 	finalityProof, isKnown := forks.FinalityProof()
 	require.True(t, isKnown)
 	require.Equal(t, expectedFinalityProof, finalityProof)
@@ -936,10 +937,10 @@ func toCertifiedBlocks(t *testing.T, blocks ...*model.Block) []*model.CertifiedB
 	return certBlocks
 }
 
-func makeFinalityProof(t *testing.T, block *model.Block, directChild *model.Block, qcCertifyingChild *flow.QuorumCertificate) *FinalityProof {
+func makeFinalityProof(t *testing.T, block *model.Block, directChild *model.Block, qcCertifyingChild *flow.QuorumCertificate) *hotstuff.FinalityProof {
 	c, err := model.NewCertifiedBlock(directChild, qcCertifyingChild) // certified child of FinalizedBlock
 	require.NoError(t, err)
-	return &FinalityProof{block, c}
+	return &hotstuff.FinalityProof{Block: block, CertifiedChild: c}
 }
 
 // blockAwaitingFinalization is intended for tracking finalization events and their order for a specific block

@@ -13,7 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/follower"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
@@ -92,12 +91,8 @@ func TestFollowerHappyPath(t *testing.T) {
 		validator := mocks.NewValidator(t)
 		validator.On("ValidateProposal", mock.Anything).Return(nil)
 
-		// initialize the follower followerHotstuffLogic
-		followerHotstuffLogic, err := follower.New(unittest.Logger(), validator, forks)
-		require.NoError(t, err)
-
 		// initialize the follower loop
-		followerLoop, err := hotstuff.NewFollowerLoop(unittest.Logger(), followerHotstuffLogic)
+		followerLoop, err := hotstuff.NewFollowerLoop(unittest.Logger(), forks)
 		require.NoError(t, err)
 
 		syncCore := module.NewBlockRequester(t)
