@@ -153,7 +153,7 @@ static int bls_verify_ep(const G2* pk, const ep_t s, const byte* data, const int
 // the membership check is separated to allow optimizing multiple verifications using the same pks
 int bls_verifyPerDistinctMessage(const byte* sig, 
                          const int nb_hashes, const byte* hashes, const uint32_t* len_hashes,
-                         const uint32_t* pks_per_hash, const ep2_st* pks) {  
+                         const uint32_t* pks_per_hash, const G2* pks) {  
 
     int ret = UNDEFINED; // return value
     
@@ -189,9 +189,13 @@ int bls_verifyPerDistinctMessage(const byte* sig,
 
     // aggregate public keys mapping to the same hash
     offset = 0;
+    G2 tmp;
     for (int i=1; i < nb_hashes+1; i++) {
         // elemsG2[i] = agg_pk[i]
-        ep2_sum_vector(elemsG2[i], (ep2_st*) &pks[offset] , pks_per_hash[i-1]);
+        E2_sum_vector(&tmp, &pks[offset] , pks_per_hash[i-1]);
+        ep2_st* relic_tmp = E2_blst_to_relic(&tmp);
+        ep2_copy(elemsG2[i], relic_tmp);
+        free(relic_tmp);
         offset += pks_per_hash[i-1];
     }
 
@@ -237,7 +241,7 @@ outG1:
 // membership check of pks in G2 is not verified in this function
 // the membership check is separated to allow optimizing multiple verifications using the same pks
 int bls_verifyPerDistinctKey(const byte* sig, 
-                         const int nb_pks, const ep2_st* pks, const uint32_t* hashes_per_pk,
+                         const int nb_pks, const G2* pks, const uint32_t* hashes_per_pk,
                          const byte* hashes, const uint32_t* len_hashes){
 
     int ret = UNDEFINED; // return value
@@ -264,7 +268,9 @@ int bls_verifyPerDistinctKey(const byte* sig,
 
     // set the public keys
     for (int i=1; i < nb_pks+1; i++) {
-        ep2_copy(elemsG2[i], (ep2_st*) &pks[i-1]);
+        ep2_st* tmp = E2_blst_to_relic(&pks[i-1]);
+        ep2_copy(elemsG2[i], tmp);
+        free(tmp);
     }
 
     // map all hashes to G1 and aggregate the ones with the same public key
@@ -336,19 +342,17 @@ int bls_verify(const G2* pk, const byte* sig, const byte* data, const int len) {
     // deserialize the signature into a curve point
     int read_ret = ep_read_bin_compact(s, sig, SIGNATURE_LEN);
     if (read_ret != RLC_OK) {
-        printf("HHH1\n");
         return read_ret;
     }
 
     // check s is in G1
     if (check_membership_G1(s) != VALID) { // only enabled if MEMBERSHIP_CHECK==1
-        printf("HHH2\n");
         return INVALID;
     }
     
     return bls_verify_ep(pk, s, data, len);
 }
-/*
+
 
 // binary tree structure to be used by bls_batch verify.
 // Each node contains a signature and a public key, the signature (resp. the public key) 
@@ -391,7 +395,7 @@ static void free_tree(node* root) {
 }
 
 // builds a binary tree of aggregation of signatures and public keys recursively.
-static node* build_tree(const int len, const ep2_st* pks, const ep_st* sigs) {
+static node* build_tree(const int len, const G2* pks, const ep_st* sigs) {
     // check if a leaf is reached
     if (len == 1) {
         return new_node(&pks[0], &sigs[0]);  // use the first element of the arrays
@@ -433,7 +437,6 @@ error:
 // verify the binary tree and fill the results using recursive batch verifications.
 static void bls_batchVerify_tree(const node* root, const int len, byte* results, 
         const byte* data, const int data_len) {
-
     // verify the aggregated signature against the aggregated public key.
     int res =  bls_verify_ep(root->pk, root->sig, data, data_len);
 
@@ -460,20 +463,22 @@ static void bls_batchVerify_tree(const node* root, const int len, byte* results,
 }
 
 // Batch verifies the validity of a multiple BLS signatures of the 
-// same message under multiple public keys.
+// same message under multiple public keys. Each signature at index `i` is verified
+// against the public key at index `i`.
 //
 // - membership checks of all signatures is verified upfront.
-// - use random coefficients for signatures and public keys at the same index.
+// - use random coefficients for signatures and public keys at the same index to prevent 
+//  indices mixup.
 // - optimize the verification by verifying an aggregated signature against an aggregated
 //  public key, and use a recursive verification to find invalid signatures.  
-void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
+void bls_batchVerify(const int sigs_len, byte* results, const G2* pks_input,
      const byte* sigs_bytes, const byte* data, const int data_len) {  
-
+    
     // initialize results to undefined
     memset(results, UNDEFINED, sigs_len);
     
     // build the arrays of G1 and G2 elements to verify
-    ep2_st* pks = (ep2_st*) malloc(sigs_len * sizeof(ep2_st));
+    G2* pks = (G2*) malloc(sigs_len * sizeof(G2));
     if (!pks) return;
     ep_st* sigs = (ep_st*) malloc(sigs_len * sizeof(ep_st));
     if (!sigs) goto out_sigs;
@@ -489,24 +494,30 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
         // the tree aggregations remain valid.
         // - valid points are multiplied by a random scalar (same for public keys at same index)
         // to make sure a signature at index (i) is verified against the public key at the same index.
-        int read_ret = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
-        if ( read_ret != RLC_OK || check_membership_G1(&sigs[i]) != VALID) {
-            if (read_ret == UNDEFINED) // unexpected error case 
-                goto out;
-            // set signature as infinity and set result as invald
-            ep_set_infty(&sigs[i]);
-            ep2_copy(&pks[i], (ep2_st*) &pks_input[i]);
-            results[i] = INVALID;
-        // multiply signatures and public keys at the same index by random coefficients
-        } else {
-            // random non-zero coefficient of a least 128 bits
-            bn_rand(r, RLC_POS, SEC_BITS);
-            bn_add_dig(r, r, 1); 
-            ep_mul_lwnaf(&sigs[i], &sigs[i], r);
-            ep2_mul_lwnaf(&pks[i], (ep2_st*) &pks_input[i], r);      
-        }
-    }
+        
+        // choose a random non-zero coefficient of at least 128 bits
+        // TODO: find a way to generate randoms
+        bn_rand(r, RLC_POS, SEC_BITS); 
+        bn_add_dig(r, r, 1); 
+        Fr* tmp = Fr_relic_to_blst(r);
+        // multiply public key by the random exponent
+        E2_mult(&pks[i], &pks_input[i], tmp);  
 
+        int read_ret = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
+        if (read_ret != RLC_OK || check_membership_G1(&sigs[i]) != VALID) {
+            if (read_ret == UNDEFINED) {// unexpected error case 
+                goto out;
+            };
+            // set signature as infinity and set result as invalid
+            // this result won't be overwritten
+            ep_set_infty(&sigs[i]);   
+            results[i] = INVALID; 
+        } else {
+            // multiply the signature by the same random exponent
+            ep_mul_lwnaf(&sigs[i], &sigs[i], r);   
+        }
+        free(tmp);  
+    }
     // build a binary tree of aggreagtions
     node* root = build_tree(sigs_len, &pks[0], &sigs[0]);
     if (!root) goto out;
@@ -515,15 +526,13 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
     bls_batchVerify_tree(root, sigs_len, &results[0], data, data_len);
     // free the allocated tree 
     free_tree(root);
-
+    
 out:
     bn_free(r);  
     for (int i=0; i < sigs_len; i++) {
         ep_free(sigs[i]);
-        ep2_free(pks[i]);
     }
     free(sigs); 
 out_sigs:
     free(pks);
 }
-*/

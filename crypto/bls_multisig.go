@@ -3,7 +3,6 @@
 
 package crypto
 
-/*
 import (
 	"errors"
 	"fmt"
@@ -14,7 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto/hash"
 	_ "github.com/onflow/flow-go/crypto/hash"
-)*/
+)
 
 // BLS multi-signature using BLS12-381 curve
 // ([zcash]https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#bls12-381)
@@ -44,7 +43,6 @@ import "C"
 // used for signatures.
 var popKMAC = internalExpandMsgXOFKMAC128(blsPOPCipherSuite)
 
-/*
 // BLSGeneratePOP returns a proof of possession (PoP) for the receiver private key.
 //
 // The KMAC hasher used in the function is guaranteed to be orthogonal to all hashers used
@@ -195,13 +193,13 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	}
 
 	var sum pointG2
-	C.ep2_sum_vector((*C.G2)(&sum), (*C.G2)(&points[0]),
+	C.E2_sum_vector((*C.G2)(&sum), (*C.G2)(&points[0]),
 		(C.int)(len(points)))
 
 	sumKey := newPubKeyBLSBLS12381(&sum)
 	return sumKey, nil
 }
-*/
+
 // IdentityBLSPublicKey returns an identity public key which corresponds to the point
 // at infinity in G2 (identity element of G2).
 // TODO: return a constant key instead of a newly allocated one
@@ -213,8 +211,6 @@ func IdentityBLSPublicKey() PublicKey {
 	identity.isIdentity = true
 	return &identity
 }
-
-/*
 
 // RemoveBLSPublicKeys removes multiple BLS public keys from a given (aggregated) public key.
 //
@@ -252,7 +248,7 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 	}
 
 	var resultPoint pointG2
-	C.ep2_subtract_vector((*C.G2)(&resultPoint), (*C.G2)(&aggPKBLS.point),
+	C.E2_subtract_vector((*C.G2)(&resultPoint), (*C.G2)(&aggPKBLS.point),
 		(*C.G2)(&pointsToSubtract[0]), (C.int)(len(pointsToSubtract)))
 
 	resultKey := newPubKeyBLSBLS12381(&resultPoint)
@@ -574,4 +570,3 @@ var invalidSignatureError = errors.New("input signature does not deserialize to 
 func IsInvalidSignatureError(err error) bool {
 	return errors.Is(err, invalidSignatureError)
 }
-*/

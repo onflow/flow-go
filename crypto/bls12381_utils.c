@@ -142,6 +142,16 @@ bn_st* Fr_blst_to_relic(const Fr* x) {
     return out;
 }
 
+// TODO: temp utility function to delete
+Fr* Fr_relic_to_blst(const bn_st* x){
+    Fr* out = (Fr*)malloc(sizeof(Fr)); 
+    byte* data = (byte*)malloc(Fr_BYTES);
+    bn_write_bin(data, Fr_BYTES, x);   
+    Fr_read_bytes(out, data, Fr_BYTES);
+    free(data);
+    return out;
+}
+
 // returns true if a == 0 and false otherwise
 bool_t Fr_is_zero(const Fr* a) {
     return bytes_are_zero((const byte*)a, Fr_BYTES);
@@ -159,7 +169,7 @@ void Fr_set_limb(Fr* a, const limb_t l){
 }
 
 void Fr_copy(Fr* res, const Fr* a) {
-    vec_copy((byte*)res, (byte*)a, Fr_BYTES);
+    vec_copy((byte*)res, (byte*)a, sizeof(Fr));
 }
 
 // sets `a` to 0
@@ -383,7 +393,7 @@ void Fp_set_limb(Fp* a, const limb_t l){
 }
 
 void Fp_copy(Fp* res, const Fp* a) {
-    vec_copy((byte*)res, (byte*)a, Fp_BYTES);
+    vec_copy((byte*)res, (byte*)a, sizeof(Fr));
 }
 
 static void Fp_add(Fp *res, const Fp *a, const Fp *b) {
@@ -960,30 +970,41 @@ bool_t E2_is_equal(const G2* p1, const G2* p2) {
     return POINTonE2_is_equal((const POINTonE2*)p1, (const POINTonE2*)p2);
 }
 
+// res = p
+void  E2_copy(G2* res, const G2* p) {
+    vec_copy(res, p, sizeof(G2));
+}
+
 // converts an E2 point from Jacobian into affine coordinates (z=1)
 void E2_to_affine(G2* res, const G2* p) {
     // minor optimization in case coordinates are already affine
     if (vec_is_equal(p->z, BLS12_381_Rx.p2, Fp2_BYTES)) {
-        vec_copy(res, p, G2_BYTES);
+        E2_copy(res, p);
         return;
     }
     // convert from Jacobian
     POINTonE2_from_Jacobian((POINTonE2*)res, (const POINTonE2*)p);   
 }
 
+// generic point addition that must handle doubling and points at infinity
 void E2_add(G2* res, const G2* a, const G2* b) {
     POINTonE2_dadd((POINTonE2*)res, (POINTonE2*)a, (POINTonE2*)b, NULL); 
 }
 
-// Exponentiation of a generic point p in G2
-void ep2_mult(ep2_t res, const ep2_t p, const Fr* expo) {
-    bn_st* tmp_expo = Fr_blst_to_relic(expo);
-    // Using window NAF of size 2
-    ep2_mul_lwnaf(res, p, tmp_expo);
-    free(tmp_expo);
+// Point negation in place.
+// no need for an api of the form E2_neg(G2* res, const G2* a) for now
+static void E2_neg(G2* a) {
+    POINTonE2_cneg((POINTonE2*)a, 1);
 }
 
-// Exponentiation of generator g2 in G2
+// Exponentiation of a generic point `a` in E2, res = expo.a
+void E2_mult(G2* res, const G2* a, const Fr* expo) {
+    pow256 tmp;
+    pow256_from_Fr(tmp, expo);
+    POINTonE2_sign((POINTonE2*)res, (POINTonE2*)a, tmp);
+}
+
+// Exponentiation of generator g2 of G2, res = expo.g2
 void G2_mult_gen(G2* res, const Fr* expo) {
     pow256 tmp;
     pow256_from_Fr(tmp, expo);
@@ -991,14 +1012,11 @@ void G2_mult_gen(G2* res, const Fr* expo) {
 }
 
 // computes the sum of the G2 array elements y and writes the sum in jointy
-void ep2_sum_vector(ep2_t jointy, ep2_st* y, const int len){
-    ep2_set_infty(jointy);
+void E2_sum_vector(G2* jointy, const G2* y, const int len){
+    E2_set_infty(jointy);
     for (int i=0; i<len; i++){
-        ep2_add_projc(jointy, jointy, &y[i]);
+        E2_add(jointy, jointy, &y[i]);
     }
-    ep2_norm(jointy, jointy); // not necessary but left here to optimize the 
-                            // multiple pairing computations with the same 
-                            // public key
 }
 
 // ------------------- other
@@ -1074,12 +1092,12 @@ int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const b
     return UNDEFINED;
 }
 
-// Subtracts the sum of a G2 array elements y from an element x and writes the 
+// Subtracts all G2 array elements `y` from an element `x` and writes the 
 // result in res
-void ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, const int len){
-    ep2_sum_vector(res, y, len);
-    ep2_neg(res, res);
-    ep2_add_projc(res, x, res);
+void E2_subtract_vector(G2* res, const G2* x, const G2* y, const int len){
+    E2_sum_vector(res, y, len);
+    E2_neg(res);
+    E2_add(res, x, res);
 }
 
 // computes the sum of the G1 array elements y and writes the sum in jointy

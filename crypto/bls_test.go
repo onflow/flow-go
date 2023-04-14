@@ -6,10 +6,10 @@ package crypto
 import (
 	"crypto/rand"
 	"encoding/hex"
-	_ "fmt"
+	"fmt"
 	mrand "math/rand"
 	"testing"
-	_ "time"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -122,14 +122,14 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 		h := internalExpandMsgXOFKMAC128(blsSigCipherSuite)
 		assert.NotNil(t, h)
 	})
-	/*
-		t.Run("constants sanity check", func(t *testing.T) {
-			// test that the ciphersuites exceed 16 bytes as per draft-irtf-cfrg-hash-to-curve
-			// The tags used by internalExpandMsgXOFKMAC128 are at least len(ciphersuite) long
-			assert.GreaterOrEqual(t, len(blsSigCipherSuite), 16)
-			assert.GreaterOrEqual(t, len(blsPOPCipherSuite), 16)
-		})
-	*/
+
+	t.Run("constants sanity check", func(t *testing.T) {
+		// test that the ciphersuites exceed 16 bytes as per draft-irtf-cfrg-hash-to-curve
+		// The tags used by internalExpandMsgXOFKMAC128 are at least len(ciphersuite) long
+		assert.GreaterOrEqual(t, len(blsSigCipherSuite), 16)
+		assert.GreaterOrEqual(t, len(blsPOPCipherSuite), 16)
+	})
+
 	t.Run("orthogonal PoP and signature hashing", func(t *testing.T) {
 		data := []byte("random_data")
 		// empty tag hasher
@@ -214,7 +214,6 @@ func TestBLSUtils(t *testing.T) {
 	testKeySize(t, sk, PrKeyLenBLSBLS12381, PubKeyLenBLSBLS12381)
 }
 
-/*
 // BLS Proof of Possession test
 func TestBLSPOP(t *testing.T) {
 	r := time.Now().UnixNano()
@@ -651,9 +650,9 @@ func TestBLSBatchVerify(t *testing.T) {
 	t.Run("one valid signature", func(t *testing.T) {
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks[:1], sigs[:1], input, kmac)
 		require.NoError(t, err)
-		assert.Equal(t, valid, expectedValid[:1],
+		assert.Equal(t, expectedValid[:1], valid,
 			"Verification of %s failed, private keys are %s, input is %x, results is %v",
-			sigs, sks, input, valid)
+			sigs[:1], sks[:1], input, valid)
 	})
 
 	// pick a random number of invalid signatures
@@ -1112,4 +1111,3 @@ func TestBLSIdentity(t *testing.T) {
 		assert.False(t, valid)
 	})
 }
-*/

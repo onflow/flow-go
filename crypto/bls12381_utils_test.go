@@ -101,7 +101,6 @@ func BenchmarkMapToG1(b *testing.B) {
 
 // test subgroup membership check in G1 and G2
 func TestSubgroupCheck(t *testing.T) {
-
 	// seed Relic PRG
 	seed := make([]byte, securityBits/8)
 	_, _ = rand.Read(seed)

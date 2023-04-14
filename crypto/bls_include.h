@@ -38,11 +38,11 @@ int      get_sk_len();
 void     bls_sign(byte*, const Fr*, const byte*, const int);
 int      bls_verify(const G2*, const byte*, const byte*, const int);
 int      bls_verifyPerDistinctMessage(const byte*, const int, const byte*, const uint32_t*,
-                         const uint32_t*, const ep2_st*);
+                         const uint32_t*, const G2*);
 int      bls_verifyPerDistinctKey(const byte*, 
-                         const int, const ep2_st*, const uint32_t*,
+                         const int, const G2*, const uint32_t*,
                          const byte*, const uint32_t*);
-void     bls_batchVerify(const int, byte*, const ep2_st*,
+void     bls_batchVerify(const int, byte*, const G2*,
             const byte*, const byte*, const int);
 
 #endif
