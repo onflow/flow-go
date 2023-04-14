@@ -480,50 +480,6 @@ func TestParseRestrictedCannotCommitLocationMismatch(t *testing.T) {
 	require.True(t, txn.IsCurrent(id))
 }
 
-func TestPauseAndResume(t *testing.T) {
-	txn := newTestTransactionState()
-
-	key1 := flow.NewRegisterID("addr", "key")
-	key2 := flow.NewRegisterID("addr2", "key2")
-
-	val, err := txn.Get(key1)
-	require.NoError(t, err)
-	require.Nil(t, val)
-
-	id1, err := txn.BeginNestedTransaction()
-	require.NoError(t, err)
-
-	err = txn.Set(key1, createByteArray(2))
-	require.NoError(t, err)
-
-	val, err = txn.Get(key1)
-	require.NoError(t, err)
-	require.NotNil(t, val)
-
-	pausedState, err := txn.PauseNestedTransaction(id1)
-	require.NoError(t, err)
-
-	val, err = txn.Get(key1)
-	require.NoError(t, err)
-	require.Nil(t, val)
-
-	txn.ResumeNestedTransaction(pausedState)
-
-	val, err = txn.Get(key1)
-	require.NoError(t, err)
-	require.NotNil(t, val)
-
-	err = txn.Set(key2, createByteArray(2))
-	require.NoError(t, err)
-
-	_, err = txn.CommitNestedTransaction(id1)
-	require.NoError(t, err)
-
-	val, err = txn.Get(key2)
-	require.NoError(t, err)
-	require.NotNil(t, val)
-}
-
 func TestFinalizeMainTransactionFailWithUnexpectedNestedTransactions(
 	t *testing.T,
 ) {
