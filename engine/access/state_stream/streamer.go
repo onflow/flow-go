@@ -24,23 +24,26 @@ type Streamable interface {
 
 // Streamer
 type Streamer struct {
-	log         zerolog.Logger
-	broadcaster *engine.Broadcaster
-	sendTimeout time.Duration
-	sub         Streamable
+	log           zerolog.Logger
+	sub           Streamable
+	broadcaster   *engine.Broadcaster
+	sendTimeout   time.Duration
+	throttleDelay time.Duration
 }
 
 func NewStreamer(
 	log zerolog.Logger,
 	broadcaster *engine.Broadcaster,
 	sendTimeout time.Duration,
+	throttleDelay time.Duration,
 	sub Streamable,
 ) *Streamer {
 	return &Streamer{
-		log:         log.With().Str("sub_id", sub.ID()).Logger(),
-		broadcaster: broadcaster,
-		sendTimeout: sendTimeout,
-		sub:         sub,
+		log:           log.With().Str("sub_id", sub.ID()).Logger(),
+		broadcaster:   broadcaster,
+		sendTimeout:   sendTimeout,
+		throttleDelay: throttleDelay,
+		sub:           sub,
 	}
 }
 
@@ -99,6 +102,13 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 		err = s.sub.Send(ctx, response, s.sendTimeout)
 		if err != nil {
 			return err
+		}
+
+		// pause before searching next response to throttle clients streaming past data.
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(s.throttleDelay):
 		}
 	}
 }

@@ -27,6 +27,7 @@ type ExecutionDataBackend struct {
 	headers        storage.Headers
 	broadcaster    *engine.Broadcaster
 	sendTimeout    time.Duration
+	throttleDelay  time.Duration
 	sendBufferSize int
 
 	getExecutionData GetExecutionDataFunc
@@ -63,7 +64,7 @@ func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, start
 
 	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponse)
 
-	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, sub).Stream(ctx)
+	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.throttleDelay, sub).Stream(ctx)
 
 	return sub
 }

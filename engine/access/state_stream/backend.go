@@ -29,6 +29,9 @@ const (
 	// DefaultSendTimeout is the default timeout for sending a message to the client. After the timeout
 	// expires, the connection is closed.
 	DefaultSendTimeout = 30 * time.Second
+
+	// DefaultThrottleDelay is the default delay to inject between searching each block to throttle scans
+	DefaultThrottleDelay = time.Duration(0)
 )
 
 type GetExecutionDataFunc func(context.Context, flow.Identifier) (*execution_data.BlockExecutionDataEntity, error)
@@ -83,6 +86,7 @@ func New(
 		headers:          headers,
 		broadcaster:      broadcaster,
 		sendTimeout:      config.ClientSendTimeout,
+		throttleDelay:    config.ThrottleDelay,
 		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
 		getStartHeight:   b.getStartHeight,
@@ -93,6 +97,7 @@ func New(
 		headers:          headers,
 		broadcaster:      broadcaster,
 		sendTimeout:      config.ClientSendTimeout,
+		throttleDelay:    config.ThrottleDelay,
 		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
 		getStartHeight:   b.getStartHeight,
