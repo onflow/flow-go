@@ -60,8 +60,8 @@ type transactionExecutor struct {
 
 	errs *errors.ErrorsCollector
 
-	nestedTxnId state.NestedTransactionId
-	pausedState *state.ExecutionState
+	startedTransactionBodyExecution bool
+	nestedTxnId                     state.NestedTransactionId
 
 	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
 	txnBodyExecutor runtime.Executor
@@ -91,13 +91,14 @@ func newTransactionExecutor(
 		TransactionVerifier: TransactionVerifier{
 			VerificationConcurrency: 4,
 		},
-		ctx:            ctx,
-		proc:           proc,
-		txnState:       txnState,
-		span:           span,
-		env:            env,
-		errs:           errors.NewErrorsCollector(),
-		cadenceRuntime: env.BorrowCadenceRuntime(),
+		ctx:                             ctx,
+		proc:                            proc,
+		txnState:                        txnState,
+		span:                            span,
+		env:                             env,
+		errs:                            errors.NewErrorsCollector(),
+		startedTransactionBodyExecution: false,
+		cadenceRuntime:                  env.BorrowCadenceRuntime(),
 	}
 }
 
@@ -131,22 +132,53 @@ func (executor *transactionExecutor) handleError(
 }
 
 func (executor *transactionExecutor) Preprocess() error {
-	if !executor.TransactionBodyExecutionEnabled {
-		return nil
-	}
-
-	err := executor.PreprocessTransactionBody()
-	return executor.handleError(err, "preprocessing")
+	return executor.handleError(executor.preprocess(), "preprocess")
 }
 
 func (executor *transactionExecutor) Execute() error {
 	return executor.handleError(executor.execute(), "executing")
 }
 
-// PreprocessTransactionBody preprocess parts of a transaction body that are
+func (executor *transactionExecutor) preprocess() error {
+	if executor.AuthorizationChecksEnabled {
+		err := executor.CheckAuthorization(
+			executor.ctx.TracerSpan,
+			executor.proc,
+			executor.txnState,
+			executor.AccountKeyWeightThreshold)
+		if err != nil {
+			executor.errs.Collect(err)
+			return executor.errs.ErrorOrNil()
+		}
+	}
+
+	if executor.SequenceNumberCheckAndIncrementEnabled {
+		err := executor.CheckAndIncrementSequenceNumber(
+			executor.ctx.TracerSpan,
+			executor.proc,
+			executor.txnState)
+		if err != nil {
+			executor.errs.Collect(err)
+			return executor.errs.ErrorOrNil()
+		}
+	}
+
+	if !executor.TransactionBodyExecutionEnabled {
+		return nil
+	}
+
+	executor.errs.Collect(executor.preprocessTransactionBody())
+	if executor.errs.CollectedFailure() {
+		return executor.errs.ErrorOrNil()
+	}
+
+	return nil
+}
+
+// preprocessTransactionBody preprocess parts of a transaction body that are
 // infrequently modified and are expensive to compute.  For now this includes
 // reading meter parameter overrides and parsing programs.
-func (executor *transactionExecutor) PreprocessTransactionBody() error {
+func (executor *transactionExecutor) preprocessTransactionBody() error {
 	meterParams, err := getBodyMeterParameters(
 		executor.ctx,
 		executor.proc,
@@ -160,6 +192,7 @@ func (executor *transactionExecutor) PreprocessTransactionBody() error {
 	if err != nil {
 		return err
 	}
+	executor.startedTransactionBodyExecution = true
 	executor.nestedTxnId = txnId
 
 	executor.txnBodyExecutor = executor.cadenceRuntime.NewTransactionExecutor(
@@ -173,93 +206,23 @@ func (executor *transactionExecutor) PreprocessTransactionBody() error {
 	// by the transaction body.
 	err = executor.txnBodyExecutor.Preprocess()
 	if err != nil {
-		executor.errs.Collect(
-			fmt.Errorf(
-				"transaction preprocess failed: %w",
-				err))
-
-		// We shouldn't early exit on non-failure since we need to deduct fees.
-		if executor.errs.CollectedFailure() {
-			return executor.errs.ErrorOrNil()
-		}
-
-		// NOTE: We need to restart the nested transaction in order to pause
-		// for fees deduction.
-		err = executor.txnState.RestartNestedTransaction(txnId)
-		if err != nil {
-			return err
-		}
+		return fmt.Errorf(
+			"transaction preprocess failed: %w",
+			err)
 	}
-
-	// Pause the transaction body's nested transaction in order to interleave
-	// auth and seq num checks.
-	pausedState, err := executor.txnState.PauseNestedTransaction(txnId)
-	if err != nil {
-		return err
-	}
-	executor.pausedState = pausedState
 
 	return nil
 }
 
 func (executor *transactionExecutor) execute() error {
-	if executor.AuthorizationChecksEnabled {
-		err := executor.CheckAuthorization(
-			executor.ctx.TracerSpan,
-			executor.proc,
-			executor.txnState,
-			executor.AccountKeyWeightThreshold)
-		if err != nil {
-			executor.errs.Collect(err)
-			executor.errs.Collect(executor.abortPreprocessed())
-			return executor.errs.ErrorOrNil()
-		}
+	if !executor.startedTransactionBodyExecution {
+		return executor.errs.ErrorOrNil()
 	}
 
-	if executor.SequenceNumberCheckAndIncrementEnabled {
-		err := executor.CheckAndIncrementSequenceNumber(
-			executor.ctx.TracerSpan,
-			executor.proc,
-			executor.txnState)
-		if err != nil {
-			executor.errs.Collect(err)
-			executor.errs.Collect(executor.abortPreprocessed())
-			return executor.errs.ErrorOrNil()
-		}
-	}
-
-	if executor.TransactionBodyExecutionEnabled {
-		err := executor.ExecuteTransactionBody()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (executor *transactionExecutor) abortPreprocessed() error {
-	if !executor.TransactionBodyExecutionEnabled {
-		return nil
-	}
-
-	executor.txnState.ResumeNestedTransaction(executor.pausedState)
-
-	// There shouldn't be any update, but drop all updates just in case.
-	err := executor.txnState.RestartNestedTransaction(executor.nestedTxnId)
-	if err != nil {
-		return err
-	}
-
-	// We need to commit the aborted state unconditionally to include
-	// the touched registers in the execution receipt.
-	_, err = executor.txnState.CommitNestedTransaction(executor.nestedTxnId)
-	return err
+	return executor.ExecuteTransactionBody()
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
-	executor.txnState.ResumeNestedTransaction(executor.pausedState)
-
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {
 
