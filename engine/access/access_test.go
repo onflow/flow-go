@@ -524,7 +524,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			}
 
 			for i, serviceEvent := range executionResult.ServiceEvents {
-				assert.Equal(suite.T(), serviceEvent.Type, er.ServiceEvents[i].Type)
+				assert.Equal(suite.T(), serviceEvent.Type.String(), er.ServiceEvents[i].Type)
 				event := serviceEvent.Event
 
 				marshalledEvent, err := json.Marshal(event)
