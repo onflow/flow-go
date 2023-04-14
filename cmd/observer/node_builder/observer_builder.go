@@ -135,7 +135,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			MaxHeightRange:            backend.DefaultMaxHeightRange,
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
-			ArchiveAddress:            "",
+			ArchiveAddressList:        nil,
 			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
 		},
 		rpcMetricsEnabled:         false,
