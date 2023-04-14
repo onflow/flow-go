@@ -11,6 +11,7 @@ import (
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -36,6 +37,8 @@ func createTestEngine(t *testing.T) *MessagingEngine {
 		network,
 		me,
 		dkg.NewBrokerTunnel(),
+		metrics.NewNoopCollector(),
+		DefaultMessagingEngineConfig(),
 	)
 	require.NoError(t, err)
 

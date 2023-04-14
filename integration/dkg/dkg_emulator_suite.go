@@ -20,6 +20,7 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
+	"github.com/onflow/flow-go/module/metrics"
 
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
@@ -439,6 +440,8 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 		core.Net,
 		core.Me,
 		brokerTunnel,
+		metrics.NewNoopCollector(),
+		dkgeng.DefaultMessagingEngineConfig(),
 	)
 	require.NoError(s.T(), err)
 

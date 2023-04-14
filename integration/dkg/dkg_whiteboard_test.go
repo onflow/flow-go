@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -123,6 +124,8 @@ func createNode(
 		core.Net,
 		core.Me,
 		brokerTunnel,
+		metrics.NewNoopCollector(),
+		dkgeng.DefaultMessagingEngineConfig(),
 	)
 	require.NoError(t, err)
 

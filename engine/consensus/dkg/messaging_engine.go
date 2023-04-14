@@ -17,31 +17,21 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// retryMax is the maximum number of times the engine will attempt to forward
-// a message before permanently giving up.
-const retryMax = 9
-
-// retryBaseWait is the duration to wait between the two first tries.
-// With 9 attempts and exponential backoff, this will retry for about
-// 8m before giving up.
-const retryBaseWait = 1 * time.Second
-
-// retryJitterPct is the percent jitter to add to each inter-retry wait.
-const retryJitterPct = 25
-
+// MessagingEngineConfig configures outbound message submission.
 type MessagingEngineConfig struct {
 	// RetryMax is the maximum number of times the engine will attempt to send
 	// an outbound message before permanently giving up.
-	RetryMax uint
+	RetryMax uint64
 	// RetryBaseWait is the duration to wait between the two first send attempts.
 	RetryBaseWait time.Duration
 	// RetryJitterPercent is the percent jitter to add to each inter-retry wait.
-	RetryJitterPercent uint
+	RetryJitterPercent uint64
 }
 
 // DefaultMessagingEngineConfig returns the config defaults. With 9 attempts and
@@ -61,9 +51,10 @@ func DefaultMessagingEngineConfig() MessagingEngineConfig {
 // The dkg.BrokerTunnel handles routing messages to/from the current DKG instance.
 type MessagingEngine struct {
 	log     zerolog.Logger
-	me      module.Local      // local object to identify the node
-	conduit network.Conduit   // network conduit for sending and receiving private messages
-	tunnel  *dkg.BrokerTunnel // tunnel for relaying private messages to and from controllers
+	me      module.Local          // local object to identify the node
+	conduit network.Conduit       // network conduit for sending and receiving private messages
+	tunnel  *dkg.BrokerTunnel     // tunnel for relaying private messages to and from controllers
+	config  MessagingEngineConfig // config for outbound message transmission
 
 	messageHandler *engine.MessageHandler // encapsulates enqueueing messages from network
 	notifier       engine.Notifier        // notifies inbound messages available for forwarding
@@ -82,11 +73,14 @@ func NewMessagingEngine(
 	net network.Network,
 	me module.Local,
 	tunnel *dkg.BrokerTunnel,
+	collector module.MempoolMetrics,
+	config MessagingEngineConfig,
 ) (*MessagingEngine, error) {
 	log = log.With().Str("engine", "dkg.messaging").Logger()
 
-	// TODO length observer metrics
-	inbound, err := fifoqueue.NewFifoQueue(1000)
+	inbound, err := fifoqueue.NewFifoQueue(
+		1000,
+		fifoqueue.WithLengthMetricObserver(metrics.ResourceDKGMessage, collector.MempoolEntries))
 	if err != nil {
 		return nil, fmt.Errorf("could not create inbound fifoqueue: %w", err)
 	}
@@ -104,6 +98,7 @@ func NewMessagingEngine(
 		messageHandler: messageHandler,
 		notifier:       notifier,
 		inbound:        inbound,
+		config:         config,
 	}
 
 	conduit, err := net.Register(channels.DKGCommittee, &eng)
@@ -216,9 +211,9 @@ func (e *MessagingEngine) forwardOutboundMessagesWorker(ctx irrecoverable.Signal
 // be resolved by broadcasting complaints in later phases.
 // ust be invoked as a goroutine.
 func (e *MessagingEngine) forwardOutboundMessage(ctx context.Context, message msg.PrivDKGMessageOut) {
-	backoff := retry.NewExponential(retryBaseWait)
-	backoff = retry.WithMaxRetries(retryMax, backoff)
-	backoff = retry.WithJitterPercent(retryJitterPct, backoff)
+	backoff := retry.NewExponential(e.config.RetryBaseWait)
+	backoff = retry.WithMaxRetries(e.config.RetryMax, backoff)
+	backoff = retry.WithJitterPercent(e.config.RetryJitterPercent, backoff)
 
 	started := time.Now()
 	log := e.log.With().Str("target", message.DestID.String()).Logger()
