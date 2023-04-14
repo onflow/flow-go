@@ -29,7 +29,7 @@ func createTestEngine(t *testing.T) *MessagingEngine {
 	// setup local with nodeID
 	nodeID := unittest.IdentifierFixture()
 	me := module.NewLocal(t)
-	me.On("NodeID").Return(nodeID)
+	me.On("NodeID").Return(nodeID).Maybe()
 
 	engine, err := NewMessagingEngine(
 		unittest.Logger(),
@@ -45,10 +45,10 @@ func createTestEngine(t *testing.T) *MessagingEngine {
 // TestForwardOutgoingMessages checks that the engine correctly forwards
 // outgoing messages from the tunnel's Out channel to the network conduit.
 func TestForwardOutgoingMessages(t *testing.T) {
-	// sender engine
 	engine := createTestEngine(t)
-	ctx := irrecoverable.NewMockSignalerContext(t, context.Background())
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
 	engine.Start(ctx)
+	defer cancel()
 
 	// expected DKGMessage
 	destinationID := unittest.IdentifierFixture()
@@ -74,8 +74,10 @@ func TestForwardOutgoingMessages(t *testing.T) {
 // TestForwardIncomingMessages checks that the engine correctly forwards
 // messages from the conduit to the tunnel's In channel.
 func TestForwardIncomingMessages(t *testing.T) {
-	// sender engine
-	e := createTestEngine(t)
+	engine := createTestEngine(t)
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
+	engine.Start(ctx)
+	defer cancel()
 
 	originID := unittest.IdentifierFixture()
 	expectedMsg := msg.PrivDKGMessageIn{
@@ -87,12 +89,12 @@ func TestForwardIncomingMessages(t *testing.T) {
 	// In channel
 	doneCh := make(chan struct{})
 	go func() {
-		receivedMsg := <-e.tunnel.MsgChIn
+		receivedMsg := <-engine.tunnel.MsgChIn
 		require.Equal(t, expectedMsg, receivedMsg)
 		close(doneCh)
 	}()
 
-	err := e.Process(channels.DKGCommittee, originID, &expectedMsg.DKGMessage)
+	err := engine.Process(channels.DKGCommittee, originID, &expectedMsg.DKGMessage)
 	require.NoError(t, err)
 
 	unittest.RequireCloseBefore(t, doneCh, time.Second, "message not received")

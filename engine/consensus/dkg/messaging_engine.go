@@ -34,15 +34,25 @@ const retryBaseWait = 1 * time.Second
 // retryJitterPct is the percent jitter to add to each inter-retry wait.
 const retryJitterPct = 25
 
-const nWorkers = 100
-
 type MessagingEngineConfig struct {
-	RetryMax           uint
-	RetryBaseWait      time.Time
+	// RetryMax is the maximum number of times the engine will attempt to send
+	// an outbound message before permanently giving up.
+	RetryMax uint
+	// RetryBaseWait is the duration to wait between the two first send attempts.
+	RetryBaseWait time.Duration
+	// RetryJitterPercent is the percent jitter to add to each inter-retry wait.
 	RetryJitterPercent uint
 }
 
-//func DefaultMessagingEngineConfig
+// DefaultMessagingEngineConfig returns the config defaults. With 9 attempts and
+// exponential backoff, this will retry for about 8m before giving up.
+func DefaultMessagingEngineConfig() MessagingEngineConfig {
+	return MessagingEngineConfig{
+		RetryMax:           9,
+		RetryBaseWait:      time.Second,
+		RetryJitterPercent: 25,
+	}
+}
 
 // MessagingEngine is an engine which sends and receives all DKG private messages.
 // The same engine instance is used for the lifetime of a node and will be used
@@ -66,7 +76,7 @@ type MessagingEngine struct {
 var _ network.MessageProcessor = (*MessagingEngine)(nil)
 var _ component.Component = (*MessagingEngine)(nil)
 
-// NewMessagingEngine returns a new engine.
+// NewMessagingEngine returns a new MessagingEngine.
 func NewMessagingEngine(
 	log zerolog.Logger,
 	net network.Network,
@@ -120,12 +130,14 @@ func (e *MessagingEngine) Process(channel channels.Channel, originID flow.Identi
 			e.log.Warn().Bool(logging.KeySuspicious, true).Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
 			return nil
 		}
-		// TODO add comment about Process errors...
-		return fmt.Errorf("unexpected failure to process inbound dkg message")
+		return fmt.Errorf("unexpected failure to process inbound dkg message: %w", err)
 	}
 	return nil
 }
 
+// forwardInboundMessagesWorker reads queued inbound messages and forwards them
+// through the broker tunnel to the DKG Controller for processing.
+// This is a worker routine which runs for the lifetime of the engine.
 func (e *MessagingEngine) forwardInboundMessagesWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -141,12 +153,13 @@ func (e *MessagingEngine) forwardInboundMessagesWorker(ctx irrecoverable.Signale
 	}
 }
 
+// popNextInboundMessage pops one message from the queue and returns it as the
+// appropriate type expected by the DKG controller.
 func (e *MessagingEngine) popNextInboundMessage() (msg.PrivDKGMessageIn, bool) {
 	nextMessage, ok := e.inbound.Pop()
 	if !ok {
 		return msg.PrivDKGMessageIn{}, false
 	}
-
 	asEngineWrapper := nextMessage.(*engine.Message)
 	asDKGMsg := asEngineWrapper.Payload.(*msg.DKGMessage)
 	originID := asEngineWrapper.OriginID
@@ -158,8 +171,11 @@ func (e *MessagingEngine) popNextInboundMessage() (msg.PrivDKGMessageIn, bool) {
 	return message, true
 }
 
+// forwardInboundMessagesWhileAvailable retrieves all inbound messages from the queue and
+// sends to the DKG Controller over the broker tunnel. Exists when the queue is empty.
 func (e *MessagingEngine) forwardInboundMessagesWhileAvailable(ctx context.Context) {
 	for {
+		started := time.Now()
 		message, ok := e.popNextInboundMessage()
 		if !ok {
 			return
@@ -169,11 +185,16 @@ func (e *MessagingEngine) forwardInboundMessagesWhileAvailable(ctx context.Conte
 		case <-ctx.Done():
 			return
 		case e.tunnel.MsgChIn <- message:
+			e.log.Debug().Dur("waited", time.Now().Sub(started)).Msg("forwarded DKG message to Broker")
 			continue
 		}
 	}
 }
 
+// forwardOutboundMessagesWorker reads outbound DKG messages created by our DKG Controller
+// and sends them to the appropriate other DKG participant. Each outbound message is sent
+// async in an ad-hoc goroutine, which internally manages retry backoff for the message.
+// This is a worker routine which runs for the lifetime of the engine.
 func (e *MessagingEngine) forwardOutboundMessagesWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -188,36 +209,42 @@ func (e *MessagingEngine) forwardOutboundMessagesWorker(ctx irrecoverable.Signal
 	}
 }
 
-// forwardOutboundMessage asynchronously attempts to forward a private
-// DKG message to a single other DKG participant, on a best effort basis.
-// Must be invoked as a goroutine.
+// forwardOutboundMessage transmits message to the target DKG participant.
+// Upon any error from the Unicast, we will retry with an exponential backoff.
+// After a limited number of attempts, we will log an error and exit.
+// The DKG protocol tolerates a number of failed private messages - these will
+// be resolved by broadcasting complaints in later phases.
+// ust be invoked as a goroutine.
 func (e *MessagingEngine) forwardOutboundMessage(ctx context.Context, message msg.PrivDKGMessageOut) {
 	backoff := retry.NewExponential(retryBaseWait)
 	backoff = retry.WithMaxRetries(retryMax, backoff)
 	backoff = retry.WithJitterPercent(retryJitterPct, backoff)
 
+	started := time.Now()
 	log := e.log.With().Str("target", message.DestID.String()).Logger()
 
-	attempts := 1
+	attempts := 0
 	err := retry.Do(ctx, backoff, func(ctx context.Context) error {
+		attempts++
 		err := e.conduit.Unicast(&message.DKGMessage, message.DestID)
-		// TODO Unicast fails to document expected errors, therefore we treat all errors as benign networking failures here
+		// TODO Unicast does not document expected errors, therefore we treat all errors as benign networking failures here
 		if err != nil {
 			log.Warn().
 				Err(err).
 				Int("attempt", attempts).
+				Dur("send_time", time.Now().Sub(started)).
 				Msgf("error sending dkg message on attempt %d - will retry...", attempts)
 		}
 
-		attempts++
 		return retry.RetryableError(err)
 	})
 
-	// TODO Unicast fails to document expected errors, therefore we treat all errors as benign networking failures here
+	// TODO Unicast does not document expected errors, therefore we treat all errors as benign networking failures here
 	if err != nil {
 		log.Error().
 			Err(err).
-			Int("attempt", attempts).
+			Int("total_attempts", attempts).
+			Dur("total_send_time", time.Now().Sub(started)).
 			Msgf("failed to send private dkg message after %d attempts - will not retry", attempts)
 	}
 }
