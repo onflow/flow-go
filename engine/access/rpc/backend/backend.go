@@ -93,6 +93,7 @@ func New(
 	fixedExecutionNodeIDs []string,
 	log zerolog.Logger,
 	snapshotHistoryLimit int,
+	archiveAddressList []string,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
@@ -108,13 +109,14 @@ func New(
 		state: state,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:           headers,
-			executionReceipts: executionReceipts,
-			connFactory:       connFactory,
-			state:             state,
-			log:               log,
-			metrics:           transactionMetrics,
-			loggedScripts:     loggedScripts,
+			headers:            headers,
+			executionReceipts:  executionReceipts,
+			connFactory:        connFactory,
+			state:              state,
+			log:                log,
+			metrics:            transactionMetrics,
+			loggedScripts:      loggedScripts,
+			archiveAddressList: archiveAddressList,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
