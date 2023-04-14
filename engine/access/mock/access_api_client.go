@@ -611,6 +611,39 @@ func (_m *AccessAPIClient) GetNetworkParameters(ctx context.Context, in *access.
 	return r0, r1
 }
 
+// GetNodeVersionInfo provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) GetNodeVersionInfo(ctx context.Context, in *access.GetNodeVersionInfoRequest, opts ...grpc.CallOption) (*access.GetNodeVersionInfoResponse, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *access.GetNodeVersionInfoResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetNodeVersionInfoRequest, ...grpc.CallOption) (*access.GetNodeVersionInfoResponse, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetNodeVersionInfoRequest, ...grpc.CallOption) *access.GetNodeVersionInfoResponse); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.GetNodeVersionInfoResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetNodeVersionInfoRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetTransaction provides a mock function with given fields: ctx, in, opts
 func (_m *AccessAPIClient) GetTransaction(ctx context.Context, in *access.GetTransactionRequest, opts ...grpc.CallOption) (*access.TransactionResponse, error) {
 	_va := make([]interface{}, len(opts))

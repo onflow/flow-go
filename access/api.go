@@ -105,6 +105,7 @@ type NetworkParameters struct {
 	ChainID flow.ChainID
 }
 
+// NodeVersionInfo
 type NodeVersionInfo struct {
 	Semver          string
 	Commit          string

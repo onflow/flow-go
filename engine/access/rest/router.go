@@ -108,3 +108,5 @@ var Routes = []route{{
 	Name:    "getNetworkParameters",
 	Handler: GetNetworkParameters,
 }}
+
+//Router NodeVerionInfo
