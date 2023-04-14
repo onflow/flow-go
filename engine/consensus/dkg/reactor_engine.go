@@ -12,7 +12,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
@@ -47,6 +49,9 @@ type ReactorEngine struct {
 	controllerFactory module.DKGControllerFactory
 	viewEvents        events.Views
 	pollStep          uint64
+
+	cm *component.ComponentManager
+	component.Component
 }
 
 // NewReactorEngine return a new ReactorEngine.
@@ -63,7 +68,7 @@ func NewReactorEngine(
 		Str("engine", "dkg.reactor").
 		Logger()
 
-	return &ReactorEngine{
+	eng := &ReactorEngine{
 		unit:              engine.NewUnit(),
 		log:               logger,
 		me:                me,
@@ -73,53 +78,40 @@ func NewReactorEngine(
 		viewEvents:        viewEvents,
 		pollStep:          DefaultPollStep,
 	}
+
+	eng.cm = component.NewComponentManagerBuilder().Build() // TODO workers
+	eng.Component = eng.cm
+
+	return eng
 }
 
-// Ready implements the module ReadyDoneAware interface. It returns a channel
-// that will close when the engine has successfully started.
-func (e *ReactorEngine) Ready() <-chan struct{} {
-	return e.unit.Ready(func() {
-		// If we are starting up in the EpochSetup phase, try to start the DKG.
-		// If the DKG for this epoch has been started previously, we will exit
-		// and fail this epoch's DKG.
-		snap := e.State.Final()
+// Start starts the engine. If we are starting up in the EpochSetup phase, try to start the DKG.
+// If the DKG for this epoch has been started previously, we will exit and fail this epoch's DKG.
+func (e *ReactorEngine) Start(ctx irrecoverable.SignalerContext) {
+	snap := e.State.Final()
+	phase, err := snap.Phase()
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to check epoch phase when starting DKG reactor engine: %w", err))
+		return
+	}
+	currentCounter, err := snap.Epochs().Current().Counter()
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to retrieve current epoch counter when starting DKG reactor engine: %w", err))
+		return
+	}
+	first, err := snap.Head()
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to retrieve finalized header when starting DKG reactor engine: %w", err))
+		return
+	}
 
-		phase, err := snap.Phase()
-		if err != nil {
-			// unexpected storage-level error
-			// TODO use irrecoverable context
-			e.log.Fatal().Err(err).Msg("failed to check epoch phase when starting DKG reactor engine")
-			return
-		}
-		currentCounter, err := snap.Epochs().Current().Counter()
-		if err != nil {
-			// unexpected storage-level error
-			// TODO use irrecoverable context
-			e.log.Fatal().Err(err).Msg("failed to retrieve current epoch counter when starting DKG reactor engine")
-			return
-		}
-		first, err := snap.Head()
-		if err != nil {
-			// unexpected storage-level error
-			// TODO use irrecoverable context
-			e.log.Fatal().Err(err).Msg("failed to retrieve finalized header when starting DKG reactor engine")
-			return
-		}
-
-		// If we start up in EpochSetup phase, attempt to start the DKG in case it wasn't started previously
-		if phase == flow.EpochPhaseSetup {
-			e.startDKGForEpoch(currentCounter, first)
-		} else if phase == flow.EpochPhaseCommitted {
-			// If we start up in EpochCommitted phase, ensure the DKG end state is set correctly.
-			e.handleEpochCommittedPhaseStarted(currentCounter, first)
-		}
-	})
-}
-
-// Done implements the module ReadyDoneAware interface. It returns a channel
-// that will close when the engine has successfully stopped.
-func (e *ReactorEngine) Done() <-chan struct{} {
-	return e.unit.Done()
+	// If we start up in EpochSetup phase, attempt to start the DKG in case it wasn't started previously
+	if phase == flow.EpochPhaseSetup {
+		e.startDKGForEpoch(currentCounter, first)
+	} else if phase == flow.EpochPhaseCommitted {
+		// If we start up in EpochCommitted phase, ensure the DKG end state is set correctly.
+		e.handleEpochCommittedPhaseStarted(currentCounter, first)
+	}
 }
 
 // EpochSetupPhaseStarted handles the EpochSetupPhaseStarted protocol event by

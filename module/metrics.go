@@ -313,6 +313,9 @@ type HotstuffMetrics interface {
 	PayloadProductionDuration(duration time.Duration)
 }
 
+type DKGMetrics interface {
+}
+
 type CollectionMetrics interface {
 	// TransactionIngested is called when a new transaction is ingested by the
 	// node. It increments the total count of ingested transactions and starts

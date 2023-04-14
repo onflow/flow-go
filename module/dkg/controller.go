@@ -92,12 +92,10 @@ type Controller struct {
 	endCh      chan struct{}
 	shutdownCh chan struct{}
 
-	// private fields that hold the DKG artifacts when the protocol runs to
-	// completion
+	// private fields that hold the DKG artifacts when the protocol runs to completion
 	privateShare   crypto.PrivateKey
 	publicKeys     []crypto.PublicKey
 	groupPublicKey crypto.PublicKey
-
 	// artifactsLock protects access to artifacts
 	artifactsLock sync.Mutex
 

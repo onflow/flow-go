@@ -13,18 +13,16 @@ type DKGContractClient interface {
 
 	// Broadcast broadcasts a message to all other nodes participating in the
 	// DKG. The message is broadcast by submitting a transaction to the DKG
-	// smart contract. An error is returned if the transaction has failed has
-	// failed.
-	// TBD: retry logic
+	// smart contract. An error is returned if the transaction has failed.
 	Broadcast(msg messages.BroadcastDKGMessage) error
 
 	// ReadBroadcast reads the broadcast messages from the smart contract.
 	// Messages are returned in the order in which they were broadcast (received
 	// and stored in the smart contract). The parameters are:
 	//
-	// * fromIndex: return messages with index >= fromIndex
-	// * referenceBlock: a marker for the state against which the query should
-	//   be executed
+	//  - fromIndex: return messages with index >= fromIndex
+	//  - referenceBlock: a marker for the state against which the query should
+	//    be executed
 	//
 	// DKG nodes should call ReadBroadcast one final time once they have
 	// observed the phase deadline trigger to guarantee they receive all
