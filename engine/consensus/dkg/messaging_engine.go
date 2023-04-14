@@ -180,7 +180,7 @@ func (e *MessagingEngine) forwardInboundMessagesWhileAvailable(ctx context.Conte
 		case <-ctx.Done():
 			return
 		case e.tunnel.MsgChIn <- message:
-			e.log.Debug().Dur("waited", time.Now().Sub(started)).Msg("forwarded DKG message to Broker")
+			e.log.Debug().Dur("waited", time.Since(started)).Msg("forwarded DKG message to Broker")
 			continue
 		}
 	}
@@ -227,7 +227,7 @@ func (e *MessagingEngine) forwardOutboundMessage(ctx context.Context, message ms
 			log.Warn().
 				Err(err).
 				Int("attempt", attempts).
-				Dur("send_time", time.Now().Sub(started)).
+				Dur("send_time", time.Since(started)).
 				Msgf("error sending dkg message on attempt %d - will retry...", attempts)
 		}
 
@@ -239,7 +239,7 @@ func (e *MessagingEngine) forwardOutboundMessage(ctx context.Context, message ms
 		log.Error().
 			Err(err).
 			Int("total_attempts", attempts).
-			Dur("total_send_time", time.Now().Sub(started)).
+			Dur("total_send_time", time.Since(started)).
 			Msgf("failed to send private dkg message after %d attempts - will not retry", attempts)
 	}
 }
