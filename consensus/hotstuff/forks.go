@@ -44,7 +44,7 @@ type Forks interface {
 	// blocks beyond the finalized root block it was initialized with.
 	FinalityProof() (*FinalityProof, bool)
 
-	// AddProposal appends the given block to the tree of pending
+	// AddValidatedBlock appends the validated block to the tree of pending
 	// blocks and updates the latest finalized block (if applicable). Unless the parent is
 	// below the pruning threshold (latest finalized view), we require that the parent is
 	// already stored in Forks. Calling this method with previously processed blocks
@@ -69,7 +69,7 @@ type Forks interface {
 	//     breaking the safety guarantees of HotStuff (or there is a critical bug / data
 	//     corruption). Forks cannot recover from this exception.
 	//   - All other errors are potential symptoms of bugs or state corruption.
-	AddProposal(proposal *model.Block) error
+	AddValidatedBlock(proposal *model.Block) error
 
 	// AddCertifiedBlock appends the given certified block to the tree of pending
 	// blocks and updates the latest finalized block (if finalization progressed).
