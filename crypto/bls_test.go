@@ -1018,7 +1018,7 @@ func TestBLSErrorTypes(t *testing.T) {
 
 // VerifyBLSSignatureManyMessages bench
 // Bench the slowest case where all messages and public keys are distinct.
-// (2*n) pairings without aggrgetion Vs (n+1) pairings with aggregation.
+// (2*n) pairings without aggregation Vs (n+1) pairings with aggregation.
 // The function is faster whenever there are redundant messages or public keys.
 func BenchmarkVerifySignatureManyMessages(b *testing.B) {
 	// inputs

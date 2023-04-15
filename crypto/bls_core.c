@@ -525,9 +525,10 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
         if ( read_ret != RLC_OK || check_membership_G1(&sigs[i]) != VALID) {
             if (read_ret == UNDEFINED) // unexpected error case 
                 goto out;
-            // set signature as infinity and set result as invald
+            // set signature and key to infinity (no effect on the aggregation tree)
+            // and set result to invalid
             ep_set_infty(&sigs[i]);
-            ep2_copy(&pks[i], (ep2_st*) &pks_input[i]);
+            ep2_set_infty(&pks[i]);
             results[i] = INVALID;
         // multiply signatures and public keys at the same index by random coefficients
         } else {
