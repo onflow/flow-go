@@ -472,7 +472,6 @@ func VerifyBLSSignatureManyMessages(
 func BatchVerifyBLSSignaturesOneMessage(
 	pks []PublicKey, sigs []Signature, message []byte, kmac hash.Hasher,
 ) ([]bool, error) {
-
 	// empty list check
 	if len(pks) == 0 {
 		return []bool{}, fmt.Errorf("invalid list of public keys: %w", blsAggregateEmptyListError)
@@ -485,38 +484,48 @@ func BatchVerifyBLSSignaturesOneMessage(
 			len(sigs))
 	}
 
-	verifBool := make([]bool, len(sigs))
-	if err := checkBLSHasher(kmac); err != nil {
-		return verifBool, err
+	// return boolean array
+	returnBool := make([]bool, len(sigs))
+	// temporary boolean array to hold the return values till all the return values are set
+	tmpBool := make([]bool, len(sigs))
+	for i := range tmpBool {
+		tmpBool[i] = true // default to true
 	}
-
-	// an invalid signature with an incorrect header but correct length
-	invalidSig := make([]byte, signatureLengthBLSBLS12381)
-	invalidSig[0] = invalidBLSSignatureHeader // incorrect header
+	if err := checkBLSHasher(kmac); err != nil {
+		return returnBool, err
+	}
 
 	// flatten the shares (required by the C layer)
 	flatSigs := make([]byte, 0, signatureLengthBLSBLS12381*len(sigs))
 	pkPoints := make([]pointG2, 0, len(pks))
 
+	getIdentityPoint := func() pointG2 {
+		pk, _ := IdentityBLSPublicKey().(*pubKeyBLSBLS12381) // second value is guaranteed to be true
+		return pk.point
+	}
+
 	for i, pk := range pks {
 		pkBLS, ok := pk.(*pubKeyBLSBLS12381)
 		if !ok {
-			return verifBool, fmt.Errorf("key at index %d is invalid: %w", i, notBLSKeyError)
+			return returnBool, fmt.Errorf("key at index %d is invalid: %w", i, notBLSKeyError)
 		}
-		pkPoints = append(pkPoints, pkBLS.point)
 
 		if len(sigs[i]) != signatureLengthBLSBLS12381 || pkBLS.isIdentity {
-			// force the signature to be invalid by replacing it with an invalid array
-			// that fails the deserialization in C.ep_read_bin_compact
-			flatSigs = append(flatSigs, invalidSig...)
+			// case of invalid signature: set the signature and public key at index `i`
+			// to identities so that there is no effect on the aggregation tree computation.
+			// However, the boolean return for index `i` is set to `false` and won't be overwritten.
+			tmpBool[i] = false
+			pkPoints = append(pkPoints, getIdentityPoint())
+			flatSigs = append(flatSigs, identityBLSSignature...)
 		} else {
+			pkPoints = append(pkPoints, pkBLS.point)
 			flatSigs = append(flatSigs, sigs[i]...)
 		}
 	}
 
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(message)
-	verifInt := make([]byte, len(verifBool))
+	verifInt := make([]byte, len(returnBool))
 
 	C.bls_batchVerify(
 		(C.int)(len(verifInt)),
@@ -529,12 +538,16 @@ func BatchVerifyBLSSignaturesOneMessage(
 
 	for i, v := range verifInt {
 		if (C.int)(v) != valid && (C.int)(v) != invalid {
-			return verifBool, fmt.Errorf("batch verification failed")
+			return returnBool, fmt.Errorf("batch verification failed")
 		}
-		verifBool[i] = ((C.int)(v) == valid)
+		if tmpBool[i] { // only overwrite if not previously written
+			tmpBool[i] = ((C.int)(v) == valid)
+		}
 	}
 
-	return verifBool, nil
+	// make sure returnBool is []false till this point
+	copy(returnBool, tmpBool)
+	return returnBool, nil
 }
 
 // blsAggregateEmptyListError is returned when a list of BLS objects (e.g. signatures or keys)

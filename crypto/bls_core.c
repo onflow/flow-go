@@ -494,29 +494,27 @@ void bls_batchVerify(const int sigs_len, byte* results, const G2* pks_input,
         // the tree aggregations remain valid.
         // - valid points are multiplied by a random scalar (same for public keys at same index)
         // to make sure a signature at index (i) is verified against the public key at the same index.
-        
-        // choose a random non-zero coefficient of at least 128 bits
-        // TODO: find a way to generate randoms
-        bn_rand(r, RLC_POS, SEC_BITS); 
-        bn_add_dig(r, r, 1); 
-        Fr* tmp = Fr_relic_to_blst(r);
-        // multiply public key by the random exponent
-        E2_mult(&pks[i], &pks_input[i], tmp);  
-
         int read_ret = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
         if (read_ret != RLC_OK || check_membership_G1(&sigs[i]) != VALID) {
             if (read_ret == UNDEFINED) {// unexpected error case 
                 goto out;
             };
-            // set signature as infinity and set result as invalid
-            // this result won't be overwritten
+            // set signature and key to infinity (no effect on the aggregation tree)
+            // and set result to invalid (result won't be overwritten)
+            E2_set_infty(&pks[i]);
             ep_set_infty(&sigs[i]);   
             results[i] = INVALID; 
         } else {
-            // multiply the signature by the same random exponent
+            // choose a random non-zero coefficient of at least 128 bits
+            // TODO: find a way to generate randoms
+            bn_rand(r, RLC_POS, SEC_BITS); 
+            bn_add_dig(r, r, 1); 
+            Fr* tmp = Fr_relic_to_blst(r);
+            // multiply public key and signature by the same random exponent
+            E2_mult(&pks[i], &pks_input[i], tmp); 
+            free(tmp);  
             ep_mul_lwnaf(&sigs[i], &sigs[i], r);   
-        }
-        free(tmp);  
+        } 
     }
     // build a binary tree of aggreagtions
     node* root = build_tree(sigs_len, &pks[0], &sigs[0]);

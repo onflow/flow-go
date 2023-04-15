@@ -174,7 +174,7 @@ void Fr_copy(Fr* res, const Fr* a) {
 
 // sets `a` to 0
 void Fr_set_zero(Fr* a){
-    vec_zero((byte*)a, Fr_BYTES);
+    vec_zero((byte*)a, sizeof(Fr));
 }
 
 void Fr_add(Fr *res, const Fr *a, const Fr *b) {
@@ -313,7 +313,7 @@ BLST_ERROR Fr_read_bytes(Fr* a, const uint8_t *bin, int len) {
     if (!check_mod_256(tmp, BLS12_381_r)) {  // check_mod_256 compares pow256 against a vec256!
         return BLST_BAD_SCALAR;
     }
-    vec_zero(tmp, Fr_BYTES);
+    vec_zero(tmp, sizeof(tmp));
     limbs_from_be_bytes((limb_t*)a, bin, Fr_BYTES);
     return BLST_SUCCESS;
 }
@@ -383,12 +383,12 @@ const limb_t BLS12_381_pR[Fp_LIMBS] = { ONE_MONT_P };  /* (1<<384)%p */
 
 // sets `a` to 0
 void Fp_set_zero(Fp* a){
-    vec_zero((byte*)a, Fp_BYTES);
+    vec_zero((byte*)a, sizeof(Fp));
 }
 
 // sets `a` to limb `l`
 void Fp_set_limb(Fp* a, const limb_t l){
-    vec_zero((byte*)a + sizeof(limb_t), Fp_BYTES - sizeof(limb_t));
+    vec_zero((byte*)a + sizeof(limb_t), sizeof(Fp) - sizeof(limb_t));
     *((limb_t*)a) = l;
 }
 
@@ -949,12 +949,12 @@ void E2_write_bytes(byte *bin, const G2* a) {
 
 // set p to infinity
 void E2_set_infty(G2* p) {
-    vec_zero(p, G2_BYTES);
+    vec_zero(p, sizeof(G2));
 }
 
 // check if `p` is infinity
 bool_t E2_is_infty(const G2* p) {
-    return vec_is_zero(p, sizeof(*p));
+    return vec_is_zero(p, sizeof(G2));
 }
 
 // checks affine point `p` is in E2
