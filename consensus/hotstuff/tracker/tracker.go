@@ -1,6 +1,7 @@
 package tracker
 
 import (
+	"github.com/onflow/flow-go/utils/trackers"
 	"unsafe"
 
 	"go.uber.org/atomic"
@@ -94,11 +95,10 @@ type NewestBlockTracker struct {
 	newestBlock *atomic.UnsafePointer
 }
 
-func NewNewestBlockTracker() *NewestBlockTracker {
-	tracker := &NewestBlockTracker{
-		newestBlock: atomic.NewUnsafePointer(unsafe.Pointer(nil)),
-	}
-	return tracker
+func NewNewestBlockTracker() trackers.MonotonicEntityTracker[model.Block] {
+	return trackers.NewNewestEntityTracker[model.Block](func(a, b *model.Block) bool {
+		return a.View > b.View
+	})
 }
 
 // Track updates local state of newestBlock if the provided instance is newer (by view)

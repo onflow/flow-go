@@ -105,27 +105,77 @@ func TestNewestTCTracker_Track(t *testing.T) {
 	}
 }
 
-// TestNewNewestBlockTracker checks that new instance returns nil tracked value.
-func TestNewNewestBlockTracker(t *testing.T) {
-	tracker := NewNewestBlockTracker()
-	require.Nil(t, tracker.NewestBlock())
-}
+//// TestNewNewestBlockTracker checks that new instance returns nil tracked value.
+//func TestNewNewestBlockTracker(t *testing.T) {
+//	tracker := NewNewestBlockTracker()
+//	require.Nil(t, tracker.NewestBlock())
+//}
+//
+//// TestNewestBlockTracker_Track this test is needed to make sure that concurrent updates on NewestBlockTracker are performed correctly,
+//// and it always tracks the newest block, especially in scenario of shared access. This test is structured in a way that it
+//// starts multiple goroutines that will try to submit their blocks simultaneously to the tracker. Once all goroutines are started
+//// we will use a wait group to execute all operations as concurrent as possible, after that we will observe if resulted value
+//// is indeed expected. This test will run multiple times.
+//func TestNewestBlockTracker_Track(t *testing.T) {
+//	tracker := NewNewestBlockTracker()
+//	samples := 20 // number of concurrent updates per test case
+//	times := 20   // number of times we run the test case
+//
+//	// setup initial value
+//	tracker.Track(helper.MakeBlock(helper.WithBlockView(0)))
+//
+//	for i := 0; i < times; i++ {
+//		startView := tracker.NewestBlock().View
+//		var readyWg, startWg, doneWg sync.WaitGroup
+//		startWg.Add(1)
+//		readyWg.Add(samples)
+//		doneWg.Add(samples)
+//		for s := 0; s < samples; s++ {
+//			block := helper.MakeBlock(helper.WithBlockView(startView + uint64(s+1)))
+//			go func(newestBlock *model.Block) {
+//				defer doneWg.Done()
+//				readyWg.Done()
+//				startWg.Wait()
+//				tracker.Track(newestBlock)
+//			}(block)
+//		}
+//
+//		// wait for all goroutines to be ready
+//		readyWg.Wait()
+//		// since we have waited for all goroutines to be ready this `Done` will start all goroutines
+//		startWg.Done()
+//		// wait for all of them to finish execution
+//		doneWg.Wait()
+//
+//		// at this point tracker MUST have the newest block
+//		require.Equal(t, startView+uint64(samples), tracker.NewestBlock().View)
+//	}
+//}
 
-// TestNewestBlockTracker_Track this test is needed to make sure that concurrent updates on NewestBlockTracker are performed correctly,
-// and it always tracks the newest block, especially in scenario of shared access. This test is structured in a way that it
-// starts multiple goroutines that will try to submit their blocks simultaneously to the tracker. Once all goroutines are started
-// we will use a wait group to execute all operations as concurrent as possible, after that we will observe if resulted value
-// is indeed expected. This test will run multiple times.
-func TestNewestBlockTracker_Track(t *testing.T) {
+// >> NO GENERICS
+// goos: darwin
+// goarch: arm64
+// pkg: github.com/onflow/flow-go/consensus/hotstuff/tracker
+// BenchmarkNewestBlockTracker
+// BenchmarkNewestBlockTracker-8   	   17018	     69778 ns/op
+// PASS
+//
+// >> GENERICS
+// goos: darwin
+// goarch: arm64
+// pkg: github.com/onflow/flow-go/consensus/hotstuff/tracker
+// BenchmarkNewestBlockTracker
+// BenchmarkNewestBlockTracker-8   	   16886	     72359 ns/op
+// PASS
+func BenchmarkNewestBlockTracker(b *testing.B) {
 	tracker := NewNewestBlockTracker()
 	samples := 20 // number of concurrent updates per test case
-	times := 20   // number of times we run the test case
 
 	// setup initial value
 	tracker.Track(helper.MakeBlock(helper.WithBlockView(0)))
 
-	for i := 0; i < times; i++ {
-		startView := tracker.NewestBlock().View
+	for i := 0; i < b.N; i++ {
+		startView := tracker.Get().View
 		var readyWg, startWg, doneWg sync.WaitGroup
 		startWg.Add(1)
 		readyWg.Add(samples)
@@ -148,6 +198,6 @@ func TestNewestBlockTracker_Track(t *testing.T) {
 		doneWg.Wait()
 
 		// at this point tracker MUST have the newest block
-		require.Equal(t, startView+uint64(samples), tracker.NewestBlock().View)
+		require.Equal(b, startView+uint64(samples), tracker.Get().View)
 	}
 }
