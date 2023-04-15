@@ -47,7 +47,7 @@ func TestHasherErrors(t *testing.T) {
 
 // tests sign and verify are consistent for multiple generated keys and messages
 func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
-	t.Run(fmt.Sprintf("Testing Generation/Signature/Verification for %s", salg), func(t *testing.T) {
+	t.Run(fmt.Sprintf("Generation/Signature/Verification for %s", salg), func(t *testing.T) {
 		seed := make([]byte, KeyGenSeedMinLen)
 		input := make([]byte, 100)
 		r := time.Now().UnixNano()
@@ -100,7 +100,6 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 			require.NoError(t, err)
 			assert.False(t, result, fmt.Sprintf(
 				"Verification should fail:\n signature:%s\n with invalid length %d", invalidSig, invalidLen))
-
 		}
 	})
 }
@@ -154,7 +153,7 @@ func testKeyGenSeed(t *testing.T, salg SigningAlgorithm, minLen int, maxLen int)
 }
 
 func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
-	t.Run(fmt.Sprintf("Testing encode/decode for %s", salg), func(t *testing.T) {
+	t.Run(fmt.Sprintf("encode/decode for %s", salg), func(t *testing.T) {
 		r := time.Now().UnixNano()
 		mrand.Seed(r)
 		t.Logf("math rand seed is %d", r)
@@ -259,7 +258,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 }
 
 func testEquals(t *testing.T, salg SigningAlgorithm, otherSigAlgo SigningAlgorithm) {
-	t.Run(fmt.Sprintf("Testing Equals for %s", salg), func(t *testing.T) {
+	t.Run(fmt.Sprintf("equals for %s", salg), func(t *testing.T) {
 		r := time.Now().UnixNano()
 		mrand.Seed(r)
 		t.Logf("math rand seed is %d", r)
@@ -304,7 +303,7 @@ func testEquals(t *testing.T, salg SigningAlgorithm, otherSigAlgo SigningAlgorit
 }
 
 func testKeysAlgorithm(t *testing.T, sk PrivateKey, salg SigningAlgorithm) {
-	t.Run(fmt.Sprintf("Testing key.Algorithm for %s", salg), func(t *testing.T) {
+	t.Run(fmt.Sprintf("key.Algorithm for %s", salg), func(t *testing.T) {
 		alg := sk.Algorithm()
 		assert.Equal(t, alg, salg)
 		alg = sk.PublicKey().Algorithm()
@@ -313,7 +312,7 @@ func testKeysAlgorithm(t *testing.T, sk PrivateKey, salg SigningAlgorithm) {
 }
 
 func testKeySize(t *testing.T, sk PrivateKey, skLen int, pkLen int) {
-	t.Run(fmt.Sprintf("Testing key.Size for %s", sk.Algorithm()), func(t *testing.T) {
+	t.Run(fmt.Sprintf("key.Size for %s", sk.Algorithm()), func(t *testing.T) {
 		size := sk.Size()
 		assert.Equal(t, size, skLen)
 		size = sk.PublicKey().Size()

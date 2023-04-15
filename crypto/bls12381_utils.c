@@ -393,7 +393,7 @@ void Fp_set_limb(Fp* a, const limb_t l){
 }
 
 void Fp_copy(Fp* res, const Fp* a) {
-    vec_copy((byte*)res, (byte*)a, sizeof(Fr));
+    vec_copy((byte*)res, (byte*)a, sizeof(Fp));
 }
 
 static void Fp_add(Fp *res, const Fp *a, const Fp *b) {
