@@ -114,6 +114,13 @@ func invalidSK(t *testing.T) PrivateKey {
 	return sk
 }
 
+// Utility function that flips a point sign bit to negate the point
+// this is shortcut which works only for zcash BLS12-381 compressed serialization
+// Applicable to both signatures and public keys
+func negatePoint(pointbytes []byte) {
+	pointbytes[0] ^= 0x20
+}
+
 // BLS tests
 func TestBLSBLS12381Hasher(t *testing.T) {
 	// generate a key pair
@@ -672,6 +679,27 @@ func TestBLSBatchVerify(t *testing.T) {
 			sigs, sks, input, valid)
 	})
 
+	// valid signatures but indices aren't correct: sig[i] is correct under pks[j]
+	// and sig[j] is correct under pks[j].
+	// implementations simply aggregating all signatures and keys would fail this test.
+	t.Run("valid signatures with incorrect indices", func(t *testing.T) {
+		i := mrand.Intn(sigsNum-1) + 1
+		j := mrand.Intn(i)
+		// swap correct keys
+		pks[i], pks[j] = pks[j], pks[i]
+
+		valid, err := BatchVerifyBLSSignaturesOneMessage(pks, sigs, input, kmac)
+		require.NoError(t, err)
+		expectedValid[i], expectedValid[j] = false, false
+		assert.Equal(t, valid, expectedValid,
+			"Verification of %s failed, private keys are %s, input is %x, results is %v",
+			sigs, sks, input, valid)
+
+		// restore keys
+		pks[i], pks[j] = pks[j], pks[i]
+		expectedValid[i], expectedValid[j] = true, true
+	})
+
 	// one valid signature
 	t.Run("one valid signature", func(t *testing.T) {
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks[:1], sigs[:1], input, kmac)
@@ -695,7 +723,6 @@ func TestBLSBatchVerify(t *testing.T) {
 
 	// some signatures are invalid
 	t.Run("some signatures are invalid", func(t *testing.T) {
-
 		for i := 0; i < invalidSigsNum; i++ { // alter invalidSigsNum random signatures
 			alterSignature(sigs[indices[i]])
 			expectedValid[indices[i]] = false
@@ -1096,7 +1123,6 @@ func TestBLSIdentity(t *testing.T) {
 	t.Run("identity signature comparison", func(t *testing.T) {
 		// verify that constructed identity signatures are recognized as such by IsBLSSignatureIdentity.
 		// construct identity signature by summing (aggregating) a random signature and its inverse.
-
 		assert.True(t, IsBLSSignatureIdentity(identityBLSSignature))
 
 		// sum up a random signature and its inverse to get identity
@@ -1106,7 +1132,7 @@ func TestBLSIdentity(t *testing.T) {
 		require.NoError(t, err)
 		oppositeSig := make([]byte, signatureLengthBLSBLS12381)
 		copy(oppositeSig, sig)
-		oppositeSig[0] ^= 0x20 // flip the last 3rd bit to flip the point sign
+		negatePoint(oppositeSig)
 		aggSig, err := AggregateBLSSignatures([]Signature{sig, oppositeSig})
 		require.NoError(t, err)
 		assert.True(t, IsBLSSignatureIdentity(aggSig))
