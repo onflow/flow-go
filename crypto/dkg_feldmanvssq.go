@@ -510,7 +510,7 @@ func (s *feldmanVSSQualState) checkComplaint(complainer index, c *complaint) boo
 	// check y[complainer] == share.G2
 	return C.verify_share(
 		(*C.Fr)(&c.answer),
-		(*C.G2)(&s.y[complainer])) != 0
+		(*C.G2)(&s.y[complainer])) == 0
 }
 
 // data = |complainee|

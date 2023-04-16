@@ -18,9 +18,9 @@ import (
 var gt *testing.T
 
 func TestDKG(t *testing.T) {
-	//t.Run("FeldmanVSSSimple", testFeldmanVSSSimple)
+	t.Run("FeldmanVSSSimple", testFeldmanVSSSimple)
 	t.Run("FeldmanVSSQual", testFeldmanVSSQual)
-	//t.Run("JointFeldman", testJointFeldman)
+	t.Run("JointFeldman", testJointFeldman)
 }
 
 // optimal threshold (t) to allow the largest number of malicious participants (m)
