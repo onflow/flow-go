@@ -1037,7 +1037,7 @@ void E2_sum_vector(G2* jointy, const G2* y, const int len){
 // Membership check in G2 of both keys is not verified in this function.
 // the membership check in G2 is separated to allow optimizing multiple verifications 
 // using the same public keys.
-int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const byte* sig2) {  
+int bls_spock_verify(const G2* pk1, const byte* sig1, const G2* pk2, const byte* sig2) {  
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
 
@@ -1063,11 +1063,14 @@ int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const b
 
     // elemsG2[1] = pk1
     ep2_new(elemsG2[1]);
-    ep2_copy(elemsG2[1], (ep2_st*)pk1);
+    ep2_st* tmp = E2_blst_to_relic(pk1);
+    ep2_copy(elemsG2[1], tmp);
 
     // elemsG2[0] = pk2
     ep2_new(elemsG2[0]);
-    ep2_copy(elemsG2[0], (ep2_st*)pk2);
+    tmp = E2_blst_to_relic(pk2);
+    ep2_copy(elemsG2[0], tmp);
+    free(tmp);
 
 #if DOUBLE_PAIRING  
     // elemsG2[0] = -pk2

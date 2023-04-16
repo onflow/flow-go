@@ -90,7 +90,7 @@ int      get_invalid();
 int      get_Fr_BYTES();
 
 // BLS based SPoCK
-int bls_spock_verify(const ep2_t, const byte*, const ep2_t, const byte*);
+int bls_spock_verify(const G2*, const byte*, const G2*, const byte*);
 
 // hash to curve functions (functions in bls12381_hashtocurve.c)
 void     map_to_G1(ep_t, const byte*, const int);

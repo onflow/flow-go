@@ -3,7 +3,6 @@
 
 package crypto
 
-/*
 // SPoCK design based on the BLS signature scheme.
 // BLS is using BLS12-381 curve and the same settings in bls.go.
 
@@ -105,4 +104,3 @@ func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signatur
 		return false, fmt.Errorf("SPoCK verification failed")
 	}
 }
-*/
