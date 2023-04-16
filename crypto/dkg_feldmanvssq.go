@@ -3,7 +3,6 @@
 
 package crypto
 
-/*
 // #cgo CFLAGS:
 // #include "dkg_include.h"
 import "C"
@@ -509,8 +508,9 @@ func (s *feldmanVSSQualState) buildAndBroadcastComplaintAnswer(complainee index)
 // - true if the complaint answer is not correct
 func (s *feldmanVSSQualState) checkComplaint(complainer index, c *complaint) bool {
 	// check y[complainer] == share.G2
-	return C.verifyshare((*C.Fr)(&c.answer),
-		(*C.G2)(&s.y[complainer])) == 0
+	return C.verify_share(
+		(*C.Fr)(&c.answer),
+		(*C.G2)(&s.y[complainer])) != 0
 }
 
 // data = |complainee|
@@ -669,4 +669,3 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		}
 	}
 }
-*/

@@ -5,11 +5,11 @@
 
 #include "bls12381_utils.h"
 
-void Fr_polynomialImage_export(byte* out, ep2_t y, const Fr* a, const int a_size, const byte x);
-void Fr_polynomialImage(Fr* out, ep2_t y, const Fr* a, const int a_size, const byte x);
-void G2_polynomialImages(ep2_st* y, const int len_y, const ep2_st* A, const int len_A);
-void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len);
-int  G2_vector_read_bin(ep2_st* A, const byte* src, const int len);
-int  verifyshare(const Fr* x, const ep2_t y);
+void        Fr_polynomial_image_export(byte* out, G2* y, const Fr* a, const int a_size, const byte x);
+void        Fr_polynomial_image(Fr* out, G2* y, const Fr* a, const int a_size, const byte x);
+void        G2_polynomial_images(G2* y, const int len_y, const G2* A, const int len_A);
+void        G2_vector_write_bytes(byte* out, const G2* A, const int len);
+BLST_ERROR  G2_vector_read_bytes(G2* A, const byte* src, const int len);
+bool_t      verify_share(const Fr* x, const G2* y);
 
 #endif

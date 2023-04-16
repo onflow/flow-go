@@ -3,7 +3,6 @@
 
 package crypto
 
-/*
 // #cgo CFLAGS:
 // #include "bls_thresholdsign_include.h"
 import "C"
@@ -580,7 +579,7 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	}
 	// compute the shares
 	for i := index(1); int(i) <= size; i++ {
-		C.Fr_polynomialImage(
+		C.Fr_polynomial_image(
 			(*C.Fr)(&x[i-1]),
 			(*C.G2)(&y[i-1]),
 			(*C.Fr)(&a[0]), (C.int)(len(a)),
@@ -604,4 +603,3 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	// generating an identity key is therefore negligible.
 	return skShares, pkShares, pkGroup, nil
 }
-*/

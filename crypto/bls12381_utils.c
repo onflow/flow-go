@@ -293,6 +293,7 @@ static void pow256_from_be_bytes(pow256 ret, const unsigned char a[Fr_BYTES])
     }
 }
 
+// internal type of BLST `pow256` uses bytes little endian.
 static void pow256_from_Fr(pow256 ret, const Fr* in) {
     le_bytes_from_limbs(ret, (limb_t*)in, Fr_BYTES);
 }
@@ -998,10 +999,19 @@ static void E2_neg(G2* a) {
 }
 
 // Exponentiation of a generic point `a` in E2, res = expo.a
-void E2_mult(G2* res, const G2* a, const Fr* expo) {
+void E2_mult(G2* res, const G2* p, const Fr* expo) {
     pow256 tmp;
     pow256_from_Fr(tmp, expo);
-    POINTonE2_sign((POINTonE2*)res, (POINTonE2*)a, tmp);
+    POINTonE2_sign((POINTonE2*)res, (POINTonE2*)p, tmp);
+}
+
+// Exponentiation of a generic point `a` in E2 by a byte exponent.
+void  E2_mult_small_expo(G2* res, const G2* p, const byte expo) {
+    pow256 pow_expo; // `pow256` uses bytes little endian.
+    pow_expo[0] = expo;
+    vec_zero(&pow_expo[1], 32-1);
+    // TODO: to bench against a specific version of mult with 8 bits expo
+    POINTonE2_sign((POINTonE2*)res, (POINTonE2*)p, pow_expo);
 }
 
 // Exponentiation of generator g2 of G2, res = expo.g2

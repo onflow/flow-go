@@ -1,7 +1,7 @@
 // +build relic
 
 #include "dkg_include.h"
-/*
+
 
 #define N_max 250
 #define N_bits_max 8  // log(250)  
@@ -11,9 +11,9 @@
 // r being the order of G1
 // writes P(x) in out and P(x).g2 in y if y is non NULL
 // x being a small integer
-void Fr_polynomialImage_export(byte* out, ep2_t y, const Fr* a, const int a_size, const byte x){
+void Fr_polynomial_image_export(byte* out, G2* y, const Fr* a, const int a_size, const byte x){
     Fr image;
-    Fr_polynomialImage(&image, y, a, a_size, x);
+    Fr_polynomial_image(&image, y, a, a_size, x);
     // exports the result
     Fr_write_bytes(out, &image);
 }
@@ -21,7 +21,7 @@ void Fr_polynomialImage_export(byte* out, ep2_t y, const Fr* a, const int a_size
 // computes P(x) = a_0 + a_1 * x + .. + a_n * x^n  where P is in Fr[X].
 // a_i are all in Fr, `a_size` - 1 is P's degree, x is a small integer less than 255.
 // The function writes P(x) in `image` and P(x).g2 in `y` if `y` is non NULL
-void Fr_polynomialImage(Fr* image, ep2_t y, const Fr* a, const int a_size, const byte x){
+void Fr_polynomial_image(Fr* image, G2* y, const Fr* a, const int a_size, const byte x){
     Fr_set_zero(image); 
     // convert `x` to Montgomery form
     Fr xR;
@@ -34,78 +34,59 @@ void Fr_polynomialImage(Fr* image, ep2_t y, const Fr* a, const int a_size, const
     }
     // compute y = P(x).g2
     if (y) {
-        bn_st* tmp = Fr_blst_to_relic(image);
-        g2_mul_gen(y, tmp);
-        free(tmp);
+        G2_mult_gen(y, image);
     }
 }
 
 // computes Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
 // and stores the point in y
-// r is the order of G2
-static void G2_polynomialImage(ep2_t y, const ep2_st* A, const int len_A, const byte x){
-    
-    bn_t bn_x;        
-    bn_new(bn_x);    
-    ep2_set_infty(y);
-    bn_set_dig(bn_x, x);
+static void G2_polynomial_image(G2* y, const G2* A, const int len_A, const byte x){        
+    E2_set_infty(y);
     for (int i = len_A-1; i >= 0 ; i--) {
-        ep2_mul_lwnaf(y, y, bn_x);
-        ep2_add_projc(y, y, (ep2_st*)&A[i]);
+        E2_mult_small_expo(y, y, x); // TODO: to bench against a specific version of mult with 8 bits expo
+        E2_add(y, y, &A[i]);
     }
-
-    ep2_norm(y, y); // not necessary but called to optimize the 
-                    // multiple pairing computations with the same public key
-    bn_free(bn_x);
 }
+
 
 // computes y[i] = Q(i+1) for all participants i ( 0 <= i < len_y)
 // where Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2[X]
-void G2_polynomialImages(ep2_st *y, const int len_y, const ep2_st* A, const int len_A) {
+void G2_polynomial_images(G2 *y, const int len_y, const G2* A, const int len_A) {
     for (byte i=0; i<len_y; i++) {
         //y[i] = Q(i+1)
-        G2_polynomialImage(y+i , A, len_A, i+1);
+        G2_polynomial_image(y+i , A, len_A, i+1);
     }
 }
 
-// export an array of ep2_st into an array of bytes
-// the array must be of length (len * G2_SER_BYTES)
-void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len) {
-    const int size = (G2_BYTES/(G2_SERIALIZATION+1));
+// export an array of G2 into an array of bytes by concatenating
+// all serializations of G2 points in order.
+// the array must be of length (len * G2_SER_BYTES).
+void G2_vector_write_bytes(byte* out, const G2* A, const int len) {
     byte* p = out;
     for (int i=0; i<len; i++){
         E2_write_bytes(p, &A[i]);
-        p += size;
+        p += G2_SER_BYTES;
     }
 }
 
-// The function imports an array of ep2_st from an array of bytes
-// the length matching is supposed to be already done.
-//
-// It returns RLC_OK if reading all the vector succeeded and RLC_ERR 
-// otherwise.
-int G2_vector_read_bin(ep2_st* A, const byte* src, const int len){
-    const int size = (G2_BYTES/(G2_SERIALIZATION+1));
+// The function imports an array of G2 from a concatenated array of bytes.
+// The bytes array is supposed to be in (len * G2_SER_BYTES) 
+BLST_ERROR G2_vector_read_bytes(G2* A, const byte* src, const int len){
     byte* p = (byte*) src;
     for (int i=0; i<len; i++){
-        int read_ret = E2_read_bytes(&A[i], p, size);
+        int read_ret = E2_read_bytes(&A[i], p, G2_SER_BYTES);
         if (read_ret != BLST_SUCCESS)
             return read_ret;
-        p += size;
+        p += G2_SER_BYTES;
     }
     // TODO: add G2 subgroup check
-    return RLC_OK;
+    return BLST_SUCCESS;
 }
 
 // returns 1 if g2^x = y, where g2 is the generator of G2
 // returns 0 otherwise
-int verifyshare(const Fr* x, const ep2_t y) {
-    ep2_t res;
-    ep2_new(res);
-    bn_st* x_tmp = Fr_blst_to_relic(x);
-    g2_mul_gen(res, x_tmp);
-    free(x_tmp);
-    return (ep2_cmp(res, (ep2_st*)y) == RLC_EQ);
+bool_t verify_share(const Fr* x, const G2* y) {
+    G2 tmp;
+    G2_mult_gen(&tmp, x);
+    return E2_is_equal(&tmp, y);
 }
-
-*/

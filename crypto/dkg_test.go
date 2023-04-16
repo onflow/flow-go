@@ -3,7 +3,6 @@
 
 package crypto
 
-/*
 import (
 	"fmt"
 	mrand "math/rand"
@@ -19,9 +18,9 @@ import (
 var gt *testing.T
 
 func TestDKG(t *testing.T) {
-	t.Run("FeldmanVSSSimple", testFeldmanVSSSimple)
+	//t.Run("FeldmanVSSSimple", testFeldmanVSSSimple)
 	t.Run("FeldmanVSSQual", testFeldmanVSSQual)
-	t.Run("JointFeldman", testJointFeldman)
+	//t.Run("JointFeldman", testJointFeldman)
 }
 
 // optimal threshold (t) to allow the largest number of malicious participants (m)
@@ -369,7 +368,6 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 				"2 group public keys are mismatching")
 		}
 	}
-
 }
 
 // time after which a silent channel causes switching to the next dkg phase
@@ -594,13 +592,12 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 		}
 
 	} else {
-		gt.Logf("turns out to be a honest send\n%x\n", data)
+		gt.Logf("%d to %d: turns out to be a honest send\n%x\n", data, proc.current, dest)
 	}
 	// honest send case: this is the only message sent
 	// malicious send case: this is a second correct send, to test the second message gets ignored
 	// by the receiver (sender has been tagged malicious after the first send)
 	proc.chans[dest] <- originalMsg
-
 }
 
 // This is a testing function
@@ -834,4 +831,4 @@ func TestDKGTransitionErrors(t *testing.T) {
 			assert.True(t, IsDKGInvalidStateTransitionError(err))
 		}
 	})
-}*/
+}

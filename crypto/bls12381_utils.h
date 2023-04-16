@@ -147,6 +147,7 @@ BLST_ERROR  E2_read_bytes(G2*, const byte *,  const int);
 void        E2_write_bytes(byte *, const G2*);
 void        G2_mult_gen(G2*, const Fr*);
 void        E2_mult(G2*, const G2*, const Fr*);
+void        E2_mult_small_expo(G2*, const G2*, const byte);
 void        E2_add(G2* res, const G2* a, const G2* b);
 void        E2_sum_vector(G2*, const G2*, const int);
 

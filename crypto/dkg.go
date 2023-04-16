@@ -1,7 +1,5 @@
 package crypto
 
-/*
-
 import (
 	"errors"
 	"fmt"
@@ -237,4 +235,3 @@ type DKGProcessor interface {
 	// log describes the misbehavior.
 	FlagMisbehavior(participant int, log string)
 }
-*/
