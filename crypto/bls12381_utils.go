@@ -20,8 +20,8 @@ import (
 
 // Go wrappers around BLST C types
 // Go wrappers around Relic C types
-type pointG1 C.ep_st
-type pointG2 C.G2
+type pointE1 C.ep_st
+type pointE2 C.E2
 type scalar C.Fr
 
 // BLS12-381 related lengths
@@ -29,8 +29,8 @@ var frBytesLen = int(C.get_Fr_BYTES())
 
 // TODO: For now scalars are represented as field elements Fr since all scalars
 // are less than r - check if distinguishing two types in necessary
-//type pointG1_blst C.G1
-//type pointG2_blst C.G2
+//type pointG1_blst C.E1
+//type pointG2_blst C.E2
 
 // context required for the BLS set-up
 type ctx struct {
@@ -79,25 +79,25 @@ func seedRelic(seed []byte) error {
 }
 
 // Exponentiation in G1 (scalar point multiplication)
-func (p *pointG1) scalarMultG1(res *pointG1, expo *scalar) {
+func (p *pointE1) scalarMultG1(res *pointE1, expo *scalar) {
 	C.ep_mult((*C.ep_st)(res), (*C.ep_st)(p), (*C.Fr)(expo))
 }
 
 // This function is for TEST only
 // Exponentiation of g1 in G1
-func generatorScalarMultG1(res *pointG1, expo *scalar) {
+func generatorScalarMultG1(res *pointE1, expo *scalar) {
 	C.ep_mult_gen_bench((*C.ep_st)(res), (*C.Fr)(expo))
 }
 
 // This function is for TEST only
 // Generic Exponentiation G1
-func genericScalarMultG1(res *pointG1, expo *scalar) {
+func genericScalarMultG1(res *pointE1, expo *scalar) {
 	C.ep_mult_generic_bench((*C.ep_st)(res), (*C.Fr)(expo))
 }
 
 // Exponentiation of g2 in G2
-func generatorScalarMultG2(res *pointG2, expo *scalar) {
-	C.G2_mult_gen((*C.G2)(res), (*C.Fr)(expo))
+func generatorScalarMultG2(res *pointE2, expo *scalar) {
+	C.G2_mult_gen((*C.E2)(res), (*C.Fr)(expo))
 }
 
 // comparison in Fr where r is the group order of G1/G2
@@ -107,8 +107,8 @@ func (x *scalar) equals(other *scalar) bool {
 }
 
 // comparison in G2
-func (p *pointG2) equals(other *pointG2) bool {
-	return C.E2_is_equal((*C.G2)(p), (*C.G2)(other)) != 0
+func (p *pointE2) equals(other *pointE2) bool {
+	return C.E2_is_equal((*C.E2)(p), (*C.E2)(other)) != 0
 }
 
 // Comparison to zero in Fr.
@@ -118,8 +118,8 @@ func (x *scalar) isZero() bool {
 }
 
 // Comparison to point at infinity in G2.
-func (p *pointG2) isInfinity() bool {
-	return C.E2_is_infty((*C.G2)(p)) != 0
+func (p *pointE2) isInfinity() bool {
+	return C.E2_is_infty((*C.E2)(p)) != 0
 }
 
 // returns a random element of Fr in input pointer
@@ -165,16 +165,16 @@ func writeScalar(dest []byte, x *scalar) {
 // writePointG2 writes a G2 point in a slice of bytes
 // The slice should be of size PubKeyLenBLSBLS12381 and the serialization
 // follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
-func writePointG2(dest []byte, a *pointG2) {
+func writePointG2(dest []byte, a *pointE2) {
 	C.E2_write_bytes((*C.uchar)(&dest[0]),
-		(*C.G2)(a),
+		(*C.E2)(a),
 	)
 }
 
 // writePointG1 writes a G1 point in a slice of bytes
 // The slice should be of size SignatureLenBLSBLS12381 and the serialization will
 // follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
-func writePointG1(dest []byte, a *pointG1) {
+func writePointG1(dest []byte, a *pointE1) {
 	C.ep_write_bin_compact((*C.uchar)(&dest[0]),
 		(*C.ep_st)(a),
 		(C.int)(signatureLengthBLSBLS12381),
@@ -206,8 +206,8 @@ func readScalarFrStar(a *scalar, src []byte) error {
 // readPointG2 reads a G2 point from a slice of bytes
 // The slice is expected to be of size PubKeyLenBLSBLS12381 and the deserialization will
 // follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
-func readPointG2(a *pointG2, src []byte) error {
-	read := C.E2_read_bytes((*C.G2)(a),
+func readPointG2(a *pointE2, src []byte) error {
+	read := C.E2_read_bytes((*C.E2)(a),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
 
@@ -226,7 +226,7 @@ func readPointG2(a *pointG2, src []byte) error {
 // readPointG1 reads a G1 point from a slice of bytes
 // The slice should be of size SignatureLenBLSBLS12381 and the deserialization will
 // follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
-func readPointG1(a *pointG1, src []byte) error {
+func readPointG1(a *pointE1, src []byte) error {
 	switch C.ep_read_bin_compact((*C.ep_st)(a),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src))) {
@@ -241,39 +241,39 @@ func readPointG1(a *pointG1, src []byte) error {
 
 // checkMembershipG1 wraps a call to a subgroup check in G1 since cgo can't be used
 // in go test files.
-func checkMembershipG1(pt *pointG1) int {
+func checkMembershipG1(pt *pointE1) int {
 	return int(C.check_membership_G1((*C.ep_st)(pt)))
 }
 
 // checkMembershipG2 wraps a call to a subgroup check in G2 since cgo can't be used
 // in go test files.
-func checkMembershipG2(pt *pointG2) int {
-	return int(C.G2_check_membership((*C.G2)(pt)))
+func checkMembershipG2(pt *pointE2) int {
+	return int(C.G2_check_membership((*C.E2)(pt)))
 }
 
 // randPointG1 wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in G1 and stores it in input point.
-func randPointG1(pt *pointG1) {
+func randPointG1(pt *pointE1) {
 	C.ep_rand_G1((*C.ep_st)(pt))
 }
 
 // randPointG1Complement wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in E1\G1 and stores it in input point.
-func randPointG1Complement(pt *pointG1) {
+func randPointG1Complement(pt *pointE1) {
 	C.ep_rand_G1complement((*C.ep_st)(pt))
 }
 
 /*
 // randPointG2 wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in G2 and stores it in input point.
-func randPointG2(pt *pointG2) {
-	C.ep2_rand_G2((*C.G2)(pt))
+func randPointG2(pt *pointE2) {
+	C.ep2_rand_G2((*C.E2)(pt))
 }
 
 // randPointG1Complement wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in E2\G2 and stores it in input point.
-func randPointG2Complement(pt *pointG2) {
-	C.ep2_rand_G2complement((*C.G2)(pt))
+func randPointG2Complement(pt *pointE2) {
+	C.ep2_rand_G2complement((*C.E2)(pt))
 }
 */
 
@@ -295,7 +295,7 @@ func hashToG1Bytes(data, dst []byte) []byte {
 		(*C.uchar)(&dst[0]), (C.int)(len(dst)))
 
 	// map the hash to G1
-	var point pointG1
+	var point pointE1
 	C.map_to_G1((*C.ep_st)(&point), (*C.uchar)(&hash[0]), (C.int)(len(hash)))
 
 	// serialize the point

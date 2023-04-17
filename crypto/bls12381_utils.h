@@ -83,14 +83,14 @@ typedef struct prec_ {
 // TODO: to delete when Relic is removed
 bn_st* Fr_blst_to_relic(const Fr* x);
 Fr*  Fr_relic_to_blst(const bn_st* x);
-ep2_st* E2_blst_to_relic(const G2* x);
+ep2_st* E2_blst_to_relic(const E2* x);
 
 int      get_valid();
 int      get_invalid();
 int      get_Fr_BYTES();
 
 // BLS based SPoCK
-int bls_spock_verify(const G2*, const byte*, const G2*, const byte*);
+int bls_spock_verify(const E2*, const byte*, const E2*, const byte*);
 
 // hash to curve functions (functions in bls12381_hashtocurve.c)
 void     map_to_G1(ep_t, const byte*, const int);
@@ -137,24 +137,24 @@ int      bowe_subgroup_check_G1(const ep_t);
 #endif
 
 // E2 and G2 utilities
-void        E2_set_infty(G2* p);
-bool_t      E2_is_infty(const G2*);
-bool_t      E2_affine_on_curve(const G2*);
-bool_t      E2_is_equal(const G2* p1, const G2* p2);
-void        E2_copy(G2*, const G2*);
-void        E2_to_affine(G2*, const G2*);
-BLST_ERROR  E2_read_bytes(G2*, const byte *,  const int); 
-void        E2_write_bytes(byte *, const G2*);
-void        G2_mult_gen(G2*, const Fr*);
-void        E2_mult(G2*, const G2*, const Fr*);
-void        E2_mult_small_expo(G2*, const G2*, const byte);
-void        E2_add(G2* res, const G2* a, const G2* b);
-void        E2_sum_vector(G2*, const G2*, const int);
+void        E2_set_infty(E2* p);
+bool_t      E2_is_infty(const E2*);
+bool_t      E2_affine_on_curve(const E2*);
+bool_t      E2_is_equal(const E2* p1, const E2* p2);
+void        E2_copy(E2*, const E2*);
+void        E2_to_affine(E2*, const E2*);
+BLST_ERROR  E2_read_bytes(E2*, const byte *,  const int); 
+void        E2_write_bytes(byte *, const E2*);
+void        G2_mult_gen(E2*, const Fr*);
+void        E2_mult(E2*, const E2*, const Fr*);
+void        E2_mult_small_expo(E2*, const E2*, const byte);
+void        E2_add(E2* res, const E2* a, const E2* b);
+void        E2_sum_vector(E2*, const E2*, const int);
 
 void     ep2_mult(ep2_t res, const ep2_t p, const Fr* expo); 
 
-void     E2_subtract_vector(G2* res, const G2* x, const G2* y, const int len);
-int      G2_check_membership(const G2*);
+void     E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len);
+int      G2_check_membership(const E2*);
 int      simple_subgroup_check_G2(const ep2_t);
 void     ep2_rand_G2(ep2_t);
 void     ep2_rand_G2complement( ep2_t);
@@ -173,7 +173,7 @@ void     bytes_print_(char*, byte*, int);
 void     Fr_print_(char*, Fr*);
 void     Fp_print_(char*, Fp*);
 void     Fp2_print_(char*, const Fp2*);
-void     E2_print_(char*, const G2*);
+void     E2_print_(char*, const E2*);
 void     fp_print_(char*, fp_t);
 void     bn_print_(char*, bn_st*);
 void     ep_print_(char*, ep_st*);

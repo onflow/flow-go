@@ -45,11 +45,11 @@ type JointFeldmanState struct {
 	// feldmanVSSQualState parallel states
 	fvss []feldmanVSSQualState
 	// is the group public key
-	jointPublicKey pointG2
+	jointPublicKey pointE2
 	// Private share of the current participant
 	jointx scalar
 	// Public keys of the group participants, the vector size is (n)
-	jointy []pointG2
+	jointy []pointE2
 }
 
 // NewJointFeldman creates a new instance of a Joint Feldman protocol.
@@ -298,7 +298,7 @@ func (s *JointFeldmanState) ForceDisqualify(participant int) error {
 }
 
 // sum up the 3 type of keys from all qualified dealers to end the protocol
-func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointG2, []pointG2) {
+func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointE2, []pointE2) {
 	qualifiedx, qualifiedPubKey, qualifiedy := s.getQualifiedKeys(qualified)
 
 	// sum up x
@@ -306,25 +306,25 @@ func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointG2
 	C.Fr_sum_vector((*C.Fr)(&jointx), (*C.Fr)(&qualifiedx[0]),
 		(C.int)(qualified))
 	// sum up Y
-	var jointPublicKey pointG2
-	C.E2_sum_vector((*C.G2)(&jointPublicKey),
-		(*C.G2)(&qualifiedPubKey[0]), (C.int)(qualified))
+	var jointPublicKey pointE2
+	C.E2_sum_vector((*C.E2)(&jointPublicKey),
+		(*C.E2)(&qualifiedPubKey[0]), (C.int)(qualified))
 	// sum up []y
-	jointy := make([]pointG2, s.size)
+	jointy := make([]pointE2, s.size)
 	for i := 0; i < s.size; i++ {
-		C.E2_sum_vector((*C.G2)(&jointy[i]),
-			(*C.G2)(&qualifiedy[i][0]), (C.int)(qualified))
+		C.E2_sum_vector((*C.E2)(&jointy[i]),
+			(*C.E2)(&qualifiedy[i][0]), (C.int)(qualified))
 	}
 	return &jointx, &jointPublicKey, jointy
 }
 
 // get the 3 type of keys from all qualified dealers
-func (s *JointFeldmanState) getQualifiedKeys(qualified int) ([]scalar, []pointG2, [][]pointG2) {
+func (s *JointFeldmanState) getQualifiedKeys(qualified int) ([]scalar, []pointE2, [][]pointE2) {
 	qualifiedx := make([]scalar, 0, qualified)
-	qualifiedPubKey := make([]pointG2, 0, qualified)
-	qualifiedy := make([][]pointG2, s.size)
+	qualifiedPubKey := make([]pointE2, 0, qualified)
+	qualifiedy := make([][]pointE2, s.size)
 	for i := 0; i < s.size; i++ {
-		qualifiedy[i] = make([]pointG2, 0, qualified)
+		qualifiedy[i] = make([]pointE2, 0, qualified)
 	}
 
 	for i := 0; i < s.size; i++ {

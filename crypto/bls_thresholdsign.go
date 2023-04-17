@@ -555,8 +555,8 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 
 	// the scalars x and G2 points y
 	x := make([]scalar, size)
-	y := make([]pointG2, size)
-	var X0 pointG2
+	y := make([]pointE2, size)
+	var X0 pointE2
 
 	// seed relic
 	if err := seedRelic(seed); err != nil {
@@ -581,7 +581,7 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	for i := index(1); int(i) <= size; i++ {
 		C.Fr_polynomial_image(
 			(*C.Fr)(&x[i-1]),
-			(*C.G2)(&y[i-1]),
+			(*C.E2)(&y[i-1]),
 			(*C.Fr)(&a[0]), (C.int)(len(a)),
 			(C.uint8_t)(i),
 		)

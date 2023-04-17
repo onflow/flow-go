@@ -90,9 +90,9 @@ func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signatur
 	}
 
 	// verify the spock proof using the secret data
-	verif := C.bls_spock_verify((*C.G2)(&blsPk1.point),
+	verif := C.bls_spock_verify((*C.E2)(&blsPk1.point),
 		(*C.uchar)(&proof1[0]),
-		(*C.G2)(&blsPk2.point),
+		(*C.E2)(&blsPk2.point),
 		(*C.uchar)(&proof2[0]))
 
 	switch verif {

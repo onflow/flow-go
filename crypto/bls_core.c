@@ -40,7 +40,7 @@ int check_membership_G1(const ep_t p){
 // 
 // membership check in G2 is using a scalar multiplication by the group order.
 // TODO: switch to the faster Bowe check 
-int G2_check_membership(const G2* p){
+int G2_check_membership(const E2* p){
 #if MEMBERSHIP_CHECK
     // check p is on curve
     if (!E2_affine_on_curve(p))  // TODO: remove and assume inputs are on curve?
@@ -84,7 +84,7 @@ void bls_sign(byte* s, const Fr* sk, const byte* data, const int len) {
 // and a message data.
 // The signature and public key are assumed to be in G1 and G2 respectively. This 
 // function only checks the pairing equality. 
-static int bls_verify_ep(const G2* pk, const ep_t s, const byte* data, const int len) {     
+static int bls_verify_ep(const E2* pk, const ep_t s, const byte* data, const int len) {     
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
 
@@ -153,7 +153,7 @@ static int bls_verify_ep(const G2* pk, const ep_t s, const byte* data, const int
 // the membership check is separated to allow optimizing multiple verifications using the same pks
 int bls_verifyPerDistinctMessage(const byte* sig, 
                          const int nb_hashes, const byte* hashes, const uint32_t* len_hashes,
-                         const uint32_t* pks_per_hash, const G2* pks) {  
+                         const uint32_t* pks_per_hash, const E2* pks) {  
 
     int ret = UNDEFINED; // return value
     
@@ -189,7 +189,7 @@ int bls_verifyPerDistinctMessage(const byte* sig,
 
     // aggregate public keys mapping to the same hash
     offset = 0;
-    G2 tmp;
+    E2 tmp;
     for (int i=1; i < nb_hashes+1; i++) {
         // elemsG2[i] = agg_pk[i]
         E2_sum_vector(&tmp, &pks[offset] , pks_per_hash[i-1]);
@@ -241,7 +241,7 @@ outG1:
 // membership check of pks in G2 is not verified in this function
 // the membership check is separated to allow optimizing multiple verifications using the same pks
 int bls_verifyPerDistinctKey(const byte* sig, 
-                         const int nb_pks, const G2* pks, const uint32_t* hashes_per_pk,
+                         const int nb_pks, const E2* pks, const uint32_t* hashes_per_pk,
                          const byte* hashes, const uint32_t* len_hashes){
 
     int ret = UNDEFINED; // return value
@@ -335,7 +335,7 @@ outG1:
 // membership check of the signature in G1 is verified.
 // membership check of pk in G2 is not verified in this function.
 // the membership check in G2 is separated to allow optimizing multiple verifications using the same key.
-int bls_verify(const G2* pk, const byte* sig, const byte* data, const int len) {  
+int bls_verify(const E2* pk, const byte* sig, const byte* data, const int len) {  
     ep_t s;
     ep_new(s);
     
@@ -360,15 +360,15 @@ int bls_verify(const G2* pk, const byte* sig, const byte* data, const int len) {
 // The leaves contain the initial signatures and public keys.
 typedef struct st_node { 
     ep_st* sig;
-    G2* pk;  
+    E2* pk;  
     struct st_node* left; 
     struct st_node* right; 
 } node;
 
-static node* new_node(const G2* pk, const ep_st* sig){
+static node* new_node(const E2* pk, const ep_st* sig){
     node* t = (node*) malloc(sizeof(node));
     if (t) {
-        t->pk = (G2*)pk;
+        t->pk = (E2*)pk;
         t->sig = (ep_st*)sig;
         t->right = t->left = NULL;
     }
@@ -395,7 +395,7 @@ static void free_tree(node* root) {
 }
 
 // builds a binary tree of aggregation of signatures and public keys recursively.
-static node* build_tree(const int len, const G2* pks, const ep_st* sigs) {
+static node* build_tree(const int len, const E2* pks, const ep_st* sigs) {
     // check if a leaf is reached
     if (len == 1) {
         return new_node(&pks[0], &sigs[0]);  // use the first element of the arrays
@@ -406,7 +406,7 @@ static node* build_tree(const int len, const G2* pks, const ep_st* sigs) {
     int left_len = len - right_len;
 
     // create a new node with new points
-    G2* new_pk = (G2*)malloc(sizeof(G2));
+    E2* new_pk = (E2*)malloc(sizeof(E2));
     if (!new_pk) goto error;
     ep_st* new_sig = (ep_st*)malloc(sizeof(ep_st));
     if (!new_sig) goto error_sig;
@@ -471,14 +471,14 @@ static void bls_batchVerify_tree(const node* root, const int len, byte* results,
 //  indices mixup.
 // - optimize the verification by verifying an aggregated signature against an aggregated
 //  public key, and use a recursive verification to find invalid signatures.  
-void bls_batchVerify(const int sigs_len, byte* results, const G2* pks_input,
+void bls_batchVerify(const int sigs_len, byte* results, const E2* pks_input,
      const byte* sigs_bytes, const byte* data, const int data_len) {  
     
     // initialize results to undefined
     memset(results, UNDEFINED, sigs_len);
     
     // build the arrays of G1 and G2 elements to verify
-    G2* pks = (G2*) malloc(sigs_len * sizeof(G2));
+    E2* pks = (E2*) malloc(sigs_len * sizeof(E2));
     if (!pks) return;
     ep_st* sigs = (ep_st*) malloc(sigs_len * sizeof(ep_st));
     if (!sigs) goto out_sigs;

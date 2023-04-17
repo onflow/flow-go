@@ -815,7 +815,7 @@ static int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
 }
 
 // TODO: temp utility function to delete
-ep2_st* E2_blst_to_relic(const G2* x) {
+ep2_st* E2_blst_to_relic(const E2* x) {
     ep2_st* out = (ep2_st*)malloc(sizeof(ep2_st)); 
     byte* data = (byte*)malloc(G2_SER_BYTES);
     E2_write_bytes(data, x);
@@ -837,7 +837,7 @@ ep2_st* E2_blst_to_relic(const G2* x) {
 
 // TODO: replace with POINTonE2_Deserialize_BE and POINTonE2_Uncompress_Z, 
 //       and update logic with G2 subgroup check?
-BLST_ERROR E2_read_bytes(G2* a, const byte *bin, const int len) {
+BLST_ERROR E2_read_bytes(E2* a, const byte *bin, const int len) {
     // check the length
     if (len != G2_SER_BYTES) {
         return BLST_BAD_ENCODING;
@@ -921,14 +921,14 @@ BLST_ERROR E2_read_bytes(G2* a, const byte *bin, const int len) {
 // The serialization follows:
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
 // The code is a modified version of Relic ep2_write_bin 
-void E2_write_bytes(byte *bin, const G2* a) {
+void E2_write_bytes(byte *bin, const E2* a) {
     if (E2_is_infty(a)) {
             // set the infinity bit
             bin[0] = (G2_SERIALIZATION << 7) | (1 << 6);
             memset(bin+1, 0, G2_SER_BYTES-1);
             return;
     }
-    G2 tmp;
+    E2 tmp;
     E2_to_affine(&tmp, a);
 
     Fp2* t_x = &(tmp.x);
@@ -949,35 +949,35 @@ void E2_write_bytes(byte *bin, const G2* a) {
 }
 
 // set p to infinity
-void E2_set_infty(G2* p) {
-    vec_zero(p, sizeof(G2));
+void E2_set_infty(E2* p) {
+    vec_zero(p, sizeof(E2));
 }
 
 // check if `p` is infinity
-bool_t E2_is_infty(const G2* p) {
-    return vec_is_zero(p, sizeof(G2));
+bool_t E2_is_infty(const E2* p) {
+    return vec_is_zero(p, sizeof(E2));
 }
 
 // checks affine point `p` is in E2
-bool_t E2_affine_on_curve(const G2* p) {
+bool_t E2_affine_on_curve(const E2* p) {
     // BLST's `POINTonE2_affine_on_curve` does not include the inifity case, 
     // unlike what the function name means.
     return POINTonE2_affine_on_curve((POINTonE2_affine*)p) | E2_is_infty(p);
 }
 
 // checks p1 == p2
-bool_t E2_is_equal(const G2* p1, const G2* p2) {
+bool_t E2_is_equal(const E2* p1, const E2* p2) {
     // `POINTonE2_is_equal` includes the infinity case
     return POINTonE2_is_equal((const POINTonE2*)p1, (const POINTonE2*)p2);
 }
 
 // res = p
-void  E2_copy(G2* res, const G2* p) {
-    vec_copy(res, p, sizeof(G2));
+void  E2_copy(E2* res, const E2* p) {
+    vec_copy(res, p, sizeof(E2));
 }
 
 // converts an E2 point from Jacobian into affine coordinates (z=1)
-void E2_to_affine(G2* res, const G2* p) {
+void E2_to_affine(E2* res, const E2* p) {
     // minor optimization in case coordinates are already affine
     if (vec_is_equal(p->z, BLS12_381_Rx.p2, Fp2_BYTES)) {
         E2_copy(res, p);
@@ -988,25 +988,25 @@ void E2_to_affine(G2* res, const G2* p) {
 }
 
 // generic point addition that must handle doubling and points at infinity
-void E2_add(G2* res, const G2* a, const G2* b) {
+void E2_add(E2* res, const E2* a, const E2* b) {
     POINTonE2_dadd((POINTonE2*)res, (POINTonE2*)a, (POINTonE2*)b, NULL); 
 }
 
 // Point negation in place.
-// no need for an api of the form E2_neg(G2* res, const G2* a) for now
-static void E2_neg(G2* a) {
+// no need for an api of the form E2_neg(E2* res, const E2* a) for now
+static void E2_neg(E2* a) {
     POINTonE2_cneg((POINTonE2*)a, 1);
 }
 
 // Exponentiation of a generic point `a` in E2, res = expo.a
-void E2_mult(G2* res, const G2* p, const Fr* expo) {
+void E2_mult(E2* res, const E2* p, const Fr* expo) {
     pow256 tmp;
     pow256_from_Fr(tmp, expo);
     POINTonE2_sign((POINTonE2*)res, (POINTonE2*)p, tmp);
 }
 
 // Exponentiation of a generic point `a` in E2 by a byte exponent.
-void  E2_mult_small_expo(G2* res, const G2* p, const byte expo) {
+void  E2_mult_small_expo(E2* res, const E2* p, const byte expo) {
     pow256 pow_expo; // `pow256` uses bytes little endian.
     pow_expo[0] = expo;
     vec_zero(&pow_expo[1], 32-1);
@@ -1015,14 +1015,14 @@ void  E2_mult_small_expo(G2* res, const G2* p, const byte expo) {
 }
 
 // Exponentiation of generator g2 of G2, res = expo.g2
-void G2_mult_gen(G2* res, const Fr* expo) {
+void G2_mult_gen(E2* res, const Fr* expo) {
     pow256 tmp;
     pow256_from_Fr(tmp, expo);
     POINTonE2_sign((POINTonE2*)res, &BLS12_381_G2, tmp);
 }
 
 // computes the sum of the G2 array elements y and writes the sum in jointy
-void E2_sum_vector(G2* jointy, const G2* y, const int len){
+void E2_sum_vector(E2* jointy, const E2* y, const int len){
     E2_set_infty(jointy);
     for (int i=0; i<len; i++){
         E2_add(jointy, jointy, &y[i]);
@@ -1037,7 +1037,7 @@ void E2_sum_vector(G2* jointy, const G2* y, const int len){
 // Membership check in G2 of both keys is not verified in this function.
 // the membership check in G2 is separated to allow optimizing multiple verifications 
 // using the same public keys.
-int bls_spock_verify(const G2* pk1, const byte* sig1, const G2* pk2, const byte* sig2) {  
+int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte* sig2) {  
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
 
@@ -1107,7 +1107,7 @@ int bls_spock_verify(const G2* pk1, const byte* sig1, const G2* pk2, const byte*
 
 // Subtracts all G2 array elements `y` from an element `x` and writes the 
 // result in res
-void E2_subtract_vector(G2* res, const G2* x, const G2* y, const int len){
+void E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len){
     E2_sum_vector(res, y, len);
     E2_neg(res);
     E2_add(res, x, res);
@@ -1345,7 +1345,7 @@ void Fp2_print_(char* s, const Fp2* a) {
     printf("\n");
 }
 
-void E2_print_(char* s, const G2* a) {
+void E2_print_(char* s, const E2* a) {
       printf("[%s]:\n", s);
       Fp2_print_(".x", &(a->x));
       Fp2_print_(".y", &(a->y));

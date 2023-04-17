@@ -446,7 +446,7 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 		return
 	}
 	// read the verification vector
-	s.vA = make([]pointG2, s.threshold+1)
+	s.vA = make([]pointE2, s.threshold+1)
 	err := readVerifVector(s.vA, data)
 	if err != nil {
 		s.disqualified = true
@@ -455,10 +455,8 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 		return
 	}
 
-	s.y = make([]pointG2, s.size)
+	s.y = make([]pointE2, s.size)
 	// compute all public keys
-	// TODO: could optimize to compute this step only to check complaint answers,
-	// and then for inputs from qualified leaders (at End call)
 	s.computePublicKeys()
 
 	// check the (already) registered complaints
@@ -510,7 +508,7 @@ func (s *feldmanVSSQualState) checkComplaint(complainer index, c *complaint) boo
 	// check y[complainer] == share.G2
 	return C.verify_share(
 		(*C.Fr)(&c.answer),
-		(*C.G2)(&s.y[complainer])) == 0
+		(*C.E2)(&s.y[complainer])) == 0
 }
 
 // data = |complainee|

@@ -35,13 +35,13 @@ type feldmanVSSstate struct {
 	a []scalar
 	// Public vector of the group, the vector size is (t+1)
 	// A_0 is the group public key
-	vA         []pointG2
+	vA         []pointE2
 	vAReceived bool
 	// Private share of the current participant
 	x         scalar
 	xReceived bool
 	// Public keys of the group participants, the vector size is (n)
-	y []pointG2
+	y []pointE2
 	// true if the private share is valid
 	validKey bool
 }
@@ -265,8 +265,8 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 
 	// Generate a polyomial P in Fr[X] of degree t
 	s.a = make([]scalar, s.threshold+1)
-	s.vA = make([]pointG2, s.threshold+1)
-	s.y = make([]pointG2, s.size)
+	s.vA = make([]pointE2, s.threshold+1)
+	s.y = make([]pointE2, s.size)
 	// non-zero a[0] - group private key is not zero
 	if err := randFrStar(&s.a[0]); err != nil {
 		return fmt.Errorf("generating the polynomial failed: %w", err)
@@ -389,7 +389,7 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 		return
 	}
 	// read the verification vector
-	s.vA = make([]pointG2, s.threshold+1)
+	s.vA = make([]pointE2, s.threshold+1)
 	err := readVerifVector(s.vA, data)
 	if err != nil {
 		s.vAReceived = true
@@ -398,7 +398,7 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 			fmt.Sprintf("reading the verification vector failed: %s", err))
 	}
 
-	s.y = make([]pointG2, s.size)
+	s.y = make([]pointE2, s.size)
 	s.computePublicKeys()
 
 	s.vAReceived = true
@@ -411,9 +411,9 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 // r being the order of G1
 // P(x) is written in dest, while g2^P(x) is written in y
 // x being a small integer
-func frPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
+func frPolynomialImage(dest []byte, a []scalar, x index, y *pointE2) {
 	C.Fr_polynomial_image_export((*C.uchar)(&dest[0]),
-		(*C.G2)(y),
+		(*C.E2)(y),
 		(*C.Fr)(&a[0]), (C.int)(len(a)),
 		(C.uint8_t)(x),
 	)
@@ -421,18 +421,18 @@ func frPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
 
 // writeVerifVector exports a vector A into an array of bytes
 // assuming the array length matches the vector length
-func writeVerifVector(dest []byte, A []pointG2) {
+func writeVerifVector(dest []byte, A []pointE2) {
 	C.G2_vector_write_bytes((*C.uchar)(&dest[0]),
-		(*C.G2)(&A[0]),
+		(*C.E2)(&A[0]),
 		(C.int)(len(A)),
 	)
 }
 
 // readVerifVector imports A vector from an array of bytes,
 // assuming the slice length matches the vector length
-func readVerifVector(A []pointG2, src []byte) error {
-	read := C.G2_vector_read_bytes(
-		(*C.G2)(&A[0]),
+func readVerifVector(A []pointE2, src []byte) error {
+	read := C.E2_vector_read_bytes(
+		(*C.E2)(&A[0]),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(A)))
 	if int(read) == blst_valid {
@@ -446,7 +446,7 @@ func (s *feldmanVSSstate) verifyShare() bool {
 	// check y[current] == x.G2
 	return C.verify_share(
 		(*C.Fr)(&s.x),
-		(*C.G2)(&s.y[s.myIndex])) != 0
+		(*C.E2)(&s.y[s.myIndex])) != 0
 }
 
 // computePublicKeys extracts the participants public keys from the verification vector
@@ -454,8 +454,8 @@ func (s *feldmanVSSstate) verifyShare() bool {
 //
 //	Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
 func (s *feldmanVSSstate) computePublicKeys() {
-	C.G2_polynomial_images(
-		(*C.G2)(&s.y[0]), (C.int)(len(s.y)),
-		(*C.G2)(&s.vA[0]), (C.int)(len(s.vA)),
+	C.E2_polynomial_images(
+		(*C.E2)(&s.y[0]), (C.int)(len(s.y)),
+		(*C.E2)(&s.vA[0]), (C.int)(len(s.vA)),
 	)
 }

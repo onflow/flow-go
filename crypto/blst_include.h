@@ -77,12 +77,13 @@ typedef struct {limb_t limbs[(R_BITS+63)/64];} Fr; // TODO: use Fr_LIMBS
 // `Fp` does not need to be exported to cgo.
 typedef vec384 Fp;
 
-// Subroup G1 in E1
-// G1 points are represented in Jacobian coordinates (x,y,z), 
+// curve E_1 (over F_p)
+// E_1 points are represented in Jacobian coordinates (x,y,z), 
 // where x, y, x are elements of F_p (type `Fp`).
-// `G1` is equivelent to type `POINTonE1` (used internally by BLST for Jacobian E1 elements)
-// `G1` is defined as a struct to be exportable through cgo to the Go layer.
-typedef struct {Fp x,y,z;} G1;
+// `E1` is equivelent to type `POINTonE1` (used internally by BLST for Jacobian E1 elements)
+// `E1` is defined as a struct to be exportable through cgo to the Go layer.
+// `E1` is also used to represent all subgroup G_1 elements. 
+typedef struct {Fp x,y,z;} E1;
 
 // field elements F_p^2
 // F_p^2 elements are represented as a vector of two F_p elements.
@@ -94,11 +95,12 @@ typedef vec384x Fp2;
 #define imag(p)  ((*(p))[1]) 
 
 
-// Subroup G2 in E2
-// G2 points are represented in Jacobian coordinates (x,y,z), 
+// curve E_2 (over F_p^2)
+// E_2 points are represented in Jacobian coordinates (x,y,z), 
 // where x, y, x are elements of F_p (type `Fp`).
-// `G2` is equivelent to type `POINTonE2` (used internally by BLST for Jacobian E1 elements)
-// `G2` is defined as a struct to be exportable through cgo to the Go layer.
-typedef struct {Fp2 x,y,z;} G2;
+// `E2` is equivelent to type `POINTonE2` (used internally by BLST for Jacobian E2 elements)
+// `E2` is defined as a struct to be exportable through cgo to the Go layer.
+// `E2` is also used to represent all subgroup G_2 elements. 
+typedef struct {Fp2 x,y,z;} E2;
 
 #endif
