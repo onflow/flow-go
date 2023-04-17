@@ -227,9 +227,9 @@ func (collector *resultCollector) processTransactionResult(
 	collector.result.
 		CollectionExecutionResultAt(txn.collectionIndex).
 		AppendTransactionResults(
-			txn.Events,
-			txn.ServiceEvents,
-			txn.ConvertedServiceEvents,
+			output.Events,
+			output.ServiceEvents,
+			output.ConvertedServiceEvents,
 			txnResult,
 		)
 
