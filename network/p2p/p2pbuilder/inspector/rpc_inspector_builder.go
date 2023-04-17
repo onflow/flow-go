@@ -149,7 +149,7 @@ func (b *GossipSubInspectorBuilder) validationInspectorConfig(validationConfigs 
 }
 
 // buildGossipSubValidationInspector builds the gossipsub rpc validation inspector.
-func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.GossipSubRPCInspector, *distributor.GossipSubInspectorNotificationDistributor, error) {
+func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.GossipSubRPCInspector, *distributor.GossipSubInspectorNotifDistributor, error) {
 	controlMsgRPCInspectorCfg, err := b.validationInspectorConfig(b.inspectorsConfig.ValidationInspectorConfigs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
