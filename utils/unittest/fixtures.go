@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	"bytes"
 	crand "crypto/rand"
 	"fmt"
 	"math/rand"
@@ -17,13 +18,14 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-
-	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/chunks"
@@ -35,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/updatable_configs"
@@ -2301,4 +2304,85 @@ func GetFlowProtocolEventID(
 	eventIDHash, err := network.EventId(channel, payload)
 	require.NoError(t, err)
 	return flow.HashToID(eventIDHash)
+}
+
+func WithBlockExecutionDataBlockID(blockID flow.Identifier) func(*execution_data.BlockExecutionData) {
+	return func(bed *execution_data.BlockExecutionData) {
+		bed.BlockID = blockID
+	}
+}
+
+func WithChunkExecutionDatas(chunks ...*execution_data.ChunkExecutionData) func(*execution_data.BlockExecutionData) {
+	return func(bed *execution_data.BlockExecutionData) {
+		bed.ChunkExecutionDatas = chunks
+	}
+}
+
+func BlockExecutionDataFixture(opts ...func(*execution_data.BlockExecutionData)) *execution_data.BlockExecutionData {
+	bed := &execution_data.BlockExecutionData{
+		BlockID:             IdentifierFixture(),
+		ChunkExecutionDatas: []*execution_data.ChunkExecutionData{},
+	}
+
+	for _, opt := range opts {
+		opt(bed)
+	}
+
+	return bed
+}
+
+func BlockExecutionDatEntityFixture(opts ...func(*execution_data.BlockExecutionData)) *execution_data.BlockExecutionDataEntity {
+	execData := BlockExecutionDataFixture(opts...)
+	return execution_data.NewBlockExecutionDataEntity(IdentifierFixture(), execData)
+}
+
+func BlockExecutionDatEntityListFixture(n int) []*execution_data.BlockExecutionDataEntity {
+	l := make([]*execution_data.BlockExecutionDataEntity, n)
+	for i := 0; i < n; i++ {
+		l[i] = BlockExecutionDatEntityFixture()
+	}
+
+	return l
+}
+
+func WithChunkEvents(events flow.EventsList) func(*execution_data.ChunkExecutionData) {
+	return func(conf *execution_data.ChunkExecutionData) {
+		conf.Events = events
+	}
+}
+
+func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*execution_data.ChunkExecutionData)) *execution_data.ChunkExecutionData {
+	collection := CollectionFixture(1)
+	ced := &execution_data.ChunkExecutionData{
+		Collection: &collection,
+		Events:     flow.EventsList{},
+		TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
+	}
+
+	for _, opt := range opts {
+		opt(ced)
+	}
+
+	if minSize <= 1 {
+		return ced
+	}
+
+	size := 1
+	for {
+		buf := &bytes.Buffer{}
+		require.NoError(t, execution_data.DefaultSerializer.Serialize(buf, ced))
+		if buf.Len() >= minSize {
+			return ced
+		}
+
+		v := make([]byte, size)
+		_, err := rand.Read(v)
+		require.NoError(t, err)
+
+		k, err := ced.TrieUpdate.Payloads[0].Key()
+		require.NoError(t, err)
+
+		ced.TrieUpdate.Payloads[0] = ledger.NewPayload(k, v)
+		size *= 2
+	}
 }

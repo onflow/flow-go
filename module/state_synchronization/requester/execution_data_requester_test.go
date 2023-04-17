@@ -656,7 +656,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 		height := uint64(i)
 		block := buildBlock(height, previousBlock, seals)
 
-		ed := synctest.ExecutionDataFixture(block.ID())
+		ed := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(block.ID()))
 
 		cid, err := eds.AddExecutionData(context.Background(), ed)
 		require.NoError(suite.T(), err)
