@@ -813,44 +813,17 @@ func ServiceEventToMessage(event flow.ServiceEvent) (*entities.ServiceEvent, err
 	}
 
 	return &entities.ServiceEvent{
-		Type:    event.Type,
+		Type:    event.Type.String(),
 		Payload: bytes,
 	}, nil
 }
 
 func MessageToServiceEvent(m *entities.ServiceEvent) (*flow.ServiceEvent, error) {
-	var event interface{}
 	rawEvent := m.Payload
-	// map keys correctly
-	switch m.Type {
-	case flow.ServiceEventSetup:
-		setup := new(flow.EpochSetup)
-		err := json.Unmarshal(rawEvent, setup)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal to EpochSetup event: %w", err)
-		}
-		event = setup
-	case flow.ServiceEventCommit:
-		commit := new(flow.EpochCommit)
-		err := json.Unmarshal(rawEvent, commit)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal to EpochCommit event: %w", err)
-		}
-		event = commit
-	case flow.ServiceEventVersionBeacon:
-		versionBeacon := new(flow.VersionBeacon)
-		err := json.Unmarshal(rawEvent, versionBeacon)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal to VersionBeacon event: %w", err)
-		}
-		event = versionBeacon
-	default:
-		return nil, fmt.Errorf("invalid event type: %s", m.Type)
-	}
-	return &flow.ServiceEvent{
-		Type:  m.Type,
-		Event: event,
-	}, nil
+	eventType := flow.ServiceEventType(m.Type)
+	se, err := flow.ServiceEventJSONMarshaller.UnmarshalWithType(rawEvent, eventType)
+
+	return &se, err
 }
 
 func ChunkToMessage(chunk *flow.Chunk) *entities.Chunk {
