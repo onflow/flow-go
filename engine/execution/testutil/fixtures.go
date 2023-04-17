@@ -264,7 +264,7 @@ func CreateAccountsWithSimpleAddresses(
 			AddAuthorizer(serviceAddress)
 
 		tx := fvm.Transaction(txBody, 0)
-		executionSnapshot, output, err := vm.RunV2(ctx, tx, snapshotTree)
+		executionSnapshot, output, err := vm.Run(ctx, tx, snapshotTree)
 		if err != nil {
 			return snapshotTree, nil, err
 		}
@@ -322,7 +322,7 @@ func RootBootstrappedLedger(
 		options...,
 	)
 
-	snapshot, _, err := vm.RunV2(ctx, bootstrap, nil)
+	snapshot, _, err := vm.Run(ctx, bootstrap, nil)
 	if err != nil {
 		panic(err)
 	}

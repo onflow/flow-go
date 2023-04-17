@@ -55,7 +55,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 
 			// run the transaction
 			require.NotPanics(t, func() {
-				_, output, err = vm.RunV2(
+				_, output, err = vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -264,7 +264,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 			return snapshotTree, err
 		}
 
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -298,7 +298,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		)
 		require.NoError(tb, err)
 
-		executionSnapshot, output, err = vm.RunV2(
+		executionSnapshot, output, err = vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)

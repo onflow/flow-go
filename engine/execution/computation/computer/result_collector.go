@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/result"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -24,9 +23,10 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// ViewCommitter commits views's deltas to the ledger and collects the proofs
+// ViewCommitter commits execution snapshot to the ledger and collects
+// the proofs
 type ViewCommitter interface {
-	// CommitView commits a views' register delta and collects proofs
+	// CommitView commits an execution snapshot and collects proofs
 	CommitView(
 		*state.ExecutionSnapshot,
 		flow.StateCommitment,
@@ -75,7 +75,7 @@ type resultCollector struct {
 	blockStats     module.ExecutionResultStats
 
 	currentCollectionStartTime time.Time
-	currentCollectionView      *delta.View
+	currentCollectionState     *state.ExecutionState
 	currentCollectionStats     module.ExecutionResultStats
 }
 
@@ -112,7 +112,7 @@ func newResultCollector(
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
 		blockStartTime:               now,
 		currentCollectionStartTime:   now,
-		currentCollectionView:        delta.NewDeltaView(nil),
+		currentCollectionState:       state.NewExecutionState(nil, state.DefaultParameters()),
 		currentCollectionStats: module.ExecutionResultStats{
 			NumberOfCollections: 1,
 		},
@@ -194,7 +194,7 @@ func (collector *resultCollector) commitCollection(
 	collector.blockStats.Merge(collector.currentCollectionStats)
 
 	collector.currentCollectionStartTime = time.Now()
-	collector.currentCollectionView = delta.NewDeltaView(nil)
+	collector.currentCollectionState = state.NewExecutionState(nil, state.DefaultParameters())
 	collector.currentCollectionStats = module.ExecutionResultStats{
 		NumberOfCollections: 1,
 	}
@@ -237,7 +237,7 @@ func (collector *resultCollector) processTransactionResult(
 		collector.result.ComputationIntensities[computationKind] += intensity
 	}
 
-	err := collector.currentCollectionView.Merge(txnExecutionSnapshot)
+	err := collector.currentCollectionState.Merge(txnExecutionSnapshot)
 	if err != nil {
 		return fmt.Errorf("failed to merge into collection view: %w", err)
 	}
@@ -253,7 +253,7 @@ func (collector *resultCollector) processTransactionResult(
 	return collector.commitCollection(
 		txn.collectionInfo,
 		collector.currentCollectionStartTime,
-		collector.currentCollectionView.Finalize())
+		collector.currentCollectionState.Finalize())
 }
 
 func (collector *resultCollector) AddTransactionResult(

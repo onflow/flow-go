@@ -152,7 +152,11 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(
+	channel channels.Channel,
+	originID flow.Identifier,
+	event interface{},
+) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
@@ -166,7 +170,11 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 	return fmt.Errorf("ingestion error does not process local events")
 }
 
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(
+	channel channels.Channel,
+	originID flow.Identifier,
+	event interface{},
+) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -176,7 +184,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
-func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
+func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) (
+	[]flow.Identifier,
+	error,
+) {
 	// get finalized height
 	final, err := finalized.Head()
 	if err != nil {
@@ -234,7 +245,10 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 	return unexecuted, nil
 }
 
-func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
+func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) (
+	[]flow.Identifier,
+	error,
+) {
 	pendings, err := finalized.Descendants()
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending blocks: %w", err)
@@ -256,7 +270,11 @@ func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Id
 	return unexecuted, nil
 }
 
-func (e *Engine) unexecutedBlocks() (finalized []flow.Identifier, pending []flow.Identifier, err error) {
+func (e *Engine) unexecutedBlocks() (
+	finalized []flow.Identifier,
+	pending []flow.Identifier,
+	err error,
+) {
 	// pin the snapshot so that finalizedUnexecutedBlocks and pendingUnexecutedBlocks are based
 	// on the same snapshot.
 	snapshot := e.state.Final()
@@ -286,7 +304,8 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 	// is called before reloading is finished, it will be blocked, which will avoid that edge case.
 	return e.mempool.Run(func(
 		blockByCollection *stdmap.BlockByCollectionBackdata,
-		executionQueues *stdmap.QueuesBackdata) error {
+		executionQueues *stdmap.QueuesBackdata,
+	) error {
 
 		// saving an executed block is currently not transactional, so it's possible
 		// the block is marked as executed but the receipt might not be saved during a crash.
@@ -367,7 +386,8 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 func (e *Engine) reloadBlock(
 	blockByCollection *stdmap.BlockByCollectionBackdata,
 	executionQueues *stdmap.QueuesBackdata,
-	blockID flow.Identifier) error {
+	blockID flow.Identifier,
+) error {
 	block, err := e.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not get block by ID: %v %w", blockID, err)
@@ -479,7 +499,8 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 	blockByCollection *stdmap.BlockByCollectionBackdata,
 	executionQueues *stdmap.QueuesBackdata,
 	block *flow.Block,
-	checkStateSync bool) ([]*flow.CollectionGuarantee, error) {
+	checkStateSync bool,
+) ([]*flow.CollectionGuarantee, error) {
 	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
 		CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
@@ -696,7 +717,10 @@ func (e *Engine) executeBlock(
 //   13
 //   14 <- 15 <- 16
 
-func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState flow.StateCommitment) error {
+func (e *Engine) onBlockExecuted(
+	executed *entity.ExecutableBlock,
+	finalState flow.StateCommitment,
+) error {
 
 	e.metrics.ExecutionStorageStateCommitment(int64(len(finalState)))
 	e.metrics.ExecutionLastExecutedBlockHeight(executed.Block.Header.Height)
@@ -834,7 +858,10 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 // find all the blocks that are needing this collection, and then
 // check if any of these block becomes executable and execute it if
 // is.
-func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
+func (e *Engine) handleCollection(
+	originID flow.Identifier,
+	collection *flow.Collection,
+) error {
 	collID := collection.ID()
 
 	span, _ := e.tracer.StartCollectionSpan(context.Background(), collID, trace.EXEHandleCollection)
@@ -860,7 +887,10 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 	)
 }
 
-func (e *Engine) addCollectionToMempool(collection *flow.Collection, backdata *stdmap.BlockByCollectionBackdata) error {
+func (e *Engine) addCollectionToMempool(
+	collection *flow.Collection,
+	backdata *stdmap.BlockByCollectionBackdata,
+) error {
 	collID := collection.ID()
 	blockByCollectionID, exists := backdata.ByID(collID)
 
@@ -911,7 +941,10 @@ func (e *Engine) addCollectionToMempool(collection *flow.Collection, backdata *s
 	return nil
 }
 
-func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
+func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (
+	*queue.Queue,
+	bool,
+) {
 	q := queue.NewQueue(blockify)
 	qID := q.ID()
 	return q, queues.Add(qID, q)
@@ -941,7 +974,11 @@ func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Qu
 //	A <- B <- C
 //	  ^- D <- E
 //	G
-func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool, bool) {
+func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (
+	*queue.Queue,
+	bool,
+	bool,
+) {
 	for _, queue := range queues.All() {
 		if stored, isNew := queue.TryAdd(blockify); stored {
 			return queue, isNew, false
@@ -1005,7 +1042,12 @@ func (e *Engine) matchAndFindMissingCollections(
 	return missingCollections, nil
 }
 
-func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, arguments [][]byte, blockID flow.Identifier) ([]byte, error) {
+func (e *Engine) ExecuteScriptAtBlockID(
+	ctx context.Context,
+	script []byte,
+	arguments [][]byte,
+	blockID flow.Identifier,
+) ([]byte, error) {
 
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
@@ -1046,7 +1088,11 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 		blockSnapshot)
 }
 
-func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, key []byte, blockID flow.Identifier) ([]byte, error) {
+func (e *Engine) GetRegisterAtBlockID(
+	ctx context.Context,
+	owner, key []byte,
+	blockID flow.Identifier,
+) ([]byte, error) {
 
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
@@ -1064,7 +1110,11 @@ func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, key []byte, bl
 	return data, nil
 }
 
-func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow.Identifier) (*flow.Account, error) {
+func (e *Engine) GetAccount(
+	ctx context.Context,
+	addr flow.Address,
+	blockID flow.Identifier,
+) (*flow.Account, error) {
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
@@ -1107,7 +1157,7 @@ func (e *Engine) saveExecutionResults(
 		e.log.Info().
 			Uint64("block_height", result.ExecutableBlock.Height()).
 			Hex("block_id", logging.Entity(result.ExecutableBlock)).
-			Str("event_type", event.Type).
+			Str("event_type", event.Type.String()).
 			Msg("service event emitted")
 	}
 
@@ -1159,7 +1209,11 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 // addOrFetch checks if there are stored collections for the given guarantees, if there is,
 // forward them to mempool to process the collection, otherwise fetch the collections.
 // any error returned are exception
-func (e *Engine) addOrFetch(blockID flow.Identifier, height uint64, guarantees []*flow.CollectionGuarantee) error {
+func (e *Engine) addOrFetch(
+	blockID flow.Identifier,
+	height uint64,
+	guarantees []*flow.CollectionGuarantee,
+) error {
 	return e.fetchAndHandleCollection(blockID, height, guarantees, func(collection *flow.Collection) error {
 		err := e.mempool.BlockByCollection.Run(
 			func(backdata *stdmap.BlockByCollectionBackdata) error {
@@ -1221,7 +1275,11 @@ func (e *Engine) fetchAndHandleCollection(
 
 // fetchCollection takes a guarantee and forwards to requester engine for fetching the collection
 // any error returned are fatal error
-func (e *Engine) fetchCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) error {
+func (e *Engine) fetchCollection(
+	blockID flow.Identifier,
+	height uint64,
+	guarantee *flow.CollectionGuarantee,
+) error {
 	e.log.Debug().
 		Hex("block", blockID[:]).
 		Hex("collection_id", logging.ID(guarantee.ID())).

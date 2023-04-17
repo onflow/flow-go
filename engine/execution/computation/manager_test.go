@@ -25,14 +25,13 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	state2 "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -211,17 +210,13 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		derivedChainData: derivedChainData,
 	}
 
-	view := delta.NewDeltaView(
-		state2.NewLedgerStorageSnapshot(
-			ledger,
-			flow.StateCommitment(ledger.InitialState())))
-	blockView := view.NewChild()
-
 	_, err = manager.ComputeBlock(
 		context.Background(),
 		unittest.IdentifierFixture(),
 		computationResult.ExecutableBlock,
-		blockView)
+		state2.NewLedgerStorageSnapshot(
+			ledger,
+			flow.StateCommitment(ledger.InitialState())))
 	require.NoError(t, err)
 }
 
@@ -508,7 +503,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 
 type PanickingVM struct{}
 
-func (p *PanickingVM) RunV2(
+func (p *PanickingVM) Run(
 	f fvm.Context,
 	procedure fvm.Procedure,
 	storageSnapshot state.StorageSnapshot,
@@ -517,10 +512,6 @@ func (p *PanickingVM) RunV2(
 	fvm.ProcedureOutput,
 	error,
 ) {
-	panic("panic, but expected with sentinel for test: Verunsicherung ")
-}
-
-func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
 
@@ -539,7 +530,7 @@ type LongRunningVM struct {
 	duration time.Duration
 }
 
-func (l *LongRunningVM) RunV2(
+func (l *LongRunningVM) Run(
 	f fvm.Context,
 	procedure fvm.Procedure,
 	storageSnapshot state.StorageSnapshot,
@@ -555,16 +546,6 @@ func (l *LongRunningVM) RunV2(
 		Value: cadence.NewVoid(),
 	}
 	return snapshot, output, nil
-}
-
-func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {
-	time.Sleep(l.duration)
-	// satisfy value marshaller
-	if scriptProcedure, is := procedure.(*fvm.ScriptProcedure); is {
-		scriptProcedure.Value = cadence.NewVoid()
-	}
-
-	return nil
 }
 
 func (l *LongRunningVM) GetAccount(
@@ -917,7 +898,8 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		cadence.NewPath("storage", "x"),
 	)
 
-	// the save should not update account storage by writing the delta from the child view back to the parent
+	// the save should not update account storage by writing the updates
+	// back to the snapshotTree
 	require.NoError(t, err)
 	require.Equal(t, nil, v)
 }

@@ -133,13 +133,15 @@ func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 			ed := synctest.ExecutionDataFixture(unittest.IdentifierFixture())
 			setExecutionDataGet(ed, nil)
 
+			edEntity := execution_data.NewBlockExecutionDataEntity(suite.executionDataID, ed)
+
 			job, err := suite.reader.AtIndex(suite.block.Header.Height)
 			require.NoError(suite.T(), err)
 
 			entry, err := JobToBlockEntry(job)
 			assert.NoError(suite.T(), err)
 
-			assert.Equal(suite.T(), entry.ExecutionData, ed)
+			assert.Equal(suite.T(), edEntity, entry.ExecutionData)
 		})
 	})
 
