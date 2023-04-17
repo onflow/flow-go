@@ -331,8 +331,13 @@ func TestValidationInspector_InvalidTopicID(t *testing.T) {
 	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
 }
 
-// TestValidationInspector_InvalidTopicID ensures that when an RPC control message contains an invalid topic ID the expected error is logged.
-func TestValidationInspector_InvalidTopicID_Integration(t *testing.T) {
+// TestGossipSubSpamMitigationIntegration tests that the spam mitigation feature of GossipSub is working as expected.
+// The test puts toghether the spam detection (through the GossipSubInspector) and the spam mitigation (through the
+// scoring system) and ensures that the mitigation is triggered when the spam detection detects spam.
+// The test scenario involves a spammer node that sends a large number of control messages to a victim node.
+// The victim node is configured to use the GossipSubInspector to detect spam and the scoring system to mitigate spam.
+// The test ensures that the victim node is disconnected from the spammer node on the GossipSub mesh after the spam detection is triggered.
+func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	t.Parallel()
 	idProvider := mock.NewIdentityProvider(t)
 	sporkID := unittest.IdentifierFixture()
@@ -359,37 +364,46 @@ func TestValidationInspector_InvalidTopicID_Integration(t *testing.T) {
 			return ok
 		})
 
-	messageCount := 10
-	controlMessageCount := int64(10)
+	spamRpcCount := 10            // total number of individual rpc messages to send
+	spamCtrlMsgCount := int64(10) // total number of control messages to send on each RPC
+
+	// unknownTopic is an unknown topic to the victim node but shaped like a valid topic (i.e., it has the correct prefix and spork ID).
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID))
+
+	// malformedTopic is a topic that is not shaped like a valid topic (i.e., it does not have the correct prefix and spork ID).
 	malformedTopic := channels.Topic("!@#$%^&**((")
-	// a topics spork ID is considered invalid if it does not match the current spork ID
+
+	// invalidSporkIDTopic is a topic that has a valid prefix but an invalid spork ID (i.e., not the current spork ID).
 	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture()))
+
+	// duplicateTopic is a valid topic that is used to send duplicate spam messages.
 	duplicateTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
 
+	// starting the nodes.
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
 	spammer.Start(t)
 
+	// wait for the nodes to discover each other
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
-	// checks end-to-end message delivery works on GossipSub
+	// as nodes started fresh and no spamming has happened yet, the nodes should be able to exchange messages on the topic.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkID)
 		return unittest.ProposalFixture(), blockTopic
 	})
 
-	// prepare to spam - generate control messages
-	graftCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(int(messageCount), unknownTopic.String()))
-	graftCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(int(messageCount), malformedTopic.String()))
-	graftCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(int(messageCount), invalidSporkIDTopic.String()))
-	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(3, duplicateTopic.String()))
+	// prepares spam graft and prune messages with different strategies.
+	graftCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithGraft(int(spamRpcCount), unknownTopic.String()))
+	graftCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithGraft(int(spamRpcCount), malformedTopic.String()))
+	graftCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithGraft(int(spamRpcCount), invalidSporkIDTopic.String()))
+	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithGraft(3, duplicateTopic.String()))
 
-	pruneCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithPrune(int(messageCount), unknownTopic.String()))
-	pruneCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithPrune(int(messageCount), malformedTopic.String()))
-	pruneCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(int(messageCount), invalidSporkIDTopic.String()))
-	pruneCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithPrune(3, duplicateTopic.String()))
+	pruneCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithPrune(int(spamRpcCount), unknownTopic.String()))
+	pruneCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithPrune(int(spamRpcCount), malformedTopic.String()))
+	pruneCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithGraft(int(spamRpcCount), invalidSporkIDTopic.String()))
+	pruneCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithPrune(3, duplicateTopic.String()))
 
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsWithUnknownTopic)
@@ -402,7 +416,8 @@ func TestValidationInspector_InvalidTopicID_Integration(t *testing.T) {
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsInvalidSporkIDTopic)
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
 
-	// checks no GossipSub message exchange should no longer happen between node1 and node2.
+	// now we expect the detection and mitigation to kick in and the victim node to disconnect from the spammer node.
+	// so the spammer and victim nodes should not be able to exchange messages on the topic.
 	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{victimNode}, []p2p.LibP2PNode{spammer.SpammerNode}, func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkID)
 		return unittest.ProposalFixture(), blockTopic

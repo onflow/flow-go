@@ -20,9 +20,9 @@ type ProtocolPeerCache interface {
 	GetPeers(pid protocol.ID) map[peer.ID]struct{}
 }
 
-// GossipSubSpamRecordCache is a cache for storing the gossipsub spam records of peers.
+// GossipSubSpamRecordCache is a cache for storing the GossipSub spam records of peers.
 // The spam records of peers is used to calculate the application specific score, which is part of the GossipSub score of a peer.
-// Note that neither of the spam records, application specific score, and GossipSub score are shared publicly with other peers.
+// Note that none of the spam records, application specific score, and GossipSub score are shared publicly with other peers.
 // Rather they are solely used by the current peer to select the peers to which it will connect on a topic mesh.
 type GossipSubSpamRecordCache interface {
 	// Add adds the GossipSubSpamRecord of a peer to the cache.
