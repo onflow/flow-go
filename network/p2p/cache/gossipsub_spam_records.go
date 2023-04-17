@@ -98,7 +98,7 @@ func (a *GossipSubSpamRecordCache) Add(peerId peer.ID, record p2p.GossipSubSpamR
 // - adjustFn: the adjust function to be applied to the record.
 // Returns:
 // - *GossipSubSpamRecord: the updated record.
-// - error on failure to update the record. The returned error is irrecoverable and the caller should crash the node.
+// - error on failure to update the record. The returned error is irrecoverable and indicates an exception.
 // Note that if any of the pre-processing functions returns an error, the record is reverted to its original state (prior to applying the update function).
 func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, adjustFn func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord) (*p2p.GossipSubSpamRecord, error) {
 	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the record.

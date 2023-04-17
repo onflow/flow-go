@@ -39,7 +39,7 @@ type GossipSubSpamRecordCache interface {
 	// - peerID: the peer ID of the peer in the GossipSub protocol.
 	// Returns:
 	// - *GossipSubSpamRecord: the GossipSubSpamRecord of the peer.
-	// - error on failure to retrieve the record. The returned error is irrecoverable and the caller should crash the node.
+	// - error on failure to retrieve the record. The returned error is irrecoverable and indicates an exception.
 	// - bool: true if the record was retrieved successfully, false otherwise.
 	Get(peerID peer.ID) (*GossipSubSpamRecord, error, bool)
 
@@ -49,7 +49,7 @@ type GossipSubSpamRecordCache interface {
 	// - adjustFn: the adjust function to be applied to the record.
 	// Returns:
 	// - *GossipSubSpamRecord: the updated record.
-	// - error on failure to update the record. The returned error is irrecoverable and the caller should crash the node.
+	// - error on failure to update the record. The returned error is irrecoverable and indicates an exception.
 	Adjust(peerID peer.ID, adjustFn func(record GossipSubSpamRecord) GossipSubSpamRecord) (*GossipSubSpamRecord, error)
 
 	// Has returns true if the cache contains the GossipSubSpamRecord of the given peer.
