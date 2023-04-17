@@ -310,3 +310,13 @@ func (state *ExecutionState) checkSize(
 	}
 	return nil
 }
+
+func (state *ExecutionState) readSetSize() int {
+	return state.spockState.readSetSize()
+}
+
+func (state *ExecutionState) interimReadSet(
+	accumulator map[flow.RegisterID]struct{},
+) {
+	state.spockState.interimReadSet(accumulator)
+}
