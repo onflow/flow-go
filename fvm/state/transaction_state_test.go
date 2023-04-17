@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,7 +14,7 @@ import (
 
 func newTestTransactionState() state.NestedTransaction {
 	return state.NewTransactionState(
-		delta.NewDeltaView(nil),
+		nil,
 		state.DefaultParameters(),
 	)
 }
@@ -197,7 +196,7 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 	val := createByteArray(2)
 
 	cachedState := state.NewExecutionState(
-		delta.NewDeltaView(nil),
+		nil,
 		state.DefaultParameters(),
 	)
 
@@ -310,7 +309,7 @@ func TestRestartNestedTransaction(t *testing.T) {
 	state := id.StateForTestingOnly()
 	require.Equal(t, uint64(0), state.InteractionUsed())
 
-	// Restart will merge the meter stat, but not the view delta
+	// Restart will merge the meter stat, but not the register updates
 
 	err = txn.RestartNestedTransaction(id)
 	require.NoError(t, err)

@@ -143,8 +143,6 @@ type NestedTransaction interface {
 	Get(id flow.RegisterID) (flow.RegisterValue, error)
 
 	Set(id flow.RegisterID, value flow.RegisterValue) error
-
-	ViewForTestingOnly() View
 }
 
 type nestedTransactionStackFrame struct {
@@ -167,10 +165,10 @@ type transactionState struct {
 // NewTransactionState constructs a new state transaction which manages nested
 // transactions.
 func NewTransactionState(
-	startView View,
+	snapshot StorageSnapshot,
 	params StateParameters,
 ) NestedTransaction {
-	startState := NewExecutionState(startView, params)
+	startState := NewExecutionState(snapshot, params)
 	return &transactionState{
 		nestedTransactions: []nestedTransactionStackFrame{
 			nestedTransactionStackFrame{
@@ -447,10 +445,6 @@ func (txnState *transactionState) MeterEmittedEvent(byteSize uint64) error {
 
 func (txnState *transactionState) TotalEmittedEventBytes() uint64 {
 	return txnState.current().TotalEmittedEventBytes()
-}
-
-func (txnState *transactionState) ViewForTestingOnly() View {
-	return txnState.current().View()
 }
 
 func (txnState *transactionState) RunWithAllLimitsDisabled(f func()) {

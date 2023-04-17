@@ -29,11 +29,6 @@ type spockState struct {
 	finalizedSpockSecret []byte
 }
 
-// TODO(patrick): rm after delta view is deleted.
-func NewSpockState(base StorageSnapshot) *spockState {
-	return newSpockState(base)
-}
-
 func newSpockState(base StorageSnapshot) *spockState {
 	return &spockState{
 		storageState:      newStorageState(base),
@@ -41,8 +36,7 @@ func newSpockState(base StorageSnapshot) *spockState {
 	}
 }
 
-// TODO(patrick): change return type to *spockState
-func (state *spockState) NewChild() View {
+func (state *spockState) NewChild() *spockState {
 	return &spockState{
 		storageState:      state.storageState.NewChild(),
 		spockSecretHasher: hash.NewSHA3_256(),

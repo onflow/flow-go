@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -20,8 +19,7 @@ func createByteArray(size int) []byte {
 }
 
 func TestExecutionState_Finalize(t *testing.T) {
-	view := delta.NewDeltaView(nil)
-	parent := state.NewExecutionState(view, state.DefaultParameters())
+	parent := state.NewExecutionState(nil, state.DefaultParameters())
 
 	child := parent.NewChild()
 
@@ -65,8 +63,7 @@ func TestExecutionState_Finalize(t *testing.T) {
 }
 
 func TestExecutionState_ChildMergeFunctionality(t *testing.T) {
-	view := delta.NewDeltaView(nil)
-	st := state.NewExecutionState(view, state.DefaultParameters())
+	st := state.NewExecutionState(nil, state.DefaultParameters())
 
 	t.Run("test read from parent state (backoff)", func(t *testing.T) {
 		key := flow.NewRegisterID("address", "key1")
@@ -137,9 +134,8 @@ func TestExecutionState_ChildMergeFunctionality(t *testing.T) {
 }
 
 func TestExecutionState_MaxValueSize(t *testing.T) {
-	view := delta.NewDeltaView(nil)
 	st := state.NewExecutionState(
-		view,
+		nil,
 		state.DefaultParameters().WithMaxValueSizeAllowed(6))
 
 	key := flow.NewRegisterID("address", "key")
@@ -156,9 +152,8 @@ func TestExecutionState_MaxValueSize(t *testing.T) {
 }
 
 func TestExecutionState_MaxKeySize(t *testing.T) {
-	view := delta.NewDeltaView(nil)
 	st := state.NewExecutionState(
-		view,
+		nil,
 		// Note: owners are always 8 bytes
 		state.DefaultParameters().WithMaxKeySizeAllowed(8+2))
 
@@ -184,8 +179,6 @@ func TestExecutionState_MaxKeySize(t *testing.T) {
 }
 
 func TestExecutionState_MaxInteraction(t *testing.T) {
-	view := delta.NewDeltaView(nil)
-
 	key1 := flow.NewRegisterID("1", "2")
 	key1Size := uint64(8 + 1)
 
@@ -202,7 +195,7 @@ func TestExecutionState_MaxInteraction(t *testing.T) {
 	key4Size := uint64(8 + 4)
 
 	st := state.NewExecutionState(
-		view,
+		nil,
 		state.DefaultParameters().
 			WithMeterParameters(
 				meter.DefaultParameters().WithStorageInteractionLimit(
@@ -224,7 +217,7 @@ func TestExecutionState_MaxInteraction(t *testing.T) {
 	require.Equal(t, st.InteractionUsed(), key1Size+key2Size+key3Size)
 
 	st = state.NewExecutionState(
-		view,
+		nil,
 		state.DefaultParameters().
 			WithMeterParameters(
 				meter.DefaultParameters().WithStorageInteractionLimit(
