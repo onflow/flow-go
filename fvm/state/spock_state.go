@@ -164,3 +164,13 @@ func (state *spockState) DropChanges() error {
 
 	return state.storageState.DropChanges()
 }
+
+func (state *spockState) readSetSize() int {
+	return state.storageState.readSetSize()
+}
+
+func (state *spockState) interimReadSet(
+	accumulator map[flow.RegisterID]struct{},
+) {
+	state.storageState.interimReadSet(accumulator)
+}
