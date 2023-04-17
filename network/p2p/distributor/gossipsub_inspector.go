@@ -20,7 +20,7 @@ const (
 	defaultGossipSubInspectorNotificationQueueWorkerCount = 1
 )
 
-var _ p2p.GossipSubInspectorNotificationDistributor = (*GossipSubInspectorNotificationDistributor)(nil)
+var _ p2p.GossipSubInspectorNotifDistributor = (*GossipSubInspectorNotificationDistributor)(nil)
 
 // GossipSubInspectorNotificationDistributor is a component that distributes gossipsub rpc inspector notifications to
 // registered consumers in a non-blocking manner and asynchronously. It is thread-safe and can be used concurrently from
@@ -32,9 +32,9 @@ type GossipSubInspectorNotificationDistributor struct {
 	cm     *component.ComponentManager
 	logger zerolog.Logger
 
-	workerPool   *worker.Pool[*p2p.InvalidControlMessageNotification]
+	workerPool   *worker.Pool[*p2p.InvCtrlMsgNotif]
 	consumerLock sync.RWMutex // protects the consumer field from concurrent updates
-	consumers    []p2p.GossipSubInvalidControlMessageNotificationConsumer
+	consumers    []p2p.GossipSubInvCtrlMsgNotifConsumer
 }
 
 // DefaultGossipSubInspectorNotificationDistributor returns a new GossipSubInspectorNotificationDistributor component with the default configuration.
@@ -61,7 +61,7 @@ func NewGossipSubInspectorNotificationDistributor(log zerolog.Logger, store engi
 		logger: lg,
 	}
 
-	pool := worker.NewWorkerPoolBuilder[*p2p.InvalidControlMessageNotification](lg, store, d.distribute).Build()
+	pool := worker.NewWorkerPoolBuilder[*p2p.InvCtrlMsgNotif](lg, store, d.distribute).Build()
 	d.workerPool = pool
 
 	cm := component.NewComponentManagerBuilder()
@@ -79,7 +79,7 @@ func NewGossipSubInspectorNotificationDistributor(log zerolog.Logger, store engi
 // DistributeInvalidControlMessageNotification distributes the gossipsub rpc inspector notification to all registered consumers.
 // The distribution is done asynchronously and non-blocking. The notification is added to a queue and processed by a worker pool.
 // DistributeEvent in this implementation does not return an error, but it logs a warning if the queue is full.
-func (g *GossipSubInspectorNotificationDistributor) DistributeInvalidControlMessageNotification(notification *p2p.InvalidControlMessageNotification) error {
+func (g *GossipSubInspectorNotificationDistributor) Distribute(notification *p2p.InvCtrlMsgNotif) error {
 	if ok := g.workerPool.Submit(notification); !ok {
 		// we use a queue with a fixed size, so this can happen when queue is full or when the notification is duplicate.
 		g.logger.Warn().Msg("gossipsub rpc inspector notification queue is full or notification is duplicate, discarding notification")
@@ -90,7 +90,7 @@ func (g *GossipSubInspectorNotificationDistributor) DistributeInvalidControlMess
 // AddConsumer adds a consumer to the distributor. The consumer will be called when distributor distributes a new event.
 // AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.
 // There is no guarantee that the consumer will be called for events that were already received by the distributor.
-func (g *GossipSubInspectorNotificationDistributor) AddConsumer(consumer p2p.GossipSubInvalidControlMessageNotificationConsumer) {
+func (g *GossipSubInspectorNotificationDistributor) AddConsumer(consumer p2p.GossipSubInvCtrlMsgNotifConsumer) {
 	g.consumerLock.Lock()
 	defer g.consumerLock.Unlock()
 
@@ -100,7 +100,7 @@ func (g *GossipSubInspectorNotificationDistributor) AddConsumer(consumer p2p.Gos
 // distribute calls the ConsumeEvent method of all registered consumers. It is called by the workers of the worker pool.
 // It is concurrency safe and can be called concurrently by multiple workers. However, the consumers may be blocking
 // on the ConsumeEvent method.
-func (g *GossipSubInspectorNotificationDistributor) distribute(notification *p2p.InvalidControlMessageNotification) error {
+func (g *GossipSubInspectorNotificationDistributor) distribute(notification *p2p.InvCtrlMsgNotif) error {
 	g.consumerLock.RLock()
 	defer g.consumerLock.RUnlock()
 

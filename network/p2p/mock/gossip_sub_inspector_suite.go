@@ -19,7 +19,7 @@ type GossipSubInspectorSuite struct {
 }
 
 // AddInvalidCtrlMsgNotificationConsumer provides a mock function with given fields: _a0
-func (_m *GossipSubInspectorSuite) AddInvalidCtrlMsgNotificationConsumer(_a0 p2p.GossipSubInvalidControlMessageNotificationConsumer) {
+func (_m *GossipSubInspectorSuite) AddInvCtrlMsgNotifConsumer(_a0 p2p.GossipSubInvCtrlMsgNotifConsumer) {
 	_m.Called(_a0)
 }
 

@@ -15,12 +15,14 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-// GossipSubSpamRecordCache is a cache for storing the gossipsub spam records of peers.
+// GossipSubSpamRecordCache is a cache for storing the gossipsub spam records of peers. It is thread-safe.
 // The spam records of peers is used to calculate the application specific score, which is part of the GossipSub score of a peer.
 // Note that neither of the spam records, application specific score, and GossipSub score are shared publicly with other peers.
 // Rather they are solely used by the current peer to select the peers to which it will connect on a topic mesh.
 type GossipSubSpamRecordCache struct {
-	c *stdmap.Backend // the in-memory underlying cache.
+	// the in-memory and thread-safe cache for storing the spam records of peers.
+	c *stdmap.Backend
+
 	// Optional: the pre-processors to be called upon reading or updating a record in the cache.
 	// The pre-processors are called in the order they are added to the cache.
 	// The pre-processors are used to perform any necessary pre-processing on the record before returning it.

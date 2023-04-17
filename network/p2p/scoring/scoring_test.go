@@ -26,7 +26,7 @@ import (
 type mockInspectorSuite struct {
 	component.Component
 	t        *testing.T
-	consumer p2p.GossipSubInvalidControlMessageNotificationConsumer
+	consumer p2p.GossipSubInvCtrlMsgNotifConsumer
 }
 
 var _ p2p.GossipSubInspectorSuite = (*mockInspectorSuite)(nil)
@@ -50,7 +50,7 @@ func (m *mockInspectorSuite) InspectFunc() func(peer.ID, *pubsub.RPC) error {
 	return nil
 }
 
-func (m *mockInspectorSuite) AddInvalidCtrlMsgNotificationConsumer(c p2p.GossipSubInvalidControlMessageNotificationConsumer) {
+func (m *mockInspectorSuite) AddInvCtrlMsgNotifConsumer(c p2p.GossipSubInvCtrlMsgNotifConsumer) {
 	require.Nil(m.t, m.consumer)
 	m.consumer = c
 }
@@ -102,7 +102,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 
 	// now simulates node2 spamming node1 with invalid gossipsub control messages.
 	for i := 0; i < 30; i++ {
-		inspectorSuite1.consumer.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+		inspectorSuite1.consumer.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 			PeerID:  node2.Host().ID(),
 			MsgType: p2p.ControlMessageTypes()[rand.Intn(len(p2p.ControlMessageTypes()))],
 			Count:   1,

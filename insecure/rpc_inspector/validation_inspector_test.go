@@ -72,7 +72,7 @@ func TestValidationInspector_SafetyThreshold(t *testing.T) {
 	})
 	logger := zerolog.New(os.Stdout).Hook(hook)
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
-	defer distributor.AssertNotCalled(t, "DistributeInvalidControlMessageNotification", mockery.Anything)
+	defer distributor.AssertNotCalled(t, "Distribute", mockery.Anything)
 	inspector := validation.NewControlMsgValidationInspector(logger, sporkID, inspectorConfig, distributor)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(inspector)
 	victimNode, _ := p2ptest.NodeFixture(
@@ -125,11 +125,11 @@ func TestValidationInspector_DiscardThreshold(t *testing.T) {
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
-	distributor.On("DistributeInvalidControlMessageNotification", mockery.Anything).
+	distributor.On("Distribute", mockery.Anything).
 		Twice().
 		Run(func(args mockery.Arguments) {
 			count.Inc()
-			notification, ok := args[0].(*p2p.InvalidControlMessageNotification)
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.True(t, validation.IsErrDiscardThreshold(notification.Err))
@@ -194,11 +194,11 @@ func TestValidationInspector_RateLimitedPeer(t *testing.T) {
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
-	distributor.On("DistributeInvalidControlMessageNotification", mockery.Anything).
+	distributor.On("Distribute", mockery.Anything).
 		Times(4).
 		Run(func(args mockery.Arguments) {
 			count.Inc()
-			notification, ok := args[0].(*p2p.InvalidControlMessageNotification)
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.True(t, validation.IsErrRateLimitedControlMsg(notification.Err))
@@ -275,11 +275,11 @@ func TestValidationInspector_InvalidTopicID(t *testing.T) {
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
-	distributor.On("DistributeInvalidControlMessageNotification", mockery.Anything).
+	distributor.On("Distribute", mockery.Anything).
 		Times(8).
 		Run(func(args mockery.Arguments) {
 			count.Inc()
-			notification, ok := args[0].(*p2p.InvalidControlMessageNotification)
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.True(t, validation.IsErrInvalidTopic(notification.Err) || validation.IsErrDuplicateTopic(notification.Err))

@@ -14,10 +14,10 @@ import (
 type GossipSubInspectorSuite struct {
 	component.Component
 	aggregatedInspector       *AggregateRPCInspector
-	ctrlMsgInspectDistributor p2p.GossipSubInspectorNotificationDistributor
+	ctrlMsgInspectDistributor p2p.GossipSubInspectorNotifDistributor
 }
 
-func NewGossipSubInspectorSuite(inspectors []p2p.GossipSubRPCInspector, ctrlMsgInspectDistributor p2p.GossipSubInspectorNotificationDistributor) *GossipSubInspectorSuite {
+func NewGossipSubInspectorSuite(inspectors []p2p.GossipSubRPCInspector, ctrlMsgInspectDistributor p2p.GossipSubInspectorNotifDistributor) *GossipSubInspectorSuite {
 	s := &GossipSubInspectorSuite{
 		ctrlMsgInspectDistributor: ctrlMsgInspectDistributor,
 		aggregatedInspector:       NewAggregateRPCInspector(inspectors...),
@@ -50,6 +50,6 @@ func (s *GossipSubInspectorSuite) InspectFunc() func(peer.ID, *pubsub.RPC) error
 // This consumer is notified when a misbehaving peer regarding gossipsub control messages is detected. This follows a pub/sub
 // pattern where the consumer is notified when a new notification is published.
 // A consumer is only notified once for each notification, and only receives notifications that were published after it was added.
-func (s *GossipSubInspectorSuite) AddInvalidCtrlMsgNotificationConsumer(c p2p.GossipSubInvalidControlMessageNotificationConsumer) {
+func (s *GossipSubInspectorSuite) AddInvCtrlMsgNotifConsumer(c p2p.GossipSubInvCtrlMsgNotifConsumer) {
 	s.ctrlMsgInspectDistributor.AddConsumer(c)
 }

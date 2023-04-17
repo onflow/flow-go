@@ -110,7 +110,7 @@ type ScoreOptionConfig struct {
 	cacheMetrics                     module.HeroCacheMetrics
 	appScoreFunc                     func(peer.ID) float64
 	topicParams                      []func(map[string]*pubsub.TopicScoreParams)
-	registerNotificationConsumerFunc func(p2p.GossipSubInvalidControlMessageNotificationConsumer)
+	registerNotificationConsumerFunc func(p2p.GossipSubInvCtrlMsgNotifConsumer)
 }
 
 func NewScoreOptionConfig(logger zerolog.Logger) *ScoreOptionConfig {
@@ -166,7 +166,7 @@ func (c *ScoreOptionConfig) SetTopicScoreParams(topic channels.Topic, topicScore
 // SetRegisterNotificationConsumerFunc sets the function to register the notification consumer for the penalty option.
 // ScoreOption uses this function to register the notification consumer for the pubsub system so that it can receive
 // notifications of invalid control messages.
-func (c *ScoreOptionConfig) SetRegisterNotificationConsumerFunc(f func(p2p.GossipSubInvalidControlMessageNotificationConsumer)) {
+func (c *ScoreOptionConfig) SetRegisterNotificationConsumerFunc(f func(p2p.GossipSubInvCtrlMsgNotifConsumer)) {
 	c.registerNotificationConsumerFunc = f
 }
 

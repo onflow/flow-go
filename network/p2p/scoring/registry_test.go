@@ -77,7 +77,7 @@ func testPeerWithSpamRecord(t *testing.T, messageType p2p.ControlMessageType, ex
 	assert.Equal(t, scoring.MaxAppSpecificReward, score)
 
 	// report a misbehavior for the peer id.
-	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
 		Count:   1,
@@ -128,7 +128,7 @@ func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2p.ControlMess
 	require.Equal(t, scoring.DefaultUnknownIdentityPenalty, score)
 
 	// report a misbehavior for the peer id.
-	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
 		Count:   1,
@@ -179,7 +179,7 @@ func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2p.Control
 	require.Equal(t, scoring.DefaultInvalidSubscriptionPenalty, score)
 
 	// report a misbehavior for the peer id.
-	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
 		Count:   1,
@@ -206,7 +206,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 		withValidSubscriptions(peerID))
 
 	// report a misbehavior for the peer id.
-	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2p.CtrlMsgPrune,
 		Count:   1,
@@ -214,7 +214,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
 
-	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2p.CtrlMsgGraft,
 		Count:   1,
@@ -222,7 +222,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
 
-	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2p.CtrlMsgIHave,
 		Count:   1,
@@ -230,7 +230,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
 
-	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2p.CtrlMsgIWant,
 		Count:   1,
@@ -272,7 +272,7 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 		}))
 
 	// report a misbehavior for the peer id.
-	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2p.CtrlMsgGraft,
 		Count:   1,
@@ -322,7 +322,7 @@ func TestPersistingUnknownIdentityPenalty(t *testing.T) {
 	require.Equal(t, scoring.DefaultUnknownIdentityPenalty, reg.AppSpecificScoreFunc()(peerID))
 
 	// report a misbehavior for the peer id.
-	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2p.CtrlMsgGraft,
 		Count:   1,
@@ -375,7 +375,7 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 	require.Equal(t, scoring.DefaultUnknownIdentityPenalty, reg.AppSpecificScoreFunc()(peerID))
 
 	// report a misbehavior for the peer id.
-	reg.OnInvalidControlMessageNotification(&p2p.InvalidControlMessageNotification{
+	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2p.CtrlMsgGraft,
 		Count:   1,

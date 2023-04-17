@@ -202,7 +202,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 	var scoreTracer p2p.PeerScoreTracer
 	if g.gossipSubPeerScoring {
 		if g.rpcInspectorSuite != nil {
-			g.scoreOptionConfig.SetRegisterNotificationConsumerFunc(g.rpcInspectorSuite.AddInvalidCtrlMsgNotificationConsumer)
+			g.scoreOptionConfig.SetRegisterNotificationConsumerFunc(g.rpcInspectorSuite.AddInvCtrlMsgNotifConsumer)
 		}
 
 		scoreOpt = scoring.NewScoreOption(g.scoreOptionConfig)
