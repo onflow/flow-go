@@ -498,7 +498,7 @@ func BatchVerifyBLSSignaturesOneMessage(
 	returnBool := make([]bool, len(sigs))
 	// temporary boolean array to hold the return values till all the return values are set
 	tmpBool := make([]bool, len(sigs))
-	for i, _ := range tmpBool {
+	for i := range tmpBool {
 		tmpBool[i] = true // default to true
 	}
 	if err := checkBLSHasher(kmac); err != nil {
