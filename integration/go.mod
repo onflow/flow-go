@@ -17,8 +17,8 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.2.0
 	github.com/onflow/cadence v0.38.1
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.12.2
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.12.1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.12.2-0.20230403152721-e61f93afa77f
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.12.2-0.20230403152721-e61f93afa77f
 	github.com/onflow/flow-emulator v0.46.0
 	github.com/onflow/flow-go v0.30.1-0.20230405170219-7aae6a2af471
 	github.com/onflow/flow-go-sdk v0.40.0
@@ -80,6 +80,7 @@ require (
 	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/containerd/continuity v0.0.0-20200107194136-26c1120b8d41 // indirect
 	github.com/containerd/fifo v0.0.0-20191213151349-ff969a566b00 // indirect
+	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cskr/pubsub v1.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -225,7 +226,7 @@ require (
 	github.com/multiformats/go-multistream v0.3.3 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/onflow/atree v0.5.0 // indirect
-	github.com/onflow/flow-ft/lib/go/contracts v0.7.0 // indirect
+	github.com/onflow/flow-ft/lib/go/contracts v0.5.0 // indirect
 	github.com/onflow/go-bitswap v0.0.0-20221017184039-808c5791a8a8 // indirect
 	github.com/onflow/sdks v0.5.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.6.1 // indirect
