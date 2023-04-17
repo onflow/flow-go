@@ -21,10 +21,10 @@ int get_sk_len() {
 
 // Checks if input point p is in the subgroup G1. 
 // The function assumes the input is known to be on the curve E1.
-int check_membership_G1(const ep_t p){
+int G1_check_membership(const ep_t p){
 #if MEMBERSHIP_CHECK
     #if MEMBERSHIP_CHECK_G1 == EXP_ORDER
-    return simple_subgroup_check_G1(p);
+    return G1_simple_subgroup_check(p);
     #elif MEMBERSHIP_CHECK_G1 == BOWE
     // section 3.2 from https://eprint.iacr.org/2019/814.pdf
     return bowe_subgroup_check_G1(p);
@@ -47,7 +47,7 @@ int G2_check_membership(const E2* p){
         return INVALID;
     // check p is in G2
     #if MEMBERSHIP_CHECK_G2 == EXP_ORDER
-    return simple_subgroup_check_G2(p);
+    return G2_simple_subgroup_check(p);
     #elif MEMBERSHIP_CHECK_G2 == BOWE
     // TODO: implement Bowe's check
     return UNDEFINED;
@@ -172,7 +172,7 @@ int bls_verifyPerDistinctMessage(const byte* sig,
     if (ret != RLC_OK) goto out;
 
     // check s is in G1
-    ret = check_membership_G1(elemsG1[0]); // only enabled if MEMBERSHIP_CHECK==1
+    ret = G1_check_membership(elemsG1[0]); // only enabled if MEMBERSHIP_CHECK==1
     if (ret != VALID) goto out;
 
     // elemsG2[0] = -g2
@@ -260,7 +260,7 @@ int bls_verifyPerDistinctKey(const byte* sig,
     if (ret != RLC_OK) goto out;
 
     // check s in G1
-    ret = check_membership_G1(elemsG1[0]); // only enabled if MEMBERSHIP_CHECK==1
+    ret = G1_check_membership(elemsG1[0]); // only enabled if MEMBERSHIP_CHECK==1
     if (ret != VALID) goto out;
 
     // elemsG2[0] = -g2
@@ -346,7 +346,7 @@ int bls_verify(const E2* pk, const byte* sig, const byte* data, const int len) {
     }
 
     // check s is in G1
-    if (check_membership_G1(s) != VALID) { // only enabled if MEMBERSHIP_CHECK==1
+    if (G1_check_membership(s) != VALID) { // only enabled if MEMBERSHIP_CHECK==1
         return INVALID;
     }
     
@@ -495,7 +495,7 @@ void bls_batchVerify(const int sigs_len, byte* results, const E2* pks_input,
         // - valid points are multiplied by a random scalar (same for public keys at same index)
         // to make sure a signature at index (i) is verified against the public key at the same index.
         int read_ret = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
-        if (read_ret != RLC_OK || check_membership_G1(&sigs[i]) != VALID) {
+        if (read_ret != RLC_OK || G1_check_membership(&sigs[i]) != VALID) {
             if (read_ret == UNDEFINED) {// unexpected error case 
                 goto out;
             };

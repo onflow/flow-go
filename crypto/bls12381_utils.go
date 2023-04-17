@@ -203,10 +203,11 @@ func readScalarFrStar(a *scalar, src []byte) error {
 
 }
 
-// readPointG2 reads a G2 point from a slice of bytes
-// The slice is expected to be of size PubKeyLenBLSBLS12381 and the deserialization will
-// follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
-func readPointG2(a *pointE2, src []byte) error {
+// readPointE2 reads a E2 point from a slice of bytes
+// The slice is expected to be of size PubKeyLenBLSBLS12381 and the deserialization
+// follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves.
+// No G2 membership check is performed.
+func readPointE2(a *pointE2, src []byte) error {
 	read := C.E2_read_bytes((*C.E2)(a),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
@@ -223,10 +224,11 @@ func readPointG2(a *pointE2, src []byte) error {
 	}
 }
 
-// readPointG1 reads a G1 point from a slice of bytes
-// The slice should be of size SignatureLenBLSBLS12381 and the deserialization will
-// follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
-func readPointG1(a *pointE1, src []byte) error {
+// readPointE1 reads a E1 point from a slice of bytes
+// The slice should be of size SignatureLenBLSBLS12381 and the deserialization
+// follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves.
+// No G1 membership check is performed.
+func readPointE1(a *pointE1, src []byte) error {
 	switch C.ep_read_bin_compact((*C.ep_st)(a),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src))) {
@@ -242,7 +244,7 @@ func readPointG1(a *pointE1, src []byte) error {
 // checkMembershipG1 wraps a call to a subgroup check in G1 since cgo can't be used
 // in go test files.
 func checkMembershipG1(pt *pointE1) int {
-	return int(C.check_membership_G1((*C.ep_st)(pt)))
+	return int(C.G1_check_membership((*C.ep_st)(pt)))
 }
 
 // checkMembershipG2 wraps a call to a subgroup check in G2 since cgo can't be used

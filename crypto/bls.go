@@ -346,7 +346,7 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 			pubKeyLengthBLSBLS12381, len(publicKeyBytes))
 	}
 	var pk pubKeyBLSBLS12381
-	err := readPointG2(&pk.point, publicKeyBytes)
+	err := readPointE2(&pk.point, publicKeyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("decode public key failed: %w", err)
 	}

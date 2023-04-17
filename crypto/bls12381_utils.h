@@ -128,8 +128,8 @@ void     ep_mult_generic_bench(ep_t, const Fr*);
 void     ep_mult(ep_t, const ep_t, const Fr*);
 void     ep_sum_vector(ep_t, ep_st*, const int);
 int      ep_sum_vector_byte(byte*, const byte*, const int);
-int      check_membership_G1(const ep_t);
-int      simple_subgroup_check_G1(const ep_t);
+int      G1_check_membership(const ep_t);
+int      G1_simple_subgroup_check(const ep_t);
 void     ep_rand_G1(ep_t);
 void     ep_rand_G1complement( ep_t);
 #if  (MEMBERSHIP_CHECK_G1 == BOWE)
@@ -155,7 +155,7 @@ void     ep2_mult(ep2_t res, const ep2_t p, const Fr* expo);
 
 void     E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len);
 int      G2_check_membership(const E2*);
-int      simple_subgroup_check_G2(const ep2_t);
+int      G2_simple_subgroup_check(const ep2_t);
 void     ep2_rand_G2(ep2_t);
 void     ep2_rand_G2complement( ep2_t);
 
