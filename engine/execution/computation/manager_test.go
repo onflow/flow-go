@@ -167,7 +167,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		}
 	}
 	require.True(t, hasUpdates)
-	require.Len(t, returnedComputationResult.BlockExecutionResult.Size(), 1+1) // 1 coll + 1 system chunk
+	require.Equal(t, returnedComputationResult.BlockExecutionResult.Size(), 1+1) // 1 coll + 1 system chunk
 	assert.NotEmpty(t, returnedComputationResult.AllExecutionSnapshots()[0].UpdatedRegisters())
 }
 
