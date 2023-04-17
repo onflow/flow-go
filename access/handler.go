@@ -57,7 +57,7 @@ func (h *Handler) GetNodeVersionInfo(ctx context.Context, _ *access.GetNodeVersi
 			Semver:          nodeVersionInfo.Semver,
 			Commit:          nodeVersionInfo.Commit,
 			SporkId:         nodeVersionInfo.SporkId[:],
-			ProtocolVersion: uint32(nodeVersionInfo.ProtocolVersion),
+			ProtocolVersion: uint64(nodeVersionInfo.ProtocolVersion),
 		},
 	}, nil
 }
