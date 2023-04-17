@@ -211,7 +211,7 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 		return false, nil
 	}
 
-	verif := C.bls_verify((*C.ep2_st)(&pk.point),
+	verif := C.bls_verify((*C.E2)(&pk.point),
 		(*C.uchar)(&s[0]),
 		(*C.uchar)(&h[0]),
 		(C.int)(len(h)))
@@ -346,13 +346,13 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 			pubKeyLengthBLSBLS12381, len(publicKeyBytes))
 	}
 	var pk pubKeyBLSBLS12381
-	err := readPointG2(&pk.point, publicKeyBytes)
+	err := readPointE2(&pk.point, publicKeyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("decode public key failed %w", err)
+		return nil, fmt.Errorf("decode public key failed: %w", err)
 	}
 
 	// membership check in G2
-	if C.check_membership_G2((*C.ep2_st)(&pk.point)) != valid {
+	if C.G2_check_membership((*C.E2)(&pk.point)) != valid {
 		return nil, invalidInputsErrorf("input key is infinity or does not encode a BLS12-381 point in the valid group")
 	}
 
@@ -460,7 +460,7 @@ type pubKeyBLSBLS12381 struct {
 	// sure the comparison is performed after an instance is created.
 	//
 	// public key G2 point
-	point pointG2
+	point pointE2
 	// G2 identity check cache
 	isIdentity bool
 }
@@ -468,7 +468,7 @@ type pubKeyBLSBLS12381 struct {
 // newPubKeyBLSBLS12381 creates a new BLS public key with the given point.
 // If no scalar is provided, the function allocates an
 // empty scalar.
-func newPubKeyBLSBLS12381(p *pointG2) *pubKeyBLSBLS12381 {
+func newPubKeyBLSBLS12381(p *pointE2) *pubKeyBLSBLS12381 {
 	if p != nil {
 		key := &pubKeyBLSBLS12381{
 			point: *p,
@@ -498,15 +498,15 @@ func (a *pubKeyBLSBLS12381) EncodeCompressed() []byte {
 	if serializationG2 != compressed {
 		panic("library is not configured to use compressed public key serialization")
 	}
-	return a.Encode()
+	dest := make([]byte, pubKeyLengthBLSBLS12381)
+	writePointG2(dest, &a.point)
+	return dest
 }
 
 // Encode returns a byte encoding of the public key.
 // Since we use a compressed encoding by default, this delegates to EncodeCompressed
 func (a *pubKeyBLSBLS12381) Encode() []byte {
-	dest := make([]byte, pubKeyLengthBLSBLS12381)
-	writePointG2(dest, &a.point)
-	return dest
+	return a.EncodeCompressed()
 }
 
 // Equals checks is two public keys are equal
@@ -546,9 +546,9 @@ func (a *blsBLS12381Algo) init() error {
 
 // This is only a TEST/DEBUG/BENCH function.
 // It returns the hash to G1 point from a slice of 128 bytes
-func mapToG1(data []byte) *pointG1 {
+func mapToG1(data []byte) *pointE1 {
 	l := len(data)
-	var h pointG1
+	var h pointE1
 	C.map_to_G1((*C.ep_st)(&h), (*C.uchar)(&data[0]), (C.int)(l))
 	return &h
 }

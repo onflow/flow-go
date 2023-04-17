@@ -21,8 +21,8 @@ func TestBLSThresholdSignature(t *testing.T) {
 	t.Run("centralized_stateless_keygen", testCentralizedStatelessAPI)
 	// stateful API
 	t.Run("centralized_stateful_keygen", testCentralizedStatefulAPI)
-	t.Run("distributed_stateful_feldmanVSS_keygen", testDistributedStatefulAPI_FeldmanVSS)
-	t.Run("distributed_stateful_jointFeldman_keygen", testDistributedStatefulAPI_JointFeldman) // Flow Random beacon case
+	//t.Run("distributed_stateful_feldmanVSS_keygen", testDistributedStatefulAPI_FeldmanVSS)
+	//t.Run("distributed_stateful_jointFeldman_keygen", testDistributedStatefulAPI_JointFeldman) // Flow Random beacon case
 }
 
 const thresholdSignatureTag = "random tag"

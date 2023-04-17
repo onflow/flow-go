@@ -183,7 +183,7 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 		return nil, blsAggregateEmptyListError
 	}
 
-	points := make([]pointG2, 0, len(keys))
+	points := make([]pointE2, 0, len(keys))
 	for i, pk := range keys {
 		pkBLS, ok := pk.(*pubKeyBLSBLS12381)
 		if !ok {
@@ -192,8 +192,8 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 		points = append(points, pkBLS.point)
 	}
 
-	var sum pointG2
-	C.ep2_sum_vector((*C.ep2_st)(&sum), (*C.ep2_st)(&points[0]),
+	var sum pointE2
+	C.E2_sum_vector((*C.E2)(&sum), (*C.E2)(&points[0]),
 		(C.int)(len(points)))
 
 	sumKey := newPubKeyBLSBLS12381(&sum)
@@ -207,7 +207,7 @@ func IdentityBLSPublicKey() PublicKey {
 
 	identity := *newPubKeyBLSBLS12381(nil)
 	// set the point to infinity
-	C.ep2_set_infty((*C.ep2_st)(&identity.point))
+	C.E2_set_infty((*C.E2)(&identity.point))
 	identity.isIdentity = true
 	return &identity
 }
@@ -233,7 +233,7 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 		return nil, notBLSKeyError
 	}
 
-	pointsToSubtract := make([]pointG2, 0, len(keysToRemove))
+	pointsToSubtract := make([]pointE2, 0, len(keysToRemove))
 	for i, pk := range keysToRemove {
 		pkBLS, ok := pk.(*pubKeyBLSBLS12381)
 		if !ok {
@@ -247,9 +247,9 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 		return aggKey, nil
 	}
 
-	var resultPoint pointG2
-	C.ep2_subtract_vector((*C.ep2_st)(&resultPoint), (*C.ep2_st)(&aggPKBLS.point),
-		(*C.ep2_st)(&pointsToSubtract[0]), (C.int)(len(pointsToSubtract)))
+	var resultPoint pointE2
+	C.E2_subtract_vector((*C.E2)(&resultPoint), (*C.E2)(&aggPKBLS.point),
+		(*C.E2)(&pointsToSubtract[0]), (C.int)(len(pointsToSubtract)))
 
 	resultKey := newPubKeyBLSBLS12381(&resultPoint)
 	return resultKey, nil
@@ -356,13 +356,13 @@ func VerifyBLSSignatureManyMessages(
 	// The comparison of the maps length minimizes the number of pairings to
 	// compute by aggregating either public keys or the message hashes in
 	// the verification equation.
-	mapPerHash := make(map[string][]pointG2)
-	mapPerPk := make(map[pointG2][][]byte)
+	mapPerHash := make(map[string][]pointE2)
+	mapPerPk := make(map[pointE2][][]byte)
 	// Note: mapPerPk is using a cgo structure as map keys which may lead to 2 equal public keys
 	// being considered distinct. This does not make the verification equation wrong but leads to
 	// computing extra pairings. This case is considered unlikely to happen since a caller is likely
 	// to use the same struct for a same public key.
-	// One way to fix this is to use the public key encoding as the map keys and store the "pointG2"
+	// One way to fix this is to use the public key encoding as the map keys and store the "pointE2"
 	// structure with the map value, which adds more complexity and processing time.
 
 	// fill the 2 maps
@@ -390,7 +390,7 @@ func VerifyBLSSignatureManyMessages(
 		flatDistinctHashes := make([]byte, 0)
 		lenHashes := make([]uint32, 0)
 		pkPerHash := make([]uint32, 0, len(mapPerHash))
-		allPks := make([]pointG2, 0)
+		allPks := make([]pointE2, 0)
 		for hash, pksVal := range mapPerHash {
 			flatDistinctHashes = append(flatDistinctHashes, []byte(hash)...)
 			lenHashes = append(lenHashes, uint32(len([]byte(hash))))
@@ -403,13 +403,13 @@ func VerifyBLSSignatureManyMessages(
 			(*C.uchar)(&flatDistinctHashes[0]),
 			(*C.uint32_t)(&lenHashes[0]),
 			(*C.uint32_t)(&pkPerHash[0]),
-			(*C.ep2_st)(&allPks[0]),
+			(*C.E2)(&allPks[0]),
 		)
 
 	} else {
 		// aggregate hashes per distinct key
 		// using the linearity of the pairing on the G1 variables.
-		distinctPks := make([]pointG2, 0, len(mapPerPk))
+		distinctPks := make([]pointE2, 0, len(mapPerPk))
 		hashPerPk := make([]uint32, 0, len(mapPerPk))
 		flatHashes := make([]byte, 0)
 		lenHashes := make([]uint32, 0)
@@ -425,7 +425,7 @@ func VerifyBLSSignatureManyMessages(
 		verif = C.bls_verifyPerDistinctKey(
 			(*C.uchar)(&s[0]),
 			(C.int)(len(mapPerPk)),
-			(*C.ep2_st)(&distinctPks[0]),
+			(*C.E2)(&distinctPks[0]),
 			(*C.uint32_t)(&hashPerPk[0]),
 			(*C.uchar)(&flatHashes[0]),
 			(*C.uint32_t)(&lenHashes[0]))
@@ -472,7 +472,6 @@ func VerifyBLSSignatureManyMessages(
 func BatchVerifyBLSSignaturesOneMessage(
 	pks []PublicKey, sigs []Signature, message []byte, kmac hash.Hasher,
 ) ([]bool, error) {
-
 	// empty list check
 	if len(pks) == 0 {
 		return []bool{}, fmt.Errorf("invalid list of public keys: %w", blsAggregateEmptyListError)
@@ -485,43 +484,53 @@ func BatchVerifyBLSSignaturesOneMessage(
 			len(sigs))
 	}
 
-	verifBool := make([]bool, len(sigs))
-	if err := checkBLSHasher(kmac); err != nil {
-		return verifBool, err
+	// return boolean array
+	returnBool := make([]bool, len(sigs))
+	// temporary boolean array to hold the return values till all the return values are set
+	tmpBool := make([]bool, len(sigs))
+	for i := range tmpBool {
+		tmpBool[i] = true // default to true
 	}
-
-	// an invalid signature with an incorrect header but correct length
-	invalidSig := make([]byte, signatureLengthBLSBLS12381)
-	invalidSig[0] = invalidBLSSignatureHeader // incorrect header
+	if err := checkBLSHasher(kmac); err != nil {
+		return returnBool, err
+	}
 
 	// flatten the shares (required by the C layer)
 	flatSigs := make([]byte, 0, signatureLengthBLSBLS12381*len(sigs))
-	pkPoints := make([]pointG2, 0, len(pks))
+	pkPoints := make([]pointE2, 0, len(pks))
+
+	getIdentityPoint := func() pointE2 {
+		pk, _ := IdentityBLSPublicKey().(*pubKeyBLSBLS12381) // second value is guaranteed to be true
+		return pk.point
+	}
 
 	for i, pk := range pks {
 		pkBLS, ok := pk.(*pubKeyBLSBLS12381)
 		if !ok {
-			return verifBool, fmt.Errorf("key at index %d is invalid: %w", i, notBLSKeyError)
+			return returnBool, fmt.Errorf("key at index %d is invalid: %w", i, notBLSKeyError)
 		}
-		pkPoints = append(pkPoints, pkBLS.point)
 
 		if len(sigs[i]) != signatureLengthBLSBLS12381 || pkBLS.isIdentity {
-			// force the signature to be invalid by replacing it with an invalid array
-			// that fails the deserialization in C.ep_read_bin_compact
-			flatSigs = append(flatSigs, invalidSig...)
+			// case of invalid signature: set the signature and public key at index `i`
+			// to identities so that there is no effect on the aggregation tree computation.
+			// However, the boolean return for index `i` is set to `false` and won't be overwritten.
+			tmpBool[i] = false
+			pkPoints = append(pkPoints, getIdentityPoint())
+			flatSigs = append(flatSigs, identityBLSSignature...)
 		} else {
+			pkPoints = append(pkPoints, pkBLS.point)
 			flatSigs = append(flatSigs, sigs[i]...)
 		}
 	}
 
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(message)
-	verifInt := make([]byte, len(verifBool))
+	verifInt := make([]byte, len(returnBool))
 
 	C.bls_batchVerify(
 		(C.int)(len(verifInt)),
 		(*C.uchar)(&verifInt[0]),
-		(*C.ep2_st)(&pkPoints[0]),
+		(*C.E2)(&pkPoints[0]),
 		(*C.uchar)(&flatSigs[0]),
 		(*C.uchar)(&h[0]),
 		(C.int)(len(h)),
@@ -529,12 +538,16 @@ func BatchVerifyBLSSignaturesOneMessage(
 
 	for i, v := range verifInt {
 		if (C.int)(v) != valid && (C.int)(v) != invalid {
-			return verifBool, fmt.Errorf("batch verification failed")
+			return returnBool, fmt.Errorf("batch verification failed")
 		}
-		verifBool[i] = ((C.int)(v) == valid)
+		if tmpBool[i] { // only overwrite if not previously written
+			tmpBool[i] = ((C.int)(v) == valid)
+		}
 	}
 
-	return verifBool, nil
+	// make sure returnBool is []false till this point
+	copy(returnBool, tmpBool)
+	return returnBool, nil
 }
 
 // blsAggregateEmptyListError is returned when a list of BLS objects (e.g. signatures or keys)
