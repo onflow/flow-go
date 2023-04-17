@@ -76,7 +76,7 @@ func NewGossipSubInspectorNotificationDistributor(log zerolog.Logger, store engi
 	return d
 }
 
-// DistributeInvalidControlMessageNotification distributes the gossipsub rpc inspector notification to all registered consumers.
+// Distribute distributes the gossipsub rpc inspector notification to all registered consumers.
 // The distribution is done asynchronously and non-blocking. The notification is added to a queue and processed by a worker pool.
 // DistributeEvent in this implementation does not return an error, but it logs a warning if the queue is full.
 func (g *GossipSubInspectorNotifDistributor) Distribute(notification *p2p.InvCtrlMsgNotif) error {
