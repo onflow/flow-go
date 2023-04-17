@@ -109,7 +109,7 @@ var Routes = []route{{
 	Handler: GetNetworkParameters,
 }, {
 	Method:  http.MethodGet,
-	Pattern: "/network/node_version_info",
+	Pattern: "/node_version_info",
 	Name:    "getNodeVersionInfo",
 	Handler: GetNodeVersionInfo,
 }}

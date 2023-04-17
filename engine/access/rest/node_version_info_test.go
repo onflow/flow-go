@@ -17,7 +17,7 @@ import (
 )
 
 func nodeVersionInfoURL(t *testing.T) string {
-	u, err := url.ParseRequestURI("/v1/network/node_version_info")
+	u, err := url.ParseRequestURI("/v1/node_version_info")
 	require.NoError(t, err)
 
 	return u.String()
@@ -33,7 +33,7 @@ func TestGetNodeVersionInfo(t *testing.T) {
 			Semver:          build.Semver(),
 			Commit:          build.Commit(),
 			SporkId:         unittest.IdentifierFixture(),
-			ProtocolVersion: uint(unittest.Uint64InRange(10, 30)),
+			ProtocolVersion: unittest.Uint64InRange(10, 30),
 		}
 
 		backend.Mock.
@@ -53,7 +53,7 @@ func nodeVersionInfoExpectedStr(nodeVersionInfo *access.NodeVersionInfo) string 
 			"commit": "%s",
 			"spork_id": "%s",
             "protocol_version": "%s"
-		}`, nodeVersionInfo.Semver, nodeVersionInfo.Commit, nodeVersionInfo.SporkId.String(), strconv.FormatUint(uint64(nodeVersionInfo.ProtocolVersion), 10))
+		}`, nodeVersionInfo.Semver, nodeVersionInfo.Commit, nodeVersionInfo.SporkId.String(), strconv.FormatUint(nodeVersionInfo.ProtocolVersion, 10))
 }
 
 func getNodeVersionInfoRequest(t *testing.T) *http.Request {

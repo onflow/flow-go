@@ -229,6 +229,7 @@ func (b *Backend) Ping(ctx context.Context) error {
 	return nil
 }
 
+// GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
 func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error) {
 	stateParams := b.state.Params()
 	sporkId, err := stateParams.SporkID()
@@ -245,7 +246,7 @@ func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionIn
 		Semver:          build.Semver(),
 		Commit:          build.Commit(),
 		SporkId:         sporkId,
-		ProtocolVersion: protocolVersion,
+		ProtocolVersion: uint64(protocolVersion),
 	}, nil
 }
 

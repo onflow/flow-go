@@ -105,10 +105,10 @@ type NetworkParameters struct {
 	ChainID flow.ChainID
 }
 
-// NodeVersionInfo
+// NodeVersionInfo contains information about node, such as semver, commit, sporkID, protocolVersion, etc
 type NodeVersionInfo struct {
 	Semver          string
 	Commit          string
 	SporkId         flow.Identifier
-	ProtocolVersion uint
+	ProtocolVersion uint64
 }

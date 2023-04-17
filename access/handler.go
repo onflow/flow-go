@@ -46,7 +46,11 @@ func (h *Handler) Ping(ctx context.Context, _ *access.PingRequest) (*access.Ping
 	return &access.PingResponse{}, nil
 }
 
-func (h *Handler) GetNodeVersionInfo(ctx context.Context, _ *access.GetNodeVersionInfoRequest) (*access.GetNodeVersionInfoResponse, error) {
+// GetNodeVersionInfo gets node version information such as semver, commit, sporkID, protocolVersion, etc
+func (h *Handler) GetNodeVersionInfo(
+	ctx context.Context,
+	_ *access.GetNodeVersionInfoRequest,
+) (*access.GetNodeVersionInfoResponse, error) {
 	nodeVersionInfo, err := h.api.GetNodeVersionInfo(ctx)
 	if err != nil {
 		return nil, err
@@ -57,7 +61,7 @@ func (h *Handler) GetNodeVersionInfo(ctx context.Context, _ *access.GetNodeVersi
 			Semver:          nodeVersionInfo.Semver,
 			Commit:          nodeVersionInfo.Commit,
 			SporkId:         nodeVersionInfo.SporkId[:],
-			ProtocolVersion: uint64(nodeVersionInfo.ProtocolVersion),
+			ProtocolVersion: nodeVersionInfo.ProtocolVersion,
 		},
 	}, nil
 }
