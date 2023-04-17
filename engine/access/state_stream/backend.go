@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -50,7 +50,7 @@ type StateStreamBackend struct {
 	seals         storage.Seals
 	results       storage.ExecutionResults
 	execDataStore execution_data.ExecutionDataStore
-	execDataCache *herocache.Cache
+	execDataCache *herocache.BlockExecutionData
 	broadcaster   *engine.Broadcaster
 }
 
@@ -62,7 +62,7 @@ func New(
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	execDataStore execution_data.ExecutionDataStore,
-	execDataCache *herocache.Cache,
+	execDataCache *herocache.BlockExecutionData,
 	broadcaster *engine.Broadcaster,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
@@ -106,7 +106,7 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, blockID flow.
 		b.log.Trace().
 			Hex("block_id", logging.ID(blockID)).
 			Msg("execution data cache hit")
-		return cached.(*execution_data.BlockExecutionDataEntity), nil
+		return cached, nil
 	}
 	b.log.Trace().
 		Hex("block_id", logging.ID(blockID)).
@@ -129,7 +129,7 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, blockID flow.
 
 	blockExecData := execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
 
-	b.execDataCache.Add(blockID, blockExecData)
+	b.execDataCache.Add(blockExecData)
 
 	return blockExecData, nil
 }
