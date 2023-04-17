@@ -3,6 +3,7 @@ package access_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/onflow/flow-go/cmd/build"
 	"os"
 	"testing"
 
@@ -840,6 +841,31 @@ func (suite *Suite) TestExecuteScript() {
 			}
 			actualResp, err := handler.ExecuteScriptAtBlockHeight(ctx, &req)
 			assertResult(err, expectedResp, actualResp)
+		})
+	})
+}
+
+// TestAPICallNodeVersionInfo tests the GetNodeVersionInfo query and check response returns correct node version
+// information
+func (suite *Suite) TestAPICallNodeVersionInfo() {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+		sporkId := unittest.IdentifierFixture()
+		protocolVersion := uint(unittest.Uint64InRange(10, 30))
+
+		suite.params.On("SporkID").Return(sporkId, nil)
+		suite.params.On("ProtocolVersion").Return(protocolVersion, nil)
+
+		req := &accessproto.GetNodeVersionInfoRequest{}
+		resp, err := handler.GetNodeVersionInfo(context.Background(), req)
+		require.NoError(suite.T(), err)
+		require.NotNil(suite.T(), resp)
+
+		respNodeVersionInfo := resp.Info
+		suite.Require().Equal(respNodeVersionInfo, &entitiesproto.NodeVersionInfo{
+			Semver:          build.Semver(),
+			Commit:          build.Commit(),
+			SporkId:         sporkId[:],
+			ProtocolVersion: uint64(protocolVersion),
 		})
 	})
 }
