@@ -52,7 +52,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.1
 	github.com/onflow/atree v0.5.0
-	github.com/onflow/cadence v0.38.0
+	github.com/onflow/cadence v0.38.1
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.12.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.12.1
@@ -100,6 +100,7 @@ require (
 
 require (
 	github.com/slok/go-http-metrics v0.10.0
+	golang.org/x/mod v0.8.0
 	gonum.org/v1/gonum v0.8.2
 )
 
@@ -265,7 +266,6 @@ require (
 	go.uber.org/dig v1.15.0 // indirect
 	go.uber.org/fx v1.18.2 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/mod v0.8.0 // indirect
 	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/oauth2 v0.6.0 // indirect
 	golang.org/x/term v0.6.0 // indirect

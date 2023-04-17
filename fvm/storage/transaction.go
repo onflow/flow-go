@@ -1,8 +1,8 @@
 package storage
 
 import (
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 )
 
 type Transaction interface {

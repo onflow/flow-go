@@ -3,11 +3,10 @@ package derived_test
 import (
 	"testing"
 
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence/runtime/common"
-
-	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 )
 
 func TestProgramDependencies_Count(t *testing.T) {

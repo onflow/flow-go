@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,7 +14,7 @@ import (
 
 func newTestTransactionState() state.NestedTransaction {
 	return state.NewTransactionState(
-		delta.NewDeltaView(nil),
+		nil,
 		state.DefaultParameters(),
 	)
 }
@@ -197,7 +196,7 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 	val := createByteArray(2)
 
 	cachedState := state.NewExecutionState(
-		delta.NewDeltaView(nil),
+		nil,
 		state.DefaultParameters(),
 	)
 
@@ -310,7 +309,7 @@ func TestRestartNestedTransaction(t *testing.T) {
 	state := id.StateForTestingOnly()
 	require.Equal(t, uint64(0), state.InteractionUsed())
 
-	// Restart will merge the meter stat, but not the view delta
+	// Restart will merge the meter stat, but not the register updates
 
 	err = txn.RestartNestedTransaction(id)
 	require.NoError(t, err)
@@ -478,50 +477,6 @@ func TestParseRestrictedCannotCommitLocationMismatch(t *testing.T) {
 
 	require.Equal(t, 1, txn.NumNestedTransactions())
 	require.True(t, txn.IsCurrent(id))
-}
-
-func TestPauseAndResume(t *testing.T) {
-	txn := newTestTransactionState()
-
-	key1 := flow.NewRegisterID("addr", "key")
-	key2 := flow.NewRegisterID("addr2", "key2")
-
-	val, err := txn.Get(key1)
-	require.NoError(t, err)
-	require.Nil(t, val)
-
-	id1, err := txn.BeginNestedTransaction()
-	require.NoError(t, err)
-
-	err = txn.Set(key1, createByteArray(2))
-	require.NoError(t, err)
-
-	val, err = txn.Get(key1)
-	require.NoError(t, err)
-	require.NotNil(t, val)
-
-	pausedState, err := txn.PauseNestedTransaction(id1)
-	require.NoError(t, err)
-
-	val, err = txn.Get(key1)
-	require.NoError(t, err)
-	require.Nil(t, val)
-
-	txn.ResumeNestedTransaction(pausedState)
-
-	val, err = txn.Get(key1)
-	require.NoError(t, err)
-	require.NotNil(t, val)
-
-	err = txn.Set(key2, createByteArray(2))
-	require.NoError(t, err)
-
-	_, err = txn.CommitNestedTransaction(id1)
-	require.NoError(t, err)
-
-	val, err = txn.Get(key2)
-	require.NoError(t, err)
-	require.NotNil(t, val)
 }
 
 func TestFinalizeMainTransactionFailWithUnexpectedNestedTransactions(

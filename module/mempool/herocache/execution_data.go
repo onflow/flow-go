@@ -20,7 +20,7 @@ type BlockExecutionData struct {
 
 // NewBlockExecutionData implements a block execution data mempool based on hero cache.
 func NewBlockExecutionData(limit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *BlockExecutionData {
-	t := &BlockExecutionData{
+	return &BlockExecutionData{
 		c: stdmap.NewBackend(
 			stdmap.WithBackData(
 				herocache.NewCache(limit,
@@ -29,13 +29,11 @@ func NewBlockExecutionData(limit uint32, logger zerolog.Logger, collector module
 					logger.With().Str("mempool", "block_execution_data").Logger(),
 					collector))),
 	}
-
-	return t
 }
 
 // Has checks whether the block execution data with the given hash is currently in
 // the memory pool.
-func (t BlockExecutionData) Has(id flow.Identifier) bool {
+func (t *BlockExecutionData) Has(id flow.Identifier) bool {
 	return t.c.Has(id)
 }
 
@@ -46,7 +44,7 @@ func (t *BlockExecutionData) Add(ed *execution_data.BlockExecutionDataEntity) bo
 }
 
 // ByID returns the block execution data with the given ID from the mempool.
-func (t BlockExecutionData) ByID(txID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
+func (t *BlockExecutionData) ByID(txID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
 	entity, exists := t.c.ByID(txID)
 	if !exists {
 		return nil, false
@@ -57,7 +55,7 @@ func (t BlockExecutionData) ByID(txID flow.Identifier) (*execution_data.BlockExe
 
 // All returns all block execution data from the mempool. Since it is using the HeroCache, All guarantees returning
 // all block execution data in the same order as they are added.
-func (t BlockExecutionData) All() []*execution_data.BlockExecutionDataEntity {
+func (t *BlockExecutionData) All() []*execution_data.BlockExecutionDataEntity {
 	entities := t.c.All()
 	eds := make([]*execution_data.BlockExecutionDataEntity, 0, len(entities))
 	for _, entity := range entities {
@@ -72,7 +70,7 @@ func (t *BlockExecutionData) Clear() {
 }
 
 // Size returns total number of stored block execution data.
-func (t BlockExecutionData) Size() uint {
+func (t *BlockExecutionData) Size() uint {
 	return t.c.Size()
 }
 

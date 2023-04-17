@@ -47,7 +47,7 @@ type Forks struct {
 var _ hotstuff.Forks = (*Forks)(nil)
 
 func New(trustedRoot *model.CertifiedBlock, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Forks, error) {
-	if (trustedRoot.Block.BlockID != trustedRoot.QC.BlockID) || (trustedRoot.Block.View != trustedRoot.QC.View) {
+	if (trustedRoot.Block.BlockID != trustedRoot.CertifyingQC.BlockID) || (trustedRoot.Block.View != trustedRoot.CertifyingQC.View) {
 		return nil, model.NewConfigurationErrorf("invalid root: root QC is not pointing to root block")
 	}
 
@@ -307,7 +307,7 @@ func (f *Forks) updateFinalizedBlockQC(blockContainer *BlockContainer) error {
 	if ancestryChain.oneChain.Block.View != b.Block.View+1 {
 		return nil
 	}
-	return f.finalizeUpToBlock(b.QC)
+	return f.finalizeUpToBlock(b.CertifyingQC)
 }
 
 // getTwoChain returns the 2-chain for the input block container b.

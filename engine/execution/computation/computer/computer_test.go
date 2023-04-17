@@ -26,16 +26,15 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -305,7 +304,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(0, 0, rag)
 		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
-		vm.On("RunV2", mock.Anything, mock.Anything, mock.Anything).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(
 				&state.ExecutionSnapshot{},
 				fvm.ProcedureOutput{},
@@ -367,7 +366,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		}
 		bootstrapOpts := append(baseBootstrapOpts, bootstrapOptions...)
-		executionSnapshot, _, err := vm.RunV2(
+		executionSnapshot, _, err := vm.Run(
 			ctx,
 			fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
 			snapshotTree)
@@ -1171,7 +1170,7 @@ type testVM struct {
 	err       fvmErrors.CodedError
 }
 
-func (vm *testVM) RunV2(
+func (vm *testVM) Run(
 	ctx fvm.Context,
 	proc fvm.Procedure,
 	storageSnapshot state.StorageSnapshot,
@@ -1198,10 +1197,6 @@ func (vm *testVM) RunV2(
 	}
 
 	return snapshot, output, nil
-}
-
-func (testVM) Run(_ fvm.Context, _ fvm.Procedure, _ state.View) error {
-	panic("not implemented")
 }
 
 func (testVM) GetAccount(
@@ -1232,7 +1227,7 @@ func getSetAProgram(
 ) {
 
 	txnState := state.NewTransactionState(
-		delta.NewDeltaView(storageSnapshot),
+		storageSnapshot,
 		state.DefaultParameters())
 
 	loc := common.AddressLocation{
