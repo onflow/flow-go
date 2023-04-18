@@ -14,7 +14,7 @@ type MetricsConfig struct {
 	// HeroCache metrics instance for each cache internally, which reduces the
 	// number of arguments needed to be passed to the libp2p node builder.
 	HeroCacheFactory metrics.HeroCacheMetricsFactory
-	
+
 	// LibP2PMetrics is the metrics instance for the libp2p node.
 	Metrics module.LibP2PMetrics
 }
