@@ -1,12 +1,16 @@
-package execution
+package upgrades
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	adminClient "github.com/onflow/flow-go/integration/client"
+	"github.com/onflow/flow-go/integration/testnet"
 )
 
 func TestStopAtHeight(t *testing.T) {
@@ -17,8 +21,6 @@ type TestStopAtHeightSuite struct {
 	Suite
 }
 
-type AdminCommandListCommands []string
-
 type StopAtHeightRequest struct {
 	Height uint64 `json:"height"`
 	Crash  bool   `json:"crash"`
@@ -27,12 +29,15 @@ type StopAtHeightRequest struct {
 func (s *TestStopAtHeightSuite) TestStopAtHeight() {
 	enContainer := s.net.ContainerByID(s.exe1ID)
 
-	// make sure stop at height admin command is available
-	commandsList := AdminCommandListCommands{}
-	err := s.SendExecutionAdminCommand(context.Background(), "list-commands", struct{}{}, &commandsList)
-	require.NoError(s.T(), err)
+	serverAddr := fmt.Sprintf("localhost:%s", enContainer.Port(testnet.AdminPort))
+	admin := adminClient.NewAdminClient(serverAddr)
 
-	require.Contains(s.T(), commandsList, "stop-at-height")
+	// make sure stop at height admin command is available
+	resp, err := admin.RunCommand(context.Background(), "list-commands", struct{}{})
+	require.NoError(s.T(), err)
+	commandsList, ok := resp.Output.([]interface{})
+	s.True(ok)
+	s.Contains(commandsList, "stop-at-height")
 
 	// wait for some blocks being finalized
 	s.BlockState.WaitForHighestFinalizedProgress(s.T(), 2)
@@ -47,18 +52,27 @@ func (s *TestStopAtHeightSuite) TestStopAtHeight() {
 		Crash:  true,
 	}
 
-	var commandResponse string
-	err = s.SendExecutionAdminCommand(context.Background(), "stop-at-height", stopAtHeightRequest, &commandResponse)
-	require.NoError(s.T(), err)
-
-	require.Equal(s.T(), "ok", commandResponse)
+	resp, err = admin.RunCommand(
+		context.Background(),
+		"stop-at-height",
+		stopAtHeightRequest,
+	)
+	s.NoError(err)
+	commandResponse, ok := resp.Output.(string)
+	s.True(ok)
+	s.Equal("ok", commandResponse)
 
 	shouldExecute := s.BlockState.WaitForBlocksByHeight(s.T(), stopHeight-1)
 	shouldNotExecute := s.BlockState.WaitForBlocksByHeight(s.T(), stopHeight)
 
 	s.ReceiptState.WaitForReceiptFrom(s.T(), shouldExecute[0].Header.ID(), s.exe1ID)
-	s.ReceiptState.WaitForNoReceiptFrom(s.T(), 5*time.Second, shouldNotExecute[0].Header.ID(), s.exe1ID)
+	s.ReceiptState.WaitForNoReceiptFrom(
+		s.T(),
+		5*time.Second,
+		shouldNotExecute[0].Header.ID(),
+		s.exe1ID,
+	)
 
 	err = enContainer.WaitForContainerStopped(10 * time.Second)
-	require.NoError(s.T(), err)
+	s.NoError(err)
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -75,7 +74,7 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("invalid chain name")
 	}
 
-	ldg := delta.NewDeltaView(state.NewReadFuncStorageSnapshot(
+	ldg := state.NewReadFuncStorageSnapshot(
 		func(id flow.RegisterID) (flow.RegisterValue, error) {
 
 			ledgerKey := executionState.RegisterIDToKey(id)
@@ -99,7 +98,7 @@ func run(*cobra.Command, []string) {
 			}
 
 			return values[0], nil
-		}))
+		})
 
 	txnState := state.NewTransactionState(ldg, state.DefaultParameters())
 	accounts := environment.NewAccounts(txnState)

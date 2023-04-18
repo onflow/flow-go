@@ -12,7 +12,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
@@ -91,7 +90,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	}
 
 	txnState := state.NewTransactionState(
-		delta.NewDeltaView(snapshot),
+		snapshot,
 		state.DefaultParameters())
 	gen := environment.NewAddressGenerator(txnState, r.Chain)
 	addressCount := gen.AddressCount()
