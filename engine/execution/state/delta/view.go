@@ -7,5 +7,7 @@ import (
 )
 
 func NewDeltaView(storage state.StorageSnapshot) state.View {
-	return state.NewSpockState(storage)
+	return state.NewExecutionState(
+		storage,
+		state.DefaultParameters())
 }

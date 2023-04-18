@@ -29,11 +29,6 @@ type spockState struct {
 	finalizedSpockSecret []byte
 }
 
-// TODO(patrick): rm after delta view is deleted.
-func NewSpockState(base StorageSnapshot) *spockState {
-	return newSpockState(base)
-}
-
 func newSpockState(base StorageSnapshot) *spockState {
 	return &spockState{
 		storageState:      newStorageState(base),
@@ -41,8 +36,7 @@ func newSpockState(base StorageSnapshot) *spockState {
 	}
 }
 
-// TODO(patrick): change return type to *spockState
-func (state *spockState) NewChild() View {
+func (state *spockState) NewChild() *spockState {
 	return &spockState{
 		storageState:      state.storageState.NewChild(),
 		spockSecretHasher: hash.NewSHA3_256(),
@@ -169,4 +163,14 @@ func (state *spockState) DropChanges() error {
 	}
 
 	return state.storageState.DropChanges()
+}
+
+func (state *spockState) readSetSize() int {
+	return state.storageState.readSetSize()
+}
+
+func (state *spockState) interimReadSet(
+	accumulator map[flow.RegisterID]struct{},
+) {
+	state.storageState.interimReadSet(accumulator)
 }
