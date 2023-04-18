@@ -16,11 +16,12 @@ import (
 type ValidationResult int
 
 const (
-	PublicNetworkEnabled  = true
-	PublicNetworkDisabled = false
-
-	MetricsEnabled  = true
-	MetricsDisabled = false
+	// PublicNetwork indicates that the unstaked public-side of the Flow blockchain that nodes can join and leave at will
+	// with no staking requirement.
+	PublicNetwork = true
+	// PrivateNetwork indicates that the staked private-side of the Flow blockchain that nodes can only join and leave
+	// with a staking requirement.
+	PrivateNetwork = false
 
 	ValidationAccept ValidationResult = iota
 	ValidationIgnore

@@ -606,7 +606,7 @@ func (builder *FollowerServiceBuilder) initPublicLibP2PFactory(networkKey crypto
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
 		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector).
-			SetPublicNetwork(p2p.PublicNetworkEnabled).
+			SetPublicNetwork(p2p.PublicNetwork).
 			SetMetrics(&p2pconfig.MetricsConfig{
 				HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 				Metrics:          builder.Metrics.Network,
@@ -697,18 +697,9 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 			return libp2pNode, nil
 		}).
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-			if builder.HeroCacheMetricsEnable {
-				heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
-			}
 			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 				builder.Logger,
-				heroCacheCollector)
-
-			err := node.Metrics.Mempool.Register(metrics.ResourceReceiveCache, receiveCache.Size)
-			if err != nil {
-				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
-			}
+				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork))
 
 			msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)
 

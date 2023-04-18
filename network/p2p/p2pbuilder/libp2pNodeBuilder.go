@@ -552,7 +552,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
 	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, gossipCfg.RpcInspector).
-		SetPublicNetwork(p2p.PublicNetworkDisabled).
+		SetPublicNetwork(p2p.PrivateNetwork).
 		SetMetrics(metricsCfg).
 		Build()
 	if err != nil {

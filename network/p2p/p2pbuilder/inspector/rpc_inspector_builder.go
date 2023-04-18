@@ -93,7 +93,7 @@ func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier
 			Metrics:          metrics.NewNoopCollector(),
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		},
-		publicNetwork: p2p.PublicNetworkEnabled,
+		publicNetwork: p2p.PublicNetwork,
 	}
 }
 

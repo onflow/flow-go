@@ -63,12 +63,12 @@ func NewNoopHeroCacheMetricsFactory() HeroCacheMetricsFactory {
 	}
 }
 
-func NetworkReceiveCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceNetwork, ResourceReceiveCache, registrar)
-}
-
-func PublicNetworkReceiveCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceNetwork, prependPublic(ResourceReceiveCache), registrar)
+func NetworkReceiveCacheMetricsFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+	r := ResourceReceiveCache
+	if publicNetwork {
+		r = prependPublic(r)
+	}
+	return f(namespaceNetwork, r)
 }
 
 func NetworkDnsTxtCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
@@ -116,7 +116,7 @@ func RpcInspectorNotificationQueueMetricFactory(f HeroCacheMetricsFactory, publi
 	if publicNetwork {
 		r = prependPublic(r)
 	}
-	return f(namespaceNetwork, ResourceRpcInspectorNotificationQueue)
+	return f(namespaceNetwork, r)
 }
 
 func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer, epoch uint64) *HeroCacheCollector {
