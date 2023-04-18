@@ -123,6 +123,8 @@ prec_st* init_precomputed_data_BLS12_381() {
     return bls_prec;
 }
 
+// ------------------- Utilities
+
 // ------------------- Fr utilities
 
 // Montgomery constant R related to the curve order r
@@ -372,7 +374,7 @@ static void vec256_from_be_bytes(Fr* out, const unsigned char *bytes, size_t n)
 // Reads a scalar from an array and maps it to Fr using modular reduction.
 // Input is byte-big-endian as used by the external APIs.
 // It returns true if scalar is zero and false otherwise.
-bool map_bytes_to_Fr(Fr* a, const uint8_t* bin, int len) {
+bool_t map_bytes_to_Fr(Fr* a, const uint8_t* bin, int len) {
     vec256_from_be_bytes(a, bin, len);
     return Fr_is_zero(a);
 }

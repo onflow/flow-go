@@ -116,7 +116,7 @@ void        Fr_inv_exp_montg(Fr *res, const Fr *a);
 BLST_ERROR  Fr_read_bytes(Fr* a, const uint8_t *bin, int len);
 BLST_ERROR  Fr_star_read_bytes(Fr* a, const uint8_t *bin, int len);
 void        Fr_write_bytes(uint8_t *bin, const Fr* a);
-bool        map_bytes_to_Fr(Fr*, const uint8_t*, int);
+bool_t      map_bytes_to_Fr(Fr*, const uint8_t*, int);
 
 // Fp utilities
 

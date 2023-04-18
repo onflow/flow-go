@@ -558,10 +558,6 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	y := make([]pointE2, size)
 	var X0 pointE2
 
-	// seed relic
-	if err := seedRelic(seed); err != nil {
-		return nil, nil, nil, fmt.Errorf("seeding relic failed: %w", err)
-	}
 	// Generate a polynomial P in Fr[X] of degree t
 	a := make([]scalar, threshold+1)
 	if err := randFrStar(&a[0]); err != nil { // non-identity key

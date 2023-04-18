@@ -258,11 +258,6 @@ func (s *feldmanVSSstate) ForceDisqualify(participant int) error {
 // generateShares is used by the dealer to generate secret polynomial from the input seed
 // and derive all private shares and public data.
 func (s *feldmanVSSstate) generateShares(seed []byte) error {
-	err := seedRelic(seed)
-	if err != nil {
-		return fmt.Errorf("generating shares failed: %w", err)
-	}
-
 	// Generate a polyomial P in Fr[X] of degree t
 	s.a = make([]scalar, s.threshold+1)
 	s.vA = make([]pointE2, s.threshold+1)

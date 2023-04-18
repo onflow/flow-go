@@ -11,6 +11,7 @@
 #include "fields.h"
 #include "consts.h"
 #include "errors.h"
+#include "sha256.h"
 
 // types used by the Flow crypto library that are imported from BLST
 // these type definitions are used as an abstraction from BLST internal types

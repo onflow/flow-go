@@ -294,7 +294,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 		defer overwrite(okm) // overwrite okm
 
 		// map the bytes to a private key : SK = OS2IP(OKM) mod r
-		isZero := mapToZr(&sk.scalar, okm)
+		isZero := mapToFr(&sk.scalar, okm)
 		if !isZero {
 			return sk, nil
 		}

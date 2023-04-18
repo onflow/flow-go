@@ -129,7 +129,7 @@ func randFr(x *scalar) error {
 	if err != nil {
 		return errors.New("internal rng failed")
 	}
-	_ = mapToZr(x, bytes)
+	_ = mapToFr(x, bytes)
 	return nil
 }
 
@@ -142,19 +142,19 @@ func randFrStar(x *scalar) error {
 		if err != nil {
 			return errors.New("internal rng failed")
 		}
-		isZero = mapToZr(x, bytes)
+		isZero = mapToFr(x, bytes)
 	}
 	return nil
 }
 
-// mapToZr reads a scalar from a slice of bytes and maps it to Zr.
+// mapToFr reads a scalar from a slice of bytes and maps it to Zr.
 // The resulting element `k` therefore satisfies 0 <= k < r.
 // It returns true if scalar is zero and false otherwise.
-func mapToZr(x *scalar, src []byte) bool {
+func mapToFr(x *scalar, src []byte) bool {
 	isZero := C.map_bytes_to_Fr((*C.Fr)(x),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
-	return bool(isZero)
+	return isZero != (C.ulonglong)(0)
 }
 
 // writeScalar writes a scalar in a slice of bytes

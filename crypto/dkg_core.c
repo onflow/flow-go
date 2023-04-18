@@ -3,11 +3,65 @@
 #include "dkg_include.h"
 
 
-#define N_max 250
-#define N_bits_max 8  // log(250)  
-#define T_max  ((N_max-1)/2)
+// HKDF is used to extract and expand entropy
+// `hkdf_ctx` holds the context of a HKDF instance
+#include "keygen.c" // imported here in order to import BLST's `HMAC_SHA256_CTX`
+typedef struct {
+        HMAC_SHA256_CTX hmac_ctx;   // HMAC context
+        byte prk[32];               // pseudo-random key used by HKDF 
+} hkdf_ctx;
 
-// computes P(x) = a_0 + a_1*x + .. + a_n x^n (mod r)
+// instanciate a HKDF to extract entropy from `ikm`. 
+static hkdf_ctx* get_hkdf_ctx(const byte* ikm, const int ikm_len) {
+    hkdf_ctx* ctx = (hkdf_ctx*) malloc(sizeof(hkdf_ctx));
+    HKDF_Extract(ctx->prk, NULL, 0, ikm, ikm_len, 0, &ctx->hmac_ctx);
+    return ctx;
+}
+
+// expand entropy from a HKDF instance
+static void expand_entropy(byte* dest, const int len, hkdf_ctx* ctx) {
+    HKDF_Expand(dest, len, ctx->prk, NULL, 0, 0, &ctx->hmac_ctx);
+}
+
+// generate a polynomial P = a_0 + a_1*x + .. + a_n x^n in F_r
+// where degree `n` is input `degree` (higher degree monomial in non-zero).
+// P also guarantees `a_0` is non zero (for single dealer BLS-DKGs, this insures
+// protocol public key output is not identity).
+//
+// `seed` is used as the source of entropy of the secret polynomial. 
+// `seed_len` is required to be at least 16, and it is not checked in the function.
+void  Fr_generate_polynomial(Fr* a, const int degree, const byte* seed, const int seed_len) {
+    // use HKDF to expand `seed` into the needed bytes
+    hkdf_ctx* ctx = get_hkdf_ctx(seed, seed_len);
+    // bytes of each coefficient a_i
+    // use extra 128 bits to reduce the modular reduction bias (128 is half of Fr_BYTES)
+    const int coef_bytes_len = Fr_BYTES + Fr_BYTES/2;
+    byte coef_bytes[coef_bytes_len];
+
+    // generate a_0 in F_r*
+    bool_t is_zero = 1;
+    while (is_zero) {
+        expand_entropy(coef_bytes, coef_bytes_len, ctx);
+        is_zero = map_bytes_to_Fr(&a[0], coef_bytes, coef_bytes_len);
+    }
+    
+    if (degree > 1) {
+        // genarate a_i on F_r, for 0<i<degree
+        for (int i=0; i < degree; i++) {
+            expand_entropy(coef_bytes, coef_bytes_len, ctx);
+            map_bytes_to_Fr(&a[i], coef_bytes, coef_bytes_len);
+        }
+        // generate a_degree in F_r* to enforce P's degree
+        is_zero = 1;
+        while (is_zero) {
+            expand_entropy(coef_bytes, coef_bytes_len, ctx);
+            is_zero = map_bytes_to_Fr(&a[degree], coef_bytes, coef_bytes_len);
+        }
+    }
+    free(ctx);
+}
+
+// computes P(x) = a_0 + a_1*x + .. + a_n x^n in F_r
 // r being the order of G1, 
 // and writes P(x) in out and P(x).g2 in y if y is non NULL
 // x being a small integer (byte).
