@@ -53,7 +53,7 @@ type Forks interface {
 	// Notes:
 	//   - Method `AddCertifiedBlock(..)` should be used preferably, if a QC certifying
 	//     `block` is already known. This is generally the case for the consensus follower.
-	//     Method `AddProposal` is intended for active consensus participants, which fully
+	//     Method `AddValidatedBlock` is intended for active consensus participants, which fully
 	//     validate blocks (incl. payload), i.e. QCs are processed as part of validated proposals.
 	//
 	// Possible error returns:
