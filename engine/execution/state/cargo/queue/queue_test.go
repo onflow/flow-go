@@ -1,6 +1,7 @@
 package queue_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -38,7 +39,8 @@ func TestFinalizedBlockQueue(t *testing.T) {
 		for _, header := range batch3 {
 			err = bq.Enqueue(header)
 			require.Error(t, err)
-			require.ErrorIs(t, err, queue.ErrNonCompliantHeader)
+			expectedError := &queue.NonCompliantHeaderHeightError{}
+			require.True(t, errors.As(err, &expectedError))
 		}
 
 		// add the second batch of headers
@@ -54,7 +56,8 @@ func TestFinalizedBlockQueue(t *testing.T) {
 		for _, header := range batch2 {
 			err = bq.Enqueue(header)
 			require.Error(t, err)
-			require.ErrorIs(t, err, queue.ErrOldHeader)
+			expectedError := &queue.NonCompliantHeaderAlreadyProcessedError{}
+			require.True(t, errors.As(err, &expectedError))
 		}
 
 		// add the third batch of headers
@@ -79,6 +82,7 @@ func TestFinalizedBlockQueue(t *testing.T) {
 
 		err = bq.Enqueue(invalid)
 		require.Error(t, err)
-		require.ErrorIs(t, err, queue.ErrCapacityReached)
+		expectedError := &queue.QueueCapacityReachedError{}
+		require.True(t, errors.As(err, &expectedError))
 	})
 }

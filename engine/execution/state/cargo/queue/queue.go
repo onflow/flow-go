@@ -1,17 +1,12 @@
 package queue
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var ErrCapacityReached = errors.New("queue capacity has reached")
-var ErrNonCompliantHeader = errors.New("headers are received in a non-compliant order, either height doesn't match or parentID")
-var ErrOldHeader = errors.New("header is in the past, queue is already on a higher hight")
-
-type headerWithID struct {
+type headerInContext struct {
 	Header *flow.Header
 	ID     flow.Identifier
 }
@@ -22,10 +17,10 @@ type headerWithID struct {
 // if it reaches the limit it prevents adding more block headers
 type FinalizedBlockQueue struct {
 	start, end, capacity int
-	headers              []headerWithID
+	headers              []headerInContext
 	lock                 sync.RWMutex
-	lastDequeuedHeader   *headerWithID
-	lastQueuedHeader     *headerWithID
+	lastDequeuedHeader   *headerInContext
+	lastQueuedHeader     *headerInContext
 }
 
 // NewFinalizedBlockQueue constructs a new FinalizedBlockQueue
@@ -37,8 +32,8 @@ func NewFinalizedBlockQueue(
 ) *FinalizedBlockQueue {
 	return &FinalizedBlockQueue{
 		capacity:           capacity,
-		headers:            make([]headerWithID, capacity),
-		lastDequeuedHeader: &headerWithID{genesis, genesis.ID()},
+		headers:            make([]headerInContext, capacity),
+		lastDequeuedHeader: &headerInContext{genesis, genesis.ID()},
 	}
 }
 
@@ -50,7 +45,7 @@ func (ft *FinalizedBlockQueue) Enqueue(header *flow.Header) error {
 	defer ft.lock.Unlock()
 
 	if ft.isFull() {
-		return ErrCapacityReached
+		return &QueueCapacityReachedError{ft.capacity}
 	}
 
 	parentID := ft.lastDequeuedHeader.ID
@@ -60,15 +55,20 @@ func (ft *FinalizedBlockQueue) Enqueue(header *flow.Header) error {
 		parentID = ft.lastQueuedHeader.ID
 		lastHeight = ft.lastQueuedHeader.Header.Height
 	}
+
 	if header.Height <= lastHeight {
-		return ErrOldHeader
+		return &NonCompliantHeaderAlreadyProcessedError{header.Height}
 	}
 
-	if parentID != header.ParentID || lastHeight+1 != header.Height {
-		return ErrNonCompliantHeader
+	if lastHeight+1 != header.Height {
+		return &NonCompliantHeaderHeightError{lastHeight + 1, header.Height}
 	}
 
-	h := headerWithID{header, header.ID()}
+	if parentID != header.ParentID {
+		return &NonCompliantHeaderParentIDError{parentID, header.ParentID}
+	}
+
+	h := headerInContext{header, header.ID()}
 	ft.headers[ft.end] = h
 	ft.lastQueuedHeader = &h
 	ft.end = (ft.end + 1) % ft.capacity
