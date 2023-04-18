@@ -2,6 +2,7 @@ package follower
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -147,8 +148,15 @@ func TestFollowerHappyPath(t *testing.T) {
 		}
 		pendingBlocks := flowBlocksToBlockProposals(flowBlocks...)
 
-		// this block should be finalized based on 2-chain finalization rule
-		targetBlockHeight := pendingBlocks[len(pendingBlocks)-4].Block.Header.Height
+		// Regarding the block that we expect to be finalized based on 2-chain finalization rule, we consider the last few blocks in `pendingBlocks`
+		//  ... <-- X <-- Y <-- Z
+		//            ╰─────────╯
+		//          2-chain on top of X
+		// Hence, we expect X to be finalized, which has the index `len(pendingBlocks)-3`
+		// Note: the HotStuff Follower does not see block Z (as there is no QC for X proving its validity). Instead, it sees the certified block
+		//  [◄(X) Y] ◄(Y)
+		// where ◄(B) denotes a QC for block B
+		targetBlockHeight := pendingBlocks[len(pendingBlocks)-3].Block.Header.Height
 
 		// emulate syncing logic, where we push same blocks over and over.
 		originID := unittest.IdentifierFixture()
@@ -173,6 +181,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		require.Eventually(t, func() bool {
 			final, err := followerState.Final().Head()
 			require.NoError(t, err)
+			fmt.Println(fmt.Sprintf("expected to be finalized: %d  |  current finalized %d", targetBlockHeight, final.Height))
 			return final.Height == targetBlockHeight
 		}, time.Minute, time.Second, "expect to process all blocks before timeout")
 
