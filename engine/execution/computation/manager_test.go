@@ -25,15 +25,13 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	state2 "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/storage/testutils"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -59,8 +57,11 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
 	require.NoError(t, err)
 
-	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+	snapshotTree, accounts, err := testutil.CreateAccounts(
+		vm,
+		testutil.RootBootstrappedLedger(vm, execCtx),
+		privateKeys,
+		chain)
 	require.NoError(t, err)
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -151,17 +152,21 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		derivedChainData: derivedChainData,
 	}
 
-	view := delta.NewDeltaView(ledger)
-	blockView := view.NewChild()
-
 	returnedComputationResult, err := engine.ComputeBlock(
 		context.Background(),
 		unittest.IdentifierFixture(),
 		executableBlock,
-		blockView)
+		snapshotTree)
 	require.NoError(t, err)
 
-	require.NotEmpty(t, blockView.(*delta.View).Delta())
+	hasUpdates := false
+	for _, snapshot := range returnedComputationResult.StateSnapshots {
+		if len(snapshot.WriteSet) > 0 {
+			hasUpdates = true
+			break
+		}
+	}
+	require.True(t, hasUpdates)
 	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].UpdatedRegisters())
 }
@@ -205,17 +210,13 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		derivedChainData: derivedChainData,
 	}
 
-	view := delta.NewDeltaView(
-		state2.NewLedgerStorageSnapshot(
-			ledger,
-			flow.StateCommitment(ledger.InitialState())))
-	blockView := view.NewChild()
-
 	_, err = manager.ComputeBlock(
 		context.Background(),
 		unittest.IdentifierFixture(),
 		computationResult.ExecutableBlock,
-		blockView)
+		state2.NewLedgerStorageSnapshot(
+			ledger,
+			flow.StateCommitment(ledger.InitialState())))
 	require.NoError(t, err)
 }
 
@@ -502,7 +503,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 
 type PanickingVM struct{}
 
-func (p *PanickingVM) RunV2(
+func (p *PanickingVM) Run(
 	f fvm.Context,
 	procedure fvm.Procedure,
 	storageSnapshot state.StorageSnapshot,
@@ -511,10 +512,6 @@ func (p *PanickingVM) RunV2(
 	fvm.ProcedureOutput,
 	error,
 ) {
-	panic("panic, but expected with sentinel for test: Verunsicherung ")
-}
-
-func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
 
@@ -533,7 +530,7 @@ type LongRunningVM struct {
 	duration time.Duration
 }
 
-func (l *LongRunningVM) RunV2(
+func (l *LongRunningVM) Run(
 	f fvm.Context,
 	procedure fvm.Procedure,
 	storageSnapshot state.StorageSnapshot,
@@ -545,18 +542,10 @@ func (l *LongRunningVM) RunV2(
 	time.Sleep(l.duration)
 
 	snapshot := &state.ExecutionSnapshot{}
-	output := fvm.ProcedureOutput{}
-	return snapshot, output, nil
-}
-
-func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {
-	time.Sleep(l.duration)
-	// satisfy value marshaller
-	if scriptProcedure, is := procedure.(*fvm.ScriptProcedure); is {
-		scriptProcedure.Value = cadence.NewVoid()
+	output := fvm.ProcedureOutput{
+		Value: cadence.NewVoid(),
 	}
-
-	return nil
+	return snapshot, output, nil
 }
 
 func (l *LongRunningVM) GetAccount(
@@ -704,8 +693,11 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
-	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+	snapshotTree, accounts, err := testutil.CreateAccounts(
+		vm,
+		testutil.RootBootstrappedLedger(vm, execCtx),
+		privateKeys,
+		chain)
 	require.NoError(t, err)
 
 	// setup transactions
@@ -790,16 +782,13 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		derivedChainData: derivedChainData,
 	}
 
-	view := delta.NewDeltaView(ledger)
-	blockView := view.NewChild()
-
 	eventEncoder.enabled = true
 
 	returnedComputationResult, err := engine.ComputeBlock(
 		context.Background(),
 		unittest.IdentifierFixture(),
 		executableBlock,
-		blockView)
+		snapshotTree)
 	require.NoError(t, err)
 
 	require.Len(t, returnedComputationResult.Events, 2)             // 1 collection + 1 system chunk
@@ -859,14 +848,18 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		},
 	)
 	vm := manager.vm
-	view := testutil.RootBootstrappedLedger(vm, ctx)
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 
-	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	accounts, err := testutil.CreateAccounts(vm, view, privateKeys, chain)
+	// Bootstrap a ledger, creating accounts with the provided private keys
+	// and the root account.
+	snapshotTree, accounts, err := testutil.CreateAccounts(
+		vm,
+		testutil.RootBootstrappedLedger(vm, ctx),
+		privateKeys,
+		chain)
 	require.NoError(t, err)
 	account := accounts[0]
 	address := cadence.NewAddress(account)
@@ -885,16 +878,13 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		script,
 		[][]byte{jsoncdc.MustEncode(address)},
 		header,
-		view)
+		snapshotTree)
 
 	require.NoError(t, err)
 
-	txnState := testutils.NewSimpleTransaction(view)
-	env := environment.NewScriptEnv(
-		context.Background(),
-		ctx.TracerSpan,
+	env := environment.NewScriptEnvironmentFromStorageSnapshot(
 		ctx.EnvironmentParams,
-		txnState)
+		snapshotTree)
 
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)
@@ -904,7 +894,8 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		cadence.NewPath("storage", "x"),
 	)
 
-	// the save should not update account storage by writing the delta from the child view back to the parent
+	// the save should not update account storage by writing the updates
+	// back to the snapshotTree
 	require.NoError(t, err)
 	require.Equal(t, nil, v)
 }

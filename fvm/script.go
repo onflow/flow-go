@@ -7,10 +7,10 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/hash"
 )
@@ -108,8 +108,8 @@ func (ScriptProcedure) Type() ProcedureType {
 	return ScriptProcedureType
 }
 
-func (proc *ScriptProcedure) ExecutionTime() derived.LogicalTime {
-	return derived.EndOfBlockExecutionTime
+func (proc *ScriptProcedure) ExecutionTime() logical.Time {
+	return logical.EndOfBlockExecutionTime
 }
 
 type scriptExecutor struct {
@@ -187,6 +187,16 @@ func (executor *scriptExecutor) execute() error {
 		return err
 	}
 
+	errs := errors.NewErrorsCollector()
+	errs.Collect(executor.executeScript())
+
+	_, err = executor.txnState.CommitNestedTransaction(txnId)
+	errs.Collect(err)
+
+	return errs.ErrorOrNil()
+}
+
+func (executor *scriptExecutor) executeScript() error {
 	rt := executor.env.BorrowCadenceRuntime()
 	defer executor.env.ReturnCadenceRuntime(rt)
 
@@ -196,17 +206,10 @@ func (executor *scriptExecutor) execute() error {
 			Arguments: executor.proc.Arguments,
 		},
 		common.ScriptLocation(executor.proc.ID))
-
 	if err != nil {
 		return err
 	}
 
 	executor.output.Value = value
-	err = executor.output.PopulateEnvironmentValues(executor.env)
-	if err != nil {
-		return err
-	}
-
-	_, err = executor.txnState.CommitNestedTransaction(txnId)
-	return err
+	return executor.output.PopulateEnvironmentValues(executor.env)
 }

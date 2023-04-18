@@ -2,7 +2,6 @@ package access
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"testing"
 	"time"
@@ -122,7 +121,7 @@ func (suite *ConsensusFollowerSuite) buildNetworkConfig() {
 	stakedConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithID(suite.stakedID),
-		testnet.SupportsUnstakedNodes(),
+		testnet.WithAdditionalFlag("--supports-observer=true"),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	)
 
@@ -176,12 +175,7 @@ func (suite *ConsensusFollowerSuite) buildNetworkConfig() {
 
 // TODO: Move this to unittest and resolve the circular dependency issue
 func UnstakedNetworkingKey() (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLen)
-	n, err := rand.Read(seed)
-	if err != nil || n != crypto.KeyGenSeedMinLen {
-		return nil, err
-	}
-	return utils.GeneratePublicNetworkingKey(unittest.SeedFixture(n))
+	return utils.GeneratePublicNetworkingKey(unittest.SeedFixture(crypto.KeyGenSeedMinLen))
 }
 
 // followerManager is a convenience wrapper around the consensus follower

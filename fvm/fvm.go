@@ -6,13 +6,13 @@ import (
 
 	"github.com/onflow/cadence"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -37,9 +37,6 @@ type ProcedureOutput struct {
 
 	// Output only by script.
 	Value cadence.Value
-
-	// TODO(patrick): rm after updating emulator to use ComputationUsed
-	GasUsed uint64
 }
 
 func (output *ProcedureOutput) PopulateEnvironmentValues(
@@ -52,8 +49,6 @@ func (output *ProcedureOutput) PopulateEnvironmentValues(
 		return fmt.Errorf("error getting computation used: %w", err)
 	}
 	output.ComputationUsed = computationUsed
-	// TODO(patrick): rm after updating emulator to use ComputationUsed
-	output.GasUsed = computationUsed
 
 	memoryUsed, err := env.MemoryUsed()
 	if err != nil {
@@ -103,7 +98,7 @@ type Procedure interface {
 
 	// For transactions, the execution time is TxIndex.  For scripts, the
 	// execution time is EndOfBlockExecutionTime.
-	ExecutionTime() derived.LogicalTime
+	ExecutionTime() logical.Time
 
 	// TODO(patrick): deprecated this.
 	SetOutput(output ProcedureOutput)
@@ -111,7 +106,7 @@ type Procedure interface {
 
 // VM runs procedures
 type VM interface {
-	RunV2(
+	Run(
 		Context,
 		Procedure,
 		state.StorageSnapshot,
@@ -121,7 +116,6 @@ type VM interface {
 		error,
 	)
 
-	Run(Context, Procedure, state.View) error
 	GetAccount(Context, flow.Address, state.StorageSnapshot) (*flow.Account, error)
 }
 
@@ -135,8 +129,21 @@ func NewVirtualMachine() *VirtualMachine {
 	return &VirtualMachine{}
 }
 
-// Run runs a procedure against a ledger in the given context.
+// TODO(patrick): rm after updating emulator
 func (vm *VirtualMachine) RunV2(
+	ctx Context,
+	proc Procedure,
+	storageSnapshot state.StorageSnapshot,
+) (
+	*state.ExecutionSnapshot,
+	ProcedureOutput,
+	error,
+) {
+	return vm.Run(ctx, proc, storageSnapshot)
+}
+
+// Run runs a procedure against a ledger in the given context.
+func (vm *VirtualMachine) Run(
 	ctx Context,
 	proc Procedure,
 	storageSnapshot state.StorageSnapshot,
@@ -174,10 +181,8 @@ func (vm *VirtualMachine) RunV2(
 			err)
 	}
 
-	// TODO(patrick): initialize view inside TransactionState
-	view := delta.NewDeltaView(storageSnapshot)
 	nestedTxn := state.NewTransactionState(
-		view,
+		storageSnapshot,
 		state.DefaultParameters().
 			WithMeterParameters(getBasicMeterParameters(ctx, proc)).
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
@@ -206,29 +211,12 @@ func (vm *VirtualMachine) RunV2(
 		}
 	}
 
-	return view.Finalize(), executor.Output(), nil
-}
-
-func (vm *VirtualMachine) Run(
-	ctx Context,
-	proc Procedure,
-	v state.View,
-) error {
-	executionSnapshot, output, err := vm.RunV2(
-		ctx,
-		proc,
-		state.NewPeekerStorageSnapshot(v))
+	executionSnapshot, err := txnState.FinalizeMainTransaction()
 	if err != nil {
-		return err
+		return nil, ProcedureOutput{}, err
 	}
 
-	err = v.Merge(executionSnapshot)
-	if err != nil {
-		return err
-	}
-
-	proc.SetOutput(output)
-	return nil
+	return executionSnapshot, executor.Output(), nil
 }
 
 // GetAccount returns an account by address or an error if none exists.
@@ -241,8 +229,7 @@ func (vm *VirtualMachine) GetAccount(
 	error,
 ) {
 	nestedTxn := state.NewTransactionState(
-		// TODO(patrick): initialize view inside TransactionState
-		delta.NewDeltaView(storageSnapshot),
+		storageSnapshot,
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
@@ -256,8 +243,8 @@ func (vm *VirtualMachine) GetAccount(
 	}
 
 	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
-		derived.EndOfBlockExecutionTime,
-		derived.EndOfBlockExecutionTime)
+		logical.EndOfBlockExecutionTime,
+		logical.EndOfBlockExecutionTime)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error creating derived transaction data for GetAccount: %w",

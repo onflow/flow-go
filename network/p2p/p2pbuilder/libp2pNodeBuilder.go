@@ -21,23 +21,24 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/tracer"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
+	"github.com/onflow/flow-go/network/p2p/unicast/stream"
+	"github.com/onflow/flow-go/network/p2p/utils"
+
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	gossipsubbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/gossipsub"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
-	"github.com/onflow/flow-go/network/p2p/subscription"
-	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
-	"github.com/onflow/flow-go/network/p2p/unicast/stream"
-	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
 const (
@@ -73,6 +74,7 @@ func DefaultGossipSubConfig() *GossipSubConfig {
 		PeerScoring:          defaultPeerScoringEnabled,
 		LocalMeshLogInterval: defaultMeshTracerLoggingInterval,
 		ScoreTracerInterval:  defaultGossipSubScoreTracerInterval,
+		RPCInspectors:        make([]p2p.GossipSubRPCInspector, 0),
 	}
 }
 
@@ -141,6 +143,8 @@ type GossipSubConfig struct {
 	ScoreTracerInterval time.Duration
 	// PeerScoring is whether to enable GossipSub peer scoring.
 	PeerScoring bool
+	// RPCInspectors gossipsub RPC control message inspectors
+	RPCInspectors []p2p.GossipSubRPCInspector
 }
 
 func DefaultResourceManagerConfig() *ResourceManagerConfig {
@@ -227,6 +231,12 @@ func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.
 	return builder
 }
 
+func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf p2p.GossipSubFactoryFunc, cf p2p.GossipSubAdapterConfigFunc) p2p.NodeBuilder {
+	builder.gossipSubBuilder.SetGossipSubFactory(gf)
+	builder.gossipSubBuilder.SetGossipSubConfigFunc(cf)
+	return builder
+}
+
 // EnableGossipSubPeerScoring enables peer scoring for the GossipSub pubsub system.
 // Arguments:
 // - module.IdentityProvider: the identity provider for the node (must be set before calling this method).
@@ -271,12 +281,6 @@ func (builder *LibP2PNodeBuilder) SetRateLimiterDistributor(distributor p2p.Unic
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf p2p.GossipSubFactoryFunc, cf p2p.GossipSubAdapterConfigFunc) p2p.NodeBuilder {
-	builder.gossipSubBuilder.SetGossipSubFactory(gf)
-	builder.gossipSubBuilder.SetGossipSubConfigFunc(cf)
-	return builder
-}
-
 func (builder *LibP2PNodeBuilder) SetStreamCreationRetryInterval(createStreamRetryInterval time.Duration) p2p.NodeBuilder {
 	builder.createStreamRetryInterval = createStreamRetryInterval
 	return builder
@@ -285,6 +289,31 @@ func (builder *LibP2PNodeBuilder) SetStreamCreationRetryInterval(createStreamRet
 func (builder *LibP2PNodeBuilder) SetGossipSubScoreTracerInterval(interval time.Duration) p2p.NodeBuilder {
 	builder.gossipSubBuilder.SetGossipSubScoreTracerInterval(interval)
 	return builder
+}
+
+func (builder *LibP2PNodeBuilder) SetGossipSubRPCInspectors(inspectors ...p2p.GossipSubRPCInspector) p2p.NodeBuilder {
+	builder.gossipSubBuilder.SetGossipSubRPCInspectors(inspectors...)
+	return builder
+}
+
+// buildRouting creates a new routing system factory for a libp2p node using the provided host.
+// It returns the newly created routing system and any errors encountered during its creation.
+//
+// Arguments:
+// - ctx: a context.Context object used to manage the lifecycle of the node.
+// - h: a libp2p host.Host object used to initialize the routing system.
+//
+// Returns:
+// - routing.Routing: a routing system for the libp2p node.
+// - error: if an error occurs during the creation of the routing system, it is returned. Otherwise, nil is returned.
+// Note that on happy path, the returned error is nil. Any non-nil error indicates that the routing system could not be created
+// and is non-recoverable. In case of an error the node should be stopped.
+func (builder *LibP2PNodeBuilder) buildRouting(ctx context.Context, h host.Host) (routing.Routing, error) {
+	routingSystem, err := builder.routingFactory(ctx, h)
+	if err != nil {
+		return nil, fmt.Errorf("could not create libp2p node routing system: %w", err)
+	}
+	return routingSystem, nil
 }
 
 // Build creates a new libp2p node using the configured options.
@@ -530,7 +559,8 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		SetPeerManagerOptions(peerManagerCfg.ConnectionPruning, peerManagerCfg.UpdateInterval).
 		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
-		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)
+		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor).
+		SetGossipSubRPCInspectors(gossipCfg.RPCInspectors...)
 
 	if gossipCfg.PeerScoring {
 		// currently, we only enable peer scoring with default parameters. So, we set the score parameters to nil.
@@ -547,24 +577,4 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	}
 
 	return builder, nil
-}
-
-// buildRouting creates a new routing system factory for a libp2p node using the provided host.
-// It returns the newly created routing system and any errors encountered during its creation.
-//
-// Arguments:
-// - ctx: a context.Context object used to manage the lifecycle of the node.
-// - h: a libp2p host.Host object used to initialize the routing system.
-//
-// Returns:
-// - routing.Routing: a routing system for the libp2p node.
-// - error: if an error occurs during the creation of the routing system, it is returned. Otherwise, nil is returned.
-// Note that on happy path, the returned error is nil. Any non-nil error indicates that the routing system could not be created
-// and is non-recoverable. In case of an error the node should be stopped.
-func (builder *LibP2PNodeBuilder) buildRouting(ctx context.Context, h host.Host) (routing.Routing, error) {
-	routingSystem, err := builder.routingFactory(ctx, h)
-	if err != nil {
-		return nil, fmt.Errorf("could not create libp2p node routing system: %w", err)
-	}
-	return routingSystem, nil
 }

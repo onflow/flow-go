@@ -11,11 +11,10 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/partial"
 	chmodels "github.com/onflow/flow-go/model/chunks"
@@ -180,12 +179,12 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 				chunkDataPack.StartState),
 			unknownRegTouch: unknownRegTouch,
 		})
-	chunkView := delta.NewDeltaView(nil)
+	chunkState := fvmState.NewExecutionState(nil, fvmState.DefaultParameters())
 
 	var problematicTx flow.Identifier
 	// executes all transactions in this chunk
 	for i, tx := range transactions {
-		executionSnapshot, output, err := fcv.vm.RunV2(
+		executionSnapshot, output, err := fcv.vm.Run(
 			context,
 			tx,
 			snapshotTree)
@@ -203,7 +202,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		serviceEvents = append(serviceEvents, output.ConvertedServiceEvents...)
 
 		snapshotTree = snapshotTree.Append(executionSnapshot)
-		err = chunkView.Merge(executionSnapshot)
+		err = chunkState.Merge(executionSnapshot)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to merge: %d (%w)", i, err)
 		}
@@ -257,7 +256,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	// Applying chunk updates to the partial trie.	This returns the expected
 	// end state commitment after updates and the list of register keys that
 	// was not provided by the chunk data package (err).
-	chunkExecutionSnapshot := chunkView.Finalize()
+	chunkExecutionSnapshot := chunkState.Finalize()
 	keys, values := executionState.RegisterEntriesToKeysValues(
 		chunkExecutionSnapshot.UpdatedRegisters())
 

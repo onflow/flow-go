@@ -32,20 +32,19 @@ import (
 type Config struct {
 	UnsecureGRPCListenAddr    string                           // the non-secure GRPC server address as ip:port
 	SecureGRPCListenAddr      string                           // the secure GRPC server address as ip:port
-	StateStreamListenAddr     string                           // the state stream GRPC server address as ip:port
 	TransportCredentials      credentials.TransportCredentials // the secure GRPC credentials
 	HTTPListenAddr            string                           // the HTTP web proxy address as ip:port
 	RESTListenAddr            string                           // the REST server address as ip:port (if empty the REST server will not be started)
 	CollectionAddr            string                           // the address of the upstream collection node
 	HistoricalAccessAddrs     string                           // the list of all access nodes from previous spork
 	MaxMsgSize                uint                             // GRPC max message size
-	MaxExecutionDataMsgSize   uint                             // GRPC max message size for block execution data
 	ExecutionClientTimeout    time.Duration                    // execution API GRPC client timeout
 	CollectionClientTimeout   time.Duration                    // collection API GRPC client timeout
 	ConnectionPoolSize        uint                             // size of the cache for storing collection and execution connections
 	MaxHeightRange            uint                             // max size of height range requests
 	PreferredExecutionNodeIDs []string                         // preferred list of upstream execution node IDs
 	FixedExecutionNodeIDs     []string                         // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
+	ArchiveAddressList        []string                         // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
 }
 
 // Engine exposes the server with a simplified version of the Access API.
@@ -183,6 +182,7 @@ func NewBuilder(log zerolog.Logger,
 		config.FixedExecutionNodeIDs,
 		log,
 		backend.DefaultSnapshotHistoryLimit,
+		config.ArchiveAddressList,
 	)
 
 	eng := &Engine{

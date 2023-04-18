@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
@@ -32,9 +30,9 @@ import (
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -371,7 +369,6 @@ var _ io.Writer = &logExtractor{}
 // BenchmarkRuntimeEmptyTransaction simulates executing blocks with `transactionsPerBlock`
 // where each transaction is an empty transaction
 func BenchmarkRuntimeTransaction(b *testing.B) {
-	rand.Seed(time.Now().UnixNano())
 
 	transactionsPerBlock := 10
 

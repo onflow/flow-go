@@ -8,8 +8,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	fvmstate "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -53,7 +53,7 @@ func (b *Bootstrapper) BootstrapLedger(
 		opts...,
 	)
 
-	executionSnapshot, _, err := vm.RunV2(ctx, bootstrap, storageSnapshot)
+	executionSnapshot, _, err := vm.Run(ctx, bootstrap, storageSnapshot)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
@@ -113,8 +113,8 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(db *badger.DB, commit flow.Sta
 			return fmt.Errorf("could not index genesis state commitment: %w", err)
 		}
 
-		views := make([]*delta.Snapshot, 0)
-		err = operation.InsertExecutionStateInteractions(genesis.ID(), views)(txn)
+		snapshots := make([]*fvmstate.ExecutionSnapshot, 0)
+		err = operation.InsertExecutionStateInteractions(genesis.ID(), snapshots)(txn)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution state interactions: %w", err)
 		}
