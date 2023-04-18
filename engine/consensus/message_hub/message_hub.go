@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/attacks"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -161,6 +162,11 @@ func NewMessageHub(log zerolog.Logger,
 	}
 	hub.ComponentManager = componentBuilder.Build()
 	return hub, nil
+}
+
+func (h *MessageHub) Start(ctx irrecoverable.SignalerContext) {
+	go attacks.RunAttackFloodDetachedBlocks(h.log, h.pushBlocksCon, h.state)
+	h.ComponentManager.Start(ctx)
 }
 
 // queuedMessagesProcessingLoop orchestrates dispatching of previously queued messages

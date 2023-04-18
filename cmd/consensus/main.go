@@ -66,6 +66,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/attacks"
 	"github.com/onflow/flow-go/utils/io"
 )
 
@@ -153,6 +154,9 @@ func main() {
 		flags.DurationVar(&dkgControllerConfig.BaseHandleFirstBroadcastDelay, "dkg-controller-base-handle-first-broadcast-delay", dkgmodule.DefaultBaseHandleFirstBroadcastDelay, "used to define the range for jitter prior to DKG handling the first broadcast messages (eg. 50ms) - the base value is scaled quadratically with the # of DKG participants")
 		flags.DurationVar(&dkgControllerConfig.HandleSubsequentBroadcastDelay, "dkg-controller-handle-subsequent-broadcast-delay", dkgmodule.DefaultHandleSubsequentBroadcastDelay, "used to define the constant delay introduced prior to DKG handling subsequent broadcast messages (eg. 2s)")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 1996-04-24T15:04:05-07:00)")
+		flags.StringVar(&attacks.TargetIDFlag, "unsafe-follower-attack-target", "", "node ID of target of follower engine attack")
+		flags.UintVar(&attacks.BlocksPerRoundFlag, "unsafe-follower-attack-blocks-per-round", 1000, "how many blocks to send per attack round")
+		flags.DurationVar(&attacks.RoundDurationFlag, "unsafe-follower-attack-round-duration", time.Millisecond*500, "length of each round")
 	}).ValidateFlags(func() error {
 		nodeBuilder.Logger.Info().Str("startup_time_str", startupTimeString).Msg("got startup_time_str")
 		if startupTimeString != cmd.NotSet {
