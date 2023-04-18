@@ -265,11 +265,11 @@ func DefaultDecayFunction() netcache.PreprocessorFunc {
 		}
 
 		// penalty is negative and below the threshold, we decay it.
-		score, err := GeometricDecay(record.Penalty, record.Decay, lastUpdated)
+		penalty, err := GeometricDecay(record.Penalty, record.Decay, lastUpdated)
 		if err != nil {
 			return record, fmt.Errorf("could not decay application specific penalty: %w", err)
 		}
-		record.Penalty = score
+		record.Penalty = penalty
 		return record, nil
 	}
 }

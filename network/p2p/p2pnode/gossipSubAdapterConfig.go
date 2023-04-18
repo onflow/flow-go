@@ -46,7 +46,8 @@ func (g *GossipSubAdapterConfig) WithRoutingDiscovery(routing routing.ContentRou
 
 // WithSubscriptionFilter adds a subscription filter option to the config.
 // Args:
-//  - filter: the subscription filter to use
+//   - filter: the subscription filter to use
+//
 // Returns:
 // -None
 func (g *GossipSubAdapterConfig) WithSubscriptionFilter(filter p2p.SubscriptionFilter) {
@@ -95,7 +96,8 @@ func (g *GossipSubAdapterConfig) WithTracer(tracer p2p.PubSubTracer) {
 
 // ScoreTracer returns the tracer for the peer score.
 // Args:
-//  - None
+//   - None
+//
 // Returns:
 // - p2p.PeerScoreTracer: the tracer for the peer score.
 func (g *GossipSubAdapterConfig) ScoreTracer() p2p.PeerScoreTracer {
