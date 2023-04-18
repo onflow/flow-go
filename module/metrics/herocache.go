@@ -64,19 +64,19 @@ func NewNoopHeroCacheMetricsFactory() HeroCacheMetricsFactory {
 }
 
 func NetworkReceiveCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingReceiveCache, registrar)
+	return NewHeroCacheCollector(namespaceNetwork, ResourceReceiveCache, registrar)
 }
 
 func PublicNetworkReceiveCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceNetwork, ResourcePublicNetworkingReceiveCache, registrar)
+	return NewHeroCacheCollector(namespaceNetwork, prependPublic(ResourceReceiveCache), registrar)
 }
 
 func NetworkDnsTxtCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDnsTxtCache, registrar)
+	return NewHeroCacheCollector(namespaceNetwork, ResourceDnsTxtCache, registrar)
 }
 
 func NetworkDnsIpCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDnsIpCache, registrar)
+	return NewHeroCacheCollector(namespaceNetwork, ResourceDnsIpCache, registrar)
 }
 
 func ChunkDataPackRequestQueueMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
@@ -92,28 +92,31 @@ func CollectionRequestsQueueMetricFactory(registrar prometheus.Registerer) *Hero
 }
 
 func DisallowListNotificationQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDisallowListNotificationQueue, registrar)
+	return NewHeroCacheCollector(namespaceNetwork, ResourceDisallowListNotificationQueue, registrar)
 }
 
 func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+	r := ResourceRpcMetricsObserverInspectorQueue
 	if publicNetwork {
-		return f(namespaceNetwork, ResourceNetworkingPublicRpcMetricsObserverInspectorQueue)
+		r = prependPublic(r)
 	}
-	return f(namespaceNetwork, ResourceNetworkingRpcMetricsObserverInspectorQueue)
+	return f(namespaceNetwork, r)
 }
 
 func GossipSubRPCInspectorQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+	r := ResourceRpcValidationInspectorQueue
 	if publicNetwork {
-		return f(namespaceNetwork, ResourceNetworkingPublicRpcValidationInspectorQueue)
+		r = prependPublic(r)
 	}
-	return f(namespaceNetwork, ResourceNetworkingRpcValidationInspectorQueue)
+	return f(namespaceNetwork, r)
 }
 
 func RpcInspectorNotificationQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+	r := ResourceRpcInspectorNotificationQueue
 	if publicNetwork {
-		return f(namespaceNetwork, ResourceNetworkingPublicRpcMetricsObserverInspectorQueue)
+		r = prependPublic(r)
 	}
-	return f(namespaceNetwork, ResourceNetworkingRpcInspectorNotificationQueue)
+	return f(namespaceNetwork, ResourceRpcInspectorNotificationQueue)
 }
 
 func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer, epoch uint64) *HeroCacheCollector {
@@ -126,6 +129,16 @@ func FollowerCacheMetrics(registrar prometheus.Registerer) *HeroCacheCollector {
 
 func AccessNodeExecutionDataCacheMetrics(registrar prometheus.Registerer) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceAccess, ResourceExecutionDataCache, registrar)
+}
+
+// prependPublic prepends the string "public" to the given string.
+// This is used to distinguish between public and private metrics.
+// Args:
+// - str: the string to prepend, example: "my_metric"
+// Returns:
+// - the prepended string, example: "public_my_metric"
+func prependPublic(str string) string {
+	return fmt.Sprintf("%s_%s", "public", str)
 }
 
 func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometheus.Registerer) *HeroCacheCollector {

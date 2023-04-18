@@ -475,7 +475,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.Logger,
 		heroCacheCollector)
 
-	err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+	err := node.Metrics.Mempool.Register(metrics.ResourceReceiveCache, receiveCache.Size)
 	if err != nil {
 		return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 	}
