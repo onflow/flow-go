@@ -381,7 +381,6 @@ func TestSpockStateRandomOps(t *testing.T) {
 
 	_ = testSpock(t, chain)
 }
-
 func TestSpockStateNewChild(t *testing.T) {
 	baseRegisterId := flow.NewRegisterID("", "base")
 	baseValue := flow.RegisterValue([]byte("base"))

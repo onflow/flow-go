@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/state"
@@ -91,7 +90,7 @@ var (
 func setupProgramsTest(t *testing.T) storage.SnapshotTree {
 	txnState := storage.SerialTransaction{
 		NestedTransaction: state.NewTransactionState(
-			delta.NewDeltaView(nil),
+			nil,
 			state.DefaultParameters()),
 	}
 

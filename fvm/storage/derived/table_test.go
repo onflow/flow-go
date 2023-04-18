@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
@@ -1064,8 +1063,9 @@ func TestDerivedDataTableGetOrCompute(t *testing.T) {
 	value := 12345
 
 	t.Run("compute value", func(t *testing.T) {
-		view := delta.NewDeltaView(nil)
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := state.NewTransactionState(
+			nil,
+			state.DefaultParameters())
 
 		txnDerivedData, err := blockDerivedData.NewTableTransaction(0, 0)
 		assert.NoError(t, err)
@@ -1101,8 +1101,9 @@ func TestDerivedDataTableGetOrCompute(t *testing.T) {
 	})
 
 	t.Run("get value", func(t *testing.T) {
-		view := delta.NewDeltaView(nil)
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := state.NewTransactionState(
+			nil,
+			state.DefaultParameters())
 
 		txnDerivedData, err := blockDerivedData.NewTableTransaction(1, 1)
 		assert.NoError(t, err)

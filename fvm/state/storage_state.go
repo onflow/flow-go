@@ -114,3 +114,19 @@ func (state *storageState) DropChanges() error {
 	state.writeSet = map[flow.RegisterID]flow.RegisterValue{}
 	return nil
 }
+
+func (state *storageState) readSetSize() int {
+	return len(state.readSet)
+}
+
+func (state *storageState) interimReadSet(
+	accumulator map[flow.RegisterID]struct{},
+) {
+	for id := range state.writeSet {
+		delete(accumulator, id)
+	}
+
+	for id := range state.readSet {
+		accumulator[id] = struct{}{}
+	}
+}
