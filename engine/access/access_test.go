@@ -3,7 +3,6 @@ package access_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/onflow/flow-go/cmd/build"
 	"os"
 	"testing"
 
@@ -20,6 +19,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/cmd/build"
 	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"

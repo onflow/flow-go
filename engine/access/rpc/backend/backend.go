@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/cmd/build"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -11,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"

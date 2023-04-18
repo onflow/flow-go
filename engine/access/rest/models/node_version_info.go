@@ -1,8 +1,9 @@
 package models
 
 import (
-	"github.com/onflow/flow-go/access"
 	"strconv"
+
+	"github.com/onflow/flow-go/access"
 )
 
 func (t *NodeVersionInfo) Build(params *access.NodeVersionInfo) {

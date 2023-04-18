@@ -2,8 +2,6 @@ package rest
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/cmd/build"
-	"github.com/onflow/flow-go/utils/unittest"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -14,6 +12,8 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func nodeVersionInfoURL(t *testing.T) string {
