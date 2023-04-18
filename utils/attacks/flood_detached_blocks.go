@@ -33,6 +33,10 @@ func RunAttackFloodDetachedBlocks(log zerolog.Logger, conduit network.Conduit, s
 		Dur("round_dur", RoundDurationFlag).
 		Logger()
 
+	defer func() {
+		log.Warn().Msgf("attack routine is exiting!")
+	}()
+
 	if TargetIDFlag == "" {
 		log.Info().Msgf("no attack target specified")
 	}
@@ -77,8 +81,9 @@ func RunAttackFloodDetachedBlocks(log zerolog.Logger, conduit network.Conduit, s
 				atomic.AddUint64(&workersDone, 1)
 			}()
 		}
+		log.Info().Msgf("initiated attack workers - going to sleep for %s", RoundDurationFlag.String())
 		time.Sleep(RoundDurationFlag)
-		log.Info().Msgf("completed attack round %d after %s with %d/%d attack workers completed", round, workersDone, workersTotal, RoundDurationFlag.String())
+		log.Info().Msgf("completed attack round %d after %s with %d/%d attack workers completed", round, RoundDurationFlag.String(), workersDone, workersTotal)
 	}
 }
 
