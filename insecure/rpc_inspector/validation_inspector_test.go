@@ -72,6 +72,7 @@ func TestValidationInspector_SafetyThreshold(t *testing.T) {
 	})
 	logger := zerolog.New(os.Stdout).Hook(hook)
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
+	mockDistributorReadyDoneAware(distributor)
 	defer distributor.AssertNotCalled(t, "Distribute", mockery.Anything)
 	inspector := validation.NewControlMsgValidationInspector(logger, sporkID, inspectorConfig, distributor)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(inspector)
@@ -123,6 +124,7 @@ func TestValidationInspector_DiscardThreshold(t *testing.T) {
 	controlMessageCount := int64(1)
 	logger := unittest.Logger()
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
+	mockDistributorReadyDoneAware(distributor)
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
 	distributor.On("Distribute", mockery.Anything).
@@ -192,6 +194,7 @@ func TestValidationInspector_RateLimitedPeer(t *testing.T) {
 	controlMessageCount := int64(1)
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
+	mockDistributorReadyDoneAware(distributor)
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
 	distributor.On("Distribute", mockery.Anything).
@@ -273,6 +276,7 @@ func TestValidationInspector_InvalidTopicID(t *testing.T) {
 	duplicateTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
+	mockDistributorReadyDoneAware(distributor)
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
 	distributor.On("Distribute", mockery.Anything).
@@ -422,4 +426,20 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkID)
 		return unittest.ProposalFixture(), blockTopic
 	})
+}
+
+// mockDistributorReadyDoneAware mocks the Ready and Done methods of the distributor to return a channel that is already closed,
+// so that the distributor is considered ready and done when the test needs.
+func mockDistributorReadyDoneAware(d *mockp2p.GossipSubInspectorNotificationDistributor) {
+	d.On("Start", mockery.Anything).Return().Maybe()
+	d.On("Ready").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
+	d.On("Done").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
 }
