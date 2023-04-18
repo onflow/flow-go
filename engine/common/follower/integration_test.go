@@ -2,7 +2,6 @@ package follower
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -181,7 +180,6 @@ func TestFollowerHappyPath(t *testing.T) {
 		require.Eventually(t, func() bool {
 			final, err := followerState.Final().Head()
 			require.NoError(t, err)
-			fmt.Println(fmt.Sprintf("expected to be finalized: %d  |  current finalized %d", targetBlockHeight, final.Height))
 			return final.Height == targetBlockHeight
 		}, time.Minute, time.Second, "expect to process all blocks before timeout")
 
