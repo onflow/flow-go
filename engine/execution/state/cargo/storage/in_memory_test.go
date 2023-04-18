@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/cargo/payload/storage"
+	"github.com/onflow/flow-go/engine/execution/state/cargo/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -20,14 +20,14 @@ func TestInMemStorage(t *testing.T) {
 		headers := unittest.BlockHeaderFixtures(13)
 		genesis, batch1, _, _ := headers[0], headers[1:5], headers[5:9], headers[9:]
 
-		store := storage.NewInMemStorage(capacity, genesis)
+		store := storage.NewInMemoryStorage(capacity, genesis)
 
 		// add the first batch of headers
 		for _, header := range batch1 {
 			update := map[flow.RegisterID]flow.RegisterValue{
 				{Key: "key", Owner: "owner"}: []byte("value"),
 			}
-			err = store.Commit(header, update)
+			err = store.CommitBlock(header, update)
 			require.NoError(t, err)
 		}
 	})

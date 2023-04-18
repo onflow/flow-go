@@ -3,6 +3,7 @@ package cargo
 import (
 	"github.com/onflow/flow-go/engine/execution/state/cargo/payload"
 	"github.com/onflow/flow-go/engine/execution/state/cargo/queue"
+	"github.com/onflow/flow-go/engine/execution/state/cargo/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -22,7 +23,7 @@ type Cargo struct {
 }
 
 func NewCargo(
-	storage payload.Storage,
+	storage storage.Storage,
 	blockQueueCapacity int,
 	genesis *flow.Header,
 ) (*Cargo, error) {

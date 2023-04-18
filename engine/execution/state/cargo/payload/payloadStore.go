@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/onflow/flow-go/engine/execution/state/cargo/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -20,7 +21,7 @@ type PayloadStore struct {
 	lock             sync.RWMutex
 }
 
-func NewPayloadStore(storage Storage) (*PayloadStore, error) {
+func NewPayloadStore(storage storage.Storage) (*PayloadStore, error) {
 	oracle, err := NewOracleView(storage)
 	if err != nil {
 		return nil, err

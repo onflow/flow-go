@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/onflow/flow-go/engine/execution/state/cargo/payload"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type InMemStorage struct {
+type InMemoryStorage struct {
 	historyCap           int
 	data                 map[flow.RegisterID]entries
 	lastCommittedBlock   *flow.Header
@@ -17,13 +16,13 @@ type InMemStorage struct {
 	lock                 sync.RWMutex
 }
 
-var _ payload.Storage = &InMemStorage{}
+var _ Storage = &InMemoryStorage{}
 
-func NewInMemStorage(
+func NewInMemoryStorage(
 	historyCap int,
 	genesis *flow.Header,
-) *InMemStorage {
-	return &InMemStorage{
+) *InMemoryStorage {
+	return &InMemoryStorage{
 		historyCap:           historyCap,
 		data:                 make(map[flow.RegisterID]entries, 0),
 		lastCommittedBlock:   genesis,
@@ -31,7 +30,7 @@ func NewInMemStorage(
 	}
 }
 
-func (s *InMemStorage) Commit(header *flow.Header, update map[flow.RegisterID]flow.RegisterValue) error {
+func (s *InMemoryStorage) CommitBlock(header *flow.Header, update map[flow.RegisterID]flow.RegisterValue) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -65,7 +64,14 @@ func (s *InMemStorage) Commit(header *flow.Header, update map[flow.RegisterID]fl
 	return nil
 }
 
-func (s *InMemStorage) RegisterValueAt(height uint64, id flow.RegisterID) (value flow.RegisterValue, err error) {
+func (s *InMemoryStorage) LastCommittedBlock() (*flow.Header, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.lastCommittedBlock, nil
+}
+
+func (s *InMemoryStorage) RegisterValueAt(height uint64, id flow.RegisterID) (value flow.RegisterValue, err error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -84,13 +90,6 @@ func (s *InMemStorage) RegisterValueAt(height uint64, id flow.RegisterID) (value
 		value = ent.value
 	}
 	return value, nil
-}
-
-func (s *InMemStorage) LastCommittedBlock() (flow.Identifier, *flow.Header, error) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	return s.lastCommittedBlockID, s.lastCommittedBlock, nil
 }
 
 type entry struct {

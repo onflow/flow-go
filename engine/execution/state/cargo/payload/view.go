@@ -3,6 +3,7 @@ package payload
 import (
 	"sync"
 
+	"github.com/onflow/flow-go/engine/execution/state/cargo/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -11,13 +12,13 @@ type View interface {
 }
 
 type OracleView struct {
-	storage Storage
+	storage storage.Storage
 	// cached value of the same data that is retrivable from storage
 	lastCommittedHeight uint64
 }
 
-func NewOracleView(storage Storage) (*OracleView, error) {
-	_, header, err := storage.LastCommittedBlock()
+func NewOracleView(storage storage.Storage) (*OracleView, error) {
+	header, err := storage.LastCommittedBlock()
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +36,7 @@ func (v *OracleView) Get(height uint64, _ flow.Identifier, id flow.RegisterID) (
 }
 
 func (v *OracleView) MergeView(header *flow.Header, view *InFlightView) error {
-	err := v.storage.Commit(header, view.delta)
+	err := v.storage.CommitBlock(header, view.delta)
 	if err != nil {
 		return err
 	}
