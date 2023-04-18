@@ -625,15 +625,19 @@ func CompleteCollectionFromTransactions(txs []*flow.TransactionBody) *entity.Com
 	}
 }
 
-func ExecutableBlockFixture(collectionsSignerIDs [][]flow.Identifier) *entity.ExecutableBlock {
+func ExecutableBlockFixture(
+	collectionsSignerIDs [][]flow.Identifier,
+	startState *flow.StateCommitment,
+) *entity.ExecutableBlock {
 
 	header := BlockHeaderFixture()
-	return ExecutableBlockFixtureWithParent(collectionsSignerIDs, header)
+	return ExecutableBlockFixtureWithParent(collectionsSignerIDs, header, startState)
 }
 
 func ExecutableBlockFixtureWithParent(
 	collectionsSignerIDs [][]flow.Identifier,
 	parent *flow.Header,
+	startState *flow.StateCommitment,
 ) *entity.ExecutableBlock {
 
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, len(collectionsSignerIDs))
@@ -651,6 +655,7 @@ func ExecutableBlockFixtureWithParent(
 	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
 		CompleteCollections: completeCollections,
+		StartState:          startState,
 	}
 	return executableBlock
 }

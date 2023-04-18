@@ -222,9 +222,11 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, nil, fmt.Errorf("cannot calculate events collection hash: %w", err)
 	}
 	if chunk.EventCollection != eventsHash {
-
+		collectionID := ""
+		if chunkDataPack.Collection != nil {
+			collectionID = chunkDataPack.Collection.ID().String()
+		}
 		for i, event := range events {
-
 			fcv.logger.Warn().Int("list_index", i).
 				Str("event_id", event.ID().String()).
 				Hex("event_fingerptint", event.Fingerprint()).
@@ -234,7 +236,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 				Uint32("event_index", event.EventIndex).
 				Bytes("event_payload", event.Payload).
 				Str("block_id", chunk.BlockID.String()).
-				Str("collection_id", chunkDataPack.Collection.ID().String()).
+				Str("collection_id", collectionID).
 				Str("result_id", result.ID().String()).
 				Uint64("chunk_index", chunk.Index).
 				Msg("not matching events debug")
