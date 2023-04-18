@@ -506,7 +506,7 @@ func (s *feldmanVSSQualState) buildAndBroadcastComplaintAnswer(complainee index)
 // - true if the complaint answer is not correct
 func (s *feldmanVSSQualState) checkComplaint(complainer index, c *complaint) bool {
 	// check y[complainer] == share.G2
-	return C.verify_share(
+	return C.G2_check_log(
 		(*C.Fr)(&c.answer),
 		(*C.E2)(&s.y[complainer])) == 0
 }

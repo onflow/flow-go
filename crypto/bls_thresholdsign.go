@@ -413,7 +413,7 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 	}
 
 	// Lagrange Interpolate at point 0
-	result := C.G1_lagrangeInterpolateAtZero_serialized(
+	result := C.E1_lagrange_interpolate_at_zero_write(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&shares[0]),
 		(*C.uint8_t)(&signers[0]), (C.int)(s.threshold+1))
@@ -501,7 +501,7 @@ func BLSReconstructThresholdSignature(size int, threshold int,
 
 	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
 	// Lagrange Interpolate at point 0
-	if C.G1_lagrangeInterpolateAtZero_serialized(
+	if C.E1_lagrange_interpolate_at_zero_write(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&flatShares[0]),
 		(*C.uint8_t)(&indexSigners[0]), (C.int)(threshold+1),

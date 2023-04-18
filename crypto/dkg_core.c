@@ -8,10 +8,10 @@
 #define T_max  ((N_max-1)/2)
 
 // computes P(x) = a_0 + a_1*x + .. + a_n x^n (mod r)
-// r being the order of G1
-// writes P(x) in out and P(x).g2 in y if y is non NULL
-// x being a small integer
-void Fr_polynomial_image_export(byte* out, E2* y, const Fr* a, const int a_size, const byte x){
+// r being the order of G1, 
+// and writes P(x) in out and P(x).g2 in y if y is non NULL
+// x being a small integer (byte).
+void Fr_polynomial_image_write(byte* out, E2* y, const Fr* a, const int a_size, const byte x){
     Fr image;
     Fr_polynomial_image(&image, y, a, a_size, x);
     // exports the result
@@ -83,9 +83,10 @@ BLST_ERROR E2_vector_read_bytes(E2* A, const byte* src, const int len){
     return BLST_SUCCESS;
 }
 
-// returns 1 if g2^x = y, where g2 is the generator of G2
-// returns 0 otherwise
-bool_t verify_share(const Fr* x, const E2* y) {
+// checks the discrete log relationship in G2.
+// - returns 1 if g2^x = y, where g2 is the generator of G2
+// - returns 0 otherwise.
+bool_t G2_check_log(const Fr* x, const E2* y) {
     E2 tmp;
     G2_mult_gen(&tmp, x);
     return E2_is_equal(&tmp, y);

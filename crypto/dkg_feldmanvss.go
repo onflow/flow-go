@@ -412,7 +412,7 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 // P(x) is written in dest, while g2^P(x) is written in y
 // x being a small integer
 func frPolynomialImage(dest []byte, a []scalar, x index, y *pointE2) {
-	C.Fr_polynomial_image_export((*C.uchar)(&dest[0]),
+	C.Fr_polynomial_image_write((*C.uchar)(&dest[0]),
 		(*C.E2)(y),
 		(*C.Fr)(&a[0]), (C.int)(len(a)),
 		(C.uint8_t)(x),
@@ -444,7 +444,7 @@ func readVerifVector(A []pointE2, src []byte) error {
 
 func (s *feldmanVSSstate) verifyShare() bool {
 	// check y[current] == x.G2
-	return C.verify_share(
+	return C.G2_check_log(
 		(*C.Fr)(&s.x),
 		(*C.E2)(&s.y[s.myIndex])) != 0
 }

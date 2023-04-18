@@ -9,7 +9,7 @@
 // Computes the Lagrange coefficient L_i(0) in Fr with regards to the range [indices(0)..indices(t)]
 // and stores it in `res`, where t is the degree of the polynomial P.
 // `len` is equal to `t+1` where `t` is the polynomial degree.
-static void Fr_lagrangeCoefficientAtZero(Fr* res, const int i, const uint8_t indices[], const int len){
+static void Fr_lagrange_coeff_at_zero(Fr* res, const int i, const uint8_t indices[], const int len){
 
     // coefficient is computed as N * D^(-1)
     Fr numerator;  // eventually would represent N*R^k  
@@ -65,7 +65,7 @@ static void Fr_lagrangeCoefficientAtZero(Fr* res, const int i, const uint8_t ind
 // Computes the Langrange interpolation at zero P(0) = LI(0) with regards to the indices [indices(0)..indices(t)] 
 // and their G1 images [shares(0)..shares(t)], and stores the resulting G1 point in `dest`.
 // `len` is equal to `t+1` where `t` is the polynomial degree.
-static void G1_lagrangeInterpolateAtZero(ep_st* dest, const ep_st shares[], const uint8_t indices[], const int len) {
+static void E1_lagrange_interpolate_at_zero(ep_st* dest, const ep_st shares[], const uint8_t indices[], const int len) {
     // Purpose is to compute Q(0) where Q(x) = A_0 + A_1*x + ... +  A_t*x^t in G1 
     // where A_i = g1 ^ a_i
 
@@ -79,7 +79,7 @@ static void G1_lagrangeInterpolateAtZero(ep_st* dest, const ep_st shares[], cons
 
     Fr fr_lagr_coef;
     for (int i=0; i < len; i++) {
-        Fr_lagrangeCoefficientAtZero(&fr_lagr_coef, i, indices, len);
+        Fr_lagrange_coeff_at_zero(&fr_lagr_coef, i, indices, len);
         bn_st* bn_lagr_coef = Fr_blst_to_relic(&fr_lagr_coef);
         ep_mul_lwnaf(mult, &shares[i], bn_lagr_coef);
         free(bn_lagr_coef);
@@ -90,9 +90,9 @@ static void G1_lagrangeInterpolateAtZero(ep_st* dest, const ep_st shares[], cons
 }
 
 // Computes the Langrange interpolation at zero LI(0) with regards to the indices [indices(0)..indices(t)] 
-// and their G1 concatenated serializations [shares(1)..shares(t+1)], and stores the serialized result in `dest`.
+// and writes their E1 concatenated serializations [shares(1)..shares(t+1)] in `dest`.
 // `len` is equal to `t+1` where `t` is the polynomial degree.
-int G1_lagrangeInterpolateAtZero_serialized(byte* dest, const byte* shares, const uint8_t indices[], const int len) {
+int E1_lagrange_interpolate_at_zero_write(byte* dest, const byte* shares, const uint8_t indices[], const int len) {
     int read_ret;
     // temp variables
     ep_t res;
@@ -108,7 +108,7 @@ int G1_lagrangeInterpolateAtZero_serialized(byte* dest, const byte* shares, cons
     // G1 interpolation at 0
     // computes Q(x) = A_0 + A_1*x + ... +  A_t*x^t  in G1,
     // where A_i = g1 ^ a_i
-    G1_lagrangeInterpolateAtZero(res, ep_shares, indices, len);
+    E1_lagrange_interpolate_at_zero(res, ep_shares, indices, len);
 
     // export the result
     ep_write_bin_compact(dest, res, SIGNATURE_LEN);
