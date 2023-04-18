@@ -45,8 +45,8 @@ func NewParticipant(
 	modules.TimeoutAggregator.PruneUpToView(finalized.View)
 
 	// recover HotStuff state from all pending blocks
-	qcCollector := recovery.Collector[*flow.QuorumCertificate]{}
-	tcCollector := recovery.Collector[*flow.TimeoutCertificate]{}
+	qcCollector := recovery.NewCollector[*flow.QuorumCertificate]()
+	tcCollector := recovery.NewCollector[*flow.TimeoutCertificate]()
 	err := recovery.Recover(log, pending,
 		recovery.ForksState(modules.Forks),                   // add pending blocks to Forks
 		recovery.VoteAggregatorState(modules.VoteAggregator), // accept votes for all pending blocks
