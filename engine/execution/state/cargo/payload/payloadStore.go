@@ -41,7 +41,7 @@ func (ps *PayloadStore) Get(
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
-	if height <= ps.oracleView.LastCommittedHeight {
+	if height <= ps.oracleView.lastCommittedHeight {
 		return ps.oracleView.Get(height, blockID, key)
 	}
 
@@ -64,13 +64,13 @@ func (ps *PayloadStore) Update(
 	defer ps.lock.Unlock()
 
 	// discard
-	if height < ps.oracleView.LastCommittedHeight {
+	if height < ps.oracleView.lastCommittedHeight {
 		return nil
 	}
 
 	var parent View
 	parent = ps.oracleView
-	if height > ps.oracleView.LastCommittedHeight {
+	if height > ps.oracleView.lastCommittedHeight {
 		var found bool
 		parent, found = ps.viewByID[parentBlockID]
 		if !found {

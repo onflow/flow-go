@@ -9,10 +9,12 @@ import (
 )
 
 type InMemStorage struct {
-	historyCap int
-	data       map[flow.RegisterID]entries
-	headerMeta *headerMeta
-	lock       sync.RWMutex
+	historyCap           int
+	data                 map[flow.RegisterID]entries
+	lastCommittedBlock   *flow.Header
+	lastCommittedBlockID flow.Identifier
+	minHeightAvailable   uint64
+	lock                 sync.RWMutex
 }
 
 var _ payload.Storage = &InMemStorage{}
@@ -22,9 +24,10 @@ func NewInMemStorage(
 	genesis *flow.Header,
 ) *InMemStorage {
 	return &InMemStorage{
-		historyCap: historyCap,
-		data:       make(map[flow.RegisterID]entries, 0),
-		headerMeta: &headerMeta{genesis.Height, genesis.ID()},
+		historyCap:           historyCap,
+		data:                 make(map[flow.RegisterID]entries, 0),
+		lastCommittedBlock:   genesis,
+		lastCommittedBlockID: genesis.ID(),
 	}
 }
 
@@ -34,11 +37,11 @@ func (s *InMemStorage) Commit(header *flow.Header, update map[flow.RegisterID]fl
 
 	h := header.Height
 	// check commit sequence
-	if s.headerMeta.height+1 != h {
-		return fmt.Errorf("commit height mismatch [%d] != [%d]", s.headerMeta.height+1, h)
+	if s.lastCommittedBlock.Height+1 != h {
+		return fmt.Errorf("commit height mismatch [%d] != [%d]", s.lastCommittedBlock.Height+1, h)
 	}
-	if s.headerMeta.id != header.ParentID {
-		return fmt.Errorf("commit parent id mismatch [%x] != [%x]", s.headerMeta.id, header.ParentID)
+	if s.lastCommittedBlockID != header.ParentID {
+		return fmt.Errorf("commit parent id mismatch [%x] != [%x]", s.lastCommittedBlockID, header.ParentID)
 	}
 
 	for key, value := range update {
@@ -53,20 +56,24 @@ func (s *InMemStorage) Commit(header *flow.Header, update map[flow.RegisterID]fl
 		}
 		es.insertAndPrune(ent, s.historyCap)
 	}
-	s.headerMeta = &headerMeta{h, header.ID()}
+	s.lastCommittedBlock = header
+	s.lastCommittedBlockID = header.ID()
+
+	if s.lastCommittedBlock.Height >= uint64(s.historyCap) {
+		s.minHeightAvailable = s.lastCommittedBlock.Height - uint64(s.historyCap) + 1
+	}
 	return nil
 }
 
-func (s *InMemStorage) RegisterAt(height uint64, id flow.RegisterID) (value flow.RegisterValue, err error) {
+func (s *InMemStorage) RegisterValueAt(height uint64, id flow.RegisterID) (value flow.RegisterValue, err error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	var minHeightAllowed uint64
-	if s.headerMeta.height >= uint64(s.historyCap) {
-		minHeightAllowed = s.headerMeta.height - uint64(s.historyCap) + 1
+	if height > s.lastCommittedBlock.Height {
+		return nil, fmt.Errorf("height out side of historic range allowed %d > %d", height, s.lastCommittedBlock.Height)
 	}
-	if height > minHeightAllowed {
-		return nil, fmt.Errorf("height out side of historic range allowed %d > %d", height, minHeightAllowed)
+	if height < s.minHeightAvailable {
+		return nil, fmt.Errorf("height out side of historic range allowed %d < %d", height, s.minHeightAvailable)
 	}
 
 	entries := s.data[id]
@@ -79,23 +86,11 @@ func (s *InMemStorage) RegisterAt(height uint64, id flow.RegisterID) (value flow
 	return value, nil
 }
 
-func (s *InMemStorage) LastCommittedBlockHeight() (uint64, error) {
+func (s *InMemStorage) LastCommittedBlock() (flow.Identifier, *flow.Header, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	return s.headerMeta.height, nil
-}
-
-func (s *InMemStorage) LastCommittedBlockID() (flow.Identifier, error) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	return s.headerMeta.id, nil
-}
-
-type headerMeta struct {
-	height uint64
-	id     flow.Identifier
+	return s.lastCommittedBlockID, s.lastCommittedBlock, nil
 }
 
 type entry struct {

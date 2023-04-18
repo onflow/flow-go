@@ -12,18 +12,18 @@ type View interface {
 
 type OracleView struct {
 	storage Storage
-	// same data is retrivable from storage but this one is used as a cache
-	LastCommittedHeight uint64
+	// cached value of the same data that is retrivable from storage
+	lastCommittedHeight uint64
 }
 
 func NewOracleView(storage Storage) (*OracleView, error) {
-	h, err := storage.LastCommittedBlockHeight()
+	_, header, err := storage.LastCommittedBlock()
 	if err != nil {
 		return nil, err
 	}
 	return &OracleView{
 		storage:             storage,
-		LastCommittedHeight: h,
+		lastCommittedHeight: header.Height,
 	}, nil
 }
 
@@ -31,7 +31,7 @@ var _ View = &OracleView{}
 
 func (v *OracleView) Get(height uint64, _ flow.Identifier, id flow.RegisterID) (flow.RegisterValue, error) {
 	// TODO: id could be used as extra sanity check
-	return v.storage.RegisterAt(height, id)
+	return v.storage.RegisterValueAt(height, id)
 }
 
 func (v *OracleView) MergeView(header *flow.Header, view *InFlightView) error {
@@ -39,7 +39,7 @@ func (v *OracleView) MergeView(header *flow.Header, view *InFlightView) error {
 	if err != nil {
 		return err
 	}
-	v.LastCommittedHeight = header.Height
+	v.lastCommittedHeight = header.Height
 	return nil
 }
 

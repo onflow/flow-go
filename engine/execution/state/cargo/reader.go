@@ -5,10 +5,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type blockAwareGetFunc func(height uint64,
+type blockAwareGetFunc func(
+	height uint64,
 	blockID flow.Identifier,
 	key flow.RegisterID,
-) (flow.RegisterValue, error)
+) (
+	flow.RegisterValue,
+	error,
+)
 
 // Reader holds on to the height and blockID
 //
