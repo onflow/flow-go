@@ -23,14 +23,22 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// mockInspectorSuite is a mock implementation of the GossipSubInspectorSuite interface.
+// It is used to test the impact of invalid control messages on the scoring and connectivity of nodes in a network.
 type mockInspectorSuite struct {
 	component.Component
 	t        *testing.T
 	consumer p2p.GossipSubInvCtrlMsgNotifConsumer
 }
 
+// ensures that mockInspectorSuite implements the GossipSubInspectorSuite interface.
 var _ p2p.GossipSubInspectorSuite = (*mockInspectorSuite)(nil)
 
+// newMockInspectorSuite creates a new mockInspectorSuite.
+// Args:
+// - t: the test object used for assertions.
+// Returns:
+// - a new mockInspectorSuite.
 func newMockInspectorSuite(t *testing.T) *mockInspectorSuite {
 	i := &mockInspectorSuite{
 		t: t,
@@ -46,15 +54,29 @@ func newMockInspectorSuite(t *testing.T) *mockInspectorSuite {
 	return i
 }
 
+// InspectFunc returns a function that is called when a node receives a control message.
+// In this mock implementation, the function does nothing.
 func (m *mockInspectorSuite) InspectFunc() func(peer.ID, *pubsub.RPC) error {
 	return nil
 }
 
+// AddInvCtrlMsgNotifConsumer adds a consumer for invalid control message notifications.
+// In this mock implementation, the consumer is stored in the mockInspectorSuite, and is used to simulate the reception of invalid control messages.
+// Args:
+// - c: the consumer to add.
+// Returns:
+// - nil.
+// Note: this function will fail the test if the consumer is already set.
 func (m *mockInspectorSuite) AddInvCtrlMsgNotifConsumer(c p2p.GossipSubInvCtrlMsgNotifConsumer) {
 	require.Nil(m.t, m.consumer)
 	m.consumer = c
 }
 
+// TestInvalidCtrlMsgScoringIntegration tests the impact of invalid control messages on the scoring and connectivity of nodes in a network.
+// It creates a network of 2 nodes, and sends a set of control messages with invalid topic IDs to one of the nodes.
+// It then checks that the node receiving the invalid control messages decreases its score for the peer spamming the invalid messages, and
+// eventually disconnects from the spamming peer on the gossipsub layer, i.e., messages sent by the spamming peer are no longer
+// received by the node.
 func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
