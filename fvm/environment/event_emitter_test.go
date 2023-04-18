@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/stdlib"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
@@ -155,7 +154,7 @@ func Test_EmitEvent_Limit(t *testing.T) {
 
 func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, eventEmitLimit uint64) environment.EventEmitter {
 	txnState := state.NewTransactionState(
-		delta.NewDeltaView(nil),
+		nil,
 		state.DefaultParameters().WithMeterParameters(
 			meter.DefaultParameters().WithEventEmitByteLimit(eventEmitLimit),
 		))

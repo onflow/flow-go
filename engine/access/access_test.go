@@ -365,7 +365,11 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
-		assertHeaderResp := func(resp *accessproto.BlockHeaderResponse, err error, header *flow.Header) {
+		assertHeaderResp := func(
+			resp *accessproto.BlockHeaderResponse,
+			err error,
+			header *flow.Header,
+		) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := resp.Block
@@ -377,7 +381,11 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.Equal(suite.T(), expectedBlockHeader, header)
 		}
 
-		assertBlockResp := func(resp *accessproto.BlockResponse, err error, block *flow.Block) {
+		assertBlockResp := func(
+			resp *accessproto.BlockResponse,
+			err error,
+			block *flow.Block,
+		) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := resp.Block
@@ -389,7 +397,11 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.Equal(suite.T(), expectedBlock.ID(), block.ID())
 		}
 
-		assertLightBlockResp := func(resp *accessproto.BlockResponse, err error, block *flow.Block) {
+		assertLightBlockResp := func(
+			resp *accessproto.BlockResponse,
+			err error,
+			block *flow.Block,
+		) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := resp.Block
@@ -482,12 +494,16 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 		er := unittest.ExecutionResultFixture(
 			unittest.WithExecutionResultBlockID(blockID),
-			unittest.WithServiceEvents(2))
+			unittest.WithServiceEvents(3))
 
 		require.NoError(suite.T(), all.Results.Store(er))
 		require.NoError(suite.T(), all.Results.Index(blockID, er.ID()))
 
-		assertResp := func(resp *accessproto.ExecutionResultForBlockIDResponse, err error, executionResult *flow.ExecutionResult) {
+		assertResp := func(
+			resp *accessproto.ExecutionResultForBlockIDResponse,
+			err error,
+			executionResult *flow.ExecutionResult,
+		) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			er := resp.ExecutionResult
@@ -511,7 +527,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			}
 
 			for i, serviceEvent := range executionResult.ServiceEvents {
-				assert.Equal(suite.T(), serviceEvent.Type, er.ServiceEvents[i].Type)
+				assert.Equal(suite.T(), serviceEvent.Type.String(), er.ServiceEvents[i].Type)
 				event := serviceEvent.Event
 
 				marshalledEvent, err := json.Marshal(event)

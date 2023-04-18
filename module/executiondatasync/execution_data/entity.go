@@ -23,10 +23,10 @@ func NewBlockExecutionDataEntity(id flow.Identifier, executionData *BlockExecuti
 	}
 }
 
-func (c *BlockExecutionDataEntity) ID() flow.Identifier {
+func (c BlockExecutionDataEntity) ID() flow.Identifier {
 	return c.id
 }
 
-func (c *BlockExecutionDataEntity) Checksum() flow.Identifier {
+func (c BlockExecutionDataEntity) Checksum() flow.Identifier {
 	return c.id
 }

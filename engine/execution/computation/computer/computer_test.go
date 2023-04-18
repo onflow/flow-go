@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -1228,7 +1227,7 @@ func getSetAProgram(
 ) {
 
 	txnState := state.NewTransactionState(
-		delta.NewDeltaView(storageSnapshot),
+		storageSnapshot,
 		state.DefaultParameters())
 
 	loc := common.AddressLocation{
