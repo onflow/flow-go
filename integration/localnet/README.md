@@ -217,7 +217,7 @@ An example of the Flow CLI configuration modified for connecting to the localnet
 ```
 {
 	"networks": {
-		"localnet": "127.0.0.1:3569"
+		"localnet": "127.0.0.1:4001"
 	}
 }
 ```
@@ -238,7 +238,7 @@ An example of the Flow CLI configuration with the service account added:
 ```
 {
 	"networks": {
-		"localnet": "127.0.0.1:3569"
+		"localnet": "127.0.0.1:4001"
 	},
 	"accounts": {
 		"localnet-service-account": {
@@ -355,15 +355,15 @@ After the transaction is sealed, the account with `<ACCOUNT_ADDRESS>` should hav
 # admin tool
 The admin tool is enabled by default in localnet for all node type except access node.
 
-For instance, in order to use admin tool to change log level, first find the local port that maps to `9002` which is the admin tool address, if the local port is `3702`, then run:
+For instance, in order to use admin tool to change log level, first find the local port that maps to `9002` which is the admin tool address, if the local port is `6100`, then run:
 ```
-curl localhost:3702/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-log-level", "data": "debug"}'
+curl localhost:6100/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-log-level", "data": "debug"}'
 ```
 
 To find the local port after launching the localnet, run `docker ps -a`, and find the port mapping.
-For instance, the following result of `docker ps -a ` shows `localnet-collection` maps 9002 port to localhost's 3702 port, so we could use 3702 port to connect to admin tool.
+For instance, the following result of `docker ps -a ` shows `localnet-collection` maps 9002 port to localhost's 6100 port, so we could use 6100 port to connect to admin tool.
 ```
-2e0621f7e592   localnet-access                   "/bin/app --nodeid=9…"   9 seconds ago    Up 8 seconds              0.0.0.0:3571->9000/tcp, :::3571->9000/tcp, 0.0.0.0:3572->9001/tcp, :::3572->9001/tcp                                                           localnet_access_2_1
-fcd92116f902   localnet-collection               "/bin/app --nodeid=0…"   9 seconds ago    Up 8 seconds              0.0.0.0:3702->9002/tcp, :::3702->9002/tcp                                                                                                      localnet_collection_1_1
-dd841d389e36   localnet-access                   "/bin/app --nodeid=a…"   10 seconds ago   Up 9 seconds              0.0.0.0:3569->9000/tcp, :::3569->9000/tcp, 0.0.0.0:3570->9001/tcp, :::3570->9001/tcp                                                           localnet_access_1_1
+2e0621f7e592   localnet-access                   "/bin/app --nodeid=9…"   9 seconds ago    Up 8 seconds              0.0.0.0:4011->9000/tcp, :::4011->9000/tcp, 0.0.0.0:4012->9001/tcp, :::4012->9001/tcp                                                           localnet_access_2_1
+fcd92116f902   localnet-collection               "/bin/app --nodeid=0…"   9 seconds ago    Up 8 seconds              0.0.0.0:6100->9002/tcp, :::6100->9002/tcp                                                                                                      localnet_collection_1_1
+dd841d389e36   localnet-access                   "/bin/app --nodeid=a…"   10 seconds ago   Up 9 seconds              0.0.0.0:4001->9000/tcp, :::4001->9000/tcp, 0.0.0.0:4002->9001/tcp, :::4002->9001/tcp                                                           localnet_access_1_1
 ```

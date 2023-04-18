@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,7 +14,7 @@ import (
 
 func newTestTransactionState() state.NestedTransaction {
 	return state.NewTransactionState(
-		delta.NewDeltaView(nil),
+		nil,
 		state.DefaultParameters(),
 	)
 }
@@ -197,7 +196,7 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 	val := createByteArray(2)
 
 	cachedState := state.NewExecutionState(
-		delta.NewDeltaView(nil),
+		nil,
 		state.DefaultParameters(),
 	)
 
@@ -310,7 +309,7 @@ func TestRestartNestedTransaction(t *testing.T) {
 	state := id.StateForTestingOnly()
 	require.Equal(t, uint64(0), state.InteractionUsed())
 
-	// Restart will merge the meter stat, but not the view delta
+	// Restart will merge the meter stat, but not the register updates
 
 	err = txn.RestartNestedTransaction(id)
 	require.NoError(t, err)
@@ -525,4 +524,86 @@ func TestFinalizeMainTransaction(t *testing.T) {
 	// Sanity check state is no longer accessible after FinalizeMainTransaction.
 	_, err = txn.Get(registerId)
 	require.ErrorContains(t, err, "cannot Get on a finalized state")
+}
+
+func TestInterimReadSet(t *testing.T) {
+	txn := newTestTransactionState()
+
+	// Setup test with a bunch of outstanding nested transaction.
+
+	readRegisterId1 := flow.NewRegisterID("read", "1")
+	readRegisterId2 := flow.NewRegisterID("read", "2")
+	readRegisterId3 := flow.NewRegisterID("read", "3")
+	readRegisterId4 := flow.NewRegisterID("read", "4")
+
+	writeRegisterId1 := flow.NewRegisterID("write", "1")
+	writeValue1 := flow.RegisterValue([]byte("value1"))
+
+	writeRegisterId2 := flow.NewRegisterID("write", "2")
+	writeValue2 := flow.RegisterValue([]byte("value2"))
+
+	writeRegisterId3 := flow.NewRegisterID("write", "3")
+	writeValue3 := flow.RegisterValue([]byte("value3"))
+
+	err := txn.Set(writeRegisterId1, writeValue1)
+	require.NoError(t, err)
+
+	_, err = txn.Get(readRegisterId1)
+	require.NoError(t, err)
+
+	_, err = txn.Get(readRegisterId2)
+	require.NoError(t, err)
+
+	value, err := txn.Get(writeRegisterId1)
+	require.NoError(t, err)
+	require.Equal(t, writeValue1, value)
+
+	_, err = txn.BeginNestedTransaction()
+	require.NoError(t, err)
+
+	err = txn.Set(readRegisterId2, []byte("blah"))
+	require.NoError(t, err)
+
+	_, err = txn.Get(readRegisterId3)
+	require.NoError(t, err)
+
+	value, err = txn.Get(writeRegisterId1)
+	require.NoError(t, err)
+	require.Equal(t, writeValue1, value)
+
+	err = txn.Set(writeRegisterId2, writeValue2)
+	require.NoError(t, err)
+
+	_, err = txn.BeginNestedTransaction()
+	require.NoError(t, err)
+
+	err = txn.Set(writeRegisterId3, writeValue3)
+	require.NoError(t, err)
+
+	value, err = txn.Get(writeRegisterId1)
+	require.NoError(t, err)
+	require.Equal(t, writeValue1, value)
+
+	value, err = txn.Get(writeRegisterId2)
+	require.NoError(t, err)
+	require.Equal(t, writeValue2, value)
+
+	value, err = txn.Get(writeRegisterId3)
+	require.NoError(t, err)
+	require.Equal(t, writeValue3, value)
+
+	_, err = txn.Get(readRegisterId4)
+	require.NoError(t, err)
+
+	// Actual test
+
+	require.Equal(
+		t,
+		map[flow.RegisterID]struct{}{
+			readRegisterId1: struct{}{},
+			readRegisterId2: struct{}{},
+			readRegisterId3: struct{}{},
+			readRegisterId4: struct{}{},
+		},
+		txn.InterimReadSet())
 }

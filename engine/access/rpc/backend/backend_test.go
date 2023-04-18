@@ -107,6 +107,7 @@ func (suite *Suite) TestPing() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	err := backend.Ping(context.Background())
@@ -141,6 +142,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	// query the handler for the latest finalized block
@@ -205,6 +207,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 			nil,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -276,6 +279,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 			nil,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -340,6 +344,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 			nil,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -415,6 +420,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 			nil,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -474,6 +480,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 			nil,
 			suite.log,
 			snapshotHistoryLimit,
+			nil,
 		)
 
 		// the handler should return a snapshot history limit error
@@ -511,6 +518,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	// query the handler for the latest sealed block
@@ -556,6 +564,7 @@ func (suite *Suite) TestGetTransaction() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
@@ -595,6 +604,7 @@ func (suite *Suite) TestGetCollection() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	actual, err := backend.GetCollectionByID(context.Background(), expected.ID())
@@ -657,6 +667,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 	suite.execClient.
 		On("GetTransactionResultByIndex", ctx, exeEventReq).
@@ -719,6 +730,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", ctx, exeEventReq).
@@ -804,6 +816,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	// Successfully return empty event list
@@ -923,6 +936,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	// should return pending status when we have not observed an expiry block
@@ -1081,6 +1095,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		flow.IdentifierList(enIDs.NodeIDs()).Strings(),
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -1138,6 +1153,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
@@ -1191,6 +1207,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	// query the handler for the latest finalized header
@@ -1320,6 +1337,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// execute request
@@ -1351,6 +1369,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// execute request with an empty block id list and expect an empty list of events and no error
@@ -1409,6 +1428,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// execute request
@@ -1438,6 +1458,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// execute request
@@ -1500,6 +1521,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// execute request
@@ -1530,6 +1552,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// execute request
@@ -1679,6 +1702,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			nil,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight)
@@ -1717,6 +1741,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			fixedENIdentifiersStr,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// execute request
@@ -1754,6 +1779,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			fixedENIdentifiersStr,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -1790,6 +1816,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			fixedENIdentifiersStr,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, minHeight+1)
@@ -1826,6 +1853,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			fixedENIdentifiersStr,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -1902,6 +1930,7 @@ func (suite *Suite) TestGetAccount() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -1982,6 +2011,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -2001,7 +2031,8 @@ func (suite *Suite) TestGetNetworkParameters() {
 
 	expectedChainID := flow.Mainnet
 
-	backend := New(nil,
+	backend := New(
+		nil,
 		nil,
 		nil,
 		nil,
@@ -2019,6 +2050,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	params := backend.GetNetworkParameters(context.Background())
@@ -2197,6 +2229,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	// mock parameters
@@ -2217,7 +2250,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 
 	suite.Run("happy path script execution success", func() {
 		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(execRes, nil).Once()
-		res, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		res, err := backend.tryExecuteScript(ctx, executionNode.Address, execReq)
 		suite.execClient.AssertExpectations(suite.T())
 		suite.checkResponse(res, err)
 	})
@@ -2225,7 +2258,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	suite.Run("script execution failure returns status OK", func() {
 		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).
 			Return(nil, status.Error(codes.InvalidArgument, "execution failure!")).Once()
-		_, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		_, err := backend.tryExecuteScript(ctx, executionNode.Address, execReq)
 		suite.execClient.AssertExpectations(suite.T())
 		suite.Require().Error(err)
 		suite.Require().Equal(status.Code(err), codes.InvalidArgument)
@@ -2234,7 +2267,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	suite.Run("execution node internal failure returns status code Internal", func() {
 		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).
 			Return(nil, status.Error(codes.Internal, "execution node internal error!")).Once()
-		_, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		_, err := backend.tryExecuteScript(ctx, executionNode.Address, execReq)
 		suite.execClient.AssertExpectations(suite.T())
 		suite.Require().Error(err)
 		suite.Require().Equal(status.Code(err), codes.Internal)

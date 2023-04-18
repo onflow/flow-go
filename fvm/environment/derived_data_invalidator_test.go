@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -258,7 +257,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	require.NoError(t, err)
 
 	nestedTxn := state.NewTransactionState(
-		delta.NewDeltaView(snapshotTree.Append(executionSnapshot)),
+		snapshotTree.Append(executionSnapshot),
 		state.DefaultParameters())
 
 	derivedBlockData := derived.NewEmptyDerivedBlockData()

@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
@@ -157,7 +156,7 @@ func NewScriptEnvironmentFromStorageSnapshot(
 
 	txn := storage.SerialTransaction{
 		NestedTransaction: state.NewTransactionState(
-			delta.NewDeltaView(storageSnapshot),
+			storageSnapshot,
 			state.DefaultParameters()),
 		DerivedTransactionCommitter: derivedTxn,
 	}

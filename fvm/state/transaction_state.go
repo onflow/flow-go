@@ -57,6 +57,10 @@ type NestedTransaction interface {
 	// transaction.
 	IsCurrent(id NestedTransactionId) bool
 
+	// InterimReadSet returns the current read set aggregated from all
+	// outstanding nested transactions.
+	InterimReadSet() map[flow.RegisterID]struct{}
+
 	// FinalizeMainTransaction finalizes the main transaction and returns
 	// its execution snapshot.  The finalized main transaction will not accept
 	// any new commits after this point.  This returns an error if there are
@@ -143,8 +147,6 @@ type NestedTransaction interface {
 	Get(id flow.RegisterID) (flow.RegisterValue, error)
 
 	Set(id flow.RegisterID, value flow.RegisterValue) error
-
-	ViewForTestingOnly() View
 }
 
 type nestedTransactionStackFrame struct {
@@ -167,10 +169,10 @@ type transactionState struct {
 // NewTransactionState constructs a new state transaction which manages nested
 // transactions.
 func NewTransactionState(
-	startView View,
+	snapshot StorageSnapshot,
 	params StateParameters,
 ) NestedTransaction {
-	startState := NewExecutionState(startView, params)
+	startState := NewExecutionState(snapshot, params)
 	return &transactionState{
 		nestedTransactions: []nestedTransactionStackFrame{
 			nestedTransactionStackFrame{
@@ -201,6 +203,23 @@ func (txnState *transactionState) MainTransactionId() NestedTransactionId {
 
 func (txnState *transactionState) IsCurrent(id NestedTransactionId) bool {
 	return txnState.current().ExecutionState == id.state
+}
+
+func (txnState *transactionState) InterimReadSet() map[flow.RegisterID]struct{} {
+	sizeEstimate := 0
+	for _, frame := range txnState.nestedTransactions {
+		sizeEstimate += frame.readSetSize()
+	}
+
+	result := make(map[flow.RegisterID]struct{}, sizeEstimate)
+
+	// Note: the interim read set must be accumulated in reverse order since
+	// the parent frame's write set will override the child frame's read set.
+	for i := len(txnState.nestedTransactions) - 1; i >= 0; i-- {
+		txnState.nestedTransactions[i].interimReadSet(result)
+	}
+
+	return result
 }
 
 func (txnState *transactionState) FinalizeMainTransaction() (
@@ -447,10 +466,6 @@ func (txnState *transactionState) MeterEmittedEvent(byteSize uint64) error {
 
 func (txnState *transactionState) TotalEmittedEventBytes() uint64 {
 	return txnState.current().TotalEmittedEventBytes()
-}
-
-func (txnState *transactionState) ViewForTestingOnly() View {
-	return txnState.current().View()
 }
 
 func (txnState *transactionState) RunWithAllLimitsDisabled(f func()) {
