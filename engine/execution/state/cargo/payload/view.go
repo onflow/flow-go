@@ -52,6 +52,7 @@ type InFlightView struct {
 
 var _ View = &InFlightView{}
 
+// returns the register at the given height
 func (v *InFlightView) Get(height uint64, blockID flow.Identifier, key flow.RegisterID) (flow.RegisterValue, error) {
 	v.lock.RLock()
 	defer v.lock.RUnlock()

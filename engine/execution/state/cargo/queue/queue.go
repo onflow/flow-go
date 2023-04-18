@@ -16,7 +16,8 @@ type headerInContext struct {
 // under the hood it uses a circular buffer with a limited size to keep these block headers
 // if it reaches the limit it prevents adding more block headers
 type FinalizedBlockQueue struct {
-	start, end, capacity int
+	head, tail, capacity int
+	isFull               bool
 	headers              []headerInContext
 	lock                 sync.RWMutex
 	lastDequeuedHeader   *headerInContext
@@ -24,8 +25,8 @@ type FinalizedBlockQueue struct {
 }
 
 // NewFinalizedBlockQueue constructs a new FinalizedBlockQueue
-// capacity limits the number of unconsumed headers in the queue
-// genesis is used to validate the very first header that is going to be added to the queue
+// `capacity“ limits the number of unconsumed headers in the queue
+// genesis is not inserted in the queue and only helps to validate the very first header that is going to be added to the queue
 func NewFinalizedBlockQueue(
 	capacity int,
 	genesis *flow.Header,
@@ -44,7 +45,7 @@ func (ft *FinalizedBlockQueue) Enqueue(header *flow.Header) error {
 	ft.lock.Lock()
 	defer ft.lock.Unlock()
 
-	if ft.isFull() {
+	if ft.isFull {
 		return &QueueCapacityReachedError{ft.capacity}
 	}
 
@@ -69,9 +70,10 @@ func (ft *FinalizedBlockQueue) Enqueue(header *flow.Header) error {
 	}
 
 	h := headerInContext{header, header.ID()}
-	ft.headers[ft.end] = h
+	ft.headers[ft.tail] = h
 	ft.lastQueuedHeader = &h
-	ft.end = (ft.end + 1) % ft.capacity
+	ft.tail = (ft.tail + 1) % ft.capacity
+	ft.isFull = ft.head == ft.tail
 	return nil
 }
 
@@ -84,8 +86,16 @@ func (ft *FinalizedBlockQueue) Peak() (flow.Identifier, *flow.Header) {
 	if ft.isEmpty() {
 		return flow.ZeroID, nil
 	}
-	header := ft.headers[ft.start]
+	header := ft.headers[ft.head]
 	return header.ID, header.Header
+}
+
+// HasHeaders returns true if queue is not empty
+func (ft *FinalizedBlockQueue) HasHeaders() bool {
+	ft.lock.RLock()
+	defer ft.lock.RUnlock()
+
+	return !ft.isEmpty()
 }
 
 // Dequeue removes the oldest header from the queue (without returning it)
@@ -95,15 +105,12 @@ func (ft *FinalizedBlockQueue) Dequeue() {
 	defer ft.lock.Unlock()
 
 	if !ft.isEmpty() {
-		ft.lastDequeuedHeader = &ft.headers[ft.start]
-		ft.start = (ft.start + 1) % ft.capacity
+		ft.lastDequeuedHeader = &ft.headers[ft.head]
+		ft.isFull = false
+		ft.head = (ft.head + 1) % ft.capacity
 	}
 }
 
 func (ft *FinalizedBlockQueue) isEmpty() bool {
-	return ft.start == ft.end
-}
-
-func (ft *FinalizedBlockQueue) isFull() bool {
-	return (ft.end+1)%ft.capacity == ft.start
+	return ft.head == ft.tail && !ft.isFull
 }

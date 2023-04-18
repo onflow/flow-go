@@ -57,13 +57,15 @@ func (c *Cargo) BlockFinalized(new *flow.Header) error {
 	// if commitable (return true by payload store), we deuque the block and continue
 	// doing the same for more blocks until payloadstore returns false, which mean it doesn't
 	// have results for that block yet and we need to hold on until next trigger.
-	blockID, header := c.blockQueue.Peak()
-	for found, err := c.payloadStore.Commit(blockID, header); found; {
-		if err != nil {
-			return err
+	if c.blockQueue.HasHeaders() {
+		blockID, header := c.blockQueue.Peak()
+		for found, err := c.payloadStore.Commit(blockID, header); found; {
+			if err != nil {
+				return err
+			}
+			c.blockQueue.Dequeue()
+			blockID, header = c.blockQueue.Peak()
 		}
-		c.blockQueue.Dequeue()
-		blockID, header = c.blockQueue.Peak()
 	}
 
 	return nil
