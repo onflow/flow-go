@@ -69,7 +69,7 @@ func RunAttackFloodDetachedBlocks(log zerolog.Logger, conduit network.Conduit, s
 		workersTotal := BlocksPerRoundFlag
 		for i := 0; i < int(workersTotal); i++ {
 			go func() {
-				err := conduit.Unicast(messages.NewBlockProposal(adjustBlock(block)), target)
+				err := conduit.Publish(messages.NewBlockProposal(adjustBlock(block)), target)
 				if err != nil {
 					log.Err(err).Msg("error sending attack block")
 				}
