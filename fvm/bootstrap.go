@@ -77,6 +77,10 @@ type BootstrapParams struct {
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
 
+	// versionFreezePeriod is the number of blocks in the future where the version
+	// changes are frozen. The Node version beacon manages the freeze period,
+	// but this is the value used when first deploying the contract, during the
+	// bootstrap procedure.
 	versionFreezePeriod cadence.UInt64
 
 	// TODO: restrictedContractDeployment should be a bool after RestrictedDeploymentEnabled is removed from the context
