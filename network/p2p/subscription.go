@@ -52,7 +52,7 @@ type TopicProvider interface {
 
 // InvalidSubscriptionError indicates that a peer has subscribed to a topic that is not allowed for its role.
 // This error is benign, i.e., it does not indicate an illegal state in the execution of the code. We expect this error
-// when there are malicious peers in the network. But such errors should not lead to a crash of the node.
+// when there are malicious peers in the network. But such errors should not lead to a crash of the node.32
 type InvalidSubscriptionError struct {
 	topic string // the topic that the peer is subscribed to, but not allowed to.
 }
