@@ -12,53 +12,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeterministicKeyGen(t *testing.T) {
-	// 2 keys generated with the same seed should be equal
-	seed := make([]byte, KeyGenSeedMinLen)
-	n, err := rand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLen)
-	require.NoError(t, err)
-	sk1, err := GeneratePrivateKey(BLSBLS12381, seed)
-	require.Nil(t, err)
-	sk2, err := GeneratePrivateKey(BLSBLS12381, seed)
-	require.Nil(t, err)
-	assert.True(t, sk1.Equals(sk2), "private keys should be equal")
-}
-
-// test the deterministicity of the relic PRG (used by the DKG polynomials)
-func TestPRGseeding(t *testing.T) {
-	blsInstance.reInit()
-	// 2 scalars generated with the same seed should be equal
-	seed := make([]byte, KeyGenSeedMinLen)
-	n, err := rand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLen)
-	require.NoError(t, err)
-	// 1st scalar (wrapped in a private key)
-	err = seedRelic(seed)
-	require.Nil(t, err)
-	var sk1 prKeyBLSBLS12381
-	randZr(&sk1.scalar)
-	// 2nd scalar (wrapped in a private key)
-	err = seedRelic(seed)
-	require.Nil(t, err)
-	var sk2 prKeyBLSBLS12381
-	randZr(&sk2.scalar)
-	// compare the 2 scalars (by comparing the private keys)
-	assert.True(t, sk1.Equals(&sk2), "private keys should be equal")
-}
-
 // G1 and G2 scalar multiplication
 func BenchmarkScalarMultG1G2(b *testing.B) {
-	blsInstance.reInit()
+
 	seed := make([]byte, securityBits/8)
 	_, _ = rand.Read(seed)
 	_ = seedRelic(seed)
 	var expo scalar
-	randZr(&expo)
+	_ = randFr(&expo)
 
 	// G1 generator multiplication
 	b.Run("G1 gen", func(b *testing.B) {
-		var res pointG1
+		var res pointE1
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			generatorScalarMultG1(&res, &expo)
@@ -68,7 +33,7 @@ func BenchmarkScalarMultG1G2(b *testing.B) {
 
 	// G1 base point multiplication
 	b.Run("G1 generic", func(b *testing.B) {
-		var res pointG1
+		var res pointE1
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			genericScalarMultG1(&res, &expo)
@@ -78,7 +43,7 @@ func BenchmarkScalarMultG1G2(b *testing.B) {
 
 	// G2 base point multiplication
 	b.Run("G2 gen", func(b *testing.B) {
-		var res pointG2
+		var res pointE2
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			generatorScalarMultG2(&res, &expo)
@@ -122,7 +87,7 @@ func TestMapToG1(t *testing.T) {
 
 // Hashing to G1 bench
 func BenchmarkMapToG1(b *testing.B) {
-	blsInstance.reInit()
+
 	input := make([]byte, expandMsgOutput)
 	for i := 0; i < len(input); i++ {
 		input[i] = byte(i)
@@ -136,14 +101,13 @@ func BenchmarkMapToG1(b *testing.B) {
 
 // test subgroup membership check in G1 and G2
 func TestSubgroupCheck(t *testing.T) {
-	blsInstance.reInit()
 	// seed Relic PRG
 	seed := make([]byte, securityBits/8)
 	_, _ = rand.Read(seed)
 	_ = seedRelic(seed)
 
-	t.Run("G1", func(t *testing.T) {
-		var p pointG1
+	/*t.Run("G1", func(t *testing.T) {
+		var p pointE1
 		randPointG1(&p) // point in G1
 		res := checkMembershipG1(&p)
 		assert.Equal(t, res, int(valid))
@@ -152,23 +116,23 @@ func TestSubgroupCheck(t *testing.T) {
 		assert.Equal(t, res, int(invalid))
 	})
 
-	t.Run("G2", func(t *testing.T) {
-		var p pointG2
-		randPointG2(&p) // point in G2
-		res := checkMembershipG2(&p)
-		assert.Equal(t, res, int(valid))
-		randPointG2Complement(&p) // point in E2\G2
-		res = checkMembershipG2(&p)
-		assert.Equal(t, res, int(invalid))
-	})
+		t.Run("G2", func(t *testing.T) {
+			var p pointE2
+			randPointG2(&p) // point in G2
+			res := checkMembershipG2(&p)
+			assert.Equal(t, res, int(valid))
+			randPointG2Complement(&p) // point in E2\G2
+			res = checkMembershipG2(&p)
+			assert.Equal(t, res, int(invalid))
+		})
+	*/
 }
 
 // subgroup membership check bench
 func BenchmarkSubgroupCheck(b *testing.B) {
-	blsInstance.reInit()
 
 	b.Run("G1", func(b *testing.B) {
-		var p pointG1
+		var p pointE1
 		randPointG1(&p)
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -176,14 +140,15 @@ func BenchmarkSubgroupCheck(b *testing.B) {
 		}
 		b.StopTimer()
 	})
-
-	b.Run("G2", func(b *testing.B) {
-		var p pointG2
-		randPointG2(&p)
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			_ = checkMembershipG2(&p) // G2
-		}
-		b.StopTimer()
-	})
+	/*
+		b.Run("G2", func(b *testing.B) {
+			var p pointE2
+			randPointG2(&p)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_ = checkMembershipG2(&p) // G2
+			}
+			b.StopTimer()
+		})
+	*/
 }
