@@ -1,69 +1,91 @@
 package storage
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type valueAtHeight struct {
+	height uint64
+	value  flow.RegisterValue
+}
+
+// InMemoryStorage implements storage interface, keeping register updates in memory,
+// it only limits historic look up of register to the last X commits
 type InMemoryStorage struct {
-	historyCap           int
-	data                 map[flow.RegisterID]entries
-	lastCommittedBlock   *flow.Header
-	lastCommittedBlockID flow.Identifier
-	minHeightAvailable   uint64
-	lock                 sync.RWMutex
+	historyCap         int
+	registers          map[flow.RegisterID][]valueAtHeight
+	lastCommittedBlock *flow.Header
+	minHeightAvailable uint64
+	lock               sync.RWMutex
 }
 
 var _ Storage = &InMemoryStorage{}
 
+// NewInMemoryStorage constructs a new InMemoryStorage
 func NewInMemoryStorage(
 	historyCap int,
 	genesis *flow.Header,
+	data map[flow.RegisterID]flow.RegisterValue,
 ) *InMemoryStorage {
+	height := genesis.Height
+	registers := make(map[flow.RegisterID][]valueAtHeight, 0)
+	for id, val := range data {
+		registers[id] = []valueAtHeight{{
+			height: height,
+			value:  val,
+		}}
+	}
 	return &InMemoryStorage{
-		historyCap:           historyCap,
-		data:                 make(map[flow.RegisterID]entries, 0),
-		lastCommittedBlock:   genesis,
-		lastCommittedBlockID: genesis.ID(),
+		historyCap:         historyCap,
+		registers:          registers,
+		lastCommittedBlock: genesis,
+		minHeightAvailable: height,
 	}
 }
 
+// CommitBlock commits block updates
 func (s *InMemoryStorage) CommitBlock(header *flow.Header, update map[flow.RegisterID]flow.RegisterValue) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	h := header.Height
 	// check commit sequence
-	if s.lastCommittedBlock.Height+1 != h {
-		return fmt.Errorf("commit height mismatch [%d] != [%d]", s.lastCommittedBlock.Height+1, h)
-	}
-	if s.lastCommittedBlockID != header.ParentID {
-		return fmt.Errorf("commit parent id mismatch [%x] != [%x]", s.lastCommittedBlockID, header.ParentID)
+	if s.lastCommittedBlock.Height+1 != header.Height || s.lastCommittedBlock.ID() != header.ParentID {
+		return &NonCompliantHeaderError{
+			s.lastCommittedBlock.Height + 1,
+			header.Height,
+			s.lastCommittedBlock.ID(),
+			header.ParentID,
+		}
 	}
 
 	for key, value := range update {
-		ent := entry{
-			height: h,
-			value:  value,
-		}
-		es, found := s.data[key]
+		vv, found := s.registers[key]
 		if !found {
-			s.data[key] = newEntries(ent, s.historyCap)
-			continue
+			// Note: this pre-allocation of memory might not be a good idea for registers that
+			// don't get updated that often, we might revisit in the future
+			vv = make([]valueAtHeight, 0, s.historyCap)
 		}
-		es.insertAndPrune(ent, s.historyCap)
+		// prune if at capacity (prune first prevents potentially extra allocation)
+		if len(vv) == s.historyCap {
+			vv = vv[1:]
+		}
+		s.registers[key] = append(vv, valueAtHeight{
+			height: header.Height,
+			value:  value,
+		})
 	}
 	s.lastCommittedBlock = header
-	s.lastCommittedBlockID = header.ID()
 
-	if s.lastCommittedBlock.Height >= uint64(s.historyCap) {
-		s.minHeightAvailable = s.lastCommittedBlock.Height - uint64(s.historyCap) + 1
+	s.minHeightAvailable = s.lastCommittedBlock.Height - uint64(s.historyCap) + 1
+	if s.lastCommittedBlock.Height < 0 {
+		s.lastCommittedBlock.Height = 0
 	}
 	return nil
 }
 
+// LastCommittedBlock returns the last commited block
 func (s *InMemoryStorage) LastCommittedBlock() (*flow.Header, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -71,18 +93,17 @@ func (s *InMemoryStorage) LastCommittedBlock() (*flow.Header, error) {
 	return s.lastCommittedBlock, nil
 }
 
+// RegisterValueAt returns the value for a register at the given height
 func (s *InMemoryStorage) RegisterValueAt(height uint64, id flow.RegisterID) (value flow.RegisterValue, err error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	if height > s.lastCommittedBlock.Height {
-		return nil, fmt.Errorf("height out side of historic range allowed %d > %d", height, s.lastCommittedBlock.Height)
-	}
-	if height < s.minHeightAvailable {
-		return nil, fmt.Errorf("height out side of historic range allowed %d < %d", height, s.minHeightAvailable)
+	if height < s.minHeightAvailable || height > s.lastCommittedBlock.Height {
+		return nil, &HeightNotAvailableError{height, s.minHeightAvailable, s.lastCommittedBlock.Height}
 	}
 
-	entries := s.data[id]
+	// TODO(ramtin): future improvement could use a binary search when history size is large
+	entries := s.registers[id]
 	for _, ent := range entries {
 		if ent.height > height {
 			break
@@ -90,24 +111,4 @@ func (s *InMemoryStorage) RegisterValueAt(height uint64, id flow.RegisterID) (va
 		value = ent.value
 	}
 	return value, nil
-}
-
-type entry struct {
-	height uint64
-	value  flow.RegisterValue
-}
-
-type entries []entry
-
-func newEntries(et entry, historyCap int) entries {
-	es := make(entries, historyCap+1)
-	es[0] = et
-	return es
-}
-
-func (es entries) insertAndPrune(entry entry, historyCap int) {
-	es = append(es, entry)
-	if len(es) > historyCap {
-		es = es[1:]
-	}
 }

@@ -61,12 +61,13 @@ func (ft *FinalizedBlockQueue) Enqueue(header *flow.Header) error {
 		return &NonCompliantHeaderAlreadyProcessedError{header.Height}
 	}
 
-	if lastHeight+1 != header.Height {
-		return &NonCompliantHeaderHeightError{lastHeight + 1, header.Height}
-	}
-
-	if parentID != header.ParentID {
-		return &NonCompliantHeaderParentIDError{parentID, header.ParentID}
+	if lastHeight+1 != header.Height || parentID != header.ParentID {
+		return &NonCompliantHeaderError{
+			lastHeight + 1,
+			header.Height,
+			parentID,
+			header.ParentID,
+		}
 	}
 
 	h := headerInContext{header, header.ID()}

@@ -40,7 +40,7 @@ func TestFinalizedBlockQueue(t *testing.T) {
 		for _, header := range batch3 {
 			err = bq.Enqueue(header)
 			require.Error(t, err)
-			expectedError := &queue.NonCompliantHeaderHeightError{}
+			expectedError := &queue.NonCompliantHeaderError{}
 			require.True(t, errors.As(err, &expectedError))
 		}
 
