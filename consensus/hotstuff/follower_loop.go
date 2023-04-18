@@ -99,8 +99,6 @@ func (fl *FollowerLoop) loop(ctx irrecoverable.SignalerContext, ready component.
 		select {
 		case b := <-fl.certifiedBlocks:
 			err := fl.forks.AddCertifiedBlock(b)
-			if err != nil {
-			}
 			if err != nil { // all errors are fatal
 				err = fmt.Errorf("finalization logic failes to process certified block %v: %w", b.ID(), err)
 				fl.log.Error().
