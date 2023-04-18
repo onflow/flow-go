@@ -265,85 +265,52 @@ func (b *backendTransactions) GetTransactionResult(
 	var txError string
 	var statusCode uint32
 	var blockHeight uint64
-	var txStatus flow.TransactionStatus
 	var block *flow.Block
-
-	if blockID == flow.ZeroID || collectionID == flow.ZeroID {
+	if blockID != flow.ZeroID {
+		block, err = b.blocks.ByID(blockID)
+		if err != nil {
+			return nil, err
+		}
+	} else if collectionID != flow.ZeroID {
+		block, err = b.blocks.ByCollectionID(collectionID)
+		if err != nil {
+			return nil, err
+		}
+	} else {
 		// find the block for the transaction
 		block, err = b.lookupBlock(txID)
 		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			return nil, rpc.ConvertStorageError(err)
 		}
-
-		// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
-		if block != nil {
-			blockID = block.ID()
-			transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, blockID)
-			blockHeight = block.Header.Height
-			if err != nil {
-				return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
-			}
-		}
-
-		// derive status of the transaction
-		txStatus, err = b.deriveTransactionStatus(tx, transactionWasExecuted, block)
-		if err != nil {
-			return nil, rpc.ConvertStorageError(err)
-		}
-
-		b.transactionMetrics.TransactionResultFetched(time.Since(start), len(tx.Script))
-
-		return &access.TransactionResult{
-			Status:        txStatus,
-			StatusCode:    uint(statusCode),
-			Events:        events,
-			ErrorMessage:  txError,
-			BlockID:       blockID,
-			TransactionID: txID,
-			BlockHeight:   blockHeight,
-		}, nil
-	} else {
-		// find the block for the transaction
-		block, err := b.blocks.ByID(blockID)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, g := range block.Payload.Guarantees {
-			if g.CollectionID == collectionID {
-
-			}
-		}
-
-		// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
-		if block != nil {
-			blockID = block.ID()
-			transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, blockID)
-			blockHeight = block.Header.Height
-			if err != nil {
-				return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
-			}
-		}
-
-		// derive status of the transaction
-		txStatus, err = b.deriveTransactionStatus(tx, transactionWasExecuted, block)
-		if err != nil {
-			return nil, rpc.ConvertStorageError(err)
-		}
-
-		b.transactionMetrics.TransactionResultFetched(time.Since(start), len(tx.Script))
-
-		return &access.TransactionResult{
-			Status:        txStatus,
-			StatusCode:    uint(statusCode),
-			Events:        events,
-			ErrorMessage:  txError,
-			BlockID:       blockID,
-			TransactionID: txID,
-			CollectionID:  collectionID,
-			BlockHeight:   blockHeight,
-		}, nil
 	}
+	blockID = block.ID()
+
+	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
+	if block != nil {
+		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, blockID)
+		blockHeight = block.Header.Height
+		if err != nil {
+			return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
+		}
+	}
+
+	// derive status of the transaction
+	txStatus, err := b.deriveTransactionStatus(tx, transactionWasExecuted, block)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	b.transactionMetrics.TransactionResultFetched(time.Since(start), len(tx.Script))
+
+	return &access.TransactionResult{
+		Status:        txStatus,
+		StatusCode:    uint(statusCode),
+		Events:        events,
+		ErrorMessage:  txError,
+		BlockID:       blockID,
+		TransactionID: txID,
+		BlockHeight:   blockHeight,
+	}, nil
 }
 
 func (b *backendTransactions) GetTransactionResultsByBlockID(
