@@ -34,10 +34,8 @@ func NewParticipant(
 	options ...Option,
 ) (*eventloop.EventLoop, error) {
 
-	// initialize the default configuration
+	// initialize the default configuration and apply the configuration options
 	cfg := DefaultParticipantConfig()
-
-	// apply the configuration options
 	for _, option := range options {
 		option(&cfg)
 	}
@@ -46,13 +44,20 @@ func NewParticipant(
 	modules.VoteAggregator.PruneUpToView(finalized.View)
 	modules.TimeoutAggregator.PruneUpToView(finalized.View)
 
-	// recover hotstuff state (inserts all pending blocks into Forks and VoteAggregator)
-	err := recovery.Participant(log, modules.Forks, modules.VoteAggregator, modules.Validator, pending)
+	// recover HotStuff state from all pending blocks
+	qcCollector := recovery.Collector[*flow.QuorumCertificate]{}
+	tcCollector := recovery.Collector[*flow.TimeoutCertificate]{}
+	err := recovery.Recover(log, pending,
+		recovery.ForksState(modules.Forks),                   // add pending blocks to Forks
+		recovery.VoteAggregatorState(modules.VoteAggregator), // accept votes for all pending blocks
+		recovery.CollectParentQCs(qcCollector),               // collect QCs from all pending block to initialize PaceMaker (below)
+		recovery.CollectTCs(tcCollector),                     // collect TCs from all pending block to initialize PaceMaker (below)
+	)
 	if err != nil {
-		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
+		return nil, fmt.Errorf("failed to scan tree of pending blocks: %w", err)
 	}
 
-	// initialize the timeout config
+	// initialize dynamically updatable timeout config
 	timeoutConfig, err := timeout.NewConfig(
 		cfg.TimeoutMinimum,
 		cfg.TimeoutMaximum,
@@ -65,9 +70,20 @@ func NewParticipant(
 		return nil, fmt.Errorf("could not initialize timeout config: %w", err)
 	}
 
+	// register as dynamically updatable via admin command
+	if cfg.Registrar != nil {
+		err = cfg.Registrar.RegisterDurationConfig("hotstuff-block-rate-delay", timeoutConfig.GetBlockRateDelay, timeoutConfig.SetBlockRateDelay)
+		if err != nil {
+			return nil, fmt.Errorf("failed to register block rate delay config: %w", err)
+		}
+	}
+
 	// initialize the pacemaker
 	controller := timeout.NewController(timeoutConfig)
-	pacemaker, err := pacemaker.New(controller, modules.Notifier, modules.Persist)
+	pacemaker, err := pacemaker.New(controller, modules.Notifier, modules.Persist,
+		pacemaker.WithQCs(qcCollector.Retrieve()...),
+		pacemaker.WithTCs(tcCollector.Retrieve()...),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)
 	}
@@ -108,14 +124,6 @@ func NewParticipant(
 	// add observer, event loop needs to receive events from distributor
 	modules.QCCreatedDistributor.AddConsumer(loop)
 	modules.TimeoutCollectorDistributor.AddConsumer(loop)
-
-	// register dynamically updatable configs
-	if cfg.Registrar != nil {
-		err = cfg.Registrar.RegisterDurationConfig("hotstuff-block-rate-delay", timeoutConfig.GetBlockRateDelay, timeoutConfig.SetBlockRateDelay)
-		if err != nil {
-			return nil, fmt.Errorf("failed to register block rate delay config: %w", err)
-		}
-	}
 
 	return loop, nil
 }

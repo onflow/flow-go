@@ -32,6 +32,15 @@ func ToBlockContainer2(block *model.Block) *BlockContainer2 { return (*BlockCont
 func (b *BlockContainer2) Block() *model.Block              { return (*model.Block)(b) }
 
 // Functions implementing forest.Vertex
-func (b *BlockContainer2) VertexID() flow.Identifier         { return b.BlockID }
-func (b *BlockContainer2) Level() uint64                     { return b.View }
-func (b *BlockContainer2) Parent() (flow.Identifier, uint64) { return b.QC.BlockID, b.QC.View }
+func (b *BlockContainer2) VertexID() flow.Identifier { return b.BlockID }
+func (b *BlockContainer2) Level() uint64             { return b.View }
+
+func (b *BlockContainer2) Parent() (flow.Identifier, uint64) {
+	// Caution: not all blocks have a QC for the parent, such as the spork root blocks.
+	// Per API contract, we are obliged to return a value to prevent panics during logging.
+	// (see vertex `forest.VertexToString` method).
+	if b.QC == nil {
+		return flow.ZeroID, 0
+	}
+	return b.QC.BlockID, b.QC.View
+}
