@@ -24,7 +24,7 @@ const (
 func AllMisbehaviorTypes() []network.Misbehavior {
 	return []network.Misbehavior{
 		StaleMessage,
-		HeavyRequest,
+		ResourceIntensiveRequest,
 		RedundantMessage,
 		UnsolicitedMessage,
 	}
