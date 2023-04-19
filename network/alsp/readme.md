@@ -29,7 +29,7 @@ until the penalty is reduced to zero again through a decaying interval.
 - **Thread-safe**: ALSP is thread-safe and can be used concurrently by multiple threads, e.g., concurrent engine calls on reporting misbehaviors.
 
 ## Usage
-ALSP is enabled by default through the networking layer. It is not necessary to explicitly enable it. Once can disable it by setting the `alsp-enbale` flag to `false`.
+ALSP is enabled by default through the networking layer. It is not necessary to explicitly enable it. One can disable it by setting the `alsp-enable` flag to `false`.
 The network.Conduit interface provides the following method to report misbehaviors: 
 - `ReportMisbehavior(*MisbehaviorReport)`: Reports a misbehavior to the ALSP. The misbehavior report contains the misbehavior type and the penalty value. The penalty value is used to increase the penalty of the remote node. The penalty value is amplified by the penalty amplification factor before being applied to the remote node. 
 
