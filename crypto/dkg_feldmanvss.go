@@ -263,12 +263,12 @@ func (s *feldmanVSSstate) ForceDisqualify(participant int) error {
 // where `n` is the input `degree` (higher degree monomial in non-zero).
 // `a_0` is also non-zero (for single dealer BLS-DKGs, this insures
 // protocol public key output is not identity).
-// `seed` is used as the entropy source and must be at least `SeedMinLenDKG`
+// `seed` is used as the entropy source and must be at least `KeyGenSeedMinLen`
 // random bytes with at least 128 bits entropy.
 func generateFrPolynomial(seed []byte, degree int) ([]scalar, error) {
-	if len(seed) < SeedMinLenDKG {
+	if len(seed) < KeyGenSeedMinLen {
 		return nil, invalidInputsErrorf(
-			"seed should be at least %d bytes, got %d", SeedMinLenDKG, len(seed))
+			"seed should be at least %d bytes, got %d", KeyGenSeedMinLen, len(seed))
 	}
 
 	// build a PRG out of the seed

@@ -10,20 +10,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/crypto/random"
 )
 
 // G1 and G2 scalar multiplication
 func BenchmarkScalarMultG1G2(b *testing.B) {
 
-	seed := make([]byte, random.Chacha20SeedLen)
-	_, _ = rand.Read(seed)
-	prg, err := random.NewChacha20PRG(seed, nil)
+	seed := make([]byte, frBytesLen)
+	_, err := rand.Read(seed)
 	require.NoError(b, err)
 
 	var expo scalar
-	_ = randFr(&expo, prg)
+	_ = mapToFr(&expo, seed)
 
 	// G1 generator multiplication
 	b.Run("G1 gen", func(b *testing.B) {

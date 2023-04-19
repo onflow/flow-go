@@ -34,9 +34,6 @@ const (
 	DKGMinSize int = MinimumThreshold + 1
 	// DKGMaxSize is the maximum size of a group participating in a DKG protocol
 	DKGMaxSize int = 254
-	// SeedMinLenDKG is the minumum seed length required to participate in a DKG protocol
-	SeedMinLenDKG = securityBits / 8
-	SeedMaxLenDKG = maxRelicPrgSeed
 )
 
 type DKGState interface {

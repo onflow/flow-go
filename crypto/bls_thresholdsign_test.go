@@ -37,7 +37,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 	n := 10
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		// generate threshold keys
-		seed := make([]byte, SeedMinLenDKG)
+		seed := make([]byte, KeyGenSeedMinLen)
 		_, err := mrand.Read(seed)
 		require.NoError(t, err)
 		skShares, pkShares, pkGroup, err := BLSThresholdKeyGen(n, threshold, seed)
@@ -346,9 +346,9 @@ func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
 		chans[i] = make(chan *message, 2*n)
 	}
 	// start DKG in all participants
-	seed := make([]byte, SeedMinLenDKG)
+	seed := make([]byte, KeyGenSeedMinLen)
 	read, err := rand.Read(seed)
-	require.Equal(t, read, SeedMinLenDKG)
+	require.Equal(t, read, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sync.Add(n)
 	for current := 0; current < n; current++ {
@@ -405,9 +405,9 @@ func testDistributedStatefulAPI_JointFeldman(t *testing.T) {
 			chans[i] = make(chan *message, 2*n)
 		}
 		// start DKG in all participants but the
-		seed := make([]byte, SeedMinLenDKG)
+		seed := make([]byte, KeyGenSeedMinLen)
 		read, err := rand.Read(seed)
-		require.Equal(t, read, SeedMinLenDKG)
+		require.Equal(t, read, KeyGenSeedMinLen)
 		require.NoError(t, err)
 		sync.Add(n)
 		for current := 0; current < n; current++ {
@@ -546,73 +546,72 @@ type statelessKeys struct {
 // Centralized test of threshold signature protocol using the threshold key generation.
 func testCentralizedStatelessAPI(t *testing.T) {
 	n := 10
-	threshold := 6
-	//for threshold := MinimumThreshold; threshold < n; threshold++ {
-	// generate threshold keys
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
-	t.Log(r)
-	seed := make([]byte, SeedMinLenDKG)
-	_, err := mrand.Read(seed)
-	require.NoError(t, err)
-	skShares, pkShares, pkGroup, err := BLSThresholdKeyGen(n, threshold, seed)
-	require.NoError(t, err)
-	// signature hasher
-	kmac := NewExpandMsgXOFKMAC128(thresholdSignatureTag)
-	// generate signature shares
-	signShares := make([]Signature, 0, n)
-	signers := make([]int, 0, n)
-	// fill the signers list and shuffle it
-	for i := 0; i < n; i++ {
-		signers = append(signers, i)
-	}
-	mrand.Shuffle(n, func(i, j int) {
-		signers[i], signers[j] = signers[j], signers[i]
-	})
-	// create (t+1) signatures of the first randomly chosen signers
-	for j := 0; j < threshold+1; j++ {
-		i := signers[j]
-		share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
+	for threshold := MinimumThreshold; threshold < n; threshold++ {
+		// generate threshold keys
+		r := time.Now().UnixNano()
+		mrand.Seed(r)
+		t.Log(r)
+		seed := make([]byte, KeyGenSeedMinLen)
+		_, err := mrand.Read(seed)
 		require.NoError(t, err)
-		verif, err := pkShares[i].Verify(share, thresholdSignatureMessage, kmac)
+		skShares, pkShares, pkGroup, err := BLSThresholdKeyGen(n, threshold, seed)
+		require.NoError(t, err)
+		// signature hasher
+		kmac := NewExpandMsgXOFKMAC128(thresholdSignatureTag)
+		// generate signature shares
+		signShares := make([]Signature, 0, n)
+		signers := make([]int, 0, n)
+		// fill the signers list and shuffle it
+		for i := 0; i < n; i++ {
+			signers = append(signers, i)
+		}
+		mrand.Shuffle(n, func(i, j int) {
+			signers[i], signers[j] = signers[j], signers[i]
+		})
+		// create (t+1) signatures of the first randomly chosen signers
+		for j := 0; j < threshold+1; j++ {
+			i := signers[j]
+			share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
+			require.NoError(t, err)
+			verif, err := pkShares[i].Verify(share, thresholdSignatureMessage, kmac)
+			require.NoError(t, err)
+			assert.True(t, verif, "signature share is not valid")
+			if verif {
+				signShares = append(signShares, share)
+			}
+		}
+		// reconstruct and test the threshold signature
+		thresholdSignature, err := BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
+		require.NoError(t, err)
+		verif, err := pkGroup.Verify(thresholdSignature, thresholdSignatureMessage, kmac)
 		require.NoError(t, err)
 		assert.True(t, verif, "signature share is not valid")
-		if verif {
-			signShares = append(signShares, share)
-		}
-	}
-	// reconstruct and test the threshold signature
-	thresholdSignature, err := BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
-	require.NoError(t, err)
-	verif, err := pkGroup.Verify(thresholdSignature, thresholdSignatureMessage, kmac)
-	require.NoError(t, err)
-	assert.True(t, verif, "signature share is not valid")
 
-	// check failure with a random redundant signer
-	if threshold > 1 {
-		randomDuplicate := mrand.Intn(int(threshold)) + 1 // 1 <= duplicate <= threshold
-		tmp := signers[randomDuplicate]
-		signers[randomDuplicate] = signers[0]
+		// check failure with a random redundant signer
+		if threshold > 1 {
+			randomDuplicate := mrand.Intn(int(threshold)) + 1 // 1 <= duplicate <= threshold
+			tmp := signers[randomDuplicate]
+			signers[randomDuplicate] = signers[0]
+			thresholdSignature, err = BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
+			assert.Error(t, err)
+			assert.True(t, IsDuplicatedSignerError(err))
+			assert.Nil(t, thresholdSignature)
+			signers[randomDuplicate] = tmp
+		}
+
+		// check with an invalid signature (invalid serialization)
+		invalidSig := make([]byte, signatureLengthBLSBLS12381)
+		signShares[0] = invalidSig
 		thresholdSignature, err = BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
 		assert.Error(t, err)
-		assert.True(t, IsDuplicatedSignerError(err))
+		assert.True(t, IsInvalidSignatureError(err))
 		assert.Nil(t, thresholdSignature)
-		signers[randomDuplicate] = tmp
 	}
-
-	// check with an invalid signature (invalid serialization)
-	invalidSig := make([]byte, signatureLengthBLSBLS12381)
-	signShares[0] = invalidSig
-	thresholdSignature, err = BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
-	assert.Error(t, err)
-	assert.True(t, IsInvalidSignatureError(err))
-	assert.Nil(t, thresholdSignature)
-	//}
 }
 
 func BenchmarkSimpleKeyGen(b *testing.B) {
 	n := 60
-	seed := make([]byte, SeedMinLenDKG)
+	seed := make([]byte, KeyGenSeedMinLen)
 	_, _ = rand.Read(seed)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -623,7 +622,7 @@ func BenchmarkSimpleKeyGen(b *testing.B) {
 
 func BenchmarkSignatureReconstruction(b *testing.B) {
 	n := 60
-	seed := make([]byte, SeedMinLenDKG)
+	seed := make([]byte, KeyGenSeedMinLen)
 	_, _ = rand.Read(seed)
 	threshold := 40
 	// generate threshold keys

@@ -293,9 +293,9 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 
 	// start DKG in all participants
 	// start listening on the channels
-	seed := make([]byte, SeedMinLenDKG)
+	seed := make([]byte, KeyGenSeedMinLen)
 	read, err := mrand.Read(seed)
-	require.Equal(t, read, SeedMinLenDKG)
+	require.Equal(t, read, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sync.Add(n)
 
@@ -771,7 +771,7 @@ func TestDKGTransitionErrors(t *testing.T) {
 	threshold := 3
 	myIndex := 0
 	dealer := 1
-	seed := make([]byte, SeedMinLenDKG)
+	seed := make([]byte, KeyGenSeedMinLen)
 
 	t.Run("feldman VSS", func(t *testing.T) {
 		state, err := NewFeldmanVSS(n, threshold, myIndex, dummyTestDKGProcessor{}, dealer)
