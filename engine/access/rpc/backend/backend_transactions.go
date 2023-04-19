@@ -260,37 +260,30 @@ func (b *backendTransactions) GetTransactionResult(
 		return nil, txErr
 	}
 
+	block, err := b.retrieveBlock(blockID, collectionID, txID)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
 	var transactionWasExecuted bool
 	var events []flow.Event
 	var txError string
 	var statusCode uint32
 	var blockHeight uint64
-	var block *flow.Block
-	if blockID != flow.ZeroID {
-		block, err = b.blocks.ByID(blockID)
-		if err != nil {
-			return nil, err
-		}
-	} else if collectionID != flow.ZeroID {
-		block, err = b.blocks.ByCollectionID(collectionID)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// find the block for the transaction
-		block, err = b.lookupBlock(txID)
-		if err != nil && !errors.Is(err, storage.ErrNotFound) {
-			return nil, rpc.ConvertStorageError(err)
-		}
-	}
-	blockID = block.ID()
 
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
+		blockID = block.ID()
 		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, blockID)
 		blockHeight = block.Header.Height
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
+		}
+		if collectionID == flow.ZeroID {
+			collectionID, err = b.lookupCollectionIDInBlock(block, txID)
+			if err != nil {
+				return nil, rpc.ConvertStorageError(err)
+			}
 		}
 	}
 
@@ -309,8 +302,52 @@ func (b *backendTransactions) GetTransactionResult(
 		ErrorMessage:  txError,
 		BlockID:       blockID,
 		TransactionID: txID,
+		CollectionID:  collectionID,
 		BlockHeight:   blockHeight,
 	}, nil
+}
+
+func (b *backendTransactions) lookupCollectionIDInBlock(block *flow.Block, txID flow.Identifier) (flow.Identifier, error) {
+	collectionID := flow.ZeroID
+	for _, guarantee := range block.Payload.Guarantees {
+		collection, err := b.collections.ByID(guarantee.CollectionID)
+		if err != nil {
+			return flow.ZeroID, err
+		}
+
+		for _, transaction := range collection.Transactions {
+			if transaction.ID() == txID {
+				collectionID = collection.ID()
+				break
+			}
+		}
+	}
+	return collectionID, nil
+}
+
+func (b *backendTransactions) retrieveBlock(blockID flow.Identifier, collectionID flow.Identifier, txID flow.Identifier) (*flow.Block, error) {
+	var block *flow.Block
+	var err error
+
+	if blockID != flow.ZeroID {
+		block, err = b.blocks.ByID(blockID)
+		if err != nil {
+			return nil, err
+		}
+	} else if collectionID != flow.ZeroID {
+		block, err = b.blocks.ByCollectionID(collectionID)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// find the block for the transaction
+		block, err = b.lookupBlock(txID)
+		if err != nil && !errors.Is(err, storage.ErrNotFound) {
+			return nil, err
+		}
+	}
+
+	return block, nil
 }
 
 func (b *backendTransactions) GetTransactionResultsByBlockID(
