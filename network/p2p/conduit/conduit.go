@@ -135,7 +135,7 @@ func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Ident
 // The misbehavior is reported to the networking layer to penalize the misbehaving node.
 // The implementation must be thread-safe and non-blocking.
 func (c *Conduit) ReportMisbehavior(report network.MisbehaviorReport) {
-	c.misbehaviorManager.HandleReportedMisbehavior(c.channel, report)
+	c.misbehaviorManager.HandleMisbehaviorReport(c.channel, report)
 }
 
 func (c *Conduit) Close() error {

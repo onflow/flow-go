@@ -32,7 +32,9 @@ import (
 // without any duplicate reports and within a specified time.
 func TestHandleReportedMisbehavior(t *testing.T) {
 	misbehaviorReportManger := mocknetwork.NewMisbehaviorReportManager(t)
-	conduitFactory := conduit.NewDefaultConduitFactory(unittest.Logger(), conduit.WithMisbehaviorManager(misbehaviorReportManger))
+	conduitFactory := conduit.NewDefaultConduitFactory(
+		unittest.Logger(),
+		conduit.WithMisbehaviorManager(misbehaviorReportManger))
 
 	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
 		t,
@@ -64,7 +66,7 @@ func TestHandleReportedMisbehavior(t *testing.T) {
 	allReportsManaged := sync.WaitGroup{}
 	allReportsManaged.Add(len(reports))
 	var seenReports []network.MisbehaviorReport
-	misbehaviorReportManger.On("HandleReportedMisbehavior", channels.TestNetworkChannel, mock.Anything).Run(func(args mock.Arguments) {
+	misbehaviorReportManger.On("HandleMisbehaviorReport", channels.TestNetworkChannel, mock.Anything).Run(func(args mock.Arguments) {
 		report := args.Get(1).(network.MisbehaviorReport)
 		require.Contains(t, reports, report)                                         // ensures that the report is one of the reports we expect.
 		require.NotContainsf(t, seenReports, report, "duplicate report: %v", report) // ensures that we have not seen this report before.

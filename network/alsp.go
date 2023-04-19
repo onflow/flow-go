@@ -43,7 +43,7 @@ type MisbehaviorReport interface {
 // The misbehavior report manager is responsible for penalizing the misbehaving node and disallow-listing the node
 // if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
 type MisbehaviorReportManager interface {
-	// HandleReportedMisbehavior handles the misbehavior report that is sent by the engine.
+	// HandleMisbehaviorReport handles the misbehavior report that is sent by the engine.
 	// The implementation of this function should penalize the misbehaving node and report the node to be
 	// disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
 	// The implementation of this function should be thread-safe and non-blocking.

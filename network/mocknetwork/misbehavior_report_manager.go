@@ -14,8 +14,8 @@ type MisbehaviorReportManager struct {
 	mock.Mock
 }
 
-// HandleReportedMisbehavior provides a mock function with given fields: _a0, _a1
-func (_m *MisbehaviorReportManager) HandleReportedMisbehavior(_a0 channels.Channel, _a1 network.MisbehaviorReport) {
+// HandleMisbehaviorReport provides a mock function with given fields: _a0, _a1
+func (_m *MisbehaviorReportManager) HandleMisbehaviorReport(_a0 channels.Channel, _a1 network.MisbehaviorReport) {
 	_m.Called(_a0, _a1)
 }
 
