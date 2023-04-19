@@ -133,6 +133,4 @@ func TestPayloadStore(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	// TODO test compliance
-	// TODO test forks
 }

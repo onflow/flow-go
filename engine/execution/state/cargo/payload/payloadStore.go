@@ -9,7 +9,7 @@ import (
 )
 
 // PayloadStore is a fork-aware payload storage
-// block updates are accepted through update as long as the parent block results
+// block updates are accepted as long as the parent block update
 // has been provided in the past.
 // payload store holds forks of updates into memory until a block finalized signal
 // is receieved, then it would move finalized results into a persistant storage
