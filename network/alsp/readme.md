@@ -60,10 +60,10 @@ ALSP package defines several constants that represent various types of misbehavi
 The following constants represent misbehavior types that can be reported:
 
 - `StaleMessage`: This misbehavior is reported when an engine receives a message that is deemed stale based on the local view of the engine. A stale message is one that is outdated, irrelevant, or already processed by the engine.
-- `HeavyRequest`: This misbehavior is reported when an engine receives a request that takes an unreasonable amount of resources for the engine to process, e.g., a request for a large number of blocks. The decision to consider a request heavy is up to the engine. Heavy requests can potentially slow down the engine, causing performance issues.
+- `ResourceIntensiveRequest`: This misbehavior is reported when an engine receives a request that takes an unreasonable amount of resources for the engine to process, e.g., a request for a large number of blocks. The decision to consider a request heavy is up to the engine. Heavy requests can potentially slow down the engine, causing performance issues.
 - `RedundantMessage`: This misbehavior is reported when an engine receives a message that is redundant, i.e., the message is already known to the engine. The decision to consider a message redundant is up to the engine. Redundant messages can increase network traffic and waste processing resources.
 - `UnsolicitedMessage`: This misbehavior is reported when an engine receives a message that is not solicited by the engine. The decision to consider a message unsolicited is up to the engine. Unsolicited messages can be a sign of spamming or malicious behavior.
-
+- `InvalidMessage`: This misbehavior is reported when an engine receives a message that is invalid and fails the validation logic as specified by the engine, i.e., the message is malformed or does not follow the protocol specification. The decision to consider a message invalid is up to the engine. Invalid messages can be a sign of spamming or malicious behavior.
 ## Thresholds and Parameters
 The ALSP provides various constants and options to customize the penalty system:
 - `misbehaviorDisallowListingThreshold`: The threshold for concluding a node behavior is malicious and disallow-listing the node. Once the penalty of a remote node reaches this threshold, the local node will disconnect from the remote node and no-longer accept any incoming connections from the remote node until the penalty is reduced to zero again through a decaying interval.
