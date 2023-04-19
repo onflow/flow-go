@@ -6,6 +6,7 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -111,13 +112,10 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	script []byte,
 	arguments [][]byte,
 ) ([]byte, error) {
-
-	execReq := &execproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   blockID[:],
-		Script:    script,
-		Arguments: arguments,
+	tryScriptExecFunc := b.tryExecuteScriptOnExecutionNode
+	if len(b.archiveAddressList) > 0 {
+		tryScriptExecFunc = b.tryExecuteScriptOnArchiveNode
 	}
-
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
 	scriptExecutors, err := b.findScriptExecutors(ctx, blockID)
 	if err != nil {
@@ -128,12 +126,12 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
 	insecureScriptHash := md5.Sum(script) //nolint:gosec
 
-	// try each of the execution nodes found
+	// try each of the executor nodes found
 	var errors *multierror.Error
-	// try to execute the script on one of the execution nodes
+	// try to execute the script on one of the execution/archive nodes
 	for _, executorAddress := range scriptExecutors {
 		execStartTime := time.Now() // record start time
-		result, err := b.tryExecuteScript(ctx, executorAddress, execReq)
+		result, err := tryScriptExecFunc(ctx, executorAddress, blockID, script, arguments)
 		if err == nil {
 			if b.log.GetLevel() == zerolog.DebugLevel {
 				executionTime := time.Now()
@@ -156,7 +154,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 
 			return result, nil
 		}
-		// return if it's just a script failure as opposed to an EN failure and skip trying other ENs
+		// return if it's just a script failure as opposed to an EN/RN failure and skip trying other ENs/RNs
 		if status.Code(err) == codes.InvalidArgument {
 			b.log.Debug().Err(err).
 				Str("script_executor_addr", executorAddress).
@@ -189,7 +187,17 @@ func (b *backendScripts) shouldLogScript(execTime time.Time, scriptHash [16]byte
 	}
 }
 
-func (b *backendScripts) tryExecuteScript(ctx context.Context, executorAddress string, req *execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {
+func (b *backendScripts) tryExecuteScriptOnExecutionNode(
+	ctx context.Context,
+	executorAddress string,
+	blockID flow.Identifier,
+	script []byte,
+	arguments [][]byte) ([]byte, error) {
+	req := &execproto.ExecuteScriptAtBlockIDRequest{
+		BlockId:   blockID[:],
+		Script:    script,
+		Arguments: arguments,
+	}
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(executorAddress)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v", executorAddress, err)
@@ -204,4 +212,27 @@ func (b *backendScripts) tryExecuteScript(ctx context.Context, executorAddress s
 		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", executorAddress, err)
 	}
 	return execResp.GetValue(), nil
+}
+
+func (b *backendScripts) tryExecuteScriptOnArchiveNode(ctx context.Context, executorAddress string, blockID flow.Identifier,
+	script []byte,
+	arguments [][]byte) ([]byte, error) {
+	req := &access.ExecuteScriptAtBlockIDRequest{
+		BlockId:   blockID[:],
+		Script:    script,
+		Arguments: arguments,
+	}
+	execRPCClient, closer, err := b.connFactory.GetAccessAPIClient(executorAddress)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create client for archive node %s: %v", executorAddress, err)
+	}
+	defer closer.Close()
+	resp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, req)
+	if err != nil {
+		if status.Code(err) == codes.Unavailable {
+			b.connFactory.InvalidateAccessAPIClient(executorAddress)
+		}
+		return nil, status.Errorf(status.Code(err), "failed to execute the script on archive node %s: %v", executorAddress, err)
+	}
+	return resp.GetValue(), nil
 }
