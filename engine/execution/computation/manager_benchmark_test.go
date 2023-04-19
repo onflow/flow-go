@@ -202,12 +202,12 @@ func BenchmarkComputeBlock(b *testing.B) {
 			elapsed += time.Since(start)
 			b.StopTimer()
 
-			for _, snapshot := range res.StateSnapshots {
+			for _, snapshot := range res.AllExecutionSnapshots() {
 				snapshotTree = snapshotTree.Append(snapshot)
 			}
 
 			require.NoError(b, err)
-			for j, r := range res.TransactionResults {
+			for j, r := range res.AllTransactionResults() {
 				// skip system transactions
 				if j >= cols*txes {
 					break
