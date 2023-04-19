@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestInMemStorage(t *testing.T) {
+func TestInMemoryStorage(t *testing.T) {
 
 	t.Run("commit checks", func(t *testing.T) {
 		var err error

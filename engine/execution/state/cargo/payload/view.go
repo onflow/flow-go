@@ -11,6 +11,7 @@ type View interface {
 	Get(height uint64, blockID flow.Identifier, key flow.RegisterID) (flow.RegisterValue, error)
 }
 
+// oracle stores views that are finalized in an storage
 type OracleView struct {
 	storage storage.Storage
 	// cached value of the same data that is retrivable from storage
@@ -52,15 +53,25 @@ type InFlightView struct {
 
 var _ View = &InFlightView{}
 
+func NewInFlightView(
+	delta map[flow.RegisterID]flow.RegisterValue,
+	parent View,
+) *InFlightView {
+	return &InFlightView{
+		delta:  delta,
+		parent: parent,
+	}
+}
+
 // returns the register at the given height
 func (v *InFlightView) Get(height uint64, blockID flow.Identifier, key flow.RegisterID) (flow.RegisterValue, error) {
-	v.lock.RLock()
-	defer v.lock.RUnlock()
-
 	value, found := v.delta[key]
 	if found {
 		return value, nil
 	}
+
+	v.lock.RLock()
+	defer v.lock.RUnlock()
 
 	return v.parent.Get(height, blockID, key)
 }

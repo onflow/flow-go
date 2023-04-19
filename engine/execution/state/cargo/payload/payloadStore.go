@@ -71,7 +71,7 @@ func (ps *PayloadStore) Update(
 
 	var parent View
 	parent = ps.oracleView
-	if height > ps.oracleView.lastCommittedHeight {
+	if height > ps.oracleView.lastCommittedHeight+1 {
 		var found bool
 		parent, found = ps.viewByID[parentBlockID]
 		if !found {
