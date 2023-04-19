@@ -5,7 +5,7 @@ package mock
 import (
 	context "context"
 
-	derived "github.com/onflow/flow-go/fvm/derived"
+	derived "github.com/onflow/flow-go/fvm/storage/derived"
 	entity "github.com/onflow/flow-go/module/mempool/entity"
 
 	execution "github.com/onflow/flow-go/engine/execution"

@@ -50,7 +50,7 @@ func (d *RemoteDebugger) RunTransaction(
 		d.ctx,
 		fvm.WithBlockHeader(d.ctx.BlockHeader))
 	tx := fvm.Transaction(txBody, 0)
-	_, output, err := d.vm.RunV2(blockCtx, tx, snapshot)
+	_, output, err := d.vm.Run(blockCtx, tx, snapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (d *RemoteDebugger) RunTransactionAtBlockID(
 		snapshot.Cache = newFileRegisterCache(regCachePath)
 	}
 	tx := fvm.Transaction(txBody, 0)
-	_, output, err := d.vm.RunV2(blockCtx, tx, snapshot)
+	_, output, err := d.vm.Run(blockCtx, tx, snapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (d *RemoteDebugger) RunScript(
 		d.ctx,
 		fvm.WithBlockHeader(d.ctx.BlockHeader))
 	script := fvm.Script(code).WithArguments(arguments...)
-	_, output, err := d.vm.RunV2(scriptCtx, script, snapshot)
+	_, output, err := d.vm.Run(scriptCtx, script, snapshot)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -128,7 +128,7 @@ func (d *RemoteDebugger) RunScriptAtBlockID(
 		d.ctx,
 		fvm.WithBlockHeader(d.ctx.BlockHeader))
 	script := fvm.Script(code).WithArguments(arguments...)
-	_, output, err := d.vm.RunV2(scriptCtx, script, snapshot)
+	_, output, err := d.vm.Run(scriptCtx, script, snapshot)
 	if err != nil {
 		return nil, nil, err
 	}

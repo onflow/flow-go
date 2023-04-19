@@ -43,21 +43,7 @@ func (_m *VM) GetAccount(_a0 fvm.Context, _a1 flow.Address, _a2 state.StorageSna
 }
 
 // Run provides a mock function with given fields: _a0, _a1, _a2
-func (_m *VM) Run(_a0 fvm.Context, _a1 fvm.Procedure, _a2 state.View) error {
-	ret := _m.Called(_a0, _a1, _a2)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(fvm.Context, fvm.Procedure, state.View) error); ok {
-		r0 = rf(_a0, _a1, _a2)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// RunV2 provides a mock function with given fields: _a0, _a1, _a2
-func (_m *VM) RunV2(_a0 fvm.Context, _a1 fvm.Procedure, _a2 state.StorageSnapshot) (*state.ExecutionSnapshot, fvm.ProcedureOutput, error) {
+func (_m *VM) Run(_a0 fvm.Context, _a1 fvm.Procedure, _a2 state.StorageSnapshot) (*state.ExecutionSnapshot, fvm.ProcedureOutput, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 *state.ExecutionSnapshot
