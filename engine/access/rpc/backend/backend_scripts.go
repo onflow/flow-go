@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -217,6 +218,7 @@ func (b *backendScripts) tryExecuteScriptOnExecutionNode(
 func (b *backendScripts) tryExecuteScriptOnArchiveNode(ctx context.Context, executorAddress string, blockID flow.Identifier,
 	script []byte,
 	arguments [][]byte) ([]byte, error) {
+	log.Info().Msgf("forwarding execute script query to archive node %v for block %v", executorAddress, blockID)
 	req := &access.ExecuteScriptAtBlockIDRequest{
 		BlockId:   blockID[:],
 		Script:    script,
