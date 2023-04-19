@@ -197,6 +197,7 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 				payloadSize)
 
 			// skip limit if payer is service account
+			// TODO skip only limit-related errors
 			if !isServiceAccount && eventEmitError != nil {
 				return eventEmitError
 			}
