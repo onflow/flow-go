@@ -2,26 +2,23 @@ package connection
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/rand"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
-	ConnectionPruningEnabled  = true
-	ConnectionPruningDisabled = false
+	PruningEnabled  = true
+	PruningDisabled = false
 )
 
 // Libp2pConnector is a libp2p based Connector implementation to connect and disconnect from peers
@@ -33,32 +30,6 @@ type Libp2pConnector struct {
 }
 
 var _ p2p.Connector = &Libp2pConnector{}
-
-// UnconvertibleIdentitiesError is an error which reports all the flow.Identifiers that could not be converted to
-// peer.AddrInfo
-type UnconvertibleIdentitiesError struct {
-	errs map[flow.Identifier]error
-}
-
-func NewUnconvertableIdentitiesError(errs map[flow.Identifier]error) error {
-	return UnconvertibleIdentitiesError{
-		errs: errs,
-	}
-}
-
-func (e UnconvertibleIdentitiesError) Error() string {
-	multierr := new(multierror.Error)
-	for id, err := range e.errs {
-		multierr = multierror.Append(multierr, fmt.Errorf("failed to connect to %s: %w", id.String(), err))
-	}
-	return multierr.Error()
-}
-
-// IsUnconvertibleIdentitiesError returns whether the given error is an UnconvertibleIdentitiesError error
-func IsUnconvertibleIdentitiesError(err error) bool {
-	var errUnconvertableIdentitiesError UnconvertibleIdentitiesError
-	return errors.As(err, &errUnconvertableIdentitiesError)
-}
 
 func NewLibp2pConnector(log zerolog.Logger, host host.Host, pruning bool) (*Libp2pConnector, error) {
 	connector, err := defaultLibp2pBackoffConnector(host)
