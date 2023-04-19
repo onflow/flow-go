@@ -8,7 +8,14 @@ import (
 )
 
 type View interface {
-	Get(height uint64, blockID flow.Identifier, key flow.RegisterID) (flow.RegisterValue, error)
+	Get(
+		height uint64,
+		blockID flow.Identifier,
+		key flow.RegisterID,
+	) (
+		flow.RegisterValue,
+		error,
+	)
 }
 
 // oracle stores views that are finalized in an storage
