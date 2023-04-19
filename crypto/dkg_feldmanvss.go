@@ -409,7 +409,7 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 func frPolynomialImage(dest []byte, a []scalar, x index, y *pointE2) {
 	C.Fr_polynomial_image_write((*C.uchar)(&dest[0]),
 		(*C.E2)(y),
-		(*C.Fr)(&a[0]), (C.int)(len(a)),
+		(*C.Fr)(&a[0]), (C.int)(len(a)-1),
 		(C.uint8_t)(x),
 	)
 }
@@ -451,6 +451,6 @@ func (s *feldmanVSSstate) verifyShare() bool {
 func (s *feldmanVSSstate) computePublicKeys() {
 	C.E2_polynomial_images(
 		(*C.E2)(&s.y[0]), (C.int)(len(s.y)),
-		(*C.E2)(&s.vA[0]), (C.int)(len(s.vA)),
+		(*C.E2)(&s.vA[0]), (C.int)(len(s.vA)-1),
 	)
 }

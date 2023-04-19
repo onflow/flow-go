@@ -578,7 +578,7 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 		C.Fr_polynomial_image(
 			(*C.Fr)(&x[i-1]),
 			(*C.E2)(&y[i-1]),
-			(*C.Fr)(&a[0]), (C.int)(len(a)),
+			(*C.Fr)(&a[0]), (C.int)(len(a)-1),
 			(C.uint8_t)(i),
 		)
 	}
