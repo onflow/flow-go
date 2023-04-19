@@ -14,8 +14,8 @@ import (
 )
 
 // Cargo is responsible for synchronization
-// between a block execution and block finalization events
-// block execution results and finalization are two concurrent
+// between block execution and block finalization events
+// block execution and finalization events are two concurrent
 // streams and requires synchronization and buffering of events
 // in case one of them is ahead of the other one.
 // payloadStore accepts block execution events in a fork-aware way and expect block finalization
@@ -23,6 +23,8 @@ import (
 // blockqueue acts as a fixed-size buffer to hold on to the unprocessed block finaliziation events
 // both blockqueue and payloadstore has some internal validation to prevent
 // out of order events and support concurency.
+// these two are frequently synced automatically on time intervals
+// but it could also be manually trigger using TrySync method
 type Cargo struct {
 	blockQueue   *queue.FinalizedBlockQueue
 	payloadStore *payload.PayloadStore
