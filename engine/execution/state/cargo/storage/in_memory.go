@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -14,13 +15,12 @@ type valueAtHeight struct {
 // InMemoryStorage implements storage interface, keeping register updates in memory,
 // it only limits historic look up of register to the last X commits
 type InMemoryStorage struct {
-	historyCapacity int
-	registers       map[flow.RegisterID][]valueAtHeight
-	// we keep all headers, but could be reduced to only a limited history
-	headers            map[flow.Identifier]*flow.Header
-	lastCommittedBlock *flow.Header
-	minHeightAvailable uint64
-	lock               sync.RWMutex
+	historyCapacity                 int
+	registers                       map[flow.RegisterID][]valueAtHeight
+	lastCommittedBlock              *flow.Header
+	recentlyCommittedBlocksByHeight map[uint64]flow.Identifier
+	minHeightAvailable              uint64
+	lock                            sync.RWMutex
 }
 
 var _ Storage = &InMemoryStorage{}
@@ -31,24 +31,22 @@ func NewInMemoryStorage(
 	genesis *flow.Header,
 	data map[flow.RegisterID]flow.RegisterValue,
 ) *InMemoryStorage {
-	height := genesis.Height
 	registers := make(map[flow.RegisterID][]valueAtHeight, 0)
 	for id, val := range data {
 		registers[id] = []valueAtHeight{{
-			height: height,
+			height: genesis.Height,
 			value:  val,
 		}}
 	}
-
-	headers := make(map[flow.Identifier]*flow.Header)
-	headers[genesis.ID()] = genesis
-
+	recentlyCommittedBlocksByHeight := map[uint64]flow.Identifier{
+		genesis.Height: genesis.ID(),
+	}
 	return &InMemoryStorage{
-		historyCapacity:    historyCapacity,
-		registers:          registers,
-		headers:            headers,
-		lastCommittedBlock: genesis,
-		minHeightAvailable: height,
+		historyCapacity:                 historyCapacity,
+		registers:                       registers,
+		recentlyCommittedBlocksByHeight: recentlyCommittedBlocksByHeight,
+		lastCommittedBlock:              genesis,
+		minHeightAvailable:              genesis.Height,
 	}
 }
 
@@ -74,22 +72,34 @@ func (s *InMemoryStorage) CommitBlock(header *flow.Header, update map[flow.Regis
 			// don't get updated that often, we might revisit in the future
 			vv = make([]valueAtHeight, 0, s.historyCapacity)
 		}
+
+		// optimization - if the value hasn't change, don't append and skip
+		if len(vv) > 0 && bytes.Equal(vv[len(vv)-1].value, value) {
+			continue
+		}
+
 		// prune if at capacity (prune first prevents potentially extra allocation)
 		if len(vv) == s.historyCapacity {
 			vv = vv[1:]
 		}
+
+		// TODO - future optimization might consider pruning historic values that are not going to be accssible anymore
+
+		// append value to the end of the list
 		s.registers[key] = append(vv, valueAtHeight{
 			height: header.Height,
 			value:  value,
 		})
 	}
 	s.lastCommittedBlock = header
-	s.headers[header.ID()] = header
+	newHeight := header.Height
+	s.recentlyCommittedBlocksByHeight[newHeight] = header.ID()
 
-	s.minHeightAvailable = s.lastCommittedBlock.Height - uint64(s.historyCapacity) + 1
-	if s.lastCommittedBlock.Height < 0 {
-		s.lastCommittedBlock.Height = 0
+	if newHeight-s.minHeightAvailable == uint64(s.historyCapacity) {
+		delete(s.recentlyCommittedBlocksByHeight, s.minHeightAvailable)
+		s.minHeightAvailable += 1
 	}
+
 	return nil
 }
 
@@ -111,7 +121,8 @@ func (s *InMemoryStorage) RegisterValueAt(height uint64, blockID flow.Identifier
 		return nil, &HeightNotAvailableError{height, s.minHeightAvailable, s.lastCommittedBlock.Height}
 	}
 
-	if _, found := s.headers[blockID]; !found {
+	expectedID, found := s.recentlyCommittedBlocksByHeight[height]
+	if !found || blockID != expectedID {
 		return nil, &InvalidBlockIDError{blockID}
 	}
 

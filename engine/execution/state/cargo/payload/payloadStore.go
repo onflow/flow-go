@@ -13,7 +13,7 @@ import (
 // has been provided in the past.
 // payload store holds forks of updates into memory until a block finalized signal
 // is receieved, then it would move finalized results into a persistant storage
-// and would prune results for the same height
+// and would prune and discard block changes that are not relevant anymore.
 type PayloadStore struct {
 	oracleView          *OracleView
 	viewByID            map[flow.Identifier]*InFlightView

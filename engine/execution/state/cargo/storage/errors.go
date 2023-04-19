@@ -29,7 +29,7 @@ type InvalidBlockIDError struct {
 
 func (e InvalidBlockIDError) Error() string {
 	return fmt.Sprintf(
-		"requested blockID is not available: requested: %x",
+		"requested blockID (%x) is not found",
 		e.blockID,
 	)
 }
