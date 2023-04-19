@@ -45,7 +45,7 @@ func (c *Cargo) Reader(header *flow.Header) state.StorageSnapshot {
 
 func (c *Cargo) BlockExecuted(header *flow.Header, updates map[flow.RegisterID]flow.RegisterValue) error {
 	// just add update to the payload store
-	// we don't trigger actions here just collect in the next block finalized we deal with the gap
+	// we don't trigger sync here and wait for the next block finalized signal
 	return c.payloadStore.BlockExecuted(header, updates)
 }
 
