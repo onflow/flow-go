@@ -412,6 +412,17 @@ func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
 	return header
 }
 
+func BlockHeaderFixtures(number int) []*flow.Header {
+	headers := make([]*flow.Header, 1, number)
+	header := BlockHeaderFixture()
+	headers[0] = header
+	for ; number > 1; number-- {
+		header = BlockHeaderWithParentFixture(header)
+		headers = append(headers, header)
+	}
+	return headers
+}
+
 func CidFixture() cid.Cid {
 	data := make([]byte, 1024)
 	_, _ = rand.Read(data)
