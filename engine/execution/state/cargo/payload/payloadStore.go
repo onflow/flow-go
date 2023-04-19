@@ -17,7 +17,8 @@ import (
 type PayloadStore struct {
 	oracleView       *OracleView
 	viewByID         map[flow.Identifier]*InFlightView
-	blockIDsByHeight map[uint64][]flow.Identifier
+	blockIDsByHeight map[uint64]map[flow.Identifier]struct{}
+	childrenByID     map[flow.Identifier][]flow.Identifier
 	lock             sync.RWMutex
 }
 
@@ -29,7 +30,8 @@ func NewPayloadStore(storage storage.Storage) (*PayloadStore, error) {
 	return &PayloadStore{
 		oracleView:       oracle,
 		viewByID:         make(map[flow.Identifier]*InFlightView, 0),
-		blockIDsByHeight: make(map[uint64][]flow.Identifier, 0),
+		blockIDsByHeight: make(map[uint64]map[flow.Identifier]struct{}, 0),
+		childrenByID:     make(map[flow.Identifier][]flow.Identifier, 0),
 		lock:             sync.RWMutex{},
 	}, nil
 }
@@ -78,14 +80,23 @@ func (ps *PayloadStore) Update(
 			// this should never happen, this means updates for a block was submitted but parent is not available
 			return fmt.Errorf("view for parent block %x is missing", parentBlockID)
 		}
+		// keep parent relationship of blocks
+		ps.childrenByID[parentBlockID] = append(ps.childrenByID[parentBlockID], blockID)
 	}
 
+	// add to view by ID
 	ps.viewByID[blockID] = &InFlightView{
 		delta:  delta,
 		parent: parent,
 	}
 
-	ps.blockIDsByHeight[height] = append(ps.blockIDsByHeight[height], blockID)
+	// add to the by height index
+	dict, found := ps.blockIDsByHeight[height]
+	if !found {
+		dict = make(map[flow.Identifier]struct{})
+	}
+	dict[blockID] = struct{}{}
+	ps.blockIDsByHeight[height] = dict
 	return nil
 }
 
@@ -111,15 +122,29 @@ func (ps *PayloadStore) Commit(
 	}
 
 	// remove all views in the same height
-	for _, blockID := range ps.blockIDsByHeight[height] {
-		delete(ps.viewByID, blockID)
+	for bID := range ps.blockIDsByHeight[height] {
+		delete(ps.viewByID, bID)
+		if bID != blockID {
+			ps.pruneBranch(bID)
+		}
+
 	}
 	delete(ps.blockIDsByHeight, height)
 
 	// update all children to use oracle
-	for _, blockID := range ps.blockIDsByHeight[height+1] {
-		ps.viewByID[blockID].UpdateParent(ps.oracleView)
+	for _, childID := range ps.childrenByID[blockID] {
+		ps.viewByID[childID].UpdateParent(ps.oracleView)
 	}
+	delete(ps.childrenByID, blockID)
 
 	return true, nil
+}
+
+func (ps *PayloadStore) pruneBranch(blockID flow.Identifier) error {
+	for _, child := range ps.childrenByID[blockID] {
+		ps.pruneBranch(child)
+		delete(ps.viewByID, child)
+	}
+	delete(ps.childrenByID, blockID)
+	return nil
 }

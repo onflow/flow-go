@@ -11,13 +11,13 @@ import (
 )
 
 type mockStorage struct {
-	RegisterValueAtFunc    func(height uint64, id flow.RegisterID) (value flow.RegisterValue, err error)
+	RegisterValueAtFunc    func(height uint64, blockID flow.Identifier, id flow.RegisterID) (value flow.RegisterValue, err error)
 	CommitBlockFunc        func(header *flow.Header, update map[flow.RegisterID]flow.RegisterValue) error
 	LastCommittedBlockFunc func() (*flow.Header, error)
 }
 
-func (s *mockStorage) RegisterValueAt(height uint64, id flow.RegisterID) (value flow.RegisterValue, err error) {
-	return s.RegisterValueAtFunc(height, id)
+func (s *mockStorage) RegisterValueAt(height uint64, blockID flow.Identifier, id flow.RegisterID) (value flow.RegisterValue, err error) {
+	return s.RegisterValueAtFunc(height, blockID, id)
 }
 
 func (s *mockStorage) CommitBlock(header *flow.Header, update map[flow.RegisterID]flow.RegisterValue) error {
@@ -37,7 +37,7 @@ func TestOracleView(t *testing.T) {
 	}
 
 	storage := &mockStorage{
-		RegisterValueAtFunc: func(h uint64, _ flow.RegisterID) (value flow.RegisterValue, err error) {
+		RegisterValueAtFunc: func(h uint64, _ flow.Identifier, _ flow.RegisterID) (value flow.RegisterValue, err error) {
 			if lastHeader.Height == h {
 				return nil, nil
 			}
@@ -56,7 +56,7 @@ func TestOracleView(t *testing.T) {
 	ov, err := payload.NewOracleView(storage)
 	require.NoError(t, err)
 
-	_, err = ov.Get(lastHeader.Height, flow.ZeroID, flow.RegisterID{})
+	_, err = ov.Get(lastHeader.Height, lastHeader.ID(), flow.RegisterID{})
 	require.NoError(t, err)
 
 	_, err = ov.Get(lastHeader.Height-1, flow.ZeroID, flow.RegisterID{})
@@ -70,6 +70,6 @@ func TestOracleView(t *testing.T) {
 	err = ov.MergeView(newHeader, payload.NewInFlightView(data, nil))
 	require.NoError(t, err)
 
-	_, err = ov.Get(newHeader.Height, flow.ZeroID, flow.RegisterID{})
+	_, err = ov.Get(newHeader.Height, newHeader.ID(), flow.RegisterID{})
 	require.NoError(t, err)
 }

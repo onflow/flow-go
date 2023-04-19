@@ -24,7 +24,6 @@ func TestPayloadStore(t *testing.T) {
 		}
 
 		storage := storage.NewInMemoryStorage(10, genesis, data)
-
 		pstore, err := payload.NewPayloadStore(storage)
 		require.NoError(t, err)
 
@@ -61,6 +60,77 @@ func TestPayloadStore(t *testing.T) {
 			require.Equal(t, i, int(val[0]))
 		}
 
+	})
+
+	t.Run("finalization forks", func(t *testing.T) {
+		headers := unittest.BlockHeaderFixtures(10)
+		genesis, mainChain := headers[0], headers[1:]
+
+		storage := storage.NewInMemoryStorage(10, genesis, nil)
+		pstore, err := payload.NewPayloadStore(storage)
+		require.NoError(t, err)
+
+		for i, header := range mainChain {
+			err = pstore.Update(header, map[flow.RegisterID]flow.RegisterValue{
+				key: []byte{byte(int8(i))},
+			})
+			require.NoError(t, err)
+		}
+
+		fork1 := unittest.BlockHeaderWithParentFixture(genesis)
+		err = pstore.Update(fork1, map[flow.RegisterID]flow.RegisterValue{
+			key: []byte{byte(int8(11))},
+		})
+		require.NoError(t, err)
+
+		val, err := pstore.Get(fork1.Height, fork1.ID(), key)
+		require.NoError(t, err)
+		require.Equal(t, 11, int(val[0]))
+
+		fork11 := unittest.BlockHeaderWithParentFixture(fork1)
+		err = pstore.Update(fork11, map[flow.RegisterID]flow.RegisterValue{
+			key: []byte{byte(int8(12))},
+		})
+		require.NoError(t, err)
+
+		val, err = pstore.Get(fork11.Height, fork11.ID(), key)
+		require.NoError(t, err)
+		require.Equal(t, 12, int(val[0]))
+
+		fork2 := unittest.BlockHeaderWithParentFixture(genesis)
+		err = pstore.Update(fork2, map[flow.RegisterID]flow.RegisterValue{
+			key: []byte{byte(int8(13))},
+		})
+		require.NoError(t, err)
+
+		val, err = pstore.Get(fork2.Height, fork2.ID(), key)
+		require.NoError(t, err)
+
+		fork22 := unittest.BlockHeaderWithParentFixture(fork2)
+		err = pstore.Update(fork22, map[flow.RegisterID]flow.RegisterValue{
+			key: []byte{byte(int8(14))},
+		})
+		require.NoError(t, err)
+
+		val, err = pstore.Get(fork22.Height, fork22.ID(), key)
+		require.NoError(t, err)
+
+		found, err := pstore.Commit(mainChain[0].ID(), mainChain[0])
+		require.True(t, found)
+		require.NoError(t, err)
+
+		// prunned ones should not return results
+		val, err = pstore.Get(fork1.Height, fork1.ID(), key)
+		require.Error(t, err)
+
+		val, err = pstore.Get(fork2.Height, fork2.ID(), key)
+		require.Error(t, err)
+
+		val, err = pstore.Get(fork11.Height, fork11.ID(), key)
+		require.Error(t, err)
+
+		val, err = pstore.Get(fork22.Height, fork22.ID(), key)
+		require.Error(t, err)
 	})
 
 	// TODO test compliance

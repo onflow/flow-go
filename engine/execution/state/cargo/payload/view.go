@@ -14,6 +14,7 @@ type View interface {
 // oracle stores views that are finalized in an storage
 type OracleView struct {
 	storage storage.Storage
+
 	// cached value of the same data that is retrivable from storage
 	lastCommittedHeight uint64
 }
@@ -31,9 +32,9 @@ func NewOracleView(storage storage.Storage) (*OracleView, error) {
 
 var _ View = &OracleView{}
 
-func (v *OracleView) Get(height uint64, _ flow.Identifier, id flow.RegisterID) (flow.RegisterValue, error) {
-	// TODO: id could be used as extra sanity check
-	return v.storage.RegisterValueAt(height, id)
+func (v *OracleView) Get(height uint64, blockID flow.Identifier, id flow.RegisterID) (flow.RegisterValue, error) {
+
+	return v.storage.RegisterValueAt(height, blockID, id)
 }
 
 func (v *OracleView) MergeView(header *flow.Header, view *InFlightView) error {

@@ -14,8 +14,9 @@ type valueAtHeight struct {
 // InMemoryStorage implements storage interface, keeping register updates in memory,
 // it only limits historic look up of register to the last X commits
 type InMemoryStorage struct {
-	historyCap         int
+	historyCapacity    int
 	registers          map[flow.RegisterID][]valueAtHeight
+	headers            map[flow.Identifier]*flow.Header
 	lastCommittedBlock *flow.Header
 	minHeightAvailable uint64
 	lock               sync.RWMutex
@@ -25,7 +26,7 @@ var _ Storage = &InMemoryStorage{}
 
 // NewInMemoryStorage constructs a new InMemoryStorage
 func NewInMemoryStorage(
-	historyCap int,
+	historyCapacity int,
 	genesis *flow.Header,
 	data map[flow.RegisterID]flow.RegisterValue,
 ) *InMemoryStorage {
@@ -37,9 +38,14 @@ func NewInMemoryStorage(
 			value:  val,
 		}}
 	}
+
+	headers := make(map[flow.Identifier]*flow.Header)
+	headers[genesis.ID()] = genesis
+
 	return &InMemoryStorage{
-		historyCap:         historyCap,
+		historyCapacity:    historyCapacity,
 		registers:          registers,
+		headers:            headers,
 		lastCommittedBlock: genesis,
 		minHeightAvailable: height,
 	}
@@ -65,10 +71,10 @@ func (s *InMemoryStorage) CommitBlock(header *flow.Header, update map[flow.Regis
 		if !found {
 			// Note: this pre-allocation of memory might not be a good idea for registers that
 			// don't get updated that often, we might revisit in the future
-			vv = make([]valueAtHeight, 0, s.historyCap)
+			vv = make([]valueAtHeight, 0, s.historyCapacity)
 		}
 		// prune if at capacity (prune first prevents potentially extra allocation)
-		if len(vv) == s.historyCap {
+		if len(vv) == s.historyCapacity {
 			vv = vv[1:]
 		}
 		s.registers[key] = append(vv, valueAtHeight{
@@ -77,8 +83,9 @@ func (s *InMemoryStorage) CommitBlock(header *flow.Header, update map[flow.Regis
 		})
 	}
 	s.lastCommittedBlock = header
+	s.headers[header.ID()] = header
 
-	s.minHeightAvailable = s.lastCommittedBlock.Height - uint64(s.historyCap) + 1
+	s.minHeightAvailable = s.lastCommittedBlock.Height - uint64(s.historyCapacity) + 1
 	if s.lastCommittedBlock.Height < 0 {
 		s.lastCommittedBlock.Height = 0
 	}
@@ -94,12 +101,17 @@ func (s *InMemoryStorage) LastCommittedBlock() (*flow.Header, error) {
 }
 
 // RegisterValueAt returns the value for a register at the given height
-func (s *InMemoryStorage) RegisterValueAt(height uint64, id flow.RegisterID) (value flow.RegisterValue, err error) {
+func (s *InMemoryStorage) RegisterValueAt(height uint64, blockID flow.Identifier, id flow.RegisterID) (value flow.RegisterValue, err error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	if height < s.minHeightAvailable || height > s.lastCommittedBlock.Height {
+	if height < s.minHeightAvailable ||
+		height > s.lastCommittedBlock.Height {
 		return nil, &HeightNotAvailableError{height, s.minHeightAvailable, s.lastCommittedBlock.Height}
+	}
+
+	if _, found := s.headers[blockID]; !found {
+		return nil, &InvalidBlockIDError{blockID}
 	}
 
 	// TODO(ramtin): future improvement could use a binary search when history size is large

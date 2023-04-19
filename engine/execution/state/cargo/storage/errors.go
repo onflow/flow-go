@@ -22,6 +22,18 @@ func (e HeightNotAvailableError) Error() string {
 	)
 }
 
+// InvalidBlockIDError is returned when the requested blockID isn't store in the storage
+type InvalidBlockIDError struct {
+	blockID flow.Identifier
+}
+
+func (e InvalidBlockIDError) Error() string {
+	return fmt.Sprintf(
+		"requested blockID is not available: requested: %x",
+		e.blockID,
+	)
+}
+
 // NonCompliantHeaderError is returned when a new commit is made but its header is
 // not compliant with the previously commit's header because of height or parent id mismatch
 type NonCompliantHeaderError struct {

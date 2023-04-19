@@ -11,7 +11,7 @@ type Storage interface {
 	// RegisterValueAt returns the register value at the given height
 	// note that if a register is not updated at specific block it pretaining the previous value
 	// non-existing registers return nil value by default and errors are only kept for fatal ones
-	RegisterValueAt(height uint64, id flow.RegisterID) (value flow.RegisterValue, err error)
+	RegisterValueAt(height uint64, blockID flow.Identifier, id flow.RegisterID) (value flow.RegisterValue, err error)
 
 	// Commit updates register values (it expects nil value for the removed registers)
 	// verifies that the new update's block header is compliant (block height and parent id matches)

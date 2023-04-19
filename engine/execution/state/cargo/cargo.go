@@ -52,28 +52,31 @@ func (c *Cargo) BlockFinalized(new *flow.Header) error {
 	}
 
 	// then trigger sync
+	return c.sync()
+}
+
+func (c *Cargo) sync() error {
 	// we take a peak at the oldest block that has been finalized and not processed yet
 	// and see if its commitable by payload storage (if results are available for that blockID),
 	// if commitable (return true by payload store), we deuque the block and continue
 	// doing the same for more blocks until payloadstore returns false, which mean it doesn't
 	// have results for that block yet and we need to hold on until next trigger.
-	if c.blockQueue.HasHeaders() {
+	for c.blockQueue.HasHeaders() {
 		blockID, header := c.blockQueue.Peak()
-		for found, err := c.payloadStore.Commit(blockID, header); found; {
-			if err != nil {
-				return err
-			}
-			c.blockQueue.Dequeue()
-			blockID, header = c.blockQueue.Peak()
+		found, err := c.payloadStore.Commit(blockID, header)
+		if err != nil {
+			return err
 		}
+		if !found {
+			break
+		}
+		c.blockQueue.Dequeue()
 	}
-
 	return nil
 }
 
 func (c *Cargo) BlockExecuted(header *flow.Header, updates map[flow.RegisterID]flow.RegisterValue) error {
 	// just add update to the payload store
-	c.payloadStore.Update(header, updates)
 	// we don't trigger actions here just collect in the next block finalized we deal with the gap
-	return nil
+	return c.payloadStore.Update(header, updates)
 }
