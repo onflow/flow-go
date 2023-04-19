@@ -53,8 +53,8 @@ import (
 	vereq "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -120,7 +120,7 @@ func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity *flow.Ide
 
 	// creates state fixture and bootstrap it.
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	stateFixture := CompleteStateFixture(t, metrics, tracer, rootSnapshot)
+	stateFixture := CompleteStateFixture(t, log, metrics, tracer, rootSnapshot)
 
 	require.NoError(t, err)
 	for _, option := range options {
@@ -146,7 +146,7 @@ func GenericNode(
 		Logger()
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	stateFixture := CompleteStateFixture(t, metrics, tracer, root)
+	stateFixture := CompleteStateFixture(t, log, metrics, tracer, root)
 
 	head, err := root.Head()
 	require.NoError(t, err)
@@ -220,6 +220,7 @@ func LocalFixture(t testing.TB, identity *flow.Identity) module.Local {
 // CompleteStateFixture is a test helper that creates, bootstraps, and returns a StateFixture for sake of unit testing.
 func CompleteStateFixture(
 	t testing.TB,
+	log zerolog.Logger,
 	metric *metrics.NoopCollector,
 	tracer module.Tracer,
 	rootSnapshot protocol.Snapshot,
@@ -248,7 +249,17 @@ func CompleteStateFixture(
 	)
 	require.NoError(t, err)
 
-	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockBlockTimer(), util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
+	mutableState, err := badgerstate.NewFullConsensusState(
+		log,
+		tracer,
+		consumer,
+		state,
+		s.Index,
+		s.Payloads,
+		util.MockBlockTimer(),
+		util.MockReceiptValidator(),
+		util.MockSealValidator(s.Seals),
+	)
 	require.NoError(t, err)
 
 	return &testmock.StateFixture{
@@ -542,7 +553,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	protoState, ok := node.State.(*badgerstate.ParticipantState)
 	require.True(t, ok)
 
-	followerState, err := badgerstate.NewFollowerState(protoState.State, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
+	followerState, err := badgerstate.NewFollowerState(
+		node.Log,
+		node.Tracer,
+		node.ProtocolEvents,
+		protoState.State,
+		node.Index,
+		node.Payloads,
+		blocktimer.DefaultBlockTimer,
+	)
 	require.NoError(t, err)
 
 	dbDir := unittest.TempDir(t)

@@ -216,7 +216,15 @@ func (exeNode *ExecutionNode) LoadMutableFollowerState(node *NodeConfig) error {
 		return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 	}
 	var err error
-	exeNode.followerState, err = badgerState.NewFollowerState(bState, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
+	exeNode.followerState, err = badgerState.NewFollowerState(
+		node.Logger,
+		node.Tracer,
+		node.ProtocolEvents,
+		bState,
+		node.Storage.Index,
+		node.Storage.Payloads,
+		blocktimer.DefaultBlockTimer,
+	)
 	return err
 }
 
@@ -899,7 +907,6 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		validator,
 		exeNode.syncCore,
 		node.Tracer,
-		compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower core: %w", err)
@@ -913,6 +920,7 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		node.Storage.Headers,
 		exeNode.finalizedHeader.Get(),
 		core,
+		followereng.WithComplianceConfigOpt(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -1093,7 +1101,7 @@ func getContractEpochCounter(
 	script := fvm.Script(scriptCode)
 
 	// execute the script
-	_, output, err := vm.RunV2(vmCtx, script, snapshot)
+	_, output, err := vm.Run(vmCtx, script, snapshot)
 	if err != nil {
 		return 0, fmt.Errorf("could not read epoch counter, internal error while executing script: %w", err)
 	}

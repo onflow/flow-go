@@ -6,13 +6,12 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -247,7 +246,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	ctx := fvm.NewContext(fvm.WithChain(flow.Testnet.Chain()))
 
 	vm := fvm.NewVirtualMachine()
-	executionSnapshot, _, err := vm.RunV2(
+	executionSnapshot, _, err := vm.Run(
 		ctx,
 		fvm.Bootstrap(
 			unittest.ServiceAccountPublicKey,
@@ -257,8 +256,9 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		snapshotTree)
 	require.NoError(t, err)
 
-	view := delta.NewDeltaView(snapshotTree.Append(executionSnapshot))
-	nestedTxn := state.NewTransactionState(view, state.DefaultParameters())
+	nestedTxn := state.NewTransactionState(
+		snapshotTree.Append(executionSnapshot),
+		state.DefaultParameters())
 
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
@@ -300,7 +300,10 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		require.Equal(t, expected, invalidator.MeterParamOverridesUpdated)
 	}
 
-	for _, registerId := range view.Finalize().AllRegisterIDs() {
+	executionSnapshot, err = txnState.FinalizeMainTransaction()
+	require.NoError(t, err)
+
+	for _, registerId := range executionSnapshot.AllRegisterIDs() {
 		checkForUpdates(registerId, true)
 		checkForUpdates(
 			flow.NewRegisterID("other owner", registerId.Key),
