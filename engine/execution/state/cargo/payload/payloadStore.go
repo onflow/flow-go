@@ -36,6 +36,13 @@ func NewPayloadStore(storage storage.Storage) (*PayloadStore, error) {
 	}, nil
 }
 
+func (ps *PayloadStore) Reader(block *flow.Header) *Reader {
+	return &Reader{height: block.Height,
+		blockID: block.ID(),
+		getFunc: ps.Get,
+	}
+}
+
 func (ps *PayloadStore) Get(
 	height uint64,
 	blockID flow.Identifier,
@@ -55,7 +62,7 @@ func (ps *PayloadStore) Get(
 	return view.Get(height, blockID, key)
 }
 
-func (ps *PayloadStore) Update(
+func (ps *PayloadStore) BlockExecuted(
 	header *flow.Header,
 	delta map[flow.RegisterID]flow.RegisterValue,
 ) error {
@@ -100,7 +107,7 @@ func (ps *PayloadStore) Update(
 	return nil
 }
 
-func (ps *PayloadStore) Commit(
+func (ps *PayloadStore) BlockFinalized(
 	blockID flow.Identifier,
 	header *flow.Header,
 ) (bool, error) {

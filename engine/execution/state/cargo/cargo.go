@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/cargo/payload"
 	"github.com/onflow/flow-go/engine/execution/state/cargo/queue"
 	"github.com/onflow/flow-go/engine/execution/state/cargo/storage"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -38,8 +39,14 @@ func NewCargo(
 	}, nil
 }
 
-func (c *Cargo) Reader(header *flow.Header) *Reader {
-	return NewReader(header, c.payloadStore.Get)
+func (c *Cargo) Reader(header *flow.Header) state.StorageSnapshot {
+	return c.payloadStore.Reader(header)
+}
+
+func (c *Cargo) BlockExecuted(header *flow.Header, updates map[flow.RegisterID]flow.RegisterValue) error {
+	// just add update to the payload store
+	// we don't trigger actions here just collect in the next block finalized we deal with the gap
+	return c.payloadStore.BlockExecuted(header, updates)
 }
 
 func (c *Cargo) BlockFinalized(new *flow.Header) error {
@@ -63,7 +70,7 @@ func (c *Cargo) sync() error {
 	// have results for that block yet and we need to hold on until next trigger.
 	for c.blockQueue.HasHeaders() {
 		blockID, header := c.blockQueue.Peak()
-		found, err := c.payloadStore.Commit(blockID, header)
+		found, err := c.payloadStore.BlockFinalized(blockID, header)
 		if err != nil {
 			return err
 		}
@@ -73,10 +80,4 @@ func (c *Cargo) sync() error {
 		c.blockQueue.Dequeue()
 	}
 	return nil
-}
-
-func (c *Cargo) BlockExecuted(header *flow.Header, updates map[flow.RegisterID]flow.RegisterValue) error {
-	// just add update to the payload store
-	// we don't trigger actions here just collect in the next block finalized we deal with the gap
-	return c.payloadStore.Update(header, updates)
 }

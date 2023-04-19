@@ -35,7 +35,7 @@ func TestPayloadStore(t *testing.T) {
 			delta := map[flow.RegisterID]flow.RegisterValue{
 				key: []byte{byte(int8(i))},
 			}
-			err = pstore.Update(header, delta)
+			err = pstore.BlockExecuted(header, delta)
 			require.NoError(t, err)
 		}
 
@@ -48,7 +48,7 @@ func TestPayloadStore(t *testing.T) {
 
 		// commit all
 		for _, header := range headers {
-			found, err := pstore.Commit(header.ID(), header)
+			found, err := pstore.BlockFinalized(header.ID(), header)
 			require.True(t, found)
 			require.NoError(t, err)
 		}
@@ -71,14 +71,14 @@ func TestPayloadStore(t *testing.T) {
 		require.NoError(t, err)
 
 		for i, header := range mainChain {
-			err = pstore.Update(header, map[flow.RegisterID]flow.RegisterValue{
+			err = pstore.BlockExecuted(header, map[flow.RegisterID]flow.RegisterValue{
 				key: []byte{byte(int8(i))},
 			})
 			require.NoError(t, err)
 		}
 
 		fork1 := unittest.BlockHeaderWithParentFixture(genesis)
-		err = pstore.Update(fork1, map[flow.RegisterID]flow.RegisterValue{
+		err = pstore.BlockExecuted(fork1, map[flow.RegisterID]flow.RegisterValue{
 			key: []byte{byte(int8(11))},
 		})
 		require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestPayloadStore(t *testing.T) {
 		require.Equal(t, 11, int(val[0]))
 
 		fork11 := unittest.BlockHeaderWithParentFixture(fork1)
-		err = pstore.Update(fork11, map[flow.RegisterID]flow.RegisterValue{
+		err = pstore.BlockExecuted(fork11, map[flow.RegisterID]flow.RegisterValue{
 			key: []byte{byte(int8(12))},
 		})
 		require.NoError(t, err)
@@ -98,7 +98,7 @@ func TestPayloadStore(t *testing.T) {
 		require.Equal(t, 12, int(val[0]))
 
 		fork2 := unittest.BlockHeaderWithParentFixture(genesis)
-		err = pstore.Update(fork2, map[flow.RegisterID]flow.RegisterValue{
+		err = pstore.BlockExecuted(fork2, map[flow.RegisterID]flow.RegisterValue{
 			key: []byte{byte(int8(13))},
 		})
 		require.NoError(t, err)
@@ -107,7 +107,7 @@ func TestPayloadStore(t *testing.T) {
 		require.NoError(t, err)
 
 		fork22 := unittest.BlockHeaderWithParentFixture(fork2)
-		err = pstore.Update(fork22, map[flow.RegisterID]flow.RegisterValue{
+		err = pstore.BlockExecuted(fork22, map[flow.RegisterID]flow.RegisterValue{
 			key: []byte{byte(int8(14))},
 		})
 		require.NoError(t, err)
@@ -115,7 +115,7 @@ func TestPayloadStore(t *testing.T) {
 		val, err = pstore.Get(fork22.Height, fork22.ID(), key)
 		require.NoError(t, err)
 
-		found, err := pstore.Commit(mainChain[0].ID(), mainChain[0])
+		found, err := pstore.BlockFinalized(mainChain[0].ID(), mainChain[0])
 		require.True(t, found)
 		require.NoError(t, err)
 
