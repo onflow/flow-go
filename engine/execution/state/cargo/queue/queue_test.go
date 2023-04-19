@@ -57,7 +57,7 @@ func TestFinalizedBlockQueue(t *testing.T) {
 		for _, header := range batch2 {
 			err = bq.Enqueue(header)
 			require.Error(t, err)
-			expectedError := &queue.NonCompliantHeaderAlreadyProcessedError{}
+			expectedError := &queue.NonCompliantHeaderError{}
 			require.True(t, errors.As(err, &expectedError))
 		}
 

@@ -33,16 +33,3 @@ func (e NonCompliantHeaderError) Error() string {
 		e.ReceivedParentBlockID,
 	)
 }
-
-// NonCompliantHeaderAlreadyProcessedError is returned when a new header is pushed to the queue
-// that is already processed in the past
-type NonCompliantHeaderAlreadyProcessedError struct {
-	receivedBlockHeight uint64
-}
-
-func (e NonCompliantHeaderAlreadyProcessedError) Error() string {
-	return fmt.Sprintf(
-		"non complient header received: block height is in the past and most likeley has already been processed: %d",
-		e.receivedBlockHeight,
-	)
-}

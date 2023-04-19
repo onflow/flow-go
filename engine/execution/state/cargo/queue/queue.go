@@ -11,10 +11,10 @@ type headerInContext struct {
 	ID     flow.Identifier
 }
 
-// FinalizedBlockQueue maintains an ordered queue of consumable block headers
-// it also verifies that headers are added to the queue in the right order
-// under the hood it uses a circular buffer with a limited size to keep these block headers
-// if it reaches the limit it prevents adding more block headers
+// FinalizedBlockQueue is a concurrency-safe queue of finalized block headers
+// Every time a new header is added to the queue it verifies the complience of the header to the
+// most recenlty added header.
+// Under the hood a circular buffer with a limited capacity is used
 type FinalizedBlockQueue struct {
 	head, tail, capacity int
 	isFull               bool
@@ -25,8 +25,8 @@ type FinalizedBlockQueue struct {
 }
 
 // NewFinalizedBlockQueue constructs a new FinalizedBlockQueue
-// `capacity“ limits the number of unconsumed headers in the queue
-// genesis is not inserted in the queue and only helps to validate the very first header that is going to be added to the queue
+// "capacity“ sets the limit on the maximum number of unconsumed block headers allowed in the queue
+// "genesis“ is not inserted in the queue and is only used to to validate the very first incoming header
 func NewFinalizedBlockQueue(
 	capacity int,
 	genesis *flow.Header,
@@ -38,9 +38,10 @@ func NewFinalizedBlockQueue(
 	}
 }
 
-// Enqueue append a header to the queue given that header is compatible
-// with previously added header (parentID matches and height is right)
-// it returns an error if the queue has reached the capacity
+// Enqueue checks the header compatibility and append a header to the queue
+// A header is compatible if its parentID matches the ID of the last inserted header (or genesis)
+// and its height is set right (last block's height plus one).
+// If header not compatible or the queue has reached its capacity, corresponding errors are returned
 func (ft *FinalizedBlockQueue) Enqueue(header *flow.Header) error {
 	ft.lock.Lock()
 	defer ft.lock.Unlock()
@@ -55,10 +56,6 @@ func (ft *FinalizedBlockQueue) Enqueue(header *flow.Header) error {
 	if !ft.isEmpty() {
 		parentID = ft.lastQueuedHeader.ID
 		lastHeight = ft.lastQueuedHeader.Header.Height
-	}
-
-	if header.Height <= lastHeight {
-		return &NonCompliantHeaderAlreadyProcessedError{header.Height}
 	}
 
 	if lastHeight+1 != header.Height || parentID != header.ParentID {
@@ -79,7 +76,7 @@ func (ft *FinalizedBlockQueue) Enqueue(header *flow.Header) error {
 }
 
 // Peak returns the oldest header in the queue without removing it
-// if queue is empty returns zero ID and nil header
+// If the queue is empty it returns zero ID and nil header
 func (ft *FinalizedBlockQueue) Peak() (flow.Identifier, *flow.Header) {
 	ft.lock.RLock()
 	defer ft.lock.RUnlock()
@@ -91,7 +88,8 @@ func (ft *FinalizedBlockQueue) Peak() (flow.Identifier, *flow.Header) {
 	return header.ID, header.Header
 }
 
-// HasHeaders returns true if queue is not empty
+// HasHeaders returns true if the queue is not empty and
+// has more headers to be consumed
 func (ft *FinalizedBlockQueue) HasHeaders() bool {
 	ft.lock.RLock()
 	defer ft.lock.RUnlock()
