@@ -975,7 +975,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 				builder.Logger,
 				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork))
 
-			err := node.Metrics.Mempool.Register(metrics.ResourceReceiveCache, receiveCache.Size)
+			err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
 			if err != nil {
 				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 			}
