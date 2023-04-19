@@ -104,7 +104,7 @@ func TestInMemoryStorage(t *testing.T) {
 		}
 	})
 
-	t.Run("test historic value return ", func(t *testing.T) {
+	t.Run("test historic value return", func(t *testing.T) {
 		var err error
 		capacity := 10
 		headers := unittest.BlockHeaderFixtures(1 + 10)
@@ -130,6 +130,44 @@ func TestInMemoryStorage(t *testing.T) {
 			val, err = store.RegisterValueAt(header.Height, header.ID(), key)
 			require.NoError(t, err)
 			require.Equal(t, i, int(val[0]))
+		}
+	})
+
+	t.Run("test update gaps", func(t *testing.T) {
+		var err error
+		capacity := 10
+		headers := unittest.BlockHeaderFixtures(1 + 10)
+		genesis, batch1 := headers[0], headers[1:10]
+
+		key := flow.RegisterID{Key: "key", Owner: "owner"}
+
+		store := storage.NewInMemoryStorage(capacity,
+			genesis,
+			map[flow.RegisterID]flow.RegisterValue{
+				key: []byte{byte(int8(0))},
+			})
+
+		val, err := store.RegisterValueAt(genesis.Height, genesis.ID(), key)
+		require.NoError(t, err)
+		require.Equal(t, 0, int(val[0]))
+
+		for i, header := range batch1 {
+			data := make(map[flow.RegisterID][]byte)
+			if i%5 == 0 {
+				data[key] = []byte{byte(int8(i))}
+			}
+			err = store.CommitBlock(header, data)
+			require.NoError(t, err)
+		}
+
+		lastUpdatedValue := 0
+		for i, header := range batch1 {
+			if i%5 == 0 {
+				lastUpdatedValue = i
+			}
+			val, err = store.RegisterValueAt(header.Height, header.ID(), key)
+			require.NoError(t, err)
+			require.Equal(t, lastUpdatedValue, int(val[0]))
 		}
 	})
 }

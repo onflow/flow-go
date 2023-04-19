@@ -40,7 +40,6 @@ func NewOracleView(storage storage.Storage) (*OracleView, error) {
 var _ View = &OracleView{}
 
 func (v *OracleView) Get(height uint64, blockID flow.Identifier, id flow.RegisterID) (flow.RegisterValue, error) {
-
 	return v.storage.RegisterValueAt(height, blockID, id)
 }
 

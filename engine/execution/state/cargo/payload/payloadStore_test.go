@@ -59,10 +59,9 @@ func TestPayloadStore(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, i, int(val[0]))
 		}
-
 	})
 
-	t.Run("cleanup forks", func(t *testing.T) {
+	t.Run("test fork cleanup", func(t *testing.T) {
 		headers := unittest.BlockHeaderFixtures(10)
 		genesis, mainChain := headers[0], headers[1:]
 

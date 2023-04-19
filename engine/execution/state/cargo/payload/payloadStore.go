@@ -73,7 +73,7 @@ func (ps *PayloadStore) BlockExecuted(
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
 
-	// discard
+	// discard (TODO: maybe return error in the future)
 	if height < ps.oracleView.lastCommittedHeight {
 		return nil
 	}
@@ -87,7 +87,7 @@ func (ps *PayloadStore) BlockExecuted(
 			// this should never happen, this means updates for a block was submitted but parent is not available
 			return fmt.Errorf("view for parent block %x is missing", parentBlockID)
 		}
-		// keep parent relationship of blocks
+		// update children list
 		ps.childrenByID[parentBlockID] = append(ps.childrenByID[parentBlockID], blockID)
 	}
 
@@ -117,7 +117,8 @@ func (ps *PayloadStore) BlockFinalized(
 	defer ps.lock.Unlock()
 
 	view, found := ps.viewByID[blockID]
-	// return, probably too early
+	// return, probably too early,
+	// return with false flag so we don't consume the event
 	if !found {
 		return false, nil
 	}
@@ -128,7 +129,9 @@ func (ps *PayloadStore) BlockFinalized(
 		return false, err
 	}
 
-	// remove all views in the same height
+	// find all blocks with the given height
+	// remove them from the viewByID list
+	// if not our target block, prune children
 	for bID := range ps.blockIDsByHeight[height] {
 		delete(ps.viewByID, bID)
 		if bID != blockID {
@@ -136,12 +139,14 @@ func (ps *PayloadStore) BlockFinalized(
 		}
 
 	}
+	// remove this height
 	delete(ps.blockIDsByHeight, height)
 
-	// update all children to use oracle
+	// update all child blocks to use the oracle view
 	for _, childID := range ps.childrenByID[blockID] {
 		ps.viewByID[childID].UpdateParent(ps.oracleView)
 	}
+	// remove childrenByID lookup
 	delete(ps.childrenByID, blockID)
 
 	return true, nil
