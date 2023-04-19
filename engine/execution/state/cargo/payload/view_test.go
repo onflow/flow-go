@@ -53,10 +53,9 @@ func TestOracleView(t *testing.T) {
 		},
 	}
 
-	ov, err := payload.NewOracleView(storage)
-	require.NoError(t, err)
+	ov := payload.NewOracleView(storage)
 
-	_, err = ov.Get(lastHeader.Height, lastHeader.ID(), flow.RegisterID{})
+	_, err := ov.Get(lastHeader.Height, lastHeader.ID(), flow.RegisterID{})
 	require.NoError(t, err)
 
 	_, err = ov.Get(lastHeader.Height-1, flow.ZeroID, flow.RegisterID{})

@@ -15,24 +15,27 @@ import (
 // is receieved, then it would move finalized results into a persistant storage
 // and would prune results for the same height
 type PayloadStore struct {
-	oracleView       *OracleView
-	viewByID         map[flow.Identifier]*InFlightView
-	blockIDsByHeight map[uint64]map[flow.Identifier]struct{}
-	childrenByID     map[flow.Identifier][]flow.Identifier
-	lock             sync.RWMutex
+	oracleView          *OracleView
+	viewByID            map[flow.Identifier]*InFlightView
+	blockIDsByHeight    map[uint64]map[flow.Identifier]struct{}
+	childrenByID        map[flow.Identifier][]flow.Identifier
+	lastCommittedHeight uint64 // a cached value for the last committed height
+	lock                sync.RWMutex
 }
 
+// NewPayloadStore constructs a new PayloadStore
 func NewPayloadStore(storage storage.Storage) (*PayloadStore, error) {
-	oracle, err := NewOracleView(storage)
+	header, err := storage.LastCommittedBlock()
 	if err != nil {
 		return nil, err
 	}
 	return &PayloadStore{
-		oracleView:       oracle,
-		viewByID:         make(map[flow.Identifier]*InFlightView, 0),
-		blockIDsByHeight: make(map[uint64]map[flow.Identifier]struct{}, 0),
-		childrenByID:     make(map[flow.Identifier][]flow.Identifier, 0),
-		lock:             sync.RWMutex{},
+		oracleView:          NewOracleView(storage),
+		viewByID:            make(map[flow.Identifier]*InFlightView, 0),
+		blockIDsByHeight:    make(map[uint64]map[flow.Identifier]struct{}, 0),
+		childrenByID:        make(map[flow.Identifier][]flow.Identifier, 0),
+		lock:                sync.RWMutex{},
+		lastCommittedHeight: header.Height,
 	}, nil
 }
 
@@ -51,7 +54,7 @@ func (ps *PayloadStore) Get(
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
-	if height <= ps.oracleView.lastCommittedHeight {
+	if height <= ps.lastCommittedHeight {
 		return ps.oracleView.Get(height, blockID, key)
 	}
 
@@ -74,13 +77,13 @@ func (ps *PayloadStore) BlockExecuted(
 	defer ps.lock.Unlock()
 
 	// discard (TODO: maybe return error in the future)
-	if height < ps.oracleView.lastCommittedHeight {
+	if height < ps.lastCommittedHeight {
 		return nil
 	}
 
 	var parent View
 	parent = ps.oracleView
-	if height > ps.oracleView.lastCommittedHeight+1 {
+	if height > ps.lastCommittedHeight+1 {
 		var found bool
 		parent, found = ps.viewByID[parentBlockID]
 		if !found {
@@ -148,6 +151,8 @@ func (ps *PayloadStore) BlockFinalized(
 	}
 	// remove childrenByID lookup
 	delete(ps.childrenByID, blockID)
+
+	ps.lastCommittedHeight = header.Height
 
 	return true, nil
 }
