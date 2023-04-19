@@ -14,8 +14,9 @@ package crypto
 // #include "bls12381_utils.h"
 import "C"
 import (
-	"crypto/rand"
 	"errors"
+
+	"github.com/onflow/flow-go/crypto/random"
 )
 
 // Go wrappers around BLST C types
@@ -122,29 +123,25 @@ func (p *pointE2) isInfinity() bool {
 	return C.E2_is_infty((*C.E2)(p)) != 0
 }
 
-// returns a random element of Fr in input pointer
-func randFr(x *scalar) error {
+// generates a random element in F_r using input random source,
+// and saves the random in `x`.
+// returns `true` if generated element is zero.
+func randFr(x *scalar, rand random.Rand) bool {
+	// use extra 128 bits to reduce the modular reduction bias
 	bytes := make([]byte, frBytesLen+securityBits/8)
-	_, err := rand.Read(bytes) // checking one output is enough
-	if err != nil {
-		return errors.New("internal rng failed")
-	}
-	_ = mapToFr(x, bytes)
-	return nil
+	rand.Read(bytes) // checking one output is enough
+	// modular reduction
+	return mapToFr(x, bytes)
 }
 
-// writes a random element of Fr* in input pointer
-func randFrStar(x *scalar) error {
-	bytes := make([]byte, frBytesLen+securityBits/8)
+// generates a random element in F_r* using input random source,
+// and saves the random in `x`.
+func randFrStar(x *scalar, rand random.Rand) {
 	isZero := true
+	// exteremely unlikely this loop runs more than once
 	for isZero {
-		_, err := rand.Read(bytes) // checking one output is enough
-		if err != nil {
-			return errors.New("internal rng failed")
-		}
-		isZero = mapToFr(x, bytes)
+		isZero = randFr(x, rand)
 	}
-	return nil
 }
 
 // mapToFr reads a scalar from a slice of bytes and maps it to Zr.

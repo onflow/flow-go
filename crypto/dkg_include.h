@@ -5,7 +5,6 @@
 
 #include "bls12381_utils.h"
 
-void        Fr_generate_polynomial(Fr* a, const int degree, const byte* seed, const int seed_len);
 void        Fr_polynomial_image_write(byte* out, E2* y, const Fr* a, const int deg, const byte x);
 void        Fr_polynomial_image(Fr* out, E2* y, const Fr* a, const int deg, const byte x);
 void        E2_polynomial_images(E2* y, const int len_y, const E2* A, const int deg);

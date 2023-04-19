@@ -533,11 +533,13 @@ func EnoughShares(threshold int, sharesNumber int) (bool, error) {
 //
 // The function returns :
 //   - (nil, nil, nil, invalidInputsErrorf) if:
+//   - seed is too short
 //   - n is not in [`ThresholdSignMinSize`, `ThresholdSignMaxSize`]
 //   - threshold value is not in interval [1, n-1]
 //   - (groupPrivKey, []pubKeyShares, groupPubKey, nil) otherwise
 func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	[]PublicKey, PublicKey, error) {
+
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
 		return nil, nil, nil, invalidInputsErrorf(
 			"size should be between %d and %d, got %d",
@@ -559,20 +561,11 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	var X0 pointE2
 
 	// Generate a polynomial P in Fr[X] of degree t
-	a := make([]scalar, threshold+1)
-	if err := randFrStar(&a[0]); err != nil { // non-identity key
-		return nil, nil, nil, fmt.Errorf("generating the random polynomial failed: %w", err)
+	a, err := generateFrPolynomial(seed, threshold)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to generate random polynomial: %w", err)
 	}
-	if threshold > 0 {
-		for i := 1; i < threshold; i++ {
-			if err := randFr(&a[i]); err != nil {
-				return nil, nil, nil, fmt.Errorf("generating the random polynomial failed: %w", err)
-			}
-		}
-		if err := randFrStar(&a[threshold]); err != nil { // enforce the polynomial degree
-			return nil, nil, nil, fmt.Errorf("generating the random polynomial failed: %w", err)
-		}
-	}
+
 	// compute the shares
 	for i := index(1); int(i) <= size; i++ {
 		C.Fr_polynomial_image(

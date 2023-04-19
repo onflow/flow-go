@@ -9,6 +9,9 @@ import "C"
 
 import (
 	"fmt"
+
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/random"
 )
 
 // Implements Feldman Verifiable Secret Sharing using
@@ -90,6 +93,7 @@ func (s *feldmanVSSstate) init() {
 // If the current participant is not the dealer, the seed is ignored.
 //
 // The function returns:
+// - invalidInputError if seed is too short
 // - dkgInvalidStateTransitionError if the DKG instance is already running.
 // - error if an unexpected exception occurs
 // - nil otherwise
@@ -255,30 +259,63 @@ func (s *feldmanVSSstate) ForceDisqualify(participant int) error {
 	return nil
 }
 
+// generate a pseudo-random polynomial P = a_0 + a_1*x + .. + a_n x^n in Fr[X]
+// where `n` is the input `degree` (higher degree monomial in non-zero).
+// `a_0` is also non-zero (for single dealer BLS-DKGs, this insures
+// protocol public key output is not identity).
+// `seed` is used as the entropy source and must be at least `SeedMinLenDKG`
+// random bytes with at least 128 bits entropy.
+func generateFrPolynomial(seed []byte, degree int) ([]scalar, error) {
+	if len(seed) < SeedMinLenDKG {
+		return nil, invalidInputsErrorf(
+			"seed should be at least %d bytes, got %d", SeedMinLenDKG, len(seed))
+	}
+
+	// build a PRG out of the seed
+	// In this case, SHA3 is used to smoothen the seed and Chacha20 is used as a PRG
+	var prgSeed [random.Chacha20SeedLen]byte
+	hash.ComputeSHA3_256(&prgSeed, seed)
+	prg, err := random.NewChacha20PRG(prgSeed[:], []byte("gen_poly"))
+	if err != nil {
+		return nil, fmt.Errorf("instanciating the PRG failed: %w", err)
+	}
+
+	// P's coefficients
+	a := make([]scalar, degree+1)
+
+	// generate a_0 in F_r*
+	randFrStar(&a[0], prg)
+	if degree > 0 {
+		// genarate a_i on F_r, for 0<i<degree
+		for i := 1; i < degree; i++ {
+			_ = randFr(&a[i], prg)
+		}
+		// generate a_degree in F_r* to enforce P's degree
+		randFrStar(&a[degree], prg)
+	}
+	return a, nil
+}
+
 // generateShares is used by the dealer to generate secret polynomial from the input seed
 // and derive all private shares and public data.
 func (s *feldmanVSSstate) generateShares(seed []byte) error {
-	// Generate a polyomial P in Fr[X] of degree t
-	s.a = make([]scalar, s.threshold+1)
-	s.vA = make([]pointE2, s.threshold+1)
+
 	s.y = make([]pointE2, s.size)
-	// non-zero a[0] - group private key is not zero
-	if err := randFrStar(&s.a[0]); err != nil {
-		return fmt.Errorf("generating the polynomial failed: %w", err)
+
+	// Generate a random polyomial P in Fr[X] of degree t (coefficients are a_i)
+	// `s.a` are the coefficients of P
+	//  - a_degree is non-zero as deg(P) = degree
+	//  - `a_0` is non-zero to make sure BLS-DKG public key is non-identity
+	var err error
+	s.a, err = generateFrPolynomial(seed, s.threshold)
+	if err != nil {
+		return fmt.Errorf("failed to generate random polynomial: %w", err)
 	}
-	generatorScalarMultG2(&s.vA[0], &s.a[0])
-	if s.threshold > 0 {
-		for i := 1; i < s.threshold; i++ {
-			if err := randFr(&s.a[i]); err != nil {
-				return fmt.Errorf("generating the polynomial failed: %w", err)
-			}
-			generatorScalarMultG2(&s.vA[i], &s.a[i])
-		}
-		// non-zero a[t] to enforce the polynomial degree
-		if err := randFrStar(&s.a[s.threshold]); err != nil {
-			return fmt.Errorf("generating the polynomial failed: %w", err)
-		}
-		generatorScalarMultG2(&s.vA[s.threshold], &s.a[s.threshold])
+
+	// compute the verification vector A_i = g2^a_i
+	s.vA = make([]pointE2, s.threshold+1)
+	for i := 0; i <= s.threshold; i++ {
+		generatorScalarMultG2(&s.vA[i], &s.a[i])
 	}
 
 	// compute the shares
