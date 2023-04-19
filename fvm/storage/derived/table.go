@@ -6,9 +6,9 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage/errors"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/state"
 )
 
 // ValueComputer is used by DerivedDataTable's GetOrCompute to compute the

@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	execState "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
