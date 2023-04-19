@@ -1115,6 +1115,11 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 				builder.Logger,
 				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork))
 
+			err := node.Metrics.Mempool.Register(metrics.PrependPublicPrefix(metrics.ResourceNetworkingReceiveCache), receiveCache.Size)
+			if err != nil {
+				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
+			}
+
 			net, err := builder.initNetwork(builder.Me, builder.PublicNetworkConfig.Metrics, middleware, top, receiveCache)
 			if err != nil {
 				return nil, err
