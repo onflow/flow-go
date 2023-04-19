@@ -62,7 +62,7 @@ func TestPayloadStore(t *testing.T) {
 
 	})
 
-	t.Run("finalization forks", func(t *testing.T) {
+	t.Run("cleanup forks", func(t *testing.T) {
 		headers := unittest.BlockHeaderFixtures(10)
 		genesis, mainChain := headers[0], headers[1:]
 

@@ -14,8 +14,9 @@ type valueAtHeight struct {
 // InMemoryStorage implements storage interface, keeping register updates in memory,
 // it only limits historic look up of register to the last X commits
 type InMemoryStorage struct {
-	historyCapacity    int
-	registers          map[flow.RegisterID][]valueAtHeight
+	historyCapacity int
+	registers       map[flow.RegisterID][]valueAtHeight
+	// we keep all headers, but could be reduced to only a limited history
 	headers            map[flow.Identifier]*flow.Header
 	lastCommittedBlock *flow.Header
 	minHeightAvailable uint64

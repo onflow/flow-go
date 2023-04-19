@@ -1,7 +1,6 @@
 package cargo
 
 import (
-	"fmt"
 	"time"
 
 	"go.uber.org/atomic"
@@ -69,7 +68,6 @@ func (c *Cargo) Reader(header *flow.Header) state.StorageSnapshot {
 // BlockFinalized is called every time a block is executed
 func (c *Cargo) BlockExecuted(header *flow.Header, updates map[flow.RegisterID]flow.RegisterValue) error {
 	// add updates to the payload store
-	fmt.Println("block executed:", header.Height)
 	return c.payloadStore.BlockExecuted(header, updates)
 }
 
@@ -77,13 +75,11 @@ func (c *Cargo) BlockExecuted(header *flow.Header, updates map[flow.RegisterID]f
 func (c *Cargo) BlockFinalized(new *flow.Header) error {
 	// enqueue the finalized header
 	// TODO deal with errors (e.g. if already processed move on)
-	fmt.Println("block finalized:", new.Height)
 	return c.blockQueue.Enqueue(new)
 }
 
 // TrySync tries to sync the block finalization queue with the payload store
 func (c *Cargo) TrySync() error {
-	fmt.Println("sync triggered")
 	// if sync is in progress skip
 	if c.syncInProgress.CompareAndSwap(false, true) {
 		defer c.syncInProgress.Store(false)
@@ -120,7 +116,6 @@ func (c *Cargo) Start() {
 					c.syncStopped <- struct{}{}
 					return
 				case <-ticker.C:
-					fmt.Println("Tick")
 					err := c.TrySync()
 					if err != nil {
 						c.syncError <- err
