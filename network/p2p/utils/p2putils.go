@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"crypto/rand"
 	"fmt"
 	"net"
 
@@ -99,33 +98,4 @@ func MessageID(data []byte) string {
 	h := hash.NewSHA3_384()
 	_, _ = h.Write(data)
 	return h.SumHash().Hex()
-}
-
-// SaltedSeedFromPeerID returns a deterministic salted seed for the given peer ID.
-// The salt is generated randomly. The salt is used to introduce randomness and uniqueness in the seed, and
-// make the seed externally unpredictable.
-// Args:
-// 	- peerID: the peer ID to generate the seed for
-// Returns:
-// 	- seed: the salted seed
-// 	- error: an error if the salt could not be generated. The error is irrecoverable.
-func SaltedSeedFromPeerID(peerID peer.ID) (flow.Identifier, error) {
-	salt := make([]byte, len(peerID))
-	n, err := rand.Read(salt)
-	if err != nil {
-		return flow.ZeroID, fmt.Errorf("could not generate random salt: %w", err)
-	}
-	if n != len(salt) {
-		return flow.ZeroID, fmt.Errorf("length of salt does not match. got: %d, expected: %d", n, len(salt))
-	}
-
-	seed := flow.MakeID(struct {
-		Salt   []byte
-		PeerID peer.ID
-	}{
-		Salt:   salt,
-		PeerID: peerID,
-	})
-
-	return seed, nil
 }
