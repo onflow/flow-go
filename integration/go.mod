@@ -5,6 +5,7 @@ go 1.19
 require (
 	cloud.google.com/go/bigquery v1.48.0
 	github.com/VividCortex/ewma v1.2.0
+	github.com/coreos/go-semver v0.3.0
 	github.com/dapperlabs/testingdock v0.4.4
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
@@ -80,7 +81,6 @@ require (
 	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/containerd/continuity v0.0.0-20200107194136-26c1120b8d41 // indirect
 	github.com/containerd/fifo v0.0.0-20191213151349-ff969a566b00 // indirect
-	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cskr/pubsub v1.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
