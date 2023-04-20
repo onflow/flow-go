@@ -3,6 +3,9 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
+	"fmt"
+	"net"
+	"strconv"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -222,12 +225,17 @@ func (b *backendScripts) tryExecuteScriptOnArchiveNode(ctx context.Context, exec
 		Script:    script,
 		Arguments: arguments,
 	}
-	execRPCClient, closer, err := b.connFactory.GetAccessAPIClient(executorAddress)
+	port, err := findPortFromAddress(executorAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	archiveClient, closer, err := b.connFactory.GetAccessAPIClientWithPort(executorAddress, port)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create client for archive node %s: %v", executorAddress, err)
 	}
 	defer closer.Close()
-	resp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, req)
+	resp, err := archiveClient.ExecuteScriptAtBlockID(ctx, req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateAccessAPIClient(executorAddress)
@@ -235,4 +243,22 @@ func (b *backendScripts) tryExecuteScriptOnArchiveNode(ctx context.Context, exec
 		return nil, status.Errorf(status.Code(err), "failed to execute the script on archive node %s: %v", executorAddress, err)
 	}
 	return resp.GetValue(), nil
+}
+
+func findPortFromAddress(address string) (uint, error) {
+	_, portStr, err := net.SplitHostPort(address)
+	if err != nil {
+		return 0, fmt.Errorf("fail to extract port from archive address %v: %w", address, err)
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return 0, fmt.Errorf("fail to convert port string %v to port", portStr)
+	}
+
+	if port < 0 {
+		return 0, fmt.Errorf("invalid port: %v", port)
+	}
+
+	return uint(port), nil
 }

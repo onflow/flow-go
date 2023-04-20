@@ -26,6 +26,7 @@ const DefaultClientTimeout = 3 * time.Second
 // ConnectionFactory is used to create an access api client
 type ConnectionFactory interface {
 	GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error)
+	GetAccessAPIClientWithPort(address string, port uint) (access.AccessAPIClient, io.Closer, error)
 	InvalidateAccessAPIClient(address string)
 	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error)
 	InvalidateExecutionAPIClient(address string)
@@ -45,7 +46,6 @@ func (c *noopCloser) Close() error {
 func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
 	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress)
 }
-
 func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
 	return p.ConnectionFactory.GetExecutionAPIClient(p.targetAddress)
 }
@@ -146,8 +146,12 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 }
 
 func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
+	return cf.GetAccessAPIClientWithPort(address, cf.CollectionGRPCPort)
+}
 
-	grpcAddress, err := getGRPCAddress(address, cf.CollectionGRPCPort)
+func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, port uint) (access.AccessAPIClient, io.Closer, error) {
+
+	grpcAddress, err := getGRPCAddress(address, port)
 	if err != nil {
 		return nil, nil, err
 	}
