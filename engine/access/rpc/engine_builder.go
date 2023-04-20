@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -20,13 +21,15 @@ type RPCEngineBuilder struct {
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
 	handler              accessproto.AccessAPIServer // Use the parent interface instead of implementation, so that we can assign it to proxy.
 	finalizedHeaderCache *synceng.FinalizedHeaderCache
+	nodeId               flow.Identifier
 }
 
 // NewRPCEngineBuilder helps to build a new RPC engine.
-func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
+func NewRPCEngineBuilder(engine *Engine, nodeId flow.Identifier) *RPCEngineBuilder {
 	// the default handler will use the engine.backend implementation
 	return &RPCEngineBuilder{
 		Engine: engine,
+		nodeId: nodeId,
 	}
 }
 
@@ -107,9 +110,9 @@ func (builder *RPCEngineBuilder) Build() (*Engine, error) {
 			return nil, fmt.Errorf("FinalizedHeaderCache (via method `WithFinalizedHeaderCache`) has to be specified")
 		}
 		if builder.signerIndicesDecoder == nil {
-			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache)
+			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.nodeId)
 		} else {
-			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
+			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.nodeId, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
 		}
 	}
 	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, handler)

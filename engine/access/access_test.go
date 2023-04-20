@@ -168,7 +168,7 @@ func (suite *Suite) RunTest(
 			backend.DefaultSnapshotHistoryLimit,
 			nil,
 		)
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me.NodeID(), access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
 		f(handler, db, all)
 	})
 }
@@ -341,7 +341,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			nil,
 		)
 
-		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeaderCache)
+		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me.NodeID())
 
 		// Send transaction 1
 		resp, err := handler.SendTransaction(context.Background(), sendReq1)
@@ -667,10 +667,10 @@ func (suite *Suite) TestGetSealedTransaction() {
 			nil,
 		)
 
-		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeaderCache)
+		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me.NodeID())
 
 		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, all.Blocks, all.Headers, collections, transactions, receipts,
-			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
+			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil, suite.me.NodeID())
 		require.NoError(suite.T(), err)
 		rpcEng, err := rpcEngBuilder.WithFinalizedHeaderCache(suite.finalizedHeaderCache).WithLegacy().Build()
 		require.NoError(suite.T(), err)
@@ -761,7 +761,7 @@ func (suite *Suite) TestExecuteScript() {
 			nil,
 		)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache)
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me.NodeID())
 
 		// initialize metrics related storage
 		metrics := metrics.NewNoopCollector()
@@ -906,7 +906,7 @@ func (suite *Suite) TestRpcEngineBuilderWithFinalizedHeaderCache() {
 		collections := bstorage.NewCollections(db, transactions)
 
 		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, all.Blocks, all.Headers, collections, transactions, receipts,
-			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
+			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil, suite.me.NodeID())
 		require.NoError(suite.T(), err)
 
 		rpcEng, err := rpcEngBuilder.WithLegacy().WithBlockSignerDecoder(suite.signerIndicesDecoder).Build()

@@ -74,7 +74,7 @@ func TransactionResultToMessage(result *TransactionResult) *access.TransactionRe
 	}
 }
 
-func TransactionResultsToMessage(results []*TransactionResult, metadata *entities.Metadata) *access.TransactionResultsResponse {
+func TransactionResultsToMessage(results []*TransactionResult) *access.TransactionResultsResponse {
 	messages := make([]*access.TransactionResultResponse, len(results))
 	for i, result := range results {
 		messages[i] = TransactionResultToMessage(result)
@@ -82,7 +82,6 @@ func TransactionResultsToMessage(results []*TransactionResult, metadata *entitie
 
 	return &access.TransactionResultsResponse{
 		TransactionResults: messages,
-		Metadata:           metadata,
 	}
 }
 
