@@ -4,7 +4,6 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // GetTransactionByID gets a transaction by requested ID.
@@ -22,7 +21,7 @@ func GetTransactionByID(r *request.Request, backend access.API, link models.Link
 	var txr *access.TransactionResult
 	// only lookup result if transaction result is to be expanded
 	if req.ExpandsResult {
-		txr, err = backend.GetTransactionResult(r.Context(), req.ID, flow.ZeroID, flow.ZeroID)
+		txr, err = backend.GetTransactionResult(r.Context(), req.ID, req.BlockID, req.CollectionID)
 		if err != nil {
 			return nil, err
 		}
@@ -40,7 +39,7 @@ func GetTransactionResultByID(r *request.Request, backend access.API, link model
 		return nil, NewBadRequestError(err)
 	}
 
-	txr, err := backend.GetTransactionResult(r.Context(), req.ID, flow.ZeroID, flow.ZeroID)
+	txr, err := backend.GetTransactionResult(r.Context(), req.ID, req.BlockID, req.CollectionID)
 	if err != nil {
 		return nil, err
 	}

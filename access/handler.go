@@ -211,22 +211,17 @@ func (h *Handler) GetTransactionResult(
 	ctx context.Context,
 	req *access.GetTransactionRequest,
 ) (*access.TransactionResultResponse, error) {
-	id, err := convert.TransactionID(req.GetId())
+	transactionID, err := convert.TransactionID(req.GetId())
 	if err != nil {
 		return nil, err
 	}
+	// NOTE: blockId could be flow.ZeroID, as it is an optional parameter. The error here is intentionally ignored.
+	blockId, _ := convert.BlockID(req.GetBlockId())
 
-	blockId, err := convert.BlockID(req.GetBlockId())
-	if err != nil {
-		return nil, err
-	}
+	// NOTE: collectionId could be flow.ZeroID, as it is an optional parameter. The error here is intentionally ignored.
+	collectionId, _ := convert.TransactionID(req.GetCollectionId())
 
-	collectionId, err := convert.TransactionID(req.GetCollectionId())
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := h.api.GetTransactionResult(ctx, id, blockId, collectionId)
+	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId)
 	if err != nil {
 		return nil, err
 	}
