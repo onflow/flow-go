@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	ServiceEventSetup  = "setup"
-	ServiceEventCommit = "commit"
+	ServiceEventSetup         = "setup"
+	ServiceEventCommit        = "commit"
+	ServiceEventVersionBeacon = "version-beacon"
 )
 
 // ServiceEvent represents a service event, which is a special event that when
@@ -87,6 +88,13 @@ func (se *ServiceEvent) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		event = commit
+	case ServiceEventVersionBeacon:
+		version := new(VersionBeacon)
+		err = json.Unmarshal(evb, version)
+		if err != nil {
+			return err
+		}
+		event = version
 	default:
 		return fmt.Errorf("invalid type: %s", tp)
 	}
@@ -137,6 +145,13 @@ func (se *ServiceEvent) UnmarshalMsgpack(b []byte) error {
 			return err
 		}
 		event = commit
+	case ServiceEventVersionBeacon:
+		version := new(VersionBeacon)
+		err = msgpack.Unmarshal(evb, version)
+		if err != nil {
+			return err
+		}
+		event = version
 	default:
 		return fmt.Errorf("invalid type: %s", tp)
 	}
@@ -186,6 +201,13 @@ func (se *ServiceEvent) UnmarshalCBOR(b []byte) error {
 			return err
 		}
 		event = commit
+	case ServiceEventVersionBeacon:
+		version := new(VersionBeacon)
+		err = cbor.Unmarshal(evb, version)
+		if err != nil {
+			return err
+		}
+		event = version
 	default:
 		return fmt.Errorf("invalid type: %s", tp)
 	}
@@ -223,6 +245,23 @@ func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
 			return false, fmt.Errorf("internal invalid type for ServiceEventCommit: %T", other.Event)
 		}
 		return commit.EqualTo(otherCommit), nil
+
+	case ServiceEventVersionBeacon:
+		version, ok := se.Event.(*VersionBeacon)
+		if !ok {
+			return false, fmt.Errorf(
+				"internal invalid type for ServiceEventVersionBeacon: %T",
+				se.Event)
+		}
+		otherVersion, ok := other.Event.(*VersionBeacon)
+		if !ok {
+			return false,
+				fmt.Errorf(
+					"internal invalid type for ServiceEventVersionBeacon: %T",
+					other.Event)
+		}
+		return version.EqualTo(otherVersion), nil
+
 	default:
 		return false, fmt.Errorf("unknown serice event type: %s", se.Type)
 	}

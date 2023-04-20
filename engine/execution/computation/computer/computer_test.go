@@ -1079,8 +1079,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	noopCollector := metrics.NewNoopCollector()
 
-	expectedNumberOfEvents := 2
-	expectedEventSize := 911
+	expectedNumberOfEvents := 3
+	expectedEventSize := 1721
 	// bootstrapping does not cache programs
 	expectedCachedPrograms := 0
 
