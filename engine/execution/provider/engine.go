@@ -266,6 +266,10 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 		Logger()
 	lg.Info().Msg("started processing chunk data pack request")
 
+	// TODO(ramtin): we might add a future logic to do extra checks on the origin of the request
+	// currently the networking layer checks that the requested is a valid node operator
+	// that has not been ejected.
+
 	// increases collector metric
 	e.metrics.ChunkDataPackRequestProcessed()
 	chunkDataPack, err := e.execState.ChunkDataPackByChunkID(request.ChunkId)
@@ -293,9 +297,6 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 			Msg("chunk data pack query takes longer than expected timeout")
 	}
 
-	// TODO(ramtin): we might add a future logic to do extra checks on the source of request
-	// currently networking layer does validate the requester is a valid node operator
-	// staked and not ejected.
 	e.deliverChunkDataResponse(chunkDataPack, request.RequesterId)
 }
 
