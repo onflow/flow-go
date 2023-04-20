@@ -20,9 +20,6 @@
 #define DOUBLE_PAIRING 1
 #define SINGLE_PAIRING (DOUBLE_PAIRING^1)
 
-// Signature and public key membership check
-#define MEMBERSHIP_CHECK 0  // TODO: switch to 1 and clean up memb check
-
 // algorithm choice for hashing to G1 
 // both methods are similar implementations of the same optimized SSWU 
 // but offer different timings.

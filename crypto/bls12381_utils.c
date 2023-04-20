@@ -1013,6 +1013,13 @@ void G2_mult_gen(E2* res, const Fr* expo) {
     POINTonE2_sign((POINTonE2*)res, &BLS12_381_G2, tmp);
 }
 
+// checks if input E2 point is on the subgroup G2.
+// It assumes input `p` is on E2.
+bool_t E2_in_G2(const E2* p){
+    // currently uses Scott method
+    return POINTonE2_in_G2((const POINTonE2*)p);
+}
+
 // computes the sum of the G2 array elements y and writes the sum in jointy
 void E2_sum_vector(E2* jointy, const E2* y, const int len){
     E2_set_infty(jointy);
@@ -1040,7 +1047,7 @@ int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte*
         return read_ret;
 
     // check s1 is in G1
-    if (G1_check_membership(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
+    if (E1_in_G1(elemsG1[0]) != VALID) 
         return INVALID;
 
     // elemsG1[1] = s2
@@ -1050,7 +1057,7 @@ int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte*
         return read_ret;
 
     // check s2 in G1
-    if (G1_check_membership(elemsG1[1]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
+    if (E1_in_G1(elemsG1[1]) != VALID) 
         return INVALID; 
 
     // elemsG2[1] = pk1
@@ -1163,22 +1170,6 @@ int G1_simple_subgroup_check(const ep_t p){
         return INVALID;
     }
     ep_free(inf);
-    return VALID;
-}
-
-// uses a simple scalar multiplication by G1's order
-// to check whether a point on the curve E2 is in G2.
-int G2_simple_subgroup_check(const ep2_t p){
-    ep2_t inf;
-    ep2_new(inf);
-    // check p^order == infinity
-    // use basic double & add as lwnaf reduces the expo modulo r
-    ep2_mul_basic(inf, (ep2_st*)p, &core_get()->ep_r);
-    if (!ep2_is_infty(inf)){
-        ep2_free(inf);
-        return INVALID;
-    }
-    ep2_free(inf);
     return VALID;
 }
 

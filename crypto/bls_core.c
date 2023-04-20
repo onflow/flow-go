@@ -21,8 +21,9 @@ int get_sk_len() {
 
 // Checks if input point p is in the subgroup G1. 
 // The function assumes the input is known to be on the curve E1.
-int G1_check_membership(const ep_t p){
-#if MEMBERSHIP_CHECK
+int E1_in_G1(const ep_t p){
+// TODO: to upadte
+/*
     #if MEMBERSHIP_CHECK_G1 == EXP_ORDER
     return G1_simple_subgroup_check(p);
     #elif MEMBERSHIP_CHECK_G1 == BOWE
@@ -31,30 +32,7 @@ int G1_check_membership(const ep_t p){
     #else
     return UNDEFINED;
     #endif
-#endif
-    return VALID;
-}
-
-// checks if input point s is on the curve E2 
-// and is in the subgroup G2.
-// 
-// membership check in G2 is using a scalar multiplication by the group order.
-// TODO: switch to the faster Bowe check 
-int G2_check_membership(const E2* p){
-#if MEMBERSHIP_CHECK
-    // check p is on curve
-    if (!E2_affine_on_curve(p))  // TODO: remove and assume inputs are on curve?
-        return INVALID;
-    // check p is in G2
-    #if MEMBERSHIP_CHECK_G2 == EXP_ORDER
-    return G2_simple_subgroup_check(p);
-    #elif MEMBERSHIP_CHECK_G2 == BOWE
-    // TODO: implement Bowe's check
-    return UNDEFINED;
-    #else
-    return UNDEFINED;
-    #endif
-#endif
+*/
     return VALID;
 }
 
@@ -172,7 +150,7 @@ int bls_verifyPerDistinctMessage(const byte* sig,
     if (ret != RLC_OK) goto out;
 
     // check s is in G1
-    ret = G1_check_membership(elemsG1[0]); // only enabled if MEMBERSHIP_CHECK==1
+    ret = E1_in_G1(elemsG1[0]);
     if (ret != VALID) goto out;
 
     // elemsG2[0] = -g2
@@ -260,7 +238,7 @@ int bls_verifyPerDistinctKey(const byte* sig,
     if (ret != RLC_OK) goto out;
 
     // check s in G1
-    ret = G1_check_membership(elemsG1[0]); // only enabled if MEMBERSHIP_CHECK==1
+    ret = E1_in_G1(elemsG1[0]); 
     if (ret != VALID) goto out;
 
     // elemsG2[0] = -g2
@@ -346,7 +324,7 @@ int bls_verify(const E2* pk, const byte* sig, const byte* data, const int len) {
     }
 
     // check s is in G1
-    if (G1_check_membership(s) != VALID) { // only enabled if MEMBERSHIP_CHECK==1
+    if (E1_in_G1(s) != VALID) {
         return INVALID;
     }
     
@@ -495,7 +473,7 @@ void bls_batchVerify(const int sigs_len, byte* results, const E2* pks_input,
         // - valid points are multiplied by a random scalar (same for public keys at same index)
         // to make sure a signature at index (i) is verified against the public key at the same index.
         int read_ret = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
-        if (read_ret != RLC_OK || G1_check_membership(&sigs[i]) != VALID) {
+        if (read_ret != RLC_OK || E1_in_G1(&sigs[i]) != VALID) {
             if (read_ret == UNDEFINED) {// unexpected error case 
                 goto out;
             };

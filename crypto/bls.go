@@ -293,7 +293,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 		}
 		defer overwrite(okm) // overwrite okm
 
-		// map the bytes to a private key using modular reduction 
+		// map the bytes to a private key using modular reduction
 		// SK = OS2IP(OKM) mod r
 		isZero := mapToFr(&sk.scalar, okm)
 		if !isZero {
@@ -353,7 +353,7 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 	}
 
 	// membership check in G2
-	if C.G2_check_membership((*C.E2)(&pk.point)) != valid {
+	if C.E2_in_G2((*C.E2)(&pk.point)) == (C.ulonglong)(0) {
 		return nil, invalidInputsErrorf("input key is infinity or does not encode a BLS12-381 point in the valid group")
 	}
 

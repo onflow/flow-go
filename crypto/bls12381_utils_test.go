@@ -119,14 +119,12 @@ func TestSubgroupCheck(t *testing.T) {
 	})*/
 
 	t.Run("G2", func(t *testing.T) {
-		t.Skip() // TODO: fix membership check in G2 and update
 		var p pointE2
 		seed := make([]byte, PubKeyLenBLSBLS12381)
 		_, err := mrand.Read(seed)
 		require.NoError(t, err)
 		mapToG2(&p, seed) // point in G2
-		res := checkMembershipG2(&p)
-		assert.Equal(t, res, int(valid))
+		assert.True(t, checkMembershipG2(&p))
 
 		inG2 := false
 		for !inG2 {
@@ -134,10 +132,8 @@ func TestSubgroupCheck(t *testing.T) {
 			require.NoError(t, err)
 			inG2 = mapToG2Complement(&p, seed) // point in E2\G2
 		}
-		res = checkMembershipG2(&p)
-		assert.Equal(t, res, int(invalid))
+		assert.False(t, checkMembershipG2(&p))
 	})
-
 }
 
 // subgroup membership check bench

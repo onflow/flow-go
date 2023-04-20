@@ -1,7 +1,6 @@
 // +build relic
 
-// keygen.c is not included as it is imported by dkg_core and is not needed
-// by bls12_381_utils
+#include "keygen.c"
 #include "hash_to_field.c"
 #include "e1.c"
 #include "map_to_g1.c"

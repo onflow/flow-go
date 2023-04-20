@@ -223,14 +223,15 @@ func readPointE1(a *pointE1, src []byte) error {
 
 // checkMembershipG1 wraps a call to a subgroup check in G1 since cgo can't be used
 // in go test files.
-func checkMembershipG1(pt *pointE1) int {
-	return int(C.G1_check_membership((*C.ep_st)(pt)))
+func checkMembershipG1(pt *pointE1) bool {
+	//return C.E1_in_G1((*C.E1)(pt)) != (C.ulonglong)(0)
+	return true
 }
 
 // checkMembershipG2 wraps a call to a subgroup check in G2 since cgo can't be used
 // in go test files.
-func checkMembershipG2(pt *pointE2) int {
-	return int(C.G2_check_membership((*C.E2)(pt)))
+func checkMembershipG2(pt *pointE2) bool {
+	return C.E2_in_G2((*C.E2)(pt)) != (C.ulonglong)(0)
 }
 
 /*
