@@ -61,7 +61,7 @@ var receiptsCmd = &cobra.Command{
 				return
 			}
 
-			fmt.Println("resultid:", receipt.ExecutionResult.ID())
+			fmt.Println("resultid:", receipt.ExecutionResult.ID(), receipt.ID())
 
 			common.PrettyPrintEntity(receipt)
 			return
