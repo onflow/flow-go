@@ -213,23 +213,23 @@ func (g *GossipSubScoreTracer) logPeerScore(peerID peer.ID) bool {
 
 	var lg zerolog.Logger
 
-	identity, valid := g.idProvider.ByPeerID(peerID)
-	if !valid {
-		lg = g.logger.With().
-			Str("flow_id", "unknown").
-			Str("role", "unknown").Logger()
-	} else {
-		lg = g.logger.With().
-			Hex("flow_id", logging.ID(identity.NodeID)).
-			Str("role", identity.Role.String()).Logger()
-	}
-
 	lg = g.logger.With().
 		Str("peer_id", peerID.String()).
 		Float64("overall_score", snapshot.Score).
 		Float64("app_specific_score", snapshot.AppSpecificScore).
 		Float64("ip_colocation_factor", snapshot.IPColocationFactor).
 		Float64("behaviour_penalty", snapshot.BehaviourPenalty).Logger()
+
+	identity, valid := g.idProvider.ByPeerID(peerID)
+	if !valid {
+		lg = lg.With().
+			Str("flow_id", "unknown").
+			Str("role", "unknown").Logger()
+	} else {
+		lg = lg.With().
+			Hex("flow_id", logging.ID(identity.NodeID)).
+			Str("role", identity.Role.String()).Logger()
+	}
 
 	g.collector.OnOverallPeerScoreUpdated(snapshot.Score)
 	g.collector.OnAppSpecificScoreUpdated(snapshot.AppSpecificScore)
