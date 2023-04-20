@@ -68,3 +68,46 @@ func TestSaltedShuffle(t *testing.T) {
 		require.ElementsMatch(t, peerIds, shuffled2)
 	}
 }
+
+// TestShuffleEmptySlice tests that shuffling an empty slice returns an empty slice.
+func TestShuffleEmptySlice(t *testing.T) {
+	pid := p2ptest.PeerIdFixture(t)
+
+	s, err := connection.NewPeerIdSliceShuffler(pid)
+	require.NoError(t, err)
+
+	peerIds := p2ptest.PeerIdSliceFixture(t, 0)
+
+	shuffled := s.Shuffle(peerIds)
+
+	require.Len(t, shuffled, 0)
+}
+
+// TestShuffleSingleElementSlice tests that shuffling a slice with a single element returns the same slice.
+// This is because the shuffle is not performed if the slice has a single element.
+func TestShuffleSingleElementSlice(t *testing.T) {
+	pid := p2ptest.PeerIdFixture(t)
+
+	s, err := connection.NewPeerIdSliceShuffler(pid)
+	require.NoError(t, err)
+
+	peerIds := p2ptest.PeerIdSliceFixture(t, 1)
+
+	shuffled := s.Shuffle(peerIds)
+
+	require.Len(t, shuffled, 1)
+	require.Equal(t, peerIds, shuffled)
+}
+
+// TestShuffleNilSlice tests that shuffling a nil slice returns an empty slice.
+// This is because the shuffle is not performed if the slice is nil.
+func TestShuffleNilSlice(t *testing.T) {
+	pid := p2ptest.PeerIdFixture(t)
+
+	s, err := connection.NewPeerIdSliceShuffler(pid)
+	require.NoError(t, err)
+
+	shuffled := s.Shuffle(nil)
+
+	require.Len(t, shuffled, 0)
+}
