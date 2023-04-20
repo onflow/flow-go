@@ -191,7 +191,7 @@ type ExecutionNode struct {
 	RequestEngine       *requester.Engine
 	ReceiptsEngine      *executionprovider.Engine
 	FollowerCore        module.HotStuffFollower
-	FollowerEngine      *followereng.Engine
+	FollowerEngine      *followereng.ComplianceEngine
 	SyncEngine          *synchronization.Engine
 	Compactor           *complete.Compactor
 	BadgerDB            *badger.DB

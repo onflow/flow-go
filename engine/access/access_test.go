@@ -39,7 +39,8 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -109,23 +110,20 @@ func (suite *Suite) SetupTest() {
 }
 
 func (suite *Suite) RunTest(
-	f func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, headers *storage.Headers, results *storage.ExecutionResults),
+	f func(handler *access.Handler, db *badger.DB, all *storage.All),
 ) {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		headers, _, _, _, _, blocks, _, _, _, _, results := util.StorageLayer(suite.T(), db)
-		transactions := storage.NewTransactions(suite.metrics, db)
-		collections := storage.NewCollections(db, transactions)
-		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
+		all := util.StorageLayer(suite.T(), db)
 
 		suite.backend = backend.New(suite.state,
 			suite.collClient,
 			nil,
-			blocks,
-			headers,
-			collections,
-			transactions,
-			receipts,
-			results,
+			all.Blocks,
+			all.Headers,
+			all.Collections,
+			all.Transactions,
+			all.Receipts,
+			all.Results,
 			suite.chainID,
 			suite.metrics,
 			nil,
@@ -135,15 +133,16 @@ func (suite *Suite) RunTest(
 			nil,
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
-		f(handler, db, blocks, headers, results)
+		f(handler, db, all)
 	})
 }
 
 func (suite *Suite) TestSendAndGetTransaction() {
-	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.Blocks, _ *storage.Headers, _ *storage.ExecutionResults) {
+	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.All) {
 		referenceBlock := unittest.BlockHeaderFixture()
 		transaction := unittest.TransactionFixture()
 		transaction.SetReferenceBlockID(referenceBlock.ID())
@@ -196,7 +195,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 }
 
 func (suite *Suite) TestSendExpiredTransaction() {
-	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.Blocks, _ *storage.Headers, _ *storage.ExecutionResults) {
+	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.All) {
 		referenceBlock := unittest.BlockHeaderFixture()
 
 		// create latest block that is past the expiry window
@@ -251,8 +250,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create storage
 		metrics := metrics.NewNoopCollector()
-		transactions := storage.NewTransactions(metrics, db)
-		collections := storage.NewCollections(db, transactions)
+		transactions := bstorage.NewTransactions(metrics, db)
+		collections := bstorage.NewCollections(db, transactions)
 
 		// create collection node cluster
 		count := 2
@@ -310,6 +309,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			nil,
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
@@ -349,7 +349,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 }
 
 func (suite *Suite) TestGetBlockByIDAndHeight() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, _ *storage.Headers, _ *storage.ExecutionResults) {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
 
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
@@ -357,14 +357,18 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		block2 := unittest.BlockFixture()
 		block2.Header.Height = 2
 
-		require.NoError(suite.T(), blocks.Store(&block1))
-		require.NoError(suite.T(), blocks.Store(&block2))
+		require.NoError(suite.T(), all.Blocks.Store(&block1))
+		require.NoError(suite.T(), all.Blocks.Store(&block2))
 
 		// the follower logic should update height index on the block storage when a block is finalized
 		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
-		assertHeaderResp := func(resp *accessproto.BlockHeaderResponse, err error, header *flow.Header) {
+		assertHeaderResp := func(
+			resp *accessproto.BlockHeaderResponse,
+			err error,
+			header *flow.Header,
+		) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := resp.Block
@@ -376,7 +380,11 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.Equal(suite.T(), expectedBlockHeader, header)
 		}
 
-		assertBlockResp := func(resp *accessproto.BlockResponse, err error, block *flow.Block) {
+		assertBlockResp := func(
+			resp *accessproto.BlockResponse,
+			err error,
+			block *flow.Block,
+		) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := resp.Block
@@ -388,7 +396,11 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.Equal(suite.T(), expectedBlock.ID(), block.ID())
 		}
 
-		assertLightBlockResp := func(resp *accessproto.BlockResponse, err error, block *flow.Block) {
+		assertLightBlockResp := func(
+			resp *accessproto.BlockResponse,
+			err error,
+			block *flow.Block,
+		) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := resp.Block
@@ -473,7 +485,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 }
 
 func (suite *Suite) TestGetExecutionResultByBlockID() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, _ *storage.Headers, executionResults *storage.ExecutionResults) {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
 
 		// test block1 get by ID
 		nonexistingID := unittest.IdentifierFixture()
@@ -481,12 +493,16 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 		er := unittest.ExecutionResultFixture(
 			unittest.WithExecutionResultBlockID(blockID),
-			unittest.WithServiceEvents(2))
+			unittest.WithServiceEvents(3))
 
-		require.NoError(suite.T(), executionResults.Store(er))
-		require.NoError(suite.T(), executionResults.Index(blockID, er.ID()))
+		require.NoError(suite.T(), all.Results.Store(er))
+		require.NoError(suite.T(), all.Results.Index(blockID, er.ID()))
 
-		assertResp := func(resp *accessproto.ExecutionResultForBlockIDResponse, err error, executionResult *flow.ExecutionResult) {
+		assertResp := func(
+			resp *accessproto.ExecutionResultForBlockIDResponse,
+			err error,
+			executionResult *flow.ExecutionResult,
+		) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			er := resp.ExecutionResult
@@ -510,7 +526,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			}
 
 			for i, serviceEvent := range executionResult.ServiceEvents {
-				assert.Equal(suite.T(), serviceEvent.Type, er.ServiceEvents[i].Type)
+				assert.Equal(suite.T(), serviceEvent.Type.String(), er.ServiceEvents[i].Type)
 				event := serviceEvent.Event
 
 				marshalledEvent, err := json.Marshal(event)
@@ -555,9 +571,9 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		headers, _, _, _, _, blocks, _, _, _, _, _ := util.StorageLayer(suite.T(), db)
-		results := storage.NewExecutionResults(suite.metrics, db)
-		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
+		all := util.StorageLayer(suite.T(), db)
+		results := bstorage.NewExecutionResults(suite.metrics, db)
+		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := flow.IdentifierList(enIdentities.NodeIDs())
 
@@ -594,8 +610,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
-		transactions := storage.NewTransactions(metrics, db)
-		collections := storage.NewCollections(db, transactions)
+		transactions := bstorage.NewTransactions(metrics, db)
+		collections := bstorage.NewCollections(db, transactions)
 		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
@@ -606,8 +622,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 		backend := backend.New(suite.state,
 			suite.collClient,
 			nil,
-			blocks,
-			headers,
+			all.Blocks,
+			all.Headers,
 			collections,
 			transactions,
 			receipts,
@@ -621,23 +637,24 @@ func (suite *Suite) TestGetSealedTransaction() {
 			enNodeIDs.Strings(),
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
 
-		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions, receipts,
+		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, all.Blocks, all.Headers, collections, transactions, receipts,
 			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
 		require.NoError(suite.T(), err)
 		rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
 			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
-		err = blocks.Store(&block)
+		err = all.Blocks.Store(&block)
 		require.NoError(suite.T(), err)
 		suite.snapshot.On("Head").Return(block.Header, nil).Twice()
 
@@ -683,11 +700,11 @@ func (suite *Suite) TestGetSealedTransaction() {
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		headers, _, _, _, _, blocks, _, _, _, _, _ := util.StorageLayer(suite.T(), db)
-		transactions := storage.NewTransactions(suite.metrics, db)
-		collections := storage.NewCollections(db, transactions)
-		results := storage.NewExecutionResults(suite.metrics, db)
-		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
+		all := util.StorageLayer(suite.T(), db)
+		transactions := bstorage.NewTransactions(suite.metrics, db)
+		collections := bstorage.NewCollections(db, transactions)
+		results := bstorage.NewExecutionResults(suite.metrics, db)
+		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
 
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		suite.snapshot.On("Identities", mock.Anything).Return(identities, nil)
@@ -699,8 +716,8 @@ func (suite *Suite) TestExecuteScript() {
 		suite.backend = backend.New(suite.state,
 			suite.collClient,
 			nil,
-			blocks,
-			headers,
+			all.Blocks,
+			all.Headers,
 			collections,
 			transactions,
 			receipts,
@@ -714,6 +731,7 @@ func (suite *Suite) TestExecuteScript() {
 			flow.IdentifierList(identities.NodeIDs()).Strings(),
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
@@ -731,14 +749,14 @@ func (suite *Suite) TestExecuteScript() {
 		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
 			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil)
 		require.NoError(suite.T(), err)
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockFixture()
 		lastBlock.Header.Height = 2
-		err = blocks.Store(&lastBlock)
+		err = all.Blocks.Store(&lastBlock)
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
@@ -755,7 +773,7 @@ func (suite *Suite) TestExecuteScript() {
 		// create another block as a predecessor of the block created earlier
 		prevBlock := unittest.BlockFixture()
 		prevBlock.Header.Height = lastBlock.Header.Height - 1
-		err = blocks.Store(&prevBlock)
+		err = all.Blocks.Store(&prevBlock)
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
 		require.NoError(suite.T(), err)

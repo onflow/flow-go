@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	chunksmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/convert"
-	convertfixtures "github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
@@ -48,8 +47,8 @@ var eventsList = flow.EventsList{
 
 // the chain we use for this test suite
 var testChain = flow.Emulator
-var epochSetupEvent, _ = convertfixtures.EpochSetupFixtureByChainID(testChain)
-var epochCommitEvent, _ = convertfixtures.EpochCommitFixtureByChainID(testChain)
+var epochSetupEvent, _ = unittest.EpochSetupFixtureByChainID(testChain)
+var epochCommitEvent, _ = unittest.EpochCommitFixtureByChainID(testChain)
 
 var epochSetupServiceEvent, _ = convert.ServiceEvent(testChain, epochSetupEvent)
 var epochCommitServiceEvent, _ = convert.ServiceEvent(testChain, epochCommitEvent)
@@ -355,7 +354,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 
 type vmMock struct{}
 
-func (vm *vmMock) RunV2(
+func (vm *vmMock) Run(
 	ctx fvm.Context,
 	proc fvm.Procedure,
 	storage state.StorageSnapshot,
@@ -411,21 +410,6 @@ func (vm *vmMock) RunV2(
 	return snapshot, output, nil
 }
 
-func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
-	snapshot, output, err := vm.RunV2(ctx, proc, nil)
-	if err != nil {
-		return err
-	}
-
-	err = led.Merge(snapshot)
-	if err != nil {
-		return err
-	}
-
-	proc.SetOutput(output)
-	return nil
-}
-
 func (vmMock) GetAccount(
 	_ fvm.Context,
 	_ flow.Address,
@@ -438,7 +422,7 @@ func (vmMock) GetAccount(
 
 type vmSystemOkMock struct{}
 
-func (vm *vmSystemOkMock) RunV2(
+func (vm *vmSystemOkMock) Run(
 	ctx fvm.Context,
 	proc fvm.Procedure,
 	storage state.StorageSnapshot,
@@ -474,21 +458,6 @@ func (vm *vmSystemOkMock) RunV2(
 	return snapshot, output, nil
 }
 
-func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
-	snapshot, output, err := vm.RunV2(ctx, proc, nil)
-	if err != nil {
-		return err
-	}
-
-	err = led.Merge(snapshot)
-	if err != nil {
-		return err
-	}
-
-	proc.SetOutput(output)
-	return nil
-}
-
 func (vmSystemOkMock) GetAccount(
 	_ fvm.Context,
 	_ flow.Address,
@@ -502,7 +471,7 @@ func (vmSystemOkMock) GetAccount(
 
 type vmSystemBadMock struct{}
 
-func (vm *vmSystemBadMock) RunV2(
+func (vm *vmSystemBadMock) Run(
 	ctx fvm.Context,
 	proc fvm.Procedure,
 	storage state.StorageSnapshot,
@@ -524,21 +493,6 @@ func (vm *vmSystemBadMock) RunV2(
 	}
 
 	return &state.ExecutionSnapshot{}, output, nil
-}
-
-func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
-	snapshot, output, err := vm.RunV2(ctx, proc, nil)
-	if err != nil {
-		return err
-	}
-
-	err = led.Merge(snapshot)
-	if err != nil {
-		return err
-	}
-
-	proc.SetOutput(output)
-	return nil
 }
 
 func (vmSystemBadMock) GetAccount(

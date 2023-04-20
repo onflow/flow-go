@@ -11,9 +11,9 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -217,7 +217,6 @@ func (e *Manager) ExecuteScript(
 		code,
 		arguments,
 		blockHeader,
-		e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID()),
 		snapshot)
 }
 

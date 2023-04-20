@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
@@ -24,13 +25,11 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/common/follower"
-	followereng "github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/buffer"
 	synchronization "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -49,6 +48,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
@@ -60,7 +60,6 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
-	storage "github.com/onflow/flow-go/storage/badger"
 )
 
 // FlowBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -122,7 +121,7 @@ type FollowerServiceBuilder struct {
 	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
-	FollowerEng *followereng.Engine
+	FollowerEng *follower.ComplianceEngine
 	SyncEng     *synceng.Engine
 
 	peerID peer.ID
@@ -156,7 +155,15 @@ func (builder *FollowerServiceBuilder) buildFollowerState() *FollowerServiceBuil
 			return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 		}
 
-		followerState, err := badgerState.NewFollowerState(state, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
+		followerState, err := badgerState.NewFollowerState(
+			node.Logger,
+			node.Tracer,
+			node.ProtocolEvents,
+			state,
+			node.Storage.Index,
+			node.Storage.Payloads,
+			blocktimer.DefaultBlockTimer,
+		)
 		builder.FollowerState = followerState
 
 		return err
@@ -228,32 +235,40 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 
 func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBuilder {
 	builder.Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// initialize cleaner for DB
-		cleaner := storage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-		conCache := buffer.NewPendingBlocks()
+		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if node.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
+		}
 
-		followerEng, err := follower.New(
+		core, err := follower.NewComplianceCore(
 			node.Logger,
-			node.Network,
-			node.Me,
-			node.Metrics.Engine,
 			node.Metrics.Mempool,
-			cleaner,
-			node.Storage.Headers,
-			node.Storage.Payloads,
+			heroCacheCollector,
+			builder.FinalizationDistributor,
 			builder.FollowerState,
-			conCache,
 			builder.FollowerCore,
 			builder.Validator,
 			builder.SyncCore,
 			node.Tracer,
-			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create follower core: %w", err)
+		}
+
+		builder.FollowerEng, err = follower.NewComplianceLayer(
+			node.Logger,
+			node.Network,
+			node.Me,
+			node.Metrics.Engine,
+			node.Storage.Headers,
+			builder.Finalized,
+			core,
 			follower.WithChannel(channels.PublicReceiveBlocks),
+			follower.WithComplianceConfigOpt(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
-		builder.FollowerEng = followerEng
 
 		return builder.FollowerEng, nil
 	})
@@ -344,6 +359,7 @@ func FlowConsensusFollowerService(opts ...FollowerOption) *FollowerServiceBuilde
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
+	ret.FinalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(ret.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	ret.FlowNodeBuilder.SkipNwAddressBasedValidations = true
@@ -558,7 +574,7 @@ func (builder *FollowerServiceBuilder) validateParams() error {
 	return nil
 }
 
-// initLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the observer.
+// initPublicLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the observer.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
 // The LibP2P host is created with the following options:
 //   - DHT as client and seeded with the given bootstrap peers
@@ -568,7 +584,7 @@ func (builder *FollowerServiceBuilder) validateParams() error {
 //   - No connection manager
 //   - No peer manager
 //   - Default libp2p pubsub options
-func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
+func (builder *FollowerServiceBuilder) initPublicLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		var pis []peer.AddrInfo
 
@@ -588,11 +604,13 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			builder.IdentityProvider,
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
-		builder.GossipSubInspectorNotifDistributor = cmd.BuildGossipsubRPCValidationInspectorNotificationDisseminator(builder.GossipSubRPCInspectorNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
-		heroStoreOpts := cmd.BuildGossipsubRPCValidationInspectorHeroStoreOpts(builder.GossipSubRPCInspectorCacheSize, builder.MetricsRegisterer, builder.MetricsEnabled)
-		rpcValidationInspector, err := p2pbuilder.BuildGossipSubRPCValidationInspector(builder.Logger, builder.SporkID, builder.GossipSubRPCValidationConfigs, builder.GossipSubInspectorNotifDistributor, heroStoreOpts...)
+		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubRPCInspectorsConfig, builder.GossipSubInspectorNotifDistributor)
+		rpcInspectors, err := rpcInspectorBuilder.
+			SetPublicNetwork(p2p.PublicNetworkEnabled).
+			SetMetrics(builder.Metrics.Network, builder.MetricsRegisterer).
+			SetMetricsEnabled(builder.MetricsEnabled).Build()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc validation inspector: %w", err)
+			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for public libp2p node: %w", err)
 		}
 
 		node, err := p2pbuilder.NewNodeBuilder(
@@ -618,11 +636,11 @@ func (builder *FollowerServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
 			SetGossipSubTracer(meshTracer).
 			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
-			SetGossipSubValidationInspector(rpcValidationInspector).
+			SetGossipSubRPCInspectors(rpcInspectors...).
 			Build()
 
 		if err != nil {
-			return nil, fmt.Errorf("could not build libp2p node: %w", err)
+			return nil, fmt.Errorf("could not build public libp2p node: %w", err)
 		}
 
 		builder.LibP2PNode = node
@@ -666,7 +684,7 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 	var libp2pNode p2p.LibP2PNode
 	builder.
 		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			libP2PFactory := builder.initLibP2PFactory(node.NetworkKey)
+			libP2PFactory := builder.initPublicLibP2PFactory(node.NetworkKey)
 
 			var err error
 			libp2pNode, err = libP2PFactory()

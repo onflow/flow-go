@@ -116,6 +116,30 @@ func (_m *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) 
 	return r0, r1
 }
 
+// Exists provides a mock function with given fields: blockID
+func (_m *Headers) Exists(blockID flow.Identifier) (bool, error) {
+	ret := _m.Called(blockID)
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (bool, error)); ok {
+		return rf(blockID)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
+		r0 = rf(blockID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(blockID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Store provides a mock function with given fields: header
 func (_m *Headers) Store(header *flow.Header) error {
 	ret := _m.Called(header)
