@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -58,6 +60,8 @@ var receiptsCmd = &cobra.Command{
 				log.Error().Err(err).Msgf("could not get receipt with id: %v", receiptID)
 				return
 			}
+
+			fmt.Println("resultid:", receipt.ExecutionResult.ID())
 
 			common.PrettyPrintEntity(receipt)
 			return
