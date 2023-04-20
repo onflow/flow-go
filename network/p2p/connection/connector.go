@@ -26,6 +26,7 @@ type Libp2pConnector struct {
 	backoffConnector *discoveryBackoff.BackoffConnector
 	host             host.Host
 	log              zerolog.Logger
+	shuffler         *PeerIdSliceShuffler
 	pruneConnections bool
 }
 
@@ -36,10 +37,17 @@ func NewLibp2pConnector(log zerolog.Logger, host host.Host, pruning bool) (*Libp
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libP2P connector: %w", err)
 	}
+
+	shuffler, err := NewPeerIdSliceShuffler(host.ID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create peer ID slice shuffler: %w", err)
+	}
+
 	libP2PConnector := &Libp2pConnector{
 		log:              log,
 		backoffConnector: connector,
 		host:             host,
+		shuffler:         shuffler,
 		pruneConnections: pruning,
 	}
 
@@ -66,8 +74,9 @@ func (l *Libp2pConnector) connectToPeers(ctx context.Context, peerIDs peer.IDSli
 	// create a channel of peer.AddrInfo as expected by the connector
 	peerCh := make(chan peer.AddrInfo, len(peerIDs))
 
-	// stuff all the peer.AddrInfo it into the channel
-	for _, peerID := range peerIDs {
+	// first shuffle, and then stuff all the peer.AddrInfo it into the channel.
+	// shuffling is not in place.
+	for _, peerID := range l.shuffler.Shuffle(peerIDs) {
 		peerCh <- peer.AddrInfo{ID: peerID}
 	}
 
