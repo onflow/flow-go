@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -37,6 +39,37 @@ var blocksCmd = &cobra.Command{
 			log.Error().Err(err).Msgf("could not get block with id: %v", blockID)
 			return
 		}
+
+		collectionIDs := []flow.Identifier{}
+		for _, src := range block.Payload.Guarantees {
+			collectionIDs = append(collectionIDs, src.CollectionID)
+		}
+		collectionHash := flow.MerkleRoot(collectionIDs...)
+
+		sealIDs := []flow.Identifier{}
+		for _, src := range block.Payload.Seals {
+			sealIDs = append(sealIDs, src.ID())
+		}
+		sealHash := flow.MerkleRoot(sealIDs...)
+
+		receiptIDs := []flow.Identifier{}
+		for i, src := range block.Payload.Receipts {
+			fmt.Println(fmt.Sprintf("receipt %v id: %v, executor: %v, result: %v, sig: %x, sporks: %x",
+				i, src.ID(), src.ExecutorID, src.ResultID, src.ExecutorSignature, src.Spocks))
+			receiptIDs = append(receiptIDs, src.ID())
+		}
+		receiptHash := flow.MerkleRoot(receiptIDs...)
+
+		resultIDs := []flow.Identifier{}
+		for _, src := range block.Payload.Results {
+			resultIDs = append(resultIDs, src.ID())
+		}
+		resultHash := flow.MerkleRoot(resultIDs...)
+
+		fmt.Println("collectionHash", collectionHash)
+		fmt.Println("sealHash", sealHash)
+		fmt.Println("receiptHash", receiptHash)
+		fmt.Println("resultHash", resultHash)
 
 		common.PrettyPrintEntity(block)
 	},
