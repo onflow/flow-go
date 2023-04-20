@@ -62,23 +62,6 @@ func (ct *ctx) initContext() error {
 	return nil
 }
 
-// seeds the internal relic random function.
-// relic context must be initialized before seeding.
-func seedRelic(seed []byte) error {
-	if len(seed) < (securityBits / 8) {
-		return invalidInputsErrorf(
-			"seed length needs to be larger than %d",
-			securityBits/8)
-	}
-	if len(seed) > maxRelicPrgSeed {
-		return invalidInputsErrorf(
-			"seed length needs to be less than %x",
-			maxRelicPrgSeed)
-	}
-	C.seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
-	return nil
-}
-
 // Exponentiation in G1 (scalar point multiplication)
 func (p *pointE1) scalarMultG1(res *pointE1, expo *scalar) {
 	C.ep_mult((*C.ep_st)(res), (*C.ep_st)(p), (*C.Fr)(expo))
@@ -250,6 +233,7 @@ func checkMembershipG2(pt *pointE2) int {
 	return int(C.G2_check_membership((*C.E2)(pt)))
 }
 
+/*
 // randPointG1 wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in G1 and stores it in input point.
 func randPointG1(pt *pointE1) {
@@ -261,20 +245,20 @@ func randPointG1(pt *pointE1) {
 func randPointG1Complement(pt *pointE1) {
 	C.ep_rand_G1complement((*C.ep_st)(pt))
 }
-
-/*
-// randPointG2 wraps a call to C since cgo can't be used in go test files.
-// It generates a random point in G2 and stores it in input point.
-func randPointG2(pt *pointE2) {
-	C.ep2_rand_G2((*C.E2)(pt))
-}
-
-// randPointG1Complement wraps a call to C since cgo can't be used in go test files.
-// It generates a random point in E2\G2 and stores it in input point.
-func randPointG2Complement(pt *pointE2) {
-	C.ep2_rand_G2complement((*C.E2)(pt))
-}
 */
+
+// mapToG2 wraps a call to C since cgo can't be used in go test files.
+// It generates a random point in G2 and stores it in input point.
+func mapToG2(pt *pointE2, src []byte) {
+	C.map_bytes_to_G2((*C.E2)(pt), (*C.uchar)(&src[0]), (C.int)(len(src)))
+}
+
+// mapToG2Complement wraps a call to C since cgo can't be used in go test files.
+// It generates a random point in E2\G2 and stores it in input point.
+func mapToG2Complement(pt *pointE2, src []byte) bool {
+	res := C.map_bytes_to_G2complement((*C.E2)(pt), (*C.uchar)(&src[0]), (C.int)(len(src)))
+	return int(res) == blst_valid
+}
 
 // This is only a TEST function.
 // It hashes `data` to a G1 point using the tag `dst` and returns the G1 point serialization.

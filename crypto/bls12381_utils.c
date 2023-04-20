@@ -53,16 +53,6 @@ ctx_t* relic_init_BLS12_381() {
     return core_get();
 }
 
-// seeds relic PRG
-void seed_relic(byte* seed, int len) {
-    #if RAND == HASHD
-    // instantiate a new DRBG
-    ctx_t *ctx = core_get();
-    ctx->seeded = 0;
-    #endif
-    rand_seed(seed, len);
-}
-
 // global variable of the pre-computed data
 prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
@@ -128,7 +118,7 @@ prec_st* init_precomputed_data_BLS12_381() {
 // ------------------- Fr utilities
 
 // Montgomery constant R related to the curve order r
-const limb_t BLS12_381_rR[Fr_LIMBS] = {  /* (1<<256)%r */
+const Fr BLS12_381_rR = {                   /* R mod r = (1<<256)%r */
     TO_LIMB_T(0x1824b159acc5056f), TO_LIMB_T(0x998c4fefecbc4ff5),
     TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe)
 };
@@ -346,7 +336,7 @@ void Fr_write_bytes(uint8_t *bin, const Fr* a) {
 
 // maps big-endian bytes into an Fr element using modular reduction
 // Input is byte-big-endian, output is vec256 (also used as Fr)
-static void vec256_from_be_bytes(Fr* out, const unsigned char *bytes, size_t n)
+static void Fr_from_be_bytes(Fr* out, const unsigned char *bytes, size_t n)
 {
     Fr digit, radix;
     Fr_set_zero(out);
@@ -375,14 +365,14 @@ static void vec256_from_be_bytes(Fr* out, const unsigned char *bytes, size_t n)
 // Input is byte-big-endian as used by the external APIs.
 // It returns true if scalar is zero and false otherwise.
 bool_t map_bytes_to_Fr(Fr* a, const uint8_t* bin, int len) {
-    vec256_from_be_bytes(a, bin, len);
+    Fr_from_be_bytes(a, bin, len);
     return Fr_is_zero(a);
 }
 
 // ------------------- Fp utilities
 
-// Montgomery constant R related to the prime p
-const limb_t BLS12_381_pR[Fp_LIMBS] = { ONE_MONT_P };  /* (1<<384)%p */
+// Montgomery constants related to the prime p
+const Fp BLS12_381_pR = { ONE_MONT_P };        /* R mod p = (1<<384)%p */
 
 // sets `a` to 0
 void Fp_set_zero(Fp* a){
@@ -1248,14 +1238,21 @@ int bowe_subgroup_check_G1(const ep_t p){
 }
 #endif
 
-// generates a random point in G1 and stores it in p
-void ep_rand_G1(ep_t p) {
+/*
+// maps the bytes to a point in G1
+// this is a testing file only, should not be used in any protocol!
+void map_bytes_to_G1(ep_t p, const uint8_t* bytes, int len) {
+    // map to Fr
+    Fr log;
+    map_bytes_to_Fr(&log, bytes, len);
     // multiplies G1 generator by a random scalar
-    ep_rand(p);
+
+    
 }
 
-// generates a random point in E1\G1 and stores it in p
-void ep_rand_G1complement(ep_t p) {
+// generates a point in E1\G1 and stores it in p
+// this is a testing file only, should not be used in any protocol!
+void map_bytes_to_G1complement(ep_t p, const uint8_t* bytes, int len) {
     // generate a random point in E1
     p->coord = BASIC;
     fp_set_dig(p->z, 1);
@@ -1273,32 +1270,46 @@ void ep_rand_G1complement(ep_t p) {
 
     assert(ep_on_curve(p));  // sanity check to make sure p is in E1
 }
+*/
 
-// generates a random point in G2 and stores it in p
-void ep2_rand_G2(ep2_t p) {
+// maps the bytes to a point in G2.
+// `len` should be at least Fr_BYTES.
+// this is a testing tool only, it should not be used in any protocol!
+void map_bytes_to_G2(E2* p, const uint8_t* bytes, int len) {
+    assert(len > Fr_BYTES);
+    // map to Fr
+    Fr log;
+    map_bytes_to_Fr(&log, bytes, len);
     // multiplies G2 generator by a random scalar
-    ep2_rand(p);
+    G2_mult_gen(p, &log);
 }
 
-// generates a random point in E2\G2 and stores it in p
-void ep2_rand_G2complement(ep2_t p) {
-    // generate a random point in E2
-    p->coord = BASIC;
-    fp_set_dig(p->z[0], 1);
-	fp_zero(p->z[1]);
-    do {
-        fp2_rand(p->x); // set x to a random field element
-        byte r;
-        rand_bytes(&r, 1);
-        fp2_zero(p->y);
-        fp_set_bit(p->y[0], 0, r&1); // set y randomly to 0 or 1
+// attempts to map `bytes` to a point in E2\G2 and stores it in p.
+// `len` should be at least G2_SER_BYTES. It returns BLST_SUCCESS only if mapping 
+// succeeds.
+// For now, function only works when E2 serialization is compressed.
+// this is a testing tool only, it should not be used in any protocol!
+BLST_ERROR map_bytes_to_G2complement(E2* p, const uint8_t* bytes, int len) {
+    assert(G2_SERIALIZATION == COMPRESSED);
+    assert(len >= G2_SER_BYTES);
+
+    // attempt to deserilize a compressed E2 point from input bytes
+    // after fixing the header 2 bits
+    byte copy[G2_SER_BYTES];
+    memcpy(copy, bytes, sizeof(copy));
+    copy[0] |= 1<<7;        // set compression bit
+    copy[0] &= ~(1<<6);     // clear infinity bit - point is not infinity
+
+    BLST_ERROR ser = E2_read_bytes(p, copy, len);
+    if (ser != BLST_SUCCESS) {
+        return ser;
     }
-    while (ep2_upk(p, p) == 0); // make sure p is in E1
 
-    // map the point to E1\G1 by clearing G1 order
-    ep2_mul_basic(p, p, &core_get()->ep_r);
+    // map the point to E2\G2 by clearing G2 order
+    E2_mult(p, p, (const Fr*)BLS12_381_r);
 
-    assert(ep2_on_curve(p));  // sanity check to make sure p is in E1
+    assert(E2_affine_on_curve(p));  // sanity check to make sure p is in E2
+    return BLST_SUCCESS;
 }
 
 // This is a testing function.

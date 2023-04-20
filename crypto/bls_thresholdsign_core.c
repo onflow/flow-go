@@ -16,8 +16,8 @@ static void Fr_lagrange_coeff_at_zero(Fr* res, const int i, const uint8_t indice
     Fr denominator; // eventually would represent D*R^k 
 
     // Initialize N and D to Montgomery constant R
-    Fr_copy(&numerator, (Fr*)BLS12_381_rR);
-    Fr_copy(&denominator, (Fr*)BLS12_381_rR);
+    Fr_copy(&numerator, &BLS12_381_rR);
+    Fr_copy(&denominator, &BLS12_381_rR);
 
     // sign of D: 0 for positive and 1 for negative
     int sign = 0; 

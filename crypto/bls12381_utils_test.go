@@ -6,7 +6,9 @@ package crypto
 import (
 	"crypto/rand"
 	"encoding/hex"
+	mrand "math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -102,10 +104,9 @@ func BenchmarkMapToG1(b *testing.B) {
 
 // test subgroup membership check in G1 and G2
 func TestSubgroupCheck(t *testing.T) {
-	// seed Relic PRG
-	seed := make([]byte, securityBits/8)
-	_, _ = rand.Read(seed)
-	_ = seedRelic(seed)
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 
 	/*t.Run("G1", func(t *testing.T) {
 		var p pointE1
@@ -115,24 +116,34 @@ func TestSubgroupCheck(t *testing.T) {
 		randPointG1Complement(&p) // point in E1\G1
 		res = checkMembershipG1(&p)
 		assert.Equal(t, res, int(invalid))
+	})*/
+
+	t.Run("G2", func(t *testing.T) {
+		t.Skip() // TODO: fix membership check in G2 and update
+		var p pointE2
+		seed := make([]byte, PubKeyLenBLSBLS12381)
+		_, err := mrand.Read(seed)
+		require.NoError(t, err)
+		mapToG2(&p, seed) // point in G2
+		res := checkMembershipG2(&p)
+		assert.Equal(t, res, int(valid))
+
+		inG2 := false
+		for !inG2 {
+			_, err := mrand.Read(seed)
+			require.NoError(t, err)
+			inG2 = mapToG2Complement(&p, seed) // point in E2\G2
+		}
+		res = checkMembershipG2(&p)
+		assert.Equal(t, res, int(invalid))
 	})
 
-		t.Run("G2", func(t *testing.T) {
-			var p pointE2
-			randPointG2(&p) // point in G2
-			res := checkMembershipG2(&p)
-			assert.Equal(t, res, int(valid))
-			randPointG2Complement(&p) // point in E2\G2
-			res = checkMembershipG2(&p)
-			assert.Equal(t, res, int(invalid))
-		})
-	*/
 }
 
 // subgroup membership check bench
 func BenchmarkSubgroupCheck(b *testing.B) {
 
-	b.Run("G1", func(b *testing.B) {
+	/*b.Run("G1", func(b *testing.B) {
 		var p pointE1
 		randPointG1(&p)
 		b.ResetTimer()
@@ -140,16 +151,20 @@ func BenchmarkSubgroupCheck(b *testing.B) {
 			_ = checkMembershipG1(&p) // G1
 		}
 		b.StopTimer()
+	})*/
+
+	b.Run("G2", func(b *testing.B) {
+		var p pointE2
+		seed := make([]byte, PubKeyLenBLSBLS12381)
+		_, err := mrand.Read(seed)
+		require.NoError(b, err)
+		mapToG2(&p, seed) // point in G2
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = checkMembershipG2(&p) // G2
+		}
+		b.StopTimer()
 	})
-	/*
-		b.Run("G2", func(b *testing.B) {
-			var p pointE2
-			randPointG2(&p)
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				_ = checkMembershipG2(&p) // G2
-			}
-			b.StopTimer()
-		})
-	*/
+
 }
