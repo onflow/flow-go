@@ -479,6 +479,9 @@ func VerifyBLSSignatureManyMessages(
 func BatchVerifyBLSSignaturesOneMessage(
 	pks []PublicKey, sigs []Signature, message []byte, kmac hash.Hasher,
 ) ([]bool, error) {
+	// set BLS context
+	blsInstance.reInit()
+
 	// boolean array returned when errors occur
 	falseSlice := make([]bool, len(sigs))
 
