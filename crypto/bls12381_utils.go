@@ -112,7 +112,7 @@ func (p *pointE2) isInfinity() bool {
 func randFr(x *scalar, rand random.Rand) bool {
 	// use extra 128 bits to reduce the modular reduction bias
 	bytes := make([]byte, frBytesLen+securityBits/8)
-	rand.Read(bytes) // checking one output is enough
+	rand.Read(bytes)
 	// modular reduction
 	return mapToFr(x, bytes)
 }
