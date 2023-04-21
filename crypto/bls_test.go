@@ -757,16 +757,19 @@ func TestBLSBatchVerify(t *testing.T) {
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks[:0], sigs[:0], input, kmac)
 		require.Error(t, err)
 		assert.True(t, IsBLSAggregateEmptyListError(err))
-		assert.Equal(t, valid, []bool{},
+		assert.Equal(t, valid, expectedValid[:0],
 			"verification should fail with empty list key, got %v", valid)
 	})
 
 	// test incorrect inputs
 	t.Run("inconsistent inputs", func(t *testing.T) {
+		for i := 0; i < sigsNum; i++ {
+			expectedValid[i] = false
+		}
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks[:len(pks)-1], sigs, input, kmac)
 		require.Error(t, err)
 		assert.True(t, IsInvalidInputsError(err))
-		assert.Equal(t, valid, []bool{},
+		assert.Equal(t, valid, expectedValid,
 			"verification should fail with incorrect input lenghts, got %v", valid)
 	})
 
