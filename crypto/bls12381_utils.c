@@ -113,8 +113,6 @@ prec_st* init_precomputed_data_BLS12_381() {
     return bls_prec;
 }
 
-// ------------------- Utilities
-
 // ------------------- Fr utilities
 
 // Montgomery constant R related to the curve order r

@@ -39,7 +39,7 @@ int      bls_verifyPerDistinctMessage(const byte*, const int, const byte*, const
 int      bls_verifyPerDistinctKey(const byte*, 
                          const int, const E2*, const uint32_t*,
                          const byte*, const uint32_t*);
-void     bls_batchVerify(const int, byte*, const E2*,
-            const byte*, const byte*, const int);
+void     bls_batch_verify(const int, byte*, const E2*,
+            const byte*, const byte*, const int, const byte*);
 
 #endif

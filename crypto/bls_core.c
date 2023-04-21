@@ -357,7 +357,7 @@ static void free_tree(node* root) {
     if (!root) return;
 
     // only free pks and sigs of non-leafs, data of leafs are allocated 
-    // as an entire array in `bls_batchVerify`.
+    // as an entire array in `bls_batch_verify`.
     if (root->left) {   // no need to check the right child for the leaf check because
                         //  the recursive build starts with the left side first
         // relic free 
@@ -413,7 +413,7 @@ error:
 }
 
 // verify the binary tree and fill the results using recursive batch verifications.
-static void bls_batchVerify_tree(const node* root, const int len, byte* results, 
+static void bls_batch_verify_tree(const node* root, const int len, byte* results, 
         const byte* data, const int data_len) {
     // verify the aggregated signature against the aggregated public key.
     int res =  bls_verify_ep(root->pk, root->sig, data, data_len);
@@ -436,21 +436,23 @@ static void bls_batchVerify_tree(const node* root, const int len, byte* results,
     // use the binary tree structure to find the invalid signatures. 
     int right_len = len/2;
     int left_len = len - right_len;
-    bls_batchVerify_tree(root->left, left_len, &results[0], data, data_len);
-    bls_batchVerify_tree(root->right, right_len, &results[left_len], data, data_len);
+    bls_batch_verify_tree(root->left, left_len, &results[0], data, data_len);
+    bls_batch_verify_tree(root->right, right_len, &results[left_len], data, data_len);
 }
 
 // Batch verifies the validity of a multiple BLS signatures of the 
 // same message under multiple public keys. Each signature at index `i` is verified
 // against the public key at index `i`.
+// `seed` is used as the entropy source for randoms required by the computation. The function
+// assumes the source size is at least (16*sigs_len) of random bytes of entropy at least 128 bits.
 //
 // - membership checks of all signatures is verified upfront.
 // - use random coefficients for signatures and public keys at the same index to prevent 
 //  indices mixup.
 // - optimize the verification by verifying an aggregated signature against an aggregated
 //  public key, and use a recursive verification to find invalid signatures.  
-void bls_batchVerify(const int sigs_len, byte* results, const E2* pks_input,
-     const byte* sigs_bytes, const byte* data, const int data_len) {  
+void bls_batch_verify(const int sigs_len, byte* results, const E2* pks_input,
+     const byte* sigs_bytes, const byte* data, const int data_len, const byte* seed) {  
     
     // initialize results to undefined
     memset(results, UNDEFINED, sigs_len);
@@ -464,7 +466,6 @@ void bls_batchVerify(const int sigs_len, byte* results, const E2* pks_input,
         ep_new(sigs[i]);
         ep2_new(pks[i]);
     }
-    bn_t r; bn_new(r);
 
     for (int i=0; i < sigs_len; i++) {
         // convert the signature points:
@@ -484,14 +485,21 @@ void bls_batchVerify(const int sigs_len, byte* results, const E2* pks_input,
             results[i] = INVALID; 
         } else {
             // choose a random non-zero coefficient of at least 128 bits
-            // TODO: find a way to generate randoms
-            bn_rand(r, RLC_POS, SEC_BITS); 
-            bn_add_dig(r, r, 1); 
-            Fr* tmp = Fr_relic_to_blst(r);
-            // multiply public key and signature by the same random exponent
-            E2_mult(&pks[i], &pks_input[i], tmp); 
-            free(tmp);  
-            ep_mul_lwnaf(&sigs[i], &sigs[i], r);   
+            Fr r, one;
+            // r = random, i-th seed is used for i-th signature
+            Fr_set_zero(&r);
+            const int seed_len = SEC_BITS/8;
+            limbs_from_be_bytes((limb_t*)&r, seed + (seed_len*i), seed_len);  // faster shortcut than Fr_map_bytes
+            // r = random + 1
+            Fr_set_limb(&one, 1);
+            Fr_add(&r, &r, &one); 
+            /*char str[20]; sprintf(str, "r-%d", i);
+            Fr_print_(str, &r);*/
+            // multiply public key and signature by the same random exponent r
+            E2_mult(&pks[i], &pks_input[i], &r);  // TODO: faster version for short expos?
+            bn_st* tmp = Fr_blst_to_relic(&r);
+            ep_mul_lwnaf(&sigs[i], &sigs[i], tmp);   
+            free(tmp); 
         } 
     }
     // build a binary tree of aggreagtions
@@ -499,7 +507,7 @@ void bls_batchVerify(const int sigs_len, byte* results, const E2* pks_input,
     if (!root) goto out;
 
     // verify the binary tree and fill the results using batch verification
-    bls_batchVerify_tree(root, sigs_len, &results[0], data, data_len);
+    bls_batch_verify_tree(root, sigs_len, &results[0], data, data_len);
     // free the allocated tree 
     free_tree(root);
     
