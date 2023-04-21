@@ -53,8 +53,8 @@ import (
 	vereq "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -62,7 +62,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -121,7 +120,7 @@ func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity *flow.Ide
 
 	// creates state fixture and bootstrap it.
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	stateFixture := CompleteStateFixture(t, metrics, tracer, rootSnapshot)
+	stateFixture := CompleteStateFixture(t, log, metrics, tracer, rootSnapshot)
 
 	require.NoError(t, err)
 	for _, option := range options {
@@ -147,7 +146,7 @@ func GenericNode(
 		Logger()
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	stateFixture := CompleteStateFixture(t, metrics, tracer, root)
+	stateFixture := CompleteStateFixture(t, log, metrics, tracer, root)
 
 	head, err := root.Head()
 	require.NoError(t, err)
@@ -221,6 +220,7 @@ func LocalFixture(t testing.TB, identity *flow.Identity) module.Local {
 // CompleteStateFixture is a test helper that creates, bootstraps, and returns a StateFixture for sake of unit testing.
 func CompleteStateFixture(
 	t testing.TB,
+	log zerolog.Logger,
 	metric *metrics.NoopCollector,
 	tracer module.Tracer,
 	rootSnapshot protocol.Snapshot,
@@ -249,7 +249,17 @@ func CompleteStateFixture(
 	)
 	require.NoError(t, err)
 
-	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockBlockTimer(), util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
+	mutableState, err := badgerstate.NewFullConsensusState(
+		log,
+		tracer,
+		consumer,
+		state,
+		s.Index,
+		s.Payloads,
+		util.MockBlockTimer(),
+		util.MockReceiptValidator(),
+		util.MockSealValidator(s.Seals),
+	)
 	require.NoError(t, err)
 
 	return &testmock.StateFixture{
@@ -543,10 +553,16 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	protoState, ok := node.State.(*badgerstate.ParticipantState)
 	require.True(t, ok)
 
-	followerState, err := badgerstate.NewFollowerState(protoState.State, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
+	followerState, err := badgerstate.NewFollowerState(
+		node.Log,
+		node.Tracer,
+		node.ProtocolEvents,
+		protoState.State,
+		node.Index,
+		node.Payloads,
+		blocktimer.DefaultBlockTimer,
+	)
 	require.NoError(t, err)
-
-	pendingBlocks := buffer.NewPendingBlocks() // for following main chain consensus
 
 	dbDir := unittest.TempDir(t)
 
@@ -689,14 +705,30 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	validator := new(mockhotstuff.Validator)
 	validator.On("ValidateProposal", mock.Anything).Return(nil)
 
-	// initialize cleaner for DB
-	cleaner := storage.NewCleaner(node.Log, node.PublicDB, node.Metrics, flow.DefaultValueLogGCFrequency)
-
-	followerEng, err := follower.New(node.Log, node.Net, node.Me, node.Metrics, node.Metrics, cleaner,
-		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, validator, syncCore, node.Tracer)
+	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
 	require.NoError(t, err)
 
-	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
+	core, err := follower.NewComplianceCore(
+		node.Log,
+		node.Metrics,
+		node.Metrics,
+		finalizationDistributor,
+		followerState,
+		followerCore,
+		validator,
+		syncCore,
+		node.Tracer,
+	)
+	require.NoError(t, err)
+	followerEng, err := follower.NewComplianceLayer(
+		node.Log,
+		node.Net,
+		node.Me,
+		node.Metrics,
+		node.Headers,
+		finalizedHeader.Get(),
+		core,
+	)
 	require.NoError(t, err)
 
 	idCache, err := cache.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())

@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -108,7 +109,7 @@ func (v *receiptValidator) fetchResult(resultID flow.Identifier) (*flow.Executio
 func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
 	block, err := v.state.AtBlockID(result.BlockID).Head()
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
+		if errors.Is(err, state.ErrUnknownSnapshotReference) {
 			return engine.NewInvalidInputErrorf("no block found %v %w", result.BlockID, err)
 		}
 		return err

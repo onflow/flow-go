@@ -15,9 +15,9 @@ import (
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/derived"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -385,7 +385,7 @@ func (e *blockComputer) executeTransaction(
 
 	txn.ctx = fvm.NewContextFromParent(txn.ctx, fvm.WithSpan(txSpan))
 
-	executionSnapshot, output, err := e.vm.RunV2(
+	executionSnapshot, output, err := e.vm.Run(
 		txn.ctx,
 		txn.TransactionProcedure,
 		storageSnapshot)

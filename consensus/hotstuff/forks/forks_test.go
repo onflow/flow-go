@@ -1,4 +1,4 @@
-package forks
+package forks_test
 
 import (
 	"fmt"
@@ -8,11 +8,16 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 )
+
+/* ***************************************************************************************************
+ *  TO BE REMOVED: I have moved the tests for the prior version of Forks to this file for reference.
+ *************************************************************************************************** */
 
 // NOTATION:
 // A block is denoted as [<qc_number>, <block_view_number>].
@@ -22,7 +27,7 @@ import (
 // receives [1,2] [2,3]
 // it should not finalize any block because there is no finalizable 2-chain.
 func TestFinalize_Direct1Chain(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 3)
 
@@ -41,7 +46,7 @@ func TestFinalize_Direct1Chain(t *testing.T) {
 // receives [1,2] [2,3] [3,4]
 // it should finalize [1,2]
 func TestFinalize_Direct2Chain(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 3)
 	builder.Add(3, 4)
@@ -61,7 +66,7 @@ func TestFinalize_Direct2Chain(t *testing.T) {
 // receives [1,2] [2,3] [3,5]
 // it should finalize [1,2]
 func TestFinalize_DirectIndirect2Chain(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 3)
 	builder.Add(3, 5)
@@ -81,7 +86,7 @@ func TestFinalize_DirectIndirect2Chain(t *testing.T) {
 // receives [1,2] [2,4] [4,5]
 // it should not finalize any blocks because there is no finalizable 2-chain.
 func TestFinalize_IndirectDirect2Chain(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 4)
 	builder.Add(4, 5)
@@ -102,7 +107,7 @@ func TestFinalize_IndirectDirect2Chain(t *testing.T) {
 // receives [1,3] [3,5] [5,6] [6,7] [7,8]
 // it should finalize [5,6]
 func TestFinalize_Direct2ChainOnIndirect(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 3)
 	builder.Add(3, 5)
 	builder.Add(5, 6)
@@ -125,7 +130,7 @@ func TestFinalize_Direct2ChainOnIndirect(t *testing.T) {
 // receives [1,2] [2,3] [3,4] [4,5] [5,6]
 // it should finalize [3,4]
 func TestFinalize_Direct2ChainOnDirect(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 3)
 	builder.Add(3, 4)
@@ -148,7 +153,7 @@ func TestFinalize_Direct2ChainOnDirect(t *testing.T) {
 // receives [1,2] [2,3] [3,5] [3,6] [3,7]
 // it should finalize [1,2]
 func TestFinalize_Multiple2Chains(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 3)
 	builder.Add(3, 5)
@@ -171,7 +176,7 @@ func TestFinalize_Multiple2Chains(t *testing.T) {
 // receives [1,2] [2,3] [2,4] [4,5] [5,6]
 // it should finalize [2,4]
 func TestFinalize_OrphanedFork(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 3)
 	builder.Add(2, 4)
@@ -194,7 +199,7 @@ func TestFinalize_OrphanedFork(t *testing.T) {
 // receives [1,2] [2,3] [2,3] [3,4] [3,4] [4,5] [4,5]
 // it should finalize [2,3]
 func TestDuplication(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 3)
 	builder.Add(2, 3)
@@ -218,7 +223,7 @@ func TestDuplication(t *testing.T) {
 // receives [1,2] [2,3] [3,4] [1,5]
 // it should finalize [1,2]
 func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 3)
 	builder.Add(3, 4)
@@ -240,7 +245,7 @@ func TestIgnoreBlocksBelowFinalizedView(t *testing.T) {
 // receives [1,2] [2,3] [3,4] [4,5] [3,5']
 // it should finalize block [2,3], and emits an DoubleProposal event with ([3,5'], [4,5])
 func TestDoubleProposal(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 3)
 	builder.Add(3, 4)
@@ -263,7 +268,7 @@ func TestDoubleProposal(t *testing.T) {
 // receives [1,2] [2,3] [2,3'] [3,4] [3',5]
 // it should return fatal error, because conflicting blocks 3 and 3' both received enough votes for QC
 func TestConflictingQCs(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 
 	builder.Add(1, 2)
 	builder.Add(2, 3)
@@ -286,7 +291,7 @@ func TestConflictingQCs(t *testing.T) {
 // receives [1,2] [2,3] [2,6] [3,4] [4,5] [6,7] [7,8]
 // It should return fatal error, because 2 conflicting forks were finalized
 func TestConflictingFinalizedForks(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 3)
 	builder.Add(3, 4)
@@ -328,7 +333,7 @@ func TestAddUnconnectedProposal(t *testing.T) {
 // receives [1,2] [2,3] [3,4], then [4,5]
 // should finalize [1,2], then [2,3]
 func TestGetProposal(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 3)
 	builder.Add(3, 4)
@@ -374,7 +379,7 @@ func TestGetProposal(t *testing.T) {
 // receives [1,2] [2,4] [2,4']
 func TestGetProposalsForView(t *testing.T) {
 
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 4)
 	builder.AddVersioned(2, 4, 0, 1)
@@ -407,7 +412,7 @@ func TestGetProposalsForView(t *testing.T) {
 // receives [1,2] [2,3] [3,4]
 // should finalize [1,2]
 func TestNotification(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 3)
 	builder.Add(3, 4)
@@ -422,9 +427,7 @@ func TestNotification(t *testing.T) {
 	finalizationCallback := mockmodule.NewFinalizer(t)
 	finalizationCallback.On("MakeFinal", blocks[0].Block.BlockID).Return(nil).Once()
 
-	genesisBQ := makeGenesis()
-
-	forks, err := New(genesisBQ, finalizationCallback, notifier)
+	forks, err := forks.New(builder.GenesisBlock(), finalizationCallback, notifier)
 	require.NoError(t, err)
 
 	err = addBlocksToForks(forks, blocks)
@@ -434,7 +437,7 @@ func TestNotification(t *testing.T) {
 // TestNewestView tests that Forks tracks the newest block view seen in received blocks.
 // receives [1,2] [2,3] [3,4]
 func TestNewestView(t *testing.T) {
-	builder := NewBlockBuilder()
+	builder := forks.NewBlockBuilder()
 	builder.Add(1, 2)
 	builder.Add(2, 3)
 	builder.Add(3, 4)
@@ -444,7 +447,7 @@ func TestNewestView(t *testing.T) {
 
 	forks, _ := newForks(t)
 
-	genesis := makeGenesis()
+	genesis := builder.GenesisBlock()
 
 	// initially newest view should be genesis block view
 	require.Equal(t, forks.NewestView(), genesis.Block.View)
@@ -457,16 +460,16 @@ func TestNewestView(t *testing.T) {
 
 // ========== internal functions ===============
 
-func newForks(t *testing.T) (*Forks, *mocks.Consumer) {
+func newForks(t *testing.T) (*forks.Forks, *mocks.Consumer) {
 	notifier := mocks.NewConsumer(t)
 	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Maybe()
 	notifier.On("OnFinalizedBlock", mock.Anything).Return(nil).Maybe()
 	finalizationCallback := mockmodule.NewFinalizer(t)
 	finalizationCallback.On("MakeFinal", mock.Anything).Return(nil).Maybe()
 
-	genesisBQ := makeGenesis()
+	genesisBQ := forks.NewBlockBuilder().GenesisBlock()
 
-	forks, err := New(genesisBQ, finalizationCallback, notifier)
+	forks, err := forks.New(genesisBQ, finalizationCallback, notifier)
 
 	require.Nil(t, err)
 	return forks, notifier
@@ -474,7 +477,7 @@ func newForks(t *testing.T) (*Forks, *mocks.Consumer) {
 
 // addBlocksToForks adds all the given blocks to Forks, in order.
 // If any errors occur, returns the first one.
-func addBlocksToForks(forks *Forks, proposals []*model.Proposal) error {
+func addBlocksToForks(forks *forks.Forks, proposals []*model.Proposal) error {
 	for _, proposal := range proposals {
 		err := forks.AddProposal(proposal)
 		if err != nil {
@@ -486,14 +489,14 @@ func addBlocksToForks(forks *Forks, proposals []*model.Proposal) error {
 }
 
 // requireLatestFinalizedBlock asserts that the latest finalized block has the given view and qc view.
-func requireLatestFinalizedBlock(t *testing.T, forks *Forks, qcView int, view int) {
+func requireLatestFinalizedBlock(t *testing.T, forks *forks.Forks, qcView int, view int) {
 	require.Equal(t, forks.FinalizedBlock().View, uint64(view), "finalized block has wrong view")
 	require.Equal(t, forks.FinalizedBlock().QC.View, uint64(qcView), "finalized block has wrong qc")
 }
 
 // requireNoBlocksFinalized asserts that no blocks have been finalized (genesis is latest finalized block).
-func requireNoBlocksFinalized(t *testing.T, forks *Forks) {
-	genesis := makeGenesis()
-	require.Equal(t, forks.FinalizedBlock().View, genesis.Block.View)
-	require.Equal(t, forks.FinalizedBlock().View, genesis.QC.View)
+func requireNoBlocksFinalized(t *testing.T, f *forks.Forks) {
+	genesis := forks.NewBlockBuilder().GenesisBlock()
+	require.Equal(t, f.FinalizedBlock().View, genesis.Block.View)
+	require.Equal(t, f.FinalizedBlock().View, genesis.CertifyingQC.View)
 }
