@@ -27,7 +27,6 @@ var _ hotstuff.BlockSignerDecoder = (*BlockSignerDecoder)(nil)
 // consensus committee has reached agreement on validity of parent block. Consequently, the
 // returned IdentifierList contains the consensus participants that signed the parent block.
 // Expected Error returns during normal operations:
-//   - model.ErrViewForUnknownEpoch if the given block is within an unknown epoch
 //   - signature.InvalidSignerIndicesError if signer indices included in the header do
 //     not encode a valid subset of the consensus committee
 func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error) {
@@ -36,12 +35,20 @@ func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.Identifi
 		return []flow.Identifier{}, nil
 	}
 
+	// we will use IdentitiesByEpoch since it's a faster call and avoids DB lookup
 	members, err := b.IdentitiesByEpoch(header.ParentView)
 	if err != nil {
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
-			return nil, fmt.Errorf("could not retrieve identities for block %x with QC view %d: %w", header.ID(), header.ParentView, err)
+			// possibly, we request epoch which is far behind in the past, in this case we won't have it in cache.
+			// try asking by parent ID
+			members, err = b.IdentitiesByBlock(header.ParentID)
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve identities for block %x with QC view %d for parent %x: %w",
+					header.ID(), header.ParentView, header.ParentID, err)
+			}
+		} else {
+			return nil, fmt.Errorf("unexpected error retrieving identities for block %v: %w", header.ID(), err)
 		}
-		return nil, fmt.Errorf("unexpected error retrieving identities for block %v: %w", header.ID(), err)
 	}
 	signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(members.NodeIDs(), header.ParentVoterIndices)
 	if err != nil {

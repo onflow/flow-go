@@ -130,7 +130,6 @@ type BlockSignerDecoder interface {
 	// consensus committee has reached agreement on validity of parent block. Consequently, the
 	// returned IdentifierList contains the consensus participants that signed the parent block.
 	// Expected Error returns during normal operations:
-	//   - model.ErrViewForUnknownEpoch if the given block's parent is within an unknown epoch
 	//   - signature.InvalidSignerIndicesError if signer indices included in the header do
 	//     not encode a valid subset of the consensus committee
 	DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error)
