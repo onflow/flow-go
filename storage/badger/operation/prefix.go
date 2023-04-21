@@ -67,12 +67,13 @@ const (
 	codeAllBlockReceipts    = 59 // index mapping of blockID to multiple receipts
 	codeIndexBlockByChunkID = 60 // index mapping chunk ID to block ID
 
-	// codes related to epoch information
+	// codes related to protocol level information
 	codeEpochSetup       = 61 // EpochSetup service event, keyed by ID
 	codeEpochCommit      = 62 // EpochCommit service event, keyed by ID
 	codeBeaconPrivateKey = 63 // BeaconPrivateKey, keyed by epoch counter
 	codeDKGStarted       = 64 // flag that the DKG for an epoch has been started
 	codeDKGEnded         = 65 // flag that the DKG for an epoch has ended (stores end state)
+	codeVersionBeacon    = 67 // flag for storing version beacons
 
 	// code for ComputationResult upload status storage
 	// NOTE: for now only GCP uploader is supported. When other uploader (AWS e.g.) needs to

@@ -30,6 +30,13 @@ type VersionBeacon struct {
 	Sequence          uint64
 }
 
+// SealedVersionBeacon is a VersionBeacon with a SealHeight field.
+// Version beacons are effective only after they are sealed.
+type SealedVersionBeacon struct {
+	*VersionBeacon
+	SealHeight uint64
+}
+
 func (v *VersionBeacon) ServiceEvent() ServiceEvent {
 	return ServiceEvent{
 		Type:  ServiceEventVersionBeacon,
