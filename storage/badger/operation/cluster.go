@@ -66,12 +66,12 @@ func IndexClusterBlockByReferenceHeight(refHeight uint64, clusterBlockID flow.Id
 func LookupClusterBlocksByReferenceHeightRange(start, end uint64, clusterBlockIDs *[]flow.Identifier) func(*badger.Txn) error {
 	startPrefix := makePrefix(codeRefHeightToClusterBlock, start)
 	endPrefix := makePrefix(codeRefHeightToClusterBlock, end)
-	prefixLen := len(startPrefix)
 
 	return iterate(startPrefix, endPrefix, func() (checkFunc, createFunc, handleFunc) {
 		check := func(key []byte) bool {
+			clusterBlockIDBytes := key[9:]
 			var clusterBlockID flow.Identifier
-			copy(clusterBlockID[:], key[prefixLen:])
+			copy(clusterBlockID[:], clusterBlockIDBytes)
 			*clusterBlockIDs = append(*clusterBlockIDs, clusterBlockID)
 
 			// the info we need is stored in the key, never process the value
