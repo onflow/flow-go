@@ -14,7 +14,6 @@ type headerInContext struct {
 // FinalizedBlockQueue is a concurrency-safe queue of finalized block headers
 // Every time a new header is added to the queue it verifies the complience of the header to the
 // most recenlty added header.
-// Under the hood a circular buffer with a limited capacity is used
 type FinalizedBlockQueue struct {
 	headers            []headerInContext
 	lock               sync.RWMutex
@@ -23,7 +22,6 @@ type FinalizedBlockQueue struct {
 }
 
 // NewFinalizedBlockQueue constructs a new FinalizedBlockQueue
-// "capacity“ sets the limit on the maximum number of unconsumed block headers allowed in the queue
 // "genesis“ is not inserted in the queue and is only used to to validate the very first incoming header
 func NewFinalizedBlockQueue(
 	genesis *flow.Header,
@@ -37,7 +35,7 @@ func NewFinalizedBlockQueue(
 // Enqueue checks the header compatibility and append a header to the queue
 // A header is compatible if its parentID matches the ID of the last inserted header (or genesis)
 // and its height is set right (last block's height plus one).
-// If header not compatible or the queue has reached its capacity, corresponding errors are returned
+// an error is returned if header not compatible
 func (ft *FinalizedBlockQueue) Enqueue(header *flow.Header) error {
 	ft.lock.Lock()
 	defer ft.lock.Unlock()
