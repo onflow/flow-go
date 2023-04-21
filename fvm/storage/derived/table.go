@@ -267,6 +267,12 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 		return err
 	}
 
+	// Don't perform actual commit for snapshot read transaction.  This is
+	// safe since all values are derived from the primary source.
+	if txn.isSnapshotReadTransaction {
+		return nil
+	}
+
 	for key, entry := range txn.writeSet {
 		_, ok := table.items[key]
 		if ok {
@@ -296,13 +302,7 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 			txn.invalidators...)
 	}
 
-	// NOTE: We cannot advance commit time when we encounter a snapshot read
-	// (aka script) transaction since these transactions don't generate new
-	// snapshots.  It is safe to commit the entries since snapshot read
-	// transactions never invalidate entries.
-	if !txn.isSnapshotReadTransaction {
-		table.latestCommitExecutionTime = txn.executionTime
-	}
+	table.latestCommitExecutionTime = txn.executionTime
 	return nil
 }
 

@@ -413,7 +413,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			unittest.IdentifierFixture(),
 			block,
 			snapshotTree,
-			derivedBlockData)
+			derivedBlockData.NewChildDerivedBlockData())
 		assert.NoError(t, err)
 		assert.Len(t, result.AllExecutionSnapshots(), 1)
 		assert.Len(t, result.AllTransactionResults(), 1)
