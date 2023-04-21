@@ -199,16 +199,11 @@ func (vm *VirtualMachine) Run(
 		return nil, ProcedureOutput{}, err
 	}
 
-	// Note: it is safe to skip committing derived data for non-normal
-	// transactions (i.e., bootstrap and script) since these do not invalidate
-	// derived data entries.
-	if proc.Type() == TransactionProcedureType {
-		// NOTE: It is not safe to ignore derivedTxnData' commit error for
-		// transactions that trigger derived data invalidation.
-		err = derivedTxnData.Commit()
-		if err != nil {
-			return nil, ProcedureOutput{}, err
-		}
+	// NOTE: It is not safe to ignore derivedTxnData' commit error for
+	// transactions that trigger derived data invalidation.
+	err = derivedTxnData.Commit()
+	if err != nil {
+		return nil, ProcedureOutput{}, err
 	}
 
 	executionSnapshot, err := txnState.FinalizeMainTransaction()
