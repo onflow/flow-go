@@ -41,10 +41,6 @@ const (
 	// such as during script execution.
 	EndOfBlockExecutionTime = ChildBlockTime - 1
 
-	// A snapshot read transaction may occur at any time within the range
-	// [0, EndOfBlockExecutionTime]
-	LargestSnapshotReadTransactionExecutionTime = EndOfBlockExecutionTime
-
 	// A normal transaction cannot commit to EndOfBlockExecutionTime.
 	//
 	// Note that we can assign the time to any value in the range
