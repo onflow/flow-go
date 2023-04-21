@@ -49,8 +49,9 @@ func NewPeerIdSliceShuffler(pid peer.ID) (*PeerIdSliceShuffler, error) {
 // The shuffling is NOT done in place, rather a new deep copy of the slice is shuffled and returned.
 // Args:
 //   - peerIds: the peer ID slice to shuffle
+//
 // Returns:
-//  - peer.IDSlice: the shuffled peer ID slice
+//   - peer.IDSlice: the shuffled peer ID slice
 func (s *PeerIdSliceShuffler) Shuffle(peerIds peer.IDSlice) peer.IDSlice {
 	shuffled := make(peer.IDSlice, len(peerIds))
 	copy(shuffled, peerIds)

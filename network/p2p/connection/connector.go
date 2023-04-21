@@ -53,10 +53,11 @@ var _ p2p.Connector = &Libp2pConnector{}
 
 // NewLibp2pConnector creates a new libp2p based connector
 // Args:
-// 	- cfg: configuration for the connector
+//   - cfg: configuration for the connector
+//
 // Returns:
-// 	- *Libp2pConnector: a new libp2p based connector
-// 	- error: an error if there is any error while creating the connector. The errors are irrecoverable and unexpected.
+//   - *Libp2pConnector: a new libp2p based connector
+//   - error: an error if there is any error while creating the connector. The errors are irrecoverable and unexpected.
 func NewLibp2pConnector(cfg *ConnectorConfig) (*Libp2pConnector, error) {
 	connector, err := cfg.BackoffConnectorFactory()
 	if err != nil {
