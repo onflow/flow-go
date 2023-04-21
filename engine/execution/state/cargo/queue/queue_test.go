@@ -15,11 +15,10 @@ func TestFinalizedBlockQueue(t *testing.T) {
 
 	t.Run("complience check", func(t *testing.T) {
 		var err error
-		capacity := 10
 		headers := unittest.BlockHeaderFixtures(13)
 		genesis, batch1, batch2, batch3 := headers[0], headers[1:5], headers[5:9], headers[9:]
 
-		bq := queue.NewFinalizedBlockQueue(capacity, genesis)
+		bq := queue.NewFinalizedBlockQueue(genesis)
 
 		// add the first batch of headers
 		for _, header := range batch1 {
@@ -68,33 +67,13 @@ func TestFinalizedBlockQueue(t *testing.T) {
 		}
 	})
 
-	t.Run("capacity check", func(t *testing.T) {
-		var err error
-		capacity := 4
-		headers := unittest.BlockHeaderFixtures(1 + capacity + 1)
-		genesis, batch1, invalid := headers[0], headers[1:5], headers[5]
-
-		bq := queue.NewFinalizedBlockQueue(capacity, genesis)
-		// should be enough space for all of the 4 headers
-		for _, header := range batch1 {
-			err = bq.Enqueue(header)
-			require.NoError(t, err)
-		}
-
-		err = bq.Enqueue(invalid)
-		require.Error(t, err)
-		expectedError := &queue.QueueCapacityReachedError{}
-		require.True(t, errors.As(err, &expectedError))
-	})
-
 	t.Run("test peak functionality", func(t *testing.T) {
 		var err error
-		capacity := 2
 
 		headers := unittest.BlockHeaderFixtures(3)
 		genesis, headers := headers[0], headers[1:]
 
-		bq := queue.NewFinalizedBlockQueue(capacity, genesis)
+		bq := queue.NewFinalizedBlockQueue(genesis)
 
 		id, header := bq.Peak()
 		require.Nil(t, header)

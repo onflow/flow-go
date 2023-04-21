@@ -1,9 +1,9 @@
 package testutils
 
 import (
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/state"
 )
 
 // NewSimpleTransaction returns a transaction which can be used to test
