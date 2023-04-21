@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/errors"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 )
 
@@ -177,16 +178,16 @@ func (table *DerivedDataTable[TKey, TVal]) get(
 
 func (table *DerivedDataTable[TKey, TVal]) unsafeValidate(
 	txn *TableTransaction[TKey, TVal],
-) RetryableError {
+) error {
 	if txn.isSnapshotReadTransaction &&
 		txn.invalidators.ShouldInvalidateEntries() {
 
-		return newNotRetryableError(
+		return fmt.Errorf(
 			"invalid TableTransaction: snapshot read can't invalidate")
 	}
 
 	if table.latestCommitExecutionTime >= txn.executionTime {
-		return newNotRetryableError(
+		return fmt.Errorf(
 			"invalid TableTransaction: non-increasing time (%v >= %v)",
 			table.latestCommitExecutionTime,
 			txn.executionTime)
@@ -194,8 +195,15 @@ func (table *DerivedDataTable[TKey, TVal]) unsafeValidate(
 
 	for _, entry := range txn.readSet {
 		if entry.isInvalid {
-			return newRetryableError(
-				"invalid TableTransactions. outdated read set")
+			if txn.snapshotTime == txn.executionTime {
+				// This should never happen since the transaction is
+				// sequentially executed.
+				return fmt.Errorf(
+					"invalid TableTransaction: unrecoverable outdated read set")
+			}
+
+			return errors.NewRetryableConflictError(
+				"invalid TableTransaction: outdated read set")
 		}
 	}
 
@@ -208,8 +216,16 @@ func (table *DerivedDataTable[TKey, TVal]) unsafeValidate(
 				entry.Value,
 				entry.ExecutionSnapshot) {
 
-				return newRetryableError(
-					"invalid TableTransactions. outdated write set")
+				if txn.snapshotTime == txn.executionTime {
+					// This should never happen since the transaction is
+					// sequentially executed.
+					return fmt.Errorf(
+						"invalid TableTransaction: unrecoverable outdated " +
+							"write set")
+				}
+
+				return errors.NewRetryableConflictError(
+					"invalid TableTransaction: outdated write set")
 			}
 		}
 	}
@@ -221,7 +237,7 @@ func (table *DerivedDataTable[TKey, TVal]) unsafeValidate(
 
 func (table *DerivedDataTable[TKey, TVal]) validate(
 	txn *TableTransaction[TKey, TVal],
-) RetryableError {
+) error {
 	table.lock.RLock()
 	defer table.lock.RUnlock()
 
@@ -230,7 +246,7 @@ func (table *DerivedDataTable[TKey, TVal]) validate(
 
 func (table *DerivedDataTable[TKey, TVal]) commit(
 	txn *TableTransaction[TKey, TVal],
-) RetryableError {
+) error {
 	table.lock.Lock()
 	defer table.lock.Unlock()
 
@@ -238,7 +254,7 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 		(!txn.isSnapshotReadTransaction ||
 			txn.snapshotTime != logical.EndOfBlockExecutionTime) {
 
-		return newNotRetryableError(
+		return fmt.Errorf(
 			"invalid TableTransaction: missing commit range [%v, %v)",
 			table.latestCommitExecutionTime+1,
 			txn.snapshotTime)
@@ -249,6 +265,12 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 	err := table.unsafeValidate(txn)
 	if err != nil {
 		return err
+	}
+
+	// Don't perform actual commit for snapshot read transaction.  This is
+	// safe since all values are derived from the primary source.
+	if txn.isSnapshotReadTransaction {
+		return nil
 	}
 
 	for key, entry := range txn.writeSet {
@@ -280,13 +302,7 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 			txn.invalidators...)
 	}
 
-	// NOTE: We cannot advance commit time when we encounter a snapshot read
-	// (aka script) transaction since these transactions don't generate new
-	// snapshots.  It is safe to commit the entries since snapshot read
-	// transactions never invalidate entries.
-	if !txn.isSnapshotReadTransaction {
-		table.latestCommitExecutionTime = txn.executionTime
-	}
+	table.latestCommitExecutionTime = txn.executionTime
 	return nil
 }
 
@@ -478,11 +494,11 @@ func (txn *TableTransaction[TKey, TVal]) AddInvalidator(
 		})
 }
 
-func (txn *TableTransaction[TKey, TVal]) Validate() RetryableError {
+func (txn *TableTransaction[TKey, TVal]) Validate() error {
 	return txn.table.validate(txn)
 }
 
-func (txn *TableTransaction[TKey, TVal]) Commit() RetryableError {
+func (txn *TableTransaction[TKey, TVal]) Commit() error {
 	return txn.table.commit(txn)
 }
 
