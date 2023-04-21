@@ -21,9 +21,6 @@ const (
 	// it is still recommened that seed is generated using a secure RNG.
 	KeyGenSeedMinLen = 2 * (securityBits / 8)
 	KeyGenSeedMaxLen = 256
-
-	// max relic PRG seed length in bytes
-	maxRelicPrgSeed = 1 << 32
 )
 
 // TODO: update this code to make sure
