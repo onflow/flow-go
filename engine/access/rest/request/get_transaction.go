@@ -11,16 +11,22 @@ type TransactionOptionals struct {
 	CollectionID flow.Identifier
 }
 
-func (t *TransactionOptionals) Build(r *Request) {
+func (t *TransactionOptionals) Parse(r *Request) error {
 	var blockId ID
-	// NOTE: blockId could be flow.ZeroID, as it is an optional parameter. The error here is intentionally ignored.
-	_ = blockId.Parse(r.GetQueryParam(blockIDQueryParam))
+	err := blockId.Parse(r.GetQueryParam(blockIDQueryParam))
+	if err != nil {
+		return err
+	}
 	t.BlockID = blockId.Flow()
 
 	var collectionId ID
-	// NOTE: collectionId could be flow.ZeroID, as it is an optional parameter. The error here is intentionally ignored.
-	_ = collectionId.Parse(r.GetQueryParam(collectionIDQueryParam))
-	t.CollectionID = blockId.Flow()
+	err = collectionId.Parse(r.GetQueryParam(collectionIDQueryParam))
+	if err != nil {
+		return err
+	}
+	t.CollectionID = collectionId.Flow()
+
+	return nil
 }
 
 type GetTransaction struct {
@@ -30,9 +36,12 @@ type GetTransaction struct {
 }
 
 func (g *GetTransaction) Build(r *Request) error {
-	g.TransactionOptionals.Build(r)
+	err := g.TransactionOptionals.Parse(r)
+	if err != nil {
+		return err
+	}
 
-	err := g.GetByIDRequest.Build(r)
+	err = g.GetByIDRequest.Build(r)
 	g.ExpandsResult = r.Expands(resultExpandable)
 
 	return err
@@ -44,9 +53,12 @@ type GetTransactionResult struct {
 }
 
 func (g *GetTransactionResult) Build(r *Request) error {
-	g.TransactionOptionals.Build(r)
+	err := g.TransactionOptionals.Parse(r)
+	if err != nil {
+		return err
+	}
 
-	err := g.GetByIDRequest.Build(r)
+	err = g.GetByIDRequest.Build(r)
 
 	return err
 }

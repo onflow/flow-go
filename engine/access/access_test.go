@@ -696,6 +696,102 @@ func (suite *Suite) TestGetSealedTransaction() {
 	})
 }
 
+// TestGetTransactionResult tests
+func (suite *Suite) TestGetTransactionResult() {
+	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+		all := util.StorageLayer(suite.T(), db)
+		results := bstorage.NewExecutionResults(suite.metrics, db)
+		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
+		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+		enNodeIDs := enIdentities.NodeIDs()
+
+		// create block -> collection -> transactions
+		block, collection := suite.createChain()
+
+		// setup mocks
+		conduit := new(mocknetwork.Conduit)
+		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
+			Once()
+		suite.request.On("Request", mock.Anything, mock.Anything).Return()
+
+		suite.state.On("Sealed").Return(suite.snapshot, nil)
+
+		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
+		allIdentities := append(colIdentities, enIdentities...)
+
+		suite.snapshot.On("Identities", mock.Anything).Return(allIdentities, nil)
+
+		// create a mock connection factory
+		connFactory := new(factorymock.ConnectionFactory)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
+		// initialize storage
+		metrics := metrics.NewNoopCollector()
+		transactions := bstorage.NewTransactions(metrics, db)
+		collections := bstorage.NewCollections(db, transactions)
+		collections.Store(&collection)
+
+		backend := backend.New(suite.state,
+			suite.collClient,
+			nil,
+			all.Blocks,
+			all.Headers,
+			collections,
+			transactions,
+			receipts,
+			results,
+			suite.chainID,
+			suite.metrics,
+			connFactory,
+			false,
+			backend.DefaultMaxHeightRange,
+			nil,
+			enNodeIDs.Strings(),
+			suite.log,
+			backend.DefaultSnapshotHistoryLimit,
+			nil,
+		)
+
+		handler := access.NewHandler(backend, suite.chainID.Chain())
+
+		err := all.Blocks.Store(&block)
+		require.NoError(suite.T(), err)
+		suite.snapshot.On("Head").Return(block.Header, nil)
+
+		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
+
+		assertTransactionResult := func(
+			resp *accessproto.TransactionResultResponse,
+			err error,
+			blockId *flow.Identifier,
+			collectionId *flow.Identifier,
+		) {
+			require.NoError(suite.T(), err)
+			require.Equal(suite.T(), blockId, flow.HashToID(resp.BlockId))
+			require.Equal(suite.T(), collectionId, flow.HashToID(resp.CollectionId))
+		}
+
+		transaction := collection.Transactions[0]
+		txID := transaction.ID()
+		blockId := block.ID()
+		collectionId := collection.ID()
+
+		getReq := &accessproto.GetTransactionRequest{
+			Id:      txID[:],
+			BlockId: blockId[:],
+		}
+		resp, err := handler.GetTransactionResult(context.Background(), getReq)
+		assertTransactionResult(resp, err, &blockId, &collectionId)
+
+		getReq = &accessproto.GetTransactionRequest{
+			Id:           txID[:],
+			CollectionId: collectionId[:],
+		}
+		resp, err = handler.GetTransactionResult(context.Background(), getReq)
+		assertTransactionResult(resp, err, &blockId, &collectionId)
+	})
+}
+
 // TestExecuteScript tests the three execute Script related calls to make sure that the execution api is called with
 // the correct block id
 func (suite *Suite) TestExecuteScript() {

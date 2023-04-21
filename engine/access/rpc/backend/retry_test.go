@@ -153,7 +153,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	// return not found to return finalized status
 	suite.execClient.On("GetTransactionResult", ctx, &exeEventReq).Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).Once()
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := backend.GetTransactionResult(ctx, txID)
+	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be finalized since the sealed blocks is smaller in height
