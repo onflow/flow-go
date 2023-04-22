@@ -4,7 +4,6 @@ package synchronization
 
 import (
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -23,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 // defaultSyncResponseQueueCapacity maximum capacity of sync responses queue
@@ -358,16 +358,22 @@ func (e *Engine) pollHeight() {
 	head := e.finalizedHeader.Get()
 	participants := e.participantsProvider.Identifiers()
 
+	nonce, err := rand.Uint64()
+	if err != nil {
+		e.log.Warn().Err(err).Msg("nonce generation failed")
+		return
+	}
+
 	// send the request for synchronization
 	req := &messages.SyncRequest{
-		Nonce:  rand.Uint64(),
+		Nonce:  nonce,
 		Height: head.Height,
 	}
 	e.log.Debug().
 		Uint64("height", req.Height).
 		Uint64("range_nonce", req.Nonce).
 		Msg("sending sync request")
-	err := e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
+	err = e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
 	if err != nil {
 		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
 		return
@@ -379,9 +385,15 @@ func (e *Engine) pollHeight() {
 func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsync.Range, batches []chainsync.Batch) {
 	var errs *multierror.Error
 
+	nonce, err := rand.Uint64()
+	if err != nil {
+		e.log.Error().Err(err).Msg("nonce generation failed")
+		return
+	}
+
 	for _, ran := range ranges {
 		req := &messages.RangeRequest{
-			Nonce:      rand.Uint64(),
+			Nonce:      nonce,
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
@@ -400,11 +412,16 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 	}
 
 	for _, batch := range batches {
+		nonce, err := rand.Uint64()
+		if err != nil {
+			e.log.Error().Err(err).Msg("nonce generation failed")
+			return
+		}
 		req := &messages.BatchRequest{
-			Nonce:    rand.Uint64(),
+			Nonce:    nonce,
 			BlockIDs: batch.BlockIDs,
 		}
-		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants...)
+		err = e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
 			continue
