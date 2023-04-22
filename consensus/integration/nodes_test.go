@@ -314,7 +314,7 @@ func createConsensusIdentities(t *testing.T, n int) *run.ParticipantData {
 
 // completeConsensusIdentities runs KG process and fills nodeInfos with missing random beacon keys
 func completeConsensusIdentities(t *testing.T, nodeInfos []bootstrap.NodeInfo) *run.ParticipantData {
-	dkgData, err := bootstrapDKG.RunFastKG(len(nodeInfos), unittest.RandomBytes(48))
+	dkgData, err := bootstrapDKG.RandomBeaconKG(len(nodeInfos), unittest.RandomBytes(48))
 	require.NoError(t, err)
 
 	participantData := &run.ParticipantData{
