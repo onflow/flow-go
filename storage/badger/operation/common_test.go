@@ -106,8 +106,8 @@ func TestInsertEncodingError(t *testing.T) {
 		key := []byte{0x01, 0x02, 0x03}
 
 		err := db.Update(insert(key, UnencodeableEntity(e)))
-
-		require.ErrorIs(t, err, errCantEncode)
+		require.Error(t, err, errCantEncode)
+		require.NotErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
@@ -169,7 +169,8 @@ func TestUpdateEncodingError(t *testing.T) {
 		})
 
 		err := db.Update(update(key, UnencodeableEntity(e)))
-		require.ErrorIs(t, err, errCantEncode)
+		require.Error(t, err)
+		require.NotErrorIs(t, err, storage.ErrNotFound)
 
 		// ensure value did not change
 		var act []byte
@@ -268,7 +269,46 @@ func TestRetrieveUnencodeable(t *testing.T) {
 
 		var act *UnencodeableEntity
 		err := db.View(retrieve(key, &act))
-		require.ErrorIs(t, err, errCantDecode)
+		require.Error(t, err)
+		require.NotErrorIs(t, err, storage.ErrNotFound)
+	})
+}
+
+// TestExists verifies that `exists` returns correct results in different scenarios.
+func TestExists(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		t.Run("non-existent key", func(t *testing.T) {
+			key := unittest.RandomBytes(32)
+			var _exists bool
+			err := db.View(exists(key, &_exists))
+			require.NoError(t, err)
+			assert.False(t, _exists)
+		})
+
+		t.Run("existent key", func(t *testing.T) {
+			key := unittest.RandomBytes(32)
+			err := db.Update(insert(key, unittest.RandomBytes(256)))
+			require.NoError(t, err)
+
+			var _exists bool
+			err = db.View(exists(key, &_exists))
+			require.NoError(t, err)
+			assert.True(t, _exists)
+		})
+
+		t.Run("removed key", func(t *testing.T) {
+			key := unittest.RandomBytes(32)
+			// insert, then remove the key
+			err := db.Update(insert(key, unittest.RandomBytes(256)))
+			require.NoError(t, err)
+			err = db.Update(remove(key))
+			require.NoError(t, err)
+
+			var _exists bool
+			err = db.View(exists(key, &_exists))
+			require.NoError(t, err)
+			assert.False(t, _exists)
+		})
 	})
 }
 

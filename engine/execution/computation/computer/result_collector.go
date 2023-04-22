@@ -11,8 +11,9 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/engine/execution/computation/result"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -22,9 +23,10 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// ViewCommitter commits views's deltas to the ledger and collects the proofs
+// ViewCommitter commits execution snapshot to the ledger and collects
+// the proofs
 type ViewCommitter interface {
-	// CommitView commits a views' register delta and collects proofs
+	// CommitView commits an execution snapshot and collects proofs
 	CommitView(
 		*state.ExecutionSnapshot,
 		flow.StateCommitment,
@@ -39,8 +41,10 @@ type ViewCommitter interface {
 type transactionResult struct {
 	transaction
 	*state.ExecutionSnapshot
+	fvm.ProcedureOutput
 }
 
+// TODO(ramtin): move committer and other folks to consumers layer
 type resultCollector struct {
 	tracer    module.Tracer
 	blockSpan otelTrace.Span
@@ -62,17 +66,16 @@ type resultCollector struct {
 
 	parentBlockExecutionResultID flow.Identifier
 
-	result *execution.ComputationResult
+	result    *execution.ComputationResult
+	consumers []result.ExecutedCollectionConsumer
 
-	chunks                 []*flow.Chunk
-	spockSignatures        []crypto.Signature
-	convertedServiceEvents flow.ServiceEventList
+	spockSignatures []crypto.Signature
 
 	blockStartTime time.Time
 	blockStats     module.ExecutionResultStats
 
 	currentCollectionStartTime time.Time
-	currentCollectionView      *delta.View
+	currentCollectionState     *state.ExecutionState
 	currentCollectionStats     module.ExecutionResultStats
 }
 
@@ -88,6 +91,7 @@ func newResultCollector(
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	numTransactions int,
+	consumers []result.ExecutedCollectionConsumer,
 ) *resultCollector {
 	numCollections := len(block.Collections()) + 1
 	now := time.Now()
@@ -104,11 +108,11 @@ func newResultCollector(
 		executionDataProvider:        executionDataProvider,
 		parentBlockExecutionResultID: parentBlockExecutionResultID,
 		result:                       execution.NewEmptyComputationResult(block),
-		chunks:                       make([]*flow.Chunk, 0, numCollections),
+		consumers:                    consumers,
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
 		blockStartTime:               now,
 		currentCollectionStartTime:   now,
-		currentCollectionView:        delta.NewDeltaView(nil),
+		currentCollectionState:       state.NewExecutionState(nil, state.DefaultParameters()),
 		currentCollectionStats: module.ExecutionResultStats{
 			NumberOfCollections: 1,
 		},
@@ -128,7 +132,7 @@ func (collector *resultCollector) commitCollection(
 		collector.blockSpan,
 		trace.EXECommitDelta).End()
 
-	startState := collector.result.EndState
+	startState := collector.result.CurrentEndState()
 	endState, proof, trieUpdate, err := collector.committer.CommitView(
 		collectionExecutionSnapshot,
 		startState)
@@ -136,64 +140,33 @@ func (collector *resultCollector) commitCollection(
 		return fmt.Errorf("commit view failed: %w", err)
 	}
 
-	events := collector.result.Events[collection.collectionIndex]
+	execColRes := collector.result.CollectionExecutionResultAt(collection.collectionIndex)
+	execColRes.UpdateExecutionSnapshot(collectionExecutionSnapshot)
+
+	events := execColRes.Events()
 	eventsHash, err := flow.EventsMerkleRootHash(events)
 	if err != nil {
 		return fmt.Errorf("hash events failed: %w", err)
 	}
 
-	collector.result.EventsHashes = append(
-		collector.result.EventsHashes,
-		eventsHash)
-
-	chunk := flow.NewChunk(
-		collection.blockId,
-		collection.collectionIndex,
-		startState,
-		len(collection.Transactions),
-		eventsHash,
-		endState)
-	collector.chunks = append(collector.chunks, chunk)
-
-	collectionStruct := collection.Collection()
-
-	// Note: There's some inconsistency in how chunk execution data and
-	// chunk data pack populate their collection fields when the collection
-	// is the system collection.
-	executionCollection := &collectionStruct
-	dataPackCollection := executionCollection
-	if collection.isSystemTransaction {
-		dataPackCollection = nil
+	col := collection.Collection()
+	chunkExecData := &execution_data.ChunkExecutionData{
+		Collection: &col,
+		Events:     events,
+		TrieUpdate: trieUpdate,
 	}
 
-	collector.result.ChunkDataPacks = append(
-		collector.result.ChunkDataPacks,
-		flow.NewChunkDataPack(
-			chunk.ID(),
-			startState,
-			proof,
-			dataPackCollection))
-
-	collector.result.ChunkExecutionDatas = append(
-		collector.result.ChunkExecutionDatas,
-		&execution_data.ChunkExecutionData{
-			Collection: executionCollection,
-			Events:     collector.result.Events[collection.collectionIndex],
-			TrieUpdate: trieUpdate,
-		})
+	collector.result.AppendCollectionAttestationResult(
+		startState,
+		endState,
+		proof,
+		eventsHash,
+		chunkExecData,
+	)
 
 	collector.metrics.ExecutionChunkDataPackGenerated(
 		len(proof),
 		len(collection.Transactions))
-
-	collector.result.EndState = endState
-
-	collector.result.TransactionResultIndex = append(
-		collector.result.TransactionResultIndex,
-		len(collector.result.TransactionResults))
-	collector.result.StateSnapshots = append(
-		collector.result.StateSnapshots,
-		collectionExecutionSnapshot)
 
 	spock, err := collector.signer.SignFunc(
 		collectionExecutionSnapshot.SpockSecret,
@@ -221,9 +194,16 @@ func (collector *resultCollector) commitCollection(
 	collector.blockStats.Merge(collector.currentCollectionStats)
 
 	collector.currentCollectionStartTime = time.Now()
-	collector.currentCollectionView = delta.NewDeltaView(nil)
+	collector.currentCollectionState = state.NewExecutionState(nil, state.DefaultParameters())
 	collector.currentCollectionStats = module.ExecutionResultStats{
 		NumberOfCollections: 1,
+	}
+
+	for _, consumer := range collector.consumers {
+		err = consumer.OnExecutedCollection(collector.result.CollectionExecutionResultAt(collection.collectionIndex))
+		if err != nil {
+			return fmt.Errorf("consumer failed: %w", err)
+		}
 	}
 
 	return nil
@@ -232,42 +212,38 @@ func (collector *resultCollector) commitCollection(
 func (collector *resultCollector) processTransactionResult(
 	txn transaction,
 	txnExecutionSnapshot *state.ExecutionSnapshot,
+	output fvm.ProcedureOutput,
 ) error {
-	collector.convertedServiceEvents = append(
-		collector.convertedServiceEvents,
-		txn.ConvertedServiceEvents...)
-
-	collector.result.Events[txn.collectionIndex] = append(
-		collector.result.Events[txn.collectionIndex],
-		txn.Events...)
-	collector.result.ServiceEvents = append(
-		collector.result.ServiceEvents,
-		txn.ServiceEvents...)
 
 	txnResult := flow.TransactionResult{
 		TransactionID:   txn.ID,
-		ComputationUsed: txn.ComputationUsed,
-		MemoryUsed:      txn.MemoryEstimate,
+		ComputationUsed: output.ComputationUsed,
+		MemoryUsed:      output.MemoryEstimate,
 	}
-	if txn.Err != nil {
-		txnResult.ErrorMessage = txn.Err.Error()
+	if output.Err != nil {
+		txnResult.ErrorMessage = output.Err.Error()
 	}
 
-	collector.result.TransactionResults = append(
-		collector.result.TransactionResults,
-		txnResult)
+	collector.result.
+		CollectionExecutionResultAt(txn.collectionIndex).
+		AppendTransactionResults(
+			output.Events,
+			output.ServiceEvents,
+			output.ConvertedServiceEvents,
+			txnResult,
+		)
 
-	for computationKind, intensity := range txn.ComputationIntensities {
+	for computationKind, intensity := range output.ComputationIntensities {
 		collector.result.ComputationIntensities[computationKind] += intensity
 	}
 
-	err := collector.currentCollectionView.Merge(txnExecutionSnapshot)
+	err := collector.currentCollectionState.Merge(txnExecutionSnapshot)
 	if err != nil {
 		return fmt.Errorf("failed to merge into collection view: %w", err)
 	}
 
-	collector.currentCollectionStats.ComputationUsed += txn.ComputationUsed
-	collector.currentCollectionStats.MemoryUsed += txn.MemoryEstimate
+	collector.currentCollectionStats.ComputationUsed += output.ComputationUsed
+	collector.currentCollectionStats.MemoryUsed += output.MemoryEstimate
 	collector.currentCollectionStats.NumberOfTransactions += 1
 
 	if !txn.lastTransactionInCollection {
@@ -277,16 +253,18 @@ func (collector *resultCollector) processTransactionResult(
 	return collector.commitCollection(
 		txn.collectionInfo,
 		collector.currentCollectionStartTime,
-		collector.currentCollectionView.Finalize())
+		collector.currentCollectionState.Finalize())
 }
 
 func (collector *resultCollector) AddTransactionResult(
 	txn transaction,
 	snapshot *state.ExecutionSnapshot,
+	output fvm.ProcedureOutput,
 ) {
 	result := transactionResult{
 		transaction:       txn,
 		ExecutionSnapshot: snapshot,
+		ProcedureOutput:   output,
 	}
 
 	select {
@@ -303,7 +281,8 @@ func (collector *resultCollector) runResultProcessor() {
 	for result := range collector.processorInputChan {
 		err := collector.processTransactionResult(
 			result.transaction,
-			result.ExecutionSnapshot)
+			result.ExecutionSnapshot,
+			result.ProcedureOutput)
 		if err != nil {
 			collector.processorError = err
 			return
@@ -342,8 +321,8 @@ func (collector *resultCollector) Finalize(
 	executionResult := flow.NewExecutionResult(
 		collector.parentBlockExecutionResultID,
 		collector.result.ExecutableBlock.ID(),
-		collector.chunks,
-		collector.convertedServiceEvents,
+		collector.result.AllChunks(),
+		collector.result.AllConvertedServiceEvents(),
 		executionDataID)
 
 	executionReceipt, err := GenerateExecutionReceipt(

@@ -174,10 +174,16 @@ func TestConcurrentAccess(t *testing.T) {
 
 func randomMTrie() (*trie.MTrie, error) {
 	var randomPath ledger.Path
-	_, _ = rand.Read(randomPath[:])
+	_, err := rand.Read(randomPath[:])
+	if err != nil {
+		return nil, err
+	}
 
 	var randomHashValue hash.Hash
-	_, _ = rand.Read(randomHashValue[:])
+	_, err = rand.Read(randomHashValue[:])
+	if err != nil {
+		return nil, err
+	}
 
 	root := node.NewNode(256, nil, nil, randomPath, nil, randomHashValue)
 

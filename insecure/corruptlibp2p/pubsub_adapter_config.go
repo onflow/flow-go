@@ -1,7 +1,6 @@
 package corruptlibp2p
 
 import (
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -83,7 +82,7 @@ func (c *CorruptPubSubAdapterConfig) WithScoreOption(_ p2p.ScoreOptionBuilder) {
 	// CorruptPubSub does not support score options. This is a no-op.
 }
 
-func (c *CorruptPubSubAdapterConfig) WithAppSpecificRpcInspector(_ func(peer.ID, *pubsub.RPC) error) {
+func (c *CorruptPubSubAdapterConfig) WithAppSpecificRpcInspectors(_ ...p2p.GossipSubRPCInspector) {
 	// CorruptPubSub receives its inspector at a different time than the original pubsub (i.e., at creation time).
 }
 
@@ -96,6 +95,9 @@ func (c *CorruptPubSubAdapterConfig) WithMessageIdFunction(f func([]byte) string
 	c.options = append(c.options, corrupt.WithMessageIdFn(func(pmsg *pb.Message) string {
 		return f(pmsg.Data)
 	}))
+}
+func (c *CorruptPubSubAdapterConfig) WithScoreTracer(_ p2p.PeerScoreTracer) {
+	// CorruptPubSub does not support score tracer. This is a no-op.
 }
 
 func (c *CorruptPubSubAdapterConfig) Build() []corrupt.Option {

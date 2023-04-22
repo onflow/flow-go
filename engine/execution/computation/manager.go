@@ -11,9 +11,9 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -104,6 +104,8 @@ func New(
 		vm = fvm.NewVirtualMachine()
 	}
 
+	chainID := vmCtx.Chain.ChainID()
+
 	options := []fvm.Option{
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
@@ -111,6 +113,8 @@ func New(
 				runtime.Config{
 					TracingEnabled:        params.CadenceTracing,
 					AccountLinkingEnabled: true,
+					// Attachments are enabled everywhere except for Mainnet
+					AttachmentsEnabled: chainID != flow.Mainnet,
 				},
 			),
 		),
@@ -130,6 +134,7 @@ func New(
 		committer,
 		me,
 		executionDataProvider,
+		nil, // TODO(ramtin): update me with proper consumers
 	)
 
 	if err != nil {
@@ -212,7 +217,6 @@ func (e *Manager) ExecuteScript(
 		code,
 		arguments,
 		blockHeader,
-		e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID()),
 		snapshot)
 }
 

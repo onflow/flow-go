@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution"
-	fvmState "github.com/onflow/flow-go/fvm/state"
+	fvmState "github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -148,7 +149,8 @@ type LedgerStorageSnapshot struct {
 	ledger     ledger.Ledger
 	commitment flow.StateCommitment
 
-	readCache map[flow.RegisterID]flow.RegisterValue
+	mutex     sync.RWMutex
+	readCache map[flow.RegisterID]flow.RegisterValue // Guarded by mutex.
 }
 
 func NewLedgerStorageSnapshot(
@@ -162,16 +164,25 @@ func NewLedgerStorageSnapshot(
 	}
 }
 
-func (storage *LedgerStorageSnapshot) Get(
+func (storage *LedgerStorageSnapshot) getFromCache(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	bool,
+) {
+	storage.mutex.RLock()
+	defer storage.mutex.RUnlock()
+
+	value, ok := storage.readCache[id]
+	return value, ok
+}
+
+func (storage *LedgerStorageSnapshot) getFromLedger(
 	id flow.RegisterID,
 ) (
 	flow.RegisterValue,
 	error,
 ) {
-	if value, ok := storage.readCache[id]; ok {
-		return value, nil
-	}
-
 	query, err := makeSingleValueQuery(storage.commitment, id)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create ledger query: %w", err)
@@ -186,14 +197,29 @@ func (storage *LedgerStorageSnapshot) Get(
 			err)
 	}
 
-	// Prevent caching of value with len zero
-	if len(value) == 0 {
-		return nil, nil
+	return value, nil
+}
+
+func (storage *LedgerStorageSnapshot) Get(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+) {
+	value, ok := storage.getFromCache(id)
+	if ok {
+		return value, nil
 	}
 
-	// don't cache value with len zero
-	storage.readCache[id] = value
+	value, err := storage.getFromLedger(id)
+	if err != nil {
+		return nil, err
+	}
 
+	storage.mutex.Lock()
+	defer storage.mutex.Unlock()
+
+	storage.readCache[id] = value
 	return value, nil
 }
 
@@ -271,7 +297,7 @@ func (s *state) SaveExecutionResults(
 	// but it's the closest thing to atomicity we could have
 	batch := badgerstorage.NewBatch(s.db)
 
-	for _, chunkDataPack := range result.ChunkDataPacks {
+	for _, chunkDataPack := range result.AllChunkDataPacks() {
 		err := s.chunkDataPacks.BatchStore(chunkDataPack, batch)
 		if err != nil {
 			return fmt.Errorf("cannot store chunk data pack: %w", err)
@@ -283,24 +309,24 @@ func (s *state) SaveExecutionResults(
 		}
 	}
 
-	err := s.commits.BatchStore(blockID, result.EndState, batch)
+	err := s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
 	if err != nil {
 		return fmt.Errorf("cannot store state commitment: %w", err)
 	}
 
-	err = s.events.BatchStore(blockID, result.Events, batch)
+	err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store events: %w", err)
 	}
 
-	err = s.serviceEvents.BatchStore(blockID, result.ServiceEvents, batch)
+	err = s.serviceEvents.BatchStore(blockID, result.AllServiceEvents(), batch)
 	if err != nil {
 		return fmt.Errorf("cannot store service events: %w", err)
 	}
 
 	err = s.transactionResults.BatchStore(
 		blockID,
-		result.TransactionResults,
+		result.AllTransactionResults(),
 		batch)
 	if err != nil {
 		return fmt.Errorf("cannot store transaction result: %w", err)

@@ -246,16 +246,14 @@ func TestBLSUtils(t *testing.T) {
 // BLS Proof of Possession test
 func TestBLSPOP(t *testing.T) {
 	rand := getPRG(t)
-	// make sure the length is larger than minimum lengths of all the signaure algos
-	seedMinLength := 48
-	seed := make([]byte, seedMinLength)
+	seed := make([]byte, KeyGenSeedMinLen)
 	input := make([]byte, 100)
 
 	t.Run("PoP tests", func(t *testing.T) {
 		loops := 10
 		for j := 0; j < loops; j++ {
 			n, err := rand.Read(seed)
-			require.Equal(t, n, seedMinLength)
+			require.Equal(t, n, KeyGenSeedMinLen)
 			require.NoError(t, err)
 			sk, err := GeneratePrivateKey(BLSBLS12381, seed)
 			require.NoError(t, err)
@@ -771,7 +769,8 @@ func alterSignature(s Signature) {
 func BenchmarkBatchVerify(b *testing.B) {
 	// random message
 	input := make([]byte, 100)
-	_, _ = crand.Read(input)
+	_, err := crand.Read(input)
+	require.NoError(b, err)
 	// hasher
 	kmac := NewExpandMsgXOFKMAC128("bench tag")
 	sigsNum := 100

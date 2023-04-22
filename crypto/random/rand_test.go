@@ -2,7 +2,6 @@ package random
 
 import (
 	"bytes"
-	"fmt"
 	mrand "math/rand"
 	"testing"
 	"time"
@@ -10,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/chacha20"
-	"gonum.org/v1/gonum/stat"
 )
 
 // sanity check for the underlying implementation of Chacha20
@@ -93,11 +91,10 @@ func getPRG(t *testing.T) *mrand.Rand {
 // For now, the tests are only used for Chacha20 PRG, but can be ported
 // to test another PRG implementation.
 
-// Simple unit testing of Uint using a very basic randomness test.
-// It doesn't evaluate randomness of the output and doesn't perform advanced statistical tests.
-func TestUint(t *testing.T) {
+// Simple unit testing of UintN using a basic randomness test.
+// It doesn't perform advanced statistical tests.
+func TestUintN(t *testing.T) {
 	rand := getPRG(t)
-
 	seed := make([]byte, Chacha20SeedLen)
 	_, err := rand.Read(seed)
 	require.NoError(t, err)
@@ -108,20 +105,25 @@ func TestUint(t *testing.T) {
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
 
-	t.Run("basic randomness", func(t *testing.T) {
-		sampleSize := 80000
-		tolerance := 0.05
-		sampleSpace := uint64(10 + rand.Intn(100))
-		distribution := make([]float64, sampleSpace)
+	t.Run("basic uniformity", func(t *testing.T) {
 
-		for i := 0; i < sampleSize; i++ {
-			r := rng.UintN(sampleSpace)
-			require.Less(t, r, sampleSpace)
-			distribution[r] += 1.0
+		maxN := uint64(1000)
+		mod := mrand.Uint64()
+		var n, classWidth uint64
+		if mod < maxN { // `mod` is too small so that we can consider `mod` classes
+			n = mod
+			classWidth = 1
+		} else { // `mod` is big enough so that we can partition [0,mod-1] into `maxN` classes
+			n = maxN
+			mod = (mod / n) * n // adjust `mod` to make sure it is a multiple of n for a more accurate test
+			classWidth = mod / n
 		}
-		stdev := stat.StdDev(distribution, nil)
-		mean := stat.Mean(distribution, nil)
-		assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
+
+		uintNf := func() (uint64, error) {
+			return uint64(rng.UintN(mod)), nil
+		}
+		BasicDistributionTest(t, n, classWidth, uintNf)
+
 	})
 
 	t.Run("zero n", func(t *testing.T) {
@@ -131,8 +133,8 @@ func TestUint(t *testing.T) {
 	})
 }
 
-// Simple unit testing of SubPermutation using a very basic randomness test.
-// It doesn't evaluate randomness of the output and doesn't perform advanced statistical tests.
+// Simple unit testing of SubPermutation using a basic randomness test.
+// It doesn't perform advanced statistical tests.
 //
 // SubPermutation tests cover Permutation as well.
 func TestSubPermutation(t *testing.T) {
@@ -149,13 +151,9 @@ func TestSubPermutation(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("basic randomness", func(t *testing.T) {
-
 		listSize := 100
 		subsetSize := 20
-
-		// statictics parameters
 		sampleSize := 85000
-		tolerance := 0.05
 		// tests the subset sampling randomness
 		samplingDistribution := make([]float64, listSize)
 		// tests the subset ordering randomness (using a particular element testElement)
@@ -179,12 +177,8 @@ func TestSubPermutation(t *testing.T) {
 				}
 			}
 		}
-		stdev := stat.StdDev(samplingDistribution, nil)
-		mean := stat.Mean(samplingDistribution, nil)
-		assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic subset randomness test failed. stdev %v, mean %v", stdev, mean))
-		stdev = stat.StdDev(orderingDistribution, nil)
-		mean = stat.Mean(orderingDistribution, nil)
-		assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic ordering randomness test failed. stdev %v, mean %v", stdev, mean))
+		EvaluateDistributionUniformity(t, samplingDistribution)
+		EvaluateDistributionUniformity(t, orderingDistribution)
 	})
 
 	// Evaluate that
@@ -218,8 +212,8 @@ func TestSubPermutation(t *testing.T) {
 	})
 }
 
-// Simple unit testing of Shuffle using a very basic randomness test.
-// It doesn't evaluate randomness of the output and doesn't perform advanced statistical tests.
+// Simple unit testing of Shuffle using a basic randomness test.
+// It doesn't perform advanced statistical tests.
 func TestShuffle(t *testing.T) {
 	rand := getPRG(t)
 
@@ -233,11 +227,9 @@ func TestShuffle(t *testing.T) {
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
 
-	t.Run("basic randomness", func(t *testing.T) {
+	t.Run("basic uniformity", func(t *testing.T) {
 		listSize := 100
-		// test parameters
 		sampleSize := 80000
-		tolerance := 0.05
 		// the distribution of a particular element of the list, testElement
 		distribution := make([]float64, listSize)
 		testElement := rand.Intn(listSize)
@@ -269,21 +261,18 @@ func TestShuffle(t *testing.T) {
 			for k := 0; k < sampleSize; k++ {
 				shuffleAndCount(t)
 			}
-			stdev := stat.StdDev(distribution, nil)
-			mean := stat.Mean(distribution, nil)
-			assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
+			EvaluateDistributionUniformity(t, distribution)
 		})
 
 		t.Run("shuffle a same permutation", func(t *testing.T) {
 			for k := 0; k < sampleSize; k++ {
+				// reinit the permutation to the same value
 				for i := 0; i < listSize; i++ {
 					list[i] = i
 				}
 				shuffleAndCount(t)
 			}
-			stdev := stat.StdDev(distribution, nil)
-			mean := stat.Mean(distribution, nil)
-			assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
+			EvaluateDistributionUniformity(t, distribution)
 		})
 	})
 
@@ -318,14 +307,10 @@ func TestSamples(t *testing.T) {
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
 
-	t.Run("basic randmoness", func(t *testing.T) {
-
+	t.Run("basic uniformity", func(t *testing.T) {
 		listSize := 100
 		samplesSize := 20
-
-		// statictics parameters
 		sampleSize := 100000
-		tolerance := 0.05
 		// tests the subset sampling randomness
 		samplingDistribution := make([]float64, listSize)
 		// tests the subset ordering randomness (using a particular element testElement)
@@ -355,12 +340,8 @@ func TestSamples(t *testing.T) {
 				}
 			}
 		}
-		stdev := stat.StdDev(samplingDistribution, nil)
-		mean := stat.Mean(samplingDistribution, nil)
-		assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic subset randomness test failed. stdev %v, mean %v", stdev, mean))
-		stdev = stat.StdDev(orderingDistribution, nil)
-		mean = stat.Mean(orderingDistribution, nil)
-		assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic ordering randomness test failed. stdev %v, mean %v", stdev, mean))
+		EvaluateDistributionUniformity(t, samplingDistribution)
+		EvaluateDistributionUniformity(t, orderingDistribution)
 	})
 
 	t.Run("zero edge cases", func(t *testing.T) {

@@ -8,11 +8,12 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 )
@@ -44,6 +45,10 @@ var (
 			"fee execution effort cost",
 			"0.0"),
 	}
+
+	// DefaultVersionFreezePeriod is the default NodeVersionBeacon freeze period -
+	// the number of blocks in the future where the version changes are frozen.
+	DefaultVersionFreezePeriod = cadence.UInt64(1000)
 )
 
 func mustParseUFix64(name string, valueString string) cadence.UFix64 {
@@ -71,6 +76,12 @@ type BootstrapParams struct {
 	minimumStorageReservation        cadence.UFix64
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
+
+	// versionFreezePeriod is the number of blocks in the future where the version
+	// changes are frozen. The Node version beacon manages the freeze period,
+	// but this is the value used when first deploying the contract, during the
+	// bootstrap procedure.
+	versionFreezePeriod cadence.UInt64
 
 	// TODO: restrictedContractDeployment should be a bool after RestrictedDeploymentEnabled is removed from the context
 	// restrictedContractDeployment of nil means that the contract deployment is taken from the fvm Context instead of from the state.
@@ -221,8 +232,9 @@ func Bootstrap(
 				FlowTokenAccountPublicKeys:     []flow.AccountPublicKey{serviceAccountPublicKey},
 				NodeAccountPublicKeys:          []flow.AccountPublicKey{serviceAccountPublicKey},
 			},
-			transactionFees: BootstrapProcedureFeeParameters{0, 0, 0},
-			epochConfig:     epochs.DefaultEpochConfig(),
+			transactionFees:     BootstrapProcedureFeeParameters{0, 0, 0},
+			epochConfig:         epochs.DefaultEpochConfig(),
+			versionFreezePeriod: DefaultVersionFreezePeriod,
 		},
 	}
 
@@ -259,7 +271,7 @@ func (BootstrapProcedure) Type() ProcedureType {
 	return BootstrapProcedureType
 }
 
-func (proc *BootstrapProcedure) ExecutionTime() derived.LogicalTime {
+func (proc *BootstrapProcedure) ExecutionTime() logical.Time {
 	return 0
 }
 
@@ -352,6 +364,8 @@ func (b *bootstrapExecutor) Execute() error {
 	b.deployIDTableStaking(service, fungibleToken, flowToken, feeContract)
 
 	b.deployEpoch(service, fungibleToken, flowToken, feeContract)
+
+	b.deployVersionBeacon(service, b.versionFreezePeriod)
 
 	// deploy staking proxy contract to the service account
 	b.deployStakingProxyContract(service)
@@ -597,7 +611,10 @@ func (b *bootstrapExecutor) setupParameters(
 	panicOnMetaInvokeErrf("failed to setup parameters: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) setupFees(service, flowFees flow.Address, surgeFactor, inclusionEffortCost, executionEffortCost cadence.UFix64) {
+func (b *bootstrapExecutor) setupFees(
+	service, flowFees flow.Address,
+	surgeFactor, inclusionEffortCost, executionEffortCost cadence.UFix64,
+) {
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
@@ -703,7 +720,10 @@ func (b *bootstrapExecutor) setupStorageForServiceAccounts(
 	panicOnMetaInvokeErrf("failed to setup storage for service accounts: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) setStakingAllowlist(service flow.Address, allowedIDs []flow.Identifier) {
+func (b *bootstrapExecutor) setStakingAllowlist(
+	service flow.Address,
+	allowedIDs []flow.Identifier,
+) {
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
@@ -773,8 +793,25 @@ func (b *bootstrapExecutor) deployStakingProxyContract(service flow.Address) {
 	panicOnMetaInvokeErrf("failed to deploy StakingProxy contract: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) deployLockedTokensContract(service flow.Address, fungibleTokenAddress,
-	flowTokenAddress flow.Address) {
+func (b *bootstrapExecutor) deployVersionBeacon(
+	service flow.Address,
+	versionFreezePeriod cadence.UInt64,
+) {
+	tx := blueprints.DeployNodeVersionBeaconTransaction(service, versionFreezePeriod)
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			tx,
+			0,
+		),
+	)
+	panicOnMetaInvokeErrf("failed to deploy NodeVersionBeacon contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployLockedTokensContract(
+	service flow.Address, fungibleTokenAddress,
+	flowTokenAddress flow.Address,
+) {
 
 	publicKeys, err := flow.EncodeRuntimeAccountPublicKeys(b.accountKeys.ServiceAccountPublicKeys)
 	if err != nil {
@@ -799,7 +836,10 @@ func (b *bootstrapExecutor) deployLockedTokensContract(service flow.Address, fun
 	panicOnMetaInvokeErrf("failed to deploy LockedTokens contract: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) deployStakingCollection(service flow.Address, fungibleTokenAddress, flowTokenAddress flow.Address) {
+func (b *bootstrapExecutor) deployStakingCollection(
+	service flow.Address,
+	fungibleTokenAddress, flowTokenAddress flow.Address,
+) {
 	contract := contracts.FlowStakingCollection(
 		fungibleTokenAddress.Hex(),
 		flowTokenAddress.Hex(),
@@ -820,7 +860,10 @@ func (b *bootstrapExecutor) deployStakingCollection(service flow.Address, fungib
 	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) setContractDeploymentRestrictions(service flow.Address, deployment *bool) {
+func (b *bootstrapExecutor) setContractDeploymentRestrictions(
+	service flow.Address,
+	deployment *bool,
+) {
 	if deployment == nil {
 		return
 	}

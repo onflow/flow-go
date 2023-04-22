@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
+	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -223,7 +224,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// burst per interval
 	burst := 5
 
-	messageRateLimiter := ratelimit.NewMessageRateLimiter(limit, burst, 4)
+	messageRateLimiter := ratelimiter.NewRateLimiter(limit, burst, 3)
 
 	// we only expect messages from the first middleware on the test suite
 	expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])

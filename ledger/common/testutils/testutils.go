@@ -152,7 +152,10 @@ func RandomPaths(n int) []l.Path {
 	i := 0
 	for i < n {
 		var path l.Path
-		_, _ = crand.Read(path[:])
+		_, err := crand.Read(path[:])
+		if err != nil {
+			panic("randomness failed")
+		}
 		// deduplicate
 		if _, found := alreadySelectPaths[path]; !found {
 			paths = append(paths, path)
@@ -167,11 +170,14 @@ func RandomPaths(n int) []l.Path {
 func RandomPayload(minByteSize int, maxByteSize int) *l.Payload {
 	keyByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	keydata := make([]byte, keyByteSize)
-	_, _ = crand.Read(keydata)
+	_, err := crand.Read(keydata)
+	if err != nil {
+		panic("randomness failed")
+	}
 	key := l.Key{KeyParts: []l.KeyPart{{Type: 0, Value: keydata}}}
 	valueByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	valuedata := make([]byte, valueByteSize)
-	_, err := crand.Read(valuedata)
+	_, err = crand.Read(valuedata)
 	if err != nil {
 		panic("random generation failed")
 	}

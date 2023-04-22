@@ -52,10 +52,11 @@ const (
 	CONSealingProcessIncorporatedResult       SpanName = "con.sealing.processIncorporatedResult"
 	CONSealingProcessApproval                 SpanName = "con.sealing.processApproval"
 
-	// Follower Engine
-	FollowerOnBlockProposal        SpanName = "follower.onBlockProposal"
-	FollowerProcessBlockProposal   SpanName = "follower.processBlockProposal"
-	FollowerProcessPendingChildren SpanName = "follower.processPendingChildren"
+	// Follower Core
+	FollowerProcessFinalizedBlock  SpanName = "follower.processFinalizedBlock"
+	FollowerProcessCertifiedBlocks SpanName = "follower.processCertifiedBlocks"
+	FollowerExtendPendingTree      SpanName = "follower.extendPendingTree"
+	FollowerExtendProtocolState    SpanName = "follower.extendProtocolState"
 
 	// Collection Node
 	//
@@ -163,8 +164,6 @@ const (
 	FVMEnvResolveLocation            SpanName = "fvm.env.resolveLocation"
 	FVMEnvGetCode                    SpanName = "fvm.env.getCode"
 	FVMEnvGetAccountContractNames    SpanName = "fvm.env.getAccountContractNames"
-	FVMEnvGetProgram                 SpanName = "fvm.env.getCachedProgram"
-	FVMEnvSetProgram                 SpanName = "fvm.env.cacheProgram"
 	FVMEnvGetOrLoadProgram           SpanName = "fvm.env.getOrLoadCachedProgram"
 	FVMEnvProgramLog                 SpanName = "fvm.env.programLog"
 	FVMEnvEmitEvent                  SpanName = "fvm.env.emitEvent"

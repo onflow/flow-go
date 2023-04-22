@@ -40,7 +40,6 @@ func Test_PaddedByteSliceLength(t *testing.T) {
 func TestBitTools(t *testing.T) {
 	seed := time.Now().UnixNano()
 	t.Logf("rand seed is %d", seed)
-
 	r := rand.NewSource(seed)
 
 	const maxBits = 131 * 8 // upper bound of indices to test

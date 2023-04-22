@@ -18,7 +18,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/rpc"
-	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 

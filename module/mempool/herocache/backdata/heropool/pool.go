@@ -273,8 +273,8 @@ func (p *Pool) claimFreeHead() EIndex {
 }
 
 // Remove removes entity corresponding to given getSliceIndex from the list.
-func (p *Pool) Remove(sliceIndex EIndex) {
-	p.invalidateEntityAtIndex(sliceIndex)
+func (p *Pool) Remove(sliceIndex EIndex) flow.Entity {
+	return p.invalidateEntityAtIndex(sliceIndex)
 }
 
 // invalidateEntityAtIndex invalidates the given getSliceIndex in the linked list by

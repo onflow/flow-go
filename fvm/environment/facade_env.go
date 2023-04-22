@@ -6,9 +6,10 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/fvm/derived"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 )
 
@@ -139,22 +140,32 @@ func newFacadeEnvironment(
 	return env
 }
 
-// TODO(patrick): remove once emulator is updated.
-func NewScriptEnvironment(
-	ctx context.Context,
-	tracer tracing.TracerSpan,
+// This is mainly used by command line tools, the emulator, and cadence tools
+// testing.
+func NewScriptEnvironmentFromStorageSnapshot(
 	params EnvironmentParams,
-	nestedTxn state.NestedTransaction,
-	derivedTxn derived.DerivedTransactionCommitter,
+	storageSnapshot state.StorageSnapshot,
 ) *facadeEnvironment {
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	derivedTxn, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
+		logical.EndOfBlockExecutionTime,
+		logical.EndOfBlockExecutionTime)
+	if err != nil {
+		panic(err)
+	}
+
+	txn := storage.SerialTransaction{
+		NestedTransaction: state.NewTransactionState(
+			storageSnapshot,
+			state.DefaultParameters()),
+		DerivedTransactionCommitter: derivedTxn,
+	}
+
 	return NewScriptEnv(
-		ctx,
-		tracer,
+		context.Background(),
+		tracing.NewTracerSpan(),
 		params,
-		storage.SerialTransaction{
-			NestedTransaction:           nestedTxn,
-			DerivedTransactionCommitter: derivedTxn,
-		})
+		txn)
 }
 
 func NewScriptEnv(
@@ -277,7 +288,7 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 }
 
 func (env *facadeEnvironment) FlushPendingUpdates() (
-	[]ContractUpdateKey,
+	ContractUpdates,
 	error,
 ) {
 	return env.ContractUpdater.Commit()
@@ -286,6 +297,7 @@ func (env *facadeEnvironment) FlushPendingUpdates() (
 func (env *facadeEnvironment) Reset() {
 	env.ContractUpdater.Reset()
 	env.EventEmitter.Reset()
+	env.Programs.Reset()
 }
 
 // Miscellaneous cadence runtime.Interface API.
