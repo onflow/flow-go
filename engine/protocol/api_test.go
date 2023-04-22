@@ -35,7 +35,6 @@ func TestHandler(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-
 	suite.snapshot = new(protocol.Snapshot)
 
 	suite.state = new(protocol.State)

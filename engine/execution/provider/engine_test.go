@@ -98,6 +98,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
 		requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
+
 		e, err := New(
 			unittest.Logger(),
 			trace.NewNoopTracer(),
@@ -156,6 +157,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
 		requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
+
 		e, err := New(
 			unittest.Logger(),
 			trace.NewNoopTracer(),

@@ -2,7 +2,7 @@ package convert_test
 
 import (
 	"bytes"
-	"crypto/rand"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
