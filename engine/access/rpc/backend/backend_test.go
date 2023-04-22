@@ -55,7 +55,6 @@ func TestHandler(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-
 	suite.log = zerolog.New(zerolog.NewConsoleWriter())
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)

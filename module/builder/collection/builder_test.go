@@ -61,8 +61,6 @@ type BuilderSuite struct {
 func (suite *BuilderSuite) SetupTest() {
 	var err error
 
-	// seed the RNG
-
 	suite.genesis = model.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
 

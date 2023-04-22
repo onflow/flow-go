@@ -65,8 +65,6 @@ type ChunkVerifierTestSuite struct {
 // Make sure variables are set properly
 // SetupTest is executed prior to each individual test in this test suite
 func (s *ChunkVerifierTestSuite) SetupSuite() {
-	// seed the RNG
-
 	vm := new(vmMock)
 	systemOkVm := new(vmSystemOkMock)
 	systemBadVm := new(vmSystemBadMock)

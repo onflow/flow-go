@@ -596,7 +596,6 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		}
 
 		// shuffle votes in random order
-
 		rand.Shuffle(len(votes), func(i, j int) {
 			votes[i], votes[j] = votes[j], votes[i]
 		})
@@ -744,7 +743,6 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		}
 
 		// shuffle votes in random order
-
 		rand.Shuffle(len(votes), func(i, j int) {
 			votes[i], votes[j] = votes[j], votes[i]
 		})

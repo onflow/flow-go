@@ -497,7 +497,6 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		chunkDataPackRequestQueueMetrics = metrics.ChunkDataPackRequestQueueMetricsFactory(node.MetricsRegisterer)
 	}
 	chdpReqQueue := queue.NewHeroStore(exeNode.exeConf.chunkDataPackRequestsCacheSize, node.Logger, chunkDataPackRequestQueueMetrics)
-
 	exeNode.providerEngine, err = exeprovider.New(
 		node.Logger,
 		node.Tracer,

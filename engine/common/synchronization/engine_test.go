@@ -58,8 +58,6 @@ type SyncSuite struct {
 }
 
 func (ss *SyncSuite) SetupTest() {
-	// seed the RNG
-
 	// generate own ID
 	ss.participants = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
 	keys := unittest.NetworkingKeys(len(ss.participants))

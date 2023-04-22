@@ -64,8 +64,6 @@ type MessageHubSuite struct {
 }
 
 func (s *MessageHubSuite) SetupTest() {
-	// seed the RNG
-
 	// initialize the paramaters
 	s.participants = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleConsensus),

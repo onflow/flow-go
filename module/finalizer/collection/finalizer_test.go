@@ -23,9 +23,6 @@ import (
 
 func TestFinalizer(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-
-		// seed the RNG
-
 		// reference block on the main consensus chain
 		refBlock := unittest.BlockHeaderFixture()
 		// genesis block for the cluster chain

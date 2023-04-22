@@ -1764,7 +1764,6 @@ func (fnb *FlowNodeBuilder) Build() (Node, error) {
 }
 
 func (fnb *FlowNodeBuilder) onStart() error {
-
 	// init nodeinfo by reading the private bootstrap file if not already set
 	if fnb.NodeID == flow.ZeroID {
 		if err := fnb.initNodeInfo(); err != nil {

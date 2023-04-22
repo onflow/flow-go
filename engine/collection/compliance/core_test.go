@@ -63,8 +63,6 @@ type CommonSuite struct {
 }
 
 func (cs *CommonSuite) SetupTest() {
-	// seed the RNG
-
 	block := unittest.ClusterBlockFixture()
 	cs.head = &block
 

@@ -41,8 +41,6 @@ type SnapshotSuite struct {
 func (suite *SnapshotSuite) SetupTest() {
 	var err error
 
-	// seed the RNG
-
 	suite.genesis = model.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
 

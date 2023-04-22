@@ -51,8 +51,6 @@ type MutatorSuite struct {
 func (suite *MutatorSuite) SetupTest() {
 	var err error
 
-	// seed the RNG
-
 	suite.genesis = model.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
 

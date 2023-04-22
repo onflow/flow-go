@@ -78,8 +78,6 @@ type CommonSuite struct {
 }
 
 func (cs *CommonSuite) SetupTest() {
-	// seed the RNG
-
 	// initialize the paramaters
 	cs.participants = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleConsensus),
