@@ -751,7 +751,6 @@ func (s *TCSuite) SetupTest() {
 	s.indices, err = signature.EncodeSignersToIndices(s.participants.NodeIDs(), s.signers.NodeIDs())
 	require.NoError(s.T(), err)
 
-	rand.Seed(time.Now().UnixNano())
 	view := uint64(int(rand.Uint32()) + len(s.participants))
 
 	highQCViews := make([]uint64, 0, len(s.signers))
