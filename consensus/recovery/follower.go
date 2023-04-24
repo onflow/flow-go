@@ -17,10 +17,9 @@ func Follower(
 	log zerolog.Logger,
 	forks hotstuff.Forks,
 	validator hotstuff.Validator,
-	finalized *flow.Header,
 	pending []*flow.Header,
 ) error {
-	return Recover(log, finalized, pending, validator, func(proposal *model.Proposal) error {
+	return Recover(log, pending, validator, func(proposal *model.Proposal) error {
 		// add it to forks
 		err := forks.AddProposal(proposal)
 		if err != nil {

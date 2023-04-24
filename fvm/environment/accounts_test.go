@@ -8,15 +8,14 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
+	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestAccounts_Create(t *testing.T) {
 	t.Run("Sets registers", func(t *testing.T) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 
 		address := flow.HexToAddress("01")
@@ -24,13 +23,15 @@ func TestAccounts_Create(t *testing.T) {
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
 
+		snapshot, err := txnState.FinalizeMainTransaction()
+		require.NoError(t, err)
+
 		// account status
-		require.Equal(t, len(view.Ledger.RegisterTouches), 1)
+		require.Equal(t, len(snapshot.AllRegisterIDs()), 1)
 	})
 
 	t.Run("Fails if account exists", func(t *testing.T) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 		address := flow.HexToAddress("01")
 
@@ -44,8 +45,7 @@ func TestAccounts_Create(t *testing.T) {
 }
 
 func TestAccounts_GetWithNoKeys(t *testing.T) {
-	view := utils.NewSimpleView()
-	txnState := state.NewTransactionState(view, state.DefaultParameters())
+	txnState := testutils.NewSimpleTransaction(nil)
 	accounts := environment.NewAccounts(txnState)
 	address := flow.HexToAddress("01")
 
@@ -62,25 +62,22 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 	t.Run("non-existent key index", func(t *testing.T) {
 
 		address := flow.HexToAddress("01")
+		registerId := flow.NewRegisterID(
+			string(address.Bytes()),
+			"public_key_0")
 
-		for _, ledgerValue := range [][]byte{{}, nil} {
-
-			view := utils.NewSimpleView()
-
-			err := view.Set(
-				flow.NewRegisterID(string(address.Bytes()), "public_key_0"),
-				ledgerValue,
-			)
-			require.NoError(t, err)
-
-			txnState := state.NewTransactionState(view, state.DefaultParameters())
+		for _, value := range [][]byte{{}, nil} {
+			txnState := testutils.NewSimpleTransaction(
+				state.MapStorageSnapshot{
+					registerId: value,
+				})
 			accounts := environment.NewAccounts(txnState)
 
-			err = accounts.Create(nil, address)
+			err := accounts.Create(nil, address)
 			require.NoError(t, err)
 
 			_, err = accounts.GetPublicKey(address, 0)
-			require.True(t, errors.IsAccountAccountPublicKeyNotFoundError(err))
+			require.True(t, errors.IsAccountPublicKeyNotFoundError(err))
 		}
 	})
 }
@@ -90,20 +87,18 @@ func TestAccounts_GetPublicKeyCount(t *testing.T) {
 	t.Run("non-existent key count", func(t *testing.T) {
 
 		address := flow.HexToAddress("01")
+		registerId := flow.NewRegisterID(
+			string(address.Bytes()),
+			"public_key_count")
 
-		for _, ledgerValue := range [][]byte{{}, nil} {
-
-			view := utils.NewSimpleView()
-			err := view.Set(
-				flow.NewRegisterID(string(address.Bytes()), "public_key_count"),
-				ledgerValue,
-			)
-			require.NoError(t, err)
-
-			txnState := state.NewTransactionState(view, state.DefaultParameters())
+		for _, value := range [][]byte{{}, nil} {
+			txnState := testutils.NewSimpleTransaction(
+				state.MapStorageSnapshot{
+					registerId: value,
+				})
 			accounts := environment.NewAccounts(txnState)
 
-			err = accounts.Create(nil, address)
+			err := accounts.Create(nil, address)
 			require.NoError(t, err)
 
 			count, err := accounts.GetPublicKeyCount(address)
@@ -118,20 +113,19 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 	t.Run("non-existent key count", func(t *testing.T) {
 
 		address := flow.HexToAddress("01")
+		registerId := flow.NewRegisterID(
+			string(address.Bytes()),
+			"public_key_count")
 
-		for _, ledgerValue := range [][]byte{{}, nil} {
+		for _, value := range [][]byte{{}, nil} {
+			txnState := testutils.NewSimpleTransaction(
+				state.MapStorageSnapshot{
+					registerId: value,
+				})
 
-			view := utils.NewSimpleView()
-			err := view.Set(
-				flow.NewRegisterID(string(address.Bytes()), "public_key_count"),
-				ledgerValue,
-			)
-			require.NoError(t, err)
-
-			txnState := state.NewTransactionState(view, state.DefaultParameters())
 			accounts := environment.NewAccounts(txnState)
 
-			err = accounts.Create(nil, address)
+			err := accounts.Create(nil, address)
 			require.NoError(t, err)
 
 			keys, err := accounts.GetPublicKeys(address)
@@ -146,8 +140,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 	address := flow.HexToAddress("0x01")
 
 	t.Run("Setting a contract puts it in Contracts", func(t *testing.T) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		a := environment.NewAccounts(txnState)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
@@ -162,8 +155,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 		require.Equal(t, contractNames[0], "Dummy")
 	})
 	t.Run("Setting a contract again, does not add it to contracts", func(t *testing.T) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		a := environment.NewAccounts(txnState)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
@@ -181,8 +173,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 		require.Equal(t, contractNames[0], "Dummy")
 	})
 	t.Run("Setting more contracts always keeps them sorted", func(t *testing.T) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		a := environment.NewAccounts(txnState)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
@@ -205,8 +196,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 		require.Equal(t, contractNames[2], "ZedDummy")
 	})
 	t.Run("Removing a contract does not fail if there is none", func(t *testing.T) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		a := environment.NewAccounts(txnState)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
@@ -215,8 +205,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 		require.NoError(t, err)
 	})
 	t.Run("Removing a contract removes it", func(t *testing.T) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		a := environment.NewAccounts(txnState)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
@@ -237,8 +226,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 func TestAccount_StorageUsed(t *testing.T) {
 
 	t.Run("Storage used on account creation is deterministic", func(t *testing.T) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 		address := flow.HexToAddress("01")
 
@@ -251,8 +239,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 	})
 
 	t.Run("Storage used on register set increases", func(t *testing.T) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 		address := flow.HexToAddress("01")
 		key := flow.NewRegisterID(string(address.Bytes()), "some_key")
@@ -269,8 +256,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 	})
 
 	t.Run("Storage used, set twice on same register to same value, stays the same", func(t *testing.T) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 		address := flow.HexToAddress("01")
 		key := flow.NewRegisterID(string(address.Bytes()), "some_key")
@@ -289,8 +275,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 	})
 
 	t.Run("Storage used, set twice on same register to larger value, increases", func(t *testing.T) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 		address := flow.HexToAddress("01")
 		key := flow.NewRegisterID(string(address.Bytes()), "some_key")
@@ -309,8 +294,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 	})
 
 	t.Run("Storage used, set twice on same register to smaller value, decreases", func(t *testing.T) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 		address := flow.HexToAddress("01")
 		key := flow.NewRegisterID(string(address.Bytes()), "some_key")
@@ -329,8 +313,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 	})
 
 	t.Run("Storage used, after register deleted, decreases", func(t *testing.T) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 		address := flow.HexToAddress("01")
 		key := flow.NewRegisterID(string(address.Bytes()), "some_key")
@@ -349,8 +332,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 	})
 
 	t.Run("Storage used on a complex scenario has correct value", func(t *testing.T) {
-		view := utils.NewSimpleView()
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 		address := flow.HexToAddress("01")
 
@@ -390,9 +372,7 @@ func createByteArray(size int) []byte {
 }
 
 func TestAccounts_AllocateStorageIndex(t *testing.T) {
-	view := utils.NewSimpleView()
-
-	txnState := state.NewTransactionState(view, state.DefaultParameters())
+	txnState := testutils.NewSimpleTransaction(nil)
 	accounts := environment.NewAccounts(txnState)
 	address := flow.HexToAddress("01")
 

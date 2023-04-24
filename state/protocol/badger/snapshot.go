@@ -6,11 +6,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dgraph-io/badger/v2"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -34,7 +35,9 @@ type Snapshot struct {
 
 var _ protocol.Snapshot = (*Snapshot)(nil)
 
-func NewSnapshot(state *State, blockID flow.Identifier) *Snapshot {
+// newSnapshotWithIncorporatedReferenceBlock creates a new state snapshot with the given reference block.
+// CAUTION: The caller is responsible for ensuring that the reference block has been incorporated.
+func newSnapshotWithIncorporatedReferenceBlock(state *State, blockID flow.Identifier) *Snapshot {
 	return &Snapshot{
 		state:   state,
 		blockID: blockID,
@@ -47,78 +50,14 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 }
 
 // QuorumCertificate (QC) returns a valid quorum certificate pointing to the
-// header at this snapshot. With the exception of the root block, a valid child
-// block must be which contains the desired QC. The sentinel error
-// state.NoChildBlockError is returned if the the QC is unknown.
-//
-// For root block snapshots, returns the root quorum certificate. For all other
-// blocks, generates a quorum certificate from a valid child, if one exists.
+// header at this snapshot.
+// The sentinel error storage.ErrNotFound is returned if the QC is unknown.
 func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
-
-	// CASE 1: for the root block, return the root QC
-	root, err := s.state.Params().Root()
+	qc, err := s.state.qcs.ByBlockID(s.blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get root: %w", err)
+		return nil, fmt.Errorf("could not retrieve quorum certificate for (%x): %w", s.blockID, err)
 	}
-
-	if s.blockID == root.ID() {
-		var rootQC flow.QuorumCertificate
-		err := s.state.db.View(operation.RetrieveRootQuorumCertificate(&rootQC))
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve root qc: %w", err)
-		}
-		return &rootQC, nil
-	}
-
-	// CASE 2: for any other block, generate the root QC from a valid child
-	child, err := s.validChild()
-	if err != nil {
-		return nil, fmt.Errorf("could not get valid child of block %x: %w", s.blockID, err)
-	}
-
-	// sanity check: ensure the child has the snapshot block as parent
-	if child.ParentID != s.blockID {
-		return nil, fmt.Errorf("child parent id (%x) does not match snapshot id (%x)", child.ParentID, s.blockID)
-	}
-
-	// retrieve the full header as we need the view for the quorum certificate
-	head, err := s.Head()
-	if err != nil {
-		return nil, fmt.Errorf("could not get head: %w", err)
-	}
-
-	qc := &flow.QuorumCertificate{
-		View:          head.View,
-		BlockID:       s.blockID,
-		SignerIndices: child.ParentVoterIndices,
-		SigData:       child.ParentVoterSigData,
-	}
-
 	return qc, nil
-}
-
-// validChild returns a child of the snapshot head. Any valid child may be returned.
-// Subsequent calls are not guaranteed to return the same child.
-// Since blocks are fully validated before insertion to the state, all stored child
-// blocks are valid and may be returned.
-//
-// Error returns:
-//   - state.NoChildBlockError if no valid child exists.
-func (s *Snapshot) validChild() (*flow.Header, error) {
-
-	var childIDs flow.IdentifierList
-	err := s.state.db.View(procedure.LookupBlockChildren(s.blockID, &childIDs))
-	if err != nil {
-		return nil, fmt.Errorf("could not look up children: %w", err)
-	}
-
-	if len(childIDs) == 0 {
-		return nil, state.NewNoChildBlockErrorf("block (id=%x) has no children stored in the protocol state", s.blockID)
-	}
-
-	// get the header of the first child
-	child, err := s.state.headers.ByBlockID(childIDs[0])
-	return child, err
 }
 
 func (s *Snapshot) Phase() (flow.EpochPhase, error) {
@@ -147,7 +86,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, err
 	}
 
-	// sort the identities so the 'Exists' binary search works
+	// sort the identities so the 'IsCached' binary search works
 	identities := setup.Participants.Sort(order.Canonical)
 
 	// get identities that are in either last/next epoch but NOT in the current epoch
@@ -416,41 +355,17 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 
 // RandomSource returns the seed for the current block snapshot.
 // Expected error returns:
-// * state.NoChildBlockError if no valid child is known
+// * storage.ErrNotFound is returned if the QC is unknown.
 func (s *Snapshot) RandomSource() ([]byte, error) {
-
-	// CASE 1: for the root block, generate the seed from the root qc
-	root, err := s.state.Params().Root()
+	qc, err := s.QuorumCertificate()
 	if err != nil {
-		return nil, fmt.Errorf("could not get root: %w", err)
+		return nil, err
 	}
-
-	if s.blockID == root.ID() {
-		var rootQC flow.QuorumCertificate
-		err := s.state.db.View(operation.RetrieveRootQuorumCertificate(&rootQC))
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve root qc: %w", err)
-		}
-
-		seed, err := seed.FromParentQCSignature(rootQC.SigData)
-		if err != nil {
-			return nil, fmt.Errorf("could not create seed from root qc: %w", err)
-		}
-		return seed, nil
-	}
-
-	// CASE 2: for any other block, use any valid child
-	child, err := s.validChild()
+	randomSource, err := seed.FromParentQCSignature(qc.SigData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get valid child of block %x: %w", s.blockID, err)
+		return nil, fmt.Errorf("could not create seed from QC's signature: %w", err)
 	}
-
-	seed, err := seed.FromParentQCSignature(child.ParentVoterSigData)
-	if err != nil {
-		return nil, fmt.Errorf("could not create seed from header's signature: %w", err)
-	}
-
-	return seed, nil
+	return randomSource, nil
 }
 
 func (s *Snapshot) Epochs() protocol.EpochQuery {
@@ -470,9 +385,8 @@ type EpochQuery struct {
 
 // Current returns the current epoch.
 func (q *EpochQuery) Current() protocol.Epoch {
-
 	// all errors returned from storage reads here are unexpected, because all
-	// snapshots reside within a current epoch, which must be queriable
+	// snapshots reside within a current epoch, which must be queryable
 	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
 	if err != nil {
 		return invalid.NewEpochf("could not get epoch status for block %x: %w", q.snap.blockID, err)
@@ -486,12 +400,14 @@ func (q *EpochQuery) Current() protocol.Epoch {
 		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", status.CurrentEpoch.CommitID, q.snap.blockID, err)
 	}
 
-	epoch, err := inmem.NewCommittedEpoch(setup, commit)
+	firstHeight, _, epochStarted, _, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
-		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
-		return invalid.NewEpochf("could not convert current epoch at block %x: %s", q.snap.blockID, err.Error())
+		return invalid.NewEpochf("could not get current epoch height bounds: %s", err.Error())
 	}
-	return epoch
+	if epochStarted {
+		return inmem.NewStartedEpoch(setup, commit, firstHeight)
+	}
+	return inmem.NewCommittedEpoch(setup, commit)
 }
 
 // Next returns the next epoch, if it is available.
@@ -518,12 +434,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 		return invalid.NewEpochf("could not get next EpochSetup (id=%x) for block %x: %w", status.NextEpoch.SetupID, q.snap.blockID, err)
 	}
 	if phase == flow.EpochPhaseSetup {
-		epoch, err := inmem.NewSetupEpoch(nextSetup)
-		if err != nil {
-			// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
-			return invalid.NewEpochf("could not convert next (setup) epoch: %s", err.Error())
-		}
-		return epoch
+		return inmem.NewSetupEpoch(nextSetup)
 	}
 
 	// if we are in committed phase, return a CommittedEpoch
@@ -532,12 +443,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 		// all errors are critical, because we must be able to retrieve EpochCommit when in committed phase
 		return invalid.NewEpochf("could not get next EpochCommit (id=%x) for block %x: %w", status.NextEpoch.CommitID, q.snap.blockID, err)
 	}
-	epoch, err := inmem.NewCommittedEpoch(nextSetup, nextCommit)
-	if err != nil {
-		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
-		return invalid.NewEpochf("could not convert next (committed) epoch: %s", err.Error())
-	}
-	return epoch
+	return inmem.NewCommittedEpoch(nextSetup, nextCommit)
 }
 
 // Previous returns the previous epoch. During the first epoch after the root
@@ -569,10 +475,72 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", status.PreviousEpoch.CommitID, q.snap.blockID, err)
 	}
 
-	epoch, err := inmem.NewCommittedEpoch(setup, commit)
+	firstHeight, finalHeight, _, epochEnded, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
-		// all conversion errors are critical and indicate we have stored invalid epoch info - strip error type info
-		return invalid.NewEpochf("could not convert previous epoch: %s", err.Error())
+		return invalid.NewEpochf("could not get epoch height bounds: %w", err)
 	}
-	return epoch
+	if epochEnded {
+		return inmem.NewEndedEpoch(setup, commit, firstHeight, finalHeight)
+	}
+	return inmem.NewStartedEpoch(setup, commit, firstHeight)
+}
+
+// retrieveEpochHeightBounds retrieves the height bounds for an epoch.
+// Height bounds are NOT fork-aware, and are only determined upon finalization.
+//
+// Since the protocol state's API is fork-aware, we may be querying an
+// un-finalized block, as in the following example:
+//
+//	Epoch 1    Epoch 2
+//	A <- B <-|- C <- D
+//
+// Suppose block B is the latest finalized block and we have queried block D.
+// Then, the transition from epoch 1 to 2 has not been committed, because the first block of epoch 2 has not been finalized.
+// In this case, the final block of Epoch 1, from the perspective of block D, is unknown.
+// There are edge-case scenarios, where a different fork could exist (as illustrated below)
+// that still adds additional blocks to Epoch 1.
+//
+//	Epoch 1      Epoch 2
+//	A <- B <---|-- C <- D
+//	     ^
+//	     ╰ X <-|- X <- Y <- Z
+//
+// Returns:
+//   - (0, 0, false, false, nil) if epoch is not started
+//   - (firstHeight, 0, true, false, nil) if epoch is started but not ended
+//   - (firstHeight, finalHeight, true, true, nil) if epoch is ended
+//
+// No errors are expected during normal operation.
+func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (firstHeight, finalHeight uint64, isFirstBlockFinalized, isLastBlockFinalized bool, err error) {
+	err = q.snap.state.db.View(func(tx *badger.Txn) error {
+		// Retrieve the epoch's first height
+		err = operation.RetrieveEpochFirstHeight(epoch, &firstHeight)(tx)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				isFirstBlockFinalized = false
+				isLastBlockFinalized = false
+				return nil
+			}
+			return err // unexpected error
+		}
+		isFirstBlockFinalized = true
+
+		var subsequentEpochFirstHeight uint64
+		err = operation.RetrieveEpochFirstHeight(epoch+1, &subsequentEpochFirstHeight)(tx)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				isLastBlockFinalized = false
+				return nil
+			}
+			return err // unexpected error
+		}
+		finalHeight = subsequentEpochFirstHeight - 1
+		isLastBlockFinalized = true
+
+		return nil
+	})
+	if err != nil {
+		return 0, 0, false, false, err
+	}
+	return firstHeight, finalHeight, isFirstBlockFinalized, isLastBlockFinalized, nil
 }

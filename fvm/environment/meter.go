@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 )
 
 const (
@@ -28,7 +28,7 @@ const (
 	ComputationKindGetBlockAtHeight           = 2014
 	ComputationKindGetCode                    = 2015
 	ComputationKindGetCurrentBlockHeight      = 2016
-	ComputationKindGetProgram                 = 2017
+	_                                         = 2017
 	ComputationKindGetStorageCapacity         = 2018
 	ComputationKindGetStorageUsed             = 2019
 	ComputationKindGetValue                   = 2020
@@ -36,7 +36,7 @@ const (
 	ComputationKindResolveLocation            = 2022
 	ComputationKindRevokeAccountKey           = 2023
 	ComputationKindRevokeEncodedAccountKey    = 2024
-	ComputationKindSetProgram                 = 2025
+	_                                         = 2025
 	ComputationKindSetValue                   = 2026
 	ComputationKindUpdateAccountContractCode  = 2027
 	ComputationKindValidatePublicKey          = 2028
@@ -45,6 +45,7 @@ const (
 	ComputationKindBLSVerifyPOP               = 2031
 	ComputationKindBLSAggregateSignatures     = 2032
 	ComputationKindBLSAggregatePublicKeys     = 2033
+	ComputationKindGetOrLoadProgram           = 2034
 )
 
 type Meter interface {
@@ -62,10 +63,10 @@ type Meter interface {
 }
 
 type meterImpl struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 }
 
-func NewMeter(txnState *state.TransactionState) Meter {
+func NewMeter(txnState state.NestedTransaction) Meter {
 	return &meterImpl{
 		txnState: txnState,
 	}
@@ -114,7 +115,7 @@ type cancellableMeter struct {
 
 func NewCancellableMeter(
 	ctx context.Context,
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 ) Meter {
 	return &cancellableMeter{
 		meterImpl: meterImpl{

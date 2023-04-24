@@ -3,11 +3,34 @@ package network
 import (
 	"errors"
 	"fmt"
+
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 var (
 	EmptyTargetList = errors.New("target list empty")
 )
+
+// ErrIllegalConnectionState indicates connection status to node is NotConnected but connections to node > 0
+type ErrIllegalConnectionState struct {
+	pid        peer.ID
+	numOfConns int
+}
+
+func (e ErrIllegalConnectionState) Error() string {
+	return fmt.Sprintf("unexpected connection status to peer %s: received NotConnected status while connection list is not empty %d ", e.pid.String(), e.numOfConns)
+}
+
+// NewConnectionStatusErr returns a new ErrIllegalConnectionState.
+func NewConnectionStatusErr(pid peer.ID, numOfConns int) ErrIllegalConnectionState {
+	return ErrIllegalConnectionState{pid: pid, numOfConns: numOfConns}
+}
+
+// IsErrConnectionStatus returns whether an error is ErrIllegalConnectionState
+func IsErrConnectionStatus(err error) bool {
+	var e ErrIllegalConnectionState
+	return errors.As(err, &e)
+}
 
 // TransientError represents an error returned from a network layer function call
 // which may be interpreted as non-critical. In general, we desire that all expected

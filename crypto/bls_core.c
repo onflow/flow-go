@@ -101,12 +101,14 @@ static int bls_verify_ep(const E2* pk, const ep_t s, const byte* data, const int
 
     // elemsG2[1] = pk
     ep2_new(elemsG2[1]);
-    ep2_copy(elemsG2[1], pk_tmp); 
+    ep2_copy(elemsG2[1], pk_tmp);
+    ep2_new(&elemsG2[0]);
+
+    int ret = UNDEFINED;
 
 #if DOUBLE_PAIRING  
     // elemsG2[0] = -g2
-    ep2_new(&elemsG2[0]);
-    ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded 
+    ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded
 
     fp12_t pair;
     fp12_new(&pair);
@@ -123,18 +125,24 @@ static int bls_verify_ep(const E2* pk, const ep_t s, const byte* data, const int
     pp_map_oatep_k12(pair2, elemsG1[1], elemsG2[1]);
 
     int res = fp12_cmp(pair1, pair2);
-#endif
+#endif   
+    if (core_get()->code == RLC_OK) {
+        if (res == RLC_EQ) {
+            ret = VALID;
+            goto out;
+        } else {
+            ret = INVALID;
+            goto out;
+        }
+    }
+    
+out:
     ep_free(elemsG1[0]);
     ep_free(elemsG1[1]);
     ep2_free(elemsG2[0]);
     ep2_free(elemsG2[1]);
     free(pk_tmp);
-    
-    if (core_get()->code == RLC_OK) {
-        if (res == RLC_EQ) return VALID;
-        return INVALID;
-    }
-    return UNDEFINED;
+    return ret;
 }
 
 

@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -156,7 +156,6 @@ func newSignatureEntries(
 }
 
 // TransactionVerifier verifies the content of the transaction by
-// checking accounts (authorizers, payer, proposer) are not frozen
 // checking there is no double signature
 // all signatures are valid
 // all accounts provides enoguh weights
@@ -169,7 +168,7 @@ type TransactionVerifier struct {
 func (v *TransactionVerifier) CheckAuthorization(
 	tracer tracing.TracerSpan,
 	proc *TransactionProcedure,
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 	keyWeightThreshold int,
 ) error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
@@ -189,7 +188,7 @@ func (v *TransactionVerifier) CheckAuthorization(
 func (v *TransactionVerifier) verifyTransaction(
 	tracer tracing.TracerSpan,
 	proc *TransactionProcedure,
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 	keyWeightThreshold int,
 ) error {
 	span := tracer.StartChildSpan(trace.FVMVerifyTransaction)
@@ -213,10 +212,6 @@ func (v *TransactionVerifier) verifyTransaction(
 	}
 
 	accounts := environment.NewAccounts(txnState)
-	err = v.checkAccountsAreNotFrozen(tx, accounts)
-	if err != nil {
-		return err
-	}
 
 	if keyWeightThreshold < 0 {
 		return nil
@@ -264,7 +259,7 @@ func (v *TransactionVerifier) verifyTransaction(
 // getAccountKeys gets the signatures' account keys and populate the account
 // keys into the signature continuation structs.
 func (v *TransactionVerifier) getAccountKeys(
-	txnState *state.TransactionState,
+	txnState storage.Transaction,
 	accounts environment.Accounts,
 	signatures []*signatureContinuation,
 	proposalKey flow.ProposalKey,
@@ -393,22 +388,4 @@ func (v *TransactionVerifier) hasSufficientKeyWeight(
 	keyWeightThreshold int,
 ) bool {
 	return weights[address] >= keyWeightThreshold
-}
-
-func (v *TransactionVerifier) checkAccountsAreNotFrozen(
-	tx *flow.TransactionBody,
-	accounts environment.Accounts,
-) error {
-	authorizers := make([]flow.Address, 0, len(tx.Authorizers)+2)
-	authorizers = append(authorizers, tx.Authorizers...)
-	authorizers = append(authorizers, tx.ProposalKey.Address, tx.Payer)
-
-	for _, authorizer := range authorizers {
-		err := accounts.CheckAccountNotFrozen(authorizer)
-		if err != nil {
-			return fmt.Errorf("checking frozen account failed: %w", err)
-		}
-	}
-
-	return nil
 }

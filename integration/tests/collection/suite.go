@@ -132,8 +132,7 @@ func (s *CollectorSuite) TearDownTest() {
 
 // Ghost returns a client for the ghost node.
 func (suite *CollectorSuite) Ghost() *ghostclient.GhostClient {
-	ghost := suite.net.ContainerByID(suite.ghostID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := suite.net.ContainerByID(suite.ghostID).GhostClient()
 	require.NoError(suite.T(), err, "could not get ghost client")
 	return client
 }
@@ -188,7 +187,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 		require.Nil(suite.T(), err)
 		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		require.True(suite.T(), ok)
-		if routed.Fingerprint() == target.Fingerprint() {
+		if routed.ID() == target.ID() {
 			break
 		}
 	}

@@ -12,7 +12,7 @@ import (
 	fghash "github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -138,12 +138,12 @@ type AccountKeyUpdater interface {
 }
 
 type ParseRestrictedAccountKeyUpdater struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     AccountKeyUpdater
 }
 
 func NewParseRestrictedAccountKeyUpdater(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl AccountKeyUpdater,
 ) ParseRestrictedAccountKeyUpdater {
 	return ParseRestrictedAccountKeyUpdater{
@@ -259,7 +259,7 @@ type accountKeyUpdater struct {
 	meter  Meter
 
 	accounts Accounts
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	env      Environment
 }
 
@@ -267,7 +267,7 @@ func NewAccountKeyUpdater(
 	tracer tracing.TracerSpan,
 	meter Meter,
 	accounts Accounts,
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	env Environment,
 ) *accountKeyUpdater {
 	return &accountKeyUpdater{
@@ -371,7 +371,7 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 		// no errors.  This is to be inline with the Cadence runtime. Otherwise
 		// Cadence runtime cannot distinguish between a 'key not found error'
 		// vs other internal errors.
-		if errors.IsAccountAccountPublicKeyNotFoundError(err) {
+		if errors.IsAccountPublicKeyNotFoundError(err) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("revoking account key failed: %w", err)
@@ -524,10 +524,6 @@ func (updater *accountKeyUpdater) AddEncodedAccountKey(
 	}
 
 	address := flow.ConvertAddress(runtimeAddress)
-	err = updater.accounts.CheckAccountNotFrozen(address)
-	if err != nil {
-		return fmt.Errorf("add encoded account key failed: %w", err)
-	}
 
 	// TODO do a call to track the computation usage and memory usage
 	//
@@ -559,10 +555,6 @@ func (updater *accountKeyUpdater) RevokeEncodedAccountKey(
 	}
 
 	address := flow.ConvertAddress(runtimeAddress)
-	err = updater.accounts.CheckAccountNotFrozen(address)
-	if err != nil {
-		return nil, fmt.Errorf("revoke encoded account key failed: %w", err)
-	}
 
 	encodedKey, err := updater.removeAccountKey(address, index)
 	if err != nil {

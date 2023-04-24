@@ -35,11 +35,11 @@ func TestFilterSubscribe(t *testing.T) {
 	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
 	ids := flow.IdentityList{identity1, identity2}
 
-	node1 := p2pfixtures.CreateNode(t, identity1.NodeID, privateKey1, sporkId, zerolog.Nop(), p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity1, ids)))
-	node2 := p2pfixtures.CreateNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop(), p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity2, ids)))
+	node1 := p2pfixtures.CreateNode(t, privateKey1, sporkId, zerolog.Nop(), ids, p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity1, ids)))
+	node2 := p2pfixtures.CreateNode(t, privateKey2, sporkId, zerolog.Nop(), ids, p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity2, ids)))
 
 	unstakedKey := unittest.NetworkingPrivKeyFixture()
-	unstakedNode := p2pfixtures.CreateNode(t, flow.ZeroID, unstakedKey, sporkId, zerolog.Nop())
+	unstakedNode := p2pfixtures.CreateNode(t, unstakedKey, sporkId, zerolog.Nop(), ids)
 
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(node2.Host())))
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(unstakedNode.Host())))
@@ -115,7 +115,12 @@ func TestCanSubscribe(t *testing.T) {
 	identity, privateKey := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
 	sporkId := unittest.IdentifierFixture()
 
-	collectionNode := p2pfixtures.CreateNode(t, identity.NodeID, privateKey, sporkId, zerolog.Nop(), p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity, flow.IdentityList{identity})))
+	collectionNode := p2pfixtures.CreateNode(t,
+		privateKey,
+		sporkId,
+		zerolog.Nop(),
+		flow.IdentityList{identity},
+		p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity, flow.IdentityList{identity})))
 
 	p2ptest.StartNode(t, signalerCtx, collectionNode, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, collectionNode, cancel, 1*time.Second)

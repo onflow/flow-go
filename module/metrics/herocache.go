@@ -60,8 +60,38 @@ func CollectionRequestsQueueMetricFactory(registrar prometheus.Registerer) *Hero
 	return NewHeroCacheCollector(namespaceCollection, ResourceCollection, registrar)
 }
 
+func DisallowListNotificationQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDisallowListNotificationQueue, registrar)
+}
+
+func GossipSubRPCValidationInspectorQueueMetricFactory(publicNetwork bool, registrar prometheus.Registerer) *HeroCacheCollector {
+	if publicNetwork {
+		return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingPublicRpcValidationInspectorQueue, registrar)
+	}
+	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcValidationInspectorQueue, registrar)
+}
+
+func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(publicNetwork bool, registrar prometheus.Registerer) *HeroCacheCollector {
+	if publicNetwork {
+		return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingPublicRpcMetricsObserverInspectorQueue, registrar)
+	}
+	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcMetricsObserverInspectorQueue, registrar)
+}
+
+func RpcInspectorNotificationQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcInspectorNotificationQueue, registrar)
+}
+
 func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer, epoch uint64) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceCollection, fmt.Sprintf("%s_%d", ResourceTransaction, epoch), registrar)
+}
+
+func FollowerCacheMetrics(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceFollowerEngine, ResourceFollowerPendingBlocksCache, registrar)
+}
+
+func AccessNodeExecutionDataCacheMetrics(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceAccess, ResourceExecutionDataCache, registrar)
 }
 
 func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometheus.Registerer) *HeroCacheCollector {

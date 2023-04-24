@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
-	fvmUtils "github.com/onflow/flow-go/fvm/utils"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	led "github.com/onflow/flow-go/ledger"
 	ledgermock "github.com/onflow/flow-go/ledger/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -33,15 +33,13 @@ func TestLedgerViewCommitter(t *testing.T) {
 			Return(expectedProof, nil).
 			Once()
 
-		view := fvmUtils.NewSimpleView()
-
-		err := view.Set(
-			flow.NewRegisterID("owner", "key"),
-			[]byte{1},
-		)
-		require.NoError(t, err)
-
-		newState, proof, _, err := com.CommitView(view, utils.StateCommitmentFixture())
+		newState, proof, _, err := com.CommitView(
+			&state.ExecutionSnapshot{
+				WriteSet: map[flow.RegisterID]flow.RegisterValue{
+					flow.NewRegisterID("owner", "key"): []byte{1},
+				},
+			},
+			utils.StateCommitmentFixture())
 		require.NoError(t, err)
 		require.Equal(t, flow.StateCommitment(expectedStateCommitment), newState)
 		require.Equal(t, []uint8(expectedProof), proof)

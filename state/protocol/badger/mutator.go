@@ -8,10 +8,12 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
@@ -25,10 +27,9 @@ import (
 // FollowerState implements a lighter version of a mutable protocol state.
 // When extending the state, it performs hardly any checks on the block payload.
 // Instead, the FollowerState relies on the consensus nodes to run the full
-// payload check. Consequently, a block B should only be considered valid, if
-// a child block with a valid header is known. The child block's header
-// includes quorum certificate, which proves that a super-majority of consensus
-// nodes consider block B as valid.
+// payload check and uses quorum certificates to prove validity of block payloads.
+// Consequently, a block B should only be considered valid, if
+// there is a certifying QC for that block QC.View == Block.View && QC.BlockID == Block.ID().
 //
 // The FollowerState allows non-consensus nodes to execute fork-aware queries
 // against the protocol state, while minimizing the amount of payload checks
@@ -38,37 +39,41 @@ type FollowerState struct {
 
 	index      storage.Index
 	payloads   storage.Payloads
-	qcs        storage.QuorumCertificates
 	tracer     module.Tracer
+	logger     zerolog.Logger
 	consumer   protocol.Consumer
 	blockTimer protocol.BlockTimer
 }
 
-// MutableState implements a mutable protocol state. When extending the
-// state with a new block, it checks the _entire_ block payload.
-type MutableState struct {
+var _ protocol.FollowerState = (*FollowerState)(nil)
+
+// ParticipantState implements a mutable state for consensus participant. It can extend the
+// state with a new block, by checking the _entire_ block payload.
+type ParticipantState struct {
 	*FollowerState
 	receiptValidator module.ReceiptValidator
 	sealValidator    module.SealValidator
 }
 
+var _ protocol.ParticipantState = (*ParticipantState)(nil)
+
 // NewFollowerState initializes a light-weight version of a mutable protocol
 // state. This implementation is suitable only for NON-Consensus nodes.
 func NewFollowerState(
+	logger zerolog.Logger,
+	tracer module.Tracer,
+	consumer protocol.Consumer,
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
-	qcs storage.QuorumCertificates,
-	tracer module.Tracer,
-	consumer protocol.Consumer,
 	blockTimer protocol.BlockTimer,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
 		State:      state,
 		index:      index,
 		payloads:   payloads,
-		qcs:        qcs,
 		tracer:     tracer,
+		logger:     logger,
 		consumer:   consumer,
 		blockTimer: blockTimer,
 	}
@@ -80,41 +85,73 @@ func NewFollowerState(
 // _entire_ block payload. Consensus nodes should use the FullConsensusState,
 // while other node roles can use the lighter FollowerState.
 func NewFullConsensusState(
+	logger zerolog.Logger,
+	tracer module.Tracer,
+	consumer protocol.Consumer,
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
-	qcs storage.QuorumCertificates,
-	tracer module.Tracer,
-	consumer protocol.Consumer,
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
-) (*MutableState, error) {
-	followerState, err := NewFollowerState(state, index, payloads, qcs, tracer, consumer, blockTimer)
+) (*ParticipantState, error) {
+	followerState, err := NewFollowerState(
+		logger,
+		tracer,
+		consumer,
+		state,
+		index,
+		payloads,
+		blockTimer,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)
 	}
-	return &MutableState{
+	return &ParticipantState{
 		FollowerState:    followerState,
 		receiptValidator: receiptValidator,
 		sealValidator:    sealValidator,
 	}, nil
 }
 
-// Extend extends the protocol state of a CONSENSUS FOLLOWER. While it checks
+// ExtendCertified extends the protocol state of a CONSENSUS FOLLOWER. While it checks
 // the validity of the header; it does _not_ check the validity of the payload.
 // Instead, the consensus follower relies on the consensus participants to
-// validate the full payload. Therefore, a follower a QC (i.e. a child block) as
-// proof that a block is valid.
-func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error {
-
+// validate the full payload. Payload validity can be proved by a valid quorum certificate.
+// Certifying QC must match candidate block:
+//
+//	candidate.View == certifyingQC.View && candidate.ID() == certifyingQC.BlockID
+//
+// Caution:
+//   - This function expects that `certifyingQC` has been validated.
+//   - The parent block must already be stored.
+//
+// No errors are expected during normal operations.
+func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
 	defer span.End()
 
-	// check if the block header is a valid extension of the finalized state
-	err := m.headerExtend(candidate)
+	// check if candidate block has been already processed
+	blockID := candidate.ID()
+	isDuplicate, err := m.checkBlockAlreadyProcessed(blockID)
+	if err != nil || isDuplicate {
+		return err
+	}
+
+	// sanity check if certifyingQC actually certifies candidate block
+	if certifyingQC.View != candidate.Header.View {
+		return fmt.Errorf("qc doesn't certify candidate block, expect %d view, got %d", candidate.Header.View, certifyingQC.View)
+	}
+	if certifyingQC.BlockID != blockID {
+		return fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
+	}
+
+	// check if the block header is a valid extension of parent block
+	err = m.headerExtend(candidate)
 	if err != nil {
-		return fmt.Errorf("header not compliant with chain state: %w", err)
+		// since we have a QC for this block, it cannot be an invalid extension
+		return fmt.Errorf("unexpected invalid block (id=%x) with certifying qc (id=%x): %s",
+			candidate.ID(), certifyingQC.ID(), err.Error())
 	}
 
 	// find the last seal at the parent block
@@ -123,8 +160,8 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 		return fmt.Errorf("payload seal(s) not compliant with chain state: %w", err)
 	}
 
-	// insert the block and index the last seal for the block
-	err = m.insert(ctx, candidate, last)
+	// insert the block, certifying QC and index the last seal for the block
+	err = m.insert(ctx, candidate, certifyingQC, last)
 	if err != nil {
 		return fmt.Errorf("failed to insert the block: %w", err)
 	}
@@ -134,15 +171,32 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 
 // Extend extends the protocol state of a CONSENSUS PARTICIPANT. It checks
 // the validity of the _entire block_ (header and full payload).
-func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error {
-
+// Expected errors during normal operations:
+//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+//   - state.InvalidExtensionError if the candidate block is invalid
+func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) error {
 	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
 	defer span.End()
 
-	// check if the block header is a valid extension of the finalized state
-	err := m.headerExtend(candidate)
+	// check if candidate block has been already processed
+	isDuplicate, err := m.checkBlockAlreadyProcessed(candidate.ID())
+	if err != nil || isDuplicate {
+		return err
+	}
+
+	// check if the block header is a valid extension of parent block
+	err = m.headerExtend(candidate)
 	if err != nil {
 		return fmt.Errorf("header not compliant with chain state: %w", err)
+	}
+
+	// check if the block header is a valid extension of the finalized state
+	err = m.checkOutdatedExtension(candidate.Header)
+	if err != nil {
+		if state.IsOutdatedExtensionError(err) {
+			return fmt.Errorf("candidate block is an outdated extension: %w", err)
+		}
+		return fmt.Errorf("could not check if block is an outdated extension: %w", err)
 	}
 
 	// check if the guarantees in the payload is a valid extension of the finalized state
@@ -164,7 +218,7 @@ func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error 
 	}
 
 	// insert the block and index the last seal for the block
-	err = m.insert(ctx, candidate, lastSeal)
+	err = m.insert(ctx, candidate, nil, lastSeal)
 	if err != nil {
 		return fmt.Errorf("failed to insert the block: %w", err)
 	}
@@ -174,6 +228,8 @@ func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error 
 
 // headerExtend verifies the validity of the block header (excluding verification of the
 // consensus rules). Specifically, we check that the block connects to the last finalized block.
+// Expected errors during normal operations:
+//   - state.InvalidExtensionError if the candidate block is invalid
 func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 	// FIRST: We do some initial cheap sanity checks, like checking the payload
 	// hash is consistent
@@ -213,13 +269,34 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 		return fmt.Errorf("validating block's time stamp failed with unexpected error: %w", err)
 	}
 
-	// THIRD: Once we have established the block is valid within itself, and the
-	// block is valid in relation to its parent, we can check whether it is
-	// valid in the context of the entire state. For this, the block needs to
-	// directly connect, through its ancestors, to the last finalized block.
+	return nil
+}
 
+// checkBlockAlreadyProcessed checks if block has been added to the protocol state.
+// Returns:
+// * (true, nil) - block has been already processed.
+// * (false, nil) - block has not been processed.
+// * (false, error) - unknown error when trying to query protocol state.
+// No errors are expected during normal operation.
+func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (bool, error) {
+	_, err := m.headers.ByBlockID(blockID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return false, nil
+		}
+		return false, fmt.Errorf("could not check if candidate block (%x) has been already processed: %w", blockID, err)
+	}
+	return true, nil
+}
+
+// checkOutdatedExtension checks whether given block is
+// valid in the context of the entire state. For this, the block needs to
+// directly connect, through its ancestors, to the last finalized block.
+// Expected errors during normal operations:
+//   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+func (m *ParticipantState) checkOutdatedExtension(header *flow.Header) error {
 	var finalizedHeight uint64
-	err = m.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
+	err := m.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
@@ -249,14 +326,13 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 		}
 		ancestorID = ancestor.ParentID
 	}
-
 	return nil
 }
 
 // guaranteeExtend verifies the validity of the collection guarantees that are
 // included in the block. Specifically, we check for expired collections and
 // duplicated collections (also including ancestor blocks).
-func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Block) error {
+func (m *ParticipantState) guaranteeExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckGuarantees)
 	defer span.End()
@@ -337,7 +413,7 @@ func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Bloc
 
 // sealExtend checks the compliance of the payload seals. Returns last seal that form a chain for
 // candidate block.
-func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*flow.Seal, error) {
+func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block) (*flow.Seal, error) {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckSeals)
 	defer span.End()
@@ -357,7 +433,7 @@ func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*
 //   - No seal has been included for the respective block in this particular fork
 //
 // We require the receipts to be sorted by block height (within a payload).
-func (m *MutableState) receiptExtend(ctx context.Context, candidate *flow.Block) error {
+func (m *ParticipantState) receiptExtend(ctx context.Context, candidate *flow.Block) error {
 
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckReceipts)
 	defer span.End()
@@ -417,8 +493,11 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 // The `candidate` block _must be valid_ (otherwise, the state will be corrupted).
 // dbUpdates contains other database operations which must be applied atomically
 // with inserting the block.
-func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last *flow.Seal) error {
-
+// Caller is responsible for ensuring block validity.
+// If insert is called from Extend(by consensus participant) then certifyingQC will be nil but the block payload will be validated.
+// If insert is called from ExtendCertified(by consensus follower) then certifyingQC must be not nil which proves payload validity.
+// No errors are expected during normal operations.
+func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate, last *flow.Seal) error {
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendDBInsert)
 	defer span.End()
 
@@ -437,6 +516,10 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 		return fmt.Errorf("could not process service events: %w", err)
 	}
 
+	qc := candidate.Header.QuorumCertificate()
+
+	var events []func()
+
 	// Both the header itself and its payload are in compliance with the protocol state.
 	// We can now store the candidate block, as well as adding its final seal
 	// to the seal index and initializing its children index.
@@ -447,10 +530,30 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
 
-		qc := candidate.Header.QuorumCertificate()
 		err = m.qcs.StoreTx(qc)(tx)
-		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-			return fmt.Errorf("could not store qc: %w", err)
+		if err != nil {
+			if !errors.Is(err, storage.ErrAlreadyExists) {
+				return fmt.Errorf("could not store incorporated qc: %w", err)
+			}
+		} else {
+			// trigger BlockProcessable for parent blocks above root height
+			if parent.Height > m.rootHeight {
+				events = append(events, func() {
+					m.consumer.BlockProcessable(parent, qc)
+				})
+			}
+		}
+
+		if certifyingQC != nil {
+			err = m.qcs.StoreTx(certifyingQC)(tx)
+			if err != nil {
+				return fmt.Errorf("could not store certifying qc: %w", err)
+			}
+
+			// trigger BlockProcessable for candidate block if it's certified
+			events = append(events, func() {
+				m.consumer.BlockProcessable(candidate.Header, certifyingQC)
+			})
 		}
 
 		// index the latest sealed block in this fork
@@ -479,9 +582,9 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 		return fmt.Errorf("could not execute state extension: %w", err)
 	}
 
-	// trigger BlockProcessable for parent blocks above root height
-	if parent.Height > m.rootHeight {
-		m.consumer.BlockProcessable(parent)
+	// execute scheduled events
+	for _, event := range events {
+		event()
 	}
 
 	return nil
@@ -490,6 +593,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 // Finalize marks the specified block as finalized.
 // This method only finalizes one block at a time.
 // Hence, the parent of `blockID` has to be the last finalized block.
+// No errors are expected during normal operations.
 func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) error {
 
 	// preliminaries: start tracer and retrieve full block
@@ -504,7 +608,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// keep track of metrics updates and protocol events to emit:
 	// * metrics are updated after a successful database update
 	// * protocol events are emitted atomically with the database update
-	// TODO deliver protocol events async https://github.com/dapperlabs/flow-go/issues/6317
 	var metrics []func()
 	var events []func()
 
@@ -564,24 +667,31 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		}
 	}
 
+	isFirstBlockOfEpoch, err := m.isFirstBlockOfEpoch(header, currentEpochSetup)
+	if err != nil {
+		return fmt.Errorf("could not check if block is first of epoch: %w", err)
+	}
+
 	// Determine metric updates and protocol events related to epoch phase
 	// changes and epoch transitions.
 	// If epoch emergency fallback is triggered, the current epoch continues until
 	// the next spork - so skip these updates.
 	if !epochFallbackTriggered {
-		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(header, epochStatus)
+		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(block, epochStatus)
 		if err != nil {
 			return fmt.Errorf("could not determine epoch phase metrics/events for finalized block: %w", err)
 		}
 		metrics = append(metrics, epochPhaseMetrics...)
 		events = append(events, epochPhaseEvents...)
 
-		epochTransitionMetrics, epochTransitionEvents, err := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, currentEpochSetup)
-		if err != nil {
-			return fmt.Errorf("could not determine epoch transition metrics/events for finalized block: %w", err)
+		if isFirstBlockOfEpoch {
+			epochTransitionMetrics, epochTransitionEvents := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, currentEpochSetup)
+			if err != nil {
+				return fmt.Errorf("could not determine epoch transition metrics/events for finalized block: %w", err)
+			}
+			metrics = append(metrics, epochTransitionMetrics...)
+			events = append(events, epochTransitionEvents...)
 		}
-		metrics = append(metrics, epochTransitionMetrics...)
-		events = append(events, epochTransitionEvents...)
 	}
 
 	// Persist updates in database
@@ -608,6 +718,12 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			err = operation.SetEpochEmergencyFallbackTriggered(blockID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not set epoch fallback flag: %w", err)
+			}
+		}
+		if isFirstBlockOfEpoch && !epochFallbackTriggered {
+			err = operation.InsertEpochFirstHeight(currentEpochSetup.Counter, header.Height)(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert epoch first block height: %w", err)
 			}
 		}
 
@@ -692,95 +808,91 @@ func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Heade
 	return blockTriggersEpochFallback, nil
 }
 
-// epochTransitionMetricsAndEventsOnBlockFinalized determines metrics to update
-// and protocol events to emit, if this block is the first of a new epoch.
+// isFirstBlockOfEpoch returns true if the given block is the first block of a new epoch.
+// We accept the EpochSetup event for the current epoch (w.r.t. input block B) which contains
+// the FirstView for the epoch (denoted W). By construction, B.View >= W.
+// Definition: B is the first block of the epoch if and only if B.parent.View < W
 //
-// Protocol events and updating metrics happen when we finalize the _first_
-// block of the new Epoch (same convention as for Epoch-Phase-Changes).
-// Approach: We retrieve the parent block's epoch information.
-// When this block's view exceeds the parent epoch's final view, this block
-// represents the first block of the next epoch. Therefore we update metrics
-// related to the epoch transition here.
-//
-// This function should only be called when epoch fallback *has not already been triggered*.
+// NOTE: There can be multiple (un-finalized) blocks that qualify as the first block of epoch N.
 // No errors are expected during normal operation.
+func (m *FollowerState) isFirstBlockOfEpoch(block *flow.Header, currentEpochSetup *flow.EpochSetup) (bool, error) {
+	currentEpochFirstView := currentEpochSetup.FirstView
+	// sanity check: B.View >= W
+	if block.View < currentEpochFirstView {
+		return false, irrecoverable.NewExceptionf("data inconsistency: block (id=%x, view=%d) is below its epoch first view %d", block.ID(), block.View, currentEpochFirstView)
+	}
+
+	parent, err := m.headers.ByBlockID(block.ParentID)
+	if err != nil {
+		return false, irrecoverable.NewExceptionf("could not retrieve parent (id=%s): %w", block.ParentID, err)
+	}
+
+	return parent.View < currentEpochFirstView, nil
+}
+
+// epochTransitionMetricsAndEventsOnBlockFinalized determines metrics to update
+// and protocol events to emit for blocks which are the first block of a new epoch.
+// Protocol events and updating metrics happen once when we finalize the _first_
+// block of the new Epoch (same convention as for Epoch-Phase-Changes).
+//
+// NOTE: This function must only be called when input `block` is the first block
+// of the epoch denoted by `currentEpochSetup`.
 func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *flow.Header, currentEpochSetup *flow.EpochSetup) (
 	metrics []func(),
 	events []func(),
-	err error,
 ) {
 
-	parentBlocksEpoch := m.AtBlockID(block.ParentID).Epochs().Current()
-	parentEpochFinalView, err := parentBlocksEpoch.FinalView()
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get parent epoch final view: %w", err)
-	}
-
-	if block.View > parentEpochFinalView {
-		// sanity check: new currentEpochSetup extends parent epoch
-		parentEpochCounter, err := parentBlocksEpoch.Counter()
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not retrieve parent epoch counter: %w", err)
-		}
-		if parentEpochCounter+1 != currentEpochSetup.Counter {
-			return nil, nil, fmt.Errorf("sanity check failed: counter for new current epoch is not consecutive with parent epoch (expected %d+1 = %d)",
-				parentEpochCounter, currentEpochSetup.Counter)
-		}
-
-		events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, block) })
-
-		// set current epoch counter corresponding to new epoch
-		metrics = append(metrics, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
-		// set epoch phase - since we are starting a new epoch we begin in the staking phase
-		metrics = append(metrics, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
-		// set current epoch view values
-		metrics = append(
-			metrics,
-			func() { m.metrics.CurrentEpochFinalView(currentEpochSetup.FinalView) },
-			func() { m.metrics.CurrentDKGPhase1FinalView(currentEpochSetup.DKGPhase1FinalView) },
-			func() { m.metrics.CurrentDKGPhase2FinalView(currentEpochSetup.DKGPhase2FinalView) },
-			func() { m.metrics.CurrentDKGPhase3FinalView(currentEpochSetup.DKGPhase3FinalView) },
-		)
-	}
+	events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, block) })
+	// set current epoch counter corresponding to new epoch
+	metrics = append(metrics, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
+	// denote the most recent epoch transition height
+	metrics = append(metrics, func() { m.metrics.EpochTransitionHeight(block.Height) })
+	// set epoch phase - since we are starting a new epoch we begin in the staking phase
+	metrics = append(metrics, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
+	// set current epoch view values
+	metrics = append(
+		metrics,
+		func() { m.metrics.CurrentEpochFinalView(currentEpochSetup.FinalView) },
+		func() { m.metrics.CurrentDKGPhase1FinalView(currentEpochSetup.DKGPhase1FinalView) },
+		func() { m.metrics.CurrentDKGPhase2FinalView(currentEpochSetup.DKGPhase2FinalView) },
+		func() { m.metrics.CurrentDKGPhase3FinalView(currentEpochSetup.DKGPhase3FinalView) },
+	)
 
 	return
 }
 
-// epochPhaseMetricsAndEventsOnBlockFinalized determines metrics to update
-// and protocol events to emit, if this block is the first of a new epoch phase.
-//
-// Protocol events and metric updates happen when we finalize the block at
-// which a service event causing an epoch phase change comes into effect.
-// See handleEpochServiceEvents for details.
+// epochPhaseMetricsAndEventsOnBlockFinalized determines metrics to update and protocol
+// events to emit. Service Events embedded into an execution result take effect, when the
+// execution result's _seal is finalized_ (i.e. when the block holding a seal for the
+// result is finalized). See also handleEpochServiceEvents for further details. Example:
 //
 // Convention:
 //
-//	A <-- ... <-- P(Seal_A) <----- B
-//	              ↑                ↑
-//	block sealing service event    first block of new Epoch phase
-//	for epoch-phase transition     (e.g. EpochSetup phase)
-//	(e.g. EpochSetup event)
+//	A <-- ... <-- C(Seal_A)
 //
-// Per convention, protocol events for epoch phase changes are emitted when
-// the first block of the new phase (eg. EpochSetup phase) is _finalized_.
-// Meaning that the new phase has started.
+// Suppose an EpochSetup service event is emitted during execution of block A. C seals A, therefore
+// we apply the metrics/events when C is finalized. The first block of the EpochSetup
+// phase is block C.
 //
 // This function should only be called when epoch fallback *has not already been triggered*.
 // No errors are expected during normal operation.
-func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.Header, epochStatus *flow.EpochStatus) (
+func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.Block, epochStatus *flow.EpochStatus) (
 	metrics []func(),
 	events []func(),
 	err error,
 ) {
 
-	parent, err := m.blocks.ByID(block.ParentID)
+	// block payload may not specify seals in order, so order them by block height before processing
+	orderedSeals, err := protocol.OrderedSeals(block.Payload, m.headers)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not get parent (id=%x): %w", block.ParentID, err)
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
+		}
+		return nil, nil, fmt.Errorf("unexpected error ordering seals: %w", err)
 	}
 
 	// track service event driven metrics and protocol events that should be emitted
-	for _, seal := range parent.Payload.Seals {
-
+	for _, seal := range orderedSeals {
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
@@ -791,18 +903,20 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.H
 				// update current epoch phase
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseSetup) })
 				// track epoch phase transition (staking->setup)
-				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, block) })
+				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, block.Header) })
 			case *flow.EpochCommit:
 				// update current epoch phase
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
 				// track epoch phase transition (setup->committed)
-				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, block) })
+				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, block.Header) })
 				// track final view of committed epoch
 				nextEpochSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
 					return nil, nil, fmt.Errorf("could not retrieve setup event for next epoch: %w", err)
 				}
 				events = append(events, func() { m.metrics.CommittedEpochFinalView(nextEpochSetup.FinalView) })
+			case *flow.VersionBeacon:
+				// do nothing for now
 			default:
 				return nil, nil, fmt.Errorf("invalid service event type in payload (%T)", event)
 			}
@@ -869,27 +983,26 @@ func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered b
 
 // handleEpochServiceEvents handles applying state changes which occur as a result
 // of service events being included in a block payload:
-// * inserting incorporated service events
-// * updating EpochStatus for the candidate block
+//   - inserting incorporated service events
+//   - updating EpochStatus for the candidate block
 //
 // Consider a chain where a service event is emitted during execution of block A.
-// Block B contains a receipt for A. Block C contains a seal for block A. Block
-// D contains a QC for C.
+// Block B contains a receipt for A. Block C contains a seal for block A.
 //
-// A <- B(RA) <- C(SA) <- D
+// A <- .. <- B(RA) <- .. <- C(SA)
 //
 // Service events are included within execution results, which are stored
 // opaquely as part of the block payload in block B. We only validate and insert
-// the typed service event to storage once we have received a valid QC for the
-// block containing the seal for A. This occurs once we mark block D as valid
-// with MarkValid. Because of this, any change to the protocol state introduced
-// by a service event emitted in A would only become visible when querying D or
-// later (D's children).
-// TODO(active-pacemaker) update docs here (remove reference to MarkValid) https://github.com/dapperlabs/flow-go/issues/6254
+// the typed service event to storage once we process C, the block containing the
+// seal for block A. This is because we rely on the sealing subsystem to validate
+// correctness of the service event before processing it.
+// Consequently, any change to the protocol state introduced by a service event
+// emitted during execution of block A would only become visible when querying
+// C or its descendants.
 //
 // This method will only apply service-event-induced state changes when the
-// input block has the form of block D (ie. has a parent, which contains a seal
-// for a block in which a service event was emitted).
+// input block has the form of block C (ie. contains a seal for a block in
+// which a service event was emitted).
 //
 // Return values:
 //   - dbUpdates - If the service events are valid, or there are no service events,
@@ -923,20 +1036,16 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 		return dbUpdates, nil
 	}
 
-	// We apply service events from blocks which are sealed by this block's PARENT.
-	// The parent's payload might contain epoch preparation service events for the next
+	// We apply service events from blocks which are sealed by this candidate block.
+	// The block's payload might contain epoch preparation service events for the next
 	// epoch. In this case, we need to update the tentative protocol state.
 	// We need to validate whether all information is available in the protocol
 	// state to go to the next epoch when needed. In cases where there is a bug
 	// in the smart contract, it could be that this happens too late and the
 	// chain finalization should halt.
-	parent, err := m.blocks.ByID(candidate.Header.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get parent (id=%x): %w", candidate.Header.ParentID, err)
-	}
 
 	// block payload may not specify seals in order, so order them by block height before processing
-	orderedSeals, err := protocol.OrderedSeals(parent.Payload, m.headers)
+	orderedSeals, err := protocol.OrderedSeals(candidate.Payload, m.headers)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
@@ -983,7 +1092,7 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 				extendingSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
 					if errors.Is(err, storage.ErrNotFound) {
-						return nil, fmt.Errorf("unexpected failure to retrieve EpochSetup (id=%x) stored in EpochStatus for block %x: %w",
+						return nil, irrecoverable.NewExceptionf("could not retrieve EpochSetup (id=%x) stored in EpochStatus for block %x: %w",
 							epochStatus.NextEpoch.SetupID, blockID, err)
 					}
 					return nil, fmt.Errorf("unexpected error retrieving next epoch setup: %w", err)
@@ -1005,7 +1114,8 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 
 				// we'll insert the commit event when we insert the block
 				dbUpdates = append(dbUpdates, m.epoch.commits.StoreTx(ev))
-
+			case *flow.VersionBeacon:
+				// do nothing for now
 			default:
 				return nil, fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
 			}
