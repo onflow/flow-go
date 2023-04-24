@@ -2,7 +2,7 @@ package execution
 
 import (
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/entity"
@@ -79,8 +79,8 @@ func (er *BlockExecutionResult) AllTransactionResults() flow.TransactionResults 
 	return res
 }
 
-func (er *BlockExecutionResult) AllExecutionSnapshots() []*state.ExecutionSnapshot {
-	res := make([]*state.ExecutionSnapshot, 0)
+func (er *BlockExecutionResult) AllExecutionSnapshots() []*snapshot.ExecutionSnapshot {
+	res := make([]*snapshot.ExecutionSnapshot, 0)
 	for _, ce := range er.collectionExecutionResults {
 		es := ce.ExecutionSnapshot()
 		res = append(res, es)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 )
@@ -143,7 +144,7 @@ func newFacadeEnvironment(
 // testing.
 func NewScriptEnvironmentFromStorageSnapshot(
 	params EnvironmentParams,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) *facadeEnvironment {
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	derivedTxn := derivedBlockData.NewSnapshotReadDerivedTransactionData()
