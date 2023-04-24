@@ -3,16 +3,18 @@ package access
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"testing"
+	"time"
+
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"testing"
-	"time"
+
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -169,33 +171,39 @@ func (s *ConsensusFollowerSuite) TestSignerIndicesDecoding() {
 
 	client := accessproto.NewAccessAPIClient(conn)
 
-	blockByID, err := makeApiRequest(client.GetBlockHeaderByID, ctx, &accessproto.GetBlockHeaderByIDRequest{Id: finalizedBlockID[:]})
+	blockByID, err, cancel := makeApiRequest(client.GetBlockHeaderByID, ctx, &accessproto.GetBlockHeaderByIDRequest{Id: finalizedBlockID[:]})
 	require.NoError(s.T(), err)
+	defer cancel()
 
-	blockByHeight, err := makeApiRequest(client.GetBlockHeaderByHeight, ctx,
+	blockByHeight, err, cancel := makeApiRequest(client.GetBlockHeaderByHeight, ctx,
 		&accessproto.GetBlockHeaderByHeightRequest{Height: finalizedBlock.Header.Height})
+	defer cancel()
+
 	if err != nil {
 		// could be that access node didn't process finalized block yet, add a small delay and try again
 		time.Sleep(time.Second)
-		blockByHeight, err = makeApiRequest(client.GetBlockHeaderByHeight, ctx,
+		blockByHeight, err, cancel = makeApiRequest(client.GetBlockHeaderByHeight, ctx,
 			&accessproto.GetBlockHeaderByHeightRequest{Height: finalizedBlock.Header.Height})
 		require.NoError(s.T(), err)
+		defer cancel()
 	}
 
 	require.Equal(s.T(), blockByID, blockByHeight)
 	require.Equal(s.T(), blockByID.Block.ParentVoterIndices, finalizedBlock.Header.ParentVoterIndices)
 	assertSignerIndicesValidity(blockByID.Block)
 
-	latestBlockHeader, err := makeApiRequest(client.GetLatestBlockHeader, ctx, &accessproto.GetLatestBlockHeaderRequest{})
+	latestBlockHeader, err, cancel := makeApiRequest(client.GetLatestBlockHeader, ctx, &accessproto.GetLatestBlockHeaderRequest{})
 	require.NoError(s.T(), err)
+	defer cancel()
 	assertSignerIndicesValidity(latestBlockHeader.Block)
 }
 
 // makeApiRequest is a helper function that encapsulates context creation for grpc client call, used to avoid repeated creation
 // of new context for each call.
-func makeApiRequest[Func func(context.Context, *Req, ...grpc.CallOption) (*Resp, error), Req any, Resp any](apiCall Func, ctx context.Context, req *Req) (*Resp, error) {
-	clientCtx, _ := context.WithTimeout(ctx, 1*time.Second)
-	return apiCall(clientCtx, req)
+func makeApiRequest[Func func(context.Context, *Req, ...grpc.CallOption) (*Resp, error), Req any, Resp any](apiCall Func, ctx context.Context, req *Req) (*Resp, error, context.CancelFunc) {
+	clientCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	resp, err := apiCall(clientCtx, req)
+	return resp, err, cancel
 }
 
 func (s *ConsensusFollowerSuite) buildNetworkConfig() {
