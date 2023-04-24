@@ -307,7 +307,12 @@ func (b *backendTransactions) GetTransactionResult(
 	}, nil
 }
 
-func (b *backendTransactions) lookupCollectionIDInBlock(block *flow.Block, txID flow.Identifier) (flow.Identifier, error) {
+// lookupCollectionIDInBlock returns the collection ID based on the transaction ID. The lookup is performed in block
+// collections.
+func (b *backendTransactions) lookupCollectionIDInBlock(
+	block *flow.Block,
+	txID flow.Identifier,
+) (flow.Identifier, error) {
 	collectionID := flow.ZeroID
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := b.collections.ByID(guarantee.CollectionID)
@@ -325,7 +330,13 @@ func (b *backendTransactions) lookupCollectionIDInBlock(block *flow.Block, txID 
 	return collectionID, nil
 }
 
-func (b *backendTransactions) retrieveBlock(blockID flow.Identifier, collectionID flow.Identifier, txID flow.Identifier) (*flow.Block, error) {
+// retrieveBlock function returns a block based on the input argument. The block ID lookup has the highest priority,
+// followed by the collection ID lookup. If both are missing, the default lookup by transaction ID is performed.
+func (b *backendTransactions) retrieveBlock(
+	blockID flow.Identifier,
+	collectionID flow.Identifier,
+	txID flow.Identifier,
+) (*flow.Block, error) {
 	var block *flow.Block
 	var err error
 

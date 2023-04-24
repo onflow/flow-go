@@ -696,7 +696,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 	})
 }
 
-// TestGetTransactionResult tests
+// TestGetTransactionResult tests different approaches to using the GetTransactionResult query, including using
+// transaction ID, block ID, and collection ID.
 func (suite *Suite) TestGetTransactionResult() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 		all := util.StorageLayer(suite.T(), db)

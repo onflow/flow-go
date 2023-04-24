@@ -651,7 +651,7 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 	bs.sealDB = &storage.Seals{}
 	bs.build.seals = bs.sealDB
 
-	bs.T().Run("Parse on top of B4 and check that no seals are included", func(t *testing.T) {
+	bs.T().Run("Build on top of B4 and check that no seals are included", func(t *testing.T) {
 		bs.sealDB.On("HighestInFork", b4.ID()).Return(b0seal, nil)
 
 		_, err := bs.build.BuildOn(b4.ID(), bs.setter)
@@ -660,7 +660,7 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 		require.Empty(t, bs.assembled.Seals, "should not include any seals")
 	})
 
-	bs.T().Run("Parse on top of B5 and check that seals for B1 is included", func(t *testing.T) {
+	bs.T().Run("Build on top of B5 and check that seals for B1 is included", func(t *testing.T) {
 		b5 := unittest.BlockWithParentFixture(b4.Header) // creating block b5
 		bs.storeBlock(b5)
 		bs.sealDB.On("HighestInFork", b5.ID()).Return(b0seal, nil)
