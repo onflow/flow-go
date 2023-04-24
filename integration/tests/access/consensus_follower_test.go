@@ -3,6 +3,14 @@ package access
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"testing"
 	"time"
 
@@ -48,33 +56,33 @@ func (s *ConsensusFollowerSuite) TearDownTest() {
 	s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
-func (suite *ConsensusFollowerSuite) SetupTest() {
-	suite.log = unittest.LoggerForTest(suite.Suite.T(), zerolog.InfoLevel)
-	suite.log.Info().Msg("================> SetupTest")
-	suite.ctx, suite.cancel = context.WithCancel(context.Background())
-	suite.buildNetworkConfig()
+func (s *ConsensusFollowerSuite) SetupTest() {
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
+	s.log.Info().Msg("================> SetupTest")
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	s.buildNetworkConfig()
 	// start the network
-	suite.net.Start(suite.ctx)
+	s.net.Start(s.ctx)
 }
 
 // TestReceiveBlocks tests the following
 // 1. The consensus follower follows the chain and persists blocks in storage.
 // 2. The consensus follower can catch up if it is started after the chain has started producing blocks.
-func (suite *ConsensusFollowerSuite) TestReceiveBlocks() {
-	ctx, cancel := context.WithCancel(suite.ctx)
+func (s *ConsensusFollowerSuite) TestReceiveBlocks() {
+	ctx, cancel := context.WithCancel(s.ctx)
 	defer cancel()
 
 	receivedBlocks := make(map[flow.Identifier]struct{}, blockCount)
 
-	suite.Run("consensus follower follows the chain", func() {
+	s.Run("consensus follower follows the chain", func() {
 		// kick off the first follower
-		suite.followerMgr1.startFollower(ctx)
+		s.followerMgr1.startFollower(ctx)
 		var err error
 		receiveBlocks := func() {
 			for i := 0; i < blockCount; i++ {
-				blockID := <-suite.followerMgr1.blockIDChan
+				blockID := <-s.followerMgr1.blockIDChan
 				receivedBlocks[blockID] = struct{}{}
-				_, err = suite.followerMgr1.getBlock(blockID)
+				_, err = s.followerMgr1.getBlock(blockID)
 				if err != nil {
 					return
 				}
@@ -82,18 +90,18 @@ func (suite *ConsensusFollowerSuite) TestReceiveBlocks() {
 		}
 
 		// wait for finalized blocks
-		unittest.AssertReturnsBefore(suite.T(), receiveBlocks, 2*time.Minute) // waiting 2 minute for 5 blocks
+		unittest.AssertReturnsBefore(s.T(), receiveBlocks, 2*time.Minute) // waiting 2 minute for 5 blocks
 
 		// all blocks were found in the storage
-		require.NoError(suite.T(), err, "finalized block not found in storage")
+		require.NoError(s.T(), err, "finalized block not found in storage")
 
 		// assert that blockCount number of blocks were received
-		require.Len(suite.T(), receivedBlocks, blockCount)
+		require.Len(s.T(), receivedBlocks, blockCount)
 	})
 
-	suite.Run("consensus follower sync up with the chain", func() {
+	s.Run("consensus follower sync up with the chain", func() {
 		// kick off the second follower
-		suite.followerMgr2.startFollower(ctx)
+		s.followerMgr2.startFollower(ctx)
 
 		// the second follower is now atleast blockCount blocks behind and should sync up and get all the missed blocks
 		receiveBlocks := func() {
@@ -101,7 +109,7 @@ func (suite *ConsensusFollowerSuite) TestReceiveBlocks() {
 				select {
 				case <-ctx.Done():
 					return
-				case blockID := <-suite.followerMgr2.blockIDChan:
+				case blockID := <-s.followerMgr2.blockIDChan:
 					delete(receivedBlocks, blockID)
 					if len(receivedBlocks) == 0 {
 						return
@@ -110,17 +118,94 @@ func (suite *ConsensusFollowerSuite) TestReceiveBlocks() {
 			}
 		}
 		// wait for finalized blocks
-		unittest.AssertReturnsBefore(suite.T(), receiveBlocks, 2*time.Minute) // waiting 2 minute for the missing 5 blocks
+		unittest.AssertReturnsBefore(s.T(), receiveBlocks, 2*time.Minute) // waiting 2 minute for the missing 5 blocks
 	})
 }
 
-func (suite *ConsensusFollowerSuite) buildNetworkConfig() {
+// TestSignerIndicesDecoding tests that access node uses signer indices' decoder to correctly parse encoded data in blocks.
+// This test receives blocks from consensus follower and then requests same blocks from access API and checks if returned data
+// matches.
+func (s *ConsensusFollowerSuite) TestSignerIndicesDecoding() {
+	// create committee so we can create decoder to assert validity of data
+	committee, err := committees.NewConsensusCommittee(s.followerMgr1.follower.State, s.stakedID)
+	require.NoError(s.T(), err)
+	blockSignerDecoder := signature.NewBlockSignerDecoder(committee)
+	assertSignerIndicesValidity := func(msg *entities.BlockHeader) {
+		block, err := convert.MessageToBlockHeader(msg)
+		require.NoError(s.T(), err)
+		decodedIdentities, err := blockSignerDecoder.DecodeSignerIDs(block)
+		require.NoError(s.T(), err)
+		// transform to assert
+		var transformed [][]byte
+		for _, identity := range decodedIdentities {
+			identity := identity
+			transformed = append(transformed, identity[:])
+		}
+		assert.ElementsMatch(s.T(), transformed, msg.ParentVoterIds, "response must contain correctly encoded signer IDs")
+	}
+
+	ctx, cancel := context.WithCancel(s.ctx)
+	defer cancel()
+
+	// kick off the first follower
+	s.followerMgr1.startFollower(ctx)
+
+	var finalizedBlockID flow.Identifier
+	select {
+	case <-time.After(30 * time.Second):
+		require.Fail(s.T(), "expect to receive finalized block before timeout")
+	case finalizedBlockID = <-s.followerMgr1.blockIDChan:
+	}
+
+	finalizedBlock, err := s.followerMgr1.getBlock(finalizedBlockID)
+	require.NoError(s.T(), err)
+
+	// create access API
+
+	grpcAddress := s.net.ContainerByID(s.stakedID).Addr(testnet.GRPCPort)
+	conn, err := grpc.DialContext(ctx, grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(s.T(), err, "failed to connect to access node")
+	defer conn.Close()
+
+	client := accessproto.NewAccessAPIClient(conn)
+
+	blockByID, err := makeApiRequest(client.GetBlockHeaderByID, ctx, &accessproto.GetBlockHeaderByIDRequest{Id: finalizedBlockID[:]})
+	require.NoError(s.T(), err)
+
+	blockByHeight, err := makeApiRequest(client.GetBlockHeaderByHeight, ctx,
+		&accessproto.GetBlockHeaderByHeightRequest{Height: finalizedBlock.Header.Height})
+	if err != nil {
+		// could be that access node didn't process finalized block yet, add a small delay and try again
+		time.Sleep(time.Second)
+		blockByHeight, err = makeApiRequest(client.GetBlockHeaderByHeight, ctx,
+			&accessproto.GetBlockHeaderByHeightRequest{Height: finalizedBlock.Header.Height})
+		require.NoError(s.T(), err)
+	}
+
+	require.Equal(s.T(), blockByID, blockByHeight)
+	require.Equal(s.T(), blockByID.Block.ParentVoterIndices, finalizedBlock.Header.ParentVoterIndices)
+	assertSignerIndicesValidity(blockByID.Block)
+
+	latestBlockHeader, err := makeApiRequest(client.GetLatestBlockHeader, ctx, &accessproto.GetLatestBlockHeaderRequest{})
+	require.NoError(s.T(), err)
+	assertSignerIndicesValidity(latestBlockHeader.Block)
+}
+
+// makeApiRequest is a helper function that encapsulates context creation for grpc client call, used to avoid repeated creation
+// of new context for each call.
+func makeApiRequest[Func func(context.Context, *Req, ...grpc.CallOption) (*Resp, error), Req any, Resp any](apiCall Func, ctx context.Context, req *Req) (*Resp, error) {
+	clientCtx, _ := context.WithTimeout(ctx, 1*time.Second)
+	return apiCall(clientCtx, req)
+}
+
+func (s *ConsensusFollowerSuite) buildNetworkConfig() {
 
 	// staked access node
-	suite.stakedID = unittest.IdentifierFixture()
+	unittest.IdentityFixture()
+	s.stakedID = unittest.IdentifierFixture()
 	stakedConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
-		testnet.WithID(suite.stakedID),
+		testnet.WithID(s.stakedID),
 		testnet.WithAdditionalFlag("--supports-observer=true"),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	)
@@ -151,26 +236,26 @@ func (suite *ConsensusFollowerSuite) buildNetworkConfig() {
 	}
 
 	unstakedKey1, err := UnstakedNetworkingKey()
-	require.NoError(suite.T(), err)
+	require.NoError(s.T(), err)
 	unstakedKey2, err := UnstakedNetworkingKey()
-	require.NoError(suite.T(), err)
+	require.NoError(s.T(), err)
 
 	followerConfigs := []testnet.ConsensusFollowerConfig{
-		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey1, suite.stakedID, consensus_follower.WithLogLevel("warn")),
-		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey2, suite.stakedID, consensus_follower.WithLogLevel("warn")),
+		testnet.NewConsensusFollowerConfig(s.T(), unstakedKey1, s.stakedID, consensus_follower.WithLogLevel("warn")),
+		testnet.NewConsensusFollowerConfig(s.T(), unstakedKey2, s.stakedID, consensus_follower.WithLogLevel("warn")),
 	}
 
 	// consensus followers
 	conf := testnet.NewNetworkConfig("consensus follower test", net, testnet.WithConsensusFollowers(followerConfigs...))
-	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf, flow.Localnet)
+	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 
-	follower1 := suite.net.ConsensusFollowerByID(followerConfigs[0].NodeID)
-	suite.followerMgr1, err = newFollowerManager(suite.T(), follower1)
-	require.NoError(suite.T(), err)
+	follower1 := s.net.ConsensusFollowerByID(followerConfigs[0].NodeID)
+	s.followerMgr1, err = newFollowerManager(s.T(), follower1)
+	require.NoError(s.T(), err)
 
-	follower2 := suite.net.ConsensusFollowerByID(followerConfigs[1].NodeID)
-	suite.followerMgr2, err = newFollowerManager(suite.T(), follower2)
-	require.NoError(suite.T(), err)
+	follower2 := s.net.ConsensusFollowerByID(followerConfigs[1].NodeID)
+	s.followerMgr2, err = newFollowerManager(s.T(), follower2)
+	require.NoError(s.T(), err)
 }
 
 // TODO: Move this to unittest and resolve the circular dependency issue
