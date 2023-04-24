@@ -11,7 +11,7 @@ are not filtered out by the existing mechanisms.
 
 ALSP relies on the application layer to detect and report the misbehaviors that 
 lead to spamming. It enforces a penalty system to penalize the misbehaving nodes that are reported by the application layer. ALSP also takes 
-extra measures to protect the network from malicious nodes that attempt on an active spamming attacks. Once the penalty of a remote node
+extra measures to protect the network from malicious nodes that attempt an active spamming attack. Once the penalty of a remote node
 reaches a certain threshold, the local node will disconnect from the remote node and no-longer accept any incoming connections from the remote node 
 until the penalty is reduced to zero again through a decaying interval.
 
