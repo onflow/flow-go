@@ -215,11 +215,24 @@ func (h *Handler) GetTransactionResult(
 	if err != nil {
 		return nil, err
 	}
-	// NOTE: blockId could be flow.ZeroID, as it is an optional parameter. The error here is intentionally ignored.
-	blockId, _ := convert.BlockID(req.GetBlockId())
 
-	// NOTE: collectionId could be flow.ZeroID, as it is an optional parameter. The error here is intentionally ignored.
-	collectionId, _ := convert.TransactionID(req.GetCollectionId())
+	blockId := flow.ZeroID
+	requestBlockId := req.GetCollectionId()
+	if requestBlockId != nil {
+		blockId, err = convert.BlockID(requestBlockId)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	collectionId := flow.ZeroID
+	requestCollectionId := req.GetCollectionId()
+	if requestCollectionId != nil {
+		collectionId, err = convert.TransactionID(requestCollectionId)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId)
 	if err != nil {
