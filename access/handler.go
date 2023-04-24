@@ -217,7 +217,7 @@ func (h *Handler) GetTransactionResult(
 	}
 
 	blockId := flow.ZeroID
-	requestBlockId := req.GetCollectionId()
+	requestBlockId := req.GetBlockId()
 	if requestBlockId != nil {
 		blockId, err = convert.BlockID(requestBlockId)
 		if err != nil {
