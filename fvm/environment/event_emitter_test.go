@@ -13,7 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"

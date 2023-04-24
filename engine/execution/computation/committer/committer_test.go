@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	led "github.com/onflow/flow-go/ledger"
 	ledgermock "github.com/onflow/flow-go/ledger/mock"
 	"github.com/onflow/flow-go/model/flow"
