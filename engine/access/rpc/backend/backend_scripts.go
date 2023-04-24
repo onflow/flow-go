@@ -171,7 +171,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 
 	errToReturn := errors.ErrorOrNil()
 	if errToReturn != nil {
-		b.log.Error().Err(err).Msg("script execution failed for execution node internal reasons")
+		b.log.Error().Err(errToReturn).Msg("script execution failed for execution node internal reasons")
 	}
 
 	return nil, rpc.ConvertMultiError(errors, "failed to execute script on execution nodes", codes.Internal)
