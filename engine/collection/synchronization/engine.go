@@ -363,7 +363,7 @@ func (e *Engine) pollHeight() {
 
 	nonce, err := rand.Uint64()
 	if err != nil {
-		e.log.Error().Err(err).Msg("nonce generation failed")
+		e.log.Error().Err(err).Msg("nonce generation failed during pollHeight")
 		return
 	}
 
@@ -387,7 +387,7 @@ func (e *Engine) sendRequests(ranges []chainsync.Range, batches []chainsync.Batc
 	for _, ran := range ranges {
 		nonce, err := rand.Uint64()
 		if err != nil {
-			e.log.Error().Err(err).Msg("nonce generation failed")
+			e.log.Error().Err(err).Msg("nonce generation failed during range request")
 			return
 		}
 		req := &messages.RangeRequest{
@@ -412,7 +412,7 @@ func (e *Engine) sendRequests(ranges []chainsync.Range, batches []chainsync.Batc
 	for _, batch := range batches {
 		nonce, err := rand.Uint64()
 		if err != nil {
-			e.log.Error().Err(err).Msg("nonce generation failed")
+			e.log.Error().Err(err).Msg("nonce generation failed during batch request")
 			return
 		}
 		req := &messages.BatchRequest{

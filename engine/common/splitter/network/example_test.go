@@ -1,7 +1,6 @@
 package network_test
 
 import (
-	"encoding/hex"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -21,9 +20,10 @@ func Example() {
 	splitterNet := splitterNetwork.NewNetwork(net, logger)
 
 	// generate an origin ID
-	var id flow.Identifier
-	bytes, _ := hex.DecodeString("0194fdc2fa2ffcc041d3ff12045b73c86e4ff95ff662a5eee82abdf44a2d0b75")
-	copy(id[:], bytes)
+	id, err := flow.HexStringToIdentifier("0194fdc2fa2ffcc041d3ff12045b73c86e4ff95ff662a5eee82abdf44a2d0b75")
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	// create engines
 	engineProcessFunc := func(engineID int) testnet.EngineProcessFunc {
@@ -38,7 +38,7 @@ func Example() {
 
 	// register engines with splitter network
 	channel := channels.Channel("foo-channel")
-	_, err := splitterNet.Register(channel, engine1)
+	_, err = splitterNet.Register(channel, engine1)
 	if err != nil {
 		fmt.Println(err)
 	}

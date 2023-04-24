@@ -360,7 +360,7 @@ func (e *Engine) pollHeight() {
 
 	nonce, err := rand.Uint64()
 	if err != nil {
-		e.log.Warn().Err(err).Msg("nonce generation failed")
+		e.log.Warn().Err(err).Msg("nonce generation failed during pollHeight")
 		return
 	}
 
@@ -385,19 +385,18 @@ func (e *Engine) pollHeight() {
 func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsync.Range, batches []chainsync.Batch) {
 	var errs *multierror.Error
 
-	nonce, err := rand.Uint64()
-	if err != nil {
-		e.log.Error().Err(err).Msg("nonce generation failed")
-		return
-	}
-
 	for _, ran := range ranges {
+		nonce, err := rand.Uint64()
+		if err != nil {
+			e.log.Error().Err(err).Msg("nonce generation failed during range request")
+			return
+		}
 		req := &messages.RangeRequest{
 			Nonce:      nonce,
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
-		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants...)
+		err = e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
 			continue
@@ -414,7 +413,7 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 	for _, batch := range batches {
 		nonce, err := rand.Uint64()
 		if err != nil {
-			e.log.Error().Err(err).Msg("nonce generation failed")
+			e.log.Error().Err(err).Msg("nonce generation failed during batch request")
 			return
 		}
 		req := &messages.BatchRequest{

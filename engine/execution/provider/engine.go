@@ -319,7 +319,7 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 	if err != nil {
 		lg.Error().
 			Err(err).
-			Msg("could not generate nonce")
+			Msg("could not generate nonce for chunk data response")
 		return
 	}
 
