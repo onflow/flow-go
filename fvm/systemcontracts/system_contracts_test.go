@@ -10,19 +10,19 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+var allChains = []flow.ChainID{
+	flow.Mainnet,
+	flow.Testnet,
+	flow.Sandboxnet,
+	flow.Benchnet,
+	flow.Localnet,
+	flow.Emulator,
+}
+
 // TestSystemContract_Address tests that we can retrieve a canonical address
 // for all accepted chains and contracts.
 func TestSystemContracts(t *testing.T) {
-	chains := []flow.ChainID{
-		flow.Mainnet,
-		flow.Testnet,
-		flow.Sandboxnet,
-		flow.Benchnet,
-		flow.Localnet,
-		flow.Emulator,
-	}
-
-	for _, chain := range chains {
+	for _, chain := range allChains {
 		_, err := SystemContractsForChain(chain)
 		require.NoError(t, err)
 		checkSystemContracts(t, chain)
@@ -41,16 +41,7 @@ func TestSystemContract_InvalidChainID(t *testing.T) {
 // TestServiceEvents tests that we can retrieve service events for all accepted
 // chains and contracts.
 func TestServiceEvents(t *testing.T) {
-	chains := []flow.ChainID{
-		flow.Mainnet,
-		flow.Testnet,
-		flow.Sandboxnet,
-		flow.Benchnet,
-		flow.Localnet,
-		flow.Emulator,
-	}
-
-	for _, chain := range chains {
+	for _, chain := range allChains {
 		_, err := ServiceEventsForChain(chain)
 		checkServiceEvents(t, chain)
 		require.NoError(t, err)
@@ -60,17 +51,8 @@ func TestServiceEvents(t *testing.T) {
 // TestServiceEventLookup_Consistency sanity checks consistency of the lookup
 // method, in case an update to ServiceEvents forgets to update the lookup.
 func TestServiceEventAll_Consistency(t *testing.T) {
-	chains := []flow.ChainID{
-		flow.Mainnet,
-		flow.Testnet,
-		flow.Sandboxnet,
-		flow.Benchnet,
-		flow.Localnet,
-		flow.Emulator,
-	}
-
 	fields := reflect.TypeOf(ServiceEvents{}).NumField()
-	for _, chain := range chains {
+	for _, chain := range allChains {
 		events, err := ServiceEventsForChain(chain)
 		require.NoError(t, err)
 
@@ -107,6 +89,10 @@ func checkSystemContracts(t *testing.T, chainID flow.ChainID) {
 	assert.Equal(t, addresses[ContractNameClusterQC], contracts.ClusterQC.Address)
 	assert.Equal(t, addresses[ContractNameDKG], contracts.DKG.Address)
 	assert.Equal(t, addresses[ContractNameNodeVersionBeacon], contracts.NodeVersionBeacon.Address)
+
+	for _, address := range addresses {
+		assert.True(t, chainID.Chain().IsValid(address))
+	}
 }
 
 func checkServiceEvents(t *testing.T, chainID flow.ChainID) {
