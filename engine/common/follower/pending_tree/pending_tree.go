@@ -26,8 +26,8 @@ func NewVertex(certifiedBlock flow.CertifiedBlock, connectedToFinalized bool) (*
 	}, nil
 }
 
-func (v *PendingBlockVertex) VertexID() flow.Identifier { return v.QC.BlockID }
-func (v *PendingBlockVertex) Level() uint64             { return v.QC.View }
+func (v *PendingBlockVertex) VertexID() flow.Identifier { return v.CertifyingQC.BlockID }
+func (v *PendingBlockVertex) Level() uint64             { return v.CertifyingQC.View }
 func (v *PendingBlockVertex) Parent() (flow.Identifier, uint64) {
 	return v.Block.Header.ParentID, v.Block.Header.ParentView
 }
