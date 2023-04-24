@@ -32,9 +32,9 @@ import (
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -413,7 +413,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			unittest.IdentifierFixture(),
 			block,
 			snapshotTree,
-			derivedBlockData)
+			derivedBlockData.NewChildDerivedBlockData())
 		assert.NoError(t, err)
 		assert.Len(t, result.AllExecutionSnapshots(), 1)
 		assert.Len(t, result.AllTransactionResults(), 1)
