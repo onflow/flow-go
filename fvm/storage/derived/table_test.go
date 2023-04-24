@@ -7,8 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/errors"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -291,7 +292,7 @@ func TestDerivedDataTableValidateRejectOutOfOrderCommit(t *testing.T) {
 
 	validateErr = testTxn.Validate()
 	require.ErrorContains(t, validateErr, "non-increasing time")
-	require.False(t, validateErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(validateErr))
 }
 
 func TestDerivedDataTableValidateRejectNonIncreasingExecutionTime(t *testing.T) {
@@ -308,7 +309,7 @@ func TestDerivedDataTableValidateRejectNonIncreasingExecutionTime(t *testing.T) 
 
 	validateErr := testTxn.Validate()
 	require.ErrorContains(t, validateErr, "non-increasing time")
-	require.False(t, validateErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(validateErr))
 }
 
 func TestDerivedDataTableValidateRejectOutdatedReadSet(t *testing.T) {
@@ -353,7 +354,7 @@ func TestDerivedDataTableValidateRejectOutdatedReadSet(t *testing.T) {
 
 	validateErr = testTxn.Validate()
 	require.ErrorContains(t, validateErr, "outdated read set")
-	require.True(t, validateErr.IsRetryable())
+	require.True(t, errors.IsRetryableConflictError(validateErr))
 }
 
 func TestDerivedDataTableValidateRejectOutdatedWriteSet(t *testing.T) {
@@ -377,7 +378,7 @@ func TestDerivedDataTableValidateRejectOutdatedWriteSet(t *testing.T) {
 
 	validateErr := testTxn.Validate()
 	require.ErrorContains(t, validateErr, "outdated write set")
-	require.True(t, validateErr.IsRetryable())
+	require.True(t, errors.IsRetryableConflictError(validateErr))
 }
 
 func TestDerivedDataTableValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T) {
@@ -767,7 +768,7 @@ func TestDerivedDataTableCommitValidateError(t *testing.T) {
 
 	commitErr := testTxn.Commit()
 	require.ErrorContains(t, commitErr, "non-increasing time")
-	require.False(t, commitErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(commitErr))
 }
 
 func TestDerivedDataTableCommitRejectCommitGapForNormalTxn(t *testing.T) {
@@ -793,7 +794,7 @@ func TestDerivedDataTableCommitRejectCommitGapForNormalTxn(t *testing.T) {
 
 	commitErr := testTxn.Commit()
 	require.ErrorContains(t, commitErr, "missing commit range [6, 10)")
-	require.False(t, commitErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(commitErr))
 }
 
 func TestDerivedDataTableCommitRejectCommitGapForSnapshotRead(t *testing.T) {
@@ -819,7 +820,7 @@ func TestDerivedDataTableCommitRejectCommitGapForSnapshotRead(t *testing.T) {
 
 	commitErr := testTxn.Commit()
 	require.ErrorContains(t, commitErr, "missing commit range [6, 10)")
-	require.False(t, commitErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(commitErr))
 }
 
 func TestDerivedDataTableCommitSnapshotReadDoesNotAdvanceCommitTime(t *testing.T) {
@@ -854,7 +855,7 @@ func TestDerivedDataTableCommitBadSnapshotReadInvalidator(t *testing.T) {
 
 	commitErr := testTxn.Commit()
 	require.ErrorContains(t, commitErr, "snapshot read can't invalidate")
-	require.False(t, commitErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(commitErr))
 }
 
 func TestDerivedDataTableCommitFineGrainInvalidation(t *testing.T) {
