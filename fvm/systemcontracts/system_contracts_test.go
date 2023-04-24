@@ -107,6 +107,11 @@ func checkSystemContracts(t *testing.T, chainID flow.ChainID) {
 	assert.Equal(t, addresses[ContractNameClusterQC], contracts.ClusterQC.Address)
 	assert.Equal(t, addresses[ContractNameDKG], contracts.DKG.Address)
 	assert.Equal(t, addresses[ContractNameNodeVersionBeacon], contracts.NodeVersionBeacon.Address)
+
+	assert.True(t, chainID.Chain().IsValid(addresses[ContractNameEpoch]))
+	assert.True(t, chainID.Chain().IsValid(addresses[ContractNameClusterQC]))
+	assert.True(t, chainID.Chain().IsValid(addresses[ContractNameDKG]))
+	assert.True(t, chainID.Chain().IsValid(addresses[ContractNameNodeVersionBeacon]))
 }
 
 func checkServiceEvents(t *testing.T, chainID flow.ChainID) {
