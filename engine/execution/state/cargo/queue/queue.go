@@ -15,10 +15,10 @@ type headerInContext struct {
 // Every time a new header is added to the queue it verifies the complience of the header to the
 // most recenlty added header.
 type FinalizedBlockQueue struct {
-	headers            []headerInContext
-	lock               sync.RWMutex
-	lastDequeuedHeader *headerInContext
-	lastQueuedHeader   *headerInContext
+	headers          []headerInContext
+	lock             sync.RWMutex
+	expectedHeight   uint64
+	expectedParentID flow.Identifier
 }
 
 // NewFinalizedBlockQueue constructs a new FinalizedBlockQueue
@@ -27,8 +27,9 @@ func NewFinalizedBlockQueue(
 	genesis *flow.Header,
 ) *FinalizedBlockQueue {
 	return &FinalizedBlockQueue{
-		headers:            make([]headerInContext, 0),
-		lastDequeuedHeader: &headerInContext{genesis, genesis.ID()},
+		headers:          make([]headerInContext, 0),
+		expectedHeight:   genesis.Height + 1,
+		expectedParentID: genesis.ID(),
 	}
 }
 
@@ -40,30 +41,26 @@ func (ft *FinalizedBlockQueue) Enqueue(header *flow.Header) error {
 	ft.lock.Lock()
 	defer ft.lock.Unlock()
 
-	expectedHeight := ft.lastDequeuedHeader.Header.Height + 1
-	expectedParentID := ft.lastDequeuedHeader.ID
-	if len(ft.headers) > 0 {
-		expectedHeight = ft.lastQueuedHeader.Header.Height + 1
-		expectedParentID = ft.lastQueuedHeader.ID
-	}
-	if expectedHeight != header.Height || expectedParentID != header.ParentID {
+	if ft.expectedHeight != header.Height || ft.expectedParentID != header.ParentID {
 		return &NonCompliantHeaderError{
-			expectedHeight,
+			ft.expectedHeight,
 			header.Height,
-			expectedParentID,
+			ft.expectedParentID,
 			header.ParentID,
 		}
 	}
 
-	h := headerInContext{header, header.ID()}
-	ft.headers = append(ft.headers, h)
-	ft.lastQueuedHeader = &h
+	blockID := header.ID()
+	ft.headers = append(ft.headers, headerInContext{header, blockID})
+	ft.expectedParentID = blockID
+	ft.expectedHeight = header.Height + 1
+
 	return nil
 }
 
-// Peak returns the oldest header in the queue without removing it
+// Peek returns the oldest header in the queue without removing it
 // If the queue is empty it returns zero ID and nil header
-func (ft *FinalizedBlockQueue) Peak() (flow.Identifier, *flow.Header) {
+func (ft *FinalizedBlockQueue) Peek() (flow.Identifier, *flow.Header) {
 	ft.lock.RLock()
 	defer ft.lock.RUnlock()
 
@@ -91,7 +88,6 @@ func (ft *FinalizedBlockQueue) Dequeue() {
 	defer ft.lock.Unlock()
 
 	if len(ft.headers) > 0 {
-		ft.lastDequeuedHeader = &ft.headers[0]
 		ft.headers = ft.headers[1:]
 	}
 }
