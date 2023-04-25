@@ -47,7 +47,9 @@ int G2_check_membership(const E2* p){
         return INVALID;
     // check p is in G2
     #if MEMBERSHIP_CHECK_G2 == EXP_ORDER
-    return G2_simple_subgroup_check(p);
+    // TODO: clean up
+    ep2_st* tmp = E2_blst_to_relic(p);
+    return G2_simple_subgroup_check(tmp);
     #elif MEMBERSHIP_CHECK_G2 == BOWE
     // TODO: implement Bowe's check
     return UNDEFINED;
