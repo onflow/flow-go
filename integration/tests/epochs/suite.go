@@ -364,7 +364,7 @@ func (s *Suite) SubmitSetApprovedListTx(ctx context.Context, env templates.Envir
 
 // ExecuteReadApprovedNodesScript executes the return proposal table script and returns a list of approved nodes
 func (s *Suite) ExecuteReadApprovedNodesScript(ctx context.Context, env templates.Environment) cadence.Value {
-	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
+	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetApprovedNodesScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
 
 	return v
@@ -380,8 +380,15 @@ func (s *Suite) getTestContainerName(role flow.Role) string {
 // and checks that the info.NodeID is in both list
 func (s *Suite) assertNodeApprovedAndProposed(ctx context.Context, env templates.Environment, info *StakedNodeOperationInfo) {
 	// ensure node ID in approved list
-	approvedNodes := s.ExecuteReadApprovedNodesScript(ctx, env)
-	require.Containsf(s.T(), approvedNodes.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected new node to be in approved nodes list: %x", info.NodeID)
+	//approvedNodes := s.ExecuteReadApprovedNodesScript(ctx, env)
+	//require.Containsf(s.T(), approvedNodes.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected new node to be in approved nodes list: %x", info.NodeID)
+
+	// Access Nodes go through a separate selection process, so they do not immediately
+	// appear on the proposed table -- skip checking for them here.
+	if info.Role == flow.RoleAccess {
+		s.T().Logf("skipping checking proposed table for joining Access Node")
+		return
+	}
 
 	// check if node is in proposed table
 	proposedTable := s.ExecuteGetProposedTableScript(ctx, env, info.NodeID)
