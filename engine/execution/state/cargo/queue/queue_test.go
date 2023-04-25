@@ -28,7 +28,7 @@ func TestFinalizedBlockQueue(t *testing.T) {
 
 		// dequeue them all all
 		for _, header := range batch1 {
-			retID, retHeader := bq.Peak()
+			retID, retHeader := bq.Peek()
 			require.Equal(t, header.ID(), retID)
 			require.Equal(t, header, retHeader)
 
@@ -75,7 +75,7 @@ func TestFinalizedBlockQueue(t *testing.T) {
 
 		bq := queue.NewFinalizedBlockQueue(genesis)
 
-		id, header := bq.Peak()
+		id, header := bq.Peek()
 		require.Nil(t, header)
 		require.Equal(t, flow.ZeroID, id)
 
@@ -84,7 +84,7 @@ func TestFinalizedBlockQueue(t *testing.T) {
 		require.NoError(t, err)
 
 		// now it should return the first header
-		id, header = bq.Peak()
+		id, header = bq.Peek()
 		require.Equal(t, headers[0], header)
 		require.Equal(t, headers[0].ID(), id)
 
@@ -93,7 +93,7 @@ func TestFinalizedBlockQueue(t *testing.T) {
 		require.NoError(t, err)
 
 		// it should still return the first header
-		id, header = bq.Peak()
+		id, header = bq.Peek()
 		require.Equal(t, headers[0], header)
 		require.Equal(t, headers[0].ID(), id)
 
@@ -101,7 +101,7 @@ func TestFinalizedBlockQueue(t *testing.T) {
 		bq.Dequeue()
 
 		// now it should return the second header
-		id, header = bq.Peak()
+		id, header = bq.Peek()
 		require.Equal(t, headers[1], header)
 		require.Equal(t, headers[1].ID(), id)
 
@@ -109,7 +109,7 @@ func TestFinalizedBlockQueue(t *testing.T) {
 		bq.Dequeue()
 
 		// now should return empty
-		id, header = bq.Peak()
+		id, header = bq.Peek()
 		require.Nil(t, header)
 		require.Equal(t, flow.ZeroID, id)
 	})
