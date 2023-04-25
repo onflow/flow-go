@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 type Handler struct {
@@ -21,7 +22,7 @@ type Handler struct {
 	chain                flow.Chain
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
 	finalizedHeaderCache *synceng.FinalizedHeaderCache
-	nodeId               flow.Identifier
+	me                   module.Local
 }
 
 // HandlerOption is used to hand over optional constructor parameters
@@ -29,12 +30,12 @@ type HandlerOption func(*Handler)
 
 var _ access.AccessAPIServer = (*Handler)(nil)
 
-func NewHandler(api API, chain flow.Chain, finalizedHeader *synceng.FinalizedHeaderCache, nodeId flow.Identifier, options ...HandlerOption) *Handler {
+func NewHandler(api API, chain flow.Chain, finalizedHeader *synceng.FinalizedHeaderCache, me module.Local, options ...HandlerOption) *Handler {
 	h := &Handler{
 		api:                  api,
 		chain:                chain,
 		finalizedHeaderCache: finalizedHeader,
-		nodeId:               nodeId,
+		me:                   me,
 		signerIndicesDecoder: &signature.NoopBlockSignerDecoder{},
 	}
 	for _, opt := range options {
@@ -601,11 +602,12 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 func (h *Handler) buildMetadataResponse() *entities.Metadata {
 	lastFinalizedHeader := h.finalizedHeaderCache.Get()
 	blockId := lastFinalizedHeader.ID()
+	nodeId := h.me.NodeID()
 
 	return &entities.Metadata{
 		LatestFinalizedBlockId: blockId[:],
 		LatestFinalizedHeight:  lastFinalizedHeader.Height,
-		NodeId:                 h.nodeId[:],
+		NodeId:                 nodeId[:],
 	}
 }
 

@@ -88,7 +88,7 @@ func NewBuilder(log zerolog.Logger,
 	rpcMetricsEnabled bool,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
-	nodeId flow.Identifier,
+	me module.Local,
 ) (*RPCEngineBuilder, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -197,7 +197,7 @@ func NewBuilder(log zerolog.Logger,
 		chain:              chainID.Chain(),
 	}
 
-	builder := NewRPCEngineBuilder(eng, nodeId)
+	builder := NewRPCEngineBuilder(eng, me)
 	if rpcMetricsEnabled {
 		builder.WithMetrics()
 	}

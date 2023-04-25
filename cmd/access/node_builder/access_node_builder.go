@@ -972,7 +972,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
-				node.NodeID,
+				builder.Me,
 			)
 			if err != nil {
 				return nil, err

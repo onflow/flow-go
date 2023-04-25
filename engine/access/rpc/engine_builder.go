@@ -2,8 +2,6 @@ package rpc
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
-
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
@@ -12,6 +10,7 @@ import (
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/module"
 )
 
 type RPCEngineBuilder struct {
@@ -21,15 +20,15 @@ type RPCEngineBuilder struct {
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
 	handler              accessproto.AccessAPIServer // Use the parent interface instead of implementation, so that we can assign it to proxy.
 	finalizedHeaderCache *synceng.FinalizedHeaderCache
-	nodeId               flow.Identifier
+	me                   module.Local
 }
 
 // NewRPCEngineBuilder helps to build a new RPC engine.
-func NewRPCEngineBuilder(engine *Engine, nodeId flow.Identifier) *RPCEngineBuilder {
+func NewRPCEngineBuilder(engine *Engine, me module.Local) *RPCEngineBuilder {
 	// the default handler will use the engine.backend implementation
 	return &RPCEngineBuilder{
 		Engine: engine,
-		nodeId: nodeId,
+		me:     me,
 	}
 }
 
@@ -110,9 +109,9 @@ func (builder *RPCEngineBuilder) Build() (*Engine, error) {
 			return nil, fmt.Errorf("FinalizedHeaderCache (via method `WithFinalizedHeaderCache`) has to be specified")
 		}
 		if builder.signerIndicesDecoder == nil {
-			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.nodeId)
+			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me)
 		} else {
-			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.nodeId, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
+			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
 		}
 	}
 	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, handler)

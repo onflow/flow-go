@@ -102,7 +102,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	suite.publicKey = networkingKey.PublicKey()
 
 	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,
-		nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, nil, nil, suite.me.NodeID())
+		nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, nil, nil, suite.me)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)
