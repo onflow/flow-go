@@ -250,9 +250,8 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 	table.lock.Lock()
 	defer table.lock.Unlock()
 
-	if table.latestCommitExecutionTime+1 < txn.snapshotTime &&
-		(!txn.isSnapshotReadTransaction ||
-			txn.snapshotTime != logical.EndOfBlockExecutionTime) {
+	if !txn.isSnapshotReadTransaction &&
+		table.latestCommitExecutionTime+1 < txn.snapshotTime {
 
 		return fmt.Errorf(
 			"invalid TableTransaction: missing commit range [%v, %v)",
@@ -307,15 +306,38 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 }
 
 func (table *DerivedDataTable[TKey, TVal]) newTableTransaction(
-	upperBoundExecutionTime logical.Time,
 	snapshotTime logical.Time,
 	executionTime logical.Time,
 	isSnapshotReadTransaction bool,
+) *TableTransaction[TKey, TVal] {
+	return &TableTransaction[TKey, TVal]{
+		table:                     table,
+		snapshotTime:              snapshotTime,
+		executionTime:             executionTime,
+		toValidateTime:            snapshotTime,
+		readSet:                   map[TKey]*invalidatableEntry[TVal]{},
+		writeSet:                  map[TKey]*invalidatableEntry[TVal]{},
+		isSnapshotReadTransaction: isSnapshotReadTransaction,
+	}
+}
+
+func (table *DerivedDataTable[TKey, TVal]) NewSnapshotReadTableTransaction() *TableTransaction[TKey, TVal] {
+	return table.newTableTransaction(
+		logical.EndOfBlockExecutionTime,
+		logical.EndOfBlockExecutionTime,
+		true)
+}
+
+func (table *DerivedDataTable[TKey, TVal]) NewTableTransaction(
+	snapshotTime logical.Time,
+	executionTime logical.Time,
 ) (
 	*TableTransaction[TKey, TVal],
 	error,
 ) {
-	if executionTime < 0 || executionTime > upperBoundExecutionTime {
+	if executionTime < 0 ||
+		executionTime > logical.LargestNormalTransactionExecutionTime {
+
 		return nil, fmt.Errorf(
 			"invalid TableTransactions: execution time out of bound: %v",
 			executionTime)
@@ -328,43 +350,10 @@ func (table *DerivedDataTable[TKey, TVal]) newTableTransaction(
 			executionTime)
 	}
 
-	return &TableTransaction[TKey, TVal]{
-		table:                     table,
-		snapshotTime:              snapshotTime,
-		executionTime:             executionTime,
-		toValidateTime:            snapshotTime,
-		readSet:                   map[TKey]*invalidatableEntry[TVal]{},
-		writeSet:                  map[TKey]*invalidatableEntry[TVal]{},
-		isSnapshotReadTransaction: isSnapshotReadTransaction,
-	}, nil
-}
-
-func (table *DerivedDataTable[TKey, TVal]) NewSnapshotReadTableTransaction(
-	snapshotTime logical.Time,
-	executionTime logical.Time,
-) (
-	*TableTransaction[TKey, TVal],
-	error,
-) {
 	return table.newTableTransaction(
-		logical.LargestSnapshotReadTransactionExecutionTime,
 		snapshotTime,
 		executionTime,
-		true)
-}
-
-func (table *DerivedDataTable[TKey, TVal]) NewTableTransaction(
-	snapshotTime logical.Time,
-	executionTime logical.Time,
-) (
-	*TableTransaction[TKey, TVal],
-	error,
-) {
-	return table.newTableTransaction(
-		logical.LargestNormalTransactionExecutionTime,
-		snapshotTime,
-		executionTime,
-		false)
+		false), nil
 }
 
 // Note: use GetOrCompute instead of Get/Set whenever possible.
