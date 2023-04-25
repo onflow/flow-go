@@ -3,6 +3,7 @@ package connection
 import (
 	"context"
 	"fmt"
+	"math/rand"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
@@ -30,7 +31,6 @@ type Libp2pConnector struct {
 	backoffConnector *discoveryBackoff.BackoffConnector
 	host             p2p.ConnectorHost
 	log              zerolog.Logger
-	shuffler         *PeerIdSliceShuffler
 	pruneConnections bool
 }
 
@@ -64,7 +64,6 @@ func NewLibp2pConnector(cfg *ConnectorConfig) (*Libp2pConnector, error) {
 		return nil, fmt.Errorf("failed to create libP2P connector: %w", err)
 	}
 
-	shuffler, err := NewPeerIdSliceShuffler(cfg.Host.ID())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create peer ID slice shuffler: %w", err)
 	}
@@ -72,7 +71,6 @@ func NewLibp2pConnector(cfg *ConnectorConfig) (*Libp2pConnector, error) {
 	libP2PConnector := &Libp2pConnector{
 		log:              cfg.Logger,
 		backoffConnector: connector,
-		shuffler:         shuffler,
 		host:             cfg.Host,
 		pruneConnections: cfg.PruneConnections,
 	}
@@ -102,7 +100,10 @@ func (l *Libp2pConnector) connectToPeers(ctx context.Context, peerIDs peer.IDSli
 
 	// first shuffle, and then stuff all the peer.AddrInfo it into the channel.
 	// shuffling is not in place.
-	for _, peerID := range l.shuffler.Shuffle(peerIDs) {
+	rand.Shuffle(len(peerIDs), func(i, j int) {
+		peerIDs[i], peerIDs[j] = peerIDs[j], peerIDs[i]
+	})
+	for _, peerID := range peerIDs {
 		peerCh <- peer.AddrInfo{ID: peerID}
 	}
 
