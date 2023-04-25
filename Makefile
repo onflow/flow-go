@@ -43,9 +43,12 @@ export CONTAINER_REGISTRY := gcr.io/flow-container-registry
 export DOCKER_BUILDKIT := 1
 
 # setup the crypto package under the GOPATH: needed to test packages importing flow-go/crypto
+# TODO: replace by bash crypto_setup.sh after removing replace statements
 .PHONY: crypto_setup_gopath
 crypto_setup_gopath:
-	bash crypto_setup.sh
+	(cd ./crypto && make setup)
+	
+
 
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
