@@ -162,9 +162,7 @@ func (vm *VirtualMachine) Run(
 	var err error
 	switch proc.Type() {
 	case ScriptProcedureType:
-		derivedTxnData, err = derivedBlockData.NewSnapshotReadDerivedTransactionData(
-			proc.ExecutionTime(),
-			proc.ExecutionTime())
+		derivedTxnData = derivedBlockData.NewSnapshotReadDerivedTransactionData()
 	case TransactionProcedureType, BootstrapProcedureType:
 		derivedTxnData, err = derivedBlockData.NewDerivedTransactionData(
 			proc.ExecutionTime(),
@@ -237,14 +235,7 @@ func (vm *VirtualMachine) GetAccount(
 		derivedBlockData = derived.NewEmptyDerivedBlockData()
 	}
 
-	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
-		logical.EndOfBlockExecutionTime,
-		logical.EndOfBlockExecutionTime)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"error creating derived transaction data for GetAccount: %w",
-			err)
-	}
+	derivedTxnData := derivedBlockData.NewSnapshotReadDerivedTransactionData()
 
 	txnState := &storage.SerialTransaction{
 		NestedTransaction:           nestedTxn,
