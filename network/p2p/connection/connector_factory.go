@@ -25,7 +25,8 @@ func DefaultLibp2pBackoffConnectorFactory(host host.Host) func() (*discoveryBack
 			time.Second,
 			5.0,
 			0,
-			rand.New(rngSrc))
+			rngSrc,
+		)
 		backoffConnector, err := discoveryBackoff.NewBackoffConnector(host, cacheSize, dialTimeout, backoff)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create backoff connector: %w", err)
