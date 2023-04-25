@@ -1,8 +1,8 @@
 package derived
 
 import (
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/state"
 )
 
 type TableInvalidator[TKey comparable, TVal any] interface {

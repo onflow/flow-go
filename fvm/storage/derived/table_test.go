@@ -7,8 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/errors"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -56,28 +57,6 @@ func TestDerivedDataTableNormalTransactionInvalidSnapshotTime(t *testing.T) {
 	require.ErrorContains(t, err, "snapshot > execution")
 
 	_, err = block.NewTableTransaction(999, 999)
-	require.NoError(t, err)
-}
-
-func TestDerivedDataTableSnapshotReadTransactionInvalidExecutionTimeBound(
-	t *testing.T,
-) {
-	block := newEmptyTestBlock()
-
-	_, err := block.NewSnapshotReadTableTransaction(
-		logical.ParentBlockTime,
-		logical.ParentBlockTime)
-	require.ErrorContains(t, err, "execution time out of bound")
-
-	_, err = block.NewSnapshotReadTableTransaction(logical.ParentBlockTime, 0)
-	require.NoError(t, err)
-
-	_, err = block.NewSnapshotReadTableTransaction(0, logical.ChildBlockTime)
-	require.ErrorContains(t, err, "execution time out of bound")
-
-	_, err = block.NewSnapshotReadTableTransaction(
-		0,
-		logical.EndOfBlockExecutionTime)
 	require.NoError(t, err)
 }
 
@@ -291,7 +270,7 @@ func TestDerivedDataTableValidateRejectOutOfOrderCommit(t *testing.T) {
 
 	validateErr = testTxn.Validate()
 	require.ErrorContains(t, validateErr, "non-increasing time")
-	require.False(t, validateErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(validateErr))
 }
 
 func TestDerivedDataTableValidateRejectNonIncreasingExecutionTime(t *testing.T) {
@@ -308,7 +287,7 @@ func TestDerivedDataTableValidateRejectNonIncreasingExecutionTime(t *testing.T) 
 
 	validateErr := testTxn.Validate()
 	require.ErrorContains(t, validateErr, "non-increasing time")
-	require.False(t, validateErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(validateErr))
 }
 
 func TestDerivedDataTableValidateRejectOutdatedReadSet(t *testing.T) {
@@ -353,7 +332,7 @@ func TestDerivedDataTableValidateRejectOutdatedReadSet(t *testing.T) {
 
 	validateErr = testTxn.Validate()
 	require.ErrorContains(t, validateErr, "outdated read set")
-	require.True(t, validateErr.IsRetryable())
+	require.True(t, errors.IsRetryableConflictError(validateErr))
 }
 
 func TestDerivedDataTableValidateRejectOutdatedWriteSet(t *testing.T) {
@@ -377,7 +356,7 @@ func TestDerivedDataTableValidateRejectOutdatedWriteSet(t *testing.T) {
 
 	validateErr := testTxn.Validate()
 	require.ErrorContains(t, validateErr, "outdated write set")
-	require.True(t, validateErr.IsRetryable())
+	require.True(t, errors.IsRetryableConflictError(validateErr))
 }
 
 func TestDerivedDataTableValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T) {
@@ -400,54 +379,6 @@ func TestDerivedDataTableValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.
 
 	err = testTxn.Validate()
 	require.NoError(t, err)
-}
-
-func TestDerivedDataTableCommitEndOfBlockSnapshotRead(t *testing.T) {
-	block := newEmptyTestBlock()
-
-	commitTime := logical.Time(5)
-	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
-	require.NoError(t, err)
-
-	err = testSetupTxn.Commit()
-	require.NoError(t, err)
-
-	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
-
-	testTxn, err := block.NewSnapshotReadTableTransaction(
-		logical.EndOfBlockExecutionTime,
-		logical.EndOfBlockExecutionTime)
-	require.NoError(t, err)
-
-	err = testTxn.Commit()
-	require.NoError(t, err)
-
-	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
-}
-
-func TestDerivedDataTableCommitSnapshotReadDontAdvanceTime(t *testing.T) {
-	block := newEmptyTestBlock()
-
-	commitTime := logical.Time(71)
-	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
-	require.NoError(t, err)
-
-	err = testSetupTxn.Commit()
-	require.NoError(t, err)
-
-	repeatedTime := commitTime + 1
-	for i := 0; i < 10; i++ {
-		txn, err := block.NewSnapshotReadTableTransaction(0, repeatedTime)
-		require.NoError(t, err)
-
-		err = txn.Commit()
-		require.NoError(t, err)
-	}
-
-	require.Equal(
-		t,
-		commitTime,
-		block.LatestCommitExecutionTimeForTestingOnly())
 }
 
 func TestDerivedDataTableCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
@@ -767,7 +698,7 @@ func TestDerivedDataTableCommitValidateError(t *testing.T) {
 
 	commitErr := testTxn.Commit()
 	require.ErrorContains(t, commitErr, "non-increasing time")
-	require.False(t, commitErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(commitErr))
 }
 
 func TestDerivedDataTableCommitRejectCommitGapForNormalTxn(t *testing.T) {
@@ -793,68 +724,42 @@ func TestDerivedDataTableCommitRejectCommitGapForNormalTxn(t *testing.T) {
 
 	commitErr := testTxn.Commit()
 	require.ErrorContains(t, commitErr, "missing commit range [6, 10)")
-	require.False(t, commitErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(commitErr))
 }
 
-func TestDerivedDataTableCommitRejectCommitGapForSnapshotRead(t *testing.T) {
+func TestDerivedDataTableCommitSnapshotReadDontAdvanceTime(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	commitTime := logical.Time(5)
+	commitTime := logical.Time(71)
 	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
+	for i := 0; i < 10; i++ {
+		txn := block.NewSnapshotReadTableTransaction()
+
+		err = txn.Commit()
+		require.NoError(t, err)
+	}
+
 	require.Equal(
 		t,
 		commitTime,
-		block.LatestCommitExecutionTimeForTestingOnly())
-
-	testTxn, err := block.NewSnapshotReadTableTransaction(10, 10)
-	require.NoError(t, err)
-
-	err = testTxn.Validate()
-	require.NoError(t, err)
-
-	commitErr := testTxn.Commit()
-	require.ErrorContains(t, commitErr, "missing commit range [6, 10)")
-	require.False(t, commitErr.IsRetryable())
-}
-
-func TestDerivedDataTableCommitSnapshotReadDoesNotAdvanceCommitTime(t *testing.T) {
-	block := newEmptyTestBlock()
-
-	expectedTime := logical.Time(10)
-	testSetupTxn, err := block.NewTableTransaction(0, expectedTime)
-	require.NoError(t, err)
-
-	err = testSetupTxn.Commit()
-	require.NoError(t, err)
-
-	testTxn, err := block.NewSnapshotReadTableTransaction(0, 11)
-	require.NoError(t, err)
-
-	err = testTxn.Commit()
-	require.NoError(t, err)
-
-	require.Equal(
-		t,
-		expectedTime,
 		block.LatestCommitExecutionTimeForTestingOnly())
 }
 
 func TestDerivedDataTableCommitBadSnapshotReadInvalidator(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	testTxn, err := block.NewSnapshotReadTableTransaction(0, 42)
-	require.NoError(t, err)
+	testTxn := block.NewSnapshotReadTableTransaction()
 
 	testTxn.AddInvalidator(&testInvalidator{invalidateAll: true})
 
 	commitErr := testTxn.Commit()
 	require.ErrorContains(t, commitErr, "snapshot read can't invalidate")
-	require.False(t, commitErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(commitErr))
 }
 
 func TestDerivedDataTableCommitFineGrainInvalidation(t *testing.T) {
