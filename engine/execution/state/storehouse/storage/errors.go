@@ -52,3 +52,16 @@ func (e NonCompliantHeaderError) Error() string {
 		e.ReceivedParentBlockID,
 	)
 }
+
+// ParentBlockNotFoundError is returned when the results for the parent block is not
+// received before this block
+type ParentBlockNotFoundError struct {
+	ParentBlockID flow.Identifier
+}
+
+func (e ParentBlockNotFoundError) Error() string {
+	return fmt.Sprintf(
+		"parent block (%x) result is not found",
+		e.ParentBlockID,
+	)
+}

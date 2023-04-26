@@ -1,7 +1,6 @@
 package forest
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage"
@@ -55,7 +54,7 @@ func (fs *ForestStorage) BlockView(
 
 	view, found := fs.viewByID[blockID]
 	if !found {
-		return nil, fmt.Errorf("view for the block %x is not available", blockID)
+		return nil, &storage.InvalidBlockIDError{BlockID: blockID}
 	}
 	return view, nil
 }
@@ -81,14 +80,14 @@ func (fs *ForestStorage) CommitBlock(
 		var err error
 		parent, err = fs.storage.BlockView(height-1, parentBlockID)
 		if err != nil {
-			return fmt.Errorf("parent block view for %x is missing (storage)", parentBlockID)
+			return &storage.ParentBlockNotFoundError{ParentBlockID: parentBlockID}
 		}
 	} else {
 		var found bool
 		parent, found = fs.viewByID[parentBlockID]
 		if !found {
 			// this should never happen, this means updates for a block was submitted but parent is not available
-			return fmt.Errorf("block view for %x is missing (in flight)", parentBlockID)
+			return &storage.ParentBlockNotFoundError{ParentBlockID: parentBlockID}
 		}
 	}
 
