@@ -341,7 +341,6 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (blockBuildCont
 		// b.tracer.StartSpan(parentID, trace.COLBuildOnSetup)
 		// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnSetup)
 
-		ctx.parent = new(flow.Header)
 		var err error
 		ctx.parent, err = b.clusterHeaders.ByBlockID(parentID)
 		if err != nil {
