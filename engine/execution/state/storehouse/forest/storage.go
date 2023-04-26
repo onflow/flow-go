@@ -1,4 +1,4 @@
-package payload
+package forest
 
 import (
 	"fmt"
@@ -8,13 +8,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// PayloadStore is a fork-aware payload storage
+// ForestStorage is a fork-aware storage
+// acts as a wrapper on any non-forkaware storage implementation
 // block updates are accepted as long as the parent block update
 // has been provided in the past.
-// payload store holds forks of updates into memory until a block finalized signal
+// it holds forks of updates into memory until a block finalized signal
 // is receieved, then it would move finalized results into a persistant storage
 // and would prune and discard block changes that are not relevant anymore.
-type PayloadStore struct {
+type ForestStorage struct {
 	storage             storage.Storage
 	viewByID            map[flow.Identifier]*InFlightView
 	blockIDsByHeight    map[uint64]map[flow.Identifier]struct{}
@@ -23,13 +24,13 @@ type PayloadStore struct {
 	lock                sync.RWMutex
 }
 
-// NewPayloadStore constructs a new PayloadStore
-func NewPayloadStore(storage storage.Storage) (*PayloadStore, error) {
+// NewStorage constructs a new ForestStorage
+func NewStorage(storage storage.Storage) (*ForestStorage, error) {
 	header, err := storage.LastCommittedBlock()
 	if err != nil {
 		return nil, err
 	}
-	return &PayloadStore{
+	return &ForestStorage{
 		storage:             storage,
 		viewByID:            make(map[flow.Identifier]*InFlightView, 0),
 		blockIDsByHeight:    make(map[uint64]map[flow.Identifier]struct{}, 0),
@@ -39,7 +40,7 @@ func NewPayloadStore(storage storage.Storage) (*PayloadStore, error) {
 	}, nil
 }
 
-func (ps *PayloadStore) BlockView(
+func (ps *ForestStorage) BlockView(
 	height uint64,
 	blockID flow.Identifier,
 ) (storage.BlockView, error) {
@@ -57,7 +58,7 @@ func (ps *PayloadStore) BlockView(
 	return view, nil
 }
 
-func (ps *PayloadStore) BlockExecuted(
+func (ps *ForestStorage) BlockExecuted(
 	header *flow.Header,
 	delta map[flow.RegisterID]flow.RegisterValue,
 ) error {
@@ -108,7 +109,7 @@ func (ps *PayloadStore) BlockExecuted(
 	return nil
 }
 
-func (ps *PayloadStore) BlockFinalized(
+func (ps *ForestStorage) BlockFinalized(
 	blockID flow.Identifier,
 	header *flow.Header,
 ) (bool, error) {
@@ -159,7 +160,7 @@ func (ps *PayloadStore) BlockFinalized(
 	return true, nil
 }
 
-func (ps *PayloadStore) pruneBranch(blockID flow.Identifier) error {
+func (ps *ForestStorage) pruneBranch(blockID flow.Identifier) error {
 	for _, child := range ps.childrenByID[blockID] {
 		ps.pruneBranch(child)
 		delete(ps.viewByID, child)

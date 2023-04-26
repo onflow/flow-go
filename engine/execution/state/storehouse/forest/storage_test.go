@@ -1,11 +1,11 @@
-package payload_test
+package forest_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/storehouse/payload"
+	"github.com/onflow/flow-go/engine/execution/state/storehouse/forest"
 	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage/ephemeral"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -25,7 +25,7 @@ func TestPayloadStore(t *testing.T) {
 		}
 
 		storage := ephemeral.NewStorage(10, genesis, data)
-		pstore, err := payload.NewPayloadStore(storage)
+		pstore, err := forest.NewStorage(storage)
 		require.NoError(t, err)
 
 		view, err := pstore.BlockView(genesis.Height, genesis.ID())
@@ -76,7 +76,7 @@ func TestPayloadStore(t *testing.T) {
 		genesis, mainChain := headers[0], headers[1:]
 
 		storage := ephemeral.NewStorage(10, genesis, nil)
-		pstore, err := payload.NewPayloadStore(storage)
+		pstore, err := forest.NewStorage(storage)
 		require.NoError(t, err)
 
 		for i, header := range mainChain {
