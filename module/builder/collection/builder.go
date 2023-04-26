@@ -214,25 +214,26 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if buildCtx.refEpochHasEnded && refHeader.Height > buildCtx.refEpochFinalHeight {
 			continue
 		}
+
+		txID := tx.ID()
 		// make sure the reference block is finalized and not orphaned
 		blockIDFinalizedAtRefHeight, err := b.mainHeaders.BlockIDByHeight(refHeader.Height)
 		if err != nil {
-			return nil, fmt.Errorf("could not check that reference block (id=%x) is finalized: %w", tx.ReferenceBlockID, err)
+			return nil, fmt.Errorf("could not check that reference block (id=%x) for transaction (id=%x) is finalized: %w", tx.ReferenceBlockID, txID, err)
 		}
 		if blockIDFinalizedAtRefHeight != tx.ReferenceBlockID {
 			// the transaction references an orphaned block - it will never be valid
-			b.transactions.Remove(tx.ID())
+			b.transactions.Remove(txID)
 			continue
 		}
 
 		// ensure the reference block is not too old
 		if refHeader.Height < buildCtx.lowestPossibleReferenceBlockHeight() {
 			// the transaction is expired, it will never be valid
-			b.transactions.Remove(tx.ID())
+			b.transactions.Remove(txID)
 			continue
 		}
 
-		txID := tx.ID()
 		// check that the transaction was not already used in un-finalized history
 		if lookup.isUnfinalizedAncestor(txID) {
 			continue
