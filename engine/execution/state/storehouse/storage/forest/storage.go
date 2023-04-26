@@ -16,13 +16,15 @@ import (
 // is receieved, then it would move finalized results into a persistant storage
 // and would prune and discard block changes that are not relevant anymore.
 type ForestStorage struct {
-	storage             storage.Storage
-	viewByID            map[flow.Identifier]*InFlightView
-	blockIDsByHeight    map[uint64]map[flow.Identifier]struct{}
-	childrenByID        map[flow.Identifier][]flow.Identifier
-	lastCommittedHeight uint64 // a cached value for the last committed height
-	lock                sync.RWMutex
+	storage            storage.Storage
+	viewByID           map[flow.Identifier]*InFlightView
+	blockIDsByHeight   map[uint64]map[flow.Identifier]struct{}
+	childrenByID       map[flow.Identifier][]flow.Identifier
+	lastCommittedBlock *flow.Header // cached value for the last committed header
+	lock               sync.RWMutex
 }
+
+var _ storage.Storage = &ForestStorage{}
 
 // NewStorage constructs a new ForestStorage
 func NewStorage(storage storage.Storage) (*ForestStorage, error) {
@@ -31,34 +33,34 @@ func NewStorage(storage storage.Storage) (*ForestStorage, error) {
 		return nil, err
 	}
 	return &ForestStorage{
-		storage:             storage,
-		viewByID:            make(map[flow.Identifier]*InFlightView, 0),
-		blockIDsByHeight:    make(map[uint64]map[flow.Identifier]struct{}, 0),
-		childrenByID:        make(map[flow.Identifier][]flow.Identifier, 0),
-		lock:                sync.RWMutex{},
-		lastCommittedHeight: header.Height,
+		storage:            storage,
+		viewByID:           make(map[flow.Identifier]*InFlightView, 0),
+		blockIDsByHeight:   make(map[uint64]map[flow.Identifier]struct{}, 0),
+		childrenByID:       make(map[flow.Identifier][]flow.Identifier, 0),
+		lock:               sync.RWMutex{},
+		lastCommittedBlock: header,
 	}, nil
 }
 
-func (ps *ForestStorage) BlockView(
+func (fs *ForestStorage) BlockView(
 	height uint64,
 	blockID flow.Identifier,
 ) (storage.BlockView, error) {
-	ps.lock.RLock()
-	defer ps.lock.RUnlock()
+	fs.lock.RLock()
+	defer fs.lock.RUnlock()
 
-	if height <= ps.lastCommittedHeight {
-		return ps.storage.BlockView(height, blockID)
+	if height <= fs.lastCommittedBlock.Height {
+		return fs.storage.BlockView(height, blockID)
 	}
 
-	view, found := ps.viewByID[blockID]
+	view, found := fs.viewByID[blockID]
 	if !found {
 		return nil, fmt.Errorf("view for the block %x is not available", blockID)
 	}
 	return view, nil
 }
 
-func (ps *ForestStorage) BlockExecuted(
+func (fs *ForestStorage) CommitBlock(
 	header *flow.Header,
 	delta map[flow.RegisterID]flow.RegisterValue,
 ) error {
@@ -66,24 +68,24 @@ func (ps *ForestStorage) BlockExecuted(
 	blockID := header.ID()
 	parentBlockID := header.ParentID
 
-	ps.lock.Lock()
-	defer ps.lock.Unlock()
+	fs.lock.Lock()
+	defer fs.lock.Unlock()
 
 	// discard (TODO: maybe return error in the future)
-	if height <= ps.lastCommittedHeight {
+	if height <= fs.lastCommittedBlock.Height {
 		return nil
 	}
 
 	var parent storage.BlockView
-	if height-1 <= ps.lastCommittedHeight {
+	if height-1 <= fs.lastCommittedBlock.Height {
 		var err error
-		parent, err = ps.storage.BlockView(height-1, parentBlockID)
+		parent, err = fs.storage.BlockView(height-1, parentBlockID)
 		if err != nil {
 			return fmt.Errorf("parent block view for %x is missing (storage)", parentBlockID)
 		}
 	} else {
 		var found bool
-		parent, found = ps.viewByID[parentBlockID]
+		parent, found = fs.viewByID[parentBlockID]
 		if !found {
 			// this should never happen, this means updates for a block was submitted but parent is not available
 			return fmt.Errorf("block view for %x is missing (in flight)", parentBlockID)
@@ -91,34 +93,38 @@ func (ps *ForestStorage) BlockExecuted(
 	}
 
 	// update children list
-	ps.childrenByID[parentBlockID] = append(ps.childrenByID[parentBlockID], blockID)
+	fs.childrenByID[parentBlockID] = append(fs.childrenByID[parentBlockID], blockID)
 
 	// add to view by ID
-	ps.viewByID[blockID] = &InFlightView{
+	fs.viewByID[blockID] = &InFlightView{
 		delta:  delta,
 		parent: parent,
 	}
 
 	// add to the by height index
-	dict, found := ps.blockIDsByHeight[height]
+	dict, found := fs.blockIDsByHeight[height]
 	if !found {
 		dict = make(map[flow.Identifier]struct{})
 	}
 	dict[blockID] = struct{}{}
-	ps.blockIDsByHeight[height] = dict
+	fs.blockIDsByHeight[height] = dict
 	return nil
 }
 
-func (ps *ForestStorage) BlockFinalized(
+func (fs *ForestStorage) LastCommittedBlock() (*flow.Header, error) {
+	return fs.lastCommittedBlock, nil
+}
+
+func (fs *ForestStorage) BlockFinalized(
 	blockID flow.Identifier,
 	header *flow.Header,
 ) (bool, error) {
 	height := header.Height
 
-	ps.lock.Lock()
-	defer ps.lock.Unlock()
+	fs.lock.Lock()
+	defer fs.lock.Unlock()
 
-	view, found := ps.viewByID[blockID]
+	view, found := fs.viewByID[blockID]
 	// return, probably too early,
 	// return with false flag so we don't consume the event
 	if !found {
@@ -126,7 +132,7 @@ func (ps *ForestStorage) BlockFinalized(
 	}
 
 	// update oracle with the correct one
-	err := ps.storage.CommitBlock(header, view.delta)
+	err := fs.storage.CommitBlock(header, view.delta)
 	if err != nil {
 		return false, err
 	}
@@ -134,37 +140,37 @@ func (ps *ForestStorage) BlockFinalized(
 	// find all blocks with the given height
 	// remove them from the viewByID list
 	// if not our target block, prune children
-	for bID := range ps.blockIDsByHeight[height] {
-		delete(ps.viewByID, bID)
+	for bID := range fs.blockIDsByHeight[height] {
+		delete(fs.viewByID, bID)
 		if bID != blockID {
-			ps.pruneBranch(bID)
+			fs.pruneBranch(bID)
 		}
 
 	}
 	// remove this height
-	delete(ps.blockIDsByHeight, height)
+	delete(fs.blockIDsByHeight, height)
 
 	// update all child blocks to use the oracle view
-	for _, childID := range ps.childrenByID[blockID] {
-		bv, err := ps.storage.BlockView(height, blockID)
+	for _, childID := range fs.childrenByID[blockID] {
+		bv, err := fs.storage.BlockView(height, blockID)
 		if err != nil {
 			return false, err
 		}
-		ps.viewByID[childID].UpdateParent(bv)
+		fs.viewByID[childID].UpdateParent(bv)
 	}
 	// remove childrenByID lookup
-	delete(ps.childrenByID, blockID)
+	delete(fs.childrenByID, blockID)
 
-	ps.lastCommittedHeight = header.Height
+	fs.lastCommittedBlock = header
 
 	return true, nil
 }
 
-func (ps *ForestStorage) pruneBranch(blockID flow.Identifier) error {
-	for _, child := range ps.childrenByID[blockID] {
-		ps.pruneBranch(child)
-		delete(ps.viewByID, child)
+func (fs *ForestStorage) pruneBranch(blockID flow.Identifier) error {
+	for _, child := range fs.childrenByID[blockID] {
+		fs.pruneBranch(child)
+		delete(fs.viewByID, child)
 	}
-	delete(ps.childrenByID, blockID)
+	delete(fs.childrenByID, blockID)
 	return nil
 }
