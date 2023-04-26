@@ -43,7 +43,10 @@ func TestInMemoryStorage(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, blk, header)
 
-			ret, err := store.RegisterValueAt(header.Height, header.ID(), key)
+			view, err := store.BlockView(header.Height, header.ID())
+			require.NoError(t, err)
+
+			ret, err := view.Get(key)
 			require.NoError(t, err)
 			require.Equal(t, randValue, ret)
 		}
@@ -53,9 +56,9 @@ func TestInMemoryStorage(t *testing.T) {
 			err = store.CommitBlock(header, nil)
 			require.Error(t, err)
 
-			ret, err := store.RegisterValueAt(header.Height, header.ID(), key)
+			view, err := store.BlockView(header.Height, header.ID())
 			require.Error(t, err)
-			require.Nil(t, ret)
+			require.Nil(t, view)
 		}
 	})
 
@@ -73,35 +76,55 @@ func TestInMemoryStorage(t *testing.T) {
 
 		store := storage.NewInMemoryStorage(capacity, genesis, data)
 
-		val, err := store.RegisterValueAt(genesis.Height-1, flow.ZeroID, key)
+		view, err := store.BlockView(genesis.Height-1, flow.ZeroID)
 		require.Error(t, err)
-		require.Nil(t, val)
+		require.Nil(t, view)
 
 		// add the first batch of headers
 		for _, header := range batch1 {
 			err = store.CommitBlock(header, data)
 			require.NoError(t, err)
 
-			ret, err := store.RegisterValueAt(header.Height, header.ID(), key)
+			view, err := store.BlockView(header.Height, header.ID())
+			require.NoError(t, err)
+
+			ret, err := view.Get(key)
 			require.NoError(t, err)
 			require.Equal(t, value, ret)
 		}
 
+		// hold on to a view from batch one to test
+		lastCommittedHeader := batch1[len(batch1)-1]
+		viewToBeStale, err := store.BlockView(lastCommittedHeader.Height, lastCommittedHeader.ID())
+		require.NoError(t, err)
+
+		ret, err := viewToBeStale.Get(key)
+		require.NoError(t, err)
+		require.Equal(t, value, ret)
+
+		// start batch2
 		for _, header := range batch2 {
 			err = store.CommitBlock(header, data)
 			require.NoError(t, err)
 
-			ret, err := store.RegisterValueAt(header.Height, header.ID(), key)
+			view, err := store.BlockView(header.Height, header.ID())
+			require.NoError(t, err)
+
+			ret, err := view.Get(key)
 			require.NoError(t, err)
 			require.Equal(t, value, ret)
 		}
 
 		// now batch one should not be available
 		for _, header := range batch1 {
-			ret, err := store.RegisterValueAt(header.Height, header.ID(), key)
+			view, err := store.BlockView(header.Height, header.ID())
 			require.Error(t, err)
-			require.Nil(t, ret)
+			require.Nil(t, view)
 		}
+
+		// check staleed view
+		ret, err = viewToBeStale.Get(key)
+		require.Error(t, err)
 	})
 
 	t.Run("test historic value return", func(t *testing.T) {
@@ -114,7 +137,10 @@ func TestInMemoryStorage(t *testing.T) {
 
 		store := storage.NewInMemoryStorage(capacity, genesis, nil)
 
-		val, err := store.RegisterValueAt(genesis.Height, genesis.ID(), key)
+		view, err := store.BlockView(genesis.Height, genesis.ID())
+		require.NoError(t, err)
+
+		val, err := view.Get(key)
 		require.NoError(t, err)
 		require.Nil(t, val)
 
@@ -127,7 +153,10 @@ func TestInMemoryStorage(t *testing.T) {
 		}
 
 		for i, header := range batch1 {
-			val, err = store.RegisterValueAt(header.Height, header.ID(), key)
+			view, err := store.BlockView(header.Height, header.ID())
+			require.NoError(t, err)
+
+			val, err := view.Get(key)
 			require.NoError(t, err)
 			require.Equal(t, i, int(val[0]))
 		}
@@ -147,7 +176,10 @@ func TestInMemoryStorage(t *testing.T) {
 				key: []byte{byte(int8(0))},
 			})
 
-		val, err := store.RegisterValueAt(genesis.Height, genesis.ID(), key)
+		view, err := store.BlockView(genesis.Height, genesis.ID())
+		require.NoError(t, err)
+
+		val, err := view.Get(key)
 		require.NoError(t, err)
 		require.Equal(t, 0, int(val[0]))
 
@@ -165,7 +197,11 @@ func TestInMemoryStorage(t *testing.T) {
 			if i%5 == 0 {
 				lastUpdatedValue = i
 			}
-			val, err = store.RegisterValueAt(header.Height, header.ID(), key)
+
+			view, err := store.BlockView(header.Height, header.ID())
+			require.NoError(t, err)
+
+			val, err = view.Get(key)
 			require.NoError(t, err)
 			require.Equal(t, lastUpdatedValue, int(val[0]))
 		}

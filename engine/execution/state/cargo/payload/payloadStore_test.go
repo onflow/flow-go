@@ -27,7 +27,10 @@ func TestPayloadStore(t *testing.T) {
 		pstore, err := payload.NewPayloadStore(storage)
 		require.NoError(t, err)
 
-		val, err := pstore.Get(genesis.Height, genesis.ID(), key)
+		view, err := pstore.BlockView(genesis.Height, genesis.ID())
+		require.NoError(t, err)
+
+		val, err := view.Get(key)
 		require.NoError(t, err)
 		require.Equal(t, initValue, val)
 
@@ -41,7 +44,10 @@ func TestPayloadStore(t *testing.T) {
 
 		// check without commit
 		for i, header := range headers {
-			val, err := pstore.Get(header.Height, header.ID(), key)
+			view, err := pstore.BlockView(header.Height, header.ID())
+			require.NoError(t, err)
+
+			val, err := view.Get(key)
 			require.NoError(t, err)
 			require.Equal(t, i, int(val[0]))
 		}
@@ -55,7 +61,10 @@ func TestPayloadStore(t *testing.T) {
 
 		// check the values after the commit
 		for i, header := range headers {
-			val, err := pstore.Get(header.Height, header.ID(), key)
+			view, err := pstore.BlockView(header.Height, header.ID())
+			require.NoError(t, err)
+
+			val, err := view.Get(key)
 			require.NoError(t, err)
 			require.Equal(t, i, int(val[0]))
 		}
@@ -82,7 +91,10 @@ func TestPayloadStore(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		val, err := pstore.Get(fork1.Height, fork1.ID(), key)
+		view, err := pstore.BlockView(fork1.Height, fork1.ID())
+		require.NoError(t, err)
+
+		val, err := view.Get(key)
 		require.NoError(t, err)
 		require.Equal(t, 11, int(val[0]))
 
@@ -92,7 +104,10 @@ func TestPayloadStore(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		val, err = pstore.Get(fork11.Height, fork11.ID(), key)
+		view, err = pstore.BlockView(fork11.Height, fork11.ID())
+		require.NoError(t, err)
+
+		val, err = view.Get(key)
 		require.NoError(t, err)
 		require.Equal(t, 12, int(val[0]))
 
@@ -102,7 +117,10 @@ func TestPayloadStore(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		val, err = pstore.Get(fork2.Height, fork2.ID(), key)
+		view, err = pstore.BlockView(fork2.Height, fork2.ID())
+		require.NoError(t, err)
+
+		val, err = view.Get(key)
 		require.NoError(t, err)
 
 		fork22 := unittest.BlockHeaderWithParentFixture(fork2)
@@ -111,24 +129,28 @@ func TestPayloadStore(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		val, err = pstore.Get(fork22.Height, fork22.ID(), key)
+		view, err = pstore.BlockView(fork22.Height, fork22.ID())
 		require.NoError(t, err)
 
+		val, err = view.Get(key)
+		require.NoError(t, err)
+
+		// first block is finalized
 		found, err := pstore.BlockFinalized(mainChain[0].ID(), mainChain[0])
 		require.True(t, found)
 		require.NoError(t, err)
 
-		// prunned ones should not return results
-		val, err = pstore.Get(fork1.Height, fork1.ID(), key)
+		// prunned ones should not return block view
+		view, err = pstore.BlockView(fork1.Height, fork1.ID())
 		require.Error(t, err)
 
-		val, err = pstore.Get(fork2.Height, fork2.ID(), key)
+		view, err = pstore.BlockView(fork2.Height, fork2.ID())
 		require.Error(t, err)
 
-		val, err = pstore.Get(fork11.Height, fork11.ID(), key)
+		view, err = pstore.BlockView(fork11.Height, fork11.ID())
 		require.Error(t, err)
 
-		val, err = pstore.Get(fork22.Height, fork22.ID(), key)
+		view, err = pstore.BlockView(fork22.Height, fork22.ID())
 		require.Error(t, err)
 	})
 

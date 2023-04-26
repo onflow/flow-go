@@ -15,7 +15,7 @@ import (
 // is receieved, then it would move finalized results into a persistant storage
 // and would prune and discard block changes that are not relevant anymore.
 type PayloadStore struct {
-	oracleView          *OracleView
+	storage             storage.Storage
 	viewByID            map[flow.Identifier]*InFlightView
 	blockIDsByHeight    map[uint64]map[flow.Identifier]struct{}
 	childrenByID        map[flow.Identifier][]flow.Identifier
@@ -30,7 +30,7 @@ func NewPayloadStore(storage storage.Storage) (*PayloadStore, error) {
 		return nil, err
 	}
 	return &PayloadStore{
-		oracleView:          NewOracleView(storage),
+		storage:             storage,
 		viewByID:            make(map[flow.Identifier]*InFlightView, 0),
 		blockIDsByHeight:    make(map[uint64]map[flow.Identifier]struct{}, 0),
 		childrenByID:        make(map[flow.Identifier][]flow.Identifier, 0),
@@ -39,30 +39,22 @@ func NewPayloadStore(storage storage.Storage) (*PayloadStore, error) {
 	}, nil
 }
 
-func (ps *PayloadStore) Reader(block *flow.Header) *Reader {
-	return &Reader{height: block.Height,
-		blockID: block.ID(),
-		getFunc: ps.Get,
-	}
-}
-
-func (ps *PayloadStore) Get(
+func (ps *PayloadStore) BlockView(
 	height uint64,
 	blockID flow.Identifier,
-	key flow.RegisterID,
-) (flow.RegisterValue, error) {
+) (storage.BlockView, error) {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
 	if height <= ps.lastCommittedHeight {
-		return ps.oracleView.Get(height, blockID, key)
+		return ps.storage.BlockView(height, blockID)
 	}
 
 	view, found := ps.viewByID[blockID]
 	if !found {
 		return nil, fmt.Errorf("view for the block %x is not available", blockID)
 	}
-	return view.Get(height, blockID, key)
+	return view, nil
 }
 
 func (ps *PayloadStore) BlockExecuted(
@@ -77,22 +69,28 @@ func (ps *PayloadStore) BlockExecuted(
 	defer ps.lock.Unlock()
 
 	// discard (TODO: maybe return error in the future)
-	if height < ps.lastCommittedHeight {
+	if height <= ps.lastCommittedHeight {
 		return nil
 	}
 
-	var parent View
-	parent = ps.oracleView
-	if height > ps.lastCommittedHeight+1 {
+	var parent storage.BlockView
+	if height-1 <= ps.lastCommittedHeight {
+		var err error
+		parent, err = ps.storage.BlockView(height-1, parentBlockID)
+		if err != nil {
+			return fmt.Errorf("parent block view for %x is missing (storage)", parentBlockID)
+		}
+	} else {
 		var found bool
 		parent, found = ps.viewByID[parentBlockID]
 		if !found {
 			// this should never happen, this means updates for a block was submitted but parent is not available
-			return fmt.Errorf("view for parent block %x is missing", parentBlockID)
+			return fmt.Errorf("block view for %x is missing (in flight)", parentBlockID)
 		}
-		// update children list
-		ps.childrenByID[parentBlockID] = append(ps.childrenByID[parentBlockID], blockID)
 	}
+
+	// update children list
+	ps.childrenByID[parentBlockID] = append(ps.childrenByID[parentBlockID], blockID)
 
 	// add to view by ID
 	ps.viewByID[blockID] = &InFlightView{
@@ -127,7 +125,7 @@ func (ps *PayloadStore) BlockFinalized(
 	}
 
 	// update oracle with the correct one
-	err := ps.oracleView.MergeView(header, view)
+	err := ps.storage.CommitBlock(header, view.delta)
 	if err != nil {
 		return false, err
 	}
@@ -147,7 +145,11 @@ func (ps *PayloadStore) BlockFinalized(
 
 	// update all child blocks to use the oracle view
 	for _, childID := range ps.childrenByID[blockID] {
-		ps.viewByID[childID].UpdateParent(ps.oracleView)
+		bv, err := ps.storage.BlockView(height, blockID)
+		if err != nil {
+			return false, err
+		}
+		ps.viewByID[childID].UpdateParent(bv)
 	}
 	// remove childrenByID lookup
 	delete(ps.childrenByID, blockID)
