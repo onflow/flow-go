@@ -344,9 +344,10 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (blockBuildCont
 		// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnSetup)
 
 		ctx.parent = new(flow.Header)
-		err := operation.RetrieveHeader(parentID, ctx.parent)(btx)
+		var err error
+		ctx.parent, err = b.clusterHeaders.ByBlockID(parentID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve parent: %w", err)
+			return fmt.Errorf("could not get parent: %w", err)
 		}
 		// retrieve the finalized boundary ON THE CLUSTER CHAIN
 		ctx.clusterChainFinalizedBlock = new(flow.Header)
