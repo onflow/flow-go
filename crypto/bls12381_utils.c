@@ -350,7 +350,7 @@ static void vec256_from_be_bytes(Fr* out, const byte *bytes, size_t n)
     Fr_set_zero(out);
     Fr_copy(&radix, (Fr*)BLS12_381_rRR); // R^2
 
-    byte* p = bytes + n;
+    byte* p = (byte*)bytes + n;
     while (n > Fr_BYTES) {
         limbs_from_be_bytes((limb_t*)&digit, p -= Fr_BYTES, Fr_BYTES); // l_i
         Fr_mul_montg(&digit, &digit, &radix); // l_i * R^i  (i is the loop number starting at 1)

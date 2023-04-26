@@ -119,6 +119,8 @@ void        Fr_write_bytes(byte *bin, const Fr* a);
 bool        map_bytes_to_Fr(Fr*, const byte*, int);
 
 // Fp utilities
+void    Fp_mul_montg(Fp *, const Fp *, const Fp *);
+void    Fp_squ_montg(Fp *, const Fp *);
 
 // E1 and G1 utilities
 int      ep_read_bin_compact(ep_t, const byte *, const int);

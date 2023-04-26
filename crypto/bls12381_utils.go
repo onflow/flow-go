@@ -23,10 +23,10 @@ package crypto
 //     (void)n;
 // }
 // __attribute__((constructor)) static void blst_cgo_init()
-// {   blst_fp temp = { 0 };
-//     struct sigaction act = { handler }, oact;
+// {   Fp temp = { 0 };
+//     struct sigaction act = {{ handler }}, oact;
 //     sigaction(SIGILL, &act, &oact);
-//     blst_fp_sqr(&temp, &temp);
+//     Fp_squ_montg(&temp, &temp);
 //     sigaction(SIGILL, &oact, NULL);
 // }
 // #endif
