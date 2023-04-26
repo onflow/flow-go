@@ -211,7 +211,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			continue
 		}
 		// disallow reference blocks above the final block of the epoch
-		if buildCtx.refEpochHasEnded && refHeader.Height > buildCtx.refEpochFinalHeight {
+		if buildCtx.refEpochFinalHeight != nil && refHeader.Height > *buildCtx.refEpochFinalHeight {
 			continue
 		}
 
@@ -370,20 +370,22 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (blockBuildCont
 		if err != nil {
 			return fmt.Errorf("could not retrieve first height of operating epoch: %w", err)
 		}
-		err = operation.RetrieveEpochLastHeight(b.clusterEpoch, &ctx.refEpochFinalHeight)(btx)
+		var refEpochFinalHeight uint64
+		err = operation.RetrieveEpochLastHeight(b.clusterEpoch, &refEpochFinalHeight)(btx)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				ctx.refEpochHasEnded = false
 				return nil
 			}
 			return fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
 		}
+		ctx.refEpochFinalHeight = &refEpochFinalHeight
 
-		ctx.refEpochHasEnded = true
-		err = operation.LookupBlockHeight(ctx.refEpochFinalHeight, &ctx.refEpochFinalID)(btx)
+		var refEpochFinalID flow.Identifier
+		err = operation.LookupBlockHeight(refEpochFinalHeight, &refEpochFinalID)(btx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve ID of final block of operating epoch: %w", err)
 		}
+		ctx.refEpochFinalID = &refEpochFinalID
 
 		return nil
 	})
