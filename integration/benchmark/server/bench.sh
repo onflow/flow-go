@@ -3,8 +3,6 @@
 set -x
 set -o pipefail
 
-cd flow-go-public/integration/localnet
-
 git fetch
 git fetch --tags
 
@@ -34,4 +32,4 @@ while read -r branch_hash; do
 
     make stop
     docker system prune -a -f
-done <../../../master.recent
+done <master.recent
