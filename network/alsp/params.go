@@ -17,7 +17,8 @@ const (
 	// If the overall penalty of this node drops below this threshold, the node is reported to be disallow-listed by
 	// the networking layer, i.e., existing connections to the node are closed and the node is no longer allowed to connect till
 	// its penalty is decayed back to zero.
-	misbehaviorDisallowListingThreshold = -24 * 60 * 60 // maximum block-list period is 1 day
+	// maximum block-list period is 1 day
+	misbehaviorDisallowListingThreshold = -24 * 60 * 60 // (Don't change this value)
 
 	// defaultPenaltyValue is the default penalty value for misbehaving nodes.
 	// By default, each reported infringement will be penalized by this value. However, the penalty can be amplified
@@ -26,7 +27,7 @@ const (
 	// decrease the number of misbehavior/sec that will result in disallow-listing the node. For example, if the engine
 	// amplifies the penalty by 10, the number of misbehavior/sec that will result in disallow-listing the node will be
 	// 10 times less than the default penalty value and the node will be disallow-listed after 10 times more misbehavior/sec.
-	defaultPenaltyValue = 0.01 * misbehaviorDisallowListingThreshold
+	defaultPenaltyValue = 0.01 * misbehaviorDisallowListingThreshold // (Don't change this value)
 
 	// initialDecaySpeed is the initial decay speed of the penalty of a misbehaving node.
 	// The decay speed is applied on an arithmetic progression. The penalty value of the node is the first term of the
@@ -42,5 +43,5 @@ const (
 	// by 90% from 100 to 10, and it takes around 2.5 hours to recover. If the node is disallow-listed for the fourth time,
 	// its decay speed is decreased by 90% from 10 to 1, and it takes around a day to recover. From this point on, the decay
 	// speed is 1, and it takes around a day to recover from each disallow-listing.
-	initialDecaySpeed = 1000
+	initialDecaySpeed = 1000 // (Don't change this value)
 )
