@@ -228,7 +228,7 @@ func (h *Handler) GetTransactionResult(
 	collectionId := flow.ZeroID
 	requestCollectionId := req.GetCollectionId()
 	if requestCollectionId != nil {
-		collectionId, err = convert.TransactionID(requestCollectionId)
+		collectionId, err = convert.CollectionID(requestCollectionId)
 		if err != nil {
 			return nil, err
 		}

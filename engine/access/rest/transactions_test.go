@@ -240,157 +240,77 @@ func TestGetTransactions(t *testing.T) {
 }
 
 func TestGetTransactionResult(t *testing.T) {
+	id := unittest.IdentifierFixture()
+	bid := unittest.IdentifierFixture()
+	cid := unittest.IdentifierFixture()
+	txr := &access.TransactionResult{
+		Status:     flow.TransactionStatusSealed,
+		StatusCode: 10,
+		Events: []flow.Event{
+			unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
+		},
+		ErrorMessage: "",
+		BlockID:      bid,
+		CollectionID: cid,
+	}
+	txr.Events[0].Payload = []byte(`test payload`)
+	expected := fmt.Sprintf(`{
+			"block_id": "%s",
+			"collection_id": "%s",
+			"execution": "Success",
+			"status": "Sealed",
+			"status_code": 10,
+			"error_message": "",
+			"computation_used": "0",
+			"events": [
+				{
+					"type": "flow.AccountCreated",
+					"transaction_id": "%s",
+					"transaction_index": "1",
+					"event_index": "0",
+					"payload": "%s"
+				}
+			],
+			"_links": {
+				"_self": "/v1/transaction_results/%s"
+			}
+		}`, bid.String(), cid.String(), id.String(), util.ToBase64(txr.Events[0].Payload), id.String())
 
 	t.Run("get by transaction ID", func(t *testing.T) {
 		backend := &mock.API{}
-		id := unittest.IdentifierFixture()
-		bid := unittest.IdentifierFixture()
-		cid := unittest.IdentifierFixture()
-
-		txr := &access.TransactionResult{
-			Status:     flow.TransactionStatusSealed,
-			StatusCode: 10,
-			Events: []flow.Event{
-				unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
-			},
-			ErrorMessage: "",
-			BlockID:      bid,
-			CollectionID: cid,
-		}
-		txr.Events[0].Payload = []byte(`test payload`)
-
 		req := getTransactionResultReq(id.String(), "", "")
 
 		backend.Mock.
 			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID).
 			Return(txr, nil)
 
-		expected := fmt.Sprintf(`{
-			"block_id": "%s",
-			"collection_id": "%s",
-			"execution": "Success",
-			"status": "Sealed",
-			"status_code": 10,
-			"error_message": "",
-			"computation_used": "0",
-			"events": [
-				{
-					"type": "flow.AccountCreated",
-					"transaction_id": "%s",
-					"transaction_index": "1",
-					"event_index": "0",
-					"payload": "%s"
-				}
-			],
-			"_links": {
-				"_self": "/v1/transaction_results/%s"
-			}
-		}`, bid.String(), cid.String(), id.String(), util.ToBase64(txr.Events[0].Payload), id.String())
 		assertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("get by block ID", func(t *testing.T) {
 		backend := &mock.API{}
-		id := unittest.IdentifierFixture()
-		bid := unittest.IdentifierFixture()
-		cid := unittest.IdentifierFixture()
-
-		txr := &access.TransactionResult{
-			Status:     flow.TransactionStatusSealed,
-			StatusCode: 10,
-			Events: []flow.Event{
-				unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
-			},
-			ErrorMessage: "",
-			BlockID:      bid,
-			CollectionID: cid,
-		}
-		txr.Events[0].Payload = []byte(`test payload`)
-
 		req := getTransactionResultReq(id.String(), bid.String(), "")
 
 		backend.Mock.
 			On("GetTransactionResult", mocks.Anything, id, bid, flow.ZeroID).
 			Return(txr, nil)
 
-		expected := fmt.Sprintf(`{
-			"block_id": "%s",
-			"collection_id": "%s",
-			"execution": "Success",
-			"status": "Sealed",
-			"status_code": 10,
-			"error_message": "",
-			"computation_used": "0",
-			"events": [
-				{
-					"type": "flow.AccountCreated",
-					"transaction_id": "%s",
-					"transaction_index": "1",
-					"event_index": "0",
-					"payload": "%s"
-				}
-			],
-			"_links": {
-				"_self": "/v1/transaction_results/%s"
-			}
-		}`, bid.String(), cid.String(), id.String(), util.ToBase64(txr.Events[0].Payload), id.String())
 		assertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("get by collection ID", func(t *testing.T) {
 		backend := &mock.API{}
-		id := unittest.IdentifierFixture()
-		bid := unittest.IdentifierFixture()
-		cid := unittest.IdentifierFixture()
-
-		txr := &access.TransactionResult{
-			Status:     flow.TransactionStatusSealed,
-			StatusCode: 10,
-			Events: []flow.Event{
-				unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
-			},
-			ErrorMessage: "",
-			BlockID:      bid,
-			CollectionID: cid,
-		}
-		txr.Events[0].Payload = []byte(`test payload`)
-
 		req := getTransactionResultReq(id.String(), "", cid.String())
 
 		backend.Mock.
 			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, cid).
 			Return(txr, nil)
 
-		expected := fmt.Sprintf(`{
-			"block_id": "%s",
-			"collection_id": "%s",
-			"execution": "Success",
-			"status": "Sealed",
-			"status_code": 10,
-			"error_message": "",
-			"computation_used": "0",
-			"events": [
-				{
-					"type": "flow.AccountCreated",
-					"transaction_id": "%s",
-					"transaction_index": "1",
-					"event_index": "0",
-					"payload": "%s"
-				}
-			],
-			"_links": {
-				"_self": "/v1/transaction_results/%s"
-			}
-		}`, bid.String(), cid.String(), id.String(), util.ToBase64(txr.Events[0].Payload), id.String())
 		assertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("get execution statuses", func(t *testing.T) {
 		backend := &mock.API{}
-		id := unittest.IdentifierFixture()
-		bid := unittest.IdentifierFixture()
-		cid := unittest.IdentifierFixture()
-
 		testVectors := map[*access.TransactionResult]string{{
 			Status:       flow.TransactionStatusExpired,
 			ErrorMessage: "",
@@ -411,16 +331,16 @@ func TestGetTransactionResult(t *testing.T) {
 			ErrorMessage: "",
 		}: string(models.SUCCESS_RESULT)}
 
-		for txr, err := range testVectors {
-			txr.BlockID = bid
-			txr.CollectionID = cid
+		for txResult, err := range testVectors {
+			txResult.BlockID = bid
+			txResult.CollectionID = cid
 			req := getTransactionResultReq(id.String(), "", "")
 			backend.Mock.
 				On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID).
-				Return(txr, nil).
+				Return(txResult, nil).
 				Once()
 
-			expected := fmt.Sprintf(`{
+			expectedResp := fmt.Sprintf(`{
 				"block_id": "%s",
 				"collection_id": "%s",
 				"execution": "%s",
@@ -432,8 +352,8 @@ func TestGetTransactionResult(t *testing.T) {
 				"_links": {
 					"_self": "/v1/transaction_results/%s"
 				}
-			}`, bid.String(), cid.String(), err, cases.Title(language.English).String(strings.ToLower(txr.Status.String())), txr.ErrorMessage, id.String())
-			assertOKResponse(t, req, expected, backend)
+			}`, bid.String(), cid.String(), err, cases.Title(language.English).String(strings.ToLower(txResult.Status.String())), txResult.ErrorMessage, id.String())
+			assertOKResponse(t, req, expectedResp, backend)
 		}
 	})
 
