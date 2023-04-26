@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"testing"
 
 	mocktestify "github.com/stretchr/testify/mock"
@@ -52,8 +51,8 @@ func nodeVersionInfoExpectedStr(nodeVersionInfo *access.NodeVersionInfo) string 
 			"semver": "%s",
 			"commit": "%s",
 			"spork_id": "%s",
-            "protocol_version": "%s"
-		}`, nodeVersionInfo.Semver, nodeVersionInfo.Commit, nodeVersionInfo.SporkId.String(), strconv.FormatUint(nodeVersionInfo.ProtocolVersion, 10))
+            "protocol_version": "%d"
+		}`, nodeVersionInfo.Semver, nodeVersionInfo.Commit, nodeVersionInfo.SporkId.String(), nodeVersionInfo.ProtocolVersion)
 }
 
 func getNodeVersionInfoRequest(t *testing.T) *http.Request {
