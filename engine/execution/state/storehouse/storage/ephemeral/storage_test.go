@@ -1,4 +1,4 @@
-package storage_test
+package ephemeral_test
 
 import (
 	"crypto/rand"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage"
+	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage/ephemeral"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -19,7 +19,7 @@ func TestInMemoryStorage(t *testing.T) {
 		headers := unittest.BlockHeaderFixtures(13)
 		genesis, batch1, _, batch3 := headers[0], headers[1:5], headers[5:9], headers[9:]
 
-		store := storage.NewInMemoryStorage(capacity, genesis, nil)
+		store := ephemeral.NewStorage(capacity, genesis, nil)
 
 		blk, err := store.LastCommittedBlock()
 		require.NoError(t, err)
@@ -74,7 +74,7 @@ func TestInMemoryStorage(t *testing.T) {
 			key: value,
 		}
 
-		store := storage.NewInMemoryStorage(capacity, genesis, data)
+		store := ephemeral.NewStorage(capacity, genesis, data)
 
 		view, err := store.BlockView(genesis.Height-1, flow.ZeroID)
 		require.Error(t, err)
@@ -135,7 +135,7 @@ func TestInMemoryStorage(t *testing.T) {
 
 		key := flow.RegisterID{Key: "key", Owner: "owner"}
 
-		store := storage.NewInMemoryStorage(capacity, genesis, nil)
+		store := ephemeral.NewStorage(capacity, genesis, nil)
 
 		view, err := store.BlockView(genesis.Height, genesis.ID())
 		require.NoError(t, err)
@@ -170,7 +170,7 @@ func TestInMemoryStorage(t *testing.T) {
 
 		key := flow.RegisterID{Key: "key", Owner: "owner"}
 
-		store := storage.NewInMemoryStorage(capacity,
+		store := ephemeral.NewStorage(capacity,
 			genesis,
 			map[flow.RegisterID]flow.RegisterValue{
 				key: []byte{byte(int8(0))},

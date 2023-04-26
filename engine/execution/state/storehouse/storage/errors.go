@@ -8,29 +8,29 @@ import (
 
 // HeightNotAvailableError is returned when request for the given height is not available
 type HeightNotAvailableError struct {
-	requestedHeight,
-	minHeightAvailable,
-	maxHeightAvailable uint64
+	RequestedHeight,
+	MinHeightAvailable,
+	MaxHeightAvailable uint64
 }
 
 func (e HeightNotAvailableError) Error() string {
 	return fmt.Sprintf(
 		"requested height is not available: requested: %d available range (%d, %d)",
-		e.requestedHeight,
-		e.minHeightAvailable,
-		e.maxHeightAvailable,
+		e.RequestedHeight,
+		e.MinHeightAvailable,
+		e.MaxHeightAvailable,
 	)
 }
 
 // InvalidBlockIDError is returned when the requested blockID isn't store in the storage
 type InvalidBlockIDError struct {
-	blockID flow.Identifier
+	BlockID flow.Identifier
 }
 
 func (e InvalidBlockIDError) Error() string {
 	return fmt.Sprintf(
 		"requested blockID (%x) is not found",
-		e.blockID,
+		e.BlockID,
 	)
 }
 

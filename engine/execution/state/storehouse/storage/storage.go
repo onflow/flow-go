@@ -1,4 +1,4 @@
-package storehouse
+package storage
 
 import (
 	"github.com/onflow/flow-go/model/flow"
