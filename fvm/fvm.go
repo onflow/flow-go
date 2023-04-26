@@ -9,10 +9,10 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -199,16 +199,11 @@ func (vm *VirtualMachine) Run(
 		return nil, ProcedureOutput{}, err
 	}
 
-	// Note: it is safe to skip committing derived data for non-normal
-	// transactions (i.e., bootstrap and script) since these do not invalidate
-	// derived data entries.
-	if proc.Type() == TransactionProcedureType {
-		// NOTE: It is not safe to ignore derivedTxnData' commit error for
-		// transactions that trigger derived data invalidation.
-		err = derivedTxnData.Commit()
-		if err != nil {
-			return nil, ProcedureOutput{}, err
-		}
+	// NOTE: It is not safe to ignore derivedTxnData' commit error for
+	// transactions that trigger derived data invalidation.
+	err = derivedTxnData.Commit()
+	if err != nil {
+		return nil, ProcedureOutput{}, err
 	}
 
 	executionSnapshot, err := txnState.FinalizeMainTransaction()
