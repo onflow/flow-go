@@ -222,10 +222,10 @@ func (m *MutableState) checkPayloadReferenceBlock(ctx extendContext) error {
 		}
 	}
 
-	// TODO ensure the reference block is part of the main chain
+	// TODO ensure the reference block is part of the main chain https://github.com/onflow/flow-go/issues/4204
 	_ = refBlock
 
-	// 3 - the reference block must be within the finalized boundary
+	// 3 - the reference block must be within the cluster's operating epoch
 	if refBlock.Height < ctx.epochFirstHeight {
 		return state.NewInvalidExtensionErrorf("invalid reference block is before operating epoch for cluster, height %d<%d", refBlock.Height, ctx.epochFirstHeight)
 	}
