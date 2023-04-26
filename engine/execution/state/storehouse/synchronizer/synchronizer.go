@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state/storehouse/queue"
 	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage"
-	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage/forest"
 )
 
 // Synchronizer is responsible for synchronization
@@ -17,7 +16,7 @@ import (
 // block execution and finalization events are two concurrent
 // streams and requires synchronization and buffering of events
 // in case one of them is ahead of the other one.
-// payloadStore accepts block execution events in a fork-aware way and expect block finalization
+// the ForkAwareStorage accepts block execution events and expect block finalization
 // signals to commit the changes into persistant storage.
 // blockqueue acts as a fixed-size buffer to hold on to the unprocessed block finaliziation events
 // both blockqueue and payloadstore has some internal validation to prevent
@@ -25,8 +24,8 @@ import (
 // these two are frequently synced automatically on time intervals
 // but it could also be manually trigger using TrySync method
 type Synchronizer struct {
+	storage    storage.ForkAwareStorage
 	blockQueue *queue.FinalizedBlockQueue
-	storage    *forest.ForestStorage
 
 	syncFrequency  time.Duration
 	syncInProgress *atomic.Bool
@@ -38,20 +37,13 @@ type Synchronizer struct {
 // NewSynchronizer constructs a new Synchronizer
 // if syncFrequency is set to zero, it won't run and requires manual triggering
 func NewSynchronizer(
-	storage storage.Storage,
-	genesis *flow.Header,
+	storage storage.ForkAwareStorage,
+	blockQueue *queue.FinalizedBlockQueue,
 	syncFrequency time.Duration,
 ) (*Synchronizer, error) {
-	// TODO load genesis from storage
-	// TODO move this to outside
-	// TODO define new interface type
-	st, err := forest.NewStorage(storage)
-	if err != nil {
-		return nil, err
-	}
 	c := &Synchronizer{
-		blockQueue:     queue.NewFinalizedBlockQueue(genesis),
-		storage:        st,
+		blockQueue:     blockQueue,
+		storage:        storage,
 		syncFrequency:  syncFrequency,
 		syncInProgress: atomic.NewBool(false),
 		stopSync:       make(chan struct{}, 1),
@@ -86,8 +78,8 @@ func (c *Synchronizer) TrySync() error {
 		// doing the same for more blocks until payloadstore returns false, which mean it doesn't
 		// have results for that block yet and we need to hold on until next trigger.
 		for c.blockQueue.HasHeaders() {
-			blockID, header := c.blockQueue.Peek()
-			found, err := c.storage.BlockFinalized(blockID, header)
+			_, header := c.blockQueue.Peek()
+			found, err := c.storage.BlockFinalized(header)
 			if err != nil {
 				return err
 			}

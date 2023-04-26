@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/engine/execution/state/storehouse/queue"
 	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage/ephemeral"
+	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage/forest"
 	"github.com/onflow/flow-go/engine/execution/state/storehouse/synchronizer"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
@@ -20,9 +22,13 @@ func TestSynchronizer(t *testing.T) {
 		genesis, headers := blocks[0], blocks[1:]
 
 		syncFreq := 50 * time.Millisecond
-		store := ephemeral.NewStorage(100, genesis, nil)
-		c, err := synchronizer.NewSynchronizer(store, genesis, syncFreq)
 
+		storage, err := forest.NewStorage(ephemeral.NewStorage(100, genesis, nil))
+		require.NoError(t, err)
+
+		blockQueue := queue.NewFinalizedBlockQueue(genesis)
+
+		c, err := synchronizer.NewSynchronizer(storage, blockQueue, syncFreq)
 		require.NoError(t, err)
 
 		<-c.Ready()
@@ -59,7 +65,7 @@ func TestSynchronizer(t *testing.T) {
 		wg.Wait()
 
 		require.Eventuallyf(t, func() bool {
-			ret, err := store.LastCommittedBlock()
+			ret, err := storage.LastCommittedBlock()
 			require.NoError(t, err)
 			return headers[8] == ret
 		}, 2*syncFreq, syncFreq/10, "final commit not matching")
@@ -70,8 +76,12 @@ func TestSynchronizer(t *testing.T) {
 		blocks := unittest.BlockHeaderFixtures(10)
 		genesis, headers := blocks[0], blocks[1:]
 
-		store := ephemeral.NewStorage(100, genesis, nil)
-		c, err := synchronizer.NewSynchronizer(store, genesis, 0)
+		storage, err := forest.NewStorage(ephemeral.NewStorage(100, genesis, nil))
+		require.NoError(t, err)
+
+		blockQueue := queue.NewFinalizedBlockQueue(genesis)
+
+		c, err := synchronizer.NewSynchronizer(storage, blockQueue, 0)
 		require.NoError(t, err)
 
 		<-c.Ready()
@@ -91,7 +101,7 @@ func TestSynchronizer(t *testing.T) {
 			err = c.TrySync()
 			require.NoError(t, err)
 
-			ret, err := store.LastCommittedBlock()
+			ret, err := storage.LastCommittedBlock()
 			require.NoError(t, err)
 			require.Equal(t, h, ret)
 		}
@@ -102,8 +112,12 @@ func TestSynchronizer(t *testing.T) {
 		blocks := unittest.BlockHeaderFixtures(10)
 		genesis, headers := blocks[0], blocks[1:]
 
-		store := ephemeral.NewStorage(100, genesis, nil)
-		c, err := synchronizer.NewSynchronizer(store, genesis, 0)
+		storage, err := forest.NewStorage(ephemeral.NewStorage(100, genesis, nil))
+		require.NoError(t, err)
+
+		blockQueue := queue.NewFinalizedBlockQueue(genesis)
+
+		c, err := synchronizer.NewSynchronizer(storage, blockQueue, 0)
 		require.NoError(t, err)
 
 		<-c.Ready()
@@ -123,7 +137,7 @@ func TestSynchronizer(t *testing.T) {
 			err = c.TrySync()
 			require.NoError(t, err)
 
-			ret, err := store.LastCommittedBlock()
+			ret, err := storage.LastCommittedBlock()
 			require.NoError(t, err)
 			require.Equal(t, h, ret)
 		}
@@ -134,8 +148,12 @@ func TestSynchronizer(t *testing.T) {
 		blocks := unittest.BlockHeaderFixtures(10)
 		genesis, headers := blocks[0], blocks[1:]
 
-		store := ephemeral.NewStorage(100, genesis, nil)
-		c, err := synchronizer.NewSynchronizer(store, genesis, 0)
+		storage, err := forest.NewStorage(ephemeral.NewStorage(100, genesis, nil))
+		require.NoError(t, err)
+
+		blockQueue := queue.NewFinalizedBlockQueue(genesis)
+
+		c, err := synchronizer.NewSynchronizer(storage, blockQueue, 0)
 		require.NoError(t, err)
 
 		<-c.Ready()
@@ -154,7 +172,7 @@ func TestSynchronizer(t *testing.T) {
 		err = c.TrySync()
 		require.NoError(t, err)
 
-		ret, err := store.LastCommittedBlock()
+		ret, err := storage.LastCommittedBlock()
 		require.NoError(t, err)
 		require.Equal(t, blocks[9], ret)
 	})
