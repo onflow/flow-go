@@ -41,12 +41,13 @@ func (ctx *blockBuildContext) highestPossibleReferenceBlockID() flow.Identifier 
 //   - the lowest block which could be used as a reference block without being
 //     immediately expired (accounting for the configured expiry buffer)
 func (ctx *blockBuildContext) lowestPossibleReferenceBlockHeight() uint64 {
-	minPossibleRefHeight := ctx.refChainFinalizedHeight - uint64(flow.DefaultTransactionExpiry-ctx.config.ExpiryBuffer)
-	if minPossibleRefHeight > ctx.refChainFinalizedHeight {
-		minPossibleRefHeight = 0 // overflow check
+	// By default, the lowest possible reference block for a non-expired collection has a height
+	// δ below the latest finalized block, for `δ := flow.DefaultTransactionExpiry - ctx.config.ExpiryBuffer`
+	// However, our current Epoch might not have δ finalized blocks yet, in which case the lowest
+	// possible reference block is the first block in the Epoch.
+	delta := uint64(flow.DefaultTransactionExpiry - ctx.config.ExpiryBuffer)
+	if ctx.refEpochFirstHeight+delta <= ctx.refChainFinalizedHeight {
+		return ctx.refEpochFirstHeight
 	}
-	if minPossibleRefHeight < ctx.refEpochFirstHeight {
-		minPossibleRefHeight = ctx.refEpochFirstHeight
-	}
-	return minPossibleRefHeight
+	return ctx.refChainFinalizedHeight - delta
 }
