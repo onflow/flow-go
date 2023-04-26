@@ -6,6 +6,8 @@ set -o pipefail
 git fetch
 git fetch --tags
 
+cd ../../localnet
+
 while read -r branch_hash; do
     hash="${branch_hash##*:}"
     branch="${branch_hash%%:*}"
@@ -32,4 +34,4 @@ while read -r branch_hash; do
 
     make stop
     docker system prune -a -f
-done <master.recent
+done <~/master.recent
