@@ -429,8 +429,6 @@ func (suite *MutatorSuite) TestExtend_WithUnfinalizedReferenceBlock() {
 func (suite *MutatorSuite) TestExtend_WithOrphanedReferenceBlock() {
 	// create a block extending genesis which is not finalized
 	orphaned := unittest.BlockWithParentFixture(suite.protoGenesis)
-	orphaned.Payload.Guarantees = nil
-	orphaned.SetPayload(*orphaned.Payload)
 	err := suite.protoState.ExtendCertified(context.Background(), orphaned, unittest.CertifyBlock(orphaned.Header))
 	suite.Require().NoError(err)
 
