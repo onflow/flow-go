@@ -133,13 +133,18 @@ func (suite *Suite) SetupTest() {
 	suite.metrics = metrics.NewNoopCollector()
 
 	suite.finalizationDistributor = pubsub.NewFinalizationDistributor()
-	suite.finalizedHeaderCache, _ = synceng.NewFinalizedHeaderCache(suite.log, suite.state, suite.finalizationDistributor)
+
+	var err error
+	suite.finalizedHeaderCache, err = synceng.NewFinalizedHeaderCache(suite.log, suite.state, suite.finalizationDistributor)
+	require.NoError(suite.T(), err)
 
 	unittest.RequireCloseBefore(suite.T(), suite.finalizedHeaderCache.Ready(), time.Second, "expect to start before timeout")
 }
 
 func (suite *Suite) TearDownTest() {
-	unittest.RequireCloseBefore(suite.T(), suite.finalizedHeaderCache.Done(), time.Second, "expect to stop before timeout")
+	if suite.finalizedHeaderCache != nil {
+		unittest.RequireCloseBefore(suite.T(), suite.finalizedHeaderCache.Done(), time.Second, "expect to stop before timeout")
+	}
 }
 
 func (suite *Suite) RunTest(
