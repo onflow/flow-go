@@ -46,7 +46,7 @@ func (ctx *blockBuildContext) lowestPossibleReferenceBlockHeight() uint64 {
 	// However, our current Epoch might not have δ finalized blocks yet, in which case the lowest
 	// possible reference block is the first block in the Epoch.
 	delta := uint64(flow.DefaultTransactionExpiry - ctx.config.ExpiryBuffer)
-	if ctx.refEpochFirstHeight+delta <= ctx.refChainFinalizedHeight {
+	if ctx.refChainFinalizedHeight <= ctx.refEpochFirstHeight+delta {
 		return ctx.refEpochFirstHeight
 	}
 	return ctx.refChainFinalizedHeight - delta
