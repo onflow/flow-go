@@ -101,7 +101,20 @@ func (suite *BuilderSuite) SetupTest() {
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID())))
 	require.NoError(suite.T(), err)
 
-	state, err := pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
+	state, err := pbadger.Bootstrap(
+		metrics,
+		suite.db,
+		all.Headers,
+		all.Seals,
+		all.Results,
+		all.Blocks,
+		all.QuorumCertificates,
+		all.Setups,
+		all.EpochCommits,
+		all.Statuses,
+		all.VersionBeacons,
+		rootSnapshot,
+	)
 	require.NoError(suite.T(), err)
 
 	suite.protoState, err = pbadger.NewFollowerState(
