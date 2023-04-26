@@ -25,6 +25,12 @@ type ProtocolSpamRecord struct {
 	Penalty float64
 }
 
+// RecordAdjustFunc is a function that is used to adjust the fields of a ProtocolSpamRecord.
+// The function is called with the current record and should return the adjusted record.
+// Returned error indicates that the adjustment is not applied, and the record should not be updated.
+// In BFT setup, the returned error should be treated as a fatal error.
+type RecordAdjustFunc func(ProtocolSpamRecord) (ProtocolSpamRecord, error)
+
 // NewProtocolSpamRecord creates a new protocol spam record with the given origin id and Penalty value.
 // The Decay speed of the record is set to the initial Decay speed. The CutoffCounter value is set to zero.
 // The Penalty value should be a negative value.
