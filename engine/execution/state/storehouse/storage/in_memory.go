@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"sync"
 
+	"github.com/onflow/flow-go/engine/execution/state/storehouse"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -14,6 +15,7 @@ type valueAtHeight struct {
 
 // InMemoryStorage implements storage interface, keeping register updates in memory,
 // it only limits historic look up of register to the last X commits
+// in memory storage is not fork-aware
 type InMemoryStorage struct {
 	historyCapacity                 int
 	registers                       map[flow.RegisterID][]valueAtHeight
@@ -23,7 +25,7 @@ type InMemoryStorage struct {
 	lock                            sync.RWMutex
 }
 
-var _ Storage = &InMemoryStorage{}
+var _ storehouse.Storage = &InMemoryStorage{}
 
 // NewInMemoryStorage constructs a new InMemoryStorage
 func NewInMemoryStorage(
@@ -111,8 +113,8 @@ func (s *InMemoryStorage) LastCommittedBlock() (*flow.Header, error) {
 	return s.lastCommittedBlock, nil
 }
 
-// RegisterValueAt returns the value for a register at the given height
-func (s *InMemoryStorage) RegisterValueAt(height uint64, blockID flow.Identifier, id flow.RegisterID) (value flow.RegisterValue, err error) {
+// BlockView construct a reader object at specific block
+func (s *InMemoryStorage) BlockView(height uint64, blockID flow.Identifier) (storehouse.BlockView, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -126,6 +128,23 @@ func (s *InMemoryStorage) RegisterValueAt(height uint64, blockID flow.Identifier
 		return nil, &InvalidBlockIDError{blockID}
 	}
 
+	return &reader{
+		height:  height,
+		blockID: blockID,
+		getFunc: s.valueAt,
+	}, nil
+}
+
+// valueAt returns the value for a register at the given height
+func (s *InMemoryStorage) valueAt(height uint64, blockID flow.Identifier, id flow.RegisterID) (value flow.RegisterValue, err error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	// min height might have changed since
+	if height < s.minHeightAvailable {
+		return nil, &HeightNotAvailableError{height, s.minHeightAvailable, s.lastCommittedBlock.Height}
+	}
+
 	// TODO(ramtin): future improvement could use a binary search when history size is large
 	entries := s.registers[id]
 	for _, ent := range entries {
@@ -135,4 +154,23 @@ func (s *InMemoryStorage) RegisterValueAt(height uint64, blockID flow.Identifier
 		value = ent.value
 	}
 	return value, nil
+}
+
+type blockAwareGetFunc func(
+	height uint64,
+	blockID flow.Identifier,
+	key flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+)
+
+type reader struct {
+	height  uint64
+	blockID flow.Identifier
+	getFunc blockAwareGetFunc
+}
+
+func (r *reader) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	return r.getFunc(r.height, r.blockID, id)
 }
