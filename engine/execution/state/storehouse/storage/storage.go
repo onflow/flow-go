@@ -12,12 +12,11 @@ type BlockView interface {
 	Get(id flow.RegisterID) (value flow.RegisterValue, err error)
 }
 
-// Storage is a block height-based persistant storage for storing historic register values.
-// it accepts updates as a set of sequential fork-free commit calls and
-// let user to query for the value of a register for at a given height
+// Storage is a storage for storing register values for each block (non-forkaware).
+// it accepts updates as a set of sequential commit calls and
+// let user to query for the value of a register for at a given height (historic lookup)
 type Storage interface {
-	// TODO(ramtin) maybe define a new type here holding both blockID and height
-	// BlockView returns an object allowing to query register values for specific block
+	// BlockView returns a blockView allowing to query register values for specific block
 	BlockView(height uint64, blockID flow.Identifier) (BlockView, error)
 
 	// Commit updates register values (it expects nil value for the removed registers)
@@ -26,4 +25,14 @@ type Storage interface {
 
 	// LastCommittedBlock returns the block header for the last committed changes
 	LastCommittedBlock() (*flow.Header, error)
+}
+
+// ForkAwareStorage is a fork-aware version of storage
+// it consumes block finalization signals to prune and update
+type ForkAwareStorage interface {
+	Storage
+
+	// BlockFinalized receives block finalization calls in the order blocks getting finalized (no-concurrent call)
+	// if the storage hasn't received the block execution results for this block it would return false
+	BlockFinalized(header *flow.Header) (bool, error)
 }
