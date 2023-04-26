@@ -1,16 +1,15 @@
-package sync
+package synchronizer
 
 import (
 	"time"
 
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 
-	"github.com/onflow/flow-go/engine/execution/state/cargo/payload"
-	"github.com/onflow/flow-go/engine/execution/state/cargo/queue"
-	"github.com/onflow/flow-go/engine/execution/state/cargo/storage"
+	"github.com/onflow/flow-go/engine/execution/state/storehouse/queue"
+	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage"
+	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage/forest"
 )
 
 // Synchronizer is responsible for synchronization
@@ -26,8 +25,8 @@ import (
 // these two are frequently synced automatically on time intervals
 // but it could also be manually trigger using TrySync method
 type Synchronizer struct {
-	blockQueue   *queue.FinalizedBlockQueue
-	payloadStore *payload.PayloadStore
+	blockQueue *queue.FinalizedBlockQueue
+	storage    *forest.ForestStorage
 
 	syncFrequency  time.Duration
 	syncInProgress *atomic.Bool
@@ -40,20 +39,19 @@ type Synchronizer struct {
 // if syncFrequency is set to zero, it won't run and requires manual triggering
 func NewSynchronizer(
 	storage storage.Storage,
-	blockQueueCapacity int,
 	genesis *flow.Header,
 	syncFrequency time.Duration,
 ) (*Synchronizer, error) {
 	// TODO load genesis from storage
 	// TODO move this to outside
 	// TODO define new interface type
-	payloadStore, err := payload.NewPayloadStore(storage)
+	st, err := forest.NewStorage(storage)
 	if err != nil {
 		return nil, err
 	}
 	c := &Synchronizer{
-		blockQueue:     queue.NewFinalizedBlockQueue(blockQueueCapacity, genesis),
-		payloadStore:   payloadStore,
+		blockQueue:     queue.NewFinalizedBlockQueue(genesis),
+		storage:        st,
 		syncFrequency:  syncFrequency,
 		syncInProgress: atomic.NewBool(false),
 		stopSync:       make(chan struct{}, 1),
@@ -64,15 +62,10 @@ func NewSynchronizer(
 	return c, nil
 }
 
-// Reader returns a reader for the execution
-func (c *Synchronizer) Reader(header *flow.Header) state.StorageSnapshot {
-	return c.payloadStore.Reader(header)
-}
-
 // BlockFinalized is called every time a block is executed
 func (c *Synchronizer) BlockExecuted(header *flow.Header, updates map[flow.RegisterID]flow.RegisterValue) error {
 	// add updates to the payload store
-	return c.payloadStore.BlockExecuted(header, updates)
+	return c.storage.CommitBlock(header, updates)
 }
 
 // BlockFinalized is called every time a new block is finalized
@@ -93,8 +86,8 @@ func (c *Synchronizer) TrySync() error {
 		// doing the same for more blocks until payloadstore returns false, which mean it doesn't
 		// have results for that block yet and we need to hold on until next trigger.
 		for c.blockQueue.HasHeaders() {
-			blockID, header := c.blockQueue.Peak()
-			found, err := c.payloadStore.BlockFinalized(blockID, header)
+			blockID, header := c.blockQueue.Peek()
+			found, err := c.storage.BlockFinalized(blockID, header)
 			if err != nil {
 				return err
 			}

@@ -1,4 +1,4 @@
-package sync_test
+package synchronizer_test
 
 import (
 	"math/rand"
@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage"
-	"github.com/onflow/flow-go/engine/execution/state/storehouse/sync"
+	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage/ephemeral"
+	"github.com/onflow/flow-go/engine/execution/state/storehouse/synchronizer"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
 )
@@ -20,8 +20,8 @@ func TestSynchronizer(t *testing.T) {
 		genesis, headers := blocks[0], blocks[1:]
 
 		syncFreq := 50 * time.Millisecond
-		store := storage.NewInMemoryStorage(100, genesis, nil)
-		c, err := sync.NewSynchronizer(store, 100, genesis, syncFreq)
+		store := ephemeral.NewStorage(100, genesis, nil)
+		c, err := synchronizer.NewSynchronizer(store, genesis, syncFreq)
 
 		require.NoError(t, err)
 
@@ -70,8 +70,8 @@ func TestSynchronizer(t *testing.T) {
 		blocks := unittest.BlockHeaderFixtures(10)
 		genesis, headers := blocks[0], blocks[1:]
 
-		store := storage.NewInMemoryStorage(100, genesis, nil)
-		c, err := cargo.NewCargo(store, 100, genesis, 0)
+		store := ephemeral.NewStorage(100, genesis, nil)
+		c, err := synchronizer.NewSynchronizer(store, genesis, 0)
 		require.NoError(t, err)
 
 		<-c.Ready()
@@ -102,8 +102,8 @@ func TestSynchronizer(t *testing.T) {
 		blocks := unittest.BlockHeaderFixtures(10)
 		genesis, headers := blocks[0], blocks[1:]
 
-		store := storage.NewInMemoryStorage(100, genesis, nil)
-		c, err := cargo.NewCargo(store, 100, genesis, 0)
+		store := ephemeral.NewStorage(100, genesis, nil)
+		c, err := synchronizer.NewSynchronizer(store, genesis, 0)
 		require.NoError(t, err)
 
 		<-c.Ready()
@@ -134,8 +134,8 @@ func TestSynchronizer(t *testing.T) {
 		blocks := unittest.BlockHeaderFixtures(10)
 		genesis, headers := blocks[0], blocks[1:]
 
-		store := storage.NewInMemoryStorage(100, genesis, nil)
-		c, err := cargo.NewCargo(store, 100, genesis, 0)
+		store := ephemeral.NewStorage(100, genesis, nil)
+		c, err := synchronizer.NewSynchronizer(store, genesis, 0)
 		require.NoError(t, err)
 
 		<-c.Ready()
