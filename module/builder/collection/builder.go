@@ -126,7 +126,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
 
 	// STEP 1a: create a lookup of all transactions included in UN-FINALIZED ancestors.
-	// In contrast to the transactions collected in step 1a, transactions in un-finalized
+	// In contrast to the transactions collected in step 1b, transactions in un-finalized
 	// collections cannot be removed from the mempool, as we would want to include
 	// such transactions in other forks.
 	err = b.populateUnfinalizedAncestryLookup(parentID, buildCtx.clusterChainFinalizedBlock.Height, lookup, limiter)
@@ -141,7 +141,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 	// STEP 1b: create a lookup of all transactions previously included in
 	// the finalized collections. Any transactions already included in finalized
-	// collections can be removed from the mempool.	err = b.populateFinalizedAncestryLookup(buildCtx.lowestPossibleReferenceBlockHeight(), buildCtx.highestPossibleReferenceBlockHeight(), lookup, limiter)
+	// collections can be removed from the mempool.
+	err = b.populateFinalizedAncestryLookup(buildCtx.lowestPossibleReferenceBlockHeight(), buildCtx.highestPossibleReferenceBlockHeight(), lookup, limiter)
 	if err != nil {
 		return nil, fmt.Errorf("could not populate finalized ancestry lookup: %w", err)
 	}
