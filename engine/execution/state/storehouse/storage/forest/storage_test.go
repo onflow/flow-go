@@ -12,7 +12,6 @@ import (
 )
 
 func TestPayloadStore(t *testing.T) {
-
 	key := flow.RegisterID{Owner: "A", Key: "B"}
 	initValue := []byte("rand value")
 
@@ -39,7 +38,7 @@ func TestPayloadStore(t *testing.T) {
 			delta := map[flow.RegisterID]flow.RegisterValue{
 				key: []byte{byte(int8(i))},
 			}
-			err = pstore.BlockExecuted(header, delta)
+			err = pstore.CommitBlock(header, delta)
 			require.NoError(t, err)
 		}
 
@@ -80,14 +79,14 @@ func TestPayloadStore(t *testing.T) {
 		require.NoError(t, err)
 
 		for i, header := range mainChain {
-			err = pstore.BlockExecuted(header, map[flow.RegisterID]flow.RegisterValue{
+			err = pstore.CommitBlock(header, map[flow.RegisterID]flow.RegisterValue{
 				key: []byte{byte(int8(i))},
 			})
 			require.NoError(t, err)
 		}
 
 		fork1 := unittest.BlockHeaderWithParentFixture(genesis)
-		err = pstore.BlockExecuted(fork1, map[flow.RegisterID]flow.RegisterValue{
+		err = pstore.CommitBlock(fork1, map[flow.RegisterID]flow.RegisterValue{
 			key: []byte{byte(int8(11))},
 		})
 		require.NoError(t, err)
@@ -100,7 +99,7 @@ func TestPayloadStore(t *testing.T) {
 		require.Equal(t, 11, int(val[0]))
 
 		fork11 := unittest.BlockHeaderWithParentFixture(fork1)
-		err = pstore.BlockExecuted(fork11, map[flow.RegisterID]flow.RegisterValue{
+		err = pstore.CommitBlock(fork11, map[flow.RegisterID]flow.RegisterValue{
 			key: []byte{byte(int8(12))},
 		})
 		require.NoError(t, err)
@@ -113,7 +112,7 @@ func TestPayloadStore(t *testing.T) {
 		require.Equal(t, 12, int(val[0]))
 
 		fork2 := unittest.BlockHeaderWithParentFixture(genesis)
-		err = pstore.BlockExecuted(fork2, map[flow.RegisterID]flow.RegisterValue{
+		err = pstore.CommitBlock(fork2, map[flow.RegisterID]flow.RegisterValue{
 			key: []byte{byte(int8(13))},
 		})
 		require.NoError(t, err)
@@ -125,7 +124,7 @@ func TestPayloadStore(t *testing.T) {
 		require.NoError(t, err)
 
 		fork22 := unittest.BlockHeaderWithParentFixture(fork2)
-		err = pstore.BlockExecuted(fork22, map[flow.RegisterID]flow.RegisterValue{
+		err = pstore.CommitBlock(fork22, map[flow.RegisterID]flow.RegisterValue{
 			key: []byte{byte(int8(14))},
 		})
 		require.NoError(t, err)
