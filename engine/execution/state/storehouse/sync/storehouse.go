@@ -1,4 +1,4 @@
-package cargo
+package sync
 
 import (
 	"time"
@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/cargo/storage"
 )
 
-// Cargo is responsible for synchronization
+// Synchronizer is responsible for synchronization
 // between block execution and block finalization events
 // block execution and finalization events are two concurrent
 // streams and requires synchronization and buffering of events
@@ -25,7 +25,7 @@ import (
 // out of order events and support concurency.
 // these two are frequently synced automatically on time intervals
 // but it could also be manually trigger using TrySync method
-type Cargo struct {
+type Synchronizer struct {
 	blockQueue   *queue.FinalizedBlockQueue
 	payloadStore *payload.PayloadStore
 
@@ -36,20 +36,22 @@ type Cargo struct {
 	syncError      chan error
 }
 
-// NewCargo constructs a new Cargo
+// NewSynchronizer constructs a new Synchronizer
 // if syncFrequency is set to zero, it won't run and requires manual triggering
-func NewCargo(
+func NewSynchronizer(
 	storage storage.Storage,
 	blockQueueCapacity int,
 	genesis *flow.Header,
 	syncFrequency time.Duration,
-) (*Cargo, error) {
+) (*Synchronizer, error) {
 	// TODO load genesis from storage
+	// TODO move this to outside
+	// TODO define new interface type
 	payloadStore, err := payload.NewPayloadStore(storage)
 	if err != nil {
 		return nil, err
 	}
-	c := &Cargo{
+	c := &Synchronizer{
 		blockQueue:     queue.NewFinalizedBlockQueue(blockQueueCapacity, genesis),
 		payloadStore:   payloadStore,
 		syncFrequency:  syncFrequency,
@@ -63,25 +65,25 @@ func NewCargo(
 }
 
 // Reader returns a reader for the execution
-func (c *Cargo) Reader(header *flow.Header) state.StorageSnapshot {
+func (c *Synchronizer) Reader(header *flow.Header) state.StorageSnapshot {
 	return c.payloadStore.Reader(header)
 }
 
 // BlockFinalized is called every time a block is executed
-func (c *Cargo) BlockExecuted(header *flow.Header, updates map[flow.RegisterID]flow.RegisterValue) error {
+func (c *Synchronizer) BlockExecuted(header *flow.Header, updates map[flow.RegisterID]flow.RegisterValue) error {
 	// add updates to the payload store
 	return c.payloadStore.BlockExecuted(header, updates)
 }
 
 // BlockFinalized is called every time a new block is finalized
-func (c *Cargo) BlockFinalized(new *flow.Header) error {
+func (c *Synchronizer) BlockFinalized(new *flow.Header) error {
 	// enqueue the finalized header
 	// TODO deal with errors (e.g. if already processed move on)
 	return c.blockQueue.Enqueue(new)
 }
 
 // TrySync tries to sync the block finalization queue with the payload store
-func (c *Cargo) TrySync() error {
+func (c *Synchronizer) TrySync() error {
 	// if sync is in progress skip
 	if c.syncInProgress.CompareAndSwap(false, true) {
 		defer c.syncInProgress.Store(false)
@@ -106,8 +108,8 @@ func (c *Cargo) TrySync() error {
 	return nil
 }
 
-// Start starts the cargo sync ticker
-func (c *Cargo) Start() {
+// Start starts the synchronizer's ticker
+func (c *Synchronizer) Start() {
 	if c.syncFrequency > 0 {
 		ticker := time.NewTicker(c.syncFrequency)
 		go func() {
@@ -131,14 +133,14 @@ func (c *Cargo) Start() {
 	c.syncStopped <- struct{}{}
 }
 
-func (c *Cargo) Ready() <-chan struct{} {
+func (c *Synchronizer) Ready() <-chan struct{} {
 	// TODO initate the storage here
 	ready := make(chan struct{})
 	defer close(ready)
 	return ready
 }
 
-func (c *Cargo) Done() <-chan struct{} {
+func (c *Synchronizer) Done() <-chan struct{} {
 	done := make(chan struct{})
 	defer close(done)
 
