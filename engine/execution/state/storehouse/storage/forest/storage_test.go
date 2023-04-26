@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/storehouse/forest"
 	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage/ephemeral"
+	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage/forest"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
