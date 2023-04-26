@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/cargo/queue"
+	"github.com/onflow/flow-go/engine/execution/state/storehouse/queue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
