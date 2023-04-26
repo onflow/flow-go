@@ -98,11 +98,20 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	//
 	// After combining both the finalized and un-finalized cluster blocks that overlap with our expiry window,
 	// we can iterate through their transactions, and build a lookup for excluding duplicated transactions.
+	//
+	// RATE LIMITING: the builder module can be configured to limit the
+	// rate at which transactions with a common payer are included in
+	// blocks. Depending on the configured limit, we either allow 1
+	// transaction every N sequential collections, or we allow K transactions
+	// per collection. The rate limiter tracks transactions included previously
+	// to enforce rate limit rules for the constructed block.
 
 	buildCtx, err := b.getBlockBuildContext(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get block build context: %w", err)
 	}
+	lookup := newTransactionLookup()
+	limiter := newRateLimiter(b.config, buildCtx.parent.Height+1)
 
 	log := b.log.With().
 		Hex("parent_id", parentID[:]).
@@ -116,23 +125,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// b.tracer.StartSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
 	// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnUnfinalizedLookup)
 
-	// STEP TWO: create a lookup of all previously used transactions on the
-	// part of the chain we care about. We do this separately for
-	// un-finalized and finalized sections of the chain to decide whether to
-	// remove conflicting transactions from the mempool.
-
-	// keep track of transactions in the ancestry to avoid duplicates
-	lookup := newTransactionLookup()
-	// keep track of transactions to enforce rate limiting
-	limiter := newRateLimiter(b.config, buildCtx.parent.Height+1)
-
-	// RATE LIMITING: the builder module can be configured to limit the
-	// rate at which transactions with a common payer are included in
-	// blocks. Depending on the configured limit, we either allow 1
-	// transaction every N sequential collections, or we allow K transactions
-	// per collection.
-
-	// first, look up previously included transactions in UN-FINALIZED ancestors
+	// STEP 1a: create a lookup of all transactions included in UN-FINALIZED ancestors.
+	// In contrast to the transactions collected in step 1a, transactions in un-finalized
+	// collections cannot be removed from the mempool, as we would want to include
+	// such transactions in other forks.
 	err = b.populateUnfinalizedAncestryLookup(parentID, buildCtx.clusterChainFinalizedBlock.Height, lookup, limiter)
 	if err != nil {
 		return nil, fmt.Errorf("could not populate un-finalized ancestry lookout (parent_id=%x): %w", parentID, err)
@@ -143,8 +139,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// b.tracer.StartSpan(parentID, trace.COLBuildOnFinalizedLookup)
 	// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnFinalizedLookup)
 
-	// second, look up previously included transactions in FINALIZED ancestors
-	err = b.populateFinalizedAncestryLookup(buildCtx.lowestPossibleReferenceBlockHeight(), buildCtx.highestPossibleReferenceBlockHeight(), lookup, limiter)
+	// STEP 1b: create a lookup of all transactions previously included in
+	// the finalized collections. Any transactions already included in finalized
+	// collections can be removed from the mempool.	err = b.populateFinalizedAncestryLookup(buildCtx.lowestPossibleReferenceBlockHeight(), buildCtx.highestPossibleReferenceBlockHeight(), lookup, limiter)
 	if err != nil {
 		return nil, fmt.Errorf("could not populate finalized ancestry lookup: %w", err)
 	}
@@ -154,7 +151,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// b.tracer.StartSpan(parentID, trace.COLBuildOnCreatePayload)
 	// defer b.tracer.FinishSpan(parentID, trace.COLBuildOnCreatePayload)
 
-	// STEP THREE: build a payload of valid transactions, while at the same
+	// STEP TWO: build a payload of valid transactions, while at the same
 	// time figuring out the correct reference block ID for the collection.
 
 	// keep track of the actual smallest reference height of all included transactions
