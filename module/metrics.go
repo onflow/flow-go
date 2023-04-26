@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 )
 
@@ -190,11 +191,24 @@ type LibP2PConnectionMetrics interface {
 	InboundConnections(connectionCount uint)
 }
 
+// AlspMetrics encapsulates the metrics collectors for the Application Layer Spam Prevention (ALSP) module, which
+// is part of the networking layer. ALSP is responsible to prevent spam attacks on the application layer messages that
+// appear to be valid for the networking layer but carry on a malicious intent on the application layer (i.e., Flow protocols).
+type AlspMetrics interface {
+	// OnMisbehaviorReported is called when a misbehavior is reported by the application layer to ALSP.
+	// An engine detecting a spamming-related misbehavior reports it to the ALSP module.
+	// Args:
+	// - channel: the channel on which the misbehavior was reported
+	// - misbehaviorType: the type of misbehavior reported
+	OnMisbehaviorReported(channel channels.Channel, misbehaviorType network.Misbehavior)
+}
+
 // NetworkMetrics is the blanket abstraction that encapsulates the metrics collectors for the networking layer.
 type NetworkMetrics interface {
 	LibP2PMetrics
 	NetworkSecurityMetrics
 	NetworkCoreMetrics
+	AlspMetrics
 }
 
 // EngineMetrics is a generic metrics consumer for node-internal data processing
