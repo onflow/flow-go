@@ -3,53 +3,21 @@ package payload
 import (
 	"sync"
 
-	"github.com/onflow/flow-go/engine/execution/state/cargo/storage"
+	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-type View interface {
-	Get(
-		height uint64,
-		blockID flow.Identifier,
-		key flow.RegisterID,
-	) (
-		flow.RegisterValue,
-		error,
-	)
-}
-
-// oracle stores views that are finalized in an storage
-type OracleView struct {
-	storage storage.Storage
-}
-
-func NewOracleView(storage storage.Storage) *OracleView {
-	return &OracleView{
-		storage: storage,
-	}
-}
-
-var _ View = &OracleView{}
-
-func (v *OracleView) Get(height uint64, blockID flow.Identifier, id flow.RegisterID) (flow.RegisterValue, error) {
-	return v.storage.RegisterValueAt(height, blockID, id)
-}
-
-func (v *OracleView) MergeView(header *flow.Header, view *InFlightView) error {
-	return v.storage.CommitBlock(header, view.delta)
-}
 
 type InFlightView struct {
 	delta  map[flow.RegisterID]flow.RegisterValue
 	lock   sync.RWMutex
-	parent View
+	parent storage.BlockView
 }
 
-var _ View = &InFlightView{}
+var _ storage.BlockView = &InFlightView{}
 
 func NewInFlightView(
 	delta map[flow.RegisterID]flow.RegisterValue,
-	parent View,
+	parent storage.BlockView,
 ) *InFlightView {
 	return &InFlightView{
 		delta:  delta,
@@ -58,7 +26,7 @@ func NewInFlightView(
 }
 
 // returns the register at the given height
-func (v *InFlightView) Get(height uint64, blockID flow.Identifier, key flow.RegisterID) (flow.RegisterValue, error) {
+func (v *InFlightView) Get(key flow.RegisterID) (flow.RegisterValue, error) {
 	value, found := v.delta[key]
 	if found {
 		return value, nil
@@ -66,10 +34,10 @@ func (v *InFlightView) Get(height uint64, blockID flow.Identifier, key flow.Regi
 
 	v.lock.RLock()
 	defer v.lock.RUnlock()
-	return v.parent.Get(height, blockID, key)
+	return v.parent.Get(key)
 }
 
-func (v *InFlightView) UpdateParent(new View) {
+func (v *InFlightView) UpdateParent(new storage.BlockView) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 	v.parent = new
