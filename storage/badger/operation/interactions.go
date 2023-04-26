@@ -1,7 +1,7 @@
 package operation
 
 import (
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/dgraph-io/badger/v2"

@@ -1,9 +1,10 @@
-package storage
+package ephemeral
 
 import (
 	"bytes"
 	"sync"
 
+	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -12,9 +13,9 @@ type valueAtHeight struct {
 	value  flow.RegisterValue
 }
 
-// InMemoryStorage implements storage interface, keeping register updates in memory,
-// it only limits historic look up of register to the last X commits
-type InMemoryStorage struct {
+// EphemeralStorage implements an non-fork-aware in-memory storage,
+// keeping block register updates in memory and limiting historic look up of register to the last X commits
+type EphemeralStorage struct {
 	historyCapacity                 int
 	registers                       map[flow.RegisterID][]valueAtHeight
 	lastCommittedBlock              *flow.Header
@@ -23,14 +24,14 @@ type InMemoryStorage struct {
 	lock                            sync.RWMutex
 }
 
-var _ Storage = &InMemoryStorage{}
+var _ storage.Storage = &EphemeralStorage{}
 
-// NewInMemoryStorage constructs a new InMemoryStorage
-func NewInMemoryStorage(
+// NewStorage constructs a new EphemeralStorage
+func NewStorage(
 	historyCapacity int,
 	genesis *flow.Header,
 	data map[flow.RegisterID]flow.RegisterValue,
-) *InMemoryStorage {
+) *EphemeralStorage {
 	registers := make(map[flow.RegisterID][]valueAtHeight, 0)
 	for id, val := range data {
 		registers[id] = []valueAtHeight{{
@@ -41,7 +42,7 @@ func NewInMemoryStorage(
 	recentlyCommittedBlocksByHeight := map[uint64]flow.Identifier{
 		genesis.Height: genesis.ID(),
 	}
-	return &InMemoryStorage{
+	return &EphemeralStorage{
 		historyCapacity:                 historyCapacity,
 		registers:                       registers,
 		recentlyCommittedBlocksByHeight: recentlyCommittedBlocksByHeight,
@@ -51,17 +52,17 @@ func NewInMemoryStorage(
 }
 
 // CommitBlock commits block updates
-func (s *InMemoryStorage) CommitBlock(header *flow.Header, update map[flow.RegisterID]flow.RegisterValue) error {
+func (s *EphemeralStorage) CommitBlock(header *flow.Header, update map[flow.RegisterID]flow.RegisterValue) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	// check commit sequence
 	if s.lastCommittedBlock.Height+1 != header.Height || s.lastCommittedBlock.ID() != header.ParentID {
-		return &NonCompliantHeaderError{
-			s.lastCommittedBlock.Height + 1,
-			header.Height,
-			s.lastCommittedBlock.ID(),
-			header.ParentID,
+		return &storage.NonCompliantHeaderError{
+			ExpectedBlockHeight:   s.lastCommittedBlock.Height + 1,
+			ReceivedBlockHeight:   header.Height,
+			ExpectedParentBlockID: s.lastCommittedBlock.ID(),
+			ReceivedParentBlockID: header.ParentID,
 		}
 	}
 
@@ -104,26 +105,51 @@ func (s *InMemoryStorage) CommitBlock(header *flow.Header, update map[flow.Regis
 }
 
 // LastCommittedBlock returns the last commited block
-func (s *InMemoryStorage) LastCommittedBlock() (*flow.Header, error) {
+func (s *EphemeralStorage) LastCommittedBlock() (*flow.Header, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	return s.lastCommittedBlock, nil
 }
 
-// RegisterValueAt returns the value for a register at the given height
-func (s *InMemoryStorage) RegisterValueAt(height uint64, blockID flow.Identifier, id flow.RegisterID) (value flow.RegisterValue, err error) {
+// BlockView construct a reader object at specific block
+func (s *EphemeralStorage) BlockView(height uint64, blockID flow.Identifier) (storage.BlockView, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	if height < s.minHeightAvailable ||
 		height > s.lastCommittedBlock.Height {
-		return nil, &HeightNotAvailableError{height, s.minHeightAvailable, s.lastCommittedBlock.Height}
+		return nil, &storage.HeightNotAvailableError{
+			RequestedHeight:    height,
+			MinHeightAvailable: s.minHeightAvailable,
+			MaxHeightAvailable: s.lastCommittedBlock.Height,
+		}
 	}
 
 	expectedID, found := s.recentlyCommittedBlocksByHeight[height]
 	if !found || blockID != expectedID {
-		return nil, &InvalidBlockIDError{blockID}
+		return nil, &storage.InvalidBlockIDError{BlockID: blockID}
+	}
+
+	return &reader{
+		height:  height,
+		blockID: blockID,
+		getFunc: s.valueAt,
+	}, nil
+}
+
+// valueAt returns the value for a register at the given height
+func (s *EphemeralStorage) valueAt(height uint64, blockID flow.Identifier, id flow.RegisterID) (value flow.RegisterValue, err error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	// min height might have changed since
+	if height < s.minHeightAvailable {
+		return nil, &storage.HeightNotAvailableError{
+			RequestedHeight:    height,
+			MinHeightAvailable: s.minHeightAvailable,
+			MaxHeightAvailable: s.lastCommittedBlock.Height,
+		}
 	}
 
 	// TODO(ramtin): future improvement could use a binary search when history size is large
@@ -135,4 +161,23 @@ func (s *InMemoryStorage) RegisterValueAt(height uint64, blockID flow.Identifier
 		value = ent.value
 	}
 	return value, nil
+}
+
+type blockAwareGetFunc func(
+	height uint64,
+	blockID flow.Identifier,
+	key flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+)
+
+type reader struct {
+	height  uint64
+	blockID flow.Identifier
+	getFunc blockAwareGetFunc
+}
+
+func (r *reader) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	return r.getFunc(r.height, r.blockID, id)
 }
