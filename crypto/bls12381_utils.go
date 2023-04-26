@@ -12,6 +12,25 @@ package crypto
 // #cgo amd64 CFLAGS: -D__ADX__ -mno-avx
 // #cgo mips64 mips64le ppc64 ppc64le riscv64 s390x CFLAGS: -D__BLST_NO_ASM__
 // #include "bls12381_utils.h"
+//
+// #if defined(__x86_64__) && (defined(__unix__) || defined(__APPLE__))
+// # include <signal.h>
+// # include <unistd.h>
+// static void handler(int signum)
+// {   ssize_t n = write(2, "Caught SIGILL in blst_cgo_init, "
+//                          "consult <blst>/bindings/go/README.md.\n", 70);
+//     _exit(128+SIGILL);
+//     (void)n;
+// }
+// __attribute__((constructor)) static void blst_cgo_init()
+// {   blst_fp temp = { 0 };
+//     struct sigaction act = { handler }, oact;
+//     sigaction(SIGILL, &act, &oact);
+//     blst_fp_sqr(&temp, &temp);
+//     sigaction(SIGILL, &oact, NULL);
+// }
+// #endif
+//
 import "C"
 import (
 	"crypto/rand"
