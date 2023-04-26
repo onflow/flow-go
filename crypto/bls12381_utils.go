@@ -166,9 +166,7 @@ func writeScalar(dest []byte, x *scalar) {
 // The slice should be of size PubKeyLenBLSBLS12381 and the serialization
 // follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func writePointG2(dest []byte, a *pointE2) {
-	C.E2_write_bytes((*C.uchar)(&dest[0]),
-		(*C.E2)(a),
-	)
+	C.E2_write_bytes((*C.uchar)(&dest[0]), (*C.E2)(a))
 }
 
 // writePointG1 writes a G1 point in a slice of bytes

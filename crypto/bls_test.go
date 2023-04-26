@@ -186,12 +186,15 @@ func TestBLSEncodeDecode(t *testing.T) {
 	assert.True(t, IsInvalidInputsError(err))
 	assert.Nil(t, sk)
 
-	//  identity public key
+	//  decode an identity public key
 	pkBytes := make([]byte, PubKeyLenBLSBLS12381)
 	pkBytes[0] = infinityPointHeader
 	pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
 	require.NoError(t, err, "decoding identity public key should succeed")
 	assert.True(t, pk.Equals(IdentityBLSPublicKey()))
+
+	// encode an identity public key
+	assert.Equal(t, pk.Encode(), pkBytes)
 
 	// invalid point
 	pkBytes = make([]byte, PubKeyLenBLSBLS12381)
@@ -436,7 +439,7 @@ func TestBLSAggregateSignatures(t *testing.T) {
 // Aggregate n public keys and their respective private keys and compare
 // the public key of the aggregated private key is equal to the aggregated
 // public key
-func TestBLSAggregatePubKeys(t *testing.T) {
+func TestBLSAggregatePublicKeys(t *testing.T) {
 	rand := getPRG(t)
 	// number of keys to aggregate
 	pkNum := rand.Intn(100) + 1
@@ -507,8 +510,8 @@ func TestBLSAggregatePubKeys(t *testing.T) {
 
 	// check that the public key corresponding to the zero private key is indeed identity
 	// The package doesn't allow to generate a zero private key. One way to obtain a zero
-	// private key is via aggrgeting opposite private keys
-	t.Run("public key of zero private key", func(t *testing.T) {
+	// private key is via aggregating opposite private keys
+	t.Run("Identity public key from identity private key", func(t *testing.T) {
 		// sk1 is group order of bls12-381 minus one
 		groupOrderMinus1 := []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33, 0x39,
 			0xD8, 0x08, 0x09, 0xA1, 0xD8, 0x05, 0x53, 0xBD, 0xA4, 0x02, 0xFF, 0xFE,
@@ -520,9 +523,39 @@ func TestBLSAggregatePubKeys(t *testing.T) {
 		one[PrKeyLenBLSBLS12381-1] = 1
 		sk2, err := DecodePrivateKey(BLSBLS12381, one)
 		require.NoError(t, err)
+		// public key of aggregated private keys
 		aggSK, err := AggregateBLSPrivateKeys([]PrivateKey{sk1, sk2})
 		require.NoError(t, err)
 		assert.True(t, aggSK.PublicKey().Equals(IdentityBLSPublicKey()))
+		// aggregated public keys
+		aggPK, err := AggregateBLSPublicKeys([]PublicKey{sk1.PublicKey(), sk2.PublicKey()})
+		require.NoError(t, err)
+		assert.True(t, aggPK.Equals(IdentityBLSPublicKey()))
+		// check of internal identity flag
+		blsKey, ok := aggPK.(*pubKeyBLSBLS12381)
+		require.True(t, ok)
+		assert.True(t, blsKey.isIdentity)
+		// check of encoding header
+		pkBytes := aggPK.Encode()
+		assert.Equal(t, infinityPointHeader, pkBytes[0])
+	})
+
+	t.Run("Identity public key from opposite points", func(t *testing.T) {
+		pkBytes := pks[0].Encode()
+		negatePoint(pkBytes)
+		minusPk, err := DecodePublicKey(BLSBLS12381, pkBytes)
+		require.NoError(t, err)
+		// aggregated public keys
+		aggPK, err := AggregateBLSPublicKeys([]PublicKey{pks[0], minusPk})
+		require.NoError(t, err)
+		assert.True(t, aggPK.Equals(IdentityBLSPublicKey()))
+		// check of internal identity flag
+		blsKey, ok := aggPK.(*pubKeyBLSBLS12381)
+		require.True(t, ok)
+		assert.True(t, blsKey.isIdentity)
+		// check of encoding header
+		pkBytes = aggPK.Encode()
+		assert.Equal(t, infinityPointHeader, pkBytes[0])
 	})
 }
 

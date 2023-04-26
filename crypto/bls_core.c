@@ -86,7 +86,7 @@ void bls_sign(byte* s, const Fr* sk, const byte* data, const int len) {
 // and a message data.
 // The signature and public key are assumed to be in G1 and G2 respectively. This 
 // function only checks the pairing equality. 
-static int bls_verify_ep(const E2* pk, const ep_t s, const byte* data, const int len) {     
+static int bls_verify_ep(const E2* pk, const ep_t s, const byte* data, const int len) {    
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
 
@@ -137,7 +137,7 @@ static int bls_verify_ep(const E2* pk, const ep_t s, const byte* data, const int
             goto out;
         }
     }
-    
+
 out:
     ep_free(elemsG1[0]);
     ep_free(elemsG1[1]);

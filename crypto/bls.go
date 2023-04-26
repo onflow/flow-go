@@ -227,7 +227,7 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 }
 
 // 0xC0 is the header of the point at infinity serialization (either in G1 or G2)
-const infinityPointHeader = 0xC0
+const infinityPointHeader = byte(0xC0)
 
 var identityBLSSignature = append([]byte{infinityPointHeader}, make([]byte, signatureLengthBLSBLS12381-1)...)
 

@@ -950,12 +950,14 @@ void E2_write_bytes(byte *bin, const E2* a) {
 
 // set p to infinity
 void E2_set_infty(E2* p) {
-    vec_zero(p, sizeof(E2));
+    // BLST infinity points are defined by Z=0
+    vec_zero(p->z, sizeof(p->z));  
 }
 
 // check if `p` is infinity
 bool_t E2_is_infty(const E2* p) {
-    return vec_is_zero(p, sizeof(E2));
+    // BLST infinity points are defined by Z=0
+    return vec_is_zero(p->z, sizeof(p->z));
 }
 
 // checks affine point `p` is in E2
