@@ -154,17 +154,17 @@ Fr* Fr_relic_to_blst(const bn_st* x){
 
 // returns true if a == 0 and false otherwise
 bool_t Fr_is_zero(const Fr* a) {
-    return bytes_are_zero((const byte*)a, Fr_BYTES);
+    return bytes_are_zero((const byte*)a, sizeof(Fr));
 }
 
 // returns true if a == b and false otherwise
 bool_t Fr_is_equal(const Fr* a, const Fr* b) {
-    return vec_is_equal(a, b, Fr_BYTES);
+    return vec_is_equal(a, b, sizeof(Fr));
 }
 
 // sets `a` to limb `l`
 void Fr_set_limb(Fr* a, const limb_t l){
-    vec_zero((byte*)a + sizeof(limb_t), Fr_BYTES - sizeof(limb_t));
+    vec_zero((byte*)a + sizeof(limb_t), sizeof(Fr) - sizeof(limb_t));
     *((limb_t*)a) = l;
 }
 
@@ -304,7 +304,7 @@ static void pow256_from_Fr(pow256 ret, const Fr* in) {
 //    - BLST_BAD_ENCODING if the length is invalid
 //    - BLST_BAD_SCALAR if the scalar isn't in Fr
 //    - BLST_SUCCESS if the scalar is valid 
-BLST_ERROR Fr_read_bytes(Fr* a, const uint8_t *bin, int len) {
+BLST_ERROR Fr_read_bytes(Fr* a, const byte *bin, int len) {
     if (len != Fr_BYTES) {
         return BLST_BAD_ENCODING;
     }
@@ -325,7 +325,7 @@ BLST_ERROR Fr_read_bytes(Fr* a, const uint8_t *bin, int len) {
 //    - BLST_BAD_ENCODING if the length is invalid
 //    - BLST_BAD_SCALAR if the scalar isn't in Fr_star
 //    - BLST_SUCCESS if the scalar is valid 
-BLST_ERROR Fr_star_read_bytes(Fr* a, const uint8_t *bin, int len) {
+BLST_ERROR Fr_star_read_bytes(Fr* a, const byte *bin, int len) {
     int ret = Fr_read_bytes(a, bin, len);
     if (ret != BLST_SUCCESS) {
         return ret;
@@ -338,28 +338,28 @@ BLST_ERROR Fr_star_read_bytes(Fr* a, const uint8_t *bin, int len) {
 }
 
 // write Fr element `a` in big endian bytes.
-void Fr_write_bytes(uint8_t *bin, const Fr* a) {
+void Fr_write_bytes(byte *bin, const Fr* a) {
     be_bytes_from_limbs(bin, (limb_t*)a, Fr_BYTES);
 }
 
 // maps big-endian bytes into an Fr element using modular reduction
 // Input is byte-big-endian, output is vec256 (also used as Fr)
-static void vec256_from_be_bytes(Fr* out, const unsigned char *bytes, size_t n)
+static void vec256_from_be_bytes(Fr* out, const byte *bytes, size_t n)
 {
     Fr digit, radix;
     Fr_set_zero(out);
     Fr_copy(&radix, (Fr*)BLS12_381_rRR); // R^2
 
-    bytes += n;
+    byte* p = bytes + n;
     while (n > Fr_BYTES) {
-        limbs_from_be_bytes((limb_t*)&digit, bytes -= Fr_BYTES, Fr_BYTES); // l_i
+        limbs_from_be_bytes((limb_t*)&digit, p -= Fr_BYTES, Fr_BYTES); // l_i
         Fr_mul_montg(&digit, &digit, &radix); // l_i * R^i  (i is the loop number starting at 1)
         Fr_add(out, out, &digit);
         Fr_mul_montg(&radix, &radix, (Fr*)BLS12_381_rRR); // R^(i+1)
         n -= Fr_BYTES;
     }
     Fr_set_zero(&digit);
-    limbs_from_be_bytes((limb_t*)&digit, bytes -= n, n);
+    limbs_from_be_bytes((limb_t*)&digit, p - n, n);
     Fr_mul_montg(&digit, &digit, &radix);
     Fr_add(out, out, &digit);
     // at this point : out = l_1*R + L_2*R^2 .. + L_n*R^n
@@ -504,8 +504,8 @@ out:
 // returns the sign of y.
 // 1 if y > (p - 1)/2 and 0 otherwise.
 // y is in montgomery form
-static byte Fp_get_sign(const fp_t y) {
-    return sgn0_pty_mont_384(y, BLS12_381_P, p0);
+static byte Fp_get_sign(const Fp* y) {
+    return sgn0_pty_mont_384((const limb_t*)y, BLS12_381_P, p0);
 }
 
 // ------------------- Fp^2 utilities
@@ -1303,7 +1303,7 @@ void ep2_rand_G2complement(ep2_t p) {
 
 // This is a testing function.
 // It wraps a call to a Relic macro since cgo can't call macros.
-void xmd_sha256(uint8_t *hash, int len_hash, uint8_t *msg, int len_msg, uint8_t *dst, int len_dst){
+void xmd_sha256(byte *hash, int len_hash, byte *msg, int len_msg, byte *dst, int len_dst){
     md_xmd_sh256(hash, len_hash, msg, len_msg, dst, len_dst);
 }
 
