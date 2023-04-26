@@ -166,7 +166,7 @@ func (s *AccessSuite) TestSignerIndicesDecoding() {
 	require.NoError(s.T(), err)
 
 	// create committee so we can create decoder to assert validity of data
-	committee, err := committees.NewConsensusCommittee(state, unittest.IdentifierFixture())
+	committee, err := committees.NewConsensusCommittee(state, container.Config.NodeID)
 	require.NoError(s.T(), err)
 	blockSignerDecoder := signature.NewBlockSignerDecoder(committee)
 	// checks if
