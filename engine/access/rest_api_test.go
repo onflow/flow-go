@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+
 	"math/rand"
 	"net/http"
 	"os"
@@ -50,6 +53,8 @@ type RestAPITestSuite struct {
 	chainID           flow.ChainID
 	metrics           *metrics.NoopCollector
 	rpcEng            *rpc.Engine
+	sealedBlock       *flow.Header
+	finalizedBlock    *flow.Header
 
 	// storage
 	blocks           *storagemock.Blocks
@@ -66,9 +71,23 @@ func (suite *RestAPITestSuite) SetupTest() {
 	suite.state = new(protocol.State)
 	suite.sealedSnaphost = new(protocol.Snapshot)
 	suite.finalizedSnapshot = new(protocol.Snapshot)
+	suite.sealedBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
+	suite.finalizedBlock = unittest.BlockHeaderWithParentFixture(suite.sealedBlock)
 
 	suite.state.On("Sealed").Return(suite.sealedSnaphost, nil)
 	suite.state.On("Final").Return(suite.finalizedSnapshot, nil)
+	suite.sealedSnaphost.On("Head").Return(
+		func() *flow.Header {
+			return suite.sealedBlock
+		},
+		nil,
+	).Maybe()
+	suite.finalizedSnapshot.On("Head").Return(
+		func() *flow.Header {
+			return suite.finalizedBlock
+		},
+		nil,
+	).Maybe()
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
 	suite.transactions = new(storagemock.Transactions)
@@ -99,11 +118,17 @@ func (suite *RestAPITestSuite) SetupTest() {
 		RESTListenAddr:         unittest.DefaultAddress,
 	}
 
+	finalizationDistributor := pubsub.NewFinalizationDistributor()
+
+	var err error
+	finalizedHeaderCache, err := synceng.NewFinalizedHeaderCache(suite.log, suite.state, finalizationDistributor)
+	require.NoError(suite.T(), err)
+
 	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
 		nil, suite.executionResults, suite.chainID, suite.metrics, suite.metrics, 0, 0, false,
 		false, nil, nil, suite.me)
 	assert.NoError(suite.T(), err)
-	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
+	suite.rpcEng, err = rpcEngBuilder.WithLegacy().WithFinalizedHeaderCache(finalizedHeaderCache).Build()
 	assert.NoError(suite.T(), err)
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
@@ -136,10 +161,8 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		suite.executionResults.On("ByBlockID", block.ID()).Return(execResult, nil)
 	}
 
-	sealedBlock := testBlocks[len(testBlocks)-1]
-	finalizedBlock := testBlocks[len(testBlocks)-2]
-	suite.sealedSnaphost.On("Head").Return(sealedBlock.Header, nil)
-	suite.finalizedSnapshot.On("Head").Return(finalizedBlock.Header, nil)
+	suite.sealedBlock = testBlocks[len(testBlocks)-1].Header
+	suite.finalizedBlock = testBlocks[len(testBlocks)-2].Header
 
 	client := suite.restAPIClient()
 
@@ -227,7 +250,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		assert.Len(suite.T(), actualBlocks, 1)
-		assert.Equal(suite.T(), finalizedBlock.ID().String(), actualBlocks[0].Header.Id)
+		assert.Equal(suite.T(), suite.finalizedBlock.ID().String(), actualBlocks[0].Header.Id)
 	})
 
 	suite.Run("GetBlockByHeight for height=sealed happy path", func() {
@@ -239,7 +262,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		assert.Len(suite.T(), actualBlocks, 1)
-		assert.Equal(suite.T(), sealedBlock.ID().String(), actualBlocks[0].Header.Id)
+		assert.Equal(suite.T(), suite.sealedBlock.ID().String(), actualBlocks[0].Header.Id)
 	})
 
 	suite.Run("GetBlockByID with a non-existing block ID", func() {
