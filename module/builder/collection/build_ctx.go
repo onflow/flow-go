@@ -20,7 +20,7 @@ type blockBuildContext struct {
 
 // highestPossibleReferenceBlockHeight returns the height of the highest possible valid reference block.
 // It is the highest finalized block which is in this cluster's operating epoch.
-func (ctx blockBuildContext) highestPossibleReferenceBlockHeight() uint64 {
+func (ctx *blockBuildContext) highestPossibleReferenceBlockHeight() uint64 {
 	if ctx.refEpochHasEnded {
 		return ctx.refEpochFinalHeight
 	}
@@ -29,7 +29,7 @@ func (ctx blockBuildContext) highestPossibleReferenceBlockHeight() uint64 {
 
 // highestPossibleReferenceBlockID returns the ID of the highest possible valid reference block.
 // It is the highest finalized block which is in this cluster's operating epoch.
-func (ctx blockBuildContext) highestPossibleReferenceBlockID() flow.Identifier {
+func (ctx *blockBuildContext) highestPossibleReferenceBlockID() flow.Identifier {
 	if ctx.refEpochHasEnded {
 		return ctx.refEpochFinalID
 	}
@@ -41,7 +41,7 @@ func (ctx blockBuildContext) highestPossibleReferenceBlockID() flow.Identifier {
 //   - the first block in this cluster's operating epoch
 //   - the lowest block which could be used as a reference block without being
 //     immediately expired (accounting for the configured expiry buffer)
-func (ctx blockBuildContext) lowestPossibleReferenceBlockHeight() uint64 {
+func (ctx *blockBuildContext) lowestPossibleReferenceBlockHeight() uint64 {
 	minPossibleRefHeight := ctx.refChainFinalizedHeight - uint64(flow.DefaultTransactionExpiry-ctx.config.ExpiryBuffer)
 	if minPossibleRefHeight > ctx.refChainFinalizedHeight {
 		minPossibleRefHeight = 0 // overflow check
