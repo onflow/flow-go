@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	mock2 "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/channels"
@@ -80,6 +81,56 @@ func TestHandleReportedMisbehavior(t *testing.T) {
 	}
 
 	unittest.RequireReturnsBefore(t, allReportsManaged.Wait, 100*time.Millisecond, "did not receive all reports")
+}
+
+// TestMisbehaviorReportMetrics tests the recording of misbehavior report metrics.
+// It checks that when a misbehavior report is received by the ALSP manager, the metrics are recorded.
+// It fails the test if the metrics are not recorded or if they are recorded incorrectly.
+func TestMisbehaviorReportMetrics(t *testing.T) {
+	alspMetrics := mock2.NewAlspMetrics(t)
+	conduitFactory := conduit.NewDefaultConduitFactory(
+		unittest.Logger(),
+		alspMetrics)
+
+	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
+		t,
+		1,
+		unittest.Logger(),
+		unittest.NetworkCodec(),
+		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+	sms := testutils.GenerateSubscriptionManagers(t, mws)
+	networks := testutils.GenerateNetworks(
+		t,
+		unittest.Logger(),
+		ids,
+		mws,
+		sms,
+		p2p.WithConduitFactory(conduitFactory))
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, networks, 100*time.Millisecond)
+	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
+	defer cancel()
+
+	e := mocknetwork.NewEngine(t)
+	con, err := networks[0].Register(channels.TestNetworkChannel, e)
+	require.NoError(t, err)
+
+	report := testutils.MisbehaviorReportFixture(t)
+
+	// this channel is used to signal that the metrics have been recorded by the ALSP manager correctly.
+	reported := make(chan struct{})
+
+	// ensures that the metrics are recorded when a misbehavior report is received.
+	alspMetrics.On("OnMisbehaviorReported", channels.TestNetworkChannel.String(), report.Reason().String()).Run(func(args mock.Arguments) {
+		close(reported)
+	}).Once()
+
+	con.ReportMisbehavior(report) // reports the misbehavior
+
+	unittest.RequireCloseBefore(t, reported, 100*time.Millisecond, "metrics for the misbehavior report were not recorded")
 }
 
 // The TestReportCreation tests the creation of misbehavior reports using the alsp.NewMisbehaviorReport function.
