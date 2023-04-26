@@ -33,5 +33,7 @@ type Storage interface {
 type ForkAwareStorage interface {
 	Storage
 
+	// BlockFinalized receives block finalization calls in the order blocks getting finalized (no-concurrent call)
+	// if the storage hasn't received the block execution results for this block it would return false
 	BlockFinalized(header *flow.Header) (bool, error)
 }
