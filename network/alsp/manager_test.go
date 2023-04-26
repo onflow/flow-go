@@ -34,6 +34,7 @@ func TestHandleReportedMisbehavior(t *testing.T) {
 	misbehaviorReportManger := mocknetwork.NewMisbehaviorReportManager(t)
 	conduitFactory := conduit.NewDefaultConduitFactory(
 		unittest.Logger(),
+		metrics.NewNoopCollector(),
 		conduit.WithMisbehaviorManager(misbehaviorReportManger))
 
 	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(

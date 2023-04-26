@@ -165,6 +165,7 @@ type NetworkInboundQueueMetrics interface {
 // NetworkCoreMetrics encapsulates the metrics collectors for the core networking layer functionality.
 type NetworkCoreMetrics interface {
 	NetworkInboundQueueMetrics
+	AlspMetrics
 	// OutboundMessageSent collects metrics related to a message sent by the node.
 	OutboundMessageSent(sizeBytes int, topic string, protocol string, messageType string)
 	// InboundMessageReceived collects metrics related to a message received by the node.
@@ -208,7 +209,6 @@ type NetworkMetrics interface {
 	LibP2PMetrics
 	NetworkSecurityMetrics
 	NetworkCoreMetrics
-	AlspMetrics
 }
 
 // EngineMetrics is a generic metrics consumer for node-internal data processing
