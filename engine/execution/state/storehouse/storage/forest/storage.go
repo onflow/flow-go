@@ -24,7 +24,7 @@ type ForestStorage struct {
 	lock               sync.RWMutex
 }
 
-var _ storage.Storage = &ForestStorage{}
+var _ storage.ForkAwareStorage = &ForestStorage{}
 
 // NewStorage constructs a new ForestStorage
 func NewStorage(storage storage.Storage) (*ForestStorage, error) {
@@ -115,11 +115,9 @@ func (fs *ForestStorage) LastCommittedBlock() (*flow.Header, error) {
 	return fs.lastCommittedBlock, nil
 }
 
-func (fs *ForestStorage) BlockFinalized(
-	blockID flow.Identifier,
-	header *flow.Header,
-) (bool, error) {
+func (fs *ForestStorage) BlockFinalized(header *flow.Header) (bool, error) {
 	height := header.Height
+	blockID := header.ID()
 
 	fs.lock.Lock()
 	defer fs.lock.Unlock()
