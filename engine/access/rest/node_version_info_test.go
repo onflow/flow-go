@@ -24,7 +24,7 @@ func nodeVersionInfoURL(t *testing.T) string {
 }
 
 func TestGetNodeVersionInfo(t *testing.T) {
-	backend := &mock.API{}
+	backend := mock.NewAPI(t)
 
 	t.Run("get node version info", func(t *testing.T) {
 		req := getNodeVersionInfoRequest(t)

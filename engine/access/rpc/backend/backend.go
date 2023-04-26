@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	lru "github.com/hashicorp/golang-lru"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
@@ -234,12 +237,12 @@ func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionIn
 	stateParams := b.state.Params()
 	sporkId, err := stateParams.SporkID()
 	if err != nil {
-		return nil, fmt.Errorf("failed to read spork ID: %w", err)
+		return nil, status.Errorf(codes.Internal, "failed to read spork ID: %v", err)
 	}
 
 	protocolVersion, err := stateParams.ProtocolVersion()
 	if err != nil {
-		return nil, fmt.Errorf("faild to read protocol version: %w", err)
+		return nil, status.Errorf(codes.Internal, "failed to read protocol version: %v", err)
 	}
 
 	return &access.NodeVersionInfo{

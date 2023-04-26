@@ -141,8 +141,8 @@ func (h *FlowAccessAPIRouter) Ping(context context.Context, req *access.PingRequ
 }
 
 func (h *FlowAccessAPIRouter) GetNodeVersionInfo(ctx context.Context, request *access.GetNodeVersionInfoRequest) (*access.GetNodeVersionInfoResponse, error) {
-	res, err := h.Upstream.GetNodeVersionInfo(ctx, request)
-	h.log("upstream", "GetNodeVersionInfo", err)
+	res, err := h.Observer.GetNodeVersionInfo(ctx, request)
+	h.log("observer", "GetNodeVersionInfo", err)
 	return res, err
 }
 
