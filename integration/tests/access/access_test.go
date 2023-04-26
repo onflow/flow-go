@@ -2,13 +2,15 @@ package access
 
 import (
 	"context"
-	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
