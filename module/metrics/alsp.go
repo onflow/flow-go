@@ -4,8 +4,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
 )
 
 // AlspMetrics is a struct that contains all the metrics related to the ALSP module.
@@ -43,9 +41,9 @@ func NewAlspMetrics() *AlspMetrics {
 // Args:
 // - channel: the channel on which the misbehavior was reported
 // - misbehaviorType: the type of misbehavior reported
-func (a *AlspMetrics) OnMisbehaviorReported(channel channels.Channel, misbehaviorType network.Misbehavior) {
+func (a *AlspMetrics) OnMisbehaviorReported(channel string, misbehaviorType string) {
 	a.reportedMisbehaviorCount.With(prometheus.Labels{
-		LabelChannel:     channel.String(),
-		LabelMisbehavior: misbehaviorType.String(),
+		LabelChannel:     channel,
+		LabelMisbehavior: misbehaviorType,
 	}).Inc()
 }

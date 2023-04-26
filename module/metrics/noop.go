@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 
 	httpmetrics "github.com/slok/go-http-metrics/metrics"
@@ -291,6 +290,6 @@ func (nc *NoopCollector) OnBehaviourPenaltyUpdated(f float64)                   
 func (nc *NoopCollector) OnIPColocationFactorUpdated(f float64)                            {}
 func (nc *NoopCollector) OnAppSpecificScoreUpdated(f float64)                              {}
 func (nc *NoopCollector) OnOverallPeerScoreUpdated(f float64)                              {}
-func (nc *NoopCollector) OnMisbehaviorReported(channels.Channel, flownet.Misbehavior) {
+func (nc *NoopCollector) OnMisbehaviorReported(string, string) {
 	// no-p0
 }

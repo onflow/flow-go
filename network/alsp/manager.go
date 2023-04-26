@@ -36,7 +36,7 @@ func NewMisbehaviorReportManager(logger zerolog.Logger, metrics module.AlspMetri
 //
 //	and report the node to be disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
 func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Channel, report network.MisbehaviorReport) {
-	m.metrics.OnMisbehaviorReported(channel, report.Reason())
+	m.metrics.OnMisbehaviorReported(channel.String(), report.Reason().String())
 
 	m.logger.Debug().
 		Str("channel", channel.String()).

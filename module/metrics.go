@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 )
 
@@ -201,7 +200,7 @@ type AlspMetrics interface {
 	// Args:
 	// - channel: the channel on which the misbehavior was reported
 	// - misbehaviorType: the type of misbehavior reported
-	OnMisbehaviorReported(channel channels.Channel, misbehaviorType network.Misbehavior)
+	OnMisbehaviorReported(channel string, misbehaviorType string)
 }
 
 // NetworkMetrics is the blanket abstraction that encapsulates the metrics collectors for the networking layer.
