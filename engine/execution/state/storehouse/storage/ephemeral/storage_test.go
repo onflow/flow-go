@@ -1,4 +1,4 @@
-package storage_test
+package ephemeral_test
 
 import (
 	"crypto/rand"
@@ -6,12 +6,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/cargo/storage"
+	"github.com/onflow/flow-go/engine/execution/state/storehouse/storage/ephemeral"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestInMemoryStorage(t *testing.T) {
+func TestStorage(t *testing.T) {
 
 	t.Run("commit checks", func(t *testing.T) {
 		var err error
@@ -19,7 +19,7 @@ func TestInMemoryStorage(t *testing.T) {
 		headers := unittest.BlockHeaderFixtures(13)
 		genesis, batch1, _, batch3 := headers[0], headers[1:5], headers[5:9], headers[9:]
 
-		store := storage.NewInMemoryStorage(capacity, genesis, nil)
+		store := ephemeral.NewStorage(capacity, genesis, nil)
 
 		blk, err := store.LastCommittedBlock()
 		require.NoError(t, err)
@@ -43,7 +43,10 @@ func TestInMemoryStorage(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, blk, header)
 
-			ret, err := store.RegisterValueAt(header.Height, header.ID(), key)
+			view, err := store.BlockView(header.Height, header.ID())
+			require.NoError(t, err)
+
+			ret, err := view.Get(key)
 			require.NoError(t, err)
 			require.Equal(t, randValue, ret)
 		}
@@ -53,9 +56,9 @@ func TestInMemoryStorage(t *testing.T) {
 			err = store.CommitBlock(header, nil)
 			require.Error(t, err)
 
-			ret, err := store.RegisterValueAt(header.Height, header.ID(), key)
+			view, err := store.BlockView(header.Height, header.ID())
 			require.Error(t, err)
-			require.Nil(t, ret)
+			require.Nil(t, view)
 		}
 	})
 
@@ -71,37 +74,57 @@ func TestInMemoryStorage(t *testing.T) {
 			key: value,
 		}
 
-		store := storage.NewInMemoryStorage(capacity, genesis, data)
+		store := ephemeral.NewStorage(capacity, genesis, data)
 
-		val, err := store.RegisterValueAt(genesis.Height-1, flow.ZeroID, key)
+		view, err := store.BlockView(genesis.Height-1, flow.ZeroID)
 		require.Error(t, err)
-		require.Nil(t, val)
+		require.Nil(t, view)
 
 		// add the first batch of headers
 		for _, header := range batch1 {
 			err = store.CommitBlock(header, data)
 			require.NoError(t, err)
 
-			ret, err := store.RegisterValueAt(header.Height, header.ID(), key)
+			view, err := store.BlockView(header.Height, header.ID())
+			require.NoError(t, err)
+
+			ret, err := view.Get(key)
 			require.NoError(t, err)
 			require.Equal(t, value, ret)
 		}
 
+		// hold on to a view from batch one to test
+		lastCommittedHeader := batch1[len(batch1)-1]
+		viewToBeStale, err := store.BlockView(lastCommittedHeader.Height, lastCommittedHeader.ID())
+		require.NoError(t, err)
+
+		ret, err := viewToBeStale.Get(key)
+		require.NoError(t, err)
+		require.Equal(t, value, ret)
+
+		// start batch2
 		for _, header := range batch2 {
 			err = store.CommitBlock(header, data)
 			require.NoError(t, err)
 
-			ret, err := store.RegisterValueAt(header.Height, header.ID(), key)
+			view, err := store.BlockView(header.Height, header.ID())
+			require.NoError(t, err)
+
+			ret, err := view.Get(key)
 			require.NoError(t, err)
 			require.Equal(t, value, ret)
 		}
 
 		// now batch one should not be available
 		for _, header := range batch1 {
-			ret, err := store.RegisterValueAt(header.Height, header.ID(), key)
+			view, err := store.BlockView(header.Height, header.ID())
 			require.Error(t, err)
-			require.Nil(t, ret)
+			require.Nil(t, view)
 		}
+
+		// check staleed view
+		ret, err = viewToBeStale.Get(key)
+		require.Error(t, err)
 	})
 
 	t.Run("test historic value return", func(t *testing.T) {
@@ -112,9 +135,12 @@ func TestInMemoryStorage(t *testing.T) {
 
 		key := flow.RegisterID{Key: "key", Owner: "owner"}
 
-		store := storage.NewInMemoryStorage(capacity, genesis, nil)
+		store := ephemeral.NewStorage(capacity, genesis, nil)
 
-		val, err := store.RegisterValueAt(genesis.Height, genesis.ID(), key)
+		view, err := store.BlockView(genesis.Height, genesis.ID())
+		require.NoError(t, err)
+
+		val, err := view.Get(key)
 		require.NoError(t, err)
 		require.Nil(t, val)
 
@@ -127,7 +153,10 @@ func TestInMemoryStorage(t *testing.T) {
 		}
 
 		for i, header := range batch1 {
-			val, err = store.RegisterValueAt(header.Height, header.ID(), key)
+			view, err := store.BlockView(header.Height, header.ID())
+			require.NoError(t, err)
+
+			val, err := view.Get(key)
 			require.NoError(t, err)
 			require.Equal(t, i, int(val[0]))
 		}
@@ -141,13 +170,16 @@ func TestInMemoryStorage(t *testing.T) {
 
 		key := flow.RegisterID{Key: "key", Owner: "owner"}
 
-		store := storage.NewInMemoryStorage(capacity,
+		store := ephemeral.NewStorage(capacity,
 			genesis,
 			map[flow.RegisterID]flow.RegisterValue{
 				key: []byte{byte(int8(0))},
 			})
 
-		val, err := store.RegisterValueAt(genesis.Height, genesis.ID(), key)
+		view, err := store.BlockView(genesis.Height, genesis.ID())
+		require.NoError(t, err)
+
+		val, err := view.Get(key)
 		require.NoError(t, err)
 		require.Equal(t, 0, int(val[0]))
 
@@ -165,7 +197,11 @@ func TestInMemoryStorage(t *testing.T) {
 			if i%5 == 0 {
 				lastUpdatedValue = i
 			}
-			val, err = store.RegisterValueAt(header.Height, header.ID(), key)
+
+			view, err := store.BlockView(header.Height, header.ID())
+			require.NoError(t, err)
+
+			val, err = view.Get(key)
 			require.NoError(t, err)
 			require.Equal(t, lastUpdatedValue, int(val[0]))
 		}

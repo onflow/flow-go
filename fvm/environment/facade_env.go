@@ -6,10 +6,9 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 )
 
@@ -147,12 +146,7 @@ func NewScriptEnvironmentFromStorageSnapshot(
 	storageSnapshot state.StorageSnapshot,
 ) *facadeEnvironment {
 	derivedBlockData := derived.NewEmptyDerivedBlockData()
-	derivedTxn, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
-		logical.EndOfBlockExecutionTime,
-		logical.EndOfBlockExecutionTime)
-	if err != nil {
-		panic(err)
-	}
+	derivedTxn := derivedBlockData.NewSnapshotReadDerivedTransactionData()
 
 	txn := storage.SerialTransaction{
 		NestedTransaction: state.NewTransactionState(
