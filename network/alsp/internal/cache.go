@@ -21,6 +21,18 @@ type SpamRecordCache struct {
 
 var _ alsp.SpamRecordCache = (*SpamRecordCache)(nil)
 
+// NewSpamRecordCache creates a new SpamRecordCache.
+// Args:
+// - sizeLimit: the maximum number of records that the cache can hold.
+// - logger: the logger used by the cache.
+// - collector: the metrics collector used by the cache.
+// - recordFactory: a factory function that creates a new spam record.
+// Returns:
+// - *SpamRecordCache, the created cache.
+// Note that the cache is supposed to keep the spam record for the authorized (staked) nodes. Since the number of such nodes is
+// expected to be small, we do not eject any records from the cache. The cache size must be large enough to hold all
+// the spam records of the authorized nodes. Also, this cache is keeping at most one record per origin id, so the
+// size of the cache must be at least the number of authorized nodes.
 func NewSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics, recordFactory func(flow.Identifier) alsp.ProtocolSpamRecord) *SpamRecordCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
@@ -44,6 +56,8 @@ func NewSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector modul
 // - originId: the origin id of the spam record.
 // Returns:
 // - true if the record is initialized, false otherwise (i.e., the record already exists).
+// Note that if Init is called multiple times for the same origin id, the record is initialized only once, and the
+// subsequent calls return false and do not change the record (i.e., the record is not re-initialized).
 func (s *SpamRecordCache) Init(originId flow.Identifier) bool {
 	return s.c.Add(ProtocolSpamRecordEntity{s.recordFactory(originId)})
 }
