@@ -10,7 +10,7 @@ import (
 // The identifier of this entity is the origin id of the spam record. This entails that the spam records
 // are deduplicated by origin id.
 type ProtocolSpamRecordEntity struct {
-	r alsp.ProtocolSpamRecord
+	alsp.ProtocolSpamRecord
 }
 
 var _ flow.Entity = (*ProtocolSpamRecordEntity)(nil)
@@ -18,13 +18,11 @@ var _ flow.Entity = (*ProtocolSpamRecordEntity)(nil)
 // ID returns the origin id of the spam record, which is used as the unique identifier of the entity for maintenance and
 // deduplication purposes in the cache.
 func (p ProtocolSpamRecordEntity) ID() flow.Identifier {
-	return p.r.OriginId
+	return p.OriginId
 }
 
 // Checksum returns the origin id of the spam record, it does not have any purpose in the cache.
 // It is implemented to satisfy the flow.Entity interface.
 func (p ProtocolSpamRecordEntity) Checksum() flow.Identifier {
-	return p.r.OriginId
+	return p.OriginId
 }
-
-
