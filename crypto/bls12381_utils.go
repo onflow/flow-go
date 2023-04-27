@@ -7,7 +7,7 @@ package crypto
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
 // and the BLS distributed key generation protocols
 
-// #cgo CFLAGS: -I${SRCDIR}/ -I${SRCDIR}/relic/build/include -I${SRCDIR}/relic/include -I${SRCDIR}/relic/include/low -I${SRCDIR}/blst_src -I${SRCDIR}/blst_src/build -D__BLST_CGO__ -fno-builtin-memcpy -fno-builtin-memset -Wall -Wno-unused-function -Wno-unused-macros
+// #cgo CFLAGS: -I${SRCDIR}/ -I${SRCDIR}/relic/build/include -I${SRCDIR}/relic/include -I${SRCDIR}/relic/include/low -I${SRCDIR}/blst_src -I${SRCDIR}/blst_src/build -O -D__BLST_PORTABLE__ -D__BLST_CGO__ -fno-builtin-memcpy -fno-builtin-memset -Wall -Wno-unused-function -Wno-unused-macros
 // #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
 // #cgo amd64 CFLAGS: -D__ADX__ -mno-avx
 // #cgo mips64 mips64le ppc64 ppc64le riscv64 s390x CFLAGS: -D__BLST_NO_ASM__
@@ -17,12 +17,12 @@ package crypto
 // # include <signal.h>
 // # include <unistd.h>
 // static void handler(int signum)
-// {   ssize_t n = write(2, "Caught SIGILL in blst_cgo_init, "
-//                          "consult <blst>/bindings/go/README.md.\n", 70);
+// {	char text[1024] = "Caught SIGILL in blst_cgo_init, BLST library (used by flow-go/crypto) requires ADX support, build with CGO_CFLAGS=-O -D__BLST_PORTABLE__";
+//		ssize_t n = write(2, &text, strlen(text));
 //     _exit(128+SIGILL);
 //     (void)n;
 // }
-// __attribute__((constructor)) static void blst_cgo_init()
+// __attribute__((constructor)) static void flow_crypto_cgo_init()
 // {   Fp temp = { 0 };
 //     struct sigaction act = {{ handler }}, oact;
 //     sigaction(SIGILL, &act, &oact);
