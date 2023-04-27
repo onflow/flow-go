@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -169,27 +167,26 @@ func (s *AccessSuite) TestSignerIndicesDecoding() {
 	committee, err := committees.NewConsensusCommittee(state, container.Config.NodeID)
 	require.NoError(s.T(), err)
 	blockSignerDecoder := signature.NewBlockSignerDecoder(committee)
-	// checks if
-	assertSignerIndicesValidity := func(msg *entities.BlockHeader) {
-		block, err := convert.MessageToBlockHeader(msg)
-		require.NoError(s.T(), err)
-		decodedIdentities, err := blockSignerDecoder.DecodeSignerIDs(block)
-		require.NoError(s.T(), err)
-		// transform to assert
-		var transformed [][]byte
-		for _, identity := range decodedIdentities {
-			identity := identity
-			transformed = append(transformed, identity[:])
-		}
-		assert.ElementsMatch(s.T(), transformed, msg.ParentVoterIds, "response must contain correctly encoded signer IDs")
-	}
 
 	expectedFinalizedBlock, err := state.AtBlockID(flow.HashToID(latestFinalizedBlock.Block.Id)).Head()
 	require.NoError(s.T(), err)
 
 	// since all blocks should be equal we will execute just check on one of them
 	require.Equal(s.T(), latestFinalizedBlock.Block.ParentVoterIndices, expectedFinalizedBlock.ParentVoterIndices)
-	assertSignerIndicesValidity(latestFinalizedBlock.Block)
+
+	// check if the response contains valid encoded signer IDs.
+	msg := latestFinalizedBlock.Block
+	block, err := convert.MessageToBlockHeader(msg)
+	require.NoError(s.T(), err)
+	decodedIdentities, err := blockSignerDecoder.DecodeSignerIDs(block)
+	require.NoError(s.T(), err)
+	// transform to assert
+	var transformed [][]byte
+	for _, identity := range decodedIdentities {
+		identity := identity
+		transformed = append(transformed, identity[:])
+	}
+	assert.ElementsMatch(s.T(), transformed, msg.ParentVoterIds, "response must contain correctly encoded signer IDs")
 }
 
 // makeApiRequest is a helper function that encapsulates context creation for grpc client call, used to avoid repeated creation
