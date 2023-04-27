@@ -69,7 +69,7 @@ func New(
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
-	// cache the root block height and ID for
+	// cache the root block height and ID for runtime lookups.
 	rootHeight, err := state.Params().SporkRootBlockHeight()
 	if err != nil {
 		return nil, fmt.Errorf("could not get spork root block height: %w", err)
