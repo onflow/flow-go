@@ -1,6 +1,7 @@
 package internal_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -89,4 +90,54 @@ func TestSpamRecordCache_Init(t *testing.T) {
 	require.NotNil(t, record2, "expected non-nil record")
 	require.Equal(t, originID2, record2.OriginId, "expected record to have correct origin ID")
 	require.Equal(t, cache.Size(), uint(2), "expected cache to have two records")
+}
+
+// TestSpamRecordCache_Adjust tests the Adjust method of the SpamRecordCache.
+// The test covers the following scenarios:
+// 1. Adjusting a spam record for an existing origin ID.
+// 2. Attempting to adjust a spam record for a non-existing origin ID.
+// 3. Attempting to adjust a spam record with an adjustFunc that returns an error.
+func TestSpamRecordCache_Adjust(t *testing.T) {
+	sizeLimit := uint32(100)
+	logger := zerolog.Nop()
+	collector := metrics.NewNoopCollector()
+	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+		return protocolSpamRecordFixture(id)
+	}
+
+	cache := internal.NewSpamRecordCache(sizeLimit, logger, collector, recordFactory)
+	require.NotNil(t, cache)
+
+	originID1 := unittest.IdentifierFixture()
+	originID2 := unittest.IdentifierFixture()
+
+	// Initialize spam records for originID1 and originID2
+	require.True(t, cache.Init(originID1))
+	require.True(t, cache.Init(originID2))
+
+	// Test adjusting the spam record for an existing origin ID
+	adjustFunc := func(record alsp.ProtocolSpamRecord) (alsp.ProtocolSpamRecord, error) {
+		record.Penalty -= 10
+		return record, nil
+	}
+	penalty, err := cache.Adjust(originID1, adjustFunc)
+	require.NoError(t, err)
+	require.Equal(t, -10.0, penalty)
+
+	record1, ok := cache.Get(originID1)
+	require.True(t, ok)
+	require.NotNil(t, record1)
+	require.Equal(t, -10.0, record1.Penalty)
+
+	// Test adjusting the spam record for a non-existing origin ID
+	originID3 := unittest.IdentifierFixture()
+	_, err = cache.Adjust(originID3, adjustFunc)
+	require.Error(t, err)
+
+	// Test adjusting the spam record with an adjustFunc that returns an error
+	adjustFuncError := func(record alsp.ProtocolSpamRecord) (alsp.ProtocolSpamRecord, error) {
+		return record, errors.New("adjustment error")
+	}
+	_, err = cache.Adjust(originID1, adjustFuncError)
+	require.Error(t, err)
 }
