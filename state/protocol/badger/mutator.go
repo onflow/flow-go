@@ -694,6 +694,12 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		}
 	}
 
+	// Extract and validate version beacon events from the block seals.
+	versionBeacons, err := m.versionBeaconOnBlockFinalized(header)
+	if err != nil {
+		return fmt.Errorf("cannot process version beacon: %w", err)
+	}
+
 	// Persist updates in database
 	// * Add this block to the height-indexed set of finalized blocks.
 	// * Update the largest finalized height to this block's height.
@@ -734,6 +740,15 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not index the seal by the sealed block ID: %w", err)
+			}
+		}
+
+		if len(versionBeacons) > 0 {
+			// only index the last version beacon as that is the relevant one.
+			// TODO: The other version beacons can be used for validation.
+			err := operation.IndexVersionBeaconByHeight(versionBeacons[len(versionBeacons)-1])(tx)
+			if err != nil {
+				return fmt.Errorf("could not index version beacon or height (%d): %w", header.Height, err)
 			}
 		}
 
@@ -918,7 +933,7 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.B
 			case *flow.VersionBeacon:
 				// do nothing for now
 			default:
-				return nil, nil, fmt.Errorf("invalid service event type in payload (%T)", event)
+				return nil, nil, fmt.Errorf("invalid service event type in payload (%T)", ev)
 			}
 		}
 	}
@@ -979,6 +994,73 @@ func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered b
 	)
 	return epochStatus, err
 
+}
+
+// versionBeaconOnBlockFinalized extracts the VersionBeacons from the parent block's
+// Seals and returns it.
+// This could return multiple VersionBeacons if the parent block contains multiple Seals.
+// The version beacons will be returned in the ascending height order of the seals.
+// Technically only the last seal is relevant.
+func (m *FollowerState) versionBeaconOnBlockFinalized(
+	header *flow.Header,
+) ([]*flow.SealedVersionBeacon, error) {
+	var versionBeacons []*flow.SealedVersionBeacon
+
+	parent, err := m.blocks.ByID(header.ParentID)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"could not get parent (id=%x): %w",
+			header.ParentID,
+			err)
+	}
+
+	seals, err := protocol.OrderedSeals(parent.Payload, m.headers)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf(
+				"ordering seals: parent payload contains"+
+					" seals for unknown block: %w", err)
+		}
+		return nil, fmt.Errorf("unexpected error ordering seals: %w", err)
+	}
+
+	for _, seal := range seals {
+		result, err := m.results.ByID(seal.ResultID)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"could not retrieve result (id=%x) for seal (id=%x): %w",
+				seal.ResultID,
+				seal.ID(),
+				err)
+		}
+		for _, event := range result.ServiceEvents {
+
+			ev, ok := event.Event.(*flow.VersionBeacon)
+
+			if !ok {
+				// skip other service event types.
+				// validation if this is a known service event type is done elsewhere.
+				continue
+			}
+
+			err := ev.Validate()
+			if err != nil {
+				m.logger.Warn().
+					Err(err).
+					Str("block_id", parent.ID().String()).
+					Interface("event", ev).
+					Msg("invalid VersionBeacon service event")
+				continue
+			}
+
+			versionBeacons = append(versionBeacons, &flow.SealedVersionBeacon{
+				VersionBeacon: ev,
+				SealHeight:    header.Height,
+			})
+		}
+	}
+
+	return versionBeacons, nil
 }
 
 // handleEpochServiceEvents handles applying state changes which occur as a result

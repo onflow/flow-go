@@ -274,6 +274,179 @@ func TestSealedIndex(t *testing.T) {
 
 }
 
+func TestVersionBeaconIndex(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		rootHeader, err := rootSnapshot.Head()
+		require.NoError(t, err)
+
+		// build a chain:
+		// G <- B1 <- B2 (resultB1(vb1)) <- B3 <- B4 (resultB2(vb2), resultB3(vb3)) <- B5 (sealB1) <- B6 (sealB2, sealB3) <- B7
+		// up until and including finalization of B5 there should be no VBs indexed
+		//    when B6 is finalized, index VB1
+		//    when B7 is finalized, we can index VB2 and VB3, but the last one should be indexed for a height
+
+		// block 1
+		b1 := unittest.BlockWithParentFixture(rootHeader)
+		b1.SetPayload(flow.EmptyPayload())
+		err = state.Extend(context.Background(), b1)
+		require.NoError(t, err)
+
+		vb1 := unittest.VersionBeaconFixture(
+			unittest.WithBoundaries(
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height,
+					Version:     "0.21.37",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 100,
+					Version:     "0.21.38",
+				},
+			),
+		)
+		vb2 := unittest.VersionBeaconFixture(
+			unittest.WithBoundaries(
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height,
+					Version:     "0.21.37",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 101,
+					Version:     "0.21.38",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 201,
+					Version:     "0.21.39",
+				},
+			),
+		)
+		vb3 := unittest.VersionBeaconFixture(
+			unittest.WithBoundaries(
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height,
+					Version:     "0.21.37",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 99,
+					Version:     "0.21.38",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 199,
+					Version:     "0.21.39",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 299,
+					Version:     "0.21.40",
+				},
+			),
+		)
+
+		b1Receipt := unittest.ReceiptForBlockFixture(b1)
+		b1Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{vb1.ServiceEvent()}
+		b2 := unittest.BlockWithParentFixture(b1.Header)
+		b2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(b1Receipt)))
+		err = state.Extend(context.Background(), b2)
+		require.NoError(t, err)
+
+		// block 3
+		b3 := unittest.BlockWithParentFixture(b2.Header)
+		b3.SetPayload(flow.EmptyPayload())
+		err = state.Extend(context.Background(), b3)
+		require.NoError(t, err)
+
+		// block 4 (resultB2, resultB3)
+		b2Receipt := unittest.ReceiptForBlockFixture(b2)
+		b2Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{vb2.ServiceEvent()}
+
+		b3Receipt := unittest.ReceiptForBlockFixture(b3)
+		b3Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{vb3.ServiceEvent()}
+
+		b4 := unittest.BlockWithParentFixture(b3.Header)
+		b4.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceiptMeta{b2Receipt.Meta(), b3Receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&b2Receipt.ExecutionResult, &b3Receipt.ExecutionResult},
+		})
+		err = state.Extend(context.Background(), b4)
+		require.NoError(t, err)
+
+		// block 5 (sealB1)
+		b1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b1Receipt.ExecutionResult))
+		b5 := unittest.BlockWithParentFixture(b4.Header)
+		b5.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{b1Seal},
+		})
+		err = state.Extend(context.Background(), b5)
+		require.NoError(t, err)
+
+		// block 6 (sealB2, sealB3)
+		b2Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b2Receipt.ExecutionResult))
+		b3Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b3Receipt.ExecutionResult))
+		b6 := unittest.BlockWithParentFixture(b5.Header)
+		b6.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{b2Seal, b3Seal},
+		})
+		err = state.Extend(context.Background(), b6)
+		require.NoError(t, err)
+
+		// block 7
+		b7 := unittest.BlockWithParentFixture(b6.Header)
+		b7.SetPayload(flow.EmptyPayload())
+		err = state.Extend(context.Background(), b7)
+		require.NoError(t, err)
+
+		versionBeacons := bstorage.NewVersionBeacons(db)
+
+		// No VB can be found before finalizing anything
+		_, err = versionBeacons.Highest(b7.Header.Height)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+
+		// finalizing b1 - b5
+		err = state.Finalize(context.Background(), b1.ID())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), b2.ID())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), b3.ID())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), b4.ID())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), b5.ID())
+		require.NoError(t, err)
+
+		// No VB can be found after finalizing B5
+		_, err = versionBeacons.Highest(b7.Header.Height)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+
+		//  once B6 is finalized, events sealed by B5 are considered in effect, hence index should now find it
+		err = state.Finalize(context.Background(), b6.ID())
+		require.NoError(t, err)
+
+		versionBeacon, err := versionBeacons.Highest(b7.Header.Height)
+		require.NoError(t, err)
+		require.Equal(t,
+			&flow.SealedVersionBeacon{
+				VersionBeacon: vb1,
+				SealHeight:    b6.Header.Height,
+			},
+			versionBeacon,
+		)
+
+		// finalizing B7 should index events sealed by B6, so VB2 and VB3
+		// while we don't expect multiple VBs in one block, we index newest, so last one emitted - VB3
+		err = state.Finalize(context.Background(), b7.ID())
+		require.NoError(t, err)
+
+		versionBeacon, err = versionBeacons.Highest(b7.Header.Height)
+		require.NoError(t, err)
+		require.Equal(t,
+			&flow.SealedVersionBeacon{
+				VersionBeacon: vb3,
+				SealHeight:    b7.Header.Height,
+			},
+			versionBeacon,
+		)
+	})
+}
+
 func TestExtendSealedBoundary(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {

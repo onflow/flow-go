@@ -11,7 +11,7 @@ import (
 //
 // No errors are expected during normal operation.
 func IndexVersionBeaconByHeight(
-	beacon flow.SealedVersionBeacon,
+	beacon *flow.SealedVersionBeacon,
 ) func(*badger.Txn) error {
 	return upsert(makePrefix(codeVersionBeacon, beacon.SealHeight), beacon)
 }

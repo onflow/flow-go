@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -11,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -265,6 +267,11 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 		return fmt.Errorf("final view of epoch less than first block view")
 	}
 
+	err = validateVersionBeacon(snap)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -340,6 +347,33 @@ func validateClusterQC(cluster protocol.Cluster) error {
 	if err != nil {
 		return fmt.Errorf("could not validate root qc: %w", err)
 	}
+	return nil
+}
+
+func validateVersionBeacon(snap protocol.Snapshot) error {
+	versionBeacon, err := snap.VersionBeacon()
+	if err != nil {
+		if errors.Is(err, state.ErrNoVersionBeacon) {
+			return nil
+		}
+		return fmt.Errorf("could not get version beacon: %w", err)
+	}
+
+	head, err := snap.Head()
+	if err != nil {
+		return fmt.Errorf("could not get snapshot head: %w", err)
+	}
+
+	// version beacon must be included in a past block to be effective
+	if versionBeacon.SealHeight > head.Height {
+		return fmt.Errorf("version table height higher than highest height")
+	}
+
+	err = versionBeacon.Validate()
+	if err != nil {
+		return fmt.Errorf("version beacon is invalid: %w", err)
+	}
+
 	return nil
 }
 

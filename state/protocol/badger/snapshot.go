@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -376,6 +377,24 @@ func (s *Snapshot) Epochs() protocol.EpochQuery {
 
 func (s *Snapshot) Params() protocol.GlobalParams {
 	return s.state.Params()
+}
+
+func (s *Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
+	head, err := s.state.headers.ByBlockID(s.blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	versionBeacon, err := s.state.versionBeacons.Highest(head.Height)
+
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, state.ErrNoVersionBeacon
+		}
+		return nil, fmt.Errorf("could not query highest version beacon: %w", err)
+	}
+
+	return versionBeacon, nil
 }
 
 // EpochQuery encapsulates querying epochs w.r.t. a snapshot.

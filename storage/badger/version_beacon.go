@@ -28,11 +28,11 @@ func (r *VersionBeacons) Highest(
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()
 
-	var beacon *flow.SealedVersionBeacon
+	var beacon flow.SealedVersionBeacon
 
-	err := operation.LookupLastVersionBeaconByHeight(belowOrEqualTo, beacon)(tx)
+	err := operation.LookupLastVersionBeaconByHeight(belowOrEqualTo, &beacon)(tx)
 	if err != nil {
 		return nil, err
 	}
-	return beacon, nil
+	return &beacon, nil
 }

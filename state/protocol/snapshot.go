@@ -136,4 +136,10 @@ type Snapshot interface {
 	// Params returns global parameters of the state this snapshot is taken from.
 	// Returns invalid.Params with state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
 	Params() GlobalParams
+
+	// VersionBeacon returns the latest sealed version beacon.
+	// Returns the following errors:
+	// - state.NoVersionBeaconError when no version beacon is available
+	// - generic error in case of unexpected critical internal corruption or bugs
+	VersionBeacon() (*flow.SealedVersionBeacon, error)
 }

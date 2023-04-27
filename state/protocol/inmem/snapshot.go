@@ -2,6 +2,7 @@ package inmem
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/seed"
 )
@@ -70,6 +71,13 @@ func (s Snapshot) Params() protocol.GlobalParams {
 
 func (s Snapshot) Encodable() EncodableSnapshot {
 	return s.enc
+}
+
+func (s Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
+	if s.enc.SealedVersionBeacon == nil {
+		return nil, state.ErrNoVersionBeacon
+	}
+	return s.enc.SealedVersionBeacon, nil
 }
 
 func SnapshotFromEncodable(enc EncodableSnapshot) *Snapshot {

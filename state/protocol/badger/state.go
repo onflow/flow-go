@@ -164,6 +164,12 @@ func Bootstrap(
 			state.metrics.BlockFinalized(block)
 		}
 
+		// 7) initialize version beacon
+		err = transaction.WithTx(state.boostrapVersionBeacon(root))(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap version beacon: %w", err)
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -788,6 +794,25 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 	}
 
 	return nil
+}
+
+// boostrapVersionBeacon bootstraps version beacon, by adding the latest beacon
+// to an index, if present.
+func (state *State) boostrapVersionBeacon(
+	snapshot protocol.Snapshot,
+) func(*badger.Txn) error {
+	return func(txn *badger.Txn) error {
+		versionBeacon, err := snapshot.VersionBeacon()
+		if err != nil {
+			// if there is no beacon, do nothing
+			if errors.Is(err, statepkg.ErrNoVersionBeacon) {
+				return nil
+			}
+			return err
+		}
+
+		return operation.IndexVersionBeaconByHeight(versionBeacon)(txn)
+	}
 }
 
 // populateCache is used after opening or bootstrapping the state to populate the cache.
