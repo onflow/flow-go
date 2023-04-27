@@ -146,3 +146,8 @@ func (s *SpamRecordCache) Identities() []flow.Identifier {
 func (s *SpamRecordCache) Remove(originId flow.Identifier) bool {
 	return s.c.Remove(originId)
 }
+
+// Size returns the number of spam records in the cache.
+func (s *SpamRecordCache) Size() uint {
+	return s.c.Size()
+}

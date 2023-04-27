@@ -30,4 +30,7 @@ type SpamRecordCache interface {
 	// - the record and true if the record exists, nil and false otherwise.
 	// Note that the returned record is a copy of the record in the cache (we do not want the caller to modify the record).
 	Get(originId flow.Identifier) (*ProtocolSpamRecord, bool)
+
+	// Size returns the number of records in the cache.
+	Size() uint
 }
