@@ -54,7 +54,7 @@ func TestPayloadStore(t *testing.T) {
 
 		// commit all
 		for _, header := range headers {
-			found, err := pstore.BlockFinalized(header.ID(), header)
+			found, err := pstore.BlockFinalized(header)
 			require.True(t, found)
 			require.NoError(t, err)
 		}
@@ -136,7 +136,7 @@ func TestPayloadStore(t *testing.T) {
 		require.NoError(t, err)
 
 		// first block is finalized
-		found, err := pstore.BlockFinalized(mainChain[0].ID(), mainChain[0])
+		found, err := pstore.BlockFinalized(mainChain[0])
 		require.True(t, found)
 		require.NoError(t, err)
 
