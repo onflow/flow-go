@@ -3,7 +3,12 @@ package internal
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
+	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network/alsp"
 )
@@ -16,10 +21,20 @@ type SpamRecordCache struct {
 
 var _ alsp.SpamRecordCache = (*SpamRecordCache)(nil)
 
-func NewSpamRecordCache(recordFactory func(flow.Identifier) alsp.ProtocolSpamRecord) *SpamRecordCache {
+func NewSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics, recordFactory func(flow.Identifier) alsp.ProtocolSpamRecord) *SpamRecordCache {
+	backData := herocache.NewCache(sizeLimit,
+		herocache.DefaultOversizeFactor,
+		// this cache is supposed to keep the spam record for the authorized (staked) nodes. Since the number of such nodes is
+		// expected to be small, we do not eject any records from the cache. The cache size must be large enough to hold all
+		// the spam records of the authorized nodes. Also, this cache is keeping at most one record per origin id, so the
+		// size of the cache must be at least the number of authorized nodes.
+		heropool.NoEjection,
+		logger.With().Str("mempool", "aslp=spam-records").Logger(),
+		collector)
+
 	return &SpamRecordCache{
 		recordFactory: recordFactory,
-		c:             stdmap.NewBackend(),
+		c:             stdmap.NewBackend(stdmap.WithBackData(backData)),
 	}
 }
 
