@@ -280,7 +280,7 @@ func (b *backendTransactions) GetTransactionResult(
 			return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
 		}
 
-		//An additional check to ensure the correctness of the collection ID.
+		// an additional check to ensure the correctness of the collection ID.
 		expectedCollectionID, err := b.lookupCollectionIDInBlock(block, txID)
 		if err != nil {
 			return nil, rpc.ConvertStorageError(err)
@@ -324,7 +324,7 @@ func (b *backendTransactions) lookupCollectionIDInBlock(
 	txID flow.Identifier,
 ) (flow.Identifier, error) {
 	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := b.collections.LightByID(guarantee.CollectionID)
+		collection, err := b.collections.LightByID(cId)
 		if err != nil {
 			return flow.ZeroID, err
 		}

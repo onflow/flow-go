@@ -753,6 +753,10 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	transactionBody := collection.Transactions[0]
 	block := unittest.BlockFixture()
 	block.Header.Height = 2
+	block.SetPayload(
+		unittest.PayloadFixture(
+			unittest.WithGuarantees(
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
 	headBlock := unittest.BlockFixture()
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
 
@@ -761,6 +765,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		Return(headBlock.Header, nil)
 
 	light := collection.Light()
+
+	suite.collections.On("LightByID", light.ID()).Return(&light, nil)
 
 	// transaction storage returns the corresponding transaction
 	suite.transactions.
@@ -999,7 +1005,12 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	transactionBody := collection.Transactions[0]
 	// block which will eventually contain the transaction
 	block := unittest.BlockFixture()
+	block.SetPayload(
+		unittest.PayloadFixture(
+			unittest.WithGuarantees(
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
 	blockID := block.ID()
+
 	// reference block to which the transaction points to
 	refBlock := unittest.BlockFixture()
 	refBlockID := refBlock.ID()
@@ -1050,6 +1061,9 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 				}
 				return nil
 			})
+
+	light := collection.Light()
+	suite.collections.On("LightByID", mock.Anything).Return(&light, nil)
 
 	// refBlock storage returns the corresponding refBlock
 	suite.blocks.
@@ -1110,8 +1124,8 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		suite.execClient.AssertNotCalled(suite.T(), "GetTransactionResult", mock.Anything, mock.Anything)
 	})
 
-	// should return finalized status when we have have observed collection for the transaction (after observing the
-	// a preceding sealed refBlock)
+	// should return finalized status when we have observed collection for the transaction (after observing the
+	// preceding sealed refBlock)
 	suite.Run("finalized", func() {
 		currentState = flow.TransactionStatusFinalized
 		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)

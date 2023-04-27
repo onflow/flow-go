@@ -97,6 +97,10 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	block := unittest.BlockFixture()
 	// Height needs to be at least DefaultTransactionExpiry before we start doing retries
 	block.Header.Height = flow.DefaultTransactionExpiry + 1
+	block.SetPayload(
+		unittest.PayloadFixture(
+			unittest.WithGuarantees(
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
 	transactionBody.SetReferenceBlockID(block.ID())
 
 	light := collection.Light()
@@ -105,8 +109,9 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
 	// collection storage returns the corresponding collection
 	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(&light, nil)
+	suite.collections.On("LightByID", mock.Anything).Return(&light, nil)
 	// block storage returns the corresponding block
-	suite.blocks.On("ByCollectionID", collection.ID()).Return(&block, nil)
+	suite.blocks.On("ByCollectionID", light.ID()).Return(&block, nil)
 
 	txID := transactionBody.ID()
 	blockID := block.ID()
