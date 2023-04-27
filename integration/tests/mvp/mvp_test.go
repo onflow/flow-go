@@ -177,7 +177,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		SetGasLimit(9999)
 
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	err = serviceAccountClient.SignAndSendTransaction(ctx, createAccountTx)
+	err = serviceAccountClient.SignAndSendTransaction(childCtx, createAccountTx)
 	require.NoError(t, err)
 
 	cancel()
