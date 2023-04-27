@@ -104,5 +104,16 @@ func NewCollector[T any]() Collector[T] {
 	return Collector[T]{list: &list}
 }
 
-func (c Collector[T]) Append(t ...T) { *c.list = append(*c.list, t...) }
-func (c Collector[T]) Retrieve() []T { return *c.list }
+// Append adds new elements to the end of the list.
+func (c Collector[T]) Append(t ...T) {
+	*c.list = append(*c.list, t...)
+}
+
+// Retrieve returns the current state of the list (unaffected by subsequent append)
+func (c Collector[T]) Retrieve() []T {
+	// Under the hood, the slice is a struct containing a pointer to an underlying array and a
+	// `len` variable indicating how many of the array elements are occupied. Here, we are
+	// returning the slice struct by value, i.e. we _copy_ the array pointer and the `len` value
+	// and return the copy. Therefore, the returned slice is unaffected by subsequent append.
+	return *c.list
+}
