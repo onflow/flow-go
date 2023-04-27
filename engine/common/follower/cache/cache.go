@@ -30,6 +30,10 @@ type batchContext struct {
 	// equivocatingBlocks holds the list of equivocations that the batch contained, when comparing to the
 	// cached blocks. An equivocation are two blocks for the same view that have different block IDs.
 	equivocatingBlocks [][2]*flow.Block
+
+	// redundant marks if processed ALL blocks in batch are already stored in cache, meaning that
+	// such input is identical to what was previously processed.
+	redundant bool
 }
 
 // Cache stores pending blocks received from other replicas, caches blocks by blockID, and maintains
@@ -152,6 +156,10 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 	//  * check whether last block in batch has a child already in the cache
 	//    (result stored in `batchContext.batchChild`)
 	bc := c.unsafeAtomicAdd(blockIDs, batch)
+	if bc.redundant {
+		// omit redundant input
+		return nil, nil, nil
+	}
 
 	// If there exists a child of the last block in the batch, then the entire batch is certified.
 	// Otherwise, all blocks in the batch _except_ for the last one are certified
@@ -272,12 +280,17 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.B
 	}
 
 	// add blocks to underlying cache, check for equivocation and report if detected
+	storedBlocks := uint64(0)
 	for i, block := range fullBlocks {
-		equivocation := c.cache(blockIDs[i], block)
+		equivocation, cached := c.cache(blockIDs[i], block)
 		if equivocation != nil {
 			bc.equivocatingBlocks = append(bc.equivocatingBlocks, [2]*flow.Block{equivocation, block})
 		}
+		if cached {
+			storedBlocks++
+		}
 	}
+	bc.redundant = storedBlocks < 1
 
 	return bc
 }
@@ -286,14 +299,14 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.B
 // equivocation. The first return value contains the already-cached equivocating block or `nil` otherwise.
 // Repeated calls with the same block are no-ops.
 // CAUTION: not concurrency safe: execute within Cache's lock.
-func (c *Cache) cache(blockID flow.Identifier, block *flow.Block) (equivocation *flow.Block) {
+func (c *Cache) cache(blockID flow.Identifier, block *flow.Block) (equivocation *flow.Block, stored bool) {
 	cachedBlocksAtView, haveCachedBlocksAtView := c.byView[block.Header.View]
 	// Check whether there is a block with the same view already in the cache.
 	// During happy-path operations `cachedBlocksAtView` contains usually zero blocks or exactly one block
 	// which is `fullBlock` (duplicate). Larger sets of blocks can only be caused by slashable byzantine actions.
 	for otherBlockID, otherBlock := range cachedBlocksAtView {
 		if otherBlockID == blockID {
-			return nil // already stored
+			return nil, false // already stored
 		}
 		// have two blocks for the same view but with different IDs => equivocation!
 		equivocation = otherBlock
@@ -305,6 +318,7 @@ func (c *Cache) cache(blockID flow.Identifier, block *flow.Block) (equivocation 
 	if !added { // future proofing code: we allow an overflowing HeroCache to potentially eject the newly added element.
 		return
 	}
+	stored = true
 
 	// populate `byView` index
 	if !haveCachedBlocksAtView {

@@ -166,6 +166,30 @@ func (s *CacheSuite) TestAddBatch() {
 	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
 }
 
+// TestDuplicatedBatch checks that processing redundant inputs rejects batches that were previously rejected
+// but accepts batches that have at least one new block.
+func (s *CacheSuite) TestDuplicatedBatch() {
+	blocks := unittest.ChainFixtureFrom(10, unittest.BlockHeaderFixture())
+
+	certifiedBatch, certifyingQC, err := s.cache.AddBlocks(blocks[1:])
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), blocks[1:len(blocks)-1], certifiedBatch)
+	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
+
+	// add same batch again, this has to be rejected as redundant input
+	certifiedBatch, certifyingQC, err = s.cache.AddBlocks(blocks[1:])
+	require.NoError(s.T(), err)
+	require.Empty(s.T(), certifiedBatch)
+	require.Nil(s.T(), certifyingQC)
+
+	// add batch with one extra leading block, this has to accepted even though 9 out of 10 blocks
+	// were already processed
+	certifiedBatch, certifyingQC, err = s.cache.AddBlocks(blocks)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), blocks[:len(blocks)-1], certifiedBatch)
+	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
+}
+
 // TestPruneUpToView tests that blocks lower than pruned height will be properly filtered out from incoming batch.
 func (s *CacheSuite) TestPruneUpToView() {
 	blocks := unittest.ChainFixtureFrom(3, unittest.BlockHeaderFixture())
