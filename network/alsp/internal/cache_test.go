@@ -25,8 +25,8 @@ func TestNewSpamRecordCache(t *testing.T) {
 	}
 
 	cache := internal.NewSpamRecordCache(sizeLimit, logger, collector, recordFactory)
-
 	require.NotNil(t, cache)
+	require.Equalf(t, uint(0), cache.Size(), "cache size must be 0")
 }
 
 // protocolSpamRecordFixture creates a new protocol spam record with the given origin id.
