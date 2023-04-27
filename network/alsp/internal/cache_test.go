@@ -111,11 +111,11 @@ func TestSpamRecordCache_Adjust(t *testing.T) {
 	originID1 := unittest.IdentifierFixture()
 	originID2 := unittest.IdentifierFixture()
 
-	// Initialize spam records for originID1 and originID2
+	// initialize spam records for originID1 and originID2
 	require.True(t, cache.Init(originID1))
 	require.True(t, cache.Init(originID2))
 
-	// Test adjusting the spam record for an existing origin ID
+	// test adjusting the spam record for an existing origin ID
 	adjustFunc := func(record alsp.ProtocolSpamRecord) (alsp.ProtocolSpamRecord, error) {
 		record.Penalty -= 10
 		return record, nil
@@ -129,15 +129,21 @@ func TestSpamRecordCache_Adjust(t *testing.T) {
 	require.NotNil(t, record1)
 	require.Equal(t, -10.0, record1.Penalty)
 
-	// Test adjusting the spam record for a non-existing origin ID
+	// test adjusting the spam record for a non-existing origin ID
 	originID3 := unittest.IdentifierFixture()
 	_, err = cache.Adjust(originID3, adjustFunc)
 	require.Error(t, err)
 
-	// Test adjusting the spam record with an adjustFunc that returns an error
+	// test adjusting the spam record with an adjustFunc that returns an error
 	adjustFuncError := func(record alsp.ProtocolSpamRecord) (alsp.ProtocolSpamRecord, error) {
 		return record, errors.New("adjustment error")
 	}
 	_, err = cache.Adjust(originID1, adjustFuncError)
 	require.Error(t, err)
+
+	// even though the adjustFunc returned an error, the record should be intact.
+	record1, ok = cache.Get(originID1)
+	require.True(t, ok)
+	require.NotNil(t, record1)
+	require.Equal(t, -10.0, record1.Penalty)
 }
