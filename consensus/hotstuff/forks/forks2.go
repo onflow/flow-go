@@ -10,6 +10,8 @@ import (
 	"github.com/onflow/flow-go/module/forest"
 )
 
+// TODO: rename file to forks.go (in subsequent PR to minimize changes, i.e. simplify review)
+
 // Forks enforces structural validity of the consensus state and implements
 // finalization rules as defined in Jolteon consensus https://arxiv.org/abs/2106.10362
 // The same approach has later been adopted by the Diem team resulting in DiemBFT v4:
