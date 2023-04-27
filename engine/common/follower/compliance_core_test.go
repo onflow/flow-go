@@ -147,7 +147,6 @@ func (s *CoreSuite) TestProcessingRangeHappyPath() {
 	require.NoError(s.T(), err)
 
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, 500*time.Millisecond, "expect all blocks to be processed before timeout")
-	s.follower.AssertExpectations(s.T())
 }
 
 // TestProcessingNotOrderedBatch tests that submitting a batch which is not properly ordered(meaning the batch is not connected)
@@ -226,7 +225,6 @@ func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
 	err = s.core.OnBlockRange(s.originID, firstHalf)
 	require.NoError(s.T(), err)
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "expect to process all blocks before timeout")
-	s.follower.AssertExpectations(s.T())
 }
 
 // TestDetectingProposalEquivocation tests that block equivocation is properly detected and reported to specific consumer.

@@ -59,8 +59,8 @@ func NewFollowerLoop(log zerolog.Logger, forks Forks) (*FollowerLoop, error) {
 //   - Under normal operations, this method is non-blocking. The follower internally
 //     queues incoming blocks and processes them in its own worker routine. However,
 //     when the inbound queue is, we block until there is space in the queue. This
-//     behaviours is intentional, because we cannot drop blocks (otherwise, we would
-//     cause disconnected blocks). Instead we simply block the compliance layer to
+//     behavior is intentional, because we cannot drop blocks (otherwise, we would
+//     cause disconnected blocks). Instead, we simply block the compliance layer to
 //     avoid any pathological edge cases.
 //   - Blocks whose views are below the latest finalized view are dropped.
 //   - Inputs are idempotent (repetitions are no-ops).

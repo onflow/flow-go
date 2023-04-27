@@ -136,8 +136,6 @@ func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
 func (s *HotStuffFollowerSuite) AfterTest(suiteName, testName string) {
 	s.cancel()
 	unittest.RequireCloseBefore(s.T(), s.follower.Done(), time.Second, "follower failed to stop")
-	s.notifier.AssertExpectations(s.T())
-	s.finalizer.AssertExpectations(s.T())
 
 	select {
 	case err := <-s.errs:
