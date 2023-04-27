@@ -87,23 +87,30 @@ func NewRestCollector(cfg metricsProm.Config) RestCollector {
 		}, []string{cfg.ServiceLabel, cfg.HandlerIDLabel}),
 	}
 
+	cfg.Registry.MustRegister(
+		r.httpRequestDurHistogram,
+		r.httpResponseSizeHistogram,
+		r.httpRequestsInflight,
+		r.httpRequestsTotal,
+	)
+
 	return r
 }
 
 // These methods are called automatically by go-http-metrics/middleware
-func (r recorder) ObserveHTTPRequestDuration(_ context.Context, p httpmetrics.HTTPReqProperties, duration time.Duration) {
+func (r *recorder) ObserveHTTPRequestDuration(_ context.Context, p httpmetrics.HTTPReqProperties, duration time.Duration) {
 	r.httpRequestDurHistogram.WithLabelValues(p.Service, p.ID, p.Method, p.Code).Observe(duration.Seconds())
 }
 
-func (r recorder) ObserveHTTPResponseSize(_ context.Context, p httpmetrics.HTTPReqProperties, sizeBytes int64) {
+func (r *recorder) ObserveHTTPResponseSize(_ context.Context, p httpmetrics.HTTPReqProperties, sizeBytes int64) {
 	r.httpResponseSizeHistogram.WithLabelValues(p.Service, p.ID, p.Method, p.Code).Observe(float64(sizeBytes))
 }
 
-func (r recorder) AddInflightRequests(_ context.Context, p httpmetrics.HTTPProperties, quantity int) {
+func (r *recorder) AddInflightRequests(_ context.Context, p httpmetrics.HTTPProperties, quantity int) {
 	r.httpRequestsInflight.WithLabelValues(p.Service, p.ID).Add(float64(quantity))
 }
 
 // New custom method to track all requests made for every REST API request
-func (r recorder) AddTotalRequests(_ context.Context, method string, id string) {
+func (r *recorder) AddTotalRequests(_ context.Context, method string, id string) {
 	r.httpRequestsTotal.WithLabelValues(method, id).Inc()
 }
