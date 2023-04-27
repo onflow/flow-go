@@ -39,6 +39,7 @@ type BackendExecutionDataSuite struct {
 	suite.Suite
 
 	state    *protocolmock.State
+	params   *protocolmock.Params
 	snapshot *protocolmock.Snapshot
 	headers  *storagemock.Headers
 	seals    *storagemock.Seals
@@ -70,6 +71,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	s.state = protocolmock.NewState(s.T())
 	s.snapshot = protocolmock.NewSnapshot(s.T())
+	s.params = protocolmock.NewParams(s.T())
 	s.headers = storagemock.NewHeaders(s.T())
 	s.seals = storagemock.NewSeals(s.T())
 	s.results = storagemock.NewExecutionResults(s.T())
@@ -88,18 +90,6 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	}
 
 	var err error
-	s.backend, err = New(
-		logger,
-		conf,
-		s.state,
-		s.headers,
-		s.seals,
-		s.results,
-		s.eds,
-		s.execDataCache,
-		s.broadcaster,
-	)
-	require.NoError(s.T(), err)
 
 	blockCount := 5
 	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionDataEntity, blockCount)
@@ -110,15 +100,14 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.blocks = make([]*flow.Block, 0, blockCount)
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
-	firstBlock := unittest.BlockFixture()
-	parent := firstBlock.Header
+	rootBlock := unittest.BlockFixture()
+	parent := rootBlock.Header
+	s.blockMap[rootBlock.Header.Height] = &rootBlock
+
+	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, rootBlock.Header.Height, rootBlock.ID())
+
 	for i := 0; i < blockCount; i++ {
-		var block *flow.Block
-		if i == 0 {
-			block = &firstBlock
-		} else {
-			block = unittest.BlockWithParentFixture(parent)
-		}
+		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
 		parent = block.Header
 
@@ -159,7 +148,10 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	}
 
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
-	s.snapshot.On("Head").Return(firstBlock.Header, nil).Maybe()
+	s.snapshot.On("Head").Return(s.blocks[0].Header, nil).Maybe()
+
+	s.state.On("Params").Return(s.params, nil).Maybe()
+	s.params.On("SporkRootBlockHeight").Return(rootBlock.Header.Height, nil).Maybe()
 
 	s.seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
 		func(blockID flow.Identifier) *flow.Seal {
@@ -224,6 +216,34 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 			return storage.ErrNotFound
 		},
 	).Maybe()
+
+	s.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
+		func(height uint64) flow.Identifier {
+			if block, ok := s.blockMap[height]; ok {
+				return block.Header.ID()
+			}
+			return flow.ZeroID
+		},
+		func(height uint64) error {
+			if _, ok := s.blockMap[height]; ok {
+				return nil
+			}
+			return storage.ErrNotFound
+		},
+	).Maybe()
+
+	s.backend, err = New(
+		logger,
+		conf,
+		s.state,
+		s.headers,
+		s.seals,
+		s.results,
+		s.eds,
+		s.execDataCache,
+		s.broadcaster,
+	)
+	require.NoError(s.T(), err)
 }
 
 func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
@@ -282,6 +302,18 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startBlockID:    s.blocks[0].ID(),
+			startHeight:     0,
+		},
+		{
+			name:            "happy path - start from root block by height",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startBlockID:    flow.ZeroID,
+			startHeight:     s.backend.rootBlockHeight, // start from root block
+		},
+		{
+			name:            "happy path - start from root block by id",
+			highestBackfill: len(s.blocks) - 1,     // backfill all blocks
+			startBlockID:    s.backend.rootBlockID, // start from root block
 			startHeight:     0,
 		},
 	}
@@ -357,6 +389,14 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 		defer subCancel()
 
 		sub := s.backend.SubscribeExecutionData(subCtx, unittest.IdentifierFixture(), 1)
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
+	})
+
+	s.Run("returns error for start height before root height", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.backend.rootBlockHeight-1)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
 	})
 
