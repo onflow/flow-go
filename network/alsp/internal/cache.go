@@ -103,6 +103,35 @@ func (s *SpamRecordCache) Adjust(originId flow.Identifier, adjustFunc alsp.Recor
 	return adjustedEntity.(ProtocolSpamRecordEntity).Penalty, nil
 }
 
+// Get returns the spam record of the given origin id.
+// Returns the record and true if the record exists, nil and false otherwise.
+// Args:
+// - originId: the origin id of the spam record.
+// Returns:
+// - the record and true if the record exists, nil and false otherwise.
+// Note that the returned record is a copy of the record in the cache (we do not want the caller to modify the record).
+func (s *SpamRecordCache) Get(originId flow.Identifier) (*alsp.ProtocolSpamRecord, bool) {
+	entity, ok := s.c.ByID(originId)
+	if !ok {
+		return nil, false
+	}
+
+	record, ok := entity.(ProtocolSpamRecordEntity)
+	if !ok {
+		// sanity check
+		// This should never happen, because the cache only contains ProtocolSpamRecordEntity entities.
+		panic("invalid entity type, expected ProtocolSpamRecordEntity type")
+	}
+
+	// return a copy of the record (we do not want the caller to modify the record).
+	return &alsp.ProtocolSpamRecord{
+		OriginId:      record.OriginId,
+		Decay:         record.Decay,
+		CutoffCounter: record.CutoffCounter,
+		Penalty:       record.Penalty,
+	}, true
+}
+
 // Identities returns the list of identities of the nodes that have a spam record in the cache.
 func (s *SpamRecordCache) Identities() []flow.Identifier {
 	return flow.GetIDs(s.c.All())

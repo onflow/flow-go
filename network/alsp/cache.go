@@ -21,4 +21,13 @@ type SpamRecordCache interface {
 	// Remove removes the spam record of the given origin id from the cache.
 	// Returns true if the record is removed, false otherwise (i.e., the record does not exist).
 	Remove(originId flow.Identifier) bool
+
+	// Get returns the spam record of the given origin id.
+	// Returns the record and true if the record exists, nil and false otherwise.
+	// Args:
+	// - originId: the origin id of the spam record.
+	// Returns:
+	// - the record and true if the record exists, nil and false otherwise.
+	// Note that the returned record is a copy of the record in the cache (we do not want the caller to modify the record).
+	Get(originId flow.Identifier) (*ProtocolSpamRecord, bool)
 }
