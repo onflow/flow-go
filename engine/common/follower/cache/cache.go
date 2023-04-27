@@ -155,9 +155,10 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 	//    (result stored in `batchContext.batchParent`)
 	//  * check whether last block in batch has a child already in the cache
 	//    (result stored in `batchContext.batchChild`)
+	//  * check if input is redundant, meaning that ALL blocks are already known
+	//    (result stored in `batchContext.redundant`)
 	bc := c.unsafeAtomicAdd(blockIDs, batch)
 	if bc.redundant {
-		// omit redundant input
 		return nil, nil, nil
 	}
 
@@ -249,6 +250,7 @@ func (c *Cache) removeByView(view uint64, blocks BlocksByID) {
 //   - check for equivocating blocks
 //   - check whether first block in batch (index 0) has a parent already in the cache
 //   - check whether last block in batch has a child already in the cache
+//   - check whether all blocks were previously stored in the cache
 //
 // Concurrency SAFE.
 //
