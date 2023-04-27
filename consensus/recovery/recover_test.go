@@ -84,7 +84,7 @@ func TestCollector(t *testing.T) {
 		c.Append(strings[1])
 		require.Equal(t, strings, c2.Retrieve())
 	})
-	
+
 	t.Run("append after retrieve", func(t *testing.T) {
 		c := NewCollector[string]()
 		strings := []string{"a", "b", "c", "d", "e"}
@@ -93,7 +93,7 @@ func TestCollector(t *testing.T) {
 		retrieved := c.Retrieve()
 		require.Equal(t, strings[:2], retrieved)
 
-		// change shouldn't be reflected in previously retrieved list
+		// appending further elements shouldn't affect previously retrieved list
 		c.Append(strings[2], strings[3], strings[4])
 		require.Equal(t, strings[:2], retrieved)
 		require.Equal(t, strings, c.Retrieve())
