@@ -14,7 +14,7 @@ import (
 // ValueComputer is used by DerivedDataTable's GetOrCompute to compute the
 // derived value when the value is not in DerivedDataTable (i.e., "cache miss").
 type ValueComputer[TKey any, TVal any] interface {
-	Compute(txnState state.NestedTransaction, key TKey) (TVal, error)
+	Compute(txnState state.NestedTransactionPreparer, key TKey) (TVal, error)
 }
 
 type invalidatableEntry[TVal any] struct {
@@ -423,7 +423,7 @@ func (txn *TableTransaction[TKey, TVal]) SetForTestingOnly(
 // Note: valFunc must be an idempotent function and it must not modify
 // txnState's values.
 func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	key TKey,
 	computer ValueComputer[TKey, TVal],
 ) (

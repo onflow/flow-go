@@ -53,7 +53,7 @@ type transactionExecutor struct {
 
 	ctx      Context
 	proc     *TransactionProcedure
-	txnState storage.Transaction
+	txnState storage.TransactionPreparer
 
 	span otelTrace.Span
 	env  environment.Environment
@@ -72,7 +72,7 @@ type transactionExecutor struct {
 func newTransactionExecutor(
 	ctx Context,
 	proc *TransactionProcedure,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) *transactionExecutor {
 	span := ctx.StartChildSpan(trace.FVMExecuteTransaction)
 	span.SetAttributes(attribute.String("transaction_id", proc.ID.String()))

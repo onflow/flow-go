@@ -265,8 +265,8 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	require.NoError(t, err)
 
 	txnState := storage.SerialTransaction{
-		NestedTransaction:           nestedTxn,
-		DerivedTransactionCommitter: derivedTxnData,
+		NestedTransactionPreparer: nestedTxn,
+		DerivedTransactionData:    derivedTxnData,
 	}
 	computer := fvm.NewMeterParamOverridesComputer(ctx, txnState)
 

@@ -42,10 +42,10 @@ type Accounts interface {
 var _ Accounts = &StatefulAccounts{}
 
 type StatefulAccounts struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 }
 
-func NewAccounts(txnState state.NestedTransaction) *StatefulAccounts {
+func NewAccounts(txnState state.NestedTransactionPreparer) *StatefulAccounts {
 	return &StatefulAccounts{
 		txnState: txnState,
 	}
