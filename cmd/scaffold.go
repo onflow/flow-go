@@ -422,7 +422,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		return fnb.GossipSubInspectorNotifDistributor, nil
 	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		cf := conduit.NewDefaultConduitFactory()
+		cf := conduit.NewDefaultConduitFactory(fnb.Logger, fnb.Metrics.Network)
 		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
 		return fnb.InitFlowNetworkWithConduitFactory(node, cf, unicastRateLimiters, peerManagerFilters)
 	})
@@ -439,7 +439,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}, fnb.PeerManagerDependencies)
 }
 
-func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory, unicastRateLimiters *ratelimit.RateLimiters, peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
+func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
+	node *NodeConfig,
+	cf network.ConduitFactory,
+	unicastRateLimiters *ratelimit.RateLimiters,
+	peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
 	var mwOpts []middleware.MiddlewareOption
 	if len(fnb.MsgValidators) > 0 {
 		mwOpts = append(mwOpts, middleware.WithMessageValidators(fnb.MsgValidators...))

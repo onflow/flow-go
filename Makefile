@@ -256,13 +256,16 @@ docker-ci-integration:
 .PHONY: docker-build-collection
 docker-build-collection:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/collection:latest" -t "$(CONTAINER_REGISTRY)/collection:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/collection:$(FLOW_GO_TAG)" .
 
 .PHONY: docker-build-collection-without-netgo
 docker-build-collection-without-netgo:
 	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
-		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" -t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_NO_NETGO)"  .
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
+		-t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_NO_NETGO)"  .
 
 .PHONY: docker-build-collection-debug
 docker-build-collection-debug:
@@ -272,13 +275,16 @@ docker-build-collection-debug:
 .PHONY: docker-build-consensus
 docker-build-consensus:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/consensus:latest" -t "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/consensus:$(FLOW_GO_TAG)" .
 
 .PHONY: docker-build-consensus-without-netgo
 docker-build-consensus-without-netgo:
 	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
-		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" -t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_NO_NETGO)" .
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
+		-t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_NO_NETGO)" .
 
 .PHONY: docker-build-consensus-debug
 docker-build-consensus-debug:
@@ -288,13 +294,16 @@ docker-build-consensus-debug:
 .PHONY: docker-build-execution
 docker-build-execution:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/execution:latest" -t "$(CONTAINER_REGISTRY)/execution:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/execution:$(FLOW_GO_TAG)" .
 
 .PHONY: docker-build-execution-without-netgo
 docker-build-execution-without-netgo:
 	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
-		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" -t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_NO_NETGO)" .
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
+		-t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_NO_NETGO)" .
 
 .PHONY: docker-build-execution-debug
 docker-build-execution-debug:
@@ -314,13 +323,16 @@ docker-build-execution-corrupt:
 .PHONY: docker-build-verification
 docker-build-verification:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/verification:latest" -t "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/verification:$(FLOW_GO_TAG)" .
 
 .PHONY: docker-build-verification-without-netgo
 docker-build-verification-without-netgo:
 	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
-		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" -t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG_NO_NETGO)" .
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
+		-t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG_NO_NETGO)" .
 
 .PHONY: docker-build-verification-debug
 docker-build-verification-debug:
@@ -340,13 +352,16 @@ docker-build-verification-corrupt:
 .PHONY: docker-build-access
 docker-build-access:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/access:latest" -t "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/access:$(FLOW_GO_TAG)" .
 
 .PHONY: docker-build-access-without-netgo
 docker-build-access-without-netgo:
 	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
-		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" -t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG_NO_NETGO)" .
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
+		-t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG_NO_NETGO)" .
 
 .PHONY: docker-build-access-debug
 docker-build-access-debug:
@@ -366,13 +381,16 @@ docker-build-access-corrupt:
 .PHONY: docker-build-observer
 docker-build-observer:
 	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/observer --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/observer:latest" -t "$(CONTAINER_REGISTRY)/observer:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-observer-without-netgo
 docker-build-observer-without-netgo:
 	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/observer --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
-		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" -t "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG_NO_NETGO)" .
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
+		-t "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG_NO_NETGO)" .
 
 
 .PHONY: docker-build-ghost

@@ -50,35 +50,9 @@ func IndexCollectionBlock(collID flow.Identifier, blockID flow.Identifier) func(
 	return insert(makePrefix(codeCollectionBlock, collID), blockID)
 }
 
-func IndexBlockIDByChunkID(chunkID, blockID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
-}
-
-// BatchIndexBlockByChunkID indexes blockID by chunkID into a batch
-func BatchIndexBlockByChunkID(blockID, chunkID flow.Identifier) func(batch *badger.WriteBatch) error {
-	return batchWrite(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
-}
-
 // LookupCollectionBlock looks up a block by a collection within that block.
 func LookupCollectionBlock(collID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollectionBlock, collID), blockID)
-}
-
-// LookupBlockIDByChunkID looks up a block by a collection within that block.
-func LookupBlockIDByChunkID(chunkID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
-}
-
-// RemoveBlockIDByChunkID removes chunkID-blockID index by chunkID
-func RemoveBlockIDByChunkID(chunkID flow.Identifier) func(*badger.Txn) error {
-	return remove(makePrefix(codeIndexBlockByChunkID, chunkID))
-}
-
-// BatchRemoveBlockIDByChunkID removes chunkID-to-blockID index entries keyed by a chunkID in a provided batch.
-// No errors are expected during normal operation, even if no entries are matched.
-// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func BatchRemoveBlockIDByChunkID(chunkID flow.Identifier) func(batch *badger.WriteBatch) error {
-	return batchRemove(makePrefix(codeIndexBlockByChunkID, chunkID))
 }
 
 // FindHeaders iterates through all headers, calling `filter` on each, and adding
