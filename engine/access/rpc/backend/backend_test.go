@@ -753,19 +753,18 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	transactionBody := collection.Transactions[0]
 	block := unittest.BlockFixture()
 	block.Header.Height = 2
+	headBlock := unittest.BlockFixture()
+	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
 	block.SetPayload(
 		unittest.PayloadFixture(
 			unittest.WithGuarantees(
 				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
-	headBlock := unittest.BlockFixture()
-	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
 
 	suite.snapshot.
 		On("Head").
 		Return(headBlock.Header, nil)
 
 	light := collection.Light()
-
 	suite.collections.On("LightByID", light.ID()).Return(&light, nil)
 
 	// transaction storage returns the corresponding transaction

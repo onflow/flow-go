@@ -324,7 +324,7 @@ func (b *backendTransactions) lookupCollectionIDInBlock(
 	txID flow.Identifier,
 ) (flow.Identifier, error) {
 	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := b.collections.LightByID(cId)
+		collection, err := b.collections.LightByID(guarantee.ID())
 		if err != nil {
 			return flow.ZeroID, err
 		}
