@@ -6,8 +6,8 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/state"
 )
 
 type DerivedTransaction interface {
@@ -101,31 +101,15 @@ func (block *DerivedBlockData) NewChildDerivedBlockData() *DerivedBlockData {
 	}
 }
 
-func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData(
-	snapshotTime logical.Time,
-	executionTime logical.Time,
-) (
-	DerivedTransactionCommitter,
-	error,
-) {
-	txnPrograms, err := block.programs.NewSnapshotReadTableTransaction(
-		snapshotTime,
-		executionTime)
-	if err != nil {
-		return nil, err
-	}
+func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData() DerivedTransactionCommitter {
+	txnPrograms := block.programs.NewSnapshotReadTableTransaction()
 
-	txnMeterParamOverrides, err := block.meterParamOverrides.NewSnapshotReadTableTransaction(
-		snapshotTime,
-		executionTime)
-	if err != nil {
-		return nil, err
-	}
+	txnMeterParamOverrides := block.meterParamOverrides.NewSnapshotReadTableTransaction()
 
 	return &DerivedTransactionData{
 		programs:            txnPrograms,
 		meterParamOverrides: txnMeterParamOverrides,
-	}, nil
+	}
 }
 
 func (block *DerivedBlockData) NewDerivedTransactionData(
