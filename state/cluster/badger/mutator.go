@@ -97,18 +97,65 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 //   - state.UnverifiableExtensionError if the reference block is _not_ a known finalized block
 //   - state.InvalidExtensionError if the candidate block is invalid
-func (m *MutableState) Extend(block *cluster.Block) error {
-	blockID := block.ID()
-	header := block.Header
-	payload := block.Payload
+func (m *MutableState) Extend(candidate *cluster.Block) error {
+	parentSpan, ctx := m.tracer.StartCollectionSpan(context.Background(), candidate.ID(), trace.COLClusterStateMutatorExtend)
+	defer parentSpan.End()
 
-	span, ctx := m.tracer.StartCollectionSpan(context.Background(), blockID, trace.COLClusterStateMutatorExtend)
+	span, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckHeader)
+	err := m.checkHeaderValidity(candidate)
+	span.End()
+	if err != nil {
+		return fmt.Errorf("error checking header validity: %w", err)
+	}
+
+	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendGetExtendCtx)
+	extendCtx, err := m.getExtendCtx(candidate)
+	span.End()
+	if err != nil {
+		return fmt.Errorf("error gettting extend context data: %w", err)
+	}
+
+	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckAncestry)
+	err = m.checkConnectsToFinalizedState(extendCtx)
+	span.End()
+	if err != nil {
+		return fmt.Errorf("error checking connection to finalized state: %w", err)
+	}
+
+	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckReferenceBlock)
+	err = m.checkPayloadReferenceBlock(extendCtx)
+	span.End()
+	if err != nil {
+		return fmt.Errorf("error checking reference block: %w", err)
+	}
+
+	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
+	err = m.checkPayloadTransactions(extendCtx)
+	span.End()
+	if err != nil {
+		return fmt.Errorf("error checking payload transactions: %w", err)
+	}
+
+	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
+	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(candidate))
 	defer span.End()
+	if err != nil {
+		return fmt.Errorf("could not insert cluster block: %w", err)
+	}
+	return nil
+}
 
-	setupSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendSetup)
+// checkHeaderValidity validates that the candidate block has a header which is
+// valid generally for inclusion in the cluster consensus, and w.r.t. its parent.
+// Expected error returns:
+//   - state.InvalidExtensionError if the candidate header is invalid
+func (m *MutableState) checkHeaderValidity(candidate *cluster.Block) error {
+	header := candidate.Header
+	payload := candidate.Payload
+
 	// check chain ID
 	if header.ChainID != m.State.clusterID {
-		return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.State.clusterID)
+		return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", header.ChainID, m.State.clusterID)
 	}
 
 	// check for a specified reference block
@@ -132,76 +179,19 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 	// the extending block must increase height by 1 from parent
 	if header.Height != parent.Height+1 {
 		return state.NewInvalidExtensionErrorf("extending block height (%d) must be parent height + 1 (%d)",
-			block.Header.Height, parent.Height)
-	}
-
-	extendCtx, err := m.getExtendCtx(block)
-	if err != nil {
-		return fmt.Errorf("could not get extend context data: %w", err)
-	}
-	setupSpan.End()
-
-	checkAncestrySpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckAncestry)
-	// ensure that the extending block connects to the finalized state, we
-	// do this by tracing back until we see a parent block that is the
-	// latest finalized block, or reach height below the finalized boundary
-
-	// start with the extending block's parent
-	parentID := header.ParentID
-	for parentID != extendCtx.finalizedClusterBlock.ID() {
-
-		// get the parent of current block
-		ancestor, err := m.headers.ByBlockID(parentID)
-		if err != nil {
-			return fmt.Errorf("could not get parent (%x): %w", block.Header.ParentID, err)
-		}
-
-		// if its height is below current boundary, the block does not connect
-		// to the finalized protocol state and would break database consistency
-		if ancestor.Height < extendCtx.finalizedClusterBlock.Height {
-			return state.NewOutdatedExtensionErrorf("block doesn't connect to finalized state. ancestor.Height (%d), final.Height (%d)",
-				ancestor.Height, extendCtx.finalizedClusterBlock.Height)
-		}
-
-		parentID = ancestor.ParentID
-	}
-	checkAncestrySpan.End()
-
-	checkRefBlockSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckReferenceBlock)
-	err = m.checkPayloadReferenceBlock(extendCtx)
-	if err != nil {
-		return fmt.Errorf("invalid reference block: %w", err)
-	}
-	checkRefBlockSpan.End()
-
-	checkTxsSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckTransactionsValid)
-	err = m.checkPayloadTransactions(extendCtx)
-	if err != nil {
-		return fmt.Errorf("invalid payload transactions: %w", err)
-	}
-	checkTxsSpan.End()
-
-	insertDbSpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
-	defer insertDbSpan.End()
-	// insert the new block
-	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(block))
-	if err != nil {
-		return fmt.Errorf("could not insert cluster block: %w", err)
+			header.Height, parent.Height)
 	}
 	return nil
 }
 
 // checkConnectsToFinalizedState validates that the candidate block connects to
-// the latest finalized state (ie. is not extending an orphaned fork.
+// the latest finalized state (ie. is not extending an orphaned fork).
 // Expected error returns:
 //   - state.UnverifiableExtensionError if the candidate extends an orphaned fork
-func (m *MutableState) checkConnectsToFinalizedState(ctx context.Context, extendCtx extendContext) error {
-	checkAncestrySpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckAncestry)
-	defer checkAncestrySpan.End()
-
-	header := extendCtx.candidate.Header
-	finalizedID := extendCtx.finalizedClusterBlock.ID()
-	finalizedHeight := extendCtx.finalizedClusterBlock.Height
+func (m *MutableState) checkConnectsToFinalizedState(ctx extendContext) error {
+	header := ctx.candidate.Header
+	finalizedID := ctx.finalizedClusterBlock.ID()
+	finalizedHeight := ctx.finalizedClusterBlock.Height
 
 	// start with the extending block's parent
 	parentID := header.ParentID
