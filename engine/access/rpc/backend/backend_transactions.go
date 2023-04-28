@@ -289,11 +289,7 @@ func (b *backendTransactions) GetTransactionResult(
 		if collectionID == flow.ZeroID {
 			collectionID = expectedCollectionID
 		} else if collectionID != expectedCollectionID {
-			return nil, rpc.ConvertError(
-				err,
-				"the actual collection that corresponds to the given transaction ID does not match the expected collection",
-				codes.Internal,
-			)
+			return nil, status.Error(codes.InvalidArgument, "transaction not found in provided collection")
 		}
 	}
 
@@ -341,29 +337,22 @@ func (b *backendTransactions) lookupCollectionIDInBlock(
 // retrieveBlock function returns a block based on the input argument. The block ID lookup has the highest priority,
 // followed by the collection ID lookup. If both are missing, the default lookup by transaction ID is performed.
 func (b *backendTransactions) retrieveBlock(
-	blockID *flow.Identifier,
-	collectionID *flow.Identifier,
-	txID *flow.Identifier,
+	blockID flow.Identifier,
+	collectionID flow.Identifier,
+	txID flow.Identifier,
 ) (*flow.Block, error) {
-	var block *flow.Block
-	var err error
+	if blockID != flow.ZeroID {
+		return b.blocks.ByID(blockID)
+	}
 
-	if *blockID != flow.ZeroID {
-		block, err = b.blocks.ByID(*blockID)
-		if err != nil {
-			return nil, err
-		}
-	} else if *collectionID != flow.ZeroID {
-		block, err = b.blocks.ByCollectionID(*collectionID)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// find the block for the transaction
-		block, err = b.lookupBlock(*txID)
-		if err != nil && !errors.Is(err, storage.ErrNotFound) {
-			return nil, err
-		}
+	if collectionID != flow.ZeroID {
+		return b.blocks.ByCollectionID(collectionID)
+	}
+
+	// find the block for the transaction
+	block, err := b.lookupBlock(txID)
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+		return nil, err
 	}
 
 	return block, nil

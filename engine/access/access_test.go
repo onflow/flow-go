@@ -799,7 +799,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		background, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		ctx, _ := irrecoverable.WithSignaler(background)
+		ctx := irrecoverable.NewMockSignalerContext(suite.T(), background)
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
 
