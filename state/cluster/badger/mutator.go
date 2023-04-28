@@ -151,17 +151,10 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 //   - state.InvalidExtensionError if the candidate header is invalid
 func (m *MutableState) checkHeaderValidity(candidate *cluster.Block) error {
 	header := candidate.Header
-	payload := candidate.Payload
 
 	// check chain ID
 	if header.ChainID != m.State.clusterID {
 		return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", header.ChainID, m.State.clusterID)
-	}
-
-	// check for a specified reference block
-	// we also implicitly check this later, but can fail fast here
-	if payload.ReferenceBlockID == flow.ZeroID {
-		return state.NewInvalidExtensionError("new block has empty reference block ID")
 	}
 
 	// get the header of the parent of the new block
