@@ -17,15 +17,26 @@ import (
 type MisbehaviorReportManager struct {
 	logger  zerolog.Logger
 	metrics module.AlspMetrics
+	cache   SpamRecordCache
 }
 
 var _ network.MisbehaviorReportManager = (*MisbehaviorReportManager)(nil)
 
 // NewMisbehaviorReportManager creates a new instance of the MisbehaviorReportManager.
-func NewMisbehaviorReportManager(logger zerolog.Logger, metrics module.AlspMetrics) *MisbehaviorReportManager {
+// Args:
+//
+//	logger: the logger instance.
+//	metrics: the metrics instance.
+//	cache: the spam record cache instance.
+//
+// Returns:
+//
+//	a new instance of the MisbehaviorReportManager.
+func NewMisbehaviorReportManager(logger zerolog.Logger, metrics module.AlspMetrics, cache SpamRecordCache) *MisbehaviorReportManager {
 	return &MisbehaviorReportManager{
 		logger:  logger.With().Str("module", "misbehavior_report_manager").Logger(),
 		metrics: metrics,
+		cache:   cache,
 	}
 }
 
