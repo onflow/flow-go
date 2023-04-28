@@ -449,3 +449,63 @@ func TestSpamRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 		require.Equal(t, -1.0, record.Penalty)
 	}
 }
+
+// TestSpamRecordCache_ConcurrentInitAndRemove tests the concurrent initialization and removal of spam records for different
+// origin IDs. The test covers the following scenarios:
+// 1. Multiple goroutines initializing spam records for different origin IDs concurrently.
+// 2. Multiple goroutines removing spam records for different origin IDs concurrently.
+// 3. The initialized records are correctly added to the cache.
+// 4. The removed records are correctly removed from the cache.
+func TestSpamRecordCache_ConcurrentInitAndRemove(t *testing.T) {
+	sizeLimit := uint32(100)
+	logger := zerolog.Nop()
+	collector := metrics.NewNoopCollector()
+	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+		return protocolSpamRecordFixture(id)
+	}
+
+	cache := internal.NewSpamRecordCache(sizeLimit, logger, collector, recordFactory)
+	require.NotNil(t, cache)
+
+	originIDs := unittest.IdentifierListFixture(20)
+	originIDsToAdd := originIDs[:10]
+	originIDsToRemove := originIDs[10:]
+
+	for _, originID := range originIDsToRemove {
+		cache.Init(originID)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(originIDs))
+
+	// initialize spam records concurrently
+	for _, originID := range originIDsToAdd {
+		go func(id flow.Identifier) {
+			defer wg.Done()
+			cache.Init(id)
+		}(originID)
+	}
+
+	// remove spam records concurrently
+	for _, originID := range originIDsToRemove {
+		go func(id flow.Identifier) {
+			defer wg.Done()
+			cache.Remove(id)
+		}(originID)
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	// ensure that the initialized records are correctly added to the cache
+	for _, originID := range originIDsToAdd {
+		record, found := cache.Get(originID)
+		require.True(t, found)
+		require.NotNil(t, record)
+	}
+
+	// ensure that the removed records are correctly removed from the cache
+	for _, originID := range originIDsToRemove {
+		_, found := cache.Get(originID)
+		require.False(t, found)
+	}
+}
