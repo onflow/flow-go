@@ -422,10 +422,9 @@ func (suite *MutatorSuite) TestExtend_WithUnfinalizedReferenceBlock() {
 }
 
 // TestExtend_WithOrphanedReferenceBlock tests that extending the cluster state
-// with a reference block is un-finalized and below the finalized boundary
-// (i.e. orphaned) should be considered an invalid extension. This reference block
-// can never be finalized, therefore the proposer knowingly generated an invalid
-// cluster block proposal.
+// with a un-finalized reference block below the finalized boundary
+// (i.e. orphaned) should be considered an invalid extension. As the proposer is supposed
+// to only use finalized blocks as reference, the proposer knowingly generated an invalid
 func (suite *MutatorSuite) TestExtend_WithOrphanedReferenceBlock() {
 	// create a block extending genesis which is not finalized
 	orphaned := unittest.BlockWithParentFixture(suite.protoGenesis)

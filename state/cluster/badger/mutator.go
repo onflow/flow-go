@@ -44,14 +44,14 @@ func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers
 type extendContext struct {
 	candidate                *cluster.Block // the proposed candidate cluster block
 	finalizedClusterBlock    flow.Header    // the latest finalized cluster block
-	finalizedConsensusHeight uint64         // the latest finalized height on the main change
+	finalizedConsensusHeight uint64         // the latest finalized height on the main chain
 	epochFirstHeight         uint64         // the first height of this cluster's operating epoch
 	epochLastHeight          uint64         // the last height of this cluster's operating epoch (may be unknown)
 	epochHasEnded            bool           // whether this cluster's operating epoch has ended (whether the above field is known)
 }
 
 // getExtendCtx reads all required information from the database in order to validate
-// a candidate extending cluster block.
+// a candidate cluster block.
 // No errors are expected during normal operation.
 func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, error) {
 	var ctx extendContext
