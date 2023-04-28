@@ -37,9 +37,9 @@ type Meter interface {
 	RunWithAllLimitsDisabled(f func())
 }
 
-// NestedTransaction provides active transaction states and facilitates common
-// state management operations.
-type NestedTransaction interface {
+// NestedTransactionPreparer provides active transaction states and facilitates
+// common state management operations.
+type NestedTransactionPreparer interface {
 	Meter
 
 	// NumNestedTransactions returns the number of uncommitted nested
@@ -171,7 +171,7 @@ type transactionState struct {
 func NewTransactionState(
 	snapshot StorageSnapshot,
 	params StateParameters,
-) NestedTransaction {
+) NestedTransactionPreparer {
 	startState := NewExecutionState(snapshot, params)
 	return &transactionState{
 		nestedTransactions: []nestedTransactionStackFrame{

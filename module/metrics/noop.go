@@ -290,6 +290,4 @@ func (nc *NoopCollector) OnBehaviourPenaltyUpdated(f float64)                   
 func (nc *NoopCollector) OnIPColocationFactorUpdated(f float64)                            {}
 func (nc *NoopCollector) OnAppSpecificScoreUpdated(f float64)                              {}
 func (nc *NoopCollector) OnOverallPeerScoreUpdated(f float64)                              {}
-func (nc *NoopCollector) OnMisbehaviorReported(string, string) {
-	// no-p0
-}
+func (nc *NoopCollector) OnMisbehaviorReported(string, string)                             {}

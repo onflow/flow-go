@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	mock2 "github.com/onflow/flow-go/module/mock"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/channels"
@@ -87,7 +87,7 @@ func TestHandleReportedMisbehavior(t *testing.T) {
 // It checks that when a misbehavior report is received by the ALSP manager, the metrics are recorded.
 // It fails the test if the metrics are not recorded or if they are recorded incorrectly.
 func TestMisbehaviorReportMetrics(t *testing.T) {
-	alspMetrics := mock2.NewAlspMetrics(t)
+	alspMetrics := mockmodule.NewAlspMetrics(t)
 	conduitFactory := conduit.NewDefaultConduitFactory(
 		unittest.Logger(),
 		alspMetrics)
