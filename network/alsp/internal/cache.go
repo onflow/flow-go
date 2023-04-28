@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/network/alsp"
 )
 
-// SpamRecordCache is a cache that stores spam records.
+// SpamRecordCache is a cache that stores spam records at the protocol layer for ALSP.
 type SpamRecordCache struct {
 	recordFactory func(flow.Identifier) alsp.ProtocolSpamRecord // recordFactory is a factory function that creates a new spam record.
 	c             *stdmap.Backend                               // c is the underlying cache.
