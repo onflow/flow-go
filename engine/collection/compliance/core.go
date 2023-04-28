@@ -202,20 +202,18 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	// if the proposal is connected to a block that is neither in the cache, nor
 	// in persistent storage, its direct parent is missing; cache the proposal
 	// and request the parent
-	_, err = c.headers.ByBlockID(header.ParentID)
-	if errors.Is(err, storage.ErrNotFound) {
+	exists, err := c.headers.Exists(header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not check parent exists: %w", err)
+	}
+	if !exists {
 		_ = c.pending.Add(originID, block)
-
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
 		log.Debug().Msg("requesting missing parent for proposal")
 		return nil
 	}
-	if err != nil {
-		return fmt.Errorf("could not check parent: %w", err)
-	}
-
 	// At this point, we should be able to connect the proposal to the finalized
 	// state and should process it to see whether to forward to hotstuff or not.
 	// processBlockAndDescendants is a recursive function. Here we trace the
