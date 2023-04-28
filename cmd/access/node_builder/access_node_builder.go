@@ -972,6 +972,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
+				builder.Me,
 			)
 			if err != nil {
 				return nil, err
@@ -980,6 +981,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.RpcEng, err = engineBuilder.
 				WithLegacy().
 				WithBlockSignerDecoder(signature.NewBlockSignerDecoder(builder.Committee)).
+				WithFinalizedHeaderCache(builder.FinalizedHeader).
 				Build()
 			if err != nil {
 				return nil, err

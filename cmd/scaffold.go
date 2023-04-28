@@ -404,7 +404,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		return libp2pNode, nil
 	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		cf := conduit.NewDefaultConduitFactory(fnb.Logger)
+		cf := conduit.NewDefaultConduitFactory(fnb.Logger, fnb.Metrics.Network)
 		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
 		return fnb.InitFlowNetworkWithConduitFactory(node, cf, unicastRateLimiters, peerManagerFilters)
 	})
