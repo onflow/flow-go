@@ -260,7 +260,7 @@ func (b *backendTransactions) GetTransactionResult(
 		return nil, txErr
 	}
 
-	block, err := b.retrieveBlock(&blockID, &collectionID, &txID)
+	block, err := b.retrieveBlock(blockID, collectionID, txID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -273,7 +273,6 @@ func (b *backendTransactions) GetTransactionResult(
 
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
-		blockID = block.ID()
 		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, block.ID())
 		blockHeight = block.Header.Height
 		if err != nil {
@@ -306,7 +305,7 @@ func (b *backendTransactions) GetTransactionResult(
 		StatusCode:    uint(statusCode),
 		Events:        events,
 		ErrorMessage:  txError,
-		BlockID:       blockID,
+		BlockID:       block.ID(),
 		TransactionID: txID,
 		CollectionID:  collectionID,
 		BlockHeight:   blockHeight,

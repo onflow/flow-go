@@ -710,10 +710,12 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// create block -> collection -> transactions
 		block, collection := suite.createChain()
+		blockNegative, collectionNegative := suite.createChain()
 		blockId := block.ID()
+		blockNegativeId := blockNegative.ID()
 
 		finalSnapshot := new(protocol.Snapshot)
-		finalSnapshot.On("Head").Return(block.Header, nil).Once()
+		finalSnapshot.On("Head").Return(block.Header, nil)
 
 		suite.state.On("Params").Return(suite.params)
 		suite.state.On("Final").Return(finalSnapshot)
@@ -724,6 +726,8 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		err := all.Blocks.Store(&block)
 		require.NoError(suite.T(), err)
+		err = all.Blocks.Store(&blockNegative)
+		require.NoError(suite.T(), err)
 
 		suite.state.On("AtBlockID", blockId).Return(suite.snapshot)
 
@@ -733,9 +737,6 @@ func (suite *Suite) TestGetTransactionResult() {
 		enNodeIDs := enIdentities.NodeIDs()
 		allIdentities := append(colIdentities, enIdentities...)
 		finalSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil)
-
-		// generate receipts
-		executionReceipts := unittest.ReceiptsForBlockFixture(&block, enNodeIDs)
 
 		// assume execution node returns an empty list of events
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&execproto.GetTransactionResultResponse{
@@ -755,6 +756,8 @@ func (suite *Suite) TestGetTransactionResult() {
 		metrics := metrics.NewNoopCollector()
 		transactions := bstorage.NewTransactions(metrics, db)
 		collections := bstorage.NewCollections(db, transactions)
+		err = collections.Store(&collectionNegative)
+		require.NoError(suite.T(), err)
 		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
@@ -785,8 +788,28 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
 
-		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, all.Blocks, all.Headers, collections, transactions, receipts,
-			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil)
+		rpcEngBuilder, err := rpc.NewBuilder(
+			suite.log,
+			suite.state,
+			rpc.Config{},
+			nil,
+			nil,
+			all.Blocks,
+			all.Headers,
+			collections,
+			transactions,
+			receipts,
+			results,
+			suite.chainID,
+			metrics,
+			metrics,
+			0,
+			0,
+			false,
+			false,
+			nil,
+			nil,
+		)
 		require.NoError(suite.T(), err)
 		rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 		require.NoError(suite.T(), err)
@@ -803,23 +826,36 @@ func (suite *Suite) TestGetTransactionResult() {
 		ingestEng.Start(ctx)
 		<-ingestEng.Ready()
 
-		// 2. Ingest engine was notified by the follower engine about a new block.
-		// Follower engine --> Ingest engine
-		mb := &model.Block{
-			BlockID: blockId,
-		}
-		ingestEng.OnFinalizedBlock(mb)
+		processExecutionReceipts := func(
+			block *flow.Block,
+			collection *flow.Collection,
+			enNodeIDs flow.IdentifierList,
+			originID flow.Identifier,
+			ingestEng *ingestion.Engine,
+		) {
+			executionReceipts := unittest.ReceiptsForBlockFixture(block, enNodeIDs)
+			// Ingest engine was notified by the follower engine about a new block.
+			// Follower engine --> Ingest engine
+			mb := &model.Block{
+				BlockID: block.ID(),
+			}
+			ingestEng.OnFinalizedBlock(mb)
 
-		// 4. Ingest engine receives the requested collection and all the execution receipts
-		ingestEng.OnCollection(originID, &collection)
+			// Ingest engine receives the requested collection and all the execution receipts
+			ingestEng.OnCollection(originID, collection)
 
-		for _, r := range executionReceipts {
-			err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
-			require.NoError(suite.T(), err)
+			for _, r := range executionReceipts {
+				err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
+				require.NoError(suite.T(), err)
+			}
 		}
+		processExecutionReceipts(&block, &collection, enNodeIDs, originID, ingestEng)
+		processExecutionReceipts(&blockNegative, &collectionNegative, enNodeIDs, originID, ingestEng)
 
 		txId := collection.Transactions[0].ID()
 		collectionId := collection.ID()
+		txIdNegative := collectionNegative.Transactions[0].ID()
+		collectionIdNegative := collectionNegative.ID()
 
 		assertTransactionResult := func(
 			resp *accessproto.TransactionResultResponse,
@@ -834,6 +870,8 @@ func (suite *Suite) TestGetTransactionResult() {
 			require.Equal(suite.T(), collectionId, actualCollectionId)
 		}
 
+		// Test behaviour with transactionId provided
+		// POSITIVE
 		suite.Run("Get transaction result by transaction ID", func() {
 			getReq := &accessproto.GetTransactionRequest{
 				Id: txId[:],
@@ -852,6 +890,26 @@ func (suite *Suite) TestGetTransactionResult() {
 			assertTransactionResult(resp, err)
 		})
 
+		suite.Run("Get transaction result with wrong transaction ID and correct block ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id:      txIdNegative[:],
+				BlockId: blockId[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			require.Error(suite.T(), err)
+			require.Nil(suite.T(), resp)
+		})
+
+		suite.Run("Get transaction result with wrong block ID and correct transaction ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id:      txId[:],
+				BlockId: blockNegativeId[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			require.Error(suite.T(), err)
+			require.Nil(suite.T(), resp)
+		})
+
 		// Test behaviour with collectionId provided
 		suite.Run("Get transaction result by collection ID", func() {
 			getReq := &accessproto.GetTransactionRequest{
@@ -860,6 +918,48 @@ func (suite *Suite) TestGetTransactionResult() {
 			}
 			resp, err := handler.GetTransactionResult(context.Background(), getReq)
 			assertTransactionResult(resp, err)
+		})
+
+		suite.Run("Get transaction result with wrong collection ID but correct transaction ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id:           txId[:],
+				CollectionId: collectionIdNegative[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			require.Error(suite.T(), err)
+			require.Nil(suite.T(), resp)
+		})
+
+		suite.Run("Get transaction result with wrong transaction ID and correct collection ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id:           txIdNegative[:],
+				CollectionId: collectionId[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			require.Error(suite.T(), err)
+			require.Nil(suite.T(), resp)
+		})
+
+		// Test behaviour with blockId and collectionId provided
+		suite.Run("Get transaction result by block ID and collection ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id:           txId[:],
+				BlockId:      blockId[:],
+				CollectionId: collectionId[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			assertTransactionResult(resp, err)
+		})
+
+		suite.Run("Get transaction result by block ID with wrong collection ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id:           txId[:],
+				BlockId:      blockId[:],
+				CollectionId: collectionIdNegative[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			require.Error(suite.T(), err)
+			require.Nil(suite.T(), resp)
 		})
 	})
 }
