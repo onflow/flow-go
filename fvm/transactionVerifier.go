@@ -168,7 +168,7 @@ type TransactionVerifier struct {
 func (v *TransactionVerifier) CheckAuthorization(
 	tracer tracing.TracerSpan,
 	proc *TransactionProcedure,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 	keyWeightThreshold int,
 ) error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
@@ -188,7 +188,7 @@ func (v *TransactionVerifier) CheckAuthorization(
 func (v *TransactionVerifier) verifyTransaction(
 	tracer tracing.TracerSpan,
 	proc *TransactionProcedure,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 	keyWeightThreshold int,
 ) error {
 	span := tracer.StartChildSpan(trace.FVMVerifyTransaction)
@@ -259,7 +259,7 @@ func (v *TransactionVerifier) verifyTransaction(
 // getAccountKeys gets the signatures' account keys and populate the account
 // keys into the signature continuation structs.
 func (v *TransactionVerifier) getAccountKeys(
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 	accounts environment.Accounts,
 	signatures []*signatureContinuation,
 	proposalKey flow.ProposalKey,

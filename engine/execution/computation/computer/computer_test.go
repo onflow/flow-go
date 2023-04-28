@@ -1334,7 +1334,7 @@ func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 func getSetAProgram(
 	t *testing.T,
 	storageSnapshot state.StorageSnapshot,
-	derivedTxnData derived.DerivedTransactionCommitter,
+	derivedTxnData *derived.DerivedTransactionData,
 ) {
 
 	txnState := state.NewTransactionState(
@@ -1365,7 +1365,7 @@ type programLoader struct {
 }
 
 func (p *programLoader) Compute(
-	_ state.NestedTransaction,
+	_ state.NestedTransactionPreparer,
 	_ common.AddressLocation,
 ) (
 	*derived.Program,

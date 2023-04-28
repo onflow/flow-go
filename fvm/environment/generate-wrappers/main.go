@@ -20,7 +20,7 @@ import (
 )
 
 func parseRestricted(
-    txnState state.NestedTransaction,
+    txnState state.NestedTransactionPreparer,
     spanName trace.SpanName,
 ) error {
     if txnState.IsParseRestricted() {
@@ -84,7 +84,7 @@ func generateWrapper(numArgs int, numRets int, content *FileContent) {
 	l("](")
 	push()
 
-	l("txnState state.NestedTransaction,")
+	l("txnState state.NestedTransactionPreparer,")
 	l("spanName trace.SpanName,")
 
 	callbackRet := "error"

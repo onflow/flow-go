@@ -89,7 +89,7 @@ var (
 
 func setupProgramsTest(t *testing.T) storage.SnapshotTree {
 	txnState := storage.SerialTransaction{
-		NestedTransaction: state.NewTransactionState(
+		NestedTransactionPreparer: state.NewTransactionState(
 			nil,
 			state.DefaultParameters()),
 	}
