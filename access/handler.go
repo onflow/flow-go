@@ -12,22 +12,30 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 type Handler struct {
 	api                  API
 	chain                flow.Chain
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
+	finalizedHeaderCache *synceng.FinalizedHeaderCache
+	me                   module.Local
 }
 
 // HandlerOption is used to hand over optional constructor parameters
 type HandlerOption func(*Handler)
 
-func NewHandler(api API, chain flow.Chain, options ...HandlerOption) *Handler {
+var _ access.AccessAPIServer = (*Handler)(nil)
+
+func NewHandler(api API, chain flow.Chain, finalizedHeader *synceng.FinalizedHeaderCache, me module.Local, options ...HandlerOption) *Handler {
 	h := &Handler{
 		api:                  api,
 		chain:                chain,
+		finalizedHeaderCache: finalizedHeader,
+		me:                   me,
 		signerIndicesDecoder: &signature.NoopBlockSignerDecoder{},
 	}
 	for _, opt := range options {
@@ -44,6 +52,26 @@ func (h *Handler) Ping(ctx context.Context, _ *access.PingRequest) (*access.Ping
 	}
 
 	return &access.PingResponse{}, nil
+}
+
+// GetNodeVersionInfo gets node version information such as semver, commit, sporkID, protocolVersion, etc
+func (h *Handler) GetNodeVersionInfo(
+	ctx context.Context,
+	_ *access.GetNodeVersionInfoRequest,
+) (*access.GetNodeVersionInfoResponse, error) {
+	nodeVersionInfo, err := h.api.GetNodeVersionInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.GetNodeVersionInfoResponse{
+		Info: &entities.NodeVersionInfo{
+			Semver:          nodeVersionInfo.Semver,
+			Commit:          nodeVersionInfo.Commit,
+			SporkId:         nodeVersionInfo.SporkId[:],
+			ProtocolVersion: nodeVersionInfo.ProtocolVersion,
+		},
+	}, nil
 }
 
 func (h *Handler) GetNetworkParameters(
@@ -142,6 +170,8 @@ func (h *Handler) GetCollectionByID(
 	ctx context.Context,
 	req *access.GetCollectionByIDRequest,
 ) (*access.CollectionResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	id, err := convert.CollectionID(req.GetId())
 	if err != nil {
 		return nil, err
@@ -159,6 +189,7 @@ func (h *Handler) GetCollectionByID(
 
 	return &access.CollectionResponse{
 		Collection: colMsg,
+		Metadata:   metadata,
 	}, nil
 }
 
@@ -167,6 +198,8 @@ func (h *Handler) SendTransaction(
 	ctx context.Context,
 	req *access.SendTransactionRequest,
 ) (*access.SendTransactionResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	txMsg := req.GetTransaction()
 
 	tx, err := convert.MessageToTransaction(txMsg, h.chain)
@@ -182,7 +215,8 @@ func (h *Handler) SendTransaction(
 	txID := tx.ID()
 
 	return &access.SendTransactionResponse{
-		Id: txID[:],
+		Id:       txID[:],
+		Metadata: metadata,
 	}, nil
 }
 
@@ -191,6 +225,8 @@ func (h *Handler) GetTransaction(
 	ctx context.Context,
 	req *access.GetTransactionRequest,
 ) (*access.TransactionResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	id, err := convert.TransactionID(req.GetId())
 	if err != nil {
 		return nil, err
@@ -203,6 +239,7 @@ func (h *Handler) GetTransaction(
 
 	return &access.TransactionResponse{
 		Transaction: convert.TransactionToMessage(*tx),
+		Metadata:    metadata,
 	}, nil
 }
 
@@ -211,6 +248,8 @@ func (h *Handler) GetTransactionResult(
 	ctx context.Context,
 	req *access.GetTransactionRequest,
 ) (*access.TransactionResultResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	transactionID, err := convert.TransactionID(req.GetId())
 	if err != nil {
 		return nil, err
@@ -239,13 +278,18 @@ func (h *Handler) GetTransactionResult(
 		return nil, err
 	}
 
-	return TransactionResultToMessage(result), nil
+	message := TransactionResultToMessage(result)
+	message.Metadata = metadata
+
+	return message, nil
 }
 
 func (h *Handler) GetTransactionResultsByBlockID(
 	ctx context.Context,
 	req *access.GetTransactionsByBlockIDRequest,
 ) (*access.TransactionResultsResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	id, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
 		return nil, err
@@ -256,13 +300,18 @@ func (h *Handler) GetTransactionResultsByBlockID(
 		return nil, err
 	}
 
-	return TransactionResultsToMessage(results), nil
+	message := TransactionResultsToMessage(results)
+	message.Metadata = metadata
+
+	return message, nil
 }
 
 func (h *Handler) GetTransactionsByBlockID(
 	ctx context.Context,
 	req *access.GetTransactionsByBlockIDRequest,
 ) (*access.TransactionsResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	id, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
 		return nil, err
@@ -275,6 +324,7 @@ func (h *Handler) GetTransactionsByBlockID(
 
 	return &access.TransactionsResponse{
 		Transactions: convert.TransactionsToMessages(transactions),
+		Metadata:     metadata,
 	}, nil
 }
 
@@ -284,6 +334,8 @@ func (h *Handler) GetTransactionResultByIndex(
 	ctx context.Context,
 	req *access.GetTransactionByIndexRequest,
 ) (*access.TransactionResultResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	blockID, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
 		return nil, err
@@ -294,7 +346,10 @@ func (h *Handler) GetTransactionResultByIndex(
 		return nil, err
 	}
 
-	return TransactionResultToMessage(result), nil
+	message := TransactionResultToMessage(result)
+	message.Metadata = metadata
+
+	return message, nil
 }
 
 // GetAccount returns an account by address at the latest sealed block.
@@ -302,6 +357,8 @@ func (h *Handler) GetAccount(
 	ctx context.Context,
 	req *access.GetAccountRequest,
 ) (*access.GetAccountResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	address := flow.BytesToAddress(req.GetAddress())
 
 	account, err := h.api.GetAccount(ctx, address)
@@ -315,7 +372,8 @@ func (h *Handler) GetAccount(
 	}
 
 	return &access.GetAccountResponse{
-		Account: accountMsg,
+		Account:  accountMsg,
+		Metadata: metadata,
 	}, nil
 }
 
@@ -324,6 +382,8 @@ func (h *Handler) GetAccountAtLatestBlock(
 	ctx context.Context,
 	req *access.GetAccountAtLatestBlockRequest,
 ) (*access.AccountResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	address, err := convert.Address(req.GetAddress(), h.chain)
 	if err != nil {
 		return nil, err
@@ -340,7 +400,8 @@ func (h *Handler) GetAccountAtLatestBlock(
 	}
 
 	return &access.AccountResponse{
-		Account: accountMsg,
+		Account:  accountMsg,
+		Metadata: metadata,
 	}, nil
 }
 
@@ -348,6 +409,8 @@ func (h *Handler) GetAccountAtBlockHeight(
 	ctx context.Context,
 	req *access.GetAccountAtBlockHeightRequest,
 ) (*access.AccountResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	address, err := convert.Address(req.GetAddress(), h.chain)
 	if err != nil {
 		return nil, err
@@ -364,7 +427,8 @@ func (h *Handler) GetAccountAtBlockHeight(
 	}
 
 	return &access.AccountResponse{
-		Account: accountMsg,
+		Account:  accountMsg,
+		Metadata: metadata,
 	}, nil
 }
 
@@ -373,6 +437,8 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 	ctx context.Context,
 	req *access.ExecuteScriptAtLatestBlockRequest,
 ) (*access.ExecuteScriptResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	script := req.GetScript()
 	arguments := req.GetArguments()
 
@@ -382,7 +448,8 @@ func (h *Handler) ExecuteScriptAtLatestBlock(
 	}
 
 	return &access.ExecuteScriptResponse{
-		Value: value,
+		Value:    value,
+		Metadata: metadata,
 	}, nil
 }
 
@@ -391,6 +458,8 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	req *access.ExecuteScriptAtBlockHeightRequest,
 ) (*access.ExecuteScriptResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	script := req.GetScript()
 	arguments := req.GetArguments()
 	blockHeight := req.GetBlockHeight()
@@ -401,7 +470,8 @@ func (h *Handler) ExecuteScriptAtBlockHeight(
 	}
 
 	return &access.ExecuteScriptResponse{
-		Value: value,
+		Value:    value,
+		Metadata: metadata,
 	}, nil
 }
 
@@ -410,6 +480,8 @@ func (h *Handler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	req *access.ExecuteScriptAtBlockIDRequest,
 ) (*access.ExecuteScriptResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	script := req.GetScript()
 	arguments := req.GetArguments()
 	blockID := convert.MessageToIdentifier(req.GetBlockId())
@@ -420,7 +492,8 @@ func (h *Handler) ExecuteScriptAtBlockID(
 	}
 
 	return &access.ExecuteScriptResponse{
-		Value: value,
+		Value:    value,
+		Metadata: metadata,
 	}, nil
 }
 
@@ -429,6 +502,8 @@ func (h *Handler) GetEventsForHeightRange(
 	ctx context.Context,
 	req *access.GetEventsForHeightRangeRequest,
 ) (*access.EventsResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	eventType, err := convert.EventType(req.GetType())
 	if err != nil {
 		return nil, err
@@ -447,7 +522,8 @@ func (h *Handler) GetEventsForHeightRange(
 		return nil, err
 	}
 	return &access.EventsResponse{
-		Results: resultEvents,
+		Results:  resultEvents,
+		Metadata: metadata,
 	}, nil
 }
 
@@ -456,6 +532,8 @@ func (h *Handler) GetEventsForBlockIDs(
 	ctx context.Context,
 	req *access.GetEventsForBlockIDsRequest,
 ) (*access.EventsResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	eventType, err := convert.EventType(req.GetType())
 	if err != nil {
 		return nil, err
@@ -477,12 +555,15 @@ func (h *Handler) GetEventsForBlockIDs(
 	}
 
 	return &access.EventsResponse{
-		Results: resultEvents,
+		Results:  resultEvents,
+		Metadata: metadata,
 	}, nil
 }
 
 // GetLatestProtocolStateSnapshot returns the latest serializable Snapshot
 func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	snapshot, err := h.api.GetLatestProtocolStateSnapshot(ctx)
 	if err != nil {
 		return nil, err
@@ -490,6 +571,7 @@ func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *acces
 
 	return &access.ProtocolStateSnapshotResponse{
 		SerializedSnapshot: snapshot,
+		Metadata:           metadata,
 	}, nil
 }
 
@@ -497,6 +579,8 @@ func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *acces
 // AN might receive multiple receipts with conflicting results for unsealed blocks.
 // If this case happens, since AN is not able to determine which result is the correct one until the block is sealed, it has to pick one result to respond to this query. For now, we return the result from the latest received receipt.
 func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	blockID := convert.MessageToIdentifier(req.GetBlockId())
 
 	result, err := h.api.GetExecutionResultForBlockID(ctx, blockID)
@@ -504,10 +588,12 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 		return nil, err
 	}
 
-	return executionResultToMessages(result)
+	return executionResultToMessages(result, metadata)
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(block.Header)
 	if err != nil {
 		return nil, err // the block was retrieved from local storage - so no errors are expected
@@ -522,13 +608,17 @@ func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flo
 	} else {
 		msg = convert.BlockToMessageLight(block)
 	}
+
 	return &access.BlockResponse{
 		Block:       msg,
 		BlockStatus: entities.BlockStatus(status),
+		Metadata:    metadata,
 	}, nil
 }
 
 func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStatus) (*access.BlockHeaderResponse, error) {
+	metadata := h.buildMetadataResponse()
+
 	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
 	if err != nil {
 		return nil, err // the block was retrieved from local storage - so no errors are expected
@@ -542,15 +632,32 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 	return &access.BlockHeaderResponse{
 		Block:       msg,
 		BlockStatus: entities.BlockStatus(status),
+		Metadata:    metadata,
 	}, nil
 }
 
-func executionResultToMessages(er *flow.ExecutionResult) (*access.ExecutionResultForBlockIDResponse, error) {
+// buildMetadataResponse builds and returns the metadata response object.
+func (h *Handler) buildMetadataResponse() *entities.Metadata {
+	lastFinalizedHeader := h.finalizedHeaderCache.Get()
+	blockId := lastFinalizedHeader.ID()
+	nodeId := h.me.NodeID()
+
+	return &entities.Metadata{
+		LatestFinalizedBlockId: blockId[:],
+		LatestFinalizedHeight:  lastFinalizedHeader.Height,
+		NodeId:                 nodeId[:],
+	}
+}
+
+func executionResultToMessages(er *flow.ExecutionResult, metadata *entities.Metadata) (*access.ExecutionResultForBlockIDResponse, error) {
 	execResult, err := convert.ExecutionResultToMessage(er)
 	if err != nil {
 		return nil, err
 	}
-	return &access.ExecutionResultForBlockIDResponse{ExecutionResult: execResult}, nil
+	return &access.ExecutionResultForBlockIDResponse{
+		ExecutionResult: execResult,
+		Metadata:        metadata,
+	}, nil
 }
 
 func blockEventsToMessages(blocks []flow.BlockEvents) ([]*access.EventsResponse_Result, error) {

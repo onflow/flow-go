@@ -315,6 +315,11 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 		Run(func(args mock.Arguments) {
 			receipt := args[1].(*flow.ExecutionReceipt)
 
+			assert.Equal(ctx.t,
+				len(computationResult.ServiceEvents),
+				len(receipt.ExecutionResult.ServiceEvents),
+			)
+
 			ctx.mu.Lock()
 			ctx.broadcastedReceipts[receipt.ExecutionResult.BlockID] = receipt
 			ctx.mu.Unlock()
@@ -452,7 +457,7 @@ func TestExecuteOneBlock(t *testing.T) {
 
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
-		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		require.False(t, more)
 
 		_, ok := commits[blockB.ID()]
@@ -504,7 +509,6 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 		commits := make(map[flow.Identifier]flow.StateCommitment)
 		commits[blockB.Block.Header.ParentID] = *blockB.StartState
 		commits[blockC.Block.Header.ParentID] = *blockC.StartState
-		//ctx.mockStateCommitsWithMap(commits)
 
 		wg := sync.WaitGroup{}
 
@@ -616,7 +620,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
-		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		require.False(t, more)
 
 		_, ok := commits[blockB.ID()]
@@ -641,8 +645,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 		blockA := unittest.BlockHeaderFixture()
 		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA, unittest.StateCommitmentPointerFixture())
 
-		//blockCstartState := unittest.StateCommitmentFixture()
-		//blocks are empty, so no state change is expected
+		// blocks are empty, so no state change is expected
 		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header, blockB.StartState)
 
 		logBlocks(map[string]*entity.ExecutableBlock{
@@ -732,7 +735,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
-		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		require.False(t, more)
 
 		_, ok := commits[blockB.ID()]
@@ -760,7 +763,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 
 		collectionIdentities := ctx.identities.Filter(filter.HasRole(flow.RoleCollection))
 		colSigner := collectionIdentities[0].ID()
-		//blocks are empty, so no state change is expected
+		// blocks are empty, so no state change is expected
 		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header, blockB.StartState)
 		// the default fixture uses a 10 collectors committee, but in this test case, there are only 4,
 		// so we need to update the signer indices.
@@ -882,7 +885,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
-		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		require.False(t, more)
 
 		_, ok := commits[blockB.ID()]
@@ -998,7 +1001,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		// wait until all 4 blocks have been executed
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
-		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		assert.False(t, more)
 
 		var ok bool
@@ -1102,7 +1105,7 @@ func TestStopAtHeight(t *testing.T) {
 
 		ctx.engine.BlockFinalized(blocks["D"].Block.Header)
 
-		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		assert.False(t, more)
 
 		var ok bool
@@ -1220,7 +1223,7 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		finalizationWg.Wait()
 		executionWg.Wait()
 
-		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		assert.False(t, more)
 
 		assert.True(t, ctx.stopControl.IsPaused())
@@ -1460,9 +1463,9 @@ func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		err = ctx.engine.handleBlock(context.Background(), blocks["D"].Block)
 		require.NoError(t, err)
 
-		//// wait until all 4 blocks have been executed
+		// // wait until all 4 blocks have been executed
 		unittest.AssertReturnsBefore(t, wg.Wait, 15*time.Second)
-		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		assert.False(t, more)
 
 		require.Len(t, ctx.broadcastedReceipts, 2)
@@ -1854,7 +1857,7 @@ func TestExecutedBlockIsUploaded(t *testing.T) {
 
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
-		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		require.False(t, more)
 
 		_, ok := commits[blockB.ID()]
@@ -1914,7 +1917,7 @@ func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
 
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
-		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		require.False(t, more)
 
 		_, ok := commits[blockB.ID()]

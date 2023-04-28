@@ -273,7 +273,8 @@ func (b *backendTransactions) GetTransactionResult(
 
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
-		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, block.ID())
+		blockID = block.ID()
+		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, blockID)
 		blockHeight = block.Header.Height
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
@@ -305,7 +306,7 @@ func (b *backendTransactions) GetTransactionResult(
 		StatusCode:    uint(statusCode),
 		Events:        events,
 		ErrorMessage:  txError,
-		BlockID:       block.ID(),
+		BlockID:       blockID,
 		TransactionID: txID,
 		CollectionID:  collectionID,
 		BlockHeight:   blockHeight,

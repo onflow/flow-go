@@ -5,13 +5,13 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/state"
 )
 
-type Transaction interface {
-	state.NestedTransaction
-	derived.DerivedTransaction
+type TransactionPreparer interface {
+	state.NestedTransactionPreparer
+	derived.DerivedTransactionPreparer
 }
 
 type TransactionComitter interface {
-	Transaction
+	TransactionPreparer
 
 	// Validate returns nil if the transaction does not conflict with
 	// previously committed transactions.  It returns an error otherwise.
@@ -25,6 +25,6 @@ type TransactionComitter interface {
 
 // TODO(patrick): implement proper transaction.
 type SerialTransaction struct {
-	state.NestedTransaction
-	derived.DerivedTransactionCommitter
+	state.NestedTransactionPreparer
+	*derived.DerivedTransactionData
 }
