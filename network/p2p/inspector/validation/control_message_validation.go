@@ -127,9 +127,11 @@ func NewControlMsgValidationInspector(
 	builder := component.NewComponentManagerBuilder()
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		distributor.Start(ctx)
-		<-distributor.Ready()
-
-		ready()
+		select {
+			case <-ctx.Done():
+			case <-distributor.Ready():
+				ready()
+		}
 		<-distributor.Done()
 	})
 	// start rate limiters cleanup loop in workers
