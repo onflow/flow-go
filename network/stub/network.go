@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -53,7 +54,7 @@ func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Netw
 		engines:        make(map[channels.Channel]network.MessageProcessor),
 		seenEventIDs:   make(map[string]struct{}),
 		qCD:            make(chan struct{}),
-		conduitFactory: conduit.NewDefaultConduitFactory(unittest.Logger()),
+		conduitFactory: conduit.NewDefaultConduitFactory(unittest.Logger(), metrics.NewNoopCollector()),
 	}
 
 	for _, opt := range opts {

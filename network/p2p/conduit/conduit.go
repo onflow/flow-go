@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
@@ -34,9 +35,18 @@ func WithMisbehaviorManager(misbehaviorManager network.MisbehaviorReportManager)
 }
 
 // NewDefaultConduitFactory creates a new DefaultConduitFactory, this is the default conduit factory used by the node.
-func NewDefaultConduitFactory(logger zerolog.Logger, opts ...DefaultConduitFactoryOpt) *DefaultConduitFactory {
+// Args:
+//
+//	logger: zerolog.Logger, the logger used by the conduit factory.
+//	metrics: module.AlspMetrics (an instance of module.NetworkMetrics can be used).
+//	opts: DefaultConduitFactoryOpt, optional arguments to override the default behavior of the conduit factory.
+//
+// Returns:
+//
+//	*DefaultConduitFactory, the created conduit factory.
+func NewDefaultConduitFactory(logger zerolog.Logger, metrics module.AlspMetrics, opts ...DefaultConduitFactoryOpt) *DefaultConduitFactory {
 	d := &DefaultConduitFactory{
-		misbehaviorManager: alsp.NewMisbehaviorReportManager(logger),
+		misbehaviorManager: alsp.NewMisbehaviorReportManager(logger, metrics),
 	}
 
 	for _, apply := range opts {
