@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
+	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -26,6 +27,8 @@ type MutableState struct {
 	headers  storage.Headers
 	payloads storage.ClusterPayloads
 }
+
+var _ clusterstate.MutableState = (*MutableState)(nil)
 
 func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads) (*MutableState, error) {
 	mutableState := &MutableState{
@@ -86,12 +89,13 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 	return ctx, nil
 }
 
-// Extend validates that the given cluster block passes compliance rules, then inserts
-// it to the cluster state.
-// TODO (Ramtin) pass context here
+// Extend introduces the given block into the cluster state as a pending
+// without modifying the current finalized state.
+// The block's parent must have already been successfully inserted.
+// TODO(ramtin) pass context here
 // Expected errors during normal operations:
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
-//   - state.UnverifiableExtensionError if the candidate block cannot be verified
+//   - state.UnverifiableExtensionError if the reference block is _not_ a known finalized block
 //   - state.InvalidExtensionError if the candidate block is invalid
 func (m *MutableState) Extend(block *cluster.Block) error {
 	blockID := block.ID()
@@ -116,7 +120,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 	// get the header of the parent of the new block
 	parent, err := m.headers.ByBlockID(header.ParentID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve latest finalized header: %w", err)
+		return irrecoverable.NewExceptionf("could not retrieve latest finalized header: %w", err)
 	}
 
 	// extending block must have correct parent view

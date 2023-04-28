@@ -68,7 +68,6 @@ func NewBuilder(db *badger.DB, tracer module.Tracer, mainHeaders storage.Headers
 // BuildOn creates a new block built on the given parent. It produces a payload
 // that is valid with respect to the un-finalized chain it extends.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
-	var proposal cluster.Block // proposal we are building
 	startTime := time.Now()
 
 	// STEP ONE: build a lookup for excluding duplicated transactions.
@@ -155,8 +154,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// STEP TWO: build a payload of valid transactions, while at the same
 	// time figuring out the correct reference block ID for the collection.
 
+	maxRefHeight := buildCtx.highestPossibleReferenceBlockHeight()
 	// keep track of the actual smallest reference height of all included transactions
-	minRefHeight := buildCtx.highestPossibleReferenceBlockHeight()
+	minRefHeight := maxRefHeight
 	minRefID := buildCtx.highestPossibleReferenceBlockID()
 
 	var transactions []*flow.TransactionBody
@@ -204,12 +204,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			return nil, fmt.Errorf("could not retrieve reference header: %w", err)
 		}
 
-		// disallow un-finalized reference blocks
-		if refHeader.Height > buildCtx.refChainFinalizedHeight {
-			continue
-		}
-		// disallow reference blocks above the final block of the epoch
-		if buildCtx.refEpochFinalHeight != nil && refHeader.Height > *buildCtx.refEpochFinalHeight {
+		// disallow un-finalized reference blocks, and reference blocks beyond the cluster's operating epoch
+		if refHeader.Height > maxRefHeight {
 			continue
 		}
 
@@ -305,7 +301,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not set fields to header: %w", err)
 	}
 
-	proposal = cluster.Block{
+	proposal := cluster.Block{
 		Header:  header,
 		Payload: &payload,
 	}
