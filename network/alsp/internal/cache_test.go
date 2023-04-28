@@ -223,7 +223,43 @@ func TestSpamRecordCache_Remove(t *testing.T) {
 	_, exists = cache.Get(originID3)
 	require.True(t, exists)
 
-	// Attempt to remove a non-existent origin ID
+	// attempt to remove a non-existent origin ID
 	originID4 := unittest.IdentifierFixture()
 	require.False(t, cache.Remove(originID4))
+}
+
+// TestSpamRecordCache_EdgeCasesAndInvalidInputs tests the edge cases and invalid inputs for SpamRecordCache methods.
+// The test covers the following scenarios:
+// 1. Initializing a spam record multiple times.
+// 2. Adjusting a non-existent spam record.
+// 3. Removing a spam record multiple times.
+func TestSpamRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
+	sizeLimit := uint32(100)
+	logger := zerolog.Nop()
+	collector := metrics.NewNoopCollector()
+	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+		return protocolSpamRecordFixture(id)
+	}
+
+	cache := internal.NewSpamRecordCache(sizeLimit, logger, collector, recordFactory)
+	require.NotNil(t, cache)
+
+	// 1. initializing a spam record multiple times
+	originID1 := unittest.IdentifierFixture()
+	require.True(t, cache.Init(originID1))
+	require.False(t, cache.Init(originID1))
+
+	// 2. Test adjusting a non-existent spam record
+	originID2 := unittest.IdentifierFixture()
+	_, err := cache.Adjust(originID2, func(record alsp.ProtocolSpamRecord) (alsp.ProtocolSpamRecord, error) {
+		record.Penalty -= 10
+		return record, nil
+	})
+	require.Error(t, err)
+
+	// 3. Test removing a spam record multiple times
+	originID3 := unittest.IdentifierFixture()
+	require.True(t, cache.Init(originID3))
+	require.True(t, cache.Remove(originID3))
+	require.False(t, cache.Remove(originID3))
 }
