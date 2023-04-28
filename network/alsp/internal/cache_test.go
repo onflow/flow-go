@@ -296,7 +296,7 @@ func TestSpamRecordCache_ConcurrentInitialization(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
 
-	// Ensure that all spam records are correctly initialized
+	// ensure that all spam records are correctly initialized
 	for _, originID := range originIDs {
 		record, found := cache.Get(originID)
 		require.True(t, found)
@@ -341,10 +341,10 @@ func TestSpamRecordCache_ConcurrentSameRecordInitialization(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
 
-	// Ensure that only one goroutine successfully initialized the record
+	// ensure that only one goroutine successfully initialized the record
 	require.Equal(t, int32(1), successCount.Load())
 
-	// Ensure that the record is correctly initialized in the cache
+	// ensure that the record is correctly initialized in the cache
 	record, found := cache.Get(originID)
 	require.True(t, found)
 	require.NotNil(t, record)
