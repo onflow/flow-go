@@ -350,3 +350,46 @@ func TestSpamRecordCache_ConcurrentSameRecordInitialization(t *testing.T) {
 	require.NotNil(t, record)
 	require.Equal(t, originID, record.OriginId)
 }
+
+// TestSpamRecordCache_ConcurrentRemoval tests the concurrent removal of spam records for different origin IDs.
+// The test covers the following scenarios:
+// 1. Multiple goroutines removing spam records for different origin IDs concurrently.
+// 2. The records are correctly removed from the cache.
+func TestSpamRecordCache_ConcurrentRemoval(t *testing.T) {
+	sizeLimit := uint32(100)
+	logger := zerolog.Nop()
+	collector := metrics.NewNoopCollector()
+	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+		return protocolSpamRecordFixture(id)
+	}
+
+	cache := internal.NewSpamRecordCache(sizeLimit, logger, collector, recordFactory)
+	require.NotNil(t, cache)
+
+	originIDs := unittest.IdentifierListFixture(10)
+	for _, originID := range originIDs {
+		cache.Init(originID)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(originIDs))
+
+	for _, originID := range originIDs {
+		go func(id flow.Identifier) {
+			defer wg.Done()
+			removed := cache.Remove(id)
+			require.True(t, removed)
+		}(originID)
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	// ensure that the records are correctly removed from the cache
+	for _, originID := range originIDs {
+		_, found := cache.Get(originID)
+		require.False(t, found)
+	}
+
+	// ensure that the cache is empty
+	require.Equal(t, uint(0), cache.Size())
+}
