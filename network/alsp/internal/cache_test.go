@@ -147,3 +147,83 @@ func TestSpamRecordCache_Adjust(t *testing.T) {
 	require.NotNil(t, record1)
 	require.Equal(t, -10.0, record1.Penalty)
 }
+
+// TestSpamRecordCache_Identities tests the Identities method of the SpamRecordCache.
+// The test covers the following scenarios:
+// 1. Initializing the cache with multiple spam records.
+// 2. Checking if the Identities method returns the correct set of origin IDs.
+func TestSpamRecordCache_Identities(t *testing.T) {
+	sizeLimit := uint32(100)
+	logger := zerolog.Nop()
+	collector := metrics.NewNoopCollector()
+	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+		return protocolSpamRecordFixture(id)
+	}
+
+	cache := internal.NewSpamRecordCache(sizeLimit, logger, collector, recordFactory)
+	require.NotNil(t, cache)
+
+	// initialize spam records for a few origin IDs
+	originID1 := unittest.IdentifierFixture()
+	originID2 := unittest.IdentifierFixture()
+	originID3 := unittest.IdentifierFixture()
+
+	require.True(t, cache.Init(originID1))
+	require.True(t, cache.Init(originID2))
+	require.True(t, cache.Init(originID3))
+
+	// check if the Identities method returns the correct set of origin IDs
+	identities := cache.Identities()
+	require.Equal(t, 3, len(identities))
+
+	identityMap := make(map[flow.Identifier]struct{})
+	for _, id := range identities {
+		identityMap[id] = struct{}{}
+	}
+
+	require.Contains(t, identityMap, originID1)
+	require.Contains(t, identityMap, originID2)
+	require.Contains(t, identityMap, originID3)
+}
+
+// TestSpamRecordCache_Remove tests the Remove method of the SpamRecordCache.
+// The test covers the following scenarios:
+// 1. Initializing the cache with multiple spam records.
+// 2. Removing a spam record and checking if it is removed correctly.
+// 3. Ensuring the other spam records are still in the cache after removal.
+// 4. Attempting to remove a non-existent origin ID.
+func TestSpamRecordCache_Remove(t *testing.T) {
+	sizeLimit := uint32(100)
+	logger := zerolog.Nop()
+	collector := metrics.NewNoopCollector()
+	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+		return protocolSpamRecordFixture(id)
+	}
+
+	cache := internal.NewSpamRecordCache(sizeLimit, logger, collector, recordFactory)
+	require.NotNil(t, cache)
+
+	// initialize spam records for a few origin IDs
+	originID1 := unittest.IdentifierFixture()
+	originID2 := unittest.IdentifierFixture()
+	originID3 := unittest.IdentifierFixture()
+
+	require.True(t, cache.Init(originID1))
+	require.True(t, cache.Init(originID2))
+	require.True(t, cache.Init(originID3))
+
+	// remove originID1 and check if the record is removed
+	require.True(t, cache.Remove(originID1))
+	_, exists := cache.Get(originID1)
+	require.False(t, exists)
+
+	// check if the other origin IDs are still in the cache
+	_, exists = cache.Get(originID2)
+	require.True(t, exists)
+	_, exists = cache.Get(originID3)
+	require.True(t, exists)
+
+	// Attempt to remove a non-existent origin ID
+	originID4 := unittest.IdentifierFixture()
+	require.False(t, cache.Remove(originID4))
+}
