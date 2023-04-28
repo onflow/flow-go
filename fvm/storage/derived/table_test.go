@@ -946,7 +946,7 @@ type testValueComputer struct {
 }
 
 func (computer *testValueComputer) Compute(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	key flow.RegisterID,
 ) (
 	int,
