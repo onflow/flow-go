@@ -18,9 +18,9 @@ func NewSimpleTransaction(
 	}
 
 	return &storage.SerialTransaction{
-		NestedTransaction: state.NewTransactionState(
+		NestedTransactionPreparer: state.NewTransactionState(
 			snapshot,
 			state.DefaultParameters()),
-		DerivedTransactionCommitter: derivedTxnData,
+		DerivedTransactionData: derivedTxnData,
 	}
 }

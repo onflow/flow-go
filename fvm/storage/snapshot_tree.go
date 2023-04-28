@@ -9,15 +9,14 @@ const (
 	compactThreshold = 10
 )
 
-type updateLog []map[flow.RegisterID]flow.RegisterValue
+type UpdateLog []map[flow.RegisterID]flow.RegisterValue
 
 // SnapshotTree is a simple LSM tree representation of the key/value storage
 // at a given point in time.
 type SnapshotTree struct {
 	base state.StorageSnapshot
 
-	fullLog      updateLog
-	compactedLog updateLog
+	compactedLog UpdateLog
 }
 
 // NewSnapshotTree returns a tree with keys/values initialized to the base
@@ -25,7 +24,6 @@ type SnapshotTree struct {
 func NewSnapshotTree(base state.StorageSnapshot) SnapshotTree {
 	return SnapshotTree{
 		base:         base,
-		fullLog:      nil,
 		compactedLog: nil,
 	}
 }
@@ -51,13 +49,12 @@ func (tree SnapshotTree) Append(
 				}
 			}
 
-			compactedLog = updateLog{mergedSet}
+			compactedLog = UpdateLog{mergedSet}
 		}
 	}
 
 	return SnapshotTree{
 		base:         tree.base,
-		fullLog:      append(tree.fullLog, update.WriteSet),
 		compactedLog: compactedLog,
 	}
 }

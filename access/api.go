@@ -71,7 +71,7 @@ func TransactionResultToMessage(result *TransactionResult) *access.TransactionRe
 		BlockId:       result.BlockID[:],
 		TransactionId: result.TransactionID[:],
 		CollectionId:  result.CollectionID[:],
-		BlockHeight:   uint64(result.BlockHeight),
+		BlockHeight:   result.BlockHeight,
 	}
 }
 

@@ -4,12 +4,15 @@ import (
 	"fmt"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/module"
 )
 
 type RPCEngineBuilder struct {
@@ -18,13 +21,16 @@ type RPCEngineBuilder struct {
 	// optional parameters, only one can be set during build phase
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
 	handler              accessproto.AccessAPIServer // Use the parent interface instead of implementation, so that we can assign it to proxy.
+	finalizedHeaderCache *synceng.FinalizedHeaderCache
+	me                   module.Local
 }
 
 // NewRPCEngineBuilder helps to build a new RPC engine.
-func NewRPCEngineBuilder(engine *Engine) *RPCEngineBuilder {
+func NewRPCEngineBuilder(engine *Engine, me module.Local) *RPCEngineBuilder {
 	// the default handler will use the engine.backend implementation
 	return &RPCEngineBuilder{
 		Engine: engine,
+		me:     me,
 	}
 }
 
@@ -54,6 +60,19 @@ func (builder *RPCEngineBuilder) WithBlockSignerDecoder(signerIndicesDecoder hot
 // Returns self-reference for chaining.
 func (builder *RPCEngineBuilder) WithNewHandler(handler accessproto.AccessAPIServer) *RPCEngineBuilder {
 	builder.handler = handler
+	return builder
+}
+
+// WithFinalizedHeaderCache method specifies that the newly created `AccessAPIServer` should use
+// the given `FinalizedHeaderCache` to retrieve information about the finalized block that will be included
+// in the server's responses.
+// Caution:
+// When injecting `BlockSignerDecoder` (via the WithBlockSignerDecoder method), you must also inject
+// the `FinalizedHeaderCache` or the builder will error during the build step.
+//
+// The method returns a self-reference for chaining.
+func (builder *RPCEngineBuilder) WithFinalizedHeaderCache(cache *synceng.FinalizedHeaderCache) *RPCEngineBuilder {
+	builder.finalizedHeaderCache = cache
 	return builder
 }
 
@@ -88,10 +107,13 @@ func (builder *RPCEngineBuilder) Build() (*Engine, error) {
 	}
 	handler := builder.handler
 	if handler == nil {
+		if builder.finalizedHeaderCache == nil {
+			return nil, fmt.Errorf("FinalizedHeaderCache (via method `WithFinalizedHeaderCache`) has to be specified")
+		}
 		if builder.signerIndicesDecoder == nil {
-			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain)
+			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me)
 		} else {
-			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
+			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
 		}
 	}
 	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, handler)

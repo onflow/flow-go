@@ -1038,6 +1038,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.rpcMetricsEnabled,
 			builder.apiRatelimits,
 			builder.apiBurstlimits,
+			builder.Me,
 		)
 		if err != nil {
 			return nil, err

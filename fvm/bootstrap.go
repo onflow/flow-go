@@ -246,7 +246,7 @@ func Bootstrap(
 
 func (b *BootstrapProcedure) NewExecutor(
 	ctx Context,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) ProcedureExecutor {
 	return newBootstrapExecutor(b.BootstrapParams, ctx, txnState)
 }
@@ -279,7 +279,7 @@ type bootstrapExecutor struct {
 	BootstrapParams
 
 	ctx      Context
-	txnState storage.Transaction
+	txnState storage.TransactionPreparer
 
 	accountCreator environment.BootstrapAccountCreator
 }
@@ -287,7 +287,7 @@ type bootstrapExecutor struct {
 func newBootstrapExecutor(
 	params BootstrapParams,
 	ctx Context,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) *bootstrapExecutor {
 	return &bootstrapExecutor{
 		BootstrapParams: params,
@@ -936,8 +936,8 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 	}
 
 	txn := &storage.SerialTransaction{
-		NestedTransaction:           b.txnState,
-		DerivedTransactionCommitter: prog,
+		NestedTransactionPreparer: b.txnState,
+		DerivedTransactionData:    prog,
 	}
 
 	err = Run(tx.NewExecutor(ctx, txn))
