@@ -20,23 +20,24 @@ const (
 	// instead, the penalty will be set to 0. This is to prevent the penalty from keeping a small negative value for a long time.
 	skipDecayThreshold = -0.1
 	// defaultDecay is the default decay value for the application specific penalty.
-	// this value is used when no custom decay value is provided.
-	// this value decays the penalty by 1% every second.
-	// assume that the penalty is -100 (the maximum application specific penalty is -100) and the skipDecayThreshold is -0.1,
+	// this value is used when no custom decay value is provided, and  decays the penalty by 1% every second.
+	// assume:
+	//     penalty = -100 (the maximum application specific penalty is -100)
+	//     skipDecayThreshold = -0.1
 	// it takes around 459 seconds for the penalty to decay to reach greater than -0.1 and turn into 0.
-	// x * 0.99^n > -0.1 (assuming negative x).
-	// 0.99^n > -0.1 / x
+	//     x * 0.99 ^ n > -0.1 (assuming negative x).
+	//     0.99 ^ n > -0.1 / x
 	// Now we can take the logarithm of both sides (with any base, but let's use base 10 for simplicity).
-	// log(0.99^n) < log(0.1 / x)
+	//     log( 0.99 ^ n ) < log( 0.1 / x )
 	// Using the properties of logarithms, we can bring down the exponent:
-	// n * log(0.99) < log(-0.1 / x)
+	//     n * log( 0.99 ) < log( -0.1 / x )
 	// And finally, we can solve for n:
-	// n > log(-0.1 / x) / log(0.99)
+	//     n > log( -0.1 / x ) / log( 0.99 )
 	// We can plug in x = -100:
-	// n > log(-0.1 / -100) / log(0.99)
-	// n > log(0.001) / log(0.99)
-	// n > -3 / log(0.99)
-	// n >  458.22
+	//     n > log( -0.1 / -100 ) / log( 0.99 )
+	//     n > log( 0.001 ) / log( 0.99 )
+	//     n > -3 / log( 0.99 )
+	//     n >  458.22
 	defaultDecay = 0.99 // default decay value for the application specific penalty.
 	// graftMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a graft misbehaviour.
 	graftMisbehaviourPenalty = -10
