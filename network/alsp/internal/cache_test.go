@@ -393,3 +393,59 @@ func TestSpamRecordCache_ConcurrentRemoval(t *testing.T) {
 	// ensure that the cache is empty
 	require.Equal(t, uint(0), cache.Size())
 }
+
+// TestSpamRecordCache_ConcurrentUpdatesAndReads tests the concurrent adjustments and reads of spam records for different
+// origin IDs. The test covers the following scenarios:
+// 1. Multiple goroutines adjusting spam records for different origin IDs concurrently.
+// 2. Multiple goroutines getting spam records for different origin IDs concurrently.
+// 3. The adjusted records are correctly updated in the cache.
+func TestSpamRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
+	sizeLimit := uint32(100)
+	logger := zerolog.Nop()
+	collector := metrics.NewNoopCollector()
+	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+		return protocolSpamRecordFixture(id)
+	}
+
+	cache := internal.NewSpamRecordCache(sizeLimit, logger, collector, recordFactory)
+	require.NotNil(t, cache)
+
+	originIDs := unittest.IdentifierListFixture(10)
+	for _, originID := range originIDs {
+		cache.Init(originID)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(originIDs) * 2)
+
+	adjustFunc := func(record alsp.ProtocolSpamRecord) (alsp.ProtocolSpamRecord, error) {
+		record.Penalty -= 1
+		return record, nil
+	}
+
+	for _, originID := range originIDs {
+		// adjust spam records concurrently
+		go func(id flow.Identifier) {
+			defer wg.Done()
+			_, err := cache.Adjust(id, adjustFunc)
+			require.NoError(t, err)
+		}(originID)
+
+		// get spam records concurrently
+		go func(id flow.Identifier) {
+			defer wg.Done()
+			record, found := cache.Get(id)
+			require.True(t, found)
+			require.NotNil(t, record)
+		}(originID)
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	// ensure that the records are correctly updated in the cache
+	for _, originID := range originIDs {
+		record, found := cache.Get(originID)
+		require.True(t, found)
+		require.Equal(t, -1.0, record.Penalty)
+	}
+}
