@@ -104,18 +104,17 @@ func testJointFeldman(t *testing.T) {
 	n := 4
 	var threshold int
 	// happy path, test multiple values of thresold
-	//for threshold = MinimumThreshold; threshold < n; threshold++ {
-	threshold = optimalThreshold(n)
-	t.Run(fmt.Sprintf("JointFeldman_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
-		dkgCommonTest(t, jointFeldman, n, threshold, happyPath)
-	})
-	//}
+	for threshold = MinimumThreshold; threshold < n; threshold++ {
+		t.Run(fmt.Sprintf("JointFeldman_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+			dkgCommonTest(t, jointFeldman, n, threshold, happyPath)
+		})
+	}
 
 	// unhappy path, with focus on the optimal threshold value
 	n = 5
 	threshold = optimalThreshold(n)
 	// unhappy path, with invalid shares
-	/*t.Run(fmt.Sprintf("JointFeldman_InvalidShares_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+	t.Run(fmt.Sprintf("JointFeldman_InvalidShares_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidShares)
 	})
 	// unhappy path, with invalid vector
@@ -133,7 +132,7 @@ func testJointFeldman(t *testing.T) {
 	// unhappy path, with duplicated messages (all types)
 	t.Run(fmt.Sprintf("JointFeldman_DuplicatedMessages_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, duplicatedMessages)
-	})*/
+	})
 }
 
 // Supported Key Generation protocols
