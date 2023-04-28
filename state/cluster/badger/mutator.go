@@ -191,6 +191,39 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 	return nil
 }
 
+// checkConnectsToFinalizedState validates that the candidate block connects to
+// the latest finalized state (ie. is not extending an orphaned fork.
+// Expected error returns:
+//   - state.UnverifiableExtensionError if the candidate extends an orphaned fork
+func (m *MutableState) checkConnectsToFinalizedState(ctx context.Context, extendCtx extendContext) error {
+	checkAncestrySpan, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckAncestry)
+	defer checkAncestrySpan.End()
+
+	header := extendCtx.candidate.Header
+	finalizedID := extendCtx.finalizedClusterBlock.ID()
+	finalizedHeight := extendCtx.finalizedClusterBlock.Height
+
+	// start with the extending block's parent
+	parentID := header.ParentID
+	for parentID != finalizedID {
+		// get the parent of current block
+		ancestor, err := m.headers.ByBlockID(parentID)
+		if err != nil {
+			return irrecoverable.NewExceptionf("could not get parent which must be known (%x): %w", header.ParentID, err)
+		}
+
+		// if its height is below current boundary, the block does not connect
+		// to the finalized protocol state and would break database consistency
+		if ancestor.Height < finalizedHeight {
+			return state.NewOutdatedExtensionErrorf(
+				"block doesn't connect to latest finalized block (height=%d, id=%x): orphaned ancestor (height=%d, id=%x)",
+				finalizedHeight, finalizedID, ancestor.Height, parentID)
+		}
+		parentID = ancestor.ParentID
+	}
+	return nil
+}
+
 // checkPayloadReferenceBlock validates the reference block is valid.
 //   - it must be a known, finalized block on the main consensus chain
 //   - it must be within the cluster's operating epoch
