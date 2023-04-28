@@ -2,10 +2,13 @@ package internal_test
 
 import (
 	"errors"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -262,4 +265,88 @@ func TestSpamRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 	require.True(t, cache.Init(originID3))
 	require.True(t, cache.Remove(originID3))
 	require.False(t, cache.Remove(originID3))
+}
+
+// TestSpamRecordCache_ConcurrentInitialization tests the concurrent initialization of spam records.
+// The test covers the following scenarios:
+// 1. Multiple goroutines initializing spam records for different origin IDs.
+// 2. Ensuring that all spam records are correctly initialized.
+func TestSpamRecordCache_ConcurrentInitialization(t *testing.T) {
+	sizeLimit := uint32(100)
+	logger := zerolog.Nop()
+	collector := metrics.NewNoopCollector()
+	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+		return protocolSpamRecordFixture(id)
+	}
+
+	cache := internal.NewSpamRecordCache(sizeLimit, logger, collector, recordFactory)
+	require.NotNil(t, cache)
+
+	originIDs := unittest.IdentifierListFixture(10)
+
+	var wg sync.WaitGroup
+	wg.Add(len(originIDs))
+
+	for _, originID := range originIDs {
+		go func(id flow.Identifier) {
+			defer wg.Done()
+			cache.Init(id)
+		}(originID)
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	// Ensure that all spam records are correctly initialized
+	for _, originID := range originIDs {
+		record, found := cache.Get(originID)
+		require.True(t, found)
+		require.NotNil(t, record)
+		require.Equal(t, originID, record.OriginId)
+	}
+}
+
+// TestSpamRecordCache_ConcurrentSameRecordInitialization tests the concurrent initialization of the same spam record.
+// The test covers the following scenarios:
+// 1. Multiple goroutines attempting to initialize the same spam record concurrently.
+// 2. Only one goroutine successfully initializes the record, and others receive false on initialization.
+// 3. The record is correctly initialized in the cache and can be retrieved using the Get method.
+func TestSpamRecordCache_ConcurrentSameRecordInitialization(t *testing.T) {
+	sizeLimit := uint32(100)
+	logger := zerolog.Nop()
+	collector := metrics.NewNoopCollector()
+	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+		return protocolSpamRecordFixture(id)
+	}
+
+	cache := internal.NewSpamRecordCache(sizeLimit, logger, collector, recordFactory)
+	require.NotNil(t, cache)
+
+	originID := unittest.IdentifierFixture()
+	const concurrentAttempts = 10
+
+	var wg sync.WaitGroup
+	wg.Add(concurrentAttempts)
+
+	successCount := atomic.Int32{}
+
+	for i := 0; i < concurrentAttempts; i++ {
+		go func() {
+			defer wg.Done()
+			initSuccess := cache.Init(originID)
+			if initSuccess {
+				successCount.Inc()
+			}
+		}()
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	// Ensure that only one goroutine successfully initialized the record
+	require.Equal(t, int32(1), successCount.Load())
+
+	// Ensure that the record is correctly initialized in the cache
+	record, found := cache.Get(originID)
+	require.True(t, found)
+	require.NotNil(t, record)
+	require.Equal(t, originID, record.OriginId)
 }
