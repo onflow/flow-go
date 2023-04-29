@@ -14,7 +14,7 @@ type TransactionPayerBalanceChecker struct{}
 
 func (_ TransactionPayerBalanceChecker) CheckPayerBalanceAndReturnMaxFees(
 	proc *TransactionProcedure,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 	env environment.Environment,
 ) (uint64, error) {
 	if !env.TransactionFeesEnabled() {

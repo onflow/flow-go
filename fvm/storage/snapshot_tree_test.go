@@ -105,10 +105,8 @@ func TestSnapshotTree(t *testing.T) {
 	check := func(
 		tree SnapshotTree,
 		expected map[flow.RegisterID]flow.RegisterValue,
-		fullLogLen int,
 		compactedLogLen int,
 	) {
-		require.Len(t, tree.fullLog, fullLogLen)
 		require.Len(t, tree.compactedLog, compactedLogLen)
 
 		for key, expectedValue := range expected {
@@ -118,11 +116,11 @@ func TestSnapshotTree(t *testing.T) {
 		}
 	}
 
-	check(tree0, expected0, 0, 0)
-	check(tree1, expected1, 1, 1)
-	check(tree2, expected2, 2, 2)
-	check(tree3, expected3, 3, 3)
-	check(compactedTree, expectedCompacted, 3+numExtraUpdates, 4)
+	check(tree0, expected0, 0)
+	check(tree1, expected1, 1)
+	check(tree2, expected2, 2)
+	check(tree3, expected3, 3)
+	check(compactedTree, expectedCompacted, 4)
 
 	emptyTree := NewSnapshotTree(nil)
 	value, err := emptyTree.Get(id1)

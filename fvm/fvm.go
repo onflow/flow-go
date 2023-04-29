@@ -87,7 +87,7 @@ func Run(executor ProcedureExecutor) error {
 type Procedure interface {
 	NewExecutor(
 		ctx Context,
-		txnState storage.Transaction,
+		txnState storage.TransactionPreparer,
 	) ProcedureExecutor
 
 	ComputationLimit(ctx Context) uint64
@@ -158,7 +158,7 @@ func (vm *VirtualMachine) Run(
 			uint32(proc.ExecutionTime()))
 	}
 
-	var derivedTxnData derived.DerivedTransactionCommitter
+	var derivedTxnData *derived.DerivedTransactionData
 	var err error
 	switch proc.Type() {
 	case ScriptProcedureType:
@@ -187,8 +187,8 @@ func (vm *VirtualMachine) Run(
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize))
 
 	txnState := &storage.SerialTransaction{
-		NestedTransaction:           nestedTxn,
-		DerivedTransactionCommitter: derivedTxnData,
+		NestedTransactionPreparer: nestedTxn,
+		DerivedTransactionData:    derivedTxnData,
 	}
 
 	executor := proc.NewExecutor(ctx, txnState)
@@ -238,8 +238,8 @@ func (vm *VirtualMachine) GetAccount(
 	derivedTxnData := derivedBlockData.NewSnapshotReadDerivedTransactionData()
 
 	txnState := &storage.SerialTransaction{
-		NestedTransaction:           nestedTxn,
-		DerivedTransactionCommitter: derivedTxnData,
+		NestedTransactionPreparer: nestedTxn,
+		DerivedTransactionData:    derivedTxnData,
 	}
 
 	env := environment.NewScriptEnv(
