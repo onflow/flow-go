@@ -102,6 +102,8 @@ func TestGeometricDecay(t *testing.T) {
 				decay:       0.000001,
 				lastUpdated: time.Now().Add(-1e9 * time.Second),
 			},
+			want:    0,
+			wantErr: nil,
 		},
 		{
 			name: "future time value causing an error",
