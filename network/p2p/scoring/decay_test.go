@@ -43,7 +43,7 @@ func TestGeometricDecay(t *testing.T) {
 				lastUpdated: time.Now(),
 			},
 			want:    0,
-			wantErr: nil,
+			wantErr: fmt.Errorf("decay factor must be in the range [0, 1], got 0"),
 		},
 		{
 			name: "decay factor of 1",
