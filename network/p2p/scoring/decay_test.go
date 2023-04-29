@@ -165,7 +165,8 @@ func TestDefaultDecayFunction(t *testing.T) {
 				},
 			},
 		},
-		{ // 2. penalty is negative and above the skipDecayThreshold and lastUpdated is too recent. In this case, the penalty should not be decayed,
+		{
+			// 2. penalty is negative and above the skipDecayThreshold and lastUpdated is too recent. In this case, the penalty should not be decayed,
 			// since less than a second has passed since last update.
 			name: "penalty is negative and but above skipDecayThreshold and lastUpdated is too recent",
 			args: args{
