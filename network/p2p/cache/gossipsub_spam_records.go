@@ -104,7 +104,7 @@ func (a *GossipSubSpamRecordCache) Add(peerId peer.ID, record p2p.GossipSubSpamR
 // Note that if any of the pre-processing functions returns an error, the record is reverted to its original state (prior to applying the update function).
 func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, adjustFn func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord) (*p2p.GossipSubSpamRecord, error) {
 	// HeroCache uses flow.Identifier for keys, so reformat of the peer.ID
-	entityId := flow.HashToID([]byte(peerID)) 
+	entityId := flow.HashToID([]byte(peerID))
 	if !a.c.Has(entityId) {
 		return nil, fmt.Errorf("could not adjust spam records for peer %s, record not found", peerID.String())
 	}

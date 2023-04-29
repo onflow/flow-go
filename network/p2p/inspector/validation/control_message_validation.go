@@ -128,9 +128,9 @@ func NewControlMsgValidationInspector(
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		distributor.Start(ctx)
 		select {
-			case <-ctx.Done():
-			case <-distributor.Ready():
-				ready()
+		case <-ctx.Done():
+		case <-distributor.Ready():
+			ready()
 		}
 		<-distributor.Done()
 	})
