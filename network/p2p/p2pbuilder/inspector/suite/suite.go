@@ -39,8 +39,12 @@ func NewGossipSubInspectorSuite(inspectors []p2p.GossipSubRPCInspector, ctrlMsgI
 		inspector := inspector // capture loop variable
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			inspector.Start(ctx)
-			<-inspector.Ready()
-			ready()
+
+			select {
+			case <-ctx.Done():
+			case <-inspector.Ready():
+				ready()
+			}
 
 			<-inspector.Done()
 		})
