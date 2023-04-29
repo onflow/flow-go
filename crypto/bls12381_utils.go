@@ -35,6 +35,7 @@ import "C"
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 )
 
 // Go wrappers around BLST C types
@@ -68,6 +69,18 @@ var blst_valid = (int)(C.BLST_SUCCESS)
 var blst_bad_encoding = (int)(C.BLST_BAD_ENCODING)
 var blst_bad_scalar = (int)(C.BLST_BAD_SCALAR)
 var blst_point_not_on_curve = (int)(C.BLST_POINT_NOT_ON_CURVE)
+
+func (a *scalar) String() string {
+	encoding := make([]byte, frBytesLen)
+	writeScalar(encoding, a)
+	return fmt.Sprintf("%#x", encoding)
+}
+
+func (p *pointE2) String() string {
+	encoding := make([]byte, pubKeyLengthBLSBLS12381)
+	writePointG2(encoding, p)
+	return fmt.Sprintf("%#x", encoding)
+}
 
 // initContext sets relic B12_381 parameters and precomputes some data in the C layer
 func (ct *ctx) initContext() error {
