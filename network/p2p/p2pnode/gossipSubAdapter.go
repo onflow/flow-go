@@ -69,10 +69,17 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 
 	if inspectorSuite := gossipSubConfig.InspectorSuiteComponent(); inspectorSuite != nil {
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
 			a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("starting inspector suite")
 			inspectorSuite.Start(ctx)
 			a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("inspector suite started")
+
+			select {
+			case <-ctx.Done():
+				a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("inspector suite context done")
+			case <-inspectorSuite.Ready():
+				ready()
+				a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("inspector suite ready")
+			}
 
 			<-inspectorSuite.Done()
 			a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("inspector suite stopped")
