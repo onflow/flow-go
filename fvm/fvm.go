@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -109,14 +110,14 @@ type VM interface {
 	Run(
 		Context,
 		Procedure,
-		state.StorageSnapshot,
+		snapshot.StorageSnapshot,
 	) (
-		*state.ExecutionSnapshot,
+		*snapshot.ExecutionSnapshot,
 		ProcedureOutput,
 		error,
 	)
 
-	GetAccount(Context, flow.Address, state.StorageSnapshot) (*flow.Account, error)
+	GetAccount(Context, flow.Address, snapshot.StorageSnapshot) (*flow.Account, error)
 }
 
 var _ VM = (*VirtualMachine)(nil)
@@ -133,9 +134,9 @@ func NewVirtualMachine() *VirtualMachine {
 func (vm *VirtualMachine) RunV2(
 	ctx Context,
 	proc Procedure,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	ProcedureOutput,
 	error,
 ) {
@@ -146,9 +147,9 @@ func (vm *VirtualMachine) RunV2(
 func (vm *VirtualMachine) Run(
 	ctx Context,
 	proc Procedure,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	ProcedureOutput,
 	error,
 ) {
@@ -216,7 +217,7 @@ func (vm *VirtualMachine) Run(
 func (vm *VirtualMachine) GetAccount(
 	ctx Context,
 	address flow.Address,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
