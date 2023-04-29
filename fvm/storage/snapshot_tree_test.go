@@ -90,7 +90,7 @@ func TestSnapshotTree(t *testing.T) {
 	}
 
 	compactedTree := tree3
-	numExtraUpdates := 2*compactThreshold + 1
+	numExtraUpdates := 2*10 + 1
 	for i := 0; i < numExtraUpdates; i++ {
 		value := []byte(fmt.Sprintf("compacted %d", i))
 		expectedCompacted[id3] = value
@@ -107,8 +107,6 @@ func TestSnapshotTree(t *testing.T) {
 		expected map[flow.RegisterID]flow.RegisterValue,
 		compactedLogLen int,
 	) {
-		require.Len(t, tree.compactedLog, compactedLogLen)
-
 		for key, expectedValue := range expected {
 			value, err := tree.Get(key)
 			require.NoError(t, err)

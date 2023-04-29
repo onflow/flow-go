@@ -3,10 +3,8 @@ package storage
 import (
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
-)
 
-const (
-	compactThreshold = 10
+	"github.com/google/btree"
 )
 
 type UpdateLog []map[flow.RegisterID]flow.RegisterValue
@@ -14,17 +12,24 @@ type UpdateLog []map[flow.RegisterID]flow.RegisterValue
 // SnapshotTree is a simple LSM tree representation of the key/value storage
 // at a given point in time.
 type SnapshotTree struct {
-	base state.StorageSnapshot
-
-	compactedLog UpdateLog
+	scratch *btree.BTreeG[flow.RegisterEntry]
+	base    state.StorageSnapshot
 }
 
 // NewSnapshotTree returns a tree with keys/values initialized to the base
 // storage snapshot.
 func NewSnapshotTree(base state.StorageSnapshot) SnapshotTree {
 	return SnapshotTree{
-		base:         base,
-		compactedLog: nil,
+		scratch: btree.NewG(
+			8,
+			func(a, b flow.RegisterEntry) bool {
+				if a.Key.Owner != b.Key.Owner {
+					return a.Key.Owner < b.Key.Owner
+				}
+				return a.Key.Key < b.Key.Key
+			},
+		),
+		base: base,
 	}
 }
 
@@ -33,39 +38,31 @@ func NewSnapshotTree(base state.StorageSnapshot) SnapshotTree {
 func (tree SnapshotTree) Append(
 	update *state.ExecutionSnapshot,
 ) SnapshotTree {
-	compactedLog := tree.compactedLog
-	if len(update.WriteSet) > 0 {
-		compactedLog = append(tree.compactedLog, update.WriteSet)
-		if len(compactedLog) > compactThreshold {
-			size := 0
-			for _, set := range compactedLog {
-				size += len(set)
-			}
+	if len(update.WriteSet) == 0 {
+		return tree
+	}
 
-			mergedSet := make(map[flow.RegisterID]flow.RegisterValue, size)
-			for _, set := range compactedLog {
-				for id, value := range set {
-					mergedSet[id] = value
-				}
-			}
-
-			compactedLog = UpdateLog{mergedSet}
-		}
+	scratch := tree.scratch.Clone()
+	for key, value := range update.WriteSet {
+		_, _ = scratch.ReplaceOrInsert(
+			flow.RegisterEntry{
+				Key:   key,
+				Value: value,
+			},
+		)
 	}
 
 	return SnapshotTree{
-		base:         tree.base,
-		compactedLog: compactedLog,
+		scratch: scratch,
+		base:    tree.base,
 	}
 }
 
 // Get returns the register id's value.
 func (tree SnapshotTree) Get(id flow.RegisterID) (flow.RegisterValue, error) {
-	for idx := len(tree.compactedLog) - 1; idx >= 0; idx-- {
-		value, ok := tree.compactedLog[idx][id]
-		if ok {
-			return value, nil
-		}
+	entity, ok := tree.scratch.Get(flow.RegisterEntry{Key: id})
+	if ok {
+		return entity.Value, nil
 	}
 
 	if tree.base != nil {

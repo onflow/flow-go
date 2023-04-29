@@ -100,6 +100,7 @@ require (
 
 require (
 	github.com/coreos/go-semver v0.3.0
+	github.com/google/btree v1.1.2
 	github.com/slok/go-http-metrics v0.10.0
 	golang.org/x/mod v0.8.0
 	gonum.org/v1/gonum v0.8.2
