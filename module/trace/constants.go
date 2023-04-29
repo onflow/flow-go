@@ -63,7 +63,7 @@ const (
 
 	// Builder
 	COLBuildOn                  SpanName = "col.builder"
-	COLBuildOnSetup             SpanName = "col.builder.setup"
+	COLBuildOnGetBuildCtx       SpanName = "col.builder.getBuildCtx"
 	COLBuildOnUnfinalizedLookup SpanName = "col.builder.unfinalizedLookup"
 	COLBuildOnFinalizedLookup   SpanName = "col.builder.finalizedLookup"
 	COLBuildOnCreatePayload     SpanName = "col.builder.createPayload"
