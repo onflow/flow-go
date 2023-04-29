@@ -21,7 +21,7 @@ import (
 //     The error is considered irrecoverable (unless the parameters can be adjusted).
 func GeometricDecay(score float64, decay float64, lastUpdated time.Time) (float64, error) {
 	if decay <= 0 || decay > 1 {
-		return 0.0, fmt.Errorf("decay factor must be in the range [0, 1], got %f", decay)
+		return 0.0, fmt.Errorf("decay factor must be in the range (0, 1], got %f", decay)
 	}
 
 	now := time.Now()
