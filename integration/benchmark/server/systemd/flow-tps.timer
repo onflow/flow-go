@@ -1,0 +1,8 @@
+[Unit]
+Description=Run control.sh every day
+
+[Timer]
+OnUnitActiveSec=10s
+
+[Install]
+WantedBy=timers.target
