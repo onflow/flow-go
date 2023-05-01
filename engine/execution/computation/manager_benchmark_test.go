@@ -20,8 +20,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -47,10 +47,10 @@ type testAccounts struct {
 func createAccounts(
 	b *testing.B,
 	vm fvm.VM,
-	snapshotTree storage.SnapshotTree,
+	snapshotTree snapshot.SnapshotTree,
 	num int,
 ) (
-	storage.SnapshotTree,
+	snapshot.SnapshotTree,
 	*testAccounts,
 ) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(num)
@@ -78,10 +78,10 @@ func createAccounts(
 func mustFundAccounts(
 	b *testing.B,
 	vm fvm.VM,
-	snapshotTree storage.SnapshotTree,
+	snapshotTree snapshot.SnapshotTree,
 	execCtx fvm.Context,
 	accs *testAccounts,
-) storage.SnapshotTree {
+) snapshot.SnapshotTree {
 	var err error
 	for _, acc := range accs.accounts {
 		transferTx := testutil.CreateTokenTransferTransaction(chain, 1_000_000, acc.address, chain.ServiceAddress())
@@ -202,12 +202,12 @@ func BenchmarkComputeBlock(b *testing.B) {
 			elapsed += time.Since(start)
 			b.StopTimer()
 
-			for _, snapshot := range res.StateSnapshots {
+			for _, snapshot := range res.AllExecutionSnapshots() {
 				snapshotTree = snapshotTree.Append(snapshot)
 			}
 
 			require.NoError(b, err)
-			for j, r := range res.TransactionResults {
+			for j, r := range res.AllTransactionResults() {
 				// skip system transactions
 				if j >= cols*txes {
 					break

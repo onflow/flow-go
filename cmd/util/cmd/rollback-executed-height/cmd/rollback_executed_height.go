@@ -224,12 +224,6 @@ func removeForBlockID(
 			return fmt.Errorf("could not remove chunk id %v for block id %v: %w", chunkID, blockID, err)
 		}
 
-		// remove chunkID-blockID index
-		err = headers.BatchRemoveChunkBlockIndexByChunkID(chunkID, writeBatch)
-
-		if err != nil {
-			return fmt.Errorf("could not remove chunk block index for chunk %v block id %v: %w", chunkID, blockID, err)
-		}
 	}
 
 	// remove commits

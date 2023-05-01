@@ -1,4 +1,4 @@
-package state
+package snapshot
 
 import (
 	"github.com/onflow/flow-go/model/flow"

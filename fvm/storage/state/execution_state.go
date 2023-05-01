@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -15,8 +16,29 @@ const (
 	DefaultMaxValueSize = 256_000_000 // ~256MB
 )
 
-// TODO(patrick): make State implement the View interface.
-//
+// TOOD(patrick): rm View interface after delta view is deleted.
+type View interface {
+	NewChild() *ExecutionState
+
+	Finalize() *snapshot.ExecutionSnapshot
+	Merge(child *snapshot.ExecutionSnapshot) error
+
+	Storage
+}
+
+// TOOD(patrick): rm Storage interface after delta view is deleted.
+// Storage is the storage interface used by the virtual machine to read and
+// write register values.
+type Storage interface {
+	// TODO(patrick): remove once fvm.VM.Run() is deprecated
+	Peek(id flow.RegisterID) (flow.RegisterValue, error)
+
+	Set(id flow.RegisterID, value flow.RegisterValue) error
+	Get(id flow.RegisterID) (flow.RegisterValue, error)
+
+	DropChanges() error
+}
+
 // State represents the execution state
 // it holds draft of updates and captures
 // all register touches
@@ -26,7 +48,7 @@ type ExecutionState struct {
 	// bookkeeping purpose).
 	finalized bool
 
-	view  View
+	*spockState
 	meter *meter.Meter
 
 	// NOTE: parent and child state shares the same limits controller
@@ -99,16 +121,15 @@ func (controller *limitsController) RunWithAllLimitsDisabled(f func()) {
 	controller.enforceLimits = current
 }
 
-func (state *ExecutionState) View() View {
-	return state.view
-}
-
 // NewExecutionState constructs a new state
-func NewExecutionState(view View, params StateParameters) *ExecutionState {
+func NewExecutionState(
+	snapshot snapshot.StorageSnapshot,
+	params StateParameters,
+) *ExecutionState {
 	m := meter.NewMeter(params.MeterParameters)
 	return &ExecutionState{
 		finalized:        false,
-		view:             view,
+		spockState:       newSpockState(snapshot),
 		meter:            m,
 		limitsController: newLimitsController(params),
 	}
@@ -121,7 +142,7 @@ func (state *ExecutionState) NewChildWithMeterParams(
 ) *ExecutionState {
 	return &ExecutionState{
 		finalized:        false,
-		view:             state.view.NewChild(),
+		spockState:       state.spockState.NewChild(),
 		meter:            meter.NewMeter(params),
 		limitsController: state.limitsController,
 	}
@@ -147,7 +168,7 @@ func (state *ExecutionState) DropChanges() error {
 		return fmt.Errorf("cannot DropChanges on a finalized state")
 	}
 
-	return state.view.DropChanges()
+	return state.spockState.DropChanges()
 }
 
 // Get returns a register value given owner and key
@@ -165,7 +186,7 @@ func (state *ExecutionState) Get(id flow.RegisterID) (flow.RegisterValue, error)
 		}
 	}
 
-	if value, err = state.view.Get(id); err != nil {
+	if value, err = state.spockState.Get(id); err != nil {
 		// wrap error into a fatal error
 		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
@@ -188,7 +209,7 @@ func (state *ExecutionState) Set(id flow.RegisterID, value flow.RegisterValue) e
 		}
 	}
 
-	if err := state.view.Set(id, value); err != nil {
+	if err := state.spockState.Set(id, value); err != nil {
 		// wrap error into a fatal error
 		setError := errors.NewLedgerFailure(err)
 		// wrap with more info
@@ -269,20 +290,20 @@ func (state *ExecutionState) TotalEmittedEventBytes() uint64 {
 	return state.meter.TotalEmittedEventBytes()
 }
 
-func (state *ExecutionState) Finalize() *ExecutionSnapshot {
+func (state *ExecutionState) Finalize() *snapshot.ExecutionSnapshot {
 	state.finalized = true
-	snapshot := state.view.Finalize()
+	snapshot := state.spockState.Finalize()
 	snapshot.Meter = state.meter
 	return snapshot
 }
 
-// MergeState the changes from a the given view to this view.
-func (state *ExecutionState) Merge(other *ExecutionSnapshot) error {
+// MergeState the changes from a the given execution snapshot to this state.
+func (state *ExecutionState) Merge(other *snapshot.ExecutionSnapshot) error {
 	if state.finalized {
 		return fmt.Errorf("cannot Merge on a finalized state")
 	}
 
-	err := state.view.Merge(other)
+	err := state.spockState.Merge(other)
 	if err != nil {
 		return errors.NewStateMergeFailure(err)
 	}
@@ -310,4 +331,14 @@ func (state *ExecutionState) checkSize(
 			state.maxValueSizeAllowed)
 	}
 	return nil
+}
+
+func (state *ExecutionState) readSetSize() int {
+	return state.spockState.readSetSize()
+}
+
+func (state *ExecutionState) interimReadSet(
+	accumulator map[flow.RegisterID]struct{},
+) {
+	state.spockState.interimReadSet(accumulator)
 }

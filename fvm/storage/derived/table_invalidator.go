@@ -1,8 +1,8 @@
 package derived
 
 import (
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 )
 
 type TableInvalidator[TKey comparable, TVal any] interface {
@@ -10,7 +10,7 @@ type TableInvalidator[TKey comparable, TVal any] interface {
 	ShouldInvalidateEntries() bool
 
 	// This returns true if the table entry should be invalidated.
-	ShouldInvalidateEntry(TKey, TVal, *state.ExecutionSnapshot) bool
+	ShouldInvalidateEntry(TKey, TVal, *snapshot.ExecutionSnapshot) bool
 }
 
 type tableInvalidatorAtTime[TKey comparable, TVal any] struct {
@@ -50,7 +50,7 @@ func (chained chainedTableInvalidators[TKey, TVal]) ShouldInvalidateEntries() bo
 func (chained chainedTableInvalidators[TKey, TVal]) ShouldInvalidateEntry(
 	key TKey,
 	value TVal,
-	snapshot *state.ExecutionSnapshot,
+	snapshot *snapshot.ExecutionSnapshot,
 ) bool {
 	for _, invalidator := range chained {
 		if invalidator.ShouldInvalidateEntry(key, value, snapshot) {

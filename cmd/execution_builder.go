@@ -51,7 +51,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/fvm"
-	fvmState "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
@@ -1082,7 +1082,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 func getContractEpochCounter(
 	vm fvm.VM,
 	vmCtx fvm.Context,
-	snapshot fvmState.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) (
 	uint64,
 	error,

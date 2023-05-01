@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -37,9 +38,9 @@ type Meter interface {
 	RunWithAllLimitsDisabled(f func())
 }
 
-// NestedTransaction provides active transaction states and facilitates common
-// state management operations.
-type NestedTransaction interface {
+// NestedTransactionPreparer provides active transaction states and facilitates
+// common state management operations.
+type NestedTransactionPreparer interface {
 	Meter
 
 	// NumNestedTransactions returns the number of uncommitted nested
@@ -57,11 +58,15 @@ type NestedTransaction interface {
 	// transaction.
 	IsCurrent(id NestedTransactionId) bool
 
+	// InterimReadSet returns the current read set aggregated from all
+	// outstanding nested transactions.
+	InterimReadSet() map[flow.RegisterID]struct{}
+
 	// FinalizeMainTransaction finalizes the main transaction and returns
 	// its execution snapshot.  The finalized main transaction will not accept
 	// any new commits after this point.  This returns an error if there are
 	// outstanding nested transactions.
-	FinalizeMainTransaction() (*ExecutionSnapshot, error)
+	FinalizeMainTransaction() (*snapshot.ExecutionSnapshot, error)
 
 	// BeginNestedTransaction creates a unrestricted nested transaction within
 	// the current unrestricted (nested) transaction.  The meter parameters are
@@ -106,7 +111,7 @@ type NestedTransaction interface {
 	CommitNestedTransaction(
 		expectedId NestedTransactionId,
 	) (
-		*ExecutionSnapshot,
+		*snapshot.ExecutionSnapshot,
 		error,
 	)
 
@@ -124,35 +129,16 @@ type NestedTransaction interface {
 	CommitParseRestrictedNestedTransaction(
 		location common.AddressLocation,
 	) (
-		*ExecutionSnapshot,
+		*snapshot.ExecutionSnapshot,
 		error,
 	)
-
-	// PauseNestedTransaction detaches the current nested transaction from the
-	// parent transaction, and returns the paused nested transaction state.
-	// The paused nested transaction may be resume via Resume.
-	//
-	// WARNING: Pause and Resume are intended for implementing continuation
-	// passing style behavior for the transaction executor, with the assumption
-	// that the states accessed prior to pausing remain valid after resumption.
-	// The paused nested transaction should not be reused across transactions.
-	// IT IS NOT SAFE TO PAUSE A NESTED TRANSACTION IN GENERAL SINCE THAT
-	// COULD LEAD TO PHANTOM READS.
-	PauseNestedTransaction(
-		expectedId NestedTransactionId,
-	) (
-		*ExecutionState,
-		error,
-	)
-
-	// ResumeNestedTransaction attaches the paused nested transaction (state)
-	// to the current transaction.
-	ResumeNestedTransaction(pausedState *ExecutionState)
 
 	// AttachAndCommitNestedTransaction commits the changes from the cached
 	// nested transaction execution snapshot to the current (nested)
 	// transaction.
-	AttachAndCommitNestedTransaction(cachedSnapshot *ExecutionSnapshot) error
+	AttachAndCommitNestedTransaction(
+		cachedSnapshot *snapshot.ExecutionSnapshot,
+	) error
 
 	// RestartNestedTransaction merges all changes that belongs to the nested
 	// transaction about to be restart (for spock/meter bookkeeping), then
@@ -164,8 +150,6 @@ type NestedTransaction interface {
 	Get(id flow.RegisterID) (flow.RegisterValue, error)
 
 	Set(id flow.RegisterID, value flow.RegisterValue) error
-
-	ViewForTestingOnly() View
 }
 
 type nestedTransactionStackFrame struct {
@@ -188,10 +172,10 @@ type transactionState struct {
 // NewTransactionState constructs a new state transaction which manages nested
 // transactions.
 func NewTransactionState(
-	startView View,
+	snapshot snapshot.StorageSnapshot,
 	params StateParameters,
-) NestedTransaction {
-	startState := NewExecutionState(startView, params)
+) NestedTransactionPreparer {
+	startState := NewExecutionState(snapshot, params)
 	return &transactionState{
 		nestedTransactions: []nestedTransactionStackFrame{
 			nestedTransactionStackFrame{
@@ -224,8 +208,25 @@ func (txnState *transactionState) IsCurrent(id NestedTransactionId) bool {
 	return txnState.current().ExecutionState == id.state
 }
 
+func (txnState *transactionState) InterimReadSet() map[flow.RegisterID]struct{} {
+	sizeEstimate := 0
+	for _, frame := range txnState.nestedTransactions {
+		sizeEstimate += frame.readSetSize()
+	}
+
+	result := make(map[flow.RegisterID]struct{}, sizeEstimate)
+
+	// Note: the interim read set must be accumulated in reverse order since
+	// the parent frame's write set will override the child frame's read set.
+	for i := len(txnState.nestedTransactions) - 1; i >= 0; i-- {
+		txnState.nestedTransactions[i].interimReadSet(result)
+	}
+
+	return result
+}
+
 func (txnState *transactionState) FinalizeMainTransaction() (
-	*ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	error,
 ) {
 	if len(txnState.nestedTransactions) > 1 {
@@ -314,7 +315,10 @@ func (txnState *transactionState) pop(op string) (*ExecutionState, error) {
 	return child.ExecutionState, nil
 }
 
-func (txnState *transactionState) mergeIntoParent() (*ExecutionSnapshot, error) {
+func (txnState *transactionState) mergeIntoParent() (
+	*snapshot.ExecutionSnapshot,
+	error,
+) {
 	childState, err := txnState.pop("commit")
 	if err != nil {
 		return nil, err
@@ -333,7 +337,7 @@ func (txnState *transactionState) mergeIntoParent() (*ExecutionSnapshot, error) 
 func (txnState *transactionState) CommitNestedTransaction(
 	expectedId NestedTransactionId,
 ) (
-	*ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	error,
 ) {
 	if !txnState.IsCurrent(expectedId) {
@@ -355,7 +359,7 @@ func (txnState *transactionState) CommitNestedTransaction(
 func (txnState *transactionState) CommitParseRestrictedNestedTransaction(
 	location common.AddressLocation,
 ) (
-	*ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	error,
 ) {
 	currentFrame := txnState.current()
@@ -373,32 +377,8 @@ func (txnState *transactionState) CommitParseRestrictedNestedTransaction(
 	return txnState.mergeIntoParent()
 }
 
-func (txnState *transactionState) PauseNestedTransaction(
-	expectedId NestedTransactionId,
-) (
-	*ExecutionState,
-	error,
-) {
-	if !txnState.IsCurrent(expectedId) {
-		return nil, fmt.Errorf(
-			"cannot pause unexpected nested transaction: id mismatch",
-		)
-	}
-
-	if txnState.IsParseRestricted() {
-		return nil, fmt.Errorf(
-			"cannot Pause parse restricted nested transaction")
-	}
-
-	return txnState.pop("pause")
-}
-
-func (txnState *transactionState) ResumeNestedTransaction(pausedState *ExecutionState) {
-	txnState.push(pausedState, nil)
-}
-
 func (txnState *transactionState) AttachAndCommitNestedTransaction(
-	cachedSnapshot *ExecutionSnapshot,
+	cachedSnapshot *snapshot.ExecutionSnapshot,
 ) error {
 	return txnState.current().Merge(cachedSnapshot)
 }
@@ -492,10 +472,6 @@ func (txnState *transactionState) MeterEmittedEvent(byteSize uint64) error {
 
 func (txnState *transactionState) TotalEmittedEventBytes() uint64 {
 	return txnState.current().TotalEmittedEventBytes()
-}
-
-func (txnState *transactionState) ViewForTestingOnly() View {
-	return txnState.current().View()
 }
 
 func (txnState *transactionState) RunWithAllLimitsDisabled(f func()) {

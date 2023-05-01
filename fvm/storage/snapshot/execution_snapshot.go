@@ -1,4 +1,4 @@
-package state
+package snapshot
 
 import (
 	"golang.org/x/exp/slices"
@@ -6,29 +6,6 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-// TOOD(patrick): rm View interface after delta view is deleted.
-type View interface {
-	NewChild() View
-
-	Finalize() *ExecutionSnapshot
-	Merge(child *ExecutionSnapshot) error
-
-	Storage
-}
-
-// TOOD(patrick): rm Storage interface after delta view is deleted.
-// Storage is the storage interface used by the virtual machine to read and
-// write register values.
-type Storage interface {
-	// TODO(patrick): remove once fvm.VM.Run() is deprecated
-	Peek(id flow.RegisterID) (flow.RegisterValue, error)
-
-	Set(id flow.RegisterID, value flow.RegisterValue) error
-	Get(id flow.RegisterID) (flow.RegisterValue, error)
-
-	DropChanges() error
-}
 
 type ExecutionSnapshot struct {
 	// Note that the ReadSet only include reads from the storage snapshot.

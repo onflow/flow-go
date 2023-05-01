@@ -8,8 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -47,12 +46,11 @@ func TestDerivedChainData(t *testing.T) {
 	txn, err := block1.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
-	view := delta.NewDeltaView(nil)
-	txState := state.NewTransactionState(view, state.DefaultParameters())
+	txState := state.NewTransactionState(nil, state.DefaultParameters())
 
 	_, err = txn.GetOrComputeProgram(txState, loc1, newProgramLoader(
 		func(
-			txnState state.NestedTransaction,
+			txnState state.NestedTransactionPreparer,
 			key common.AddressLocation,
 		) (*Program, error) {
 			return prog1, nil
@@ -83,12 +81,11 @@ func TestDerivedChainData(t *testing.T) {
 	txn, err = block2.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
-	view = delta.NewDeltaView(nil)
-	txState = state.NewTransactionState(view, state.DefaultParameters())
+	txState = state.NewTransactionState(nil, state.DefaultParameters())
 
 	_, err = txn.GetOrComputeProgram(txState, loc2, newProgramLoader(
 		func(
-			txnState state.NestedTransaction,
+			txnState state.NestedTransactionPreparer,
 			key common.AddressLocation,
 		) (*Program, error) {
 			return prog2, nil
@@ -185,7 +182,7 @@ func TestDerivedChainData(t *testing.T) {
 
 type programLoader struct {
 	f func(
-		txnState state.NestedTransaction,
+		txnState state.NestedTransactionPreparer,
 		key common.AddressLocation,
 	) (*Program, error)
 }
@@ -194,7 +191,7 @@ var _ ValueComputer[common.AddressLocation, *Program] = &programLoader{}
 
 func newProgramLoader(
 	f func(
-		txnState state.NestedTransaction,
+		txnState state.NestedTransactionPreparer,
 		key common.AddressLocation,
 	) (*Program, error),
 ) *programLoader {
@@ -204,7 +201,7 @@ func newProgramLoader(
 }
 
 func (p *programLoader) Compute(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	key common.AddressLocation,
 ) (*Program, error) {
 	return p.f(txnState, key)
