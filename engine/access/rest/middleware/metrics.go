@@ -13,14 +13,17 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// we have to use single rest collector for all metrics since it's not allowed to register same
+// collector multiple times.
+var restCollector = metrics.NewRestCollector(metricsProm.Config{Prefix: "access_rest_api"})
+
 func MetricsMiddleware() mux.MiddlewareFunc {
-	r := metrics.NewRestCollector(metricsProm.Config{Prefix: "access_rest_api"})
-	metricsMiddleware := middleware.New(middleware.Config{Recorder: r})
+	metricsMiddleware := middleware.New(middleware.Config{Recorder: restCollector})
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			// This is a custom metric being called on every http request
-			r.AddTotalRequests(req.Context(), req.Method, req.URL.Path)
+			restCollector.AddTotalRequests(req.Context(), req.Method, req.URL.Path)
 
 			// Modify the writer
 			respWriter := &responseWriter{w, http.StatusOK}
