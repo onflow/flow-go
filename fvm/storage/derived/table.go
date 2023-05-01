@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/storage/errors"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 )
 
@@ -18,8 +19,8 @@ type ValueComputer[TKey any, TVal any] interface {
 }
 
 type invalidatableEntry[TVal any] struct {
-	Value             TVal                     // immutable after initialization.
-	ExecutionSnapshot *state.ExecutionSnapshot // immutable after initialization.
+	Value             TVal                        // immutable after initialization.
+	ExecutionSnapshot *snapshot.ExecutionSnapshot // immutable after initialization.
 
 	isInvalid bool // Guarded by DerivedDataTable' lock.
 }
@@ -359,7 +360,7 @@ func (table *DerivedDataTable[TKey, TVal]) NewTableTransaction(
 // Note: use GetOrCompute instead of Get/Set whenever possible.
 func (txn *TableTransaction[TKey, TVal]) get(key TKey) (
 	TVal,
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	bool,
 ) {
 
@@ -385,7 +386,7 @@ func (txn *TableTransaction[TKey, TVal]) get(key TKey) (
 
 func (txn *TableTransaction[TKey, TVal]) GetForTestingOnly(key TKey) (
 	TVal,
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	bool,
 ) {
 	return txn.get(key)
@@ -394,7 +395,7 @@ func (txn *TableTransaction[TKey, TVal]) GetForTestingOnly(key TKey) (
 func (txn *TableTransaction[TKey, TVal]) set(
 	key TKey,
 	value TVal,
-	snapshot *state.ExecutionSnapshot,
+	snapshot *snapshot.ExecutionSnapshot,
 ) {
 	txn.writeSet[key] = &invalidatableEntry[TVal]{
 		Value:             value,
@@ -410,7 +411,7 @@ func (txn *TableTransaction[TKey, TVal]) set(
 func (txn *TableTransaction[TKey, TVal]) SetForTestingOnly(
 	key TKey,
 	value TVal,
-	snapshot *state.ExecutionSnapshot,
+	snapshot *snapshot.ExecutionSnapshot,
 ) {
 	txn.set(key, value, snapshot)
 }

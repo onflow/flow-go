@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
-	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 )
@@ -162,7 +162,7 @@ func TestKeyListSignature(t *testing.T) {
 					vm fvm.VM,
 					chain flow.Chain,
 					ctx fvm.Context,
-					snapshotTree storage.SnapshotTree,
+					snapshotTree snapshot.SnapshotTree,
 				) {
 					privateKey, publicKey := createKey()
 					signableMessage, message := createMessage("foo")
@@ -258,7 +258,7 @@ func TestKeyListSignature(t *testing.T) {
 					vm fvm.VM,
 					chain flow.Chain,
 					ctx fvm.Context,
-					snapshotTree storage.SnapshotTree,
+					snapshotTree snapshot.SnapshotTree,
 				) {
 					privateKeyA, publicKeyA := createKey()
 					privateKeyB, publicKeyB := createKey()
@@ -394,7 +394,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				vm fvm.VM,
 				chain flow.Chain,
 				ctx fvm.Context,
-				snapshotTree storage.SnapshotTree,
+				snapshotTree snapshot.SnapshotTree,
 			) {
 
 				code := func(signatureAlgorithm signatureAlgorithm) []byte {
@@ -505,7 +505,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				vm fvm.VM,
 				chain flow.Chain,
 				ctx fvm.Context,
-				snapshotTree storage.SnapshotTree,
+				snapshotTree snapshot.SnapshotTree,
 			) {
 
 				code := []byte(
@@ -628,7 +628,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				vm fvm.VM,
 				chain flow.Chain,
 				ctx fvm.Context,
-				snapshotTree storage.SnapshotTree,
+				snapshotTree snapshot.SnapshotTree,
 			) {
 
 				code := func(signatureAlgorithm signatureAlgorithm) []byte {
@@ -752,7 +752,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				vm fvm.VM,
 				chain flow.Chain,
 				ctx fvm.Context,
-				snapshotTree storage.SnapshotTree,
+				snapshotTree snapshot.SnapshotTree,
 			) {
 
 				message, cadenceMessage := createMessage("random_message")

@@ -32,8 +32,8 @@ import (
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
@@ -61,7 +61,7 @@ type fakeCommitter struct {
 }
 
 func (committer *fakeCommitter) CommitView(
-	view *state.ExecutionSnapshot,
+	view *snapshot.ExecutionSnapshot,
 	startState flow.StateCommitment,
 ) (
 	flow.StateCommitment,
@@ -308,7 +308,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(
-				&state.ExecutionSnapshot{},
+				&snapshot.ExecutionSnapshot{},
 				fvm.ProcedureOutput{},
 				nil).
 			Once() // just system chunk
@@ -362,7 +362,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		opts := append(baseOpts, contextOptions...)
 		ctx := fvm.NewContext(opts...)
-		snapshotTree := storage.NewSnapshotTree(nil)
+		snapshotTree := snapshot.NewSnapshotTree(nil)
 
 		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
@@ -776,7 +776,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			context.Background(),
 			unittest.IdentifierFixture(),
 			block,
-			state.MapStorageSnapshot{key: value},
+			snapshot.MapStorageSnapshot{key: value},
 			derived.NewEmptyDerivedBlockData())
 		assert.NoError(t, err)
 		assert.Len(t, result.AllExecutionSnapshots(), collectionCount+1) // +1 system chunk
@@ -878,7 +878,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			context.Background(),
 			unittest.IdentifierFixture(),
 			block,
-			state.MapStorageSnapshot{key: value},
+			snapshot.MapStorageSnapshot{key: value},
 			derived.NewEmptyDerivedBlockData())
 		require.NoError(t, err)
 		assert.Len(t, result.AllExecutionSnapshots(), collectionCount+1) // +1 system chunk
@@ -1280,9 +1280,9 @@ type testVM struct {
 func (vm *testVM) Run(
 	ctx fvm.Context,
 	proc fvm.Procedure,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -1297,7 +1297,7 @@ func (vm *testVM) Run(
 
 	getSetAProgram(vm.t, storageSnapshot, derivedTxnData)
 
-	snapshot := &state.ExecutionSnapshot{}
+	snapshot := &snapshot.ExecutionSnapshot{}
 	output := fvm.ProcedureOutput{
 		Events: generateEvents(vm.eventsPerTransaction, txn.TxIndex),
 		Err:    vm.err,
@@ -1309,7 +1309,7 @@ func (vm *testVM) Run(
 func (testVM) GetAccount(
 	_ fvm.Context,
 	_ flow.Address,
-	_ state.StorageSnapshot,
+	_ snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -1333,7 +1333,7 @@ func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 
 func getSetAProgram(
 	t *testing.T,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 	derivedTxnData *derived.DerivedTransactionData,
 ) {
 
