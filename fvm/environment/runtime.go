@@ -14,7 +14,8 @@ func DefaultRuntimeParams() RuntimeParams {
 	return RuntimeParams{
 		ReusableCadenceRuntimePool: runtime.NewReusableCadenceRuntimePool(
 			0,
-			cadenceRuntime.Config{}),
+			cadenceRuntime.Config{},
+		),
 	}
 }
 

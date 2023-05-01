@@ -215,10 +215,8 @@ func (f FakeAccounts) SetContract(_ string, _ flow.Address, _ []byte) error   { 
 func (f FakeAccounts) DeleteContract(_ string, _ flow.Address) error          { return nil }
 func (f FakeAccounts) Create(_ []flow.AccountPublicKey, _ flow.Address) error { return nil }
 func (f FakeAccounts) GetValue(_ flow.RegisterID) (flow.RegisterValue, error) { return nil, nil }
-func (f FakeAccounts) CheckAccountNotFrozen(_ flow.Address) error             { return nil }
 func (f FakeAccounts) GetStorageUsed(_ flow.Address) (uint64, error)          { return 0, nil }
 func (f FakeAccounts) SetValue(_ flow.RegisterID, _ []byte) error             { return nil }
 func (f FakeAccounts) AllocateStorageIndex(_ flow.Address) (atree.StorageIndex, error) {
 	return atree.StorageIndex{}, nil
 }
-func (f FakeAccounts) SetAccountFrozen(_ flow.Address, _ bool) error { return nil }

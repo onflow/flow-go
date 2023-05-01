@@ -113,12 +113,14 @@ void        Fr_from_montg(Fr *res, const Fr *a);
 void        Fr_exp_montg(Fr *res, const Fr* base, const limb_t* expo, const int expo_len);
 void        Fr_inv_montg_eucl(Fr *res, const Fr *a);
 void        Fr_inv_exp_montg(Fr *res, const Fr *a);
-BLST_ERROR  Fr_read_bytes(Fr* a, const uint8_t *bin, int len);
-BLST_ERROR  Fr_star_read_bytes(Fr* a, const uint8_t *bin, int len);
-void        Fr_write_bytes(uint8_t *bin, const Fr* a);
-bool_t      map_bytes_to_Fr(Fr*, const uint8_t*, int);
+BLST_ERROR  Fr_read_bytes(Fr* a, const byte *bin, int len);
+BLST_ERROR  Fr_star_read_bytes(Fr* a, const byte *bin, int len);
+void        Fr_write_bytes(byte *bin, const Fr* a);
+bool_t      map_bytes_to_Fr(Fr*, const byte*, int);
 
 // Fp utilities
+void    Fp_mul_montg(Fp *, const Fp *, const Fp *);
+void    Fp_squ_montg(Fp *, const Fp *);
 
 // E1 and G1 utilities
 int      ep_read_bin_compact(ep_t, const byte *, const int);
@@ -161,7 +163,7 @@ prec_st* init_precomputed_data_BLS12_381();
 void     precomputed_data_set(const prec_st* p);
 
 // utility testing function
-void xmd_sha256(uint8_t *, int, uint8_t *, int, uint8_t *, int);
+void xmd_sha256(byte *, int, byte *, int, byte *, int);
 
 // Debugging related functions
 void     bytes_print_(char*, byte*, int);

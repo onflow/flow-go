@@ -22,7 +22,7 @@ relic_tests:
 ifeq ($(ADX_SUPPORT), 1)
 	go test -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic $(if $(VERBOSE),-v,)
 else
-	CGO_CFLAGS="-D__BLST_PORTABLE__" go test -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic $(if $(VERBOSE),-v,)
+	CGO_CFLAGS="-O -D__BLST_PORTABLE__" go test -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic $(if $(VERBOSE),-v,)
 endif
 
 # test all packages that do not require Relic library (all functionalities except the BLS-related ones)

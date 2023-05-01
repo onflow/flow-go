@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -41,7 +42,7 @@ type MutatorSuite struct {
 	chainID flow.ChainID
 
 	// protocol state for reference blocks for transactions
-	protoState   protocol.MutableState
+	protoState   protocol.FollowerState
 	protoGenesis *flow.Header
 
 	state cluster.MutableState
@@ -62,14 +63,15 @@ func (suite *MutatorSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	headers, _, seals, index, conPayloads, blocks, qcs, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
+	log := zerolog.Nop()
+	all := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
 	suite.NoError(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, tracer, headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
 	suite.Assert().Nil(err)
 	consumer := events.NewNoop()
 
@@ -86,10 +88,18 @@ func (suite *MutatorSuite) SetupTest() {
 
 	suite.protoGenesis = genesis.Header
 
-	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+	state, err := pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 	require.NoError(suite.T(), err)
 
-	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, qcs, tracer, consumer, protocolutil.MockBlockTimer())
+	suite.protoState, err = pbadger.NewFollowerState(
+		log,
+		tracer,
+		consumer,
+		state,
+		all.Index,
+		all.Payloads,
+		protocolutil.MockBlockTimer(),
+	)
 	require.NoError(suite.T(), err)
 }
 
@@ -361,7 +371,7 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 		next := unittest.BlockWithParentFixture(parent)
 		next.Payload.Guarantees = nil
 		next.SetPayload(*next.Payload)
-		err := suite.protoState.Extend(context.Background(), next)
+		err := suite.protoState.ExtendCertified(context.Background(), next, unittest.CertifyBlock(next.Header))
 		suite.Require().Nil(err)
 		err = suite.protoState.Finalize(context.Background(), next.ID())
 		suite.Require().Nil(err)

@@ -227,7 +227,7 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 }
 
 // 0xC0 is the header of the point at infinity serialization (either in G1 or G2)
-const infinityPointHeader = 0xC0
+const infinityPointHeader = byte(0xC0)
 
 var identityBLSSignature = append([]byte{infinityPointHeader}, make([]byte, signatureLengthBLSBLS12381-1)...)
 
@@ -445,7 +445,7 @@ func (sk *prKeyBLSBLS12381) Equals(other PrivateKey) bool {
 
 // String returns the hex string representation of the key.
 func (sk *prKeyBLSBLS12381) String() string {
-	return fmt.Sprintf("%#x", sk.Encode())
+	return sk.scalar.String()
 }
 
 // pubKeyBLSBLS12381 is the public key of BLS using BLS12_381,
@@ -521,7 +521,7 @@ func (pk *pubKeyBLSBLS12381) Equals(other PublicKey) bool {
 
 // String returns the hex string representation of the key.
 func (pk *pubKeyBLSBLS12381) String() string {
-	return fmt.Sprintf("%#x", pk.Encode())
+	return pk.point.String()
 }
 
 // Get Macro definitions from the C layer as Cgo does not export macros

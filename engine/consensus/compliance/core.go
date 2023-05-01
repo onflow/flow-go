@@ -43,10 +43,9 @@ type Core struct {
 	hotstuffMetrics   module.HotstuffMetrics
 	complianceMetrics module.ComplianceMetrics
 	tracer            module.Tracer
-	cleaner           storage.Cleaner
 	headers           storage.Headers
 	payloads          storage.Payloads
-	state             protocol.MutableState
+	state             protocol.ParticipantState
 	// track latest finalized view/height - used to efficiently drop outdated or too-far-ahead blocks
 	finalizedView     counters.StrictMonotonousCounter
 	finalizedHeight   counters.StrictMonotonousCounter
@@ -66,10 +65,9 @@ func NewCore(
 	hotstuffMetrics module.HotstuffMetrics,
 	complianceMetrics module.ComplianceMetrics,
 	tracer module.Tracer,
-	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
-	state protocol.MutableState,
+	state protocol.ParticipantState,
 	pending module.PendingBlockBuffer,
 	sync module.BlockRequester,
 	validator hotstuff.Validator,
@@ -92,7 +90,6 @@ func NewCore(
 		mempoolMetrics:    mempool,
 		hotstuffMetrics:   hotstuffMetrics,
 		complianceMetrics: complianceMetrics,
-		cleaner:           cleaner,
 		headers:           headers,
 		payloads:          payloads,
 		state:             state,
@@ -161,10 +158,10 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// ignore proposals which are too far ahead of our local finalized state
 	// instead, rely on sync engine to catch up finalization more effectively, and avoid
 	// large subtree of blocks to be cached.
-	if header.Height > finalHeight+c.config.SkipNewProposalsThreshold {
+	if header.View > finalView+c.config.SkipNewProposalsThreshold {
 		log.Debug().
 			Uint64("skip_new_proposals_threshold", c.config.SkipNewProposalsThreshold).
-			Msg("dropping block too far ahead of locally finalized height")
+			Msg("dropping block too far ahead of locally finalized view")
 		return nil
 	}
 
@@ -237,12 +234,6 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
-
-	// most of the heavy database checks are done at this point, so this is a
-	// good moment to potentially kick-off a garbage collection of the DB
-	// NOTE: this is only effectively run every 1000th calls, which corresponds
-	// to every 1000th successfully processed block
-	c.cleaner.RunGC()
 
 	return nil
 }

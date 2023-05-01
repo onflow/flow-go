@@ -4,11 +4,9 @@
 package crypto
 
 import (
-	"crypto/rand"
 	"encoding/hex"
 	mrand "math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,9 +14,8 @@ import (
 
 // G1 and G2 scalar multiplication
 func BenchmarkScalarMultG1G2(b *testing.B) {
-
-	seed := make([]byte, frBytesLen)
-	_, err := rand.Read(seed)
+	seed := make([]byte, securityBits/8)
+	_, err := mrand.Read(seed)
 	require.NoError(b, err)
 
 	var expo scalar
@@ -104,9 +101,10 @@ func BenchmarkMapToG1(b *testing.B) {
 
 // test subgroup membership check in G1 and G2
 func TestSubgroupCheck(t *testing.T) {
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
-	t.Logf("math rand seed is %d", r)
+	prg := getPRG(t)
+	seed := make([]byte, securityBits/8)
+	_, err := prg.Read(seed)
+	require.NoError(t, err)
 
 	/*t.Run("G1", func(t *testing.T) {
 		var p pointE1

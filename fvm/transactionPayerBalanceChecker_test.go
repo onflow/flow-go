@@ -12,8 +12,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	fvmmock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -27,9 +26,7 @@ func TestTransactionPayerBalanceChecker(t *testing.T) {
 		proc.Transaction = &flow.TransactionBody{}
 		proc.Transaction.Payer = payer
 
-		txnState := state.NewTransactionState(
-			utils.NewSimpleView(),
-			state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 
 		d := fvm.TransactionPayerBalanceChecker{}
 		maxFees, err := d.CheckPayerBalanceAndReturnMaxFees(proc, txnState, env)
@@ -50,9 +47,7 @@ func TestTransactionPayerBalanceChecker(t *testing.T) {
 		proc.Transaction = &flow.TransactionBody{}
 		proc.Transaction.Payer = payer
 
-		txnState := state.NewTransactionState(
-			utils.NewSimpleView(),
-			state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 
 		d := fvm.TransactionPayerBalanceChecker{}
 		maxFees, err := d.CheckPayerBalanceAndReturnMaxFees(proc, txnState, env)
@@ -73,9 +68,7 @@ func TestTransactionPayerBalanceChecker(t *testing.T) {
 		proc.Transaction = &flow.TransactionBody{}
 		proc.Transaction.Payer = payer
 
-		txnState := state.NewTransactionState(
-			utils.NewSimpleView(),
-			state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 
 		d := fvm.TransactionPayerBalanceChecker{}
 		maxFees, err := d.CheckPayerBalanceAndReturnMaxFees(proc, txnState, env)
@@ -101,9 +94,7 @@ func TestTransactionPayerBalanceChecker(t *testing.T) {
 		proc.Transaction = &flow.TransactionBody{}
 		proc.Transaction.Payer = payer
 
-		txnState := state.NewTransactionState(
-			utils.NewSimpleView(),
-			state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 
 		d := fvm.TransactionPayerBalanceChecker{}
 		maxFees, err := d.CheckPayerBalanceAndReturnMaxFees(proc, txnState, env)
@@ -128,9 +119,7 @@ func TestTransactionPayerBalanceChecker(t *testing.T) {
 		proc.Transaction = &flow.TransactionBody{}
 		proc.Transaction.Payer = payer
 
-		txnState := state.NewTransactionState(
-			utils.NewSimpleView(),
-			state.DefaultParameters())
+		txnState := testutils.NewSimpleTransaction(nil)
 
 		d := fvm.TransactionPayerBalanceChecker{}
 		maxFees, err := d.CheckPayerBalanceAndReturnMaxFees(proc, txnState, env)

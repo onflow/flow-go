@@ -162,7 +162,7 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 			if c.received && !c.answerReceived {
 				s.disqualified = true
 				s.processor.Disqualify(int(s.dealerIndex),
-					fmt.Sprintf("complaint from %d was not answered",
+					fmt.Sprintf("complaint from (%d) was not answered",
 						complainer))
 				break
 			}
@@ -412,7 +412,7 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 
 	if s.vAReceived {
 		if !s.verifyShare() {
-			// otherwise, build a complaint
+			// build a complaint
 			s.buildAndBroadcastComplaint()
 		}
 	}
@@ -465,8 +465,8 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 			if s.checkComplaint(complainer, c) {
 				s.disqualified = true
 				s.processor.Disqualify(int(s.dealerIndex),
-					fmt.Sprintf("verification vector received: a complaint answer to %d is invalid",
-						complainer))
+					fmt.Sprintf("verification vector received: a complaint answer to (%d) is invalid, answer is %s, computed key is %s",
+						complainer, &c.answer, &s.y[complainer]))
 				return
 			}
 		}
@@ -482,6 +482,14 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 // build a complaint against the dealer, add it to the local
 // complaint map and broadcast it
 func (s *feldmanVSSQualState) buildAndBroadcastComplaint() {
+	var logMsg string
+	if s.vAReceived && s.xReceived {
+		logMsg = fmt.Sprintf("building a complaint, share is %s, computed public key is %s",
+			&s.x, &s.y[s.myIndex])
+	} else {
+		logMsg = "building a complaint"
+	}
+	s.processor.FlagMisbehavior(int(s.dealerIndex), logMsg)
 	s.complaints[s.myIndex] = &complaint{
 		received:       true,
 		answerReceived: false,
@@ -582,8 +590,8 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 		s.disqualified = s.checkComplaint(origin, c)
 		if s.disqualified {
 			s.processor.Disqualify(int(s.dealerIndex),
-				fmt.Sprintf("complaint received: complaint answer to %d is invalid",
-					origin))
+				fmt.Sprintf("complaint received: answer to (%d) is invalid, answer is %s, computed public key is %s",
+					origin, &c.answer, &s.y[origin]))
 		}
 		return
 	}
@@ -656,8 +664,8 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 			s.disqualified = s.checkComplaint(complainer, c)
 			if s.disqualified {
 				s.processor.Disqualify(int(s.dealerIndex),
-					fmt.Sprintf("complaint answer received: complaint answer to %d is invalid",
-						complainer))
+					fmt.Sprintf("complaint answer received: answer to (%d) is invalid, answer is %s, computed key is %s",
+						complainer, &c.answer, &s.y[complainer]))
 			}
 		}
 

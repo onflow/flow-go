@@ -146,7 +146,7 @@ type Node struct {
 	voteAggregator    hotstuff.VoteAggregator
 	timeoutAggregator hotstuff.TimeoutAggregator
 	messageHub        *message_hub.MessageHub
-	state             *bprotocol.MutableState
+	state             *bprotocol.ParticipantState
 	headers           *storage.Headers
 	net               *Network
 }
@@ -377,17 +377,43 @@ func createNode(
 	statusesDB := storage.NewEpochStatuses(metricsCollector, db)
 	consumer := events.NewDistributor()
 
-	state, err := bprotocol.Bootstrap(metricsCollector, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, rootSnapshot)
+	localID := identity.ID()
+
+	log := unittest.Logger().With().
+		Int("index", index).
+		Hex("node_id", localID[:]).
+		Logger()
+
+	state, err := bprotocol.Bootstrap(
+		metricsCollector,
+		db,
+		headersDB,
+		sealsDB,
+		resultsDB,
+		blocksDB,
+		qcsDB,
+		setupsDB,
+		commitsDB,
+		statusesDB,
+		rootSnapshot,
+	)
 	require.NoError(t, err)
 
 	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)
 	require.NoError(t, err)
 
-	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, qcsDB, tracer, consumer,
-		blockTimer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
+	fullState, err := bprotocol.NewFullConsensusState(
+		log,
+		tracer,
+		consumer,
+		state,
+		indexDB,
+		payloadsDB,
+		blockTimer,
+		util.MockReceiptValidator(),
+		util.MockSealValidator(sealsDB),
+	)
 	require.NoError(t, err)
-
-	localID := identity.ID()
 
 	node := &Node{
 		db:    db,
@@ -395,12 +421,6 @@ func createNode(
 		index: index,
 		id:    identity,
 	}
-
-	// log with node index an ID
-	log := unittest.Logger().With().
-		Int("index", index).
-		Hex("node_id", localID[:]).
-		Logger()
 
 	stopper.AddNode(node)
 
@@ -415,9 +435,6 @@ func createNode(
 	notifier := pubsub.NewDistributor()
 	notifier.AddConsumer(counterConsumer)
 	notifier.AddConsumer(logConsumer)
-
-	cleaner := &storagemock.Cleaner{}
-	cleaner.On("RunGC")
 
 	require.Equal(t, participant.nodeInfo.NodeID, localID)
 	privateKeys, err := participant.nodeInfo.PrivateKeys()
@@ -578,7 +595,6 @@ func createNode(
 		metricsCollector,
 		metricsCollector,
 		tracer,
-		cleaner,
 		headersDB,
 		payloadsDB,
 		fullState,

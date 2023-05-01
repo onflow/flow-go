@@ -118,7 +118,7 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 
 		msg, ok := e.pendingBlocks.Pop()
 		if ok {
-			inBlock := msg.(flow.Slashable[messages.ClusterBlockProposal])
+			inBlock := msg.(flow.Slashable[*messages.ClusterBlockProposal])
 			err := e.core.OnBlockProposal(inBlock.OriginID, inBlock.Message)
 			e.core.engineMetrics.MessageHandled(metrics.EngineClusterCompliance, metrics.MessageBlockProposal)
 			if err != nil {
@@ -146,7 +146,7 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 
 // OnClusterBlockProposal feeds a new block proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
-func (e *Engine) OnClusterBlockProposal(proposal flow.Slashable[messages.ClusterBlockProposal]) {
+func (e *Engine) OnClusterBlockProposal(proposal flow.Slashable[*messages.ClusterBlockProposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageBlockProposal)
 	if e.pendingBlocks.Push(proposal) {
 		e.pendingBlocksNotifier.Notify()
@@ -157,7 +157,7 @@ func (e *Engine) OnClusterBlockProposal(proposal flow.Slashable[messages.Cluster
 
 // OnSyncedClusterBlock feeds a block obtained from sync proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
-func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[messages.ClusterBlockProposal]) {
+func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[*messages.ClusterBlockProposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
 	if e.pendingBlocks.Push(syncedBlock) {
 		e.pendingBlocksNotifier.Notify()

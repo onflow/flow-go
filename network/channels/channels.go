@@ -124,7 +124,6 @@ const (
 	// Channels for protocols actively synchronizing state across nodes
 	SyncCommittee     = Channel("sync-committee")
 	SyncClusterPrefix = "sync-cluster" // dynamic channel, use SyncCluster function
-	SyncExecution     = Channel("sync-execution")
 
 	// Channels for dkg communication
 	DKGCommittee = "dkg-committee"
@@ -180,7 +179,6 @@ func initializeChannelRoleMap() {
 
 	// Channels for protocols actively synchronizing state across nodes
 	channelRoleMap[SyncCommittee] = flow.Roles()
-	channelRoleMap[SyncExecution] = flow.RoleList{flow.RoleExecution}
 
 	// Channels for DKG communication
 	channelRoleMap[DKGCommittee] = flow.RoleList{flow.RoleConsensus}
@@ -279,6 +277,15 @@ func ChannelFromTopic(topic Topic) (Channel, bool) {
 	return "", false
 }
 
+// SporkIDFromTopic returns the spork ID from a topic.
+// All errors returned from this function can be considered benign.
+func SporkIDFromTopic(topic Topic) (flow.Identifier, error) {
+	if index := strings.LastIndex(topic.String(), "/"); index != -1 {
+		return flow.HexStringToIdentifier(string(topic)[index+1:])
+	}
+	return flow.Identifier{}, fmt.Errorf("spork ID is missing")
+}
+
 // ConsensusCluster returns a dynamic cluster consensus channel based on
 // the chain ID of the cluster in question.
 func ConsensusCluster(clusterID flow.ChainID) Channel {
@@ -289,4 +296,43 @@ func ConsensusCluster(clusterID flow.ChainID) Channel {
 // ID of the cluster in question.
 func SyncCluster(clusterID flow.ChainID) Channel {
 	return Channel(fmt.Sprintf("%s-%s", SyncClusterPrefix, clusterID))
+}
+
+// IsValidFlowTopic ensures the topic is a valid Flow network topic.
+// A valid Topic has the following properties:
+// - A Channel can be derived from the Topic and that channel exists.
+// - The sporkID part of the Topic is equal to the current network sporkID.
+// All errors returned from this function can be considered benign.
+func IsValidFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
+	channel, ok := ChannelFromTopic(topic)
+	if !ok {
+		return fmt.Errorf("invalid topic: failed to get channel from topic")
+	}
+	err := IsValidFlowChannel(channel)
+	if err != nil {
+		return fmt.Errorf("invalid topic: %w", err)
+	}
+
+	if IsClusterChannel(channel) {
+		return nil
+	}
+
+	sporkID, err := SporkIDFromTopic(topic)
+	if err != nil {
+		return err
+	}
+	if sporkID != expectedSporkID {
+		return fmt.Errorf("invalid topic: wrong spork ID %s the current spork ID is %s", sporkID, expectedSporkID)
+	}
+
+	return nil
+}
+
+// IsValidFlowChannel ensures the channel is a valid Flow network channel.
+// All errors returned from this function can be considered benign.
+func IsValidFlowChannel(channel Channel) error {
+	if !ChannelExists(channel) {
+		return fmt.Errorf("unknown channel: %s", channel)
+	}
+	return nil
 }

@@ -98,7 +98,7 @@ func TestExecutionFlow(t *testing.T) {
 		col2.ID(): &col2,
 	}
 
-	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
+	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 
 	// signed by the only collector
 	block := unittest.BlockWithParentAndProposerFixture(t, genesis, conID.NodeID)
@@ -259,7 +259,7 @@ func deployContractBlock(t *testing.T, conID *flow.Identity, colID *flow.Identit
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
 
-	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
+	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 
 	// make block
 	block := unittest.BlockWithParentAndProposerFixture(t, parent, conID.NodeID)
@@ -294,7 +294,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	// make collection
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 
-	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
+	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 	// make block
 	block := unittest.BlockWithParentAndProposerFixture(t, parent, conID.NodeID)
 	voterIndices, err := signature.EncodeSignersToIndices(
@@ -326,7 +326,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
-	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
+	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 	block := unittest.BlockWithParentAndProposerFixture(t, parent, conID.NodeID)
@@ -581,39 +581,3 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	verificationEngine.AssertExpectations(t)
 }
-
-// Test that when received the same state delta for the second time,
-// the delta will be saved again without causing any error.
-// func TestReceiveTheSameDeltaMultipleTimes(t *testing.T) {
-// 	hub := stub.NewNetworkHub()
-//
-// 	chainID := flow.Mainnet
-//
-// 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-// 	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-// 	ver1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-// 	ver2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-//
-// 	identities := unittest.CompleteIdentitySet(colID, exeID, ver1ID, ver2ID)
-//
-// 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21, chainID)
-// 	defer exeNode.Done()
-//
-// 	genesis, err := exeNode.State.AtHeight(0).Head()
-// 	require.NoError(t, err)
-//
-// 	delta := unittest.StateDeltaWithParentFixture(genesis)
-// 	delta.ExecutableBlock.StartState = unittest.GenesisStateCommitment
-// 	delta.EndState = unittest.GenesisStateCommitment
-//
-// 	fmt.Printf("block id: %v, delta for block (%v)'s parent id: %v\n", genesis.ID(), delta.Block.ID(), delta.ParentID())
-// 	exeNode.IngestionEngine.SubmitLocal(delta)
-// 	time.Sleep(time.Second)
-//
-// 	exeNode.IngestionEngine.SubmitLocal(delta)
-// 	// handling the same delta again to verify the DB calls in saveExecutionResults
-// 	// are idempotent, if they weren't, it will hit log.Fatal and crash before
-// 	// sleep is done
-// 	time.Sleep(time.Second)
-//
-// }

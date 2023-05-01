@@ -33,3 +33,9 @@ issues:
     - path: 'cmd/access/node_build/*' 
       linters:
         - typecheck
+    - path: 'cmd/observer/node_builder/*'
+      linters:
+        - typecheck
+    - path: 'follower/*'
+      linters:
+        - typecheck

@@ -52,7 +52,7 @@ type MessageHubSuite struct {
 	payloads          *storage.ClusterPayloads
 	me                *module.Local
 	state             *clusterstate.MutableState
-	protoState        *protocol.MutableState
+	protoState        *protocol.State
 	net               *mocknetwork.Network
 	con               *mocknetwork.Conduit
 	hotstuff          *module.HotStuff
@@ -83,7 +83,7 @@ func (s *MessageHubSuite) SetupTest() {
 
 	s.payloads = storage.NewClusterPayloads(s.T())
 	s.me = module.NewLocal(s.T())
-	s.protoState = protocol.NewMutableState(s.T())
+	s.protoState = protocol.NewState(s.T())
 	s.net = mocknetwork.NewNetwork(s.T())
 	s.con = mocknetwork.NewConduit(s.T())
 	s.hotstuff = module.NewHotStuff(s.T())
@@ -193,7 +193,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 		block := unittest.ClusterBlockFixture()
 
 		blockProposalMsg := messages.NewClusterBlockProposal(&block)
-		expectedComplianceMsg := flow.Slashable[messages.ClusterBlockProposal]{
+		expectedComplianceMsg := flow.Slashable[*messages.ClusterBlockProposal]{
 			OriginID: originID,
 			Message:  blockProposalMsg,
 		}

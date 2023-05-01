@@ -126,9 +126,6 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, v
 // This implementation already support the cases, where the DKG committee is a
 // _strict subset_ of the full consensus committee.
 func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error {
-	if len(signers) == 0 {
-		return model.NewInsufficientSignaturesErrorf("empty list of signers")
-	}
 	signerIdentities := signers.Lookup()
 	dkg, err := c.committee.DKG(view)
 	if err != nil {
@@ -151,24 +148,6 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	}
 	if !beaconValid {
 		return fmt.Errorf("invalid reconstructed random beacon sig for block (%x): %w", blockID, model.ErrInvalidSignature)
-	}
-
-	// verify the aggregated staking and beacon signatures next (more costly)
-	// Caution: this function will error if pubKeys is empty
-	verifyAggregatedSignature := func(pubKeys []crypto.PublicKey, aggregatedSig crypto.Signature, hasher hash.Hasher) error {
-		// TODO: as further optimization, replace the following call with model/signature.PublicKeyAggregator
-		aggregatedKey, err := crypto.AggregateBLSPublicKeys(pubKeys) // caution: requires non-empty slice of keys!
-		if err != nil {
-			return fmt.Errorf("internal error computing aggregated key: %w", err)
-		}
-		valid, err := aggregatedKey.Verify(aggregatedSig, msg, hasher)
-		if err != nil {
-			return fmt.Errorf("internal error while verifying aggregated signature: %w", err)
-		}
-		if !valid {
-			return fmt.Errorf("invalid aggregated sig for block %v: %w", blockID, model.ErrInvalidSignature)
-		}
-		return nil
 	}
 
 	// STEP 2: verify aggregated random beacon key shares
@@ -203,10 +182,9 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	}
 
 	// Step 2b: verify aggregated beacon signature.
-	// Our previous threshold check also guarantees that `beaconPubKeys` is not empty.
-	err = verifyAggregatedSignature(beaconPubKeys, blockSigData.AggregatedRandomBeaconSig, c.beaconHasher)
+	err = verifyAggregatedSignatureOneMessage(beaconPubKeys, blockSigData.AggregatedRandomBeaconSig, c.beaconHasher, msg)
 	if err != nil {
-		return fmt.Errorf("verifying aggregated random beacon sig shares failed for block %v: %w", blockID, err)
+		return fmt.Errorf("verifying aggregated random beacon signature failed for block %v: %w", blockID, err)
 	}
 
 	// STEP 3: validating the aggregated staking signatures
@@ -232,10 +210,9 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 		}
 		stakingPubKeys = append(stakingPubKeys, identity.StakingPubKey)
 	}
-	err = verifyAggregatedSignature(stakingPubKeys, blockSigData.AggregatedStakingSig, c.stakingHasher)
+	err = verifyAggregatedSignatureOneMessage(stakingPubKeys, blockSigData.AggregatedStakingSig, c.stakingHasher, msg)
 	if err != nil {
-		return fmt.Errorf("verifying aggregated staking sig failed for block %v: %w", blockID, err)
-
+		return fmt.Errorf("verifying aggregated staking signature failed for block %v: %w", blockID, err)
 	}
 
 	return nil
@@ -251,5 +228,6 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 //   - unexpected errors should be treated as symptoms of bugs or uncovered
 //     edge cases in the logic (i.e. as fatal)
 func (c *CombinedVerifierV3) VerifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
-	return verifyTC(signers, sigData, view, highQCViews, c.timeoutObjectHasher)
+	stakingPks := signers.PublicStakingKeys()
+	return verifyTCSignatureManyMessages(stakingPks, sigData, view, highQCViews, c.timeoutObjectHasher)
 }

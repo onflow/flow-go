@@ -93,6 +93,7 @@ func New(
 	fixedExecutionNodeIDs []string,
 	log zerolog.Logger,
 	snapshotHistoryLimit int,
+	archiveAddressList []string,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
@@ -108,13 +109,14 @@ func New(
 		state: state,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:           headers,
-			executionReceipts: executionReceipts,
-			connFactory:       connFactory,
-			state:             state,
-			log:               log,
-			metrics:           transactionMetrics,
-			loggedScripts:     loggedScripts,
+			headers:            headers,
+			executionReceipts:  executionReceipts,
+			connFactory:        connFactory,
+			state:              state,
+			log:                log,
+			metrics:            transactionMetrics,
+			loggedScripts:      loggedScripts,
+			archiveAddressList: archiveAddressList,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
@@ -188,7 +190,7 @@ func identifierList(ids []string) (flow.IdentifierList, error) {
 	for i, idStr := range ids {
 		id, err := flow.HexStringToIdentifier(idStr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %v", id, err)
+			return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %w", id, err)
 		}
 		idList[i] = id
 	}

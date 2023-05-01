@@ -53,8 +53,9 @@ func (sys *SystemContracts) Invoke(
 	error,
 ) {
 	contractLocation := common.AddressLocation{
-		Address: common.Address(spec.AddressFromChain(sys.chain)),
-		Name:    spec.LocationName,
+		Address: common.MustBytesToAddress(
+			spec.AddressFromChain(sys.chain).Bytes()),
+		Name: spec.LocationName,
 	}
 
 	span := sys.tracer.StartChildSpan(trace.FVMInvokeContractFunction)
@@ -156,7 +157,7 @@ func (sys *SystemContracts) DeductTransactionFees(
 // uses `FlowServiceAccount.setupNewAccount` from https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowServiceAccount.cdc
 var setupNewAccountSpec = ContractFunctionSpec{
 	AddressFromChain: ServiceAddress,
-	LocationName:     systemcontracts.ContractServiceAccount,
+	LocationName:     systemcontracts.ContractNameServiceAccount,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_setupNewAccount,
 	ArgumentTypes: []sema.Type{
 		sema.AuthAccountType,
@@ -168,7 +169,7 @@ var setupNewAccountSpec = ContractFunctionSpec{
 // account.
 func (sys *SystemContracts) SetupNewAccount(
 	flowAddress flow.Address,
-	payer common.Address,
+	payer flow.Address,
 ) (cadence.Value, error) {
 	return sys.Invoke(
 		setupNewAccountSpec,
@@ -181,7 +182,7 @@ func (sys *SystemContracts) SetupNewAccount(
 
 var accountAvailableBalanceSpec = ContractFunctionSpec{
 	AddressFromChain: ServiceAddress,
-	LocationName:     systemcontracts.ContractStorageFees,
+	LocationName:     systemcontracts.ContractNameStorageFees,
 	FunctionName:     systemcontracts.ContractStorageFeesFunction_defaultTokenAvailableBalance,
 	ArgumentTypes: []sema.Type{
 		&sema.AddressType{},
@@ -191,7 +192,7 @@ var accountAvailableBalanceSpec = ContractFunctionSpec{
 // AccountAvailableBalance executes the get available balance contract on the
 // storage fees contract.
 func (sys *SystemContracts) AccountAvailableBalance(
-	address common.Address,
+	address flow.Address,
 ) (cadence.Value, error) {
 	return sys.Invoke(
 		accountAvailableBalanceSpec,
@@ -203,7 +204,7 @@ func (sys *SystemContracts) AccountAvailableBalance(
 
 var accountBalanceInvocationSpec = ContractFunctionSpec{
 	AddressFromChain: ServiceAddress,
-	LocationName:     systemcontracts.ContractServiceAccount,
+	LocationName:     systemcontracts.ContractNameServiceAccount,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_defaultTokenBalance,
 	ArgumentTypes: []sema.Type{
 		sema.PublicAccountType,
@@ -213,7 +214,7 @@ var accountBalanceInvocationSpec = ContractFunctionSpec{
 // AccountBalance executes the get available balance contract on the service
 // account.
 func (sys *SystemContracts) AccountBalance(
-	address common.Address,
+	address flow.Address,
 ) (cadence.Value, error) {
 	return sys.Invoke(
 		accountBalanceInvocationSpec,
@@ -225,7 +226,7 @@ func (sys *SystemContracts) AccountBalance(
 
 var accountStorageCapacitySpec = ContractFunctionSpec{
 	AddressFromChain: ServiceAddress,
-	LocationName:     systemcontracts.ContractStorageFees,
+	LocationName:     systemcontracts.ContractNameStorageFees,
 	FunctionName:     systemcontracts.ContractStorageFeesFunction_calculateAccountCapacity,
 	ArgumentTypes: []sema.Type{
 		&sema.AddressType{},
@@ -235,7 +236,7 @@ var accountStorageCapacitySpec = ContractFunctionSpec{
 // AccountStorageCapacity executes the get storage capacity contract on the
 // service account.
 func (sys *SystemContracts) AccountStorageCapacity(
-	address common.Address,
+	address flow.Address,
 ) (cadence.Value, error) {
 	return sys.Invoke(
 		accountStorageCapacitySpec,
@@ -247,8 +248,8 @@ func (sys *SystemContracts) AccountStorageCapacity(
 
 // AccountsStorageCapacity gets storage capacity for multiple accounts at once.
 func (sys *SystemContracts) AccountsStorageCapacity(
-	addresses []common.Address,
-	payer common.Address,
+	addresses []flow.Address,
+	payer flow.Address,
 	maxTxFees uint64,
 ) (cadence.Value, error) {
 	arrayValues := make([]cadence.Value, len(addresses))
@@ -259,7 +260,7 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 	return sys.Invoke(
 		ContractFunctionSpec{
 			AddressFromChain: ServiceAddress,
-			LocationName:     systemcontracts.ContractStorageFees,
+			LocationName:     systemcontracts.ContractNameStorageFees,
 			FunctionName:     systemcontracts.ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck,
 			ArgumentTypes: []sema.Type{
 				sema.NewConstantSizedType(
@@ -277,34 +278,4 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 			cadence.UFix64(maxTxFees),
 		},
 	)
-}
-
-var useContractAuditVoucherSpec = ContractFunctionSpec{
-	AddressFromChain: ServiceAddress,
-	LocationName:     systemcontracts.ContractDeploymentAudits,
-	FunctionName:     systemcontracts.ContractDeploymentAuditsFunction_useVoucherForDeploy,
-	ArgumentTypes: []sema.Type{
-		&sema.AddressType{},
-		sema.StringType,
-	},
-}
-
-// UseContractAuditVoucher executes the use a contract deployment audit voucher
-// contract.
-func (sys *SystemContracts) UseContractAuditVoucher(
-	address flow.Address,
-	code string,
-) (bool, error) {
-	resultCdc, err := sys.Invoke(
-		useContractAuditVoucherSpec,
-		[]cadence.Value{
-			cadence.BytesToAddress(address.Bytes()),
-			cadence.String(code),
-		},
-	)
-	if err != nil {
-		return false, err
-	}
-	result := resultCdc.(cadence.Bool).ToGoValue().(bool)
-	return result, nil
 }

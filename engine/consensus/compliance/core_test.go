@@ -54,17 +54,16 @@ type CommonSuite struct {
 	// storage data
 	headerDB   map[flow.Identifier]*flow.Header
 	payloadDB  map[flow.Identifier]*flow.Payload
-	pendingDB  map[flow.Identifier]flow.Slashable[flow.Block]
-	childrenDB map[flow.Identifier][]flow.Slashable[flow.Block]
+	pendingDB  map[flow.Identifier]flow.Slashable[*flow.Block]
+	childrenDB map[flow.Identifier][]flow.Slashable[*flow.Block]
 
 	// mocked dependencies
 	me                *module.Local
 	metrics           *metrics.NoopCollector
 	tracer            realModule.Tracer
-	cleaner           *storage.Cleaner
 	headers           *storage.Headers
 	payloads          *storage.Payloads
-	state             *protocol.MutableState
+	state             *protocol.ParticipantState
 	snapshot          *protocol.Snapshot
 	con               *mocknetwork.Conduit
 	net               *mocknetwork.Network
@@ -96,8 +95,8 @@ func (cs *CommonSuite) SetupTest() {
 	// initialize the storage data
 	cs.headerDB = make(map[flow.Identifier]*flow.Header)
 	cs.payloadDB = make(map[flow.Identifier]*flow.Payload)
-	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[flow.Block])
-	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[flow.Block])
+	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[*flow.Block])
+	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[*flow.Block])
 
 	// store the head header and payload
 	cs.headerDB[block.ID()] = block.Header
@@ -110,10 +109,6 @@ func (cs *CommonSuite) SetupTest() {
 			return cs.myID
 		},
 	)
-
-	// set up storage cleaner
-	cs.cleaner = &storage.Cleaner{}
-	cs.cleaner.On("RunGC").Return()
 
 	// set up header storage mock
 	cs.headers = &storage.Headers{}
@@ -158,7 +153,7 @@ func (cs *CommonSuite) SetupTest() {
 	)
 
 	// set up protocol state mock
-	cs.state = &protocol.MutableState{}
+	cs.state = &protocol.ParticipantState{}
 	cs.state.On("Final").Return(
 		func() protint.Snapshot {
 			return cs.snapshot
@@ -210,7 +205,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.pending = &module.PendingBlockBuffer{}
 	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
 	cs.pending.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) flow.Slashable[flow.Block] {
+		func(blockID flow.Identifier) flow.Slashable[*flow.Block] {
 			return cs.pendingDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -219,7 +214,7 @@ func (cs *CommonSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("ByParentID", mock.Anything).Return(
-		func(blockID flow.Identifier) []flow.Slashable[flow.Block] {
+		func(blockID flow.Identifier) []flow.Slashable[*flow.Block] {
 			return cs.childrenDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -257,7 +252,6 @@ func (cs *CommonSuite) SetupTest() {
 		cs.metrics,
 		cs.metrics,
 		cs.tracer,
-		cs.cleaner,
 		cs.headers,
 		cs.payloads,
 		cs.state,
@@ -327,7 +321,7 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 	// create a proposal which is far enough ahead to be dropped
 	originID := cs.participants[1].NodeID
 	block := unittest.BlockFixture()
-	block.Header.Height = cs.head.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
+	block.Header.View = cs.head.View + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
 	proposal := unittest.ProposalFromBlock(&block)
 
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -431,7 +425,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 
 	cs.Run("invalid block", func() {
 		// make sure we fail to extend the state
-		*cs.state = protocol.MutableState{}
+		*cs.state = protocol.ParticipantState{}
 		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewInvalidExtensionError(""))
 		// we should notify VoteAggregator about the invalid block
@@ -451,7 +445,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 
 	cs.Run("outdated block", func() {
 		// make sure we fail to extend the state
-		*cs.state = protocol.MutableState{}
+		*cs.state = protocol.ParticipantState{}
 		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(state.NewOutdatedExtensionError(""))
 
@@ -469,7 +463,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 
 	cs.Run("unexpected error", func() {
 		// make sure we fail to extend the state
-		*cs.state = protocol.MutableState{}
+		*cs.state = protocol.ParticipantState{}
 		cs.state.On("Final").Return(func() protint.Snapshot { return cs.snapshot })
 		unexpectedErr := errors.New("unexpected generic error")
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(unexpectedErr)

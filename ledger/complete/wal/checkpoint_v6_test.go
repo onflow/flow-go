@@ -3,10 +3,10 @@ package wal
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
@@ -87,7 +87,10 @@ func createSimpleTrie(t *testing.T) []*trie.MTrie {
 
 func randPathPayload() (ledger.Path, ledger.Payload) {
 	var path ledger.Path
-	rand.Read(path[:])
+	_, err := rand.Read(path[:])
+	if err != nil {
+		panic("randomness failed")
+	}
 	payload := testutils.RandomPayload(1, 100)
 	return path, *payload
 }
@@ -123,6 +126,33 @@ func createMultipleRandomTries(t *testing.T) []*trie.MTrie {
 	tries = append(tries, activeTrie)
 
 	_, payloads2 := randNPathPayloads(100)
+	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads2, false)
+	require.NoError(t, err, "update registers")
+	tries = append(tries, activeTrie)
+
+	return tries
+}
+
+func createMultipleRandomTriesMini(t *testing.T) []*trie.MTrie {
+	tries := make([]*trie.MTrie, 0)
+	activeTrie := trie.NewEmptyMTrie()
+
+	var err error
+	// add tries with no shared paths
+	for i := 0; i < 5; i++ {
+		paths, payloads := randNPathPayloads(20)
+		activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, paths, payloads, false)
+		require.NoError(t, err, "update registers")
+		tries = append(tries, activeTrie)
+	}
+
+	// add trie with some shared path
+	sharedPaths, payloads1 := randNPathPayloads(10)
+	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads1, false)
+	require.NoError(t, err, "update registers")
+	tries = append(tries, activeTrie)
+
+	_, payloads2 := randNPathPayloads(10)
 	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads2, false)
 	require.NoError(t, err, "update registers")
 	tries = append(tries, activeTrie)
@@ -193,10 +223,16 @@ func TestEncodeSubTrie(t *testing.T) {
 
 func randomNode() *node.Node {
 	var randomPath ledger.Path
-	rand.Read(randomPath[:])
+	_, err := rand.Read(randomPath[:])
+	if err != nil {
+		panic("randomness failed")
+	}
 
 	var randomHashValue hash.Hash
-	rand.Read(randomHashValue[:])
+	_, err = rand.Read(randomHashValue[:])
+	if err != nil {
+		panic("randomness failed")
+	}
 
 	return node.NewNode(256, nil, nil, randomPath, nil, randomHashValue)
 }
@@ -273,6 +309,68 @@ func TestCheckpointV6IsDeterminstic(t *testing.T) {
 				"found difference in checkpoint files")
 
 		}
+	})
+}
+
+func TestWriteAndReadCheckpointV6LeafEmptyTrie(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := []*trie.MTrie{trie.NewEmptyMTrie()}
+		fileName := "checkpoint-empty-trie"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+
+		bufSize := 10
+		leafNodesCh := make(chan *LeafNode, bufSize)
+		go func() {
+			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
+			require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+		}()
+		for range leafNodesCh {
+			require.Fail(t, "should not return any nodes")
+		}
+	})
+}
+
+func TestWriteAndReadCheckpointV6LeafSimpleTrie(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimpleTrie(t)
+		fileName := "checkpoint"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		bufSize := 1
+		leafNodesCh := make(chan *LeafNode, bufSize)
+		go func() {
+			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
+			require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+		}()
+		resultPayloads := make([]ledger.Payload, 0)
+		for leafNode := range leafNodesCh {
+			// avoid dummy payload from empty trie
+			if leafNode.Payload != nil {
+				resultPayloads = append(resultPayloads, *leafNode.Payload)
+			}
+		}
+		require.EqualValues(t, tries[1].AllPayloads(), resultPayloads)
+	})
+}
+
+func TestWriteAndReadCheckpointV6LeafMultipleTries(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		fileName := "checkpoint-multi-leaf-file"
+		tries := createMultipleRandomTriesMini(t)
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		bufSize := 5
+		leafNodesCh := make(chan *LeafNode, bufSize)
+		go func() {
+			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
+			require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
+		}()
+		resultPayloads := make([]ledger.Payload, 0)
+		for leafNode := range leafNodesCh {
+			resultPayloads = append(resultPayloads, *leafNode.Payload)
+		}
+		require.NotEmpty(t, resultPayloads)
 	})
 }
 
@@ -414,6 +512,36 @@ func TestAllPartFileExist(t *testing.T) {
 			require.NoError(t, err, "fail to remove part file")
 
 			_, err = OpenAndReadCheckpointV6(dir, fileName, &logger)
+			require.ErrorIs(t, err, os.ErrNotExist, "wrong error type returned")
+		}
+	})
+}
+
+// verify that if a part file is missing then os.ErrNotExist should return
+func TestAllPartFileExistLeafReader(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		for i := 0; i < 17; i++ {
+			tries := createSimpleTrie(t)
+			fileName := fmt.Sprintf("checkpoint_missing_part_file_%v", i)
+			var fileToDelete string
+			var err error
+			if i == 16 {
+				fileToDelete, _ = filePathTopTries(dir, fileName)
+			} else {
+				fileToDelete, _, err = filePathSubTries(dir, fileName, i)
+			}
+			require.NoErrorf(t, err, "fail to find sub trie file path")
+
+			logger := unittest.Logger()
+			require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+
+			// delete i-th part file, then the error should mention i-th file missing
+			err = os.Remove(fileToDelete)
+			require.NoError(t, err, "fail to remove part file")
+
+			bufSize := 10
+			leafNodesCh := make(chan *LeafNode, bufSize)
+			err = OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
 			require.ErrorIs(t, err, os.ErrNotExist, "wrong error type returned")
 		}
 	})

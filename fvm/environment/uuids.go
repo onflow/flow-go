@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -16,12 +16,12 @@ type UUIDGenerator interface {
 }
 
 type ParseRestrictedUUIDGenerator struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     UUIDGenerator
 }
 
 func NewParseRestrictedUUIDGenerator(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl UUIDGenerator,
 ) UUIDGenerator {
 	return ParseRestrictedUUIDGenerator{
@@ -41,13 +41,13 @@ type uUIDGenerator struct {
 	tracer tracing.TracerSpan
 	meter  Meter
 
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 }
 
 func NewUUIDGenerator(
 	tracer tracing.TracerSpan,
 	meter Meter,
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 ) *uUIDGenerator {
 	return &uUIDGenerator{
 		tracer:   tracer,

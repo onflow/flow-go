@@ -60,13 +60,4 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 		partnerCOLCount += clusterPartnerCount
 		internalCOLCount += clusterInternalCount
 	}
-
-	// ensure we have enough total collectors
-	totalCollectors := partnerCOLCount + internalCOLCount
-	if totalCollectors < flagCollectionClusters*minNodesPerCluster {
-		log.Fatal().Msgf(
-			"will not bootstrap configuration with insufficient # of collectors for cluster count: "+
-				"(total_collectors=%d, clusters=%d, min_total_collectors=%d)",
-			totalCollectors, flagCollectionClusters, flagCollectionClusters*minNodesPerCluster)
-	}
 }

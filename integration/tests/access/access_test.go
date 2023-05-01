@@ -43,11 +43,11 @@ func (s *AccessSuite) TearDownTest() {
 	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
-func (suite *AccessSuite) SetupTest() {
-	suite.log = unittest.LoggerForTest(suite.Suite.T(), zerolog.InfoLevel)
-	suite.log.Info().Msg("================> SetupTest")
+func (s *AccessSuite) SetupTest() {
+	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
+	s.log.Info().Msg("================> SetupTest")
 	defer func() {
-		suite.log.Info().Msg("================> Finish SetupTest")
+		s.log.Info().Msg("================> Finish SetupTest")
 	}()
 
 	nodeConfigs := []testnet.NodeConfig{
@@ -77,38 +77,38 @@ func (suite *AccessSuite) SetupTest() {
 	}
 
 	conf := testnet.NewNetworkConfig("access_api_test", nodeConfigs)
-	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf, flow.Localnet)
+	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 
 	// start the network
-	suite.T().Logf("starting flow network with docker containers")
-	suite.ctx, suite.cancel = context.WithCancel(context.Background())
+	s.T().Logf("starting flow network with docker containers")
+	s.ctx, s.cancel = context.WithCancel(context.Background())
 
-	suite.net.Start(suite.ctx)
+	s.net.Start(s.ctx)
 }
 
-func (suite *AccessSuite) TestAPIsAvailable() {
-	suite.T().Run("TestHTTPProxyPortOpen", func(t *testing.T) {
-		httpProxyAddress := net.JoinHostPort("localhost", suite.net.AccessPorts[testnet.AccessNodeAPIProxyPort])
+func (s *AccessSuite) TestAPIsAvailable() {
+
+	s.T().Run("TestHTTPProxyPortOpen", func(t *testing.T) {
+		httpProxyAddress := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCWebPort)
 
 		conn, err := net.DialTimeout("tcp", httpProxyAddress, 1*time.Second)
-		require.NoError(suite.T(), err, "http proxy port not open on the access node")
+		require.NoError(s.T(), err, "http proxy port not open on the access node")
 
 		conn.Close()
 	})
 
-	suite.T().Run("TestAccessConnection", func(t *testing.T) {
-		grpcAddress := net.JoinHostPort("localhost", suite.net.AccessPorts[testnet.AccessNodeAPIPort])
-
-		ctx, cancel := context.WithTimeout(suite.ctx, 1*time.Second)
+	s.T().Run("TestAccessConnection", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(s.ctx, 1*time.Second)
 		defer cancel()
 
+		grpcAddress := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort)
 		conn, err := grpc.DialContext(ctx, grpcAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		require.NoError(t, err, "failed to connect to access node")
 		defer conn.Close()
 
 		client := accessproto.NewAccessAPIClient(conn)
 
-		_, err = client.Ping(suite.ctx, &accessproto.PingRequest{})
+		_, err = client.Ping(s.ctx, &accessproto.PingRequest{})
 		assert.NoError(t, err, "failed to ping access node")
 	})
 }

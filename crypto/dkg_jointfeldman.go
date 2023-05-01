@@ -194,7 +194,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if disqualifiedTotal > s.threshold || s.size-disqualifiedTotal <= s.threshold {
 		return nil, nil, nil,
 			dkgFailureErrorf(
-				"Joint-Feldman failed because the diqualified participants number is high: %d disqualified, threshold is %d, size is %d",
+				"Joint-Feldman failed because the disqualified participants number is high: %d disqualified, threshold is %d, size is %d",
 				disqualifiedTotal, s.threshold, s.size)
 	}
 
