@@ -88,6 +88,15 @@ type GossipSubRPCInspector interface {
 	Inspect(peer.ID, *pubsub.RPC) error
 }
 
+// GossipSubMsgValidationRpcInspector app specific RPC inspector used to inspect and validate incoming RPC messages before they are processed by libp2p.
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+type GossipSubMsgValidationRpcInspector interface {
+	GossipSubRPCInspector
+	ClusterIDUpdateConsumer
+}
+
 // Topic is the abstraction of the underlying pubsub topic that is used by the Flow network.
 type Topic interface {
 	// String returns the topic name as a string.

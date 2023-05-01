@@ -392,6 +392,12 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		// set rpc inspectors on gossipsub config
 		fnb.GossipSubConfig.RPCInspectors = rpcInspectors
 
+		for _, rpcInspector := range fnb.GossipSubConfig.RPCInspectors {
+			if r, ok := rpcInspector.(p2p.GossipSubMsgValidationRpcInspector); ok {
+				fnb.ClusterIDUpdateDistributor.AddConsumer(r)
+			}
+		}
+		
 		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
 			fnb.Logger,
 			myAddr,
