@@ -22,7 +22,7 @@ func runDKG(nodes []model.NodeInfo) dkg.DKGData {
 	if flagFastKG {
 		dkgData, err = bootstrapDKG.RunFastKG(n, flagBootstrapRandomSeed)
 	} else {
-		dkgData, err = bootstrapDKG.RunDKG(n, GenerateRandomSeeds(n, crypto.SeedMinLenDKG))
+		dkgData, err = bootstrapDKG.RunDKG(n, GenerateRandomSeeds(n, crypto.KeyGenSeedMinLen))
 	}
 	if err != nil {
 		log.Fatal().Err(err).Msg("error running DKG")

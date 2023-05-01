@@ -248,7 +248,7 @@ func initNodes(t *testing.T, n int, phase1Duration, phase2Duration, phase3Durati
 			logger:            logger,
 		}
 
-		seed := unittest.SeedFixture(20)
+		seed := unittest.SeedFixture(crypto.KeyGenSeedMinLen)
 
 		dkg, err := crypto.NewJointFeldman(n, signature.RandomBeaconThreshold(n), i, broker)
 		require.NoError(t, err)
