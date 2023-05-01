@@ -277,9 +277,13 @@ func ChannelFromTopic(topic Topic) (Channel, bool) {
 	return "", false
 }
 
-// sporkIDFromTopic returns the pre-pended spork ID for the topic.
+// sporkIDStrFromTopic returns the pre-pended spork ID for the topic.
+// A valid channel has a sporkID suffix:
+//
+//	channel/spork_id
+//
 // All errors returned from this function can be considered benign.
-func sporkIDFromTopic(topic Topic) (string, error) {
+func sporkIDStrFromTopic(topic Topic) (string, error) {
 	if index := strings.LastIndex(topic.String(), "/"); index != -1 {
 		return string(topic)[index+1:], nil
 	}
@@ -313,7 +317,7 @@ func SyncCluster(clusterID flow.ChainID) Channel {
 // ensures the sporkID part of the Topic is equal to the current network sporkID.
 // All errors returned from this function can be considered benign.
 func IsValidFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
-	sporkID, err := sporkIDFromTopic(topic)
+	sporkID, err := sporkIDStrFromTopic(topic)
 	if err != nil {
 		return NewInvalidTopicErr(topic, fmt.Errorf("failed to get spork ID from topic: %w", err))
 	}
