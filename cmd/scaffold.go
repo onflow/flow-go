@@ -397,7 +397,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 				fnb.ClusterIDUpdateDistributor.AddConsumer(r)
 			}
 		}
-		
+
 		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
 			fnb.Logger,
 			myAddr,
