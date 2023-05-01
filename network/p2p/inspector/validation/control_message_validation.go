@@ -285,7 +285,13 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
 	// if count greater than hard threshold perform synchronous topic validation on random subset of the iHave messages
 	if count > validationConfig.HardThreshold {
-		err := c.validateTopicsSample(validationConfig.ControlMsg, controlMessage, sampleSize)
+		// for iHave control message topic validation we only validate a random subset of the messages
+		// shuffle the ihave messages to perform random validation on a subset of size sampleSize
+		err := c.sampleCtrlMessages(p2p.CtrlMsgIHave, controlMessage, sampleSize)
+		if err != nil {
+			return fmt.Errorf("failed to sample ihave messages: %w", err)
+		}
+		err = c.validateTopicsSample(validationConfig.ControlMsg, controlMessage, sampleSize)
 		if err != nil {
 			lg.Warn().
 				Err(err).
@@ -300,6 +306,15 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 				return err
 			}
 		}
+	}
+
+	// pre-processing validation passed, perform ihave sampling again
+	// to randomize async validation to avoid data race that can occur when
+	// performing the sampling asynchronously.
+	// for iHave control message topic validation we only validate a random subset of the messages
+	err := c.sampleCtrlMessages(p2p.CtrlMsgIHave, controlMessage, sampleSize)
+	if err != nil {
+		return fmt.Errorf("failed to sample ihave messages: %w", err)
 	}
 	return nil
 }
@@ -400,20 +415,29 @@ func (c *ControlMsgValidationInspector) validateTopicsSample(ctrlMsgType p2p.Con
 	validateTopic := c.validateTopicInlineFunc(seen)
 	switch ctrlMsgType {
 	case p2p.CtrlMsgIHave:
-		// for iHave control message topic validation we only validate a random subset of the messages
-		iHaves := ctrlMsg.GetIhave()
-		err := flowrand.Samples(uint(len(iHaves)), sampleSize, func(i, j uint) {
-			iHaves[i], iHaves[j] = iHaves[j], iHaves[i]
-		})
-		if err != nil {
-			return fmt.Errorf("failed to get random sample of ihave control messages: %w", err)
-		}
 		for i := uint(0); i < sampleSize; i++ {
-			topic := channels.Topic(iHaves[i].GetTopicID())
-			err = validateTopic(topic)
+			topic := channels.Topic(ctrlMsg.Ihave[i].GetTopicID())
+			err := validateTopic(topic)
 			if err != nil {
 				return NewInvalidTopicErr(topic, sampleSize, err)
 			}
+		}
+	}
+	return nil
+}
+
+// sampleCtrlMessages performs sampling on the specified control message that will randomize
+// the items in the control message slice up to index sampleSize-1.
+func (c *ControlMsgValidationInspector) sampleCtrlMessages(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage, sampleSize uint) error {
+	switch ctrlMsgType {
+	case p2p.CtrlMsgIHave:
+		iHaves := ctrlMsg.GetIhave()
+		swap := func(i, j uint) {
+			iHaves[i], iHaves[j] = iHaves[j], iHaves[i]
+		}
+		err := flowrand.Samples(uint(len(iHaves)), sampleSize, swap)
+		if err != nil {
+			return fmt.Errorf("failed to get random sample of ihave control messages: %w", err)
 		}
 	}
 	return nil
