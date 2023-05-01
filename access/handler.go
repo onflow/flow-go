@@ -250,12 +250,30 @@ func (h *Handler) GetTransactionResult(
 ) (*access.TransactionResultResponse, error) {
 	metadata := h.buildMetadataResponse()
 
-	id, err := convert.TransactionID(req.GetId())
+	transactionID, err := convert.TransactionID(req.GetId())
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := h.api.GetTransactionResult(ctx, id)
+	blockId := flow.ZeroID
+	requestBlockId := req.GetBlockId()
+	if requestBlockId != nil {
+		blockId, err = convert.BlockID(requestBlockId)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	collectionId := flow.ZeroID
+	requestCollectionId := req.GetCollectionId()
+	if requestCollectionId != nil {
+		collectionId, err = convert.CollectionID(requestCollectionId)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId)
 	if err != nil {
 		return nil, err
 	}
