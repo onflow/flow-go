@@ -3,6 +3,6 @@ Description=Flow TPS tests - control script to generate list of merge hashes
 
 [Service]
 Type=oneshot
-ExecStart=/tmp/flow-go/integration/benchmark/server/control.sh
-WorkingDirectory=/tmp
+ExecStart=/opt/flow-go/integration/benchmark/server/control.sh
+WorkingDirectory=/opt
 RemainAfterExit=no
