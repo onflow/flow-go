@@ -328,6 +328,9 @@ func IsValidFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
 // IsValidFlowClusterTopic ensures the topic is a valid Flow network topic and
 // ensures the cluster ID part of the Topic is equal to one of the provided active cluster IDs.
 // All errors returned from this function can be considered benign.
+// Expected errors:
+// - ErrInvalidTopic if the topic is not a valid Flow topic or the cluster ID cannot be derived from the topic.
+// - ErrUnknownClusterID if the cluster ID from the topic is not in the activeClusterIDS list.
 func IsValidFlowClusterTopic(topic Topic, activeClusterIDS []string) error {
 	err := isValidFlowTopic(topic)
 	if err != nil {
@@ -345,7 +348,7 @@ func IsValidFlowClusterTopic(topic Topic, activeClusterIDS []string) error {
 		}
 	}
 
-	return NewInvalidTopicErr(topic, fmt.Errorf("invalid flow topic contains cluster ID (%s) not in active cluster IDs list %s", clusterID, activeClusterIDS))
+	return NewUnknownClusterIDErr(clusterID, activeClusterIDS)
 }
 
 // isValidFlowTopic ensures the topic is a valid Flow network topic.

@@ -6,8 +6,6 @@ import (
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	mock "github.com/stretchr/testify/mock"
 
-	module "github.com/onflow/flow-go/module"
-
 	peer "github.com/libp2p/go-libp2p/core/peer"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -76,11 +74,6 @@ func (_m *GossipSubRPCInspector) Ready() <-chan struct{} {
 	}
 
 	return r0
-}
-
-// SetClusterIDSProvider provides a mock function with given fields: _a0
-func (_m *GossipSubRPCInspector) SetClusterIDSProvider(_a0 module.ClusterIDSProvider) {
-	_m.Called(_a0)
 }
 
 // Start provides a mock function with given fields: _a0

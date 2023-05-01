@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	realcluster "github.com/onflow/flow-go/state/cluster"
 	cluster "github.com/onflow/flow-go/state/cluster/mock"
 	realprotocol "github.com/onflow/flow-go/state/protocol"
@@ -45,7 +46,6 @@ type mockComponents struct {
 }
 
 func newMockComponents(t *testing.T) *mockComponents {
-
 	components := &mockComponents{
 		state:             cluster.NewState(t),
 		prop:              mockcomponent.NewComponent(t),
@@ -67,7 +67,9 @@ func newMockComponents(t *testing.T) *mockComponents {
 	components.voteAggregator.On("Start", mock.Anything)
 	components.timeoutAggregator.On("Start", mock.Anything)
 	components.messageHub.On("Start", mock.Anything)
-
+	params := cluster.NewParams(t)
+	params.On("ChainID").Return(flow.ChainID("chain-id"), nil).Maybe()
+	components.state.On("Params").Return(params).Maybe()
 	return components
 }
 
@@ -149,6 +151,7 @@ func (suite *Suite) SetupTest() {
 	suite.phase = flow.EpochPhaseSetup
 	suite.header = unittest.BlockHeaderFixture()
 	suite.epochQuery = mocks.NewEpochQuery(suite.T(), suite.counter)
+
 	suite.state.On("Final").Return(suite.snap)
 	suite.state.On("AtBlockID", suite.header.ID()).Return(suite.snap).Maybe()
 	suite.snap.On("Epochs").Return(suite.epochQuery)
@@ -167,8 +170,11 @@ func (suite *Suite) SetupTest() {
 		return herocache.NewTransactions(1000, suite.log, metrics.NewNoopCollector())
 	})
 
+	clusterIDUpdateDistributor := mockp2p.NewClusterIDUpdateDistributor(suite.T())
+	clusterIDUpdateDistributor.On("DistributeClusterIDUpdate", mock.AnythingOfType("p2p.ClusterIDUpdate")).Maybe()
+
 	var err error
-	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights)
+	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights, clusterIDUpdateDistributor)
 	suite.Require().Nil(err)
 }
 
@@ -257,8 +263,11 @@ func (suite *Suite) MockAsUnauthorizedNode(forEpoch uint64) {
 		Return(nil, nil, nil, nil, nil, nil, nil, ErrNotAuthorizedForEpoch)
 	suite.MockFactoryCreate(mock.MatchedBy(authorizedMatcher))
 
+	clusterIDUpdateDistributor := mockp2p.NewClusterIDUpdateDistributor(suite.T())
+	clusterIDUpdateDistributor.On("DistributeClusterIDUpdate", mock.AnythingOfType("p2p.ClusterIDUpdate")).Maybe()
+
 	var err error
-	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights)
+	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights, clusterIDUpdateDistributor)
 	suite.Require().Nil(err)
 }
 

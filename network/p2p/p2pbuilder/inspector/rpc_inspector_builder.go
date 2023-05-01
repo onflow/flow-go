@@ -30,6 +30,9 @@ type GossipSubRPCValidationInspectorConfigs struct {
 	GraftLimits map[string]int
 	// PruneLimits PRUNE control message validation limits.
 	PruneLimits map[string]int
+	// ClusterPrefixDiscardThreshold the upper bound on the amount of cluster prefixed control messages that will be processed
+	// before a node starts to get penalized.
+	ClusterPrefixDiscardThreshold uint64
 }
 
 // GossipSubRPCMetricsInspectorConfigs rpc metrics observer inspector configuration.
@@ -66,6 +69,7 @@ func DefaultGossipSubRPCInspectorsConfig() *GossipSubRPCInspectorsConfig {
 				validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
 				validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
 			},
+			ClusterPrefixDiscardThreshold: validation.DefaultClusterPrefixDiscardThreshold,
 		},
 		MetricsInspectorConfigs: &GossipSubRPCMetricsInspectorConfigs{
 			NumberOfWorkers: inspector.DefaultControlMsgMetricsInspectorNumberOfWorkers,
@@ -166,10 +170,11 @@ func (b *GossipSubInspectorBuilder) validationInspectorConfig(validationConfigs 
 
 	// setup gossip sub RPC control message inspector config
 	controlMsgRPCInspectorCfg := &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:     validationConfigs.NumberOfWorkers,
-		InspectMsgStoreOpts: opts,
-		GraftValidationCfg:  graftValidationCfg,
-		PruneValidationCfg:  pruneValidationCfg,
+		NumberOfWorkers:               validationConfigs.NumberOfWorkers,
+		InspectMsgStoreOpts:           opts,
+		GraftValidationCfg:            graftValidationCfg,
+		PruneValidationCfg:            pruneValidationCfg,
+		ClusterPrefixDiscardThreshold: validationConfigs.ClusterPrefixDiscardThreshold,
 	}
 	return controlMsgRPCInspectorCfg, nil
 }
@@ -211,9 +216,10 @@ func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation
 	})
 
 	return &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:     validation.DefaultNumberOfWorkers,
-		InspectMsgStoreOpts: opts,
-		GraftValidationCfg:  graftCfg,
-		PruneValidationCfg:  pruneCfg,
+		NumberOfWorkers:               validation.DefaultNumberOfWorkers,
+		InspectMsgStoreOpts:           opts,
+		GraftValidationCfg:            graftCfg,
+		PruneValidationCfg:            pruneCfg,
+		ClusterPrefixDiscardThreshold: validation.DefaultClusterPrefixDiscardThreshold,
 	}
 }

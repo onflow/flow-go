@@ -36,6 +36,12 @@ const (
 	// Currently, the default rate limit is equal to the discard threshold amount.
 	// This will result in a rate limit of 30 prunes/sec.
 	DefaultPruneRateLimit = DefaultPruneDiscardThreshold
+
+	// DefaultClusterPrefixDiscardThreshold the upper bound limit on the amount of cluster prefixed control messages allowed
+	// to be processed when the cluster IDs provider has not been set or a node is behind in the protocol state. If the number
+	// of cluster prefixed control messages in an RPC exceeds this threshold the entire RPC will be dropped and the node should
+	// be penalized.
+	DefaultClusterPrefixDiscardThreshold = 100
 )
 
 // CtrlMsgValidationLimits limits used to construct control message validation configuration.

@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 )
@@ -56,17 +57,16 @@ type Engine struct {
 	epochs map[uint64]*RunningEpochComponents // epoch-scoped components per epoch
 
 	// internal event notifications
-	epochTransitionEvents        chan *flow.Header // sends first block of new epoch
-	epochSetupPhaseStartedEvents chan *flow.Header // sends first block of EpochSetup phase
-	epochStopEvents              chan uint64       // sends counter of epoch to stop
-
-	cm *component.ComponentManager
+	epochTransitionEvents        chan *flow.Header              // sends first block of new epoch
+	epochSetupPhaseStartedEvents chan *flow.Header              // sends first block of EpochSetup phase
+	epochStopEvents              chan uint64                    // sends counter of epoch to stop
+	clusterIDUpdateDistributor   p2p.ClusterIDUpdateDistributor // sends cluster ID updates to consumers
+	cm                           *component.ComponentManager
 	component.Component
 }
 
 var _ component.Component = (*Engine)(nil)
 var _ protocol.Consumer = (*Engine)(nil)
-var _ module.ClusterIDSProvider = (*Engine)(nil)
 
 func New(
 	log zerolog.Logger,
@@ -76,6 +76,7 @@ func New(
 	voter module.ClusterRootQCVoter,
 	factory EpochComponentsFactory,
 	heightEvents events.Heights,
+	clusterIDUpdateDistributor p2p.ClusterIDUpdateDistributor,
 ) (*Engine, error) {
 	e := &Engine{
 		log:                          log.With().Str("engine", "epochmgr").Logger(),
@@ -90,6 +91,7 @@ func New(
 		epochTransitionEvents:        make(chan *flow.Header, 1),
 		epochSetupPhaseStartedEvents: make(chan *flow.Header, 1),
 		epochStopEvents:              make(chan uint64, 1),
+		clusterIDUpdateDistributor:   clusterIDUpdateDistributor,
 	}
 
 	e.cm = component.NewComponentManagerBuilder().
@@ -449,7 +451,6 @@ func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nex
 // No errors are expected during normal operation.
 func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, counter uint64, components *EpochComponents) error {
 	epochCtx, cancel, errCh := irrecoverable.WithSignallerAndCancel(engineCtx)
-
 	// start component using its own context
 	components.Start(epochCtx)
 	go e.handleEpochErrors(engineCtx, errCh)
@@ -457,6 +458,11 @@ func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, c
 	select {
 	case <-components.Ready():
 		e.storeEpochComponents(counter, NewRunningEpochComponents(components, cancel))
+		activeClusterIDS, err := e.activeClusterIDS()
+		if err != nil {
+			return fmt.Errorf("failed to get active cluster IDs: %w", err)
+		}
+		e.clusterIDUpdateDistributor.DistributeClusterIDUpdate(activeClusterIDS)
 		return nil
 	case <-time.After(e.startupTimeout):
 		cancel() // cancel current context if we didn't start in time
@@ -482,6 +488,11 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 	case <-components.Done():
 		e.removeEpoch(counter)
 		e.pools.ForEpoch(counter).Clear()
+		activeClusterIDS, err := e.activeClusterIDS()
+		if err != nil {
+			return fmt.Errorf("failed to get active cluster IDs: %w", err)
+		}
+		e.clusterIDUpdateDistributor.DistributeClusterIDUpdate(activeClusterIDS)
 		return nil
 	case <-time.After(e.startupTimeout):
 		return fmt.Errorf("could not stop epoch %d components after %s", counter, e.startupTimeout)
@@ -514,9 +525,9 @@ func (e *Engine) removeEpoch(counter uint64) {
 	e.mu.Unlock()
 }
 
-// ActiveClusterIDS returns the active canonical cluster ID's for the assigned collection clusters.
+// activeClusterIDS returns the active canonical cluster ID's for the assigned collection clusters.
 // No errors are expected during normal operation.
-func (e *Engine) ActiveClusterIDS() ([]string, error) {
+func (e *Engine) activeClusterIDS() ([]string, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	clusterIDs := make([]string, 0)

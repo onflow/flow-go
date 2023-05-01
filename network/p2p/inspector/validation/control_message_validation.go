@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
@@ -52,6 +51,12 @@ type ControlMsgValidationInspectorConfig struct {
 	GraftValidationCfg *CtrlMsgValidationConfig
 	// PruneValidationCfg validation configuration for PRUNE control messages.
 	PruneValidationCfg *CtrlMsgValidationConfig
+	// ClusterPrefixDiscardThreshold the upper bound on the amount of cluster prefixed control messages that will be processed
+	// before a node starts to get penalized. This allows LN nodes to process some cluster prefixed control messages during startup
+	// when the cluster ID's provider is set asynchronously. It also allows processing of some stale messages that may be sent by nodes
+	// that fall behind in the protocol. After the amount of cluster prefixed control messages processed exceeds this threshold the node
+	// will be pushed to the edge of the network mesh.
+	ClusterPrefixDiscardThreshold uint64
 }
 
 // getCtrlMsgValidationConfig returns the CtrlMsgValidationConfig for the specified p2p.ControlMessageType.
@@ -79,15 +84,19 @@ type ControlMsgValidationInspector struct {
 	sporkID flow.Identifier
 	// lock RW mutex used to synchronize access to the  clusterIDSProvider.
 	lock sync.RWMutex
-	// clusterIDSProvider the cluster IDS providers provides active cluster IDs for cluster Topic validation. The
-	// clusterIDSProvider must be configured for LN nodes to validate control message with cluster prefixed topics.
-	clusterIDSProvider module.ClusterIDSProvider
+	// activeClusterIDS list of active cluster IDS used to validate cluster prefixed control messages.
+	activeClusterIDS []string
 	// config control message validation configurations.
 	config *ControlMsgValidationInspectorConfig
 	// distributor used to disseminate invalid RPC message notifications.
 	distributor p2p.GossipSubInspectorNotificationDistributor
 	// workerPool queue that stores *InspectMsgRequest that will be processed by component workers.
 	workerPool *worker.Pool[*InspectMsgRequest]
+	// clusterPrefixTopicsReceivedTracker keeps track of the amount of cluster prefixed topics received. The counter is incremented in the following scenarios.
+	// - The cluster prefix topic was received while the inspector waits for the cluster IDs provider to be set.
+	// - The node sends cluster prefix topic where the cluster prefix does not match any of the active cluster IDs,
+	// the inspector will allow a configured number of these messages from
+	clusterPrefixTopicsReceivedTracker *ClusterPrefixedTopicsReceived
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
@@ -111,10 +120,11 @@ func NewControlMsgValidationInspector(
 ) *ControlMsgValidationInspector {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 	c := &ControlMsgValidationInspector{
-		logger:      lg,
-		sporkID:     sporkID,
-		config:      config,
-		distributor: distributor,
+		logger:                             lg,
+		sporkID:                            sporkID,
+		config:                             config,
+		distributor:                        distributor,
+		clusterPrefixTopicsReceivedTracker: NewClusterPrefixedTopicsReceivedTracker(),
 	}
 
 	cfg := &queue.HeroStoreConfig{
@@ -202,15 +212,11 @@ func (c *ControlMsgValidationInspector) Name() string {
 	return rpcInspectorComponentName
 }
 
-// SetClusterIDSProvider sets the cluster IDs provider that is used to provider cluster ID information
-// about active clusters for collection nodes. This method should only be called once, and subsequent calls
-// will be a no-op.
-func (c *ControlMsgValidationInspector) SetClusterIDSProvider(provider module.ClusterIDSProvider) {
+// OnClusterIDSUpdate consumes cluster ID updates from the p2p.ClusterIDUpdateDistributor.
+func (c *ControlMsgValidationInspector) OnClusterIDSUpdate(clusterIDS p2p.ClusterIDUpdate) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	if c.clusterIDSProvider == nil {
-		c.clusterIDSProvider = provider
-	}
+	c.activeClusterIDS = clusterIDS
 }
 
 // blockingPreprocessingRpc ensures the RPC control message count does not exceed the configured discard threshold.
@@ -258,7 +264,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 	case !req.validationConfig.RateLimiter.Allow(req.Peer, int(count)): // check if Peer RPC messages are rate limited
 		validationErr = NewRateLimitedControlMsgErr(req.validationConfig.ControlMsg)
 	case count > req.validationConfig.SafetyThreshold: // check if Peer RPC messages Count greater than safety threshold further inspect each message individually
-		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg)
+		validationErr = c.validateTopics(req.Peer, req.validationConfig.ControlMsg, req.ctrlMsg)
 	default:
 		lg.Trace().
 			Uint64("upper_threshold", req.validationConfig.DiscardThreshold).
@@ -298,19 +304,9 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 // Expected error returns during normal operations:
 //   - channels.ErrInvalidTopic: if topic is invalid.
 //   - ErrDuplicateTopic: if a duplicate topic ID is encountered.
-func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
+func (c *ControlMsgValidationInspector) validateTopics(from peer.ID, ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
 	seen := make(map[channels.Topic]struct{})
-	validateTopic := func(topic channels.Topic) error {
-		if _, ok := seen[topic]; ok {
-			return NewIDuplicateTopicErr(topic)
-		}
-		seen[topic] = struct{}{}
-		err := c.validateTopic(topic, ctrlMsgType)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
+	validateTopic := c.validateTopicInlineFunc(from, ctrlMsgType, seen)
 	switch ctrlMsgType {
 	case p2p.CtrlMsgGraft:
 		for _, graft := range ctrlMsg.GetGraft() {
@@ -335,10 +331,13 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 // validateTopic ensures the topic is a valid flow topic/channel.
 // Expected error returns during normal operations:
 //   - channels.ErrInvalidTopic: if topic is invalid.
+//   - ErrActiveClusterIDsNotSet: if the cluster ID provider is not set.
+//   - ErrActiveClusterIDS: if an error is encountered while getting the active cluster IDs list. This error indicates an unexpected bug or state corruption.
+//   - channels.ErrUnknownClusterID: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
 //
 // This func returns an exception in case of unexpected bug or state corruption if cluster prefixed topic validation
 // fails due to unexpected error returned when getting the active cluster IDS.
-func (c *ControlMsgValidationInspector) validateTopic(topic channels.Topic, ctrlMsgType p2p.ControlMessageType) error {
+func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channels.Topic) error {
 	channel, ok := channels.ChannelFromTopic(topic)
 	if !ok {
 		return channels.NewInvalidTopicErr(topic, fmt.Errorf("failed to get channel from topic"))
@@ -346,7 +345,7 @@ func (c *ControlMsgValidationInspector) validateTopic(topic channels.Topic, ctrl
 
 	// handle cluster prefixed topics
 	if channels.IsClusterChannel(channel) {
-		return c.validateClusterPrefixedTopic(topic, ctrlMsgType)
+		return c.validateClusterPrefixedTopic(from, topic)
 	}
 
 	// non cluster prefixed topic validation
@@ -359,28 +358,64 @@ func (c *ControlMsgValidationInspector) validateTopic(topic channels.Topic, ctrl
 
 // validateClusterPrefixedTopic validates cluster prefixed topics.
 // Expected error returns during normal operations:
+//   - ErrActiveClusterIDsNotSet: if the cluster ID provider is not set.
+//   - ErrActiveClusterIDS: if an error is encountered while getting the active cluster IDs list. This error indicates an unexpected bug or state corruption.
 //   - channels.ErrInvalidTopic: if topic is invalid.
-//
-// This func returns an exception in case of unexpected bug or state corruption if cluster prefixed topic validation
-// fails due to unexpected error returned when getting the active cluster IDS.
-func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(topic channels.Topic, ctrlMsgType p2p.ControlMessageType) error {
+//   - channels.ErrUnknownClusterID: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
+func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.ID, topic channels.Topic) error {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	if c.clusterIDSProvider == nil {
-		c.logger.Warn().
-			Str("topic", topic.String()).
-			Str("ctrl_msg_type", string(ctrlMsgType)).
-			Msg("failed to validate control message with cluster pre-fixed topic cluster ids provider is not set")
-		return nil
-	}
-	activeClusterIDS, err := c.clusterIDSProvider.ActiveClusterIDS()
-	if err != nil {
-		return fmt.Errorf("failed to get active cluster IDS: %w", err)
+	if len(c.activeClusterIDS) == 0 {
+		// cluster IDs have not been updated yet
+		c.clusterPrefixTopicsReceivedTracker.Inc(from)
+		return NewActiveClusterIDsNotSetErr(topic)
 	}
 
-	err = channels.IsValidFlowClusterTopic(topic, activeClusterIDS)
+	err := channels.IsValidFlowClusterTopic(topic, c.activeClusterIDS)
 	if err != nil {
+		if channels.IsErrUnknownClusterID(err) {
+			// unknown cluster ID error could indicate that a node has fallen
+			// behind and needs to catchup increment to topics received tracker.
+			c.clusterPrefixTopicsReceivedTracker.Inc(from)
+		}
 		return err
 	}
+
+	// topic validation passed reset the prefix topics received tracker for this peer
+	c.clusterPrefixTopicsReceivedTracker.Reset(from)
 	return nil
+}
+
+// validateTopicInlineFunc returns a callback func that validates topics and keeps track of duplicates.
+func (c *ControlMsgValidationInspector) validateTopicInlineFunc(from peer.ID, ctrlMsgType p2p.ControlMessageType, seen map[channels.Topic]struct{}) func(topic channels.Topic) error {
+	lg := c.logger.With().
+		Str("from", from.String()).
+		Str("ctrl_msg_type", string(ctrlMsgType)).
+		Logger()
+	return func(topic channels.Topic) error {
+		if _, ok := seen[topic]; ok {
+			return NewIDuplicateTopicErr(topic)
+		}
+		seen[topic] = struct{}{}
+		err := c.validateTopic(from, topic)
+		if err != nil {
+			switch {
+			case channels.IsErrUnknownClusterID(err) && c.clusterPrefixTopicsReceivedTracker.Load(from) <= c.config.ClusterPrefixDiscardThreshold:
+				lg.Warn().
+					Err(err).
+					Str("topic", topic.String()).
+					Msg("processing unknown cluster prefixed topic received below cluster prefixed discard threshold peer may be behind in the protocol")
+				return nil
+			case IsErrActiveClusterIDsNotSet(err) && c.clusterPrefixTopicsReceivedTracker.Load(from) <= c.config.ClusterPrefixDiscardThreshold:
+				lg.Warn().
+					Err(err).
+					Str("topic", topic.String()).
+					Msg("failed to validate cluster prefixed control message with cluster pre-fixed topic active cluster ids not set")
+				return nil
+			default:
+				return err
+			}
+		}
+		return nil
+	}
 }

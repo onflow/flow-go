@@ -97,3 +97,23 @@ func IsErrDuplicateTopic(err error) bool {
 	var e ErrDuplicateTopic
 	return errors.As(err, &e)
 }
+
+// ErrActiveClusterIDsNotSet error that indicates a cluster prefixed control message has been received but the cluster IDs have not been set yet.
+type ErrActiveClusterIDsNotSet struct {
+	topic channels.Topic
+}
+
+func (e ErrActiveClusterIDsNotSet) Error() string {
+	return fmt.Errorf("failed to validate cluster prefixed topic %s no active cluster IDs set", e.topic).Error()
+}
+
+// NewActiveClusterIDsNotSetErr returns a new ErrActiveClusterIDsNotSet
+func NewActiveClusterIDsNotSetErr(topic channels.Topic) ErrActiveClusterIDsNotSet {
+	return ErrActiveClusterIDsNotSet{topic: topic}
+}
+
+// IsErrActiveClusterIDsNotSet returns true if an error is ErrActiveClusterIDsNotSet
+func IsErrActiveClusterIDsNotSet(err error) bool {
+	var e ErrActiveClusterIDsNotSet
+	return errors.As(err, &e)
+}

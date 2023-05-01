@@ -573,6 +573,7 @@ func main() {
 				rootQCVoter,
 				factory,
 				heightEvents,
+				node.ClusterIDUpdateDistributor,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create epoch manager: %w", err)
@@ -580,12 +581,6 @@ func main() {
 
 			// register the manager for protocol events
 			node.ProtocolEvents.AddConsumer(manager)
-
-			// for collection nodes RPC inspectors must validate cluster prefixed topics
-			// using the ClusterIDSProvider methods implemented by the epoch manager.
-			for _, rpcInspector := range nodeBuilder.GossipSubConfig.RPCInspectors {
-				rpcInspector.SetClusterIDSProvider(manager)
-			}
 
 			return manager, err
 		})

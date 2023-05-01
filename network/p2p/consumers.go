@@ -108,3 +108,30 @@ type GossipSubInvalidControlMessageNotificationConsumer interface {
 	// The implementation must be concurrency safe, but can be blocking.
 	OnInvalidControlMessageNotification(*InvalidControlMessageNotification)
 }
+
+// ClusterIDUpdate list of active cluster IDS.
+type ClusterIDUpdate []string
+
+// ClusterIDUpdateConsumer  is the interface for the consumer that consumes cluster ID update events.
+// Cluster IDs are updated when a new set of epoch components start and the old set of epoch components stops.
+// A new list of cluster IDs will be assigned when the new set of epoch components are started, and the old set of cluster
+// IDs are removed when the current set of epoch components are stopped. The implementation must be concurrency safe and  non-blocking.
+type ClusterIDUpdateConsumer interface {
+	// OnClusterIDSUpdate is called when a new cluster ID update event is distributed.
+	// Any error on consuming event must handle internally.
+	// The implementation must be concurrency safe, but can be blocking.
+	OnClusterIDSUpdate(ClusterIDUpdate)
+}
+
+// ClusterIDUpdateDistributor is the interface for the distributor that distributes cluster ID update events to all consumers.
+// The implementation should guarantee that all registered consumers are called upon distribution of a new event.
+type ClusterIDUpdateDistributor interface {
+	// DistributeClusterIDUpdate distributes the event to all the consumers.
+	// Implementation must be concurrency safe, and non-blocking.
+	DistributeClusterIDUpdate(ClusterIDUpdate)
+
+	// AddConsumer adds a consumer to the distributor. The consumer will be called when the distributor distributes a new event.
+	// AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.
+	// There is no guarantee that the consumer will be called for events that were already received by the distributor.
+	AddConsumer(ClusterIDUpdateConsumer)
+}
