@@ -83,7 +83,7 @@ type ControlMsgValidationInspector struct {
 	component.Component
 	logger  zerolog.Logger
 	sporkID flow.Identifier
-	metrics module.GossipSubRPCValidationInspectorMetrics
+	metrics module.GossipSubRpcValidationInspectorMetrics
 	// config control message validation configurations.
 	config *ControlMsgValidationInspectorConfig
 	// distributor used to disseminate invalid RPC message notifications.
@@ -110,7 +110,7 @@ func NewControlMsgValidationInspector(
 	sporkID flow.Identifier,
 	config *ControlMsgValidationInspectorConfig,
 	distributor p2p.GossipSubInspectorNotificationDistributor,
-	inspectorMetrics module.GossipSubRPCValidationInspectorMetrics,
+	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics,
 ) *ControlMsgValidationInspector {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 	c := &ControlMsgValidationInspector{

@@ -112,7 +112,7 @@ type GossipSubMetrics interface {
 	GossipSubScoringMetrics
 	GossipSubRouterMetrics
 	GossipSubLocalMeshMetrics
-	GossipSubRPCValidationInspectorMetrics
+	GossipSubRpcValidationInspectorMetrics
 }
 
 type LibP2PMetrics interface {
@@ -149,8 +149,8 @@ type GossipSubScoringMetrics interface {
 	SetWarningStateCount(uint)
 }
 
-// GossipSubRPCValidationInspectorMetrics encapsulates the metrics collectors for the gossipsub rpc validation control message inspectors.
-type GossipSubRPCValidationInspectorMetrics interface {
+// GossipSubRpcValidationInspectorMetrics encapsulates the metrics collectors for the gossipsub rpc validation control message inspectors.
+type GossipSubRpcValidationInspectorMetrics interface {
 	// PreProcessingStarted increments the metric tracking the number of messages being pre-processed by the rpc validation inspector.
 	PreProcessingStarted(msgType string)
 	// PreProcessingFinished tracks the time spent by the rpc validation inspector to pre-process a message and decrements the metric tracking

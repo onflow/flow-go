@@ -9,8 +9,8 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// GossipSubRPCValidationInspectorMetrics metrics collector for the gossipsub RPC validation inspector.
-type GossipSubRPCValidationInspectorMetrics struct {
+// GossipSubRpcValidationInspectorMetrics metrics collector for the gossipsub RPC validation inspector.
+type GossipSubRpcValidationInspectorMetrics struct {
 	prefix                                  string
 	numRpcControlMessagesPreProcessing      *prometheus.GaugeVec
 	rpcControlMessagePreProcessingTime      *prometheus.CounterVec
@@ -20,11 +20,11 @@ type GossipSubRPCValidationInspectorMetrics struct {
 	rpcControlMessageAsyncProcessTime       *prometheus.CounterVec
 }
 
-var _ module.GossipSubRPCValidationInspectorMetrics = (*GossipSubRPCValidationInspectorMetrics)(nil)
+var _ module.GossipSubRpcValidationInspectorMetrics = (*GossipSubRpcValidationInspectorMetrics)(nil)
 
-// NewGossipSubRPCValidationInspectorMetrics returns a new *GossipSubRPCValidationInspectorMetrics.
-func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRPCValidationInspectorMetrics {
-	gc := &GossipSubRPCValidationInspectorMetrics{prefix: prefix}
+// NewGossipSubRPCValidationInspectorMetrics returns a new *GossipSubRpcValidationInspectorMetrics.
+func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValidationInspectorMetrics {
+	gc := &GossipSubRpcValidationInspectorMetrics{prefix: prefix}
 	gc.numRpcControlMessagesPreProcessing = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespaceNetwork,
@@ -78,37 +78,37 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRPCValid
 }
 
 // PreProcessingStarted increments the metric tracking the number of messages being pre-processed by the rpc validation inspector.
-func (c *GossipSubRPCValidationInspectorMetrics) PreProcessingStarted(msgType string) {
+func (c *GossipSubRpcValidationInspectorMetrics) PreProcessingStarted(msgType string) {
 	c.numRpcControlMessagesPreProcessing.WithLabelValues(msgType).Inc()
 }
 
 // PreProcessingFinished tracks the time spent by the rpc validation inspector to pre-process a message and decrements the metric tracking
 // the number of messages being processed by the rpc validation inspector.
-func (c *GossipSubRPCValidationInspectorMetrics) PreProcessingFinished(msgType string, duration time.Duration) {
+func (c *GossipSubRpcValidationInspectorMetrics) PreProcessingFinished(msgType string, duration time.Duration) {
 	c.numRpcControlMessagesPreProcessing.WithLabelValues(msgType).Dec()
 	c.rpcControlMessagePreProcessingTime.WithLabelValues(msgType).Add(duration.Seconds())
 }
 
 // IHavePreProcessingStarted increments the metric tracking the number of iHave messages being pre-processed by the rpc validation inspector.
-func (c *GossipSubRPCValidationInspectorMetrics) IHavePreProcessingStarted(ihaveMsgType string, sampleSize uint) {
+func (c *GossipSubRpcValidationInspectorMetrics) IHavePreProcessingStarted(ihaveMsgType string, sampleSize uint) {
 	c.numRpcIHaveControlMessagesPreProcessing.WithLabelValues(ihaveMsgType).Add(float64(sampleSize))
 }
 
 // IHavePreProcessingFinished tracks the time spent by the rpc validation inspector to pre-process a iHave message and decrements the metric tracking
 // the number of iHave messages being processed by the rpc validation inspector.
-func (c *GossipSubRPCValidationInspectorMetrics) IHavePreProcessingFinished(ihaveMsgType string, sampleSize uint, duration time.Duration) {
+func (c *GossipSubRpcValidationInspectorMetrics) IHavePreProcessingFinished(ihaveMsgType string, sampleSize uint, duration time.Duration) {
 	c.numRpcIHaveControlMessagesPreProcessing.WithLabelValues(ihaveMsgType).Sub(float64(sampleSize))
 	c.rpcIHaveControlMessagePreProcessingTime.WithLabelValues(ihaveMsgType).Add(duration.Seconds())
 }
 
 // AsyncProcessingStarted increments the metric tracking the number of messages being processed asynchronously by the rpc validation inspector.
-func (c *GossipSubRPCValidationInspectorMetrics) AsyncProcessingStarted(msgType string) {
+func (c *GossipSubRpcValidationInspectorMetrics) AsyncProcessingStarted(msgType string) {
 	c.numRpcControlMessagesAsyncProcessing.WithLabelValues(msgType).Inc()
 }
 
 // AsyncProcessingFinished tracks the time spent by the rpc validation inspector to process a message asynchronously and decrements the metric tracking
 // the number of messages being processed asynchronously by the rpc validation inspector.
-func (c *GossipSubRPCValidationInspectorMetrics) AsyncProcessingFinished(msgType string, duration time.Duration) {
+func (c *GossipSubRpcValidationInspectorMetrics) AsyncProcessingFinished(msgType string, duration time.Duration) {
 	c.numRpcControlMessagesAsyncProcessing.WithLabelValues(msgType).Dec()
 	c.rpcControlMessageAsyncProcessTime.WithLabelValues(msgType).Add(duration.Seconds())
 }
