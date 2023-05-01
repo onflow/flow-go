@@ -6,7 +6,9 @@ set -o pipefail
 git fetch
 git fetch --tags
 
-cd ../../localnet
+# assumes flow-go was already cloned by user
+
+cd flow-go/integration/localnet
 
 while read -r branch_hash; do
     hash="${branch_hash##*:}"
@@ -34,4 +36,4 @@ while read -r branch_hash; do
 
     make stop
     docker system prune -a -f
-done <~/master.recent
+done </opt/master.recent
