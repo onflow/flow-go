@@ -2,6 +2,7 @@ package util
 
 import (
 	"context"
+	"math"
 	"reflect"
 
 	"github.com/onflow/flow-go/module"
@@ -184,4 +185,18 @@ func DetypeSlice[T any](typedSlice []T) []any {
 		untypedSlice[i] = t
 	}
 	return untypedSlice
+}
+
+// SampleN util func that computes a percentage of the provider number n. If the resulting
+// sample is greater than the provided max then the ceil of max is returned by default. If n
+// is less than or equal to 0 then 0 is returned.
+func SampleN(n int, max, percentage float64) uint {
+	if n <= 0 {
+		return 0
+	}
+	sample := float64(n) * percentage
+	if sample > max {
+		sample = max
+	}
+	return uint(math.Ceil(sample))
 }

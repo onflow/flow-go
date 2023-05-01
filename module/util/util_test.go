@@ -303,3 +303,30 @@ func TestDetypeSlice(t *testing.T) {
 		assert.Equal(t, slice[i], detyped[i].(int))
 	}
 }
+
+func TestSampleN(t *testing.T) {
+	t.Run("returns expected sample", func(t *testing.T) {
+		n := 8
+		max := 5.0
+		percentage := .5
+		sample := util.SampleN(n, max, percentage)
+		assert.Equal(t, uint(4), sample)
+	})
+	t.Run("returns max value when sample greater than max", func(t *testing.T) {
+		n := 20
+		max := 5.0
+		percentage := .5
+		sample := util.SampleN(n, max, percentage)
+		assert.Equal(t, uint(max), sample)
+	})
+	t.Run("returns 0 when n is less than or equal to 0", func(t *testing.T) {
+		n := 0
+		max := 5.0
+		percentage := .5
+		sample := util.SampleN(n, max, percentage)
+		assert.Equal(t, uint(0), sample, "sample returned should be 0 when n == 0")
+		n = -1
+		sample = util.SampleN(n, max, percentage)
+		assert.Equal(t, uint(0), sample, "sample returned should be 0 when n < 0")
+	})
+}

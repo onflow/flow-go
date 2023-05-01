@@ -2,7 +2,6 @@ package validation
 
 import (
 	"fmt"
-	"math"
 	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -17,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector/internal"
@@ -185,7 +185,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 			}
 		case p2p.CtrlMsgIHave:
 			// iHave specific pre-processing
-			sampleSize := c.iHaveSampleSize(len(control.GetIhave()), validationConfig.IHaveInspectionMaxSampleSize, validationConfig.IHaveSyncInspectSampleSizePercentage)
+			sampleSize := util.SampleN(len(control.GetIhave()), validationConfig.IHaveInspectionMaxSampleSize, validationConfig.IHaveSyncInspectSampleSizePercentage)
 			err := c.blockingIHaveSamplePreprocessing(from, validationConfig, control, sampleSize)
 			if err != nil {
 				lg.Error().
@@ -317,7 +317,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 		validationErr = NewRateLimitedControlMsgErr(req.validationConfig.ControlMsg)
 	case count > req.validationConfig.SafetyThreshold && req.validationConfig.ControlMsg == p2p.CtrlMsgIHave:
 		// we only perform async inspection on a sample size of iHave messages
-		sampleSize := c.iHaveSampleSize(len(req.ctrlMsg.GetIhave()), req.validationConfig.IHaveInspectionMaxSampleSize, req.validationConfig.IHaveAsyncInspectSampleSizePercentage)
+		sampleSize := util.SampleN(len(req.ctrlMsg.GetIhave()), req.validationConfig.IHaveInspectionMaxSampleSize, req.validationConfig.IHaveAsyncInspectSampleSizePercentage)
 		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg, sampleSize)
 	case count > req.validationConfig.SafetyThreshold:
 		// check if Peer RPC messages Count greater than safety threshold further inspect each message individually
@@ -421,14 +421,4 @@ func (c *ControlMsgValidationInspector) validateTopic(topic channels.Topic) erro
 		return err
 	}
 	return nil
-}
-
-// iHaveSampleSize calculates a sample size for ihave inspection based on the provided configuration number of ihave messages n.
-// The max sample size is returned if the calculated sample size is greater than the configured max sample size.
-func (c *ControlMsgValidationInspector) iHaveSampleSize(n int, maxSampleSize, percentage float64) uint {
-	sampleSize := float64(n) * percentage
-	if sampleSize > maxSampleSize {
-		sampleSize = maxSampleSize
-	}
-	return uint(math.Ceil(sampleSize))
 }
