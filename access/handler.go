@@ -12,16 +12,19 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
+
+type FinalizedHeaderCache interface {
+	Get() *flow.Header
+}
 
 type Handler struct {
 	api                  API
 	chain                flow.Chain
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
-	finalizedHeaderCache *synceng.FinalizedHeaderCache
+	finalizedHeaderCache FinalizedHeaderCache
 	me                   module.Local
 }
 
@@ -30,7 +33,7 @@ type HandlerOption func(*Handler)
 
 var _ access.AccessAPIServer = (*Handler)(nil)
 
-func NewHandler(api API, chain flow.Chain, finalizedHeader *synceng.FinalizedHeaderCache, me module.Local, options ...HandlerOption) *Handler {
+func NewHandler(api API, chain flow.Chain, finalizedHeader FinalizedHeaderCache, me module.Local, options ...HandlerOption) *Handler {
 	h := &Handler{
 		api:                  api,
 		chain:                chain,
