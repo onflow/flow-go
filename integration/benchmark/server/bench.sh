@@ -3,12 +3,11 @@
 set -x
 set -o pipefail
 
+# assumes flow-go was already cloned by user
+cd flow-go/integration/localnet
+
 git fetch
 git fetch --tags
-
-# assumes flow-go was already cloned by user
-
-cd flow-go/integration/localnet
 
 while read -r branch_hash; do
     hash="${branch_hash##*:}"
