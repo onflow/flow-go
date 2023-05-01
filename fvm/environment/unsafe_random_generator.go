@@ -32,12 +32,12 @@ type unsafeRandomGenerator struct {
 }
 
 type ParseRestrictedUnsafeRandomGenerator struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 	impl     UnsafeRandomGenerator
 }
 
 func NewParseRestrictedUnsafeRandomGenerator(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	impl UnsafeRandomGenerator,
 ) UnsafeRandomGenerator {
 	return ParseRestrictedUnsafeRandomGenerator{

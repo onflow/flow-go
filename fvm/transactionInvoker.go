@@ -15,6 +15,7 @@ import (
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -53,7 +54,7 @@ type transactionExecutor struct {
 
 	ctx      Context
 	proc     *TransactionProcedure
-	txnState storage.Transaction
+	txnState storage.TransactionPreparer
 
 	span otelTrace.Span
 	env  environment.Environment
@@ -72,7 +73,7 @@ type transactionExecutor struct {
 func newTransactionExecutor(
 	ctx Context,
 	proc *TransactionProcedure,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) *transactionExecutor {
 	span := ctx.StartChildSpan(trace.FVMExecuteTransaction)
 	span.SetAttributes(attribute.String("transaction_id", proc.ID.String()))
@@ -348,7 +349,7 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
-	var bodySnapshot *state.ExecutionSnapshot
+	var bodySnapshot *snapshot.ExecutionSnapshot
 	bodySnapshot, err = executor.txnState.CommitNestedTransaction(bodyTxnId)
 	if err != nil {
 		return

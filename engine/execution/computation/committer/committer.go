@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	execState "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -29,7 +29,7 @@ func NewLedgerViewCommitter(
 }
 
 func (committer *LedgerViewCommitter) CommitView(
-	snapshot *state.ExecutionSnapshot,
+	snapshot *snapshot.ExecutionSnapshot,
 	baseState flow.StateCommitment,
 ) (
 	newCommit flow.StateCommitment,
@@ -61,7 +61,7 @@ func (committer *LedgerViewCommitter) CommitView(
 }
 
 func (committer *LedgerViewCommitter) collectProofs(
-	snapshot *state.ExecutionSnapshot,
+	snapshot *snapshot.ExecutionSnapshot,
 	baseState flow.StateCommitment,
 ) (
 	proof []byte,

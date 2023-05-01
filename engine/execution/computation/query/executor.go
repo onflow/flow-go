@@ -14,7 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/debug"
@@ -32,7 +32,7 @@ type Executor interface {
 		script []byte,
 		arguments [][]byte,
 		blockHeader *flow.Header,
-		snapshot state.StorageSnapshot,
+		snapshot snapshot.StorageSnapshot,
 	) (
 		[]byte,
 		error,
@@ -42,7 +42,7 @@ type Executor interface {
 		ctx context.Context,
 		addr flow.Address,
 		header *flow.Header,
-		snapshot state.StorageSnapshot,
+		snapshot snapshot.StorageSnapshot,
 	) (
 		*flow.Account,
 		error,
@@ -101,7 +101,7 @@ func (e *QueryExecutor) ExecuteScript(
 	script []byte,
 	arguments [][]byte,
 	blockHeader *flow.Header,
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) (
 	encodedValue []byte,
 	err error,
@@ -207,7 +207,7 @@ func (e *QueryExecutor) GetAccount(
 	ctx context.Context,
 	address flow.Address,
 	blockHeader *flow.Header,
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
