@@ -4,17 +4,17 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 )
 
 type timestampedSnapshotTree struct {
 	currentSnapshotTime logical.Time
 	baseSnapshotTime    logical.Time
 
-	storage.SnapshotTree
+	snapshot.SnapshotTree
 
-	fullLog storage.UpdateLog
+	fullLog snapshot.UpdateLog
 }
 
 func newTimestampedSnapshotTree(
@@ -24,7 +24,7 @@ func newTimestampedSnapshotTree(
 	return timestampedSnapshotTree{
 		currentSnapshotTime: snapshotTime,
 		baseSnapshotTime:    snapshotTime,
-		SnapshotTree:        storage.NewSnapshotTree(storageSnapshot),
+		SnapshotTree:        snapshot.NewSnapshotTree(storageSnapshot),
 		fullLog:             nil,
 	}
 }
@@ -47,7 +47,7 @@ func (tree timestampedSnapshotTree) SnapshotTime() logical.Time {
 func (tree timestampedSnapshotTree) UpdatesSince(
 	snapshotTime logical.Time,
 ) (
-	storage.UpdateLog,
+	snapshot.UpdateLog,
 	error,
 ) {
 	if snapshotTime < tree.baseSnapshotTime {

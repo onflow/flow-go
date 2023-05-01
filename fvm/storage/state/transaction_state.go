@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -65,7 +66,7 @@ type NestedTransactionPreparer interface {
 	// its execution snapshot.  The finalized main transaction will not accept
 	// any new commits after this point.  This returns an error if there are
 	// outstanding nested transactions.
-	FinalizeMainTransaction() (*ExecutionSnapshot, error)
+	FinalizeMainTransaction() (*snapshot.ExecutionSnapshot, error)
 
 	// BeginNestedTransaction creates a unrestricted nested transaction within
 	// the current unrestricted (nested) transaction.  The meter parameters are
@@ -110,7 +111,7 @@ type NestedTransactionPreparer interface {
 	CommitNestedTransaction(
 		expectedId NestedTransactionId,
 	) (
-		*ExecutionSnapshot,
+		*snapshot.ExecutionSnapshot,
 		error,
 	)
 
@@ -128,14 +129,16 @@ type NestedTransactionPreparer interface {
 	CommitParseRestrictedNestedTransaction(
 		location common.AddressLocation,
 	) (
-		*ExecutionSnapshot,
+		*snapshot.ExecutionSnapshot,
 		error,
 	)
 
 	// AttachAndCommitNestedTransaction commits the changes from the cached
 	// nested transaction execution snapshot to the current (nested)
 	// transaction.
-	AttachAndCommitNestedTransaction(cachedSnapshot *ExecutionSnapshot) error
+	AttachAndCommitNestedTransaction(
+		cachedSnapshot *snapshot.ExecutionSnapshot,
+	) error
 
 	// RestartNestedTransaction merges all changes that belongs to the nested
 	// transaction about to be restart (for spock/meter bookkeeping), then
@@ -169,7 +172,7 @@ type transactionState struct {
 // NewTransactionState constructs a new state transaction which manages nested
 // transactions.
 func NewTransactionState(
-	snapshot StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 	params StateParameters,
 ) NestedTransactionPreparer {
 	startState := NewExecutionState(snapshot, params)
@@ -223,7 +226,7 @@ func (txnState *transactionState) InterimReadSet() map[flow.RegisterID]struct{} 
 }
 
 func (txnState *transactionState) FinalizeMainTransaction() (
-	*ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	error,
 ) {
 	if len(txnState.nestedTransactions) > 1 {
@@ -312,7 +315,10 @@ func (txnState *transactionState) pop(op string) (*ExecutionState, error) {
 	return child.ExecutionState, nil
 }
 
-func (txnState *transactionState) mergeIntoParent() (*ExecutionSnapshot, error) {
+func (txnState *transactionState) mergeIntoParent() (
+	*snapshot.ExecutionSnapshot,
+	error,
+) {
 	childState, err := txnState.pop("commit")
 	if err != nil {
 		return nil, err
@@ -331,7 +337,7 @@ func (txnState *transactionState) mergeIntoParent() (*ExecutionSnapshot, error) 
 func (txnState *transactionState) CommitNestedTransaction(
 	expectedId NestedTransactionId,
 ) (
-	*ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	error,
 ) {
 	if !txnState.IsCurrent(expectedId) {
@@ -353,7 +359,7 @@ func (txnState *transactionState) CommitNestedTransaction(
 func (txnState *transactionState) CommitParseRestrictedNestedTransaction(
 	location common.AddressLocation,
 ) (
-	*ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	error,
 ) {
 	currentFrame := txnState.current()
@@ -372,7 +378,7 @@ func (txnState *transactionState) CommitParseRestrictedNestedTransaction(
 }
 
 func (txnState *transactionState) AttachAndCommitNestedTransaction(
-	cachedSnapshot *ExecutionSnapshot,
+	cachedSnapshot *snapshot.ExecutionSnapshot,
 ) error {
 	return txnState.current().Merge(cachedSnapshot)
 }

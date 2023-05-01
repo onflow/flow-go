@@ -1,7 +1,7 @@
 package result
 
 import (
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -36,7 +36,7 @@ type ExecutedCollection interface {
 	TransactionResults() flow.TransactionResults
 
 	// ExecutionSnapshot returns the execution snapshot
-	ExecutionSnapshot() *state.ExecutionSnapshot
+	ExecutionSnapshot() *snapshot.ExecutionSnapshot
 }
 
 // ExecutedCollectionConsumer consumes ExecutedCollections

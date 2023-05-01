@@ -15,7 +15,7 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
@@ -357,9 +357,9 @@ type vmMock struct{}
 func (vm *vmMock) Run(
 	ctx fvm.Context,
 	proc fvm.Procedure,
-	storage state.StorageSnapshot,
+	storage snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -369,7 +369,7 @@ func (vm *vmMock) Run(
 			"invokable is not a transaction")
 	}
 
-	snapshot := &state.ExecutionSnapshot{}
+	snapshot := &snapshot.ExecutionSnapshot{}
 	output := fvm.ProcedureOutput{}
 
 	id0 := flow.NewRegisterID("00", "")
@@ -413,7 +413,7 @@ func (vm *vmMock) Run(
 func (vmMock) GetAccount(
 	_ fvm.Context,
 	_ flow.Address,
-	_ state.StorageSnapshot,
+	_ snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error) {
@@ -425,9 +425,9 @@ type vmSystemOkMock struct{}
 func (vm *vmSystemOkMock) Run(
 	ctx fvm.Context,
 	proc fvm.Procedure,
-	storage state.StorageSnapshot,
+	storage snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -441,7 +441,7 @@ func (vm *vmSystemOkMock) Run(
 	id5 := flow.NewRegisterID("05", "")
 
 	// add "default" interaction expected in tests
-	snapshot := &state.ExecutionSnapshot{
+	snapshot := &snapshot.ExecutionSnapshot{
 		ReadSet: map[flow.RegisterID]struct{}{
 			id0: struct{}{},
 			id5: struct{}{},
@@ -461,7 +461,7 @@ func (vm *vmSystemOkMock) Run(
 func (vmSystemOkMock) GetAccount(
 	_ fvm.Context,
 	_ flow.Address,
-	_ state.StorageSnapshot,
+	_ snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -474,9 +474,9 @@ type vmSystemBadMock struct{}
 func (vm *vmSystemBadMock) Run(
 	ctx fvm.Context,
 	proc fvm.Procedure,
-	storage state.StorageSnapshot,
+	storage snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -492,13 +492,13 @@ func (vm *vmSystemBadMock) Run(
 		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
 	}
 
-	return &state.ExecutionSnapshot{}, output, nil
+	return &snapshot.ExecutionSnapshot{}, output, nil
 }
 
 func (vmSystemBadMock) GetAccount(
 	_ fvm.Context,
 	_ flow.Address,
-	_ state.StorageSnapshot,
+	_ snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,

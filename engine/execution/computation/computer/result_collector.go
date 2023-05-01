@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -28,7 +29,7 @@ import (
 type ViewCommitter interface {
 	// CommitView commits an execution snapshot and collects proofs
 	CommitView(
-		*state.ExecutionSnapshot,
+		*snapshot.ExecutionSnapshot,
 		flow.StateCommitment,
 	) (
 		flow.StateCommitment,
@@ -40,7 +41,7 @@ type ViewCommitter interface {
 
 type transactionResult struct {
 	transaction
-	*state.ExecutionSnapshot
+	*snapshot.ExecutionSnapshot
 	fvm.ProcedureOutput
 }
 
@@ -126,7 +127,7 @@ func newResultCollector(
 func (collector *resultCollector) commitCollection(
 	collection collectionInfo,
 	startTime time.Time,
-	collectionExecutionSnapshot *state.ExecutionSnapshot,
+	collectionExecutionSnapshot *snapshot.ExecutionSnapshot,
 ) error {
 	defer collector.tracer.StartSpanFromParent(
 		collector.blockSpan,
@@ -211,7 +212,7 @@ func (collector *resultCollector) commitCollection(
 
 func (collector *resultCollector) processTransactionResult(
 	txn transaction,
-	txnExecutionSnapshot *state.ExecutionSnapshot,
+	txnExecutionSnapshot *snapshot.ExecutionSnapshot,
 	output fvm.ProcedureOutput,
 ) error {
 
@@ -258,7 +259,7 @@ func (collector *resultCollector) processTransactionResult(
 
 func (collector *resultCollector) AddTransactionResult(
 	txn transaction,
-	snapshot *state.ExecutionSnapshot,
+	snapshot *snapshot.ExecutionSnapshot,
 	output fvm.ProcedureOutput,
 ) {
 	result := transactionResult{
