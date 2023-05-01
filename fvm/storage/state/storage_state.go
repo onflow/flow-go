@@ -3,11 +3,12 @@ package state
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type storageState struct {
-	baseStorage StorageSnapshot
+	baseStorage snapshot.StorageSnapshot
 
 	// The read set only include reads from the baseStorage
 	readSet map[flow.RegisterID]struct{}
@@ -15,7 +16,7 @@ type storageState struct {
 	writeSet map[flow.RegisterID]flow.RegisterValue
 }
 
-func newStorageState(base StorageSnapshot) *storageState {
+func newStorageState(base snapshot.StorageSnapshot) *storageState {
 	return &storageState{
 		baseStorage: base,
 		readSet:     map[flow.RegisterID]struct{}{},
@@ -24,17 +25,17 @@ func newStorageState(base StorageSnapshot) *storageState {
 }
 
 func (state *storageState) NewChild() *storageState {
-	return newStorageState(NewPeekerStorageSnapshot(state))
+	return newStorageState(snapshot.NewPeekerStorageSnapshot(state))
 }
 
-func (state *storageState) Finalize() *ExecutionSnapshot {
-	return &ExecutionSnapshot{
+func (state *storageState) Finalize() *snapshot.ExecutionSnapshot {
+	return &snapshot.ExecutionSnapshot{
 		ReadSet:  state.readSet,
 		WriteSet: state.writeSet,
 	}
 }
 
-func (state *storageState) Merge(snapshot *ExecutionSnapshot) error {
+func (state *storageState) Merge(snapshot *snapshot.ExecutionSnapshot) error {
 	for id := range snapshot.ReadSet {
 		_, ok := state.writeSet[id]
 		if ok {

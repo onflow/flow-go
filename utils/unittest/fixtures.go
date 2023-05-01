@@ -22,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/testutils"
@@ -334,8 +334,8 @@ func WithoutGuarantee(payload *flow.Payload) {
 	payload.Guarantees = nil
 }
 
-func StateInteractionsFixture() *state.ExecutionSnapshot {
-	return &state.ExecutionSnapshot{}
+func StateInteractionsFixture() *snapshot.ExecutionSnapshot {
+	return &snapshot.ExecutionSnapshot{}
 }
 
 func BlockWithParentAndProposerFixture(

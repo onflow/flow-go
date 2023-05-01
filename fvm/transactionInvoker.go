@@ -15,6 +15,7 @@ import (
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -348,7 +349,7 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
-	var bodySnapshot *state.ExecutionSnapshot
+	var bodySnapshot *snapshot.ExecutionSnapshot
 	bodySnapshot, err = executor.txnState.CommitNestedTransaction(bodyTxnId)
 	if err != nil {
 		return

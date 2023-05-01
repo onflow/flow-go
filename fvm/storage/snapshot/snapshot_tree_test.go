@@ -1,4 +1,4 @@
-package storage
+package snapshot
 
 import (
 	"fmt"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -21,7 +20,7 @@ func TestSnapshotTree(t *testing.T) {
 	// entries:
 	// 1 -> 1v0
 	tree0 := NewSnapshotTree(
-		state.MapStorageSnapshot{
+		MapStorageSnapshot{
 			id1: value1v0,
 		})
 
@@ -35,7 +34,7 @@ func TestSnapshotTree(t *testing.T) {
 	value2v1 := flow.RegisterValue("2v1")
 
 	tree1 := tree0.Append(
-		&state.ExecutionSnapshot{
+		&ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
 				id2: value2v1,
 			},
@@ -52,7 +51,7 @@ func TestSnapshotTree(t *testing.T) {
 	value3v1 := flow.RegisterValue("3v1")
 
 	tree2 := tree1.Append(
-		&state.ExecutionSnapshot{
+		&ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
 				id1: value1v1,
 				id3: value3v1,
@@ -69,7 +68,7 @@ func TestSnapshotTree(t *testing.T) {
 	value2v2 := flow.RegisterValue("2v2")
 
 	tree3 := tree2.Append(
-		&state.ExecutionSnapshot{
+		&ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
 				id2: value2v2,
 			},
@@ -95,7 +94,7 @@ func TestSnapshotTree(t *testing.T) {
 		value := []byte(fmt.Sprintf("compacted %d", i))
 		expectedCompacted[id3] = value
 		compactedTree = compactedTree.Append(
-			&state.ExecutionSnapshot{
+			&ExecutionSnapshot{
 				WriteSet: map[flow.RegisterID]flow.RegisterValue{
 					id3: value,
 				},

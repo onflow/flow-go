@@ -5,9 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -23,7 +22,7 @@ func TestTimestampedSnapshotTree(t *testing.T) {
 	value0 := flow.RegisterValue([]byte("value0"))
 
 	tree0 := newTimestampedSnapshotTree(
-		state.MapStorageSnapshot{
+		snapshot.MapStorageSnapshot{
 			registerId0: value0,
 		},
 		baseSnapshotTime)
@@ -38,7 +37,7 @@ func TestTimestampedSnapshotTree(t *testing.T) {
 	}
 
 	tree1 := tree0.Append(
-		&state.ExecutionSnapshot{
+		&snapshot.ExecutionSnapshot{
 			WriteSet: writeSet1,
 		})
 
@@ -52,7 +51,7 @@ func TestTimestampedSnapshotTree(t *testing.T) {
 	}
 
 	tree2 := tree1.Append(
-		&state.ExecutionSnapshot{
+		&snapshot.ExecutionSnapshot{
 			WriteSet: writeSet2,
 		})
 
@@ -66,7 +65,7 @@ func TestTimestampedSnapshotTree(t *testing.T) {
 	}
 
 	tree3 := tree2.Append(
-		&state.ExecutionSnapshot{
+		&snapshot.ExecutionSnapshot{
 			WriteSet: writeSet3,
 		})
 
@@ -80,14 +79,14 @@ func TestTimestampedSnapshotTree(t *testing.T) {
 	}
 
 	tree4 := tree3.Append(
-		&state.ExecutionSnapshot{
+		&snapshot.ExecutionSnapshot{
 			WriteSet: writeSet4,
 		})
 
 	// Verify the trees internal values
 
 	trees := []timestampedSnapshotTree{tree0, tree1, tree2, tree3, tree4}
-	logs := storage.UpdateLog{writeSet1, writeSet2, writeSet3, writeSet4}
+	logs := snapshot.UpdateLog{writeSet1, writeSet2, writeSet3, writeSet4}
 
 	for i, tree := range trees {
 		require.Equal(t, baseSnapshotTime, tree.baseSnapshotTime)
@@ -170,13 +169,13 @@ func TestRebaseableTimestampedSnapshotTree(t *testing.T) {
 	value2 := flow.RegisterValue([]byte("value2"))
 
 	tree1 := newTimestampedSnapshotTree(
-		state.MapStorageSnapshot{
+		snapshot.MapStorageSnapshot{
 			registerId: value1,
 		},
 		0)
 
 	tree2 := newTimestampedSnapshotTree(
-		state.MapStorageSnapshot{
+		snapshot.MapStorageSnapshot{
 			registerId: value2,
 		},
 		0)

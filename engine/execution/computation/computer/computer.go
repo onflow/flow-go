@@ -15,9 +15,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -107,7 +106,7 @@ type BlockComputer interface {
 		ctx context.Context,
 		parentBlockExecutionResultID flow.Identifier,
 		block *entity.ExecutableBlock,
-		snapshot state.StorageSnapshot,
+		snapshot snapshot.StorageSnapshot,
 		derivedBlockData *derived.DerivedBlockData,
 	) (
 		*execution.ComputationResult,
@@ -182,7 +181,7 @@ func (e *blockComputer) ExecuteBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 	derivedBlockData *derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,
@@ -272,7 +271,7 @@ func (e *blockComputer) executeBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	baseSnapshot state.StorageSnapshot,
+	baseSnapshot snapshot.StorageSnapshot,
 	derivedBlockData *derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,
@@ -311,7 +310,7 @@ func (e *blockComputer) executeBlock(
 		e.colResCons)
 	defer collector.Stop()
 
-	snapshotTree := storage.NewSnapshotTree(baseSnapshot)
+	snapshotTree := snapshot.NewSnapshotTree(baseSnapshot)
 	for _, txn := range transactions {
 		txnExecutionSnapshot, output, err := e.executeTransaction(
 			blockSpan,
@@ -352,10 +351,10 @@ func (e *blockComputer) executeBlock(
 func (e *blockComputer) executeTransaction(
 	parentSpan otelTrace.Span,
 	txn transaction,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 	collector *resultCollector,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
