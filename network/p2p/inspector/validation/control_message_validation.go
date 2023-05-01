@@ -158,7 +158,7 @@ func NewControlMsgValidationInspector(
 // All errors returned from this function can be considered benign.
 // errors returned:
 //
-//	ErrDiscardThreshold - if the message count for the control message type exceeds the discard threshold.
+//	ErrHardThreshold - if the message count for the control message type exceeds the hard threshold.
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	control := rpc.GetControl()
 
@@ -216,7 +216,7 @@ func (c *ControlMsgValidationInspector) Name() string {
 	return rpcInspectorComponentName
 }
 
-// blockingPreprocessingRpc generic pre-processing validation func that ensures the RPC control message count does not exceed the configured discard threshold.
+// blockingPreprocessingRpc generic pre-processing validation func that ensures the RPC control message count does not exceed the configured hard threshold.
 func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
@@ -230,15 +230,15 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 		c.metrics.PreProcessingFinished(validationConfig.ControlMsg.String(), uint(count), time.Since(start))
 	}()
 
-	// if Count greater than discard threshold drop message and penalize
-	if count > validationConfig.DiscardThreshold {
-		discardThresholdErr := NewDiscardThresholdErr(validationConfig.ControlMsg, count, validationConfig.DiscardThreshold)
+	// if Count greater than hard threshold drop message and penalize
+	if count > validationConfig.HardThreshold {
+		hardThresholdErr := NewHardThresholdErr(validationConfig.ControlMsg, count, validationConfig.HardThreshold)
 		lg.Warn().
-			Err(discardThresholdErr).
-			Uint64("upper_threshold", discardThresholdErr.discardThreshold).
+			Err(hardThresholdErr).
+			Uint64("upper_threshold", hardThresholdErr.hardThreshold).
 			Bool(logging.KeySuspicious, true).
 			Msg("rejecting rpc control message")
-		err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, discardThresholdErr))
+		err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, hardThresholdErr))
 		if err != nil {
 			lg.Error().
 				Err(err).
@@ -246,7 +246,7 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 				Msg("failed to distribute invalid control message notification")
 			return err
 		}
-		return discardThresholdErr
+		return hardThresholdErr
 	}
 
 	return nil
@@ -268,7 +268,7 @@ func (c *ControlMsgValidationInspector) blockingIHaveSamplePreprocessing(from pe
 }
 
 // blockingPreprocessingSampleRpc blocking pre-processing validation func that performs some pre-validation of RPC control messages.
-// If the RPC control message count exceeds the configured discard threshold we perform synchronous topic validation on a subset
+// If the RPC control message count exceeds the configured hard threshold we perform synchronous topic validation on a subset
 // of the control messages. This is used for control message types that do not have an upper bound on the amount of messages a node can send.
 func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
@@ -276,8 +276,8 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 		Uint64("ctrl_msg_count", count).
 		Str("peer_id", from.String()).
 		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
-	// if count greater than discard threshold perform synchronous topic validation on random subset of the iHave messages
-	if count > validationConfig.DiscardThreshold {
+	// if count greater than hard threshold perform synchronous topic validation on random subset of the iHave messages
+	if count > validationConfig.HardThreshold {
 		err := c.validateTopics(validationConfig.ControlMsg, controlMessage, sampleSize)
 		if err != nil {
 			lg.Warn().
@@ -324,7 +324,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg, 0)
 	default:
 		lg.Trace().
-			Uint64("discard_threshold", req.validationConfig.DiscardThreshold).
+			Uint64("hard_threshold", req.validationConfig.HardThreshold).
 			Uint64("safety_threshold", req.validationConfig.SafetyThreshold).
 			Msg(fmt.Sprintf("control message %s inspection passed %d is below configured safety threshold", req.validationConfig.ControlMsg, count))
 		return nil

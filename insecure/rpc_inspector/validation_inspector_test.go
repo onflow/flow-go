@@ -102,22 +102,22 @@ func TestValidationInspector_SafetyThreshold(t *testing.T) {
 	}, 2*time.Second, 10*time.Millisecond)
 }
 
-// TestValidationInspector_DiscardThreshold ensures that when RPC control message count is above the configured discard threshold the control message validation inspector
+// TestValidationInspector_HardThreshold ensures that when RPC control message count is above the configured hard threshold the control message validation inspector
 // returns the expected error.
-func TestValidationInspector_DiscardThreshold(t *testing.T) {
+func TestValidationInspector_HardThreshold(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role)
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
-	discardThreshold := uint64(10)
+	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
+	hardThreshold := uint64(10)
 	// create our RPC validation inspector
 	inspectorConfig := internal.DefaultRPCValidationConfig()
 	inspectorConfig.NumberOfWorkers = 1
-	inspectorConfig.GraftValidationCfg.DiscardThreshold = discardThreshold
-	inspectorConfig.PruneValidationCfg.DiscardThreshold = discardThreshold
+	inspectorConfig.GraftValidationCfg.HardThreshold = hardThreshold
+	inspectorConfig.PruneValidationCfg.HardThreshold = hardThreshold
 
 	messageCount := 50
 	controlMessageCount := int64(1)
@@ -134,7 +134,7 @@ func TestValidationInspector_DiscardThreshold(t *testing.T) {
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.Equal(t, uint64(messageCount), notification.Count)
 
-			require.True(t, validation.IsErrDiscardThreshold(notification.Err))
+			require.True(t, validation.IsErrHardThreshold(notification.Err))
 			require.True(t, notification.MsgType == p2p.CtrlMsgGraft || notification.MsgType == p2p.CtrlMsgPrune)
 			if count.Load() == 2 {
 				close(done)
@@ -173,9 +173,9 @@ func TestValidationInspector_DiscardThreshold(t *testing.T) {
 	unittest.RequireCloseBefore(t, done, 2*time.Second, "failed to inspect RPC messages on time")
 }
 
-// TestValidationInspector_DiscardThresholdIHave ensures that when the ihave RPC control message count is above the configured discard threshold the control message validation inspector
+// TestValidationInspector_HardThresholdIHave ensures that when the ihave RPC control message count is above the configured hard threshold the control message validation inspector
 // inspects a sample size of the ihave messages and returns the expected error when validation for a topic in that sample fails.
-func TestValidationInspector_DiscardThresholdIHave(t *testing.T) {
+func TestValidationInspector_HardThresholdIHave(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
@@ -186,7 +186,7 @@ func TestValidationInspector_DiscardThresholdIHave(t *testing.T) {
 	// create our RPC validation inspector
 	inspectorConfig := internal.DefaultRPCValidationConfig()
 	inspectorConfig.NumberOfWorkers = 1
-	inspectorConfig.IHaveValidationCfg.DiscardThreshold = 50
+	inspectorConfig.IHaveValidationCfg.HardThreshold = 50
 	inspectorConfig.IHaveValidationCfg.IHaveInspectionMaxSampleSize = 100
 	// set the sample size divisor to 2 which will force inspection of 50% of topic IDS
 	inspectorConfig.IHaveValidationCfg.IHaveSyncInspectSampleSizePercentage = .5
@@ -334,21 +334,21 @@ func TestValidationInspector_InvalidTopicID(t *testing.T) {
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role)
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
+	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
 	inspectorConfig := internal.DefaultRPCValidationConfig()
 	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
 
 	inspectorConfig.IHaveValidationCfg.SafetyThreshold = 0
-	inspectorConfig.IHaveValidationCfg.DiscardThreshold = 50
+	inspectorConfig.IHaveValidationCfg.HardThreshold = 50
 	inspectorConfig.IHaveValidationCfg.IHaveAsyncInspectSampleSizePercentage = .5
 	inspectorConfig.IHaveValidationCfg.IHaveInspectionMaxSampleSize = 100
 	ihaveMessageCount := 100
 
 	inspectorConfig.NumberOfWorkers = 1
 
-	// SafetyThreshold < messageCount < DiscardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
+	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
 	messageCount := inspectorConfig.GraftValidationCfg.SafetyThreshold + 1
 	controlMessageCount := int64(1)

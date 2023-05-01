@@ -11,40 +11,42 @@ import (
 )
 
 const (
-	// DiscardThresholdMapKey key used to set the  discard threshold config limit.
-	DiscardThresholdMapKey = "discardthreshold"
+	// HardThresholdMapKey key used to set the  hard threshold config limit.
+	HardThresholdMapKey = "hardthreshold"
 	// SafetyThresholdMapKey key used to set the safety threshold config limit.
 	SafetyThresholdMapKey = "safetythreshold"
 	// RateLimitMapKey key used to set the rate limit config limit.
 	RateLimitMapKey = "ratelimit"
-	// DefaultGraftDiscardThreshold upper bound for graft messages, RPC control messages with a count
-	// above the discard threshold are automatically discarded.
-	DefaultGraftDiscardThreshold = 30
+	// DefaultGraftHardThreshold upper bound for graft messages, RPC control messages with a count
+	// above the hard threshold are automatically discarded.
+	DefaultGraftHardThreshold = 30
 	// DefaultGraftSafetyThreshold a lower bound for graft messages, RPC control messages with a message count
 	// lower than the safety threshold bypass validation.
-	DefaultGraftSafetyThreshold = .5 * DefaultGraftDiscardThreshold
+	DefaultGraftSafetyThreshold = .5 * DefaultGraftHardThreshold
 	// DefaultGraftRateLimit the rate limit for graft control messages.
-	// Currently, the default rate limit is equal to the discard threshold amount.
+	// Currently, the default rate limit is equal to the hard threshold amount.
 	// This will result in a rate limit of 30 grafts/sec.
-	DefaultGraftRateLimit = DefaultGraftDiscardThreshold
+	DefaultGraftRateLimit = DefaultGraftHardThreshold
 
-	// DefaultPruneDiscardThreshold upper bound for prune messages, RPC control messages with a count
-	// above the discard threshold are automatically discarded.
-	DefaultPruneDiscardThreshold = 30
+	// DefaultPruneHardThreshold upper bound for prune messages, RPC control messages with a count
+	// above the hard threshold are automatically discarded.
+	DefaultPruneHardThreshold = 30
 	// DefaultPruneSafetyThreshold a lower bound for prune messages, RPC control messages with a message count
 	// lower than the safety threshold bypass validation.
-	DefaultPruneSafetyThreshold = .5 * DefaultPruneDiscardThreshold
+	DefaultPruneSafetyThreshold = .5 * DefaultPruneHardThreshold
 	// DefaultPruneRateLimit the rate limit for prune control messages.
-	// Currently, the default rate limit is equal to the discard threshold amount.
+	// Currently, the default rate limit is equal to the hard threshold amount.
 	// This will result in a rate limit of 30 prunes/sec.
-	DefaultPruneRateLimit = DefaultPruneDiscardThreshold
+	DefaultPruneRateLimit = DefaultPruneHardThreshold
 
-	// DefaultIHaveDiscardThreshold upper bound for ihave messages, RPC control messages with a count
-	// above the discard threshold are automatically discarded.
-	DefaultIHaveDiscardThreshold = 100
+	// DefaultIHaveHardThreshold upper bound for ihave messages, the message count for ihave messages
+	// exceeds the configured hard threshold only a sample size of the messages will be inspected. This
+	// ensures liveness of the network because there is no expected max number of ihave messages than can be
+	// received by a node.
+	DefaultIHaveHardThreshold = 100
 	// DefaultIHaveSafetyThreshold a lower bound for ihave messages, RPC control messages with a message count
 	// lower than the safety threshold bypass validation.
-	DefaultIHaveSafetyThreshold = .5 * DefaultIHaveDiscardThreshold
+	DefaultIHaveSafetyThreshold = .5 * DefaultIHaveHardThreshold
 	// DefaultIHaveRateLimit rate limiting for ihave control messages is disabled.
 	DefaultIHaveRateLimit = 0
 	// DefaultIHaveSyncInspectSampleSizePercentage the default percentage of ihaves to use as the sample size for synchronous inspection 25%.
@@ -58,8 +60,8 @@ const (
 // CtrlMsgValidationLimits limits used to construct control message validation configuration.
 type CtrlMsgValidationLimits map[string]int
 
-func (c CtrlMsgValidationLimits) DiscardThreshold() uint64 {
-	return uint64(c[DiscardThresholdMapKey])
+func (c CtrlMsgValidationLimits) HardThreshold() uint64 {
+	return uint64(c[HardThresholdMapKey])
 }
 
 func (c CtrlMsgValidationLimits) SafetyThreshold() uint64 {
@@ -80,9 +82,9 @@ type CtrlMsgValidationConfigOption func(*CtrlMsgValidationConfig)
 type CtrlMsgValidationConfig struct {
 	// ControlMsg the type of RPC control message.
 	ControlMsg p2p.ControlMessageType
-	// DiscardThreshold indicates the hard limit for size of the RPC control message
-	// any RPC messages with size > DiscardThreshold should be dropped.
-	DiscardThreshold uint64
+	// HardThreshold indicates the hard limit for size of the RPC control message
+	// any RPC messages with size > HardThreshold should be dropped.
+	HardThreshold uint64
 	// SafetyThreshold lower limit for the size of the RPC control message, any RPC messages
 	// with a size < SafetyThreshold can skip validation step to avoid resource wasting.
 	SafetyThreshold uint64
@@ -127,16 +129,16 @@ func NewCtrlMsgValidationConfig(controlMsg p2p.ControlMessageType, cfgLimitValue
 	switch {
 	case cfgLimitValues.RateLimit() < 0:
 		return nil, NewInvalidLimitConfigErr(controlMsg, RateLimitMapKey, uint64(cfgLimitValues.RateLimit()))
-	case cfgLimitValues.DiscardThreshold() <= 0:
-		return nil, NewInvalidLimitConfigErr(controlMsg, DiscardThresholdMapKey, cfgLimitValues.DiscardThreshold())
+	case cfgLimitValues.HardThreshold() <= 0:
+		return nil, NewInvalidLimitConfigErr(controlMsg, HardThresholdMapKey, cfgLimitValues.HardThreshold())
 	case cfgLimitValues.SafetyThreshold() <= 0:
 		return nil, NewInvalidLimitConfigErr(controlMsg, SafetyThresholdMapKey, cfgLimitValues.SafetyThreshold())
 	}
 
 	conf := &CtrlMsgValidationConfig{
-		ControlMsg:       controlMsg,
-		DiscardThreshold: cfgLimitValues.DiscardThreshold(),
-		SafetyThreshold:  cfgLimitValues.SafetyThreshold(),
+		ControlMsg:      controlMsg,
+		HardThreshold:   cfgLimitValues.HardThreshold(),
+		SafetyThreshold: cfgLimitValues.SafetyThreshold(),
 	}
 
 	if cfgLimitValues.RateLimit() == 0 {
