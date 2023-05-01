@@ -23,14 +23,14 @@ while read -r branch_hash; do
     echo "The current directory (middle of loop) is $PWD"
     make -C ../.. crypto_setup_gopath
     make stop
-    rm -f docker-compose.nodes.yml
+#    rm -f docker-compose.nodes.yml
     rm -rf data profiler trie
     make clean-data
     echo "The current directory (middle2 of loop) is $PWD"
     make -e COLLECTION=12 VERIFICATION=12 NCLUSTERS=12 LOGLEVEL=INFO bootstrap
 #    make -e COLLECTION=12 VERIFICATION=12 NCLUSTERS=12 LOGLEVEL=INFO init
-    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml build || continue
-    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d || continue
+#    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml build || continue
+#    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d || continue
 
     echo "The current directory (middle3 of loop) is $PWD"
     sleep 30;
