@@ -290,9 +290,13 @@ func sporkIDStrFromTopic(topic Topic) (string, error) {
 	return "", fmt.Errorf("spork id missing from topic")
 }
 
-// clusterIDFromTopic returns the pre-pended cluster ID for the cluster prefixed topic.
+// clusterIDStrFromTopic returns the pre-pended cluster ID for the cluster prefixed topic.
+// A valid cluster-prefixed channel includes the cluster prefix and cluster ID suffix:
+//
+//	sync-cluster/some_cluster_id
+//
 // All errors returned from this function can be considered benign.
-func clusterIDFromTopic(topic Topic) (string, error) {
+func clusterIDStrFromTopic(topic Topic) (string, error) {
 	for prefix := range clusterChannelPrefixRoleMap {
 		if strings.HasPrefix(topic.String(), prefix) {
 			return strings.TrimPrefix(topic.String(), fmt.Sprintf("%s-", prefix)), nil
@@ -341,7 +345,7 @@ func IsValidFlowClusterTopic(topic Topic, activeClusterIDS []string) error {
 		return err
 	}
 
-	clusterID, err := clusterIDFromTopic(topic)
+	clusterID, err := clusterIDStrFromTopic(topic)
 	if err != nil {
 		return NewInvalidTopicErr(topic, fmt.Errorf("failed to get cluster ID from topic: %w", err))
 	}
