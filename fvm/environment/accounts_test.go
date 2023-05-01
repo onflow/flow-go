@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -68,7 +68,7 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 
 		for _, value := range [][]byte{{}, nil} {
 			txnState := testutils.NewSimpleTransaction(
-				state.MapStorageSnapshot{
+				snapshot.MapStorageSnapshot{
 					registerId: value,
 				})
 			accounts := environment.NewAccounts(txnState)
@@ -93,7 +93,7 @@ func TestAccounts_GetPublicKeyCount(t *testing.T) {
 
 		for _, value := range [][]byte{{}, nil} {
 			txnState := testutils.NewSimpleTransaction(
-				state.MapStorageSnapshot{
+				snapshot.MapStorageSnapshot{
 					registerId: value,
 				})
 			accounts := environment.NewAccounts(txnState)
@@ -119,7 +119,7 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 
 		for _, value := range [][]byte{{}, nil} {
 			txnState := testutils.NewSimpleTransaction(
-				state.MapStorageSnapshot{
+				snapshot.MapStorageSnapshot{
 					registerId: value,
 				})
 
