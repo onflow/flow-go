@@ -285,7 +285,7 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
 	// if count greater than hard threshold perform synchronous topic validation on random subset of the iHave messages
 	if count > validationConfig.HardThreshold {
-		err := c.validateTopics(validationConfig.ControlMsg, controlMessage, sampleSize)
+		err := c.validateTopicsSample(validationConfig.ControlMsg, controlMessage, sampleSize)
 		if err != nil {
 			lg.Warn().
 				Err(err).
@@ -325,10 +325,10 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 	case count > req.validationConfig.SafetyThreshold && req.validationConfig.ControlMsg == p2p.CtrlMsgIHave:
 		// we only perform async inspection on a sample size of iHave messages
 		sampleSize := util.SampleN(len(req.ctrlMsg.GetIhave()), req.validationConfig.IHaveInspectionMaxSampleSize, req.validationConfig.IHaveAsyncInspectSampleSizePercentage)
-		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg, sampleSize)
+		validationErr = c.validateTopicsSample(req.validationConfig.ControlMsg, req.ctrlMsg, sampleSize)
 	case count > req.validationConfig.SafetyThreshold:
 		// check if Peer RPC messages Count greater than safety threshold further inspect each message individually
-		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg, 0)
+		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg)
 	default:
 		lg.Trace().
 			Uint64("hard_threshold", req.validationConfig.HardThreshold).
@@ -367,22 +367,10 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 }
 
 // validateTopics ensures all topics in the specified control message are valid flow topic/channel and no duplicate topics exist.
-// A sampleSize is only used when validating the topics of iHave control messages types because the number of iHave messages that
-// can exist in a single RPC is unbounded.
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage, sampleSize uint) error {
+func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
 	seen := make(map[channels.Topic]struct{})
-	validateTopic := func(topic channels.Topic) error {
-		if _, ok := seen[topic]; ok {
-			return NewIDuplicateTopicErr(topic)
-		}
-		seen[topic] = struct{}{}
-		err := c.validateTopic(topic)
-		if err != nil {
-			return NewInvalidTopicErr(topic, sampleSize, err)
-		}
-		return nil
-	}
+	validateTopic := c.validateTopicInlineFunc(seen)
 	switch ctrlMsgType {
 	case p2p.CtrlMsgGraft:
 		for _, graft := range ctrlMsg.GetGraft() {
@@ -400,6 +388,17 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+// validateTopicsSample ensures all topics in the specified control message are valid flow topic/channel and no duplicate topics exist.
+// Sample size ensures liveness of the network when validating messages with no upper bound on the amount of messages that may be received.
+// All errors returned from this function can be considered benign.
+func (c *ControlMsgValidationInspector) validateTopicsSample(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage, sampleSize uint) error {
+	seen := make(map[channels.Topic]struct{})
+	validateTopic := c.validateTopicInlineFunc(seen)
+	switch ctrlMsgType {
 	case p2p.CtrlMsgIHave:
 		// for iHave control message topic validation we only validate a random subset of the messages
 		iHaves := ctrlMsg.GetIhave()
@@ -413,7 +412,7 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 			topic := channels.Topic(iHaves[i].GetTopicID())
 			err = validateTopic(topic)
 			if err != nil {
-				return err
+				return NewInvalidTopicErr(topic, sampleSize, err)
 			}
 		}
 	}
@@ -428,4 +427,19 @@ func (c *ControlMsgValidationInspector) validateTopic(topic channels.Topic) erro
 		return err
 	}
 	return nil
+}
+
+// validateTopicInlineFunc returns a callback func that validates topics and keeps track of duplicates.
+func (c *ControlMsgValidationInspector) validateTopicInlineFunc(seen map[channels.Topic]struct{}) func(topic channels.Topic) error {
+	return func(topic channels.Topic) error {
+		if _, ok := seen[topic]; ok {
+			return NewIDuplicateTopicErr(topic)
+		}
+		seen[topic] = struct{}{}
+		err := c.validateTopic(topic)
+		if err != nil {
+			return NewInvalidTopicErr(topic, 0, err)
+		}
+		return nil
+	}
 }

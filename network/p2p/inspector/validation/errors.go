@@ -89,7 +89,10 @@ type ErrInvalidTopic struct {
 }
 
 func (e ErrInvalidTopic) Error() string {
-	return fmt.Errorf("invalid topic %s out of %d total topics sampled: %w", e.topic, e.sampleSize, e.err).Error()
+	if e.sampleSize > 0 {
+		return fmt.Errorf("invalid topic %s out of %d total topics sampled: %w", e.topic, e.sampleSize, e.err).Error()
+	}
+	return fmt.Errorf("invalid topic %s: %w", e.topic, e.err).Error()
 }
 
 // NewInvalidTopicErr returns a new ErrMalformedTopic
