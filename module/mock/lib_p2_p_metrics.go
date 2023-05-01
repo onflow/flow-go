@@ -105,16 +105,6 @@ func (_m *LibP2PMetrics) DNSLookupDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
-// IHavePreProcessingFinished provides a mock function with given fields: ihaveMsgType, sampleSize, duration
-func (_m *LibP2PMetrics) IHavePreProcessingFinished(ihaveMsgType string, sampleSize uint, duration time.Duration) {
-	_m.Called(ihaveMsgType, sampleSize, duration)
-}
-
-// IHavePreProcessingStarted provides a mock function with given fields: ihaveMsgType, sampleSize
-func (_m *LibP2PMetrics) IHavePreProcessingStarted(ihaveMsgType string, sampleSize uint) {
-	_m.Called(ihaveMsgType, sampleSize)
-}
-
 // InboundConnections provides a mock function with given fields: connectionCount
 func (_m *LibP2PMetrics) InboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
@@ -260,14 +250,14 @@ func (_m *LibP2PMetrics) OutboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
 }
 
-// PreProcessingFinished provides a mock function with given fields: msgType, duration
-func (_m *LibP2PMetrics) PreProcessingFinished(msgType string, duration time.Duration) {
-	_m.Called(msgType, duration)
+// PreProcessingFinished provides a mock function with given fields: msgType, sampleSize, duration
+func (_m *LibP2PMetrics) PreProcessingFinished(msgType string, sampleSize uint, duration time.Duration) {
+	_m.Called(msgType, sampleSize, duration)
 }
 
-// PreProcessingStarted provides a mock function with given fields: msgType
-func (_m *LibP2PMetrics) PreProcessingStarted(msgType string) {
-	_m.Called(msgType)
+// PreProcessingStarted provides a mock function with given fields: msgType, sampleSize
+func (_m *LibP2PMetrics) PreProcessingStarted(msgType string, sampleSize uint) {
+	_m.Called(msgType, sampleSize)
 }
 
 // RoutingTablePeerAdded provides a mock function with given fields:

@@ -218,17 +218,18 @@ func (c *ControlMsgValidationInspector) Name() string {
 
 // blockingPreprocessingRpc generic pre-processing validation func that ensures the RPC control message count does not exceed the configured discard threshold.
 func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
-	c.metrics.PreProcessingStarted(validationConfig.ControlMsg.String())
-	start := time.Now()
-	defer func() {
-		c.metrics.PreProcessingFinished(validationConfig.ControlMsg.String(), time.Since(start))
-	}()
-
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
 		Uint64("ctrl_msg_count", count).
 		Str("peer_id", from.String()).
 		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
+
+	c.metrics.PreProcessingStarted(validationConfig.ControlMsg.String(), uint(count))
+	start := time.Now()
+	defer func() {
+		c.metrics.PreProcessingFinished(validationConfig.ControlMsg.String(), uint(count), time.Since(start))
+	}()
+
 	// if Count greater than discard threshold drop message and penalize
 	if count > validationConfig.DiscardThreshold {
 		discardThresholdErr := NewDiscardThresholdErr(validationConfig.ControlMsg, count, validationConfig.DiscardThreshold)
@@ -253,10 +254,10 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 
 // blockingPreprocessingSampleRpc blocking pre-processing of a sample of iHave control messages.
 func (c *ControlMsgValidationInspector) blockingIHaveSamplePreprocessing(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
-	c.metrics.IHavePreProcessingStarted(p2p.CtrlMsgIHave.String(), sampleSize)
+	c.metrics.PreProcessingStarted(p2p.CtrlMsgIHave.String(), sampleSize)
 	start := time.Now()
 	defer func() {
-		c.metrics.IHavePreProcessingFinished(p2p.CtrlMsgIHave.String(), sampleSize, time.Since(start))
+		c.metrics.PreProcessingFinished(p2p.CtrlMsgIHave.String(), sampleSize, time.Since(start))
 	}()
 
 	err := c.blockingPreprocessingSampleRpc(from, validationConfig, controlMessage, sampleSize)

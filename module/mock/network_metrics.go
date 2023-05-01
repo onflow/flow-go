@@ -110,16 +110,6 @@ func (_m *NetworkMetrics) DuplicateInboundMessagesDropped(topic string, _a1 stri
 	_m.Called(topic, _a1, messageType)
 }
 
-// IHavePreProcessingFinished provides a mock function with given fields: ihaveMsgType, sampleSize, duration
-func (_m *NetworkMetrics) IHavePreProcessingFinished(ihaveMsgType string, sampleSize uint, duration time.Duration) {
-	_m.Called(ihaveMsgType, sampleSize, duration)
-}
-
-// IHavePreProcessingStarted provides a mock function with given fields: ihaveMsgType, sampleSize
-func (_m *NetworkMetrics) IHavePreProcessingStarted(ihaveMsgType string, sampleSize uint) {
-	_m.Called(ihaveMsgType, sampleSize)
-}
-
 // InboundConnections provides a mock function with given fields: connectionCount
 func (_m *NetworkMetrics) InboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
@@ -305,14 +295,14 @@ func (_m *NetworkMetrics) OutboundMessageSent(sizeBytes int, topic string, _a2 s
 	_m.Called(sizeBytes, topic, _a2, messageType)
 }
 
-// PreProcessingFinished provides a mock function with given fields: msgType, duration
-func (_m *NetworkMetrics) PreProcessingFinished(msgType string, duration time.Duration) {
-	_m.Called(msgType, duration)
+// PreProcessingFinished provides a mock function with given fields: msgType, sampleSize, duration
+func (_m *NetworkMetrics) PreProcessingFinished(msgType string, sampleSize uint, duration time.Duration) {
+	_m.Called(msgType, sampleSize, duration)
 }
 
-// PreProcessingStarted provides a mock function with given fields: msgType
-func (_m *NetworkMetrics) PreProcessingStarted(msgType string) {
-	_m.Called(msgType)
+// PreProcessingStarted provides a mock function with given fields: msgType, sampleSize
+func (_m *NetworkMetrics) PreProcessingStarted(msgType string, sampleSize uint) {
+	_m.Called(msgType, sampleSize)
 }
 
 // QueueDuration provides a mock function with given fields: duration, priority

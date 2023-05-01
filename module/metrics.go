@@ -152,15 +152,10 @@ type GossipSubScoringMetrics interface {
 // GossipSubRpcValidationInspectorMetrics encapsulates the metrics collectors for the gossipsub rpc validation control message inspectors.
 type GossipSubRpcValidationInspectorMetrics interface {
 	// PreProcessingStarted increments the metric tracking the number of messages being pre-processed by the rpc validation inspector.
-	PreProcessingStarted(msgType string)
+	PreProcessingStarted(msgType string, sampleSize uint)
 	// PreProcessingFinished tracks the time spent by the rpc validation inspector to pre-process a message and decrements the metric tracking
 	// the number of messages being pre-processed by the rpc validation inspector.
-	PreProcessingFinished(msgType string, duration time.Duration)
-	// IHavePreProcessingStarted increments the metric tracking the number of iHave messages being pre-processed by the rpc validation inspector.
-	IHavePreProcessingStarted(ihaveMsgType string, sampleSize uint)
-	// IHavePreProcessingFinished tracks the time spent by the rpc validation inspector to pre-process a iHave message and decrements the metric tracking
-	// the number of iHave messages being pre-processed by the rpc validation inspector.
-	IHavePreProcessingFinished(ihaveMsgType string, sampleSize uint, duration time.Duration)
+	PreProcessingFinished(msgType string, sampleSize uint, duration time.Duration)
 	// AsyncProcessingStarted increments the metric tracking the number of inspect message request being processed by workers in the rpc validator worker pool.
 	AsyncProcessingStarted(msgType string)
 	// AsyncProcessingFinished tracks the time spent by a rpc validation inspector worker to process an inspect message request asynchronously and decrements the metric tracking
