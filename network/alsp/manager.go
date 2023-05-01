@@ -3,8 +3,10 @@ package alsp
 import (
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp/internal"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -22,6 +24,16 @@ type MisbehaviorReportManager struct {
 
 var _ network.MisbehaviorReportManager = (*MisbehaviorReportManager)(nil)
 
+type MisbehaviorReportManagerConfig struct {
+	// Size is the size of the spam record cache.
+	Size   int
+	Logger zerolog.Logger
+	// AlspMetrics is the metrics instance for the alsp module (collecting spam reports).
+	AlspMetrics module.AlspMetrics
+	// CacheMetrics is the metrics factory for the spam record cache.
+	CacheMetricFactory module.HeroCacheMetrics
+}
+
 // NewMisbehaviorReportManager creates a new instance of the MisbehaviorReportManager.
 // Args:
 //
@@ -32,7 +44,16 @@ var _ network.MisbehaviorReportManager = (*MisbehaviorReportManager)(nil)
 // Returns:
 //
 //	a new instance of the MisbehaviorReportManager.
-func NewMisbehaviorReportManager(logger zerolog.Logger, metrics module.AlspMetrics, cache SpamRecordCache) *MisbehaviorReportManager {
+func NewMisbehaviorReportManager(logger zerolog.Logger, metrics module.AlspMetrics) *MisbehaviorReportManager {
+	cache := internal.NewSpamRecordCache(size, logger, herocacheFactory(), func(id flow.Identifier) ProtocolSpamRecord {
+		return ProtocolSpamRecord{
+			OriginId:      id,
+			Decay:         initialDecaySpeed,
+			CutoffCounter: 0,
+			Penalty:       0,
+		}
+	})
+
 	return &MisbehaviorReportManager{
 		logger:  logger.With().Str("module", "misbehavior_report_manager").Logger(),
 		metrics: metrics,
