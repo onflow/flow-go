@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func newTestTransactionState() state.NestedTransaction {
+func newTestTransactionState() state.NestedTransactionPreparer {
 	return state.NewTransactionState(
 		nil,
 		state.DefaultParameters(),
