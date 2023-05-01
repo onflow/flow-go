@@ -218,6 +218,9 @@ func (c *ControlMsgValidationInspector) Name() string {
 
 // blockingPreprocessingRpc generic pre-processing validation func that ensures the RPC control message count does not exceed the configured hard threshold.
 func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
+	if validationConfig.ControlMsg != p2p.CtrlMsgGraft && validationConfig.ControlMsg != p2p.CtrlMsgPrune {
+		return fmt.Errorf("unexpected control message type %s encountered during blocking pre-processing rpc, expected %s or %s", validationConfig.ControlMsg, p2p.CtrlMsgGraft, p2p.CtrlMsgPrune)
+	}
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
 		Uint64("ctrl_msg_count", count).
@@ -271,6 +274,10 @@ func (c *ControlMsgValidationInspector) blockingIHaveSamplePreprocessing(from pe
 // If the RPC control message count exceeds the configured hard threshold we perform synchronous topic validation on a subset
 // of the control messages. This is used for control message types that do not have an upper bound on the amount of messages a node can send.
 func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
+	if validationConfig.ControlMsg != p2p.CtrlMsgIHave && validationConfig.ControlMsg != p2p.CtrlMsgIWant {
+		return fmt.Errorf("unexpected control message type %s encountered during blocking pre-processing sample rpc, expected %s or %s", validationConfig.ControlMsg, p2p.CtrlMsgIHave, p2p.CtrlMsgIWant)
+	}
+
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
 		Uint64("ctrl_msg_count", count).
