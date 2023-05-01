@@ -1,7 +1,6 @@
-package storage
+package snapshot
 
 import (
-	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -9,23 +8,21 @@ const (
 	compactThreshold = 10
 )
 
-type updateLog []map[flow.RegisterID]flow.RegisterValue
+type UpdateLog []map[flow.RegisterID]flow.RegisterValue
 
 // SnapshotTree is a simple LSM tree representation of the key/value storage
 // at a given point in time.
 type SnapshotTree struct {
-	base state.StorageSnapshot
+	base StorageSnapshot
 
-	fullLog      updateLog
-	compactedLog updateLog
+	compactedLog UpdateLog
 }
 
 // NewSnapshotTree returns a tree with keys/values initialized to the base
 // storage snapshot.
-func NewSnapshotTree(base state.StorageSnapshot) SnapshotTree {
+func NewSnapshotTree(base StorageSnapshot) SnapshotTree {
 	return SnapshotTree{
 		base:         base,
-		fullLog:      nil,
 		compactedLog: nil,
 	}
 }
@@ -33,7 +30,7 @@ func NewSnapshotTree(base state.StorageSnapshot) SnapshotTree {
 // Append returns a new tree with updates from the execution snapshot "applied"
 // to the original original tree.
 func (tree SnapshotTree) Append(
-	update *state.ExecutionSnapshot,
+	update *ExecutionSnapshot,
 ) SnapshotTree {
 	compactedLog := tree.compactedLog
 	if len(update.WriteSet) > 0 {
@@ -51,13 +48,12 @@ func (tree SnapshotTree) Append(
 				}
 			}
 
-			compactedLog = updateLog{mergedSet}
+			compactedLog = UpdateLog{mergedSet}
 		}
 	}
 
 	return SnapshotTree{
 		base:         tree.base,
-		fullLog:      append(tree.fullLog, update.WriteSet),
 		compactedLog: compactedLog,
 	}
 }

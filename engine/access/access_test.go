@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/cmd/build"
 	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
@@ -899,6 +900,31 @@ func (suite *Suite) TestExecuteScript() {
 	})
 }
 
+// TestAPICallNodeVersionInfo tests the GetNodeVersionInfo query and check response returns correct node version
+// information
+func (suite *Suite) TestAPICallNodeVersionInfo() {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+		sporkId := unittest.IdentifierFixture()
+		protocolVersion := uint(unittest.Uint64InRange(10, 30))
+
+		suite.params.On("SporkID").Return(sporkId, nil)
+		suite.params.On("ProtocolVersion").Return(protocolVersion, nil)
+
+		req := &accessproto.GetNodeVersionInfoRequest{}
+		resp, err := handler.GetNodeVersionInfo(context.Background(), req)
+		require.NoError(suite.T(), err)
+		require.NotNil(suite.T(), resp)
+
+		respNodeVersionInfo := resp.Info
+		suite.Require().Equal(respNodeVersionInfo, &entitiesproto.NodeVersionInfo{
+			Semver:          build.Semver(),
+			Commit:          build.Commit(),
+			SporkId:         sporkId[:],
+			ProtocolVersion: uint64(protocolVersion),
+		})
+	})
+}
+
 // TestRpcEngineBuilderWithFinalizedHeaderCache test checks whether the RPC builder can construct the engine correctly
 // only when the WithFinalizedHeaderCache method has been called.
 func (suite *Suite) TestRpcEngineBuilderWithFinalizedHeaderCache() {
@@ -926,8 +952,9 @@ func (suite *Suite) TestRpcEngineBuilderWithFinalizedHeaderCache() {
 	})
 }
 
-// TestLastFinalizedBlockHeightResult test checks whether the response from a GetBlockHeaderByID request contains
-// the finalized block height and ID even when the finalized block height has been changed.
+// TestLastFinalizedBlockHeightResult tests on example of the GetBlockHeaderByID function that the LastFinalizedBlock
+// field in the response matches the finalized header from cache. It also tests that the LastFinalizedBlock field is
+// updated correctly when a block with a greater height is finalized.
 func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
 		block := unittest.BlockWithParentFixture(suite.finalizedBlock)
@@ -968,9 +995,6 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 	})
 }
 
-// TestLastFinalizedBlockHeightResult tests on example of the GetBlockHeaderByID function that the LastFinalizedBlock
-// field in the response matches the finalized header from cache. It also tests that the LastFinalizedBlock field is
-// updated correctly when a block with a greater height is finalized.
 func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 	collection := unittest.CollectionFixture(10)
 	refBlockID := unittest.IdentifierFixture()

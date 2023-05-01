@@ -1,7 +1,7 @@
 package execution
 
 import (
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -12,7 +12,7 @@ type CollectionExecutionResult struct {
 	serviceEvents          flow.EventsList
 	convertedServiceEvents flow.ServiceEventList
 	transactionResults     flow.TransactionResults
-	executionSnapshot      *state.ExecutionSnapshot
+	executionSnapshot      *snapshot.ExecutionSnapshot
 }
 
 // NewEmptyCollectionExecutionResult constructs a new  CollectionExecutionResult
@@ -38,12 +38,12 @@ func (c *CollectionExecutionResult) AppendTransactionResults(
 }
 
 func (c *CollectionExecutionResult) UpdateExecutionSnapshot(
-	executionSnapshot *state.ExecutionSnapshot,
+	executionSnapshot *snapshot.ExecutionSnapshot,
 ) {
 	c.executionSnapshot = executionSnapshot
 }
 
-func (c *CollectionExecutionResult) ExecutionSnapshot() *state.ExecutionSnapshot {
+func (c *CollectionExecutionResult) ExecutionSnapshot() *snapshot.ExecutionSnapshot {
 	return c.executionSnapshot
 }
 
