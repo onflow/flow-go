@@ -294,3 +294,5 @@ func (nc *NoopCollector) PreProcessingStarted(string, uint)                 {}
 func (nc *NoopCollector) PreProcessingFinished(string, uint, time.Duration) {}
 func (nc *NoopCollector) AsyncProcessingStarted(string)                     {}
 func (nc *NoopCollector) AsyncProcessingFinished(string, time.Duration)     {}
+
+func (nc *NoopCollector) OnMisbehaviorReported(string, string) {}

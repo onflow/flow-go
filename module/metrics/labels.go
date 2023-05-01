@@ -19,6 +19,7 @@ const (
 	LabelConnectionUseFD     = "usefd" // whether the connection is using a file descriptor
 	LabelSuccess             = "success"
 	LabelCtrlMsgType         = "control_message_type"
+	LabelMisbehavior         = "misbehavior"
 )
 
 const (
@@ -110,6 +111,7 @@ const (
 	ResourceTransactionResults         = "transaction_results"               // execution node
 	ResourceTransactionResultIndices   = "transaction_result_indices"        // execution node
 	ResourceTransactionResultByBlock   = "transaction_result_by_block"       // execution node
+	ResourceExecutionDataCache         = "execution_data_cache"              // access node
 )
 
 const (

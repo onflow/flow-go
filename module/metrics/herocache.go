@@ -90,6 +90,10 @@ func FollowerCacheMetrics(registrar prometheus.Registerer) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceFollowerEngine, ResourceFollowerPendingBlocksCache, registrar)
 }
 
+func AccessNodeExecutionDataCacheMetrics(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceAccess, ResourceExecutionDataCache, registrar)
+}
+
 func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometheus.Registerer) *HeroCacheCollector {
 
 	histogramNormalizedBucketSlotAvailable := prometheus.NewHistogram(prometheus.HistogramOpts{

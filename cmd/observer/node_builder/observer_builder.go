@@ -135,6 +135,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			MaxHeightRange:            backend.DefaultMaxHeightRange,
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
+			ArchiveAddressList:        nil,
 			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
 		},
 		rpcMetricsEnabled:         false,
@@ -566,7 +567,7 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 	}
 	anb := &ObserverServiceBuilder{
 		ObserverServiceConfig:   config,
-		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String()),
+		FlowNodeBuilder:         cmd.FlowNode("observer"),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
 	anb.FinalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
@@ -1037,6 +1038,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.rpcMetricsEnabled,
 			builder.apiRatelimits,
 			builder.apiBurstlimits,
+			builder.Me,
 		)
 		if err != nil {
 			return nil, err
