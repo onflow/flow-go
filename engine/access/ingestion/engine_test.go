@@ -116,9 +116,9 @@ func (suite *Suite) SetupTest() {
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(suite.T(), err)
 
-	finalizationDistributor := pubsub.NewFinalizationDistributor()
+	followerDistributor := pubsub.NewFollowerDistributor()
 
-	finalizedHeaderCache, err := synceng.NewFinalizedHeaderCache(log, suite.proto.state, finalizationDistributor)
+	finalizedHeaderCache, err := synceng.NewFinalizedHeaderCache(log, suite.proto.state, followerDistributor)
 	require.NoError(suite.T(), err)
 
 	rpcEngBuilder, err := rpc.NewBuilder(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,

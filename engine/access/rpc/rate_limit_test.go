@@ -117,10 +117,10 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	finalizationDistributor := pubsub.NewFinalizationDistributor()
+	followerDistributor := pubsub.NewFollowerDistributor()
 
 	var err error
-	finalizedHeaderCache, err := synceng.NewFinalizedHeaderCache(suite.log, suite.state, finalizationDistributor)
+	finalizedHeaderCache, err := synceng.NewFinalizedHeaderCache(suite.log, suite.state, followerDistributor)
 	require.NoError(suite.T(), err)
 
 	rpcEngBuilder, err := NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,

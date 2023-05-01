@@ -118,10 +118,10 @@ func (suite *RestAPITestSuite) SetupTest() {
 		RESTListenAddr:         unittest.DefaultAddress,
 	}
 
-	finalizationDistributor := pubsub.NewFinalizationDistributor()
+	followerDistributor := pubsub.NewFollowerDistributor()
 
 	var err error
-	finalizedHeaderCache, err := synceng.NewFinalizedHeaderCache(suite.log, suite.state, finalizationDistributor)
+	finalizedHeaderCache, err := synceng.NewFinalizedHeaderCache(suite.log, suite.state, followerDistributor)
 	require.NoError(suite.T(), err)
 
 	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,

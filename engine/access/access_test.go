@@ -52,27 +52,27 @@ import (
 
 type Suite struct {
 	suite.Suite
-	state                   *protocol.State
-	sealedSnapshot          *protocol.Snapshot
-	finalSnapshot           *protocol.Snapshot
-	epochQuery              *protocol.EpochQuery
-	params                  *protocol.Params
-	signerIndicesDecoder    *hsmock.BlockSignerDecoder
-	signerIds               flow.IdentifierList
-	log                     zerolog.Logger
-	net                     *mocknetwork.Network
-	request                 *module.Requester
-	collClient              *accessmock.AccessAPIClient
-	execClient              *accessmock.ExecutionAPIClient
-	me                      *module.Local
-	rootBlock               *flow.Header
-	sealedBlock             *flow.Header
-	finalizedBlock          *flow.Header
-	chainID                 flow.ChainID
-	metrics                 *metrics.NoopCollector
-	backend                 *backend.Backend
-	finalizationDistributor *pubsub.FinalizationDistributor
-	finalizedHeaderCache    *synceng.FinalizedHeaderCache
+	state                *protocol.State
+	sealedSnapshot       *protocol.Snapshot
+	finalSnapshot        *protocol.Snapshot
+	epochQuery           *protocol.EpochQuery
+	params               *protocol.Params
+	signerIndicesDecoder *hsmock.BlockSignerDecoder
+	signerIds            flow.IdentifierList
+	log                  zerolog.Logger
+	net                  *mocknetwork.Network
+	request              *module.Requester
+	collClient           *accessmock.AccessAPIClient
+	execClient           *accessmock.ExecutionAPIClient
+	me                   *module.Local
+	rootBlock            *flow.Header
+	sealedBlock          *flow.Header
+	finalizedBlock       *flow.Header
+	chainID              flow.ChainID
+	metrics              *metrics.NoopCollector
+	backend              *backend.Backend
+	followerDistributor  *pubsub.FollowerDistributor
+	finalizedHeaderCache *synceng.FinalizedHeaderCache
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -133,10 +133,10 @@ func (suite *Suite) SetupTest() {
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
 
-	suite.finalizationDistributor = pubsub.NewFinalizationDistributor()
+	suite.followerDistributor = pubsub.NewFollowerDistributor()
 
 	var err error
-	suite.finalizedHeaderCache, err = synceng.NewFinalizedHeaderCache(suite.log, suite.state, suite.finalizationDistributor)
+	suite.finalizedHeaderCache, err = synceng.NewFinalizedHeaderCache(suite.log, suite.state, suite.followerDistributor)
 	require.NoError(suite.T(), err)
 
 	unittest.RequireCloseBefore(suite.T(), suite.finalizedHeaderCache.Ready(), time.Second, "expect to start before timeout")
@@ -1256,7 +1256,7 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 
 		suite.finalizedBlock = newFinalizedBlock.Header
 		// report new finalized block to finalized blocks cache
-		suite.finalizationDistributor.OnFinalizedBlock(model.BlockFromFlow(suite.finalizedBlock))
+		suite.followerDistributor.OnFinalizedBlock(model.BlockFromFlow(suite.finalizedBlock))
 		time.Sleep(time.Millisecond * 100) // give enough time to process async event
 
 		resp, err = handler.GetBlockHeaderByID(context.Background(), req)
