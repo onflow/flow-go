@@ -11,5 +11,3 @@ cd flow-go
 git fetch
 
 git log  --merges --first-parent  --format=master:%H origin/master --since '1 week' | sort -R  | tee /opt/master.recent
-
-date +"Hello. The current date and time is %a %b %d %T %Z %Y" | tee -a /opt/hello.txt
