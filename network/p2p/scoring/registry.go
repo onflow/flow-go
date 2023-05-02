@@ -67,6 +67,13 @@ func DefaultGossipSubCtrlMsgPenaltyValue() GossipSubCtrlMsgPenaltyValue {
 	}
 }
 
+// GossipSubAppSpecificScoreRegistry is the registry for the application specific score of peers in the GossipSub protocol.
+// The application specific score is part of the overall score of a peer, and is used to determine the peer's score based
+// on its behavior related to the application (Flow protocol).
+// This registry holds the view of the local peer of the application specific score of other peers in the network based
+// on what it has observed from the network.
+// Similar to the GossipSub score, the application specific score is meant to be private to the local peer, and is not
+// shared with other peers in the network.
 type GossipSubAppSpecificScoreRegistry struct {
 	logger     zerolog.Logger
 	idProvider module.IdentityProvider
@@ -79,16 +86,42 @@ type GossipSubAppSpecificScoreRegistry struct {
 	mu        sync.Mutex
 }
 
+// GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
+// The configuration is used to initialize the registry.
 type GossipSubAppSpecificScoreRegistryConfig struct {
-	Logger        zerolog.Logger
-	Validator     p2p.SubscriptionValidator
+	Logger zerolog.Logger
+
+	// Validator is the subscription validator used to validate the subscriptions of peers, and determine if a peer is
+	// authorized to subscribe to a topic.
+	Validator p2p.SubscriptionValidator
+
+	// DecayFunction is the decay function used to decay the spam penalty of peers.
 	DecayFunction netcache.PreprocessorFunc
-	Penalty       GossipSubCtrlMsgPenaltyValue
-	IdProvider    module.IdentityProvider
-	Init          func() p2p.GossipSubSpamRecord
-	CacheFactory  func() p2p.GossipSubSpamRecordCache
+
+	// Penalty encapsulates the penalty unit for each control message type misbehaviour.
+	Penalty GossipSubCtrlMsgPenaltyValue
+
+	// IdProvider is the identity provider used to translate peer ids at the networking layer to Flow identifiers (if
+	// an authorized peer is found).
+	IdProvider module.IdentityProvider
+
+	// Init is a factory function that returns a new GossipSubSpamRecord. It is used to initialize the spam record of
+	// a peer when the peer is first observed by the local peer.
+	Init func() p2p.GossipSubSpamRecord
+
+	// CacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
+	// The cache is used to store the application specific penalty of peers.
+	CacheFactory func() p2p.GossipSubSpamRecordCache
 }
 
+// NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
+// Args:
+//
+//	config: the configuration for the registry.
+//
+// Returns:
+//
+//	a new GossipSubAppSpecificScoreRegistry.
 func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig) *GossipSubAppSpecificScoreRegistry {
 	reg := &GossipSubAppSpecificScoreRegistry{
 		logger:         config.Logger.With().Str("module", "app_score_registry").Logger(),
@@ -275,6 +308,9 @@ func DefaultDecayFunction() netcache.PreprocessorFunc {
 	}
 }
 
+// InitAppScoreRecordState initializes the gossipsub spam record state for a peer.
+// Returns:
+//   - a gossipsub spam record with the default decay value and 0 penalty.
 func InitAppScoreRecordState() p2p.GossipSubSpamRecord {
 	return p2p.GossipSubSpamRecord{
 		Decay:   defaultDecay,
