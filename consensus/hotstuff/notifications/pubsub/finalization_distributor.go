@@ -11,10 +11,6 @@ import (
 type OnBlockFinalizedConsumer = func(block *model.Block)
 type OnBlockIncorporatedConsumer = func(block *model.Block)
 
-type OnBlockFinalizedDistributor interface {
-	AddOnBlockFinalizedConsumer(consumer OnBlockFinalizedConsumer)
-}
-
 // FinalizationDistributor ingests finalization events from hotstuff and distributes it to subscribers.
 type FinalizationDistributor struct {
 	notifications.NoopConsumer

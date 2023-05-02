@@ -43,13 +43,13 @@ func NewUnsubscribedFinalizationActor() *FinalizationActor {
 }
 
 // CreateWorker embeds the OnBlockFinalized handler function into the actor, which
-// means it is ready for use. A worker function is returned which must be added
+// means it is ready for use. A worker function is returned which should be added
 // to a ComponentBuilder during construction of the higher-level component.
 // One FinalizationActor instance provides exactly one worker, so CreateWorker will
 // panic if it is called more than once.
 func (actor *FinalizationActor) CreateWorker(handler OnBlockFinalized) component.ComponentWorker {
 	if actor.handler != nil {
-		panic("invoked CreateWorker twice")
+		panic("invoked CreatedWorker twice")
 	}
 	actor.handler = handler
 	return actor.worker
