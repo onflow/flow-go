@@ -33,7 +33,7 @@ func NewFollowerLoop(log zerolog.Logger, forks Forks) (*FollowerLoop, error) {
 	// the compliance layer. Generally, the follower loop should be able to process inbound blocks faster
 	// than they pass through the compliance layer. Nevertheless, in the worst case we will fill the
 	// channel and block the compliance layer's workers. Though, that should happen only if compliance
-	// engine receives large number of blocks in short periods of time (e.g. when catching up for).
+	// engine receives large number of blocks in short periods of time (e.g. when catching up).
 	// TODO(active-pacemaker) add metrics for length of inbound channels
 	certifiedBlocks := make(chan *model.CertifiedBlock, 1000)
 

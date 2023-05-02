@@ -423,7 +423,7 @@ func TestDoubleProposal(t *testing.T) {
 }
 
 // TestConflictingQCs checks that adding 2 conflicting QCs should return model.ByzantineThresholdExceededError
-// We ingest the the following block tree:
+// We ingest the following block tree:
 //
 //	[◄(1) 2] [◄(2) 3]   [◄(3) 4]  [◄(4) 6]
 //	         [◄(2) 3']  [◄(3') 5]

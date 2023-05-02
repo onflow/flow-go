@@ -10,7 +10,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// BlockScanner describes a function for ingesting pending blocks
+// BlockScanner describes a function for ingesting pending blocks.
+// Any returned errors are considered fatal. 
 type BlockScanner func(proposal *model.Proposal) error
 
 // Recover is a utility method for recovering the HotStuff state after a restart.
@@ -58,7 +59,7 @@ func ForksState(forks hotstuff.Forks) BlockScanner {
 
 // VoteAggregatorState recovers the VoteAggregator's internal state as follows:
 //   - Add all blocks descending from the latest finalized block to accept votes.
-//     Those blocks should be rapidly pruned. As the node catches up.
+//     Those blocks should be rapidly pruned as the node catches up.
 //
 // Caution: input blocks must be valid.
 func VoteAggregatorState(voteAggregator hotstuff.VoteAggregator) BlockScanner {

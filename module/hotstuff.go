@@ -45,7 +45,7 @@ type HotStuff interface {
 // all nodes other than consensus generally require the Source Of Randomness included in
 // QCs to process the block in the first place.
 //
-// The central purpose of the HotStuffFollower is to informs other components within the
+// The central purpose of the HotStuffFollower is to inform other components within the
 // node about finalization of blocks.
 //
 // Notes:
@@ -65,8 +65,8 @@ type HotStuffFollower interface {
 	// Notes:
 	//  - Under normal operations, this method is non-blocking. The follower internally
 	//    queues incoming blocks and processes them in its own worker routine. However,
-	//    when the inbound queue is, we block until there is space in the queue. This
-	//    behaviours is intentional, because we cannot drop blocks (otherwise, we would
+	//    when the inbound queue is full, we block until there is space in the queue. This
+	//    behaviour is intentional, because we cannot drop blocks (otherwise, we would
 	//    cause disconnected blocks). Instead we simply block the compliance layer to
 	//    avoid any pathological edge cases.
 	//  - Blocks whose views are below the latest finalized view are dropped.
