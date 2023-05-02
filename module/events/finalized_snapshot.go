@@ -1,4 +1,4 @@
-package synchronization
+package events
 
 import (
 	"fmt"

@@ -384,17 +384,13 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				return nil, fmt.Errorf("could not create follower core: %w", err)
 			}
 
-			final, err := node.State.Final().Head()
-			if err != nil {
-				return nil, fmt.Errorf("could not get finalized header: %w", err)
-			}
 			followerEng, err = followereng.NewComplianceLayer(
 				node.Logger,
 				node.Network,
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
-				final,
+				node.FinalizedHeader,
 				core,
 				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
