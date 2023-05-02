@@ -20,6 +20,13 @@ type ProtocolPeerCache interface {
 	GetPeers(pid protocol.ID) map[peer.ID]struct{}
 }
 
+// AdjustFunction is a function that adjusts the GossipSub spam record of a peer.
+// Args:
+// - record: the GossipSubSpamRecord of the peer.
+// Returns:
+// - *GossipSubSpamRecord: the adjusted GossipSubSpamRecord of the peer.
+type AdjustFunction func(record GossipSubSpamRecord) GossipSubSpamRecord
+
 // GossipSubSpamRecordCache is a cache for storing the GossipSub spam records of peers.
 // The spam records of peers is used to calculate the application specific score, which is part of the GossipSub score of a peer.
 // Note that none of the spam records, application specific score, and GossipSub score are shared publicly with other peers.
@@ -52,7 +59,7 @@ type GossipSubSpamRecordCache interface {
 	// Returns:
 	// - *GossipSubSpamRecord: the updated record.
 	// - error on failure to update the record. The returned error is irrecoverable and indicates an exception.
-	Adjust(peerID peer.ID, adjustFn func(record GossipSubSpamRecord) GossipSubSpamRecord) (*GossipSubSpamRecord, error)
+	Adjust(peerID peer.ID, function AdjustFunction) (*GossipSubSpamRecord, error)
 
 	// Has returns true if the cache contains the GossipSubSpamRecord of the given peer.
 	// Args:
