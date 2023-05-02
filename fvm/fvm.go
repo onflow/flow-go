@@ -100,9 +100,6 @@ type Procedure interface {
 	// For transactions, the execution time is TxIndex.  For scripts, the
 	// execution time is EndOfBlockExecutionTime.
 	ExecutionTime() logical.Time
-
-	// TODO(patrick): deprecated this.
-	SetOutput(output ProcedureOutput)
 }
 
 // VM runs procedures
@@ -128,19 +125,6 @@ type VirtualMachine struct {
 
 func NewVirtualMachine() *VirtualMachine {
 	return &VirtualMachine{}
-}
-
-// TODO(patrick): rm after updating emulator
-func (vm *VirtualMachine) RunV2(
-	ctx Context,
-	proc Procedure,
-	storageSnapshot snapshot.StorageSnapshot,
-) (
-	*snapshot.ExecutionSnapshot,
-	ProcedureOutput,
-	error,
-) {
-	return vm.Run(ctx, proc, storageSnapshot)
 }
 
 // Run runs a procedure against a ledger in the given context.
