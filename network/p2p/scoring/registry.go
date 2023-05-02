@@ -2,7 +2,6 @@ package scoring
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -83,7 +82,6 @@ type GossipSubAppSpecificScoreRegistry struct {
 	// initial application specific penalty record, used to initialize the penalty cache entry.
 	init      func() p2p.GossipSubSpamRecord
 	validator p2p.SubscriptionValidator
-	mu        sync.Mutex
 }
 
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
