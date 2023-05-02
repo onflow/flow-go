@@ -24,24 +24,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-type SetOnce[T any] struct {
-	t   T
-	set bool
-}
-
-func (s SetOnce[T]) Get() (T, bool) {
-	return s.t, s.set
-}
-
-func (s SetOnce[T]) Set(t T) bool {
-	if s.set {
-		return false
-	}
-	s.t = t
-	s.set = true
-	return true
-}
-
 // Builder is the builder for collection block payloads. Upon providing a
 // payload hash, it also memorizes the payload contents.
 //
