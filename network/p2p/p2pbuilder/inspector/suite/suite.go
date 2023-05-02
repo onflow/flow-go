@@ -25,6 +25,7 @@ type GossipSubInspectorSuite struct {
 // Args:
 //   - inspectors: the rpc inspectors that are used to inspect the gossipsub rpc messages.
 //   - ctrlMsgInspectDistributor: the notification distributor that is used to notify consumers when a misbehaving peer
+//
 // regarding gossipsub control messages is detected.
 // Returns:
 //   - the new GossipSubInspectorSuite.
