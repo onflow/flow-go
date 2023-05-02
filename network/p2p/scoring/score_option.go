@@ -91,6 +91,19 @@ const (
 
 	// defaultScoreCacheSize is the default size of the cache used to store the app specific penalty of peers.
 	defaultScoreCacheSize = 1000
+
+	// defaultDecayInterval is the default decay interval for the overall score of a peer at the GossipSub scoring
+	// system. It is the interval over which we decay the effect of past behavior. So that the effect of past behavior
+	// is not permanent.
+	defaultDecayInterval = 1 * time.Hour
+
+	// defaultDecayToZero is the default decay to zero for the overall score of a peer at the GossipSub scoring system.
+	// It defines the maximum value below which a peer scoring counter is reset to zero.
+	// This is to prevent the counter from decaying to a very small value.
+	// The default value is 0.01, which means that a counter will be reset to zero if it decays to 0.01.
+	// When a counter hits the DecayToZero threshold, it means that the peer did not exhibit the behavior
+	// for a long time, and we can reset the counter.
+	defaultDecayToZero = 0.01
 )
 
 // ScoreOption is a functional option for configuring the peer scoring system.
@@ -182,12 +195,11 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 		})
 	validator := NewSubscriptionValidator()
 	scoreRegistry := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
-		Logger:        logger,
-		DecayFunction: DefaultDecayFunction(),
-		Penalty:       DefaultGossipSubCtrlMsgPenaltyValue(),
-		Validator:     validator,
-		Init:          InitAppScoreRecordState,
-		IdProvider:    cfg.provider,
+		Logger:     logger,
+		Penalty:    DefaultGossipSubCtrlMsgPenaltyValue(),
+		Validator:  validator,
+		Init:       InitAppScoreRecordState,
+		IdProvider: cfg.provider,
 		CacheFactory: func() p2p.GossipSubSpamRecordCache {
 			return netcache.NewGossipSubSpamRecordCache(cfg.cacheSize, cfg.logger, cfg.cacheMetrics, DefaultDecayFunction())
 		},
@@ -260,13 +272,12 @@ func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 		SkipAtomicValidation: true,
 		// DecayInterval is the interval over which we decay the effect of past behavior. So that
 		// a good or bad behavior will not have a permanent effect on the penalty.
-		DecayInterval: time.Hour,
+		DecayInterval: defaultDecayInterval,
 		// DecayToZero defines the maximum value below which a peer scoring counter is reset to zero.
 		// This is to prevent the counter from decaying to a very small value.
-		// The default value is 0.01, which means that a counter will be reset to zero if it decays to 0.01.
 		// When a counter hits the DecayToZero threshold, it means that the peer did not exhibit the behavior
 		// for a long time, and we can reset the counter.
-		DecayToZero: 0.01,
+		DecayToZero: defaultDecayToZero,
 		// AppSpecificWeight is the weight of the application specific penalty.
 		AppSpecificWeight: DefaultAppSpecificScoreWeight,
 	}
