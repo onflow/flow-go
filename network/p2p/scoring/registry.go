@@ -248,7 +248,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 
 	// try initializing the application specific penalty for the peer if it is not yet initialized.
 	// this is done to avoid the case where the peer is not yet cached and the application specific penalty is not yet initialized.
-	// initialization is gone successful only if the peer is not yet cached.
+	// initialization is successful only if the peer is not yet cached.
 	initialized := r.spamScoreCache.Add(notification.PeerID, r.init())
 	lg.Trace().Bool("initialized", initialized).Msg("initialization attempt for application specific")
 
