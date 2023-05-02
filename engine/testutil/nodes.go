@@ -245,6 +245,7 @@ func CompleteStateFixture(
 		s.Setups,
 		s.EpochCommits,
 		s.Statuses,
+		s.VersionBeacons,
 		rootSnapshot,
 	)
 	require.NoError(t, err)

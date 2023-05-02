@@ -52,7 +52,20 @@ func TestFollowerHappyPath(t *testing.T) {
 		all := storageutil.StorageLayer(t, db)
 
 		// bootstrap root snapshot
-		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
+		state, err := pbadger.Bootstrap(
+			metrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.Statuses,
+			all.VersionBeacons,
+			rootSnapshot,
+		)
 		require.NoError(t, err)
 		mockTimer := util.MockBlockTimer()
 

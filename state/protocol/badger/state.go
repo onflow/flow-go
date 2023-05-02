@@ -32,6 +32,7 @@ type State struct {
 		commits  storage.EpochCommits
 		statuses storage.EpochStatuses
 	}
+	versionBeacons storage.VersionBeacons
 	// cache the root height because it cannot change over the lifecycle of a protocol state instance
 	rootHeight uint64
 	// cache the spork root block height because it cannot change over the lifecycle of a protocol state instance
@@ -69,6 +70,7 @@ func Bootstrap(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
+	versionBeacons storage.VersionBeacons,
 	root protocol.Snapshot,
 	options ...BootstrapConfigOptions,
 ) (*State, error) {
@@ -86,7 +88,19 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
-	state := newState(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses)
+	state := newState(
+		metrics,
+		db,
+		headers,
+		seals,
+		results,
+		blocks,
+		qcs,
+		setups,
+		commits,
+		statuses,
+		versionBeacons,
+	)
 
 	if err := IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
@@ -555,6 +569,7 @@ func OpenState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
+	versionBeacons storage.VersionBeacons,
 ) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db)
 	if err != nil {
@@ -563,7 +578,19 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	state := newState(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses)
+	state := newState(
+		metrics,
+		db,
+		headers,
+		seals,
+		results,
+		blocks,
+		qcs,
+		setups,
+		commits,
+		statuses,
+		versionBeacons,
+	)
 
 	// report last finalized and sealed block height
 	finalSnapshot := state.Final()
@@ -675,6 +702,7 @@ func newState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
+	versionBeacons storage.VersionBeacons,
 ) *State {
 	return &State{
 		metrics: metrics,
@@ -693,6 +721,7 @@ func newState(
 			commits:  commits,
 			statuses: statuses,
 		},
+		versionBeacons: versionBeacons,
 	}
 }
 

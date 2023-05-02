@@ -68,7 +68,20 @@ func (suite *SnapshotSuite) SetupTest() {
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	root := unittest.RootSnapshotFixture(participants)
 
-	suite.protoState, err = pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, root)
+	suite.protoState, err = pbadger.Bootstrap(
+		metrics,
+		suite.db,
+		all.Headers,
+		all.Seals,
+		all.Results,
+		all.Blocks,
+		all.QuorumCertificates,
+		all.Setups,
+		all.EpochCommits,
+		all.Statuses,
+		all.VersionBeacons,
+		root,
+	)
 	require.NoError(suite.T(), err)
 
 	suite.Require().Nil(err)
