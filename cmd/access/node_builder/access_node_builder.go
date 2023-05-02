@@ -314,10 +314,8 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 
 		followerCore, err := consensus.NewFollower(
 			node.Logger,
-			builder.Committee,
 			node.Storage.Headers,
 			final,
-			verifier,
 			builder.FinalizationDistributor,
 			node.RootBlock.Header,
 			node.RootQC,
