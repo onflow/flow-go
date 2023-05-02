@@ -15,7 +15,9 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
+	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/fork"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -50,6 +52,8 @@ type Builder struct {
 	db             *badger.DB
 	mainHeaders    storage.Headers
 	clusterHeaders storage.Headers
+	protoState     protocol.State
+	clusterState   clusterstate.State
 	payloads       storage.ClusterPayloads
 	transactions   mempool.Transactions
 	tracer         module.Tracer
@@ -62,10 +66,24 @@ type Builder struct {
 	epochFinalID        *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
 }
 
-func NewBuilder(db *badger.DB, tracer module.Tracer, mainHeaders storage.Headers, clusterHeaders storage.Headers, payloads storage.ClusterPayloads, transactions mempool.Transactions, log zerolog.Logger, epochCounter uint64, opts ...Opt) (*Builder, error) {
+func NewBuilder(
+	db *badger.DB,
+	tracer module.Tracer,
+	protoState protocol.State,
+	clusterState clusterstate.State,
+	mainHeaders storage.Headers,
+	clusterHeaders storage.Headers,
+	payloads storage.ClusterPayloads,
+	transactions mempool.Transactions,
+	log zerolog.Logger,
+	epochCounter uint64,
+	opts ...Opt,
+) (*Builder, error) {
 	b := Builder{
 		db:             db,
 		tracer:         tracer,
+		protoState:     protoState,
+		clusterState:   clusterState,
 		mainHeaders:    mainHeaders,
 		clusterHeaders: clusterHeaders,
 		payloads:       payloads,
@@ -211,40 +229,37 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	ctx.parentID = parentID
 	ctx.lookup = newTransactionLookup()
 
-	err := b.db.View(func(btx *badger.Txn) error {
-		var err error
-		ctx.parent, err = b.clusterHeaders.ByBlockID(parentID)
-		if err != nil {
-			return fmt.Errorf("could not get parent: %w", err)
-		}
-		ctx.limiter = newRateLimiter(b.config, ctx.parent.Height+1)
+	var err error
+	ctx.parent, err = b.clusterHeaders.ByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get parent: %w", err)
+	}
+	ctx.limiter = newRateLimiter(b.config, ctx.parent.Height+1)
 
-		// retrieve the finalized boundary ON THE CLUSTER CHAIN
-		ctx.clusterChainFinalizedBlock = new(flow.Header)
-		err = procedure.RetrieveLatestFinalizedClusterHeader(ctx.parent.ChainID, ctx.clusterChainFinalizedBlock)(btx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve cluster final: %w", err)
-		}
+	// retrieve the finalized boundary ON THE CLUSTER CHAIN
+	ctx.clusterChainFinalizedBlock, err = b.clusterState.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve cluster chain finalized header: %w", err)
+	}
 
-		// retrieve the height and ID of the latest finalized block ON THE MAIN CHAIN
-		// this is used as the reference point for transaction expiry
-		err = operation.RetrieveFinalizedHeight(&ctx.refChainFinalizedHeight)(btx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve main finalized height: %w", err)
-		}
-		err = operation.LookupBlockHeight(ctx.refChainFinalizedHeight, &ctx.refChainFinalizedID)(btx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve main finalized ID: %w", err)
-		}
+	// retrieve the height and ID of the latest finalized block ON THE MAIN CHAIN
+	// this is used as the reference point for transaction expiry
+	mainChainFinalizedHeader, err := b.protoState.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve main chain finalized header: %w", err)
+	}
+	ctx.refChainFinalizedHeight = mainChainFinalizedHeader.Height
+	ctx.refChainFinalizedID = mainChainFinalizedHeader.ID()
 
-		// if the epoch has ended and the final block is cached, use the cached values
-		if b.epochFinalHeight != nil && b.epochFinalID != nil {
-			ctx.refEpochFinalID = b.epochFinalID
-			ctx.refEpochFinalHeight = b.epochFinalHeight
-			return nil
-		}
+	// if the epoch has ended and the final block is cached, use the cached values
+	if b.epochFinalHeight != nil && b.epochFinalID != nil {
+		ctx.refEpochFinalID = b.epochFinalID
+		ctx.refEpochFinalHeight = b.epochFinalHeight
+		return ctx, nil
+	}
 
-		// otherwise, attempt to read them from storage
+	// otherwise, attempt to read them from storage
+	err = b.db.View(func(btx *badger.Txn) error {
 		var refEpochFinalHeight uint64
 		var refEpochFinalID flow.Identifier
 
@@ -265,6 +280,9 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 		// cache the values
 		b.epochFinalHeight = &refEpochFinalHeight
 		b.epochFinalID = &refEpochFinalID
+		// store the values in the build context
+		ctx.refEpochFinalID = b.epochFinalID
+		ctx.refEpochFinalHeight = b.epochFinalHeight
 
 		return nil
 	})
