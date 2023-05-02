@@ -115,7 +115,6 @@ type FollowerServiceBuilder struct {
 	Finalized               *flow.Header
 	Pending                 []*flow.Header
 	FollowerCore            module.HotStuffFollower
-	Validator               hotstuff.Validator
 	// for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -216,12 +215,7 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 		// state when the follower detects newly finalized blocks
 		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
 
-		packer := hotsignature.NewConsensusSigDataPacker(builder.Committee)
-		// initialize the verifier for the protocol consensus
-		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
-		builder.Validator = hotstuffvalidator.New(builder.Committee, verifier)
-
-		followerCore, err := consensus.NewFollower(node.Logger, builder.Committee, node.Storage.Headers, final, verifier,
+		followerCore, err := consensus.NewFollower(node.Logger, node.Storage.Headers, final,
 			builder.FinalizationDistributor, node.RootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize follower core: %w", err)
@@ -241,6 +235,10 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 			heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 		}
 
+		packer := hotsignature.NewConsensusSigDataPacker(builder.Committee)
+		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
+		val := hotstuffvalidator.New(builder.Committee, verifier) // verifier for HotStuff signature constructs (QCs, TCs, votes)
+
 		core, err := follower.NewComplianceCore(
 			node.Logger,
 			node.Metrics.Mempool,
@@ -248,7 +246,7 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 			builder.FinalizationDistributor,
 			builder.FollowerState,
 			builder.FollowerCore,
-			builder.Validator,
+			val,
 			builder.SyncCore,
 			node.Tracer,
 		)
