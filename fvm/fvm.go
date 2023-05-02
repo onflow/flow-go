@@ -6,14 +6,14 @@ import (
 
 	"github.com/onflow/cadence"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -88,7 +88,7 @@ func Run(executor ProcedureExecutor) error {
 type Procedure interface {
 	NewExecutor(
 		ctx Context,
-		txnState storage.Transaction,
+		txnState storage.TransactionPreparer,
 	) ProcedureExecutor
 
 	ComputationLimit(ctx Context) uint64
@@ -110,14 +110,14 @@ type VM interface {
 	Run(
 		Context,
 		Procedure,
-		state.StorageSnapshot,
+		snapshot.StorageSnapshot,
 	) (
-		*state.ExecutionSnapshot,
+		*snapshot.ExecutionSnapshot,
 		ProcedureOutput,
 		error,
 	)
 
-	GetAccount(Context, flow.Address, state.StorageSnapshot) (*flow.Account, error)
+	GetAccount(Context, flow.Address, snapshot.StorageSnapshot) (*flow.Account, error)
 }
 
 var _ VM = (*VirtualMachine)(nil)
@@ -134,9 +134,9 @@ func NewVirtualMachine() *VirtualMachine {
 func (vm *VirtualMachine) RunV2(
 	ctx Context,
 	proc Procedure,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	ProcedureOutput,
 	error,
 ) {
@@ -147,9 +147,9 @@ func (vm *VirtualMachine) RunV2(
 func (vm *VirtualMachine) Run(
 	ctx Context,
 	proc Procedure,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	ProcedureOutput,
 	error,
 ) {
@@ -159,13 +159,11 @@ func (vm *VirtualMachine) Run(
 			uint32(proc.ExecutionTime()))
 	}
 
-	var derivedTxnData derived.DerivedTransactionCommitter
+	var derivedTxnData *derived.DerivedTransactionData
 	var err error
 	switch proc.Type() {
 	case ScriptProcedureType:
-		derivedTxnData, err = derivedBlockData.NewSnapshotReadDerivedTransactionData(
-			proc.ExecutionTime(),
-			proc.ExecutionTime())
+		derivedTxnData = derivedBlockData.NewSnapshotReadDerivedTransactionData()
 	case TransactionProcedureType, BootstrapProcedureType:
 		derivedTxnData, err = derivedBlockData.NewDerivedTransactionData(
 			proc.ExecutionTime(),
@@ -182,17 +180,16 @@ func (vm *VirtualMachine) Run(
 			err)
 	}
 
-	// TODO(patrick): initialize view inside TransactionState
 	nestedTxn := state.NewTransactionState(
-		delta.NewDeltaView(storageSnapshot),
+		storageSnapshot,
 		state.DefaultParameters().
 			WithMeterParameters(getBasicMeterParameters(ctx, proc)).
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize))
 
 	txnState := &storage.SerialTransaction{
-		NestedTransaction:           nestedTxn,
-		DerivedTransactionCommitter: derivedTxnData,
+		NestedTransactionPreparer: nestedTxn,
+		DerivedTransactionData:    derivedTxnData,
 	}
 
 	executor := proc.NewExecutor(ctx, txnState)
@@ -201,16 +198,11 @@ func (vm *VirtualMachine) Run(
 		return nil, ProcedureOutput{}, err
 	}
 
-	// Note: it is safe to skip committing derived data for non-normal
-	// transactions (i.e., bootstrap and script) since these do not invalidate
-	// derived data entries.
-	if proc.Type() == TransactionProcedureType {
-		// NOTE: It is not safe to ignore derivedTxnData' commit error for
-		// transactions that trigger derived data invalidation.
-		err = derivedTxnData.Commit()
-		if err != nil {
-			return nil, ProcedureOutput{}, err
-		}
+	// NOTE: It is not safe to ignore derivedTxnData' commit error for
+	// transactions that trigger derived data invalidation.
+	err = derivedTxnData.Commit()
+	if err != nil {
+		return nil, ProcedureOutput{}, err
 	}
 
 	executionSnapshot, err := txnState.FinalizeMainTransaction()
@@ -225,14 +217,13 @@ func (vm *VirtualMachine) Run(
 func (vm *VirtualMachine) GetAccount(
 	ctx Context,
 	address flow.Address,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
 ) {
 	nestedTxn := state.NewTransactionState(
-		// TODO(patrick): initialize view inside TransactionState
-		delta.NewDeltaView(storageSnapshot),
+		storageSnapshot,
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
@@ -245,18 +236,11 @@ func (vm *VirtualMachine) GetAccount(
 		derivedBlockData = derived.NewEmptyDerivedBlockData()
 	}
 
-	derivedTxnData, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
-		logical.EndOfBlockExecutionTime,
-		logical.EndOfBlockExecutionTime)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"error creating derived transaction data for GetAccount: %w",
-			err)
-	}
+	derivedTxnData := derivedBlockData.NewSnapshotReadDerivedTransactionData()
 
 	txnState := &storage.SerialTransaction{
-		NestedTransaction:           nestedTxn,
-		DerivedTransactionCommitter: derivedTxnData,
+		NestedTransactionPreparer: nestedTxn,
+		DerivedTransactionData:    derivedTxnData,
 	}
 
 	env := environment.NewScriptEnv(

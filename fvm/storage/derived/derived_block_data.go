@@ -6,13 +6,13 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/state"
 )
 
-type DerivedTransaction interface {
+type DerivedTransactionPreparer interface {
 	GetOrComputeProgram(
-		txState state.NestedTransaction,
+		txState state.NestedTransactionPreparer,
 		addressLocation common.AddressLocation,
 		programComputer ValueComputer[common.AddressLocation, *Program],
 	) (
@@ -22,7 +22,7 @@ type DerivedTransaction interface {
 	GetProgram(location common.AddressLocation) (*Program, bool)
 
 	GetMeterParamOverrides(
-		txnState state.NestedTransaction,
+		txnState state.NestedTransactionPreparer,
 		getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
 	) (
 		MeterParamOverrides,
@@ -30,13 +30,6 @@ type DerivedTransaction interface {
 	)
 
 	AddInvalidator(invalidator TransactionInvalidator)
-}
-
-type DerivedTransactionCommitter interface {
-	DerivedTransaction
-
-	Validate() error
-	Commit() error
 }
 
 type Program struct {
@@ -101,38 +94,22 @@ func (block *DerivedBlockData) NewChildDerivedBlockData() *DerivedBlockData {
 	}
 }
 
-func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData(
-	snapshotTime logical.Time,
-	executionTime logical.Time,
-) (
-	DerivedTransactionCommitter,
-	error,
-) {
-	txnPrograms, err := block.programs.NewSnapshotReadTableTransaction(
-		snapshotTime,
-		executionTime)
-	if err != nil {
-		return nil, err
-	}
+func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData() *DerivedTransactionData {
+	txnPrograms := block.programs.NewSnapshotReadTableTransaction()
 
-	txnMeterParamOverrides, err := block.meterParamOverrides.NewSnapshotReadTableTransaction(
-		snapshotTime,
-		executionTime)
-	if err != nil {
-		return nil, err
-	}
+	txnMeterParamOverrides := block.meterParamOverrides.NewSnapshotReadTableTransaction()
 
 	return &DerivedTransactionData{
 		programs:            txnPrograms,
 		meterParamOverrides: txnMeterParamOverrides,
-	}, nil
+	}
 }
 
 func (block *DerivedBlockData) NewDerivedTransactionData(
 	snapshotTime logical.Time,
 	executionTime logical.Time,
 ) (
-	DerivedTransactionCommitter,
+	*DerivedTransactionData,
 	error,
 ) {
 	txnPrograms, err := block.programs.NewTableTransaction(
@@ -174,7 +151,7 @@ func (block *DerivedBlockData) CachedPrograms() int {
 }
 
 func (transaction *DerivedTransactionData) GetOrComputeProgram(
-	txState state.NestedTransaction,
+	txState state.NestedTransactionPreparer,
 	addressLocation common.AddressLocation,
 	programComputer ValueComputer[common.AddressLocation, *Program],
 ) (
@@ -213,7 +190,7 @@ func (transaction *DerivedTransactionData) AddInvalidator(
 }
 
 func (transaction *DerivedTransactionData) GetMeterParamOverrides(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
 ) (
 	MeterParamOverrides,

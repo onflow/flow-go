@@ -12,10 +12,10 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -91,7 +91,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 	}
 
 	txnState := state.NewTransactionState(
-		delta.NewDeltaView(snapshot),
+		snapshot,
 		state.DefaultParameters())
 	gen := environment.NewAddressGenerator(txnState, r.Chain)
 	addressCount := gen.AddressCount()
@@ -124,7 +124,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload, commit ledger.State) 
 type balanceProcessor struct {
 	vm              fvm.VM
 	ctx             fvm.Context
-	storageSnapshot state.StorageSnapshot
+	storageSnapshot snapshot.StorageSnapshot
 	env             environment.Environment
 	balanceScript   []byte
 	momentsScript   []byte
@@ -138,7 +138,7 @@ type balanceProcessor struct {
 
 func NewBalanceReporter(
 	chain flow.Chain,
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) *balanceProcessor {
 	vm := fvm.NewVirtualMachine()
 	ctx := fvm.NewContext(
@@ -163,7 +163,7 @@ func newAccountDataProcessor(
 	rwc ReportWriter,
 	rwm ReportWriter,
 	chain flow.Chain,
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) *balanceProcessor {
 	bp := NewBalanceReporter(chain, snapshot)
 

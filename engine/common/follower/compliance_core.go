@@ -268,8 +268,11 @@ func (c *ComplianceCore) processCertifiedBlocks(ctx context.Context, blocks Cert
 			return fmt.Errorf("could not extend protocol state with certified block: %w", err)
 		}
 
-		hotstuffProposal := model.ProposalFromFlow(certifiedBlock.Block.Header)
-		c.follower.SubmitProposal(hotstuffProposal) // submit the model to follower for async processing
+		b, err := model.NewCertifiedBlock(model.BlockFromFlow(certifiedBlock.Block.Header), certifiedBlock.CertifyingQC)
+		if err != nil {
+			return fmt.Errorf("failed to convert certified block %v to HotStuff type: %w", certifiedBlock.Block.ID(), err)
+		}
+		c.follower.AddCertifiedBlock(&b) // submit the model to follower for async processing
 	}
 	return nil
 }

@@ -332,14 +332,9 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return committee, err
 		}).
 		Component("follower core", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
 			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
-
-			packer := hotsignature.NewConsensusSigDataPacker(committee)
-			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(committee, packer)
 
 			finalized, pending, err := recoveryprotocol.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
@@ -352,10 +347,8 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			// so that it gets notified upon each new finalized block
 			followerCore, err = flowconsensus.NewFollower(
 				node.Logger,
-				committee,
 				node.Storage.Headers,
 				final,
-				verifier,
 				followerDistributor,
 				node.RootBlock.Header,
 				node.RootQC,

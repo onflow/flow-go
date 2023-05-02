@@ -38,7 +38,7 @@ type TransactionProcedure struct {
 
 func (proc *TransactionProcedure) NewExecutor(
 	ctx Context,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) ProcedureExecutor {
 	return newTransactionExecutor(ctx, proc, txnState)
 }
