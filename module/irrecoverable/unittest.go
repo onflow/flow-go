@@ -24,3 +24,8 @@ func NewMockSignalerContext(t *testing.T, ctx context.Context) *MockSignalerCont
 		t:       t,
 	}
 }
+
+func NewMockSignalerContextWithCancel(t *testing.T, parent context.Context) (*MockSignalerContext, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(parent)
+	return NewMockSignalerContext(t, ctx), cancel
+}
