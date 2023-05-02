@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -14,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/events"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
@@ -28,17 +28,15 @@ const defaultBlockQueueCapacity = 10_000
 // Implements collection.Compliance interface.
 type Engine struct {
 	*component.ComponentManager
-	log                    zerolog.Logger
-	metrics                module.EngineMetrics
-	me                     module.Local
-	headers                storage.Headers
-	payloads               storage.ClusterPayloads
-	state                  protocol.State
-	core                   *Core
-	pendingBlocks          *fifoqueue.FifoQueue // queue for processing inbound blocks
-	pendingBlocksNotifier  engine.Notifier
-	finalizedBlockTracker  *tracker.NewestBlockTracker
-	finalizedBlockNotifier engine.Notifier
+	log                   zerolog.Logger
+	metrics               module.EngineMetrics
+	me                    module.Local
+	headers               storage.Headers
+	payloads              storage.ClusterPayloads
+	state                 protocol.State
+	core                  *Core
+	pendingBlocks         *fifoqueue.FifoQueue // queue for processing inbound blocks
+	pendingBlocksNotifier engine.Notifier
 }
 
 var _ collection.Compliance = (*Engine)(nil)
@@ -49,6 +47,7 @@ func NewEngine(
 	state protocol.State,
 	payloads storage.ClusterPayloads,
 	core *Core,
+	actor *events.FinalizationActor,
 ) (*Engine, error) {
 	engineLog := log.With().Str("cluster_compliance", "engine").Logger()
 
@@ -64,23 +63,21 @@ func NewEngine(
 	}
 
 	eng := &Engine{
-		log:                    engineLog,
-		metrics:                core.engineMetrics,
-		me:                     me,
-		headers:                core.headers,
-		payloads:               payloads,
-		state:                  state,
-		core:                   core,
-		pendingBlocks:          blocksQueue,
-		pendingBlocksNotifier:  engine.NewNotifier(),
-		finalizedBlockTracker:  tracker.NewNewestBlockTracker(),
-		finalizedBlockNotifier: engine.NewNotifier(),
+		log:                   engineLog,
+		metrics:               core.engineMetrics,
+		me:                    me,
+		headers:               core.headers,
+		payloads:              payloads,
+		state:                 state,
+		core:                  core,
+		pendingBlocks:         blocksQueue,
+		pendingBlocksNotifier: engine.NewNotifier(),
 	}
 
 	// create the component manager and worker threads
 	eng.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(eng.processBlocksLoop).
-		AddWorker(eng.finalizationProcessingLoop).
+		AddWorker(actor.CreateWorker(eng.handleFinalizedBlock)).
 		Build()
 
 	return eng, nil
@@ -133,17 +130,6 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 	}
 }
 
-// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-// It informs compliance.Core about finalization of the respective block.
-//
-// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
-// from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(block *model.Block) {
-	if e.finalizedBlockTracker.Track(block) {
-		e.finalizedBlockNotifier.Notify()
-	}
-}
-
 // OnClusterBlockProposal feeds a new block proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
 func (e *Engine) OnClusterBlockProposal(proposal flow.Slashable[*messages.ClusterBlockProposal]) {
@@ -166,23 +152,12 @@ func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[*messages.Clust
 	}
 }
 
-// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
-func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
-	doneSignal := ctx.Done()
-	blockFinalizedSignal := e.finalizedBlockNotifier.Channel()
-	for {
-		select {
-		case <-doneSignal:
-			return
-		case <-blockFinalizedSignal:
-			// retrieve the latest finalized header, so we know the height
-			finalHeader, err := e.headers.ByBlockID(e.finalizedBlockTracker.NewestBlock().BlockID)
-			if err != nil { // no expected errors
-				ctx.Throw(err)
-			}
-			e.core.ProcessFinalizedBlock(finalHeader)
-		}
+func (e *Engine) handleFinalizedBlock(block *model.Block) error {
+	// retrieve the latest finalized header, so we know the height
+	finalHeader, err := e.headers.ByBlockID(block.BlockID)
+	if err != nil { // no expected errors
+		return fmt.Errorf("could not get finalized header: %w", err)
 	}
+	e.core.ProcessFinalizedBlock(finalHeader)
+	return nil
 }

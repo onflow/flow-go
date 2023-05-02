@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/events"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
@@ -49,6 +50,7 @@ type EngineSuite struct {
 	errs   <-chan error
 
 	engine *Engine
+	actor  *events.FinalizationActor
 }
 
 func (cs *EngineSuite) SetupTest() {
@@ -133,7 +135,8 @@ func (cs *EngineSuite) SetupTest() {
 		nil,
 	)
 
-	e, err := NewEngine(unittest.Logger(), cs.me, cs.protoState, cs.payloads, cs.core)
+	cs.actor = events.NewUnsubscribedFinalizationActor()
+	e, err := NewEngine(unittest.Logger(), cs.me, cs.protoState, cs.payloads, cs.core, cs.actor)
 	require.NoError(cs.T(), err)
 	cs.engine = e
 
@@ -224,6 +227,6 @@ func (cs *EngineSuite) TestOnFinalizedBlock() {
 		Run(func(_ mock.Arguments) { wg.Done() }).
 		Return(uint(0)).Once()
 
-	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock.Header))
+	cs.actor.OnBlockFinalized(model.BlockFromFlow(finalizedBlock.Header))
 	unittest.AssertReturnsBefore(cs.T(), wg.Wait, time.Second, "an expected call to block buffer wasn't made")
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chainsync"
 	modulecompliance "github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/events"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
@@ -65,6 +66,7 @@ func (f *ComplianceEngineFactory) Create(
 	hot module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
+	actor *events.FinalizationActor,
 	validator hotstuff.Validator,
 ) (*compliance.Engine, error) {
 
@@ -95,6 +97,7 @@ func (f *ComplianceEngineFactory) Create(
 		f.protoState,
 		payloads,
 		core,
+		actor,
 	)
 	return engine, err
 }
