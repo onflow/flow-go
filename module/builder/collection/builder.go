@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/fork"
@@ -20,6 +21,24 @@ import (
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	"github.com/onflow/flow-go/utils/logging"
 )
+
+type SetOnce[T any] struct {
+	t   T
+	set bool
+}
+
+func (s SetOnce[T]) Get() (T, bool) {
+	return s.t, s.set
+}
+
+func (s SetOnce[T]) Set(t T) bool {
+	if s.set {
+		return false
+	}
+	s.t = t
+	s.set = true
+	return true
+}
 
 // Builder is the builder for collection block payloads. Upon providing a
 // payload hash, it also memorizes the payload contents.
@@ -37,6 +56,10 @@ type Builder struct {
 	config         Config
 	log            zerolog.Logger
 	clusterEpoch   uint64 // the operating epoch for this cluster
+	// cache of values about the operating epoch which never change
+	refEpochFirstHeight uint64           // first height of this cluster's operating epoch
+	epochFinalHeight    *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
+	epochFinalID        *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
 }
 
 func NewBuilder(db *badger.DB, tracer module.Tracer, mainHeaders storage.Headers, clusterHeaders storage.Headers, payloads storage.ClusterPayloads, transactions mempool.Transactions, log zerolog.Logger, epochCounter uint64, opts ...Opt) (*Builder, error) {
@@ -50,6 +73,11 @@ func NewBuilder(db *badger.DB, tracer module.Tracer, mainHeaders storage.Headers
 		config:         DefaultConfig(),
 		log:            log.With().Str("component", "cluster_builder").Logger(),
 		clusterEpoch:   epochCounter,
+	}
+
+	err := db.View(operation.RetrieveEpochFirstHeight(epochCounter, &b.refEpochFirstHeight))
+	if err != nil {
+		return nil, fmt.Errorf("could not get epoch first height: %w", err)
 	}
 
 	for _, apply := range opts {
@@ -70,7 +98,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	parentSpan, ctx := b.tracer.StartSpanFromContext(context.Background(), trace.COLBuildOn)
 	defer parentSpan.End()
 
-	// STEP ONE: build a lookup for excluding duplicated transactions.
+	// STEP 1: build a lookup for excluding duplicated transactions.
 	// This is briefly how it works:
 	//
 	// Let E be the global transaction expiry.
@@ -140,6 +168,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not populate finalized ancestry lookup: %w", err)
 	}
 
+	// STEP 2: build a payload of valid transactions, while at the same
+	// time figuring out the correct reference block ID for the collection.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnCreatePayload)
 	payload, err := b.buildPayload(buildCtx)
 	span.End()
@@ -147,6 +177,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not build payload: %w", err)
 	}
 
+	// STEP 3: we have a set of transactions that are valid to include on this fork.
+	// Now we create the header for the cluster block.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnCreateHeader)
 	header, err := b.buildHeader(buildCtx, payload, setter)
 	span.End()
@@ -159,6 +191,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		Payload: payload,
 	}
 
+	// STEP 4: insert the cluster block to the database.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
 	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(&proposal))
 	span.End()
@@ -203,12 +236,18 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 		if err != nil {
 			return fmt.Errorf("could not retrieve main finalized ID: %w", err)
 		}
-		// retrieve the height bounds of the operating epoch
-		err = operation.RetrieveEpochFirstHeight(b.clusterEpoch, &ctx.refEpochFirstHeight)(btx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve first height of operating epoch: %w", err)
+
+		// if the epoch has ended and the final block is cached, use the cached values
+		if b.epochFinalHeight != nil && b.epochFinalID != nil {
+			ctx.refEpochFinalID = b.epochFinalID
+			ctx.refEpochFinalHeight = b.epochFinalHeight
+			return nil
 		}
+
+		// otherwise, attempt to read them from storage
 		var refEpochFinalHeight uint64
+		var refEpochFinalID flow.Identifier
+
 		err = operation.RetrieveEpochLastHeight(b.clusterEpoch, &refEpochFinalHeight)(btx)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
@@ -216,14 +255,16 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 			}
 			return fmt.Errorf("unexpected failure to retrieve final height of operating epoch: %w", err)
 		}
-		ctx.refEpochFinalHeight = &refEpochFinalHeight
-
-		var refEpochFinalID flow.Identifier
 		err = operation.LookupBlockHeight(refEpochFinalHeight, &refEpochFinalID)(btx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve ID of final block of operating epoch: %w", err)
+			// if we are able to retrieve the epoch's final height, the block must be finalized
+			// therefore failing to look up its height here is an unexpected error
+			return irrecoverable.NewExceptionf("could not retrieve ID of finalized final block of operating epoch: %w", err)
 		}
-		ctx.refEpochFinalID = &refEpochFinalID
+
+		// cache the values
+		b.epochFinalHeight = &refEpochFinalHeight
+		b.epochFinalID = &refEpochFinalID
 
 		return nil
 	})
@@ -312,9 +353,6 @@ func (b *Builder) populateFinalizedAncestryLookup(ctx *blockBuildContext) error 
 
 	return nil
 }
-
-// STEP 2: build a payload of valid transactions, while at the same
-// time figuring out the correct reference block ID for the collection.
 
 // buildPayload constructs a valid payload based on transactions available in the mempool.
 // If the mempool is empty, an empty payload will be returned.
@@ -440,10 +478,6 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 		totalByteSize += txByteSize
 		totalGas += tx.GasLimit
 	}
-
-	// STEP FOUR: we have a set of transactions that are valid to include
-	// on this fork. Now we need to create the collection that will be
-	// used in the payload and construct the final proposal model
 
 	// build the payload from the transactions
 	payload := cluster.PayloadFromTransactions(minRefID, transactions...)
