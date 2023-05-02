@@ -11,7 +11,7 @@ import (
 )
 
 // BlockScanner describes a function for ingesting pending blocks.
-// Any returned errors are considered fatal. 
+// Any returned errors are considered fatal.
 type BlockScanner func(proposal *model.Proposal) error
 
 // Recover is a utility method for recovering the HotStuff state after a restart.
