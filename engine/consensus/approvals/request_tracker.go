@@ -1,8 +1,6 @@
 package approvals
 
 import (
-	"crypto/rand"
-	"encoding/binary"
 	"fmt"
 	"sync"
 	"time"
@@ -10,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -44,28 +43,28 @@ func NewRequestTrackerItem(blackoutPeriodMin, blackoutPeriodMax int) (RequestTra
 }
 
 // Update creates a _new_ RequestTrackerItem with incremented request number and updated NextTimeout.
+// No errors are expected during normal operation.
 func (i RequestTrackerItem) Update() (RequestTrackerItem, error) {
 	i.Requests++
 	var err error
 	i.NextTimeout, err = randBlackout(i.blackoutPeriodMin, i.blackoutPeriodMax)
 	if err != nil {
-		return RequestTrackerItem{}, err
+		return RequestTrackerItem{}, fmt.Errorf("could not get next timeout: %w", err)
 	}
-	return i, err
+	return i, nil
 }
 
 func (i RequestTrackerItem) IsBlackout() bool {
 	return time.Now().Before(i.NextTimeout)
 }
 
+// No errors are expected during normal operation.
 func randBlackout(min int, max int) (time.Time, error) {
-	buff := make([]byte, 8)
-	if _, err := rand.Read(buff); err != nil {
-		return time.Now(), fmt.Errorf("failed to generate randomness")
+	random, err := rand.Uint64n(uint64(max - min + 1))
+	if err != nil {
+		return time.Now(), fmt.Errorf("failed to generate blackout: %w", err)
 	}
-	rand := binary.LittleEndian.Uint64(buff)
-
-	blackoutSeconds := rand%uint64(max-min+1) + uint64(min)
+	blackoutSeconds := random + uint64(min)
 	blackout := time.Now().Add(time.Duration(blackoutSeconds) * time.Second)
 	return blackout, nil
 }
