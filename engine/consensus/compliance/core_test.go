@@ -130,6 +130,13 @@ func (cs *CommonSuite) SetupTest() {
 			return nil
 		},
 	)
+	cs.headers.On("Exists", mock.Anything).Return(
+		func(blockID flow.Identifier) bool {
+			_, exists := cs.headerDB[blockID]
+			return exists
+		}, func(blockID flow.Identifier) error {
+			return nil
+		})
 
 	// set up payload storage mock
 	cs.payloads = &storage.Payloads{}
@@ -511,7 +518,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	}
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(parent, cs.head)
+	err := cs.core.processBlockAndDescendants(parent)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// make sure we drop the cache after trying to process

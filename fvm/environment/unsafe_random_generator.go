@@ -11,7 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -32,12 +32,12 @@ type unsafeRandomGenerator struct {
 }
 
 type ParseRestrictedUnsafeRandomGenerator struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 	impl     UnsafeRandomGenerator
 }
 
 func NewParseRestrictedUnsafeRandomGenerator(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	impl UnsafeRandomGenerator,
 ) UnsafeRandomGenerator {
 	return ParseRestrictedUnsafeRandomGenerator{
