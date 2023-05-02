@@ -12,7 +12,7 @@ import (
 func NewSimpleTransaction(
 	snapshot snapshot.StorageSnapshot,
 ) *storage.SerialTransaction {
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 	if err != nil {
 		panic(err)

@@ -261,7 +261,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		snapshotTree.Append(executionSnapshot),
 		state.DefaultParameters())
 
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
