@@ -3,7 +3,6 @@ package connection
 import (
 	"context"
 	"fmt"
-	"math/rand"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
@@ -12,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 const (
@@ -100,7 +100,7 @@ func (l *Libp2pConnector) connectToPeers(ctx context.Context, peerIDs peer.IDSli
 
 	// first shuffle, and then stuff all the peer.AddrInfo it into the channel.
 	// shuffling is not in place.
-	rand.Shuffle(len(peerIDs), func(i, j int) {
+	rand.Shuffle(uint(len(peerIDs)), func(i, j uint) {
 		peerIDs[i], peerIDs[j] = peerIDs[j], peerIDs[i]
 	})
 	for _, peerID := range peerIDs {
