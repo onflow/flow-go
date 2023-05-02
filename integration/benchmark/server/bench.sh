@@ -23,7 +23,7 @@ while read -r branch_hash; do
     echo "The current directory (middle of loop) is $PWD"
     make -C ../.. crypto_setup_gopath
     make stop
-#    rm -f docker-compose.nodes.yml
+    rm -f docker-compose.nodes.yml
     rm -rf data profiler trie
     make clean-data
     echo "The current directory (middle2 of loop) is $PWD"
