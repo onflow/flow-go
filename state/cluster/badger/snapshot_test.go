@@ -9,7 +9,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/onflow/flow-go/model/cluster"
@@ -31,8 +30,9 @@ type SnapshotSuite struct {
 	db    *badger.DB
 	dbdir string
 
-	genesis *model.Block
-	chainID flow.ChainID
+	genesis      *model.Block
+	chainID      flow.ChainID
+	epochCounter uint64
 
 	protoState protocol.State
 
@@ -58,15 +58,8 @@ func (suite *SnapshotSuite) SetupTest() {
 	all := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
-	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
-	suite.Assert().Nil(err)
-	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
-	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
-	suite.Assert().Nil(err)
-
-	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	root := unittest.RootSnapshotFixture(participants)
+	root := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
+	suite.epochCounter = root.Encodable().Epochs.Current.Counter
 
 	suite.protoState, err = pbadger.Bootstrap(
 		metrics,
@@ -82,9 +75,14 @@ func (suite *SnapshotSuite) SetupTest() {
 		all.VersionBeacons,
 		root,
 	)
-	require.NoError(suite.T(), err)
+	suite.Require().NoError(err)
 
-	suite.Require().Nil(err)
+	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
+	suite.Require().NoError(err)
+	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
+	suite.Require().NoError(err)
+	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
+	suite.Require().NoError(err)
 }
 
 // runs after each test finishes
