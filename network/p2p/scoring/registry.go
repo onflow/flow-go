@@ -243,8 +243,6 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 // The implementation must be concurrency safe, but can be blocking.
 func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(notification *p2p.InvCtrlMsgNotif) {
 	// we use mutex to ensure the method is concurrency safe.
-	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	lg := r.logger.With().
 		Str("peer_id", notification.PeerID.String()).
