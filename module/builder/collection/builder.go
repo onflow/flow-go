@@ -269,7 +269,7 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get block build context: %w", err)
 	}
 	return ctx, nil
 }

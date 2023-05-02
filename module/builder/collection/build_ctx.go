@@ -16,8 +16,8 @@ type blockBuildContext struct {
 	refEpochFinalHeight        *uint64          // last height of this cluster's operating epoch (nil if epoch not ended)
 	refEpochFinalID            *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
 	config                     Config
-	lookup                     *transactionLookup
 	limiter                    *rateLimiter
+	lookup                     *transactionLookup
 }
 
 // highestPossibleReferenceBlockHeight returns the height of the highest possible valid reference block.
