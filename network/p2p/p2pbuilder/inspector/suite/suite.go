@@ -23,11 +23,11 @@ type GossipSubInspectorSuite struct {
 // control messages is detected.
 // The suite is also a component, which is used to start and stop the rpc inspectors.
 // Args:
-// * inspectors: the rpc inspectors that are used to inspect the gossipsub rpc messages.
-// * ctrlMsgInspectDistributor: the notification distributor that is used to notify consumers when a misbehaving peer
+//   - inspectors: the rpc inspectors that are used to inspect the gossipsub rpc messages.
+//   - ctrlMsgInspectDistributor: the notification distributor that is used to notify consumers when a misbehaving peer
 // regarding gossipsub control messages is detected.
 // Returns:
-// * the new GossipSubInspectorSuite.
+//   - the new GossipSubInspectorSuite.
 func NewGossipSubInspectorSuite(inspectors []p2p.GossipSubRPCInspector, ctrlMsgInspectDistributor p2p.GossipSubInspectorNotifDistributor) *GossipSubInspectorSuite {
 	s := &GossipSubInspectorSuite{
 		ctrlMsgInspectDistributor: ctrlMsgInspectDistributor,
