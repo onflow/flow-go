@@ -334,14 +334,14 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			unittest.IdentifierFixture(),
 			executableBlock,
 			snapshot,
-			derived.NewEmptyDerivedBlockData())
+			derived.NewEmptyDerivedBlockData(0))
 		require.NoError(t, err)
 
-		for _, snapshot := range computationResult.StateSnapshots {
+		for _, snapshot := range computationResult.AllExecutionSnapshots() {
 			spockSecrets = append(spockSecrets, snapshot.SpockSecret)
 		}
 
-		chunkDataPacks = computationResult.ChunkDataPacks
+		chunkDataPacks = computationResult.AllChunkDataPacks()
 		result = &computationResult.ExecutionResult
 	})
 

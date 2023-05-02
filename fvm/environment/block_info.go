@@ -6,11 +6,11 @@ import (
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	storageTxn "github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/storage"
+	storageErr "github.com/onflow/flow-go/storage"
 )
 
 type BlockInfo interface {
@@ -28,12 +28,12 @@ type BlockInfo interface {
 }
 
 type ParseRestrictedBlockInfo struct {
-	txnState storageTxn.Transaction
+	txnState storage.TransactionPreparer
 	impl     BlockInfo
 }
 
 func NewParseRestrictedBlockInfo(
-	txnState storageTxn.Transaction,
+	txnState storage.TransactionPreparer,
 	impl BlockInfo,
 ) BlockInfo {
 	return ParseRestrictedBlockInfo{
@@ -145,7 +145,7 @@ func (info *blockInfo) GetBlockAtHeight(
 	header, err := info.blocks.ByHeightFrom(height, info.blockHeader)
 	// TODO (ramtin): remove dependency on storage and move this if condition
 	// to blockfinder
-	if errors.Is(err, storage.ErrNotFound) {
+	if errors.Is(err, storageErr.ErrNotFound) {
 		return runtime.Block{}, false, nil
 	} else if err != nil {
 		return runtime.Block{}, false, fmt.Errorf(

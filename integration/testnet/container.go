@@ -391,6 +391,7 @@ func (c *Container) OpenState() (*state.State, error) {
 	setups := storage.NewEpochSetups(metrics, db)
 	commits := storage.NewEpochCommits(metrics, db)
 	statuses := storage.NewEpochStatuses(metrics, db)
+	versionBeacons := storage.NewVersionBeacons(db)
 
 	return state.OpenState(
 		metrics,
@@ -403,6 +404,7 @@ func (c *Container) OpenState() (*state.State, error) {
 		setups,
 		commits,
 		statuses,
+		versionBeacons,
 	)
 }
 

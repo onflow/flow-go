@@ -7,18 +7,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/errors"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func newEmptyTestBlock() *DerivedDataTable[string, *string] {
-	return NewEmptyTable[string, *string]()
+	return NewEmptyTable[string, *string](0)
 }
 
 func TestDerivedDataTableWithTransactionOffset(t *testing.T) {
-	block := NewEmptyTableWithOffset[string, *string](18)
+	block := NewEmptyTable[string, *string](18)
 
 	require.Equal(
 		t,
@@ -60,30 +61,8 @@ func TestDerivedDataTableNormalTransactionInvalidSnapshotTime(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestDerivedDataTableSnapshotReadTransactionInvalidExecutionTimeBound(
-	t *testing.T,
-) {
-	block := newEmptyTestBlock()
-
-	_, err := block.NewSnapshotReadTableTransaction(
-		logical.ParentBlockTime,
-		logical.ParentBlockTime)
-	require.ErrorContains(t, err, "execution time out of bound")
-
-	_, err = block.NewSnapshotReadTableTransaction(logical.ParentBlockTime, 0)
-	require.NoError(t, err)
-
-	_, err = block.NewSnapshotReadTableTransaction(0, logical.ChildBlockTime)
-	require.ErrorContains(t, err, "execution time out of bound")
-
-	_, err = block.NewSnapshotReadTableTransaction(
-		0,
-		logical.EndOfBlockExecutionTime)
-	require.NoError(t, err)
-}
-
 func TestDerivedDataTableToValidateTime(t *testing.T) {
-	block := NewEmptyTableWithOffset[string, *string](8)
+	block := NewEmptyTable[string, *string](8)
 	require.Equal(
 		t,
 		logical.Time(7),
@@ -292,7 +271,7 @@ func TestDerivedDataTableValidateRejectOutOfOrderCommit(t *testing.T) {
 
 	validateErr = testTxn.Validate()
 	require.ErrorContains(t, validateErr, "non-increasing time")
-	require.False(t, validateErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(validateErr))
 }
 
 func TestDerivedDataTableValidateRejectNonIncreasingExecutionTime(t *testing.T) {
@@ -309,7 +288,7 @@ func TestDerivedDataTableValidateRejectNonIncreasingExecutionTime(t *testing.T) 
 
 	validateErr := testTxn.Validate()
 	require.ErrorContains(t, validateErr, "non-increasing time")
-	require.False(t, validateErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(validateErr))
 }
 
 func TestDerivedDataTableValidateRejectOutdatedReadSet(t *testing.T) {
@@ -327,7 +306,7 @@ func TestDerivedDataTableValidateRejectOutdatedReadSet(t *testing.T) {
 	key := "abc"
 	valueString := "value"
 	expectedValue := &valueString
-	expectedSnapshot := &state.ExecutionSnapshot{}
+	expectedSnapshot := &snapshot.ExecutionSnapshot{}
 
 	testSetupTxn1.SetForTestingOnly(key, expectedValue, expectedSnapshot)
 
@@ -354,7 +333,7 @@ func TestDerivedDataTableValidateRejectOutdatedReadSet(t *testing.T) {
 
 	validateErr = testTxn.Validate()
 	require.ErrorContains(t, validateErr, "outdated read set")
-	require.True(t, validateErr.IsRetryable())
+	require.True(t, errors.IsRetryableConflictError(validateErr))
 }
 
 func TestDerivedDataTableValidateRejectOutdatedWriteSet(t *testing.T) {
@@ -374,11 +353,11 @@ func TestDerivedDataTableValidateRejectOutdatedWriteSet(t *testing.T) {
 	require.NoError(t, err)
 
 	value := "value"
-	testTxn.SetForTestingOnly("key", &value, &state.ExecutionSnapshot{})
+	testTxn.SetForTestingOnly("key", &value, &snapshot.ExecutionSnapshot{})
 
 	validateErr := testTxn.Validate()
 	require.ErrorContains(t, validateErr, "outdated write set")
-	require.True(t, validateErr.IsRetryable())
+	require.True(t, errors.IsRetryableConflictError(validateErr))
 }
 
 func TestDerivedDataTableValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.T) {
@@ -397,58 +376,10 @@ func TestDerivedDataTableValidateIgnoreInvalidatorsOlderThanSnapshot(t *testing.
 	require.NoError(t, err)
 
 	value := "value"
-	testTxn.SetForTestingOnly("key", &value, &state.ExecutionSnapshot{})
+	testTxn.SetForTestingOnly("key", &value, &snapshot.ExecutionSnapshot{})
 
 	err = testTxn.Validate()
 	require.NoError(t, err)
-}
-
-func TestDerivedDataTableCommitEndOfBlockSnapshotRead(t *testing.T) {
-	block := newEmptyTestBlock()
-
-	commitTime := logical.Time(5)
-	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
-	require.NoError(t, err)
-
-	err = testSetupTxn.Commit()
-	require.NoError(t, err)
-
-	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
-
-	testTxn, err := block.NewSnapshotReadTableTransaction(
-		logical.EndOfBlockExecutionTime,
-		logical.EndOfBlockExecutionTime)
-	require.NoError(t, err)
-
-	err = testTxn.Commit()
-	require.NoError(t, err)
-
-	require.Equal(t, commitTime, block.LatestCommitExecutionTimeForTestingOnly())
-}
-
-func TestDerivedDataTableCommitSnapshotReadDontAdvanceTime(t *testing.T) {
-	block := newEmptyTestBlock()
-
-	commitTime := logical.Time(71)
-	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
-	require.NoError(t, err)
-
-	err = testSetupTxn.Commit()
-	require.NoError(t, err)
-
-	repeatedTime := commitTime + 1
-	for i := 0; i < 10; i++ {
-		txn, err := block.NewSnapshotReadTableTransaction(0, repeatedTime)
-		require.NoError(t, err)
-
-		err = txn.Commit()
-		require.NoError(t, err)
-	}
-
-	require.Equal(
-		t,
-		commitTime,
-		block.LatestCommitExecutionTimeForTestingOnly())
 }
 
 func TestDerivedDataTableCommitWriteOnlyTransactionNoInvalidation(t *testing.T) {
@@ -466,7 +397,7 @@ func TestDerivedDataTableCommitWriteOnlyTransactionNoInvalidation(t *testing.T) 
 
 	valueString := "stuff"
 	expectedValue := &valueString
-	expectedSnapshot := &state.ExecutionSnapshot{}
+	expectedSnapshot := &snapshot.ExecutionSnapshot{}
 
 	testTxn.SetForTestingOnly(key, expectedValue, expectedSnapshot)
 
@@ -515,7 +446,7 @@ func TestDerivedDataTableCommitWriteOnlyTransactionWithInvalidation(t *testing.T
 
 	valueString := "blah"
 	expectedValue := &valueString
-	expectedSnapshot := &state.ExecutionSnapshot{}
+	expectedSnapshot := &snapshot.ExecutionSnapshot{}
 
 	testTxn.SetForTestingOnly(key, expectedValue, expectedSnapshot)
 
@@ -563,7 +494,7 @@ func TestDerivedDataTableCommitUseOriginalEntryOnDuplicateWriteEntries(t *testin
 	key := "17"
 	valueString := "foo"
 	expectedValue := &valueString
-	expectedSnapshot := &state.ExecutionSnapshot{}
+	expectedSnapshot := &snapshot.ExecutionSnapshot{}
 
 	testSetupTxn.SetForTestingOnly(key, expectedValue, expectedSnapshot)
 
@@ -578,7 +509,7 @@ func TestDerivedDataTableCommitUseOriginalEntryOnDuplicateWriteEntries(t *testin
 
 	otherString := "other"
 	otherValue := &otherString
-	otherSnapshot := &state.ExecutionSnapshot{}
+	otherSnapshot := &snapshot.ExecutionSnapshot{}
 
 	testTxn.SetForTestingOnly(key, otherValue, otherSnapshot)
 
@@ -611,14 +542,14 @@ func TestDerivedDataTableCommitReadOnlyTransactionNoInvalidation(t *testing.T) {
 	key1 := "key1"
 	valStr1 := "value1"
 	expectedValue1 := &valStr1
-	expectedSnapshot1 := &state.ExecutionSnapshot{}
+	expectedSnapshot1 := &snapshot.ExecutionSnapshot{}
 
 	testSetupTxn.SetForTestingOnly(key1, expectedValue1, expectedSnapshot1)
 
 	key2 := "key2"
 	valStr2 := "value2"
 	expectedValue2 := &valStr2
-	expectedSnapshot2 := &state.ExecutionSnapshot{}
+	expectedSnapshot2 := &snapshot.ExecutionSnapshot{}
 
 	testSetupTxn.SetForTestingOnly(key2, expectedValue2, expectedSnapshot2)
 
@@ -695,14 +626,14 @@ func TestDerivedDataTableCommitReadOnlyTransactionWithInvalidation(t *testing.T)
 	key1 := "key1"
 	valStr1 := "v1"
 	expectedValue1 := &valStr1
-	expectedSnapshot1 := &state.ExecutionSnapshot{}
+	expectedSnapshot1 := &snapshot.ExecutionSnapshot{}
 
 	testSetupTxn2.SetForTestingOnly(key1, expectedValue1, expectedSnapshot1)
 
 	key2 := "key2"
 	valStr2 := "v2"
 	expectedValue2 := &valStr2
-	expectedSnapshot2 := &state.ExecutionSnapshot{}
+	expectedSnapshot2 := &snapshot.ExecutionSnapshot{}
 
 	testSetupTxn2.SetForTestingOnly(key2, expectedValue2, expectedSnapshot2)
 
@@ -768,7 +699,7 @@ func TestDerivedDataTableCommitValidateError(t *testing.T) {
 
 	commitErr := testTxn.Commit()
 	require.ErrorContains(t, commitErr, "non-increasing time")
-	require.False(t, commitErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(commitErr))
 }
 
 func TestDerivedDataTableCommitRejectCommitGapForNormalTxn(t *testing.T) {
@@ -794,68 +725,42 @@ func TestDerivedDataTableCommitRejectCommitGapForNormalTxn(t *testing.T) {
 
 	commitErr := testTxn.Commit()
 	require.ErrorContains(t, commitErr, "missing commit range [6, 10)")
-	require.False(t, commitErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(commitErr))
 }
 
-func TestDerivedDataTableCommitRejectCommitGapForSnapshotRead(t *testing.T) {
+func TestDerivedDataTableCommitSnapshotReadDontAdvanceTime(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	commitTime := logical.Time(5)
+	commitTime := logical.Time(71)
 	testSetupTxn, err := block.NewTableTransaction(0, commitTime)
 	require.NoError(t, err)
 
 	err = testSetupTxn.Commit()
 	require.NoError(t, err)
 
+	for i := 0; i < 10; i++ {
+		txn := block.NewSnapshotReadTableTransaction()
+
+		err = txn.Commit()
+		require.NoError(t, err)
+	}
+
 	require.Equal(
 		t,
 		commitTime,
-		block.LatestCommitExecutionTimeForTestingOnly())
-
-	testTxn, err := block.NewSnapshotReadTableTransaction(10, 10)
-	require.NoError(t, err)
-
-	err = testTxn.Validate()
-	require.NoError(t, err)
-
-	commitErr := testTxn.Commit()
-	require.ErrorContains(t, commitErr, "missing commit range [6, 10)")
-	require.False(t, commitErr.IsRetryable())
-}
-
-func TestDerivedDataTableCommitSnapshotReadDoesNotAdvanceCommitTime(t *testing.T) {
-	block := newEmptyTestBlock()
-
-	expectedTime := logical.Time(10)
-	testSetupTxn, err := block.NewTableTransaction(0, expectedTime)
-	require.NoError(t, err)
-
-	err = testSetupTxn.Commit()
-	require.NoError(t, err)
-
-	testTxn, err := block.NewSnapshotReadTableTransaction(0, 11)
-	require.NoError(t, err)
-
-	err = testTxn.Commit()
-	require.NoError(t, err)
-
-	require.Equal(
-		t,
-		expectedTime,
 		block.LatestCommitExecutionTimeForTestingOnly())
 }
 
 func TestDerivedDataTableCommitBadSnapshotReadInvalidator(t *testing.T) {
 	block := newEmptyTestBlock()
 
-	testTxn, err := block.NewSnapshotReadTableTransaction(0, 42)
-	require.NoError(t, err)
+	testTxn := block.NewSnapshotReadTableTransaction()
 
 	testTxn.AddInvalidator(&testInvalidator{invalidateAll: true})
 
 	commitErr := testTxn.Commit()
 	require.ErrorContains(t, commitErr, "snapshot read can't invalidate")
-	require.False(t, commitErr.IsRetryable())
+	require.False(t, errors.IsRetryableConflictError(commitErr))
 }
 
 func TestDerivedDataTableCommitFineGrainInvalidation(t *testing.T) {
@@ -869,12 +774,12 @@ func TestDerivedDataTableCommitFineGrainInvalidation(t *testing.T) {
 	readKey1 := "read-key-1"
 	readValStr1 := "read-value-1"
 	readValue1 := &readValStr1
-	readSnapshot1 := &state.ExecutionSnapshot{}
+	readSnapshot1 := &snapshot.ExecutionSnapshot{}
 
 	readKey2 := "read-key-2"
 	readValStr2 := "read-value-2"
 	readValue2 := &readValStr2
-	readSnapshot2 := &state.ExecutionSnapshot{}
+	readSnapshot2 := &snapshot.ExecutionSnapshot{}
 
 	testSetupTxn.SetForTestingOnly(readKey1, readValue1, readSnapshot1)
 	testSetupTxn.SetForTestingOnly(readKey2, readValue2, readSnapshot2)
@@ -902,12 +807,12 @@ func TestDerivedDataTableCommitFineGrainInvalidation(t *testing.T) {
 	writeKey1 := "write key 1"
 	writeValStr1 := "write value 1"
 	writeValue1 := &writeValStr1
-	writeSnapshot1 := &state.ExecutionSnapshot{}
+	writeSnapshot1 := &snapshot.ExecutionSnapshot{}
 
 	writeKey2 := "write key 2"
 	writeValStr2 := "write value 2"
 	writeValue2 := &writeValStr2
-	writeSnapshot2 := &state.ExecutionSnapshot{}
+	writeSnapshot2 := &snapshot.ExecutionSnapshot{}
 
 	testTxn.SetForTestingOnly(writeKey1, writeValue1, writeSnapshot1)
 	testTxn.SetForTestingOnly(writeKey2, writeValue2, writeSnapshot2)
@@ -988,7 +893,7 @@ func TestDerivedDataTableNewChildDerivedBlockData(t *testing.T) {
 	key := "foo bar"
 	valStr := "zzz"
 	value := &valStr
-	state := &state.ExecutionSnapshot{}
+	state := &snapshot.ExecutionSnapshot{}
 
 	txn.SetForTestingOnly(key, value, state)
 
@@ -1042,7 +947,7 @@ type testValueComputer struct {
 }
 
 func (computer *testValueComputer) Compute(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	key flow.RegisterID,
 ) (
 	int,
@@ -1058,14 +963,15 @@ func (computer *testValueComputer) Compute(
 }
 
 func TestDerivedDataTableGetOrCompute(t *testing.T) {
-	blockDerivedData := NewEmptyTable[flow.RegisterID, int]()
+	blockDerivedData := NewEmptyTable[flow.RegisterID, int](0)
 
 	key := flow.NewRegisterID("addr", "key")
 	value := 12345
 
 	t.Run("compute value", func(t *testing.T) {
-		view := delta.NewDeltaView(nil)
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := state.NewTransactionState(
+			nil,
+			state.DefaultParameters())
 
 		txnDerivedData, err := blockDerivedData.NewTableTransaction(0, 0)
 		assert.NoError(t, err)
@@ -1101,8 +1007,9 @@ func TestDerivedDataTableGetOrCompute(t *testing.T) {
 	})
 
 	t.Run("get value", func(t *testing.T) {
-		view := delta.NewDeltaView(nil)
-		txnState := state.NewTransactionState(view, state.DefaultParameters())
+		txnState := state.NewTransactionState(
+			nil,
+			state.DefaultParameters())
 
 		txnDerivedData, err := blockDerivedData.NewTableTransaction(1, 1)
 		assert.NoError(t, err)

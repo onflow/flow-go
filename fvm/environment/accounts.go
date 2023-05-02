@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -42,10 +42,10 @@ type Accounts interface {
 var _ Accounts = &StatefulAccounts{}
 
 type StatefulAccounts struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 }
 
-func NewAccounts(txnState state.NestedTransaction) *StatefulAccounts {
+func NewAccounts(txnState state.NestedTransactionPreparer) *StatefulAccounts {
 	return &StatefulAccounts{
 		txnState: txnState,
 	}

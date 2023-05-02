@@ -71,7 +71,7 @@ func NewScriptWithContextAndArgs(
 
 func (proc *ScriptProcedure) NewExecutor(
 	ctx Context,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) ProcedureExecutor {
 	return newScriptExecutor(ctx, proc, txnState)
 }
@@ -115,7 +115,7 @@ func (proc *ScriptProcedure) ExecutionTime() logical.Time {
 type scriptExecutor struct {
 	ctx      Context
 	proc     *ScriptProcedure
-	txnState storage.Transaction
+	txnState storage.TransactionPreparer
 
 	env environment.Environment
 
@@ -125,7 +125,7 @@ type scriptExecutor struct {
 func newScriptExecutor(
 	ctx Context,
 	proc *ScriptProcedure,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) *scriptExecutor {
 	return &scriptExecutor{
 		ctx:      ctx,
