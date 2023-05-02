@@ -262,6 +262,10 @@ func (m *MutableState) checkPayloadReferenceBlock(ctx extendContext) error {
 //   - no duplicate transaction exists along the fork being extended
 //   - the collection's reference block is equal to the oldest reference block among
 //     its constituent transactions
+//
+// Expected error returns:
+//   - state.InvalidExtensionError if the reference block is invalid for use.
+//   - state.UnverifiableExtensionError if the reference block is unknown.
 func (m *MutableState) checkPayloadTransactions(ctx extendContext) error {
 	block := ctx.candidate
 	payload := block.Payload
