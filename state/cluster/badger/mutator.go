@@ -43,7 +43,7 @@ func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers
 // extendContext encapsulates all state information required in order to validate a candidate cluster block.
 type extendContext struct {
 	candidate                *cluster.Block // the proposed candidate cluster block
-	finalizedClusterBlock    flow.Header    // the latest finalized cluster block
+	finalizedClusterBlock    *flow.Header   // the latest finalized cluster block
 	finalizedConsensusHeight uint64         // the latest finalized height on the main chain
 	epochFirstHeight         uint64         // the first height of this cluster's operating epoch
 	epochLastHeight          uint64         // the last height of this cluster's operating epoch (may be unknown)
@@ -59,7 +59,8 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 
 	err := m.State.db.View(func(tx *badger.Txn) error {
 		// get the latest finalized cluster block and latest finalized consensus height
-		err := procedure.RetrieveLatestFinalizedClusterHeader(candidate.Header.ChainID, &ctx.finalizedClusterBlock)(tx)
+		ctx.finalizedClusterBlock = new(flow.Header)
+		err := procedure.RetrieveLatestFinalizedClusterHeader(candidate.Header.ChainID, ctx.finalizedClusterBlock)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized cluster head: %w", err)
 		}
