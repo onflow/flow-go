@@ -705,9 +705,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	validator := new(mockhotstuff.Validator)
 	validator.On("ValidateProposal", mock.Anything).Return(nil)
 
-	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
-	require.NoError(t, err)
-
 	core, err := follower.NewComplianceCore(
 		node.Log,
 		node.Metrics,
@@ -720,13 +717,16 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Tracer,
 	)
 	require.NoError(t, err)
+
+	finalizedHeader, err := protoState.Final().Head()
+	require.NoError(t, err)
 	followerEng, err := follower.NewComplianceLayer(
 		node.Log,
 		node.Net,
 		node.Me,
 		node.Metrics,
 		node.Headers,
-		finalizedHeader.Get(),
+		finalizedHeader,
 		core,
 	)
 	require.NoError(t, err)

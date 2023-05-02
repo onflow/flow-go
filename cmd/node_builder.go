@@ -267,6 +267,8 @@ type NodeConfig struct {
 	RootSeal    *flow.Seal
 	RootChainID flow.ChainID
 	SporkID     flow.Identifier
+	// cached finalized block for use in bootstrapping
+	FinalizedHeader *flow.Header
 
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool

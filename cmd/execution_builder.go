@@ -197,7 +197,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("provider engine", exeNode.LoadProviderEngine).
 		Component("checker engine", exeNode.LoadCheckerEngine).
 		Component("ingestion engine", exeNode.LoadIngestionEngine).
-		Component("finalized snapshot", exeNode.LoadFinalizedSnapshot).
 		Component("consensus committee", exeNode.LoadConsensusCommittee).
 		Component("follower core", exeNode.LoadFollowerCore).
 		Component("follower engine", exeNode.LoadFollowerEngine).
@@ -917,7 +916,7 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		node.Me,
 		node.Metrics.Engine,
 		node.Storage.Headers,
-		exeNode.finalizedHeader.Get(),
+		exeNode.builder.FinalizedHeader,
 		core,
 		followereng.WithComplianceConfigOpt(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 	)
@@ -972,21 +971,6 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 		retrieve,
 	)
 	return eng, err
-}
-
-func (exeNode *ExecutionNode) LoadFinalizedSnapshot(
-	node *NodeConfig,
-) (
-	module.ReadyDoneAware,
-	error,
-) {
-	var err error
-	exeNode.finalizedHeader, err = synchronization.NewFinalizedHeaderCache(node.Logger, node.State, exeNode.finalizationDistributor)
-	if err != nil {
-		return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-	}
-
-	return exeNode.finalizedHeader, nil
 }
 
 func (exeNode *ExecutionNode) LoadSynchronizationEngine(
