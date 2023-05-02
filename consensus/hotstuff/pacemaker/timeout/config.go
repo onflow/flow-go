@@ -16,6 +16,9 @@ import (
 //   - On timeout: increase timeout by multiplicative factor `TimeoutAdjustmentFactor`. This
 //     results in exponentially growing timeout duration on multiple subsequent timeouts.
 //   - On progress: decrease timeout by multiplicative factor `TimeoutAdjustmentFactor.
+//
+// Config is implemented such that it can be passed by value, while still supporting updates of
+// `BlockRateDelayMS` at runtime (all configs share the same memory holding `BlockRateDelayMS`).
 type Config struct {
 	// MinReplicaTimeout is the minimum the timeout can decrease to [MILLISECONDS]
 	MinReplicaTimeout float64

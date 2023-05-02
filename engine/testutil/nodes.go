@@ -849,23 +849,14 @@ func (s *RoundRobinLeaderSelection) DKG(_ uint64) (hotstuff.DKG, error) {
 	return nil, fmt.Errorf("error")
 }
 
-func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState *badgerstate.FollowerState, notifier hotstuff.FinalizationConsumer,
-	rootHead *flow.Header, rootQC *flow.QuorumCertificate) (module.HotStuffFollower, *confinalizer.Finalizer) {
-
-	identities, err := node.State.AtHeight(0).Identities(filter.HasRole(flow.RoleConsensus))
-	require.NoError(t, err)
-
-	committee := &RoundRobinLeaderSelection{
-		identities: identities,
-		me:         node.Me.NodeID(),
-	}
-
-	// mock finalization updater
-	verifier := &mockhotstuff.Verifier{}
-	verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	verifier.On("VerifyTC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
+func createFollowerCore(
+	t *testing.T,
+	node *testmock.GenericNode,
+	followerState *badgerstate.FollowerState,
+	notifier hotstuff.FinalizationConsumer,
+	rootHead *flow.Header,
+	rootQC *flow.QuorumCertificate,
+) (module.HotStuffFollower, *confinalizer.Finalizer) {
 	finalizer := confinalizer.NewFinalizer(node.PublicDB, node.Headers, followerState, trace.NewNoopTracer())
 
 	pending := make([]*flow.Header, 0)
@@ -873,10 +864,8 @@ func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState 
 	// creates a consensus follower with noop consumer as the notifier
 	followerCore, err := consensus.NewFollower(
 		node.Log,
-		committee,
 		node.Headers,
 		finalizer,
-		verifier,
 		notifier,
 		rootHead,
 		rootQC,

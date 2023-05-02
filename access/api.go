@@ -29,7 +29,7 @@ type API interface {
 	SendTransaction(ctx context.Context, tx *flow.TransactionBody) error
 	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)
 	GetTransactionsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.TransactionBody, error)
-	GetTransactionResult(ctx context.Context, id flow.Identifier) (*TransactionResult, error)
+	GetTransactionResult(ctx context.Context, id flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier) (*TransactionResult, error)
 	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32) (*TransactionResult, error)
 	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*TransactionResult, error)
 
