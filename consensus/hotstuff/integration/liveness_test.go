@@ -220,12 +220,11 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 		t.Logf("dumping state of system:")
 		for i, inst := range instances {
 			t.Logf(
-				"instance %d: %d %d %d %d",
+				"instance %d: %d %d %d",
 				i,
 				inst.pacemaker.CurView(),
 				inst.pacemaker.NewestQC().View,
 				inst.forks.FinalizedBlock().View,
-				inst.forks.NewestView(),
 			)
 		}
 	}
