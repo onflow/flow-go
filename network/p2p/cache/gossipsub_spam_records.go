@@ -92,21 +92,21 @@ func (a *GossipSubSpamRecordCache) Add(peerId peer.ID, record p2p.GossipSubSpamR
 	})
 }
 
-// Adjust adjusts the GossipSub spam penalty of a peer in the cache. It assumes that a record already exists for the peer in the cache.
+// Update updates the GossipSub spam penalty of a peer in the cache. It assumes that a record already exists for the peer in the cache.
 // It first reads the record from the cache, applies the pre-processing functions to the record, and then applies the update function to the record.
 // The order of the pre-processing functions is the same as the order in which they were added to the cache.
 // Args:
 // - peerID: the peer ID of the peer in the GossipSub protocol.
-// - adjustFn: the adjust function to be applied to the record.
+// - updateFn: the update function to be applied to the record.
 // Returns:
 // - *GossipSubSpamRecord: the updated record.
 // - error on failure to update the record. The returned error is irrecoverable and indicates an exception.
 // Note that if any of the pre-processing functions returns an error, the record is reverted to its original state (prior to applying the update function).
-func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, adjustFn p2p.AdjustFunction) (*p2p.GossipSubSpamRecord, error) {
+func (a *GossipSubSpamRecordCache) Update(peerID peer.ID, updateFn p2p.UpdateFunction) (*p2p.GossipSubSpamRecord, error) {
 	// HeroCache uses flow.Identifier for keys, so reformat of the peer.ID
 	entityId := flow.HashToID([]byte(peerID))
 	if !a.c.Has(entityId) {
-		return nil, fmt.Errorf("could not adjust spam records for peer %s, record not found", peerID.String())
+		return nil, fmt.Errorf("could not update spam records for peer %s, record not found", peerID.String())
 	}
 
 	var err error
@@ -124,7 +124,7 @@ func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, adjustFn p2p.AdjustFun
 		}
 
 		// apply the update function to the record.
-		e.GossipSubSpamRecord = adjustFn(e.GossipSubSpamRecord)
+		e.GossipSubSpamRecord = updateFn(e.GossipSubSpamRecord)
 
 		if e.GossipSubSpamRecord != currentRecord {
 			e.lastUpdated = time.Now()
@@ -132,7 +132,7 @@ func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, adjustFn p2p.AdjustFun
 		return e
 	})
 	if err != nil {
-		return nil, fmt.Errorf("could not adjust spam records for peer %s, error: %w", peerID.String(), err)
+		return nil, fmt.Errorf("could not update spam records for peer %s, error: %w", peerID.String(), err)
 	}
 	if !updated {
 		// this happens when the underlying HeroCache fails to update the record.

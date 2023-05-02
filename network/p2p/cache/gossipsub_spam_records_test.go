@@ -110,27 +110,27 @@ func TestGossipSubSpamRecordCache_Concurrent_Add(t *testing.T) {
 	}
 }
 
-// TestGossipSubSpamRecordCache_Adjust tests the Adjust method of the GossipSubSpamRecordCache. It tests if the cache can adjust
-// the penalty of an existing record and fail to adjust the penalty of a non-existing record.
-func TestGossipSubSpamRecordCache_Adjust(t *testing.T) {
+// TestGossipSubSpamRecordCache_Update tests the Update method of the GossipSubSpamRecordCache. It tests if the cache can update
+// the penalty of an existing record and fail to update the penalty of a non-existing record.
+func TestGossipSubSpamRecordCache_Update(t *testing.T) {
 	cache := netcache.NewGossipSubSpamRecordCache(200, unittest.Logger(), metrics.NewNoopCollector())
 
 	peerID := "peer1"
 
-	// tests adjusting the penalty of an existing record.
+	// tests updateing the penalty of an existing record.
 	require.True(t, cache.Add(peer.ID(peerID), p2p.GossipSubSpamRecord{
 		Decay:   0.1,
 		Penalty: 0.5,
 	}))
-	record, err := cache.Adjust(peer.ID(peerID), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+	record, err := cache.Update(peer.ID(peerID), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		record.Penalty = 0.7
 		return record
 	})
 	require.NoError(t, err)
-	require.Equal(t, 0.7, record.Penalty) // checks if the penalty is adjusted correctly.
+	require.Equal(t, 0.7, record.Penalty) // checks if the penalty is updateed correctly.
 
-	// tests adjusting the penalty of a non-existing record.
-	record, err = cache.Adjust(peer.ID("peer2"), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+	// tests updating the penalty of a non-existing record.
+	record, err = cache.Update(peer.ID("peer2"), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		require.Fail(t, "the function should not be called for a non-existing record")
 		return record
 	})
@@ -138,9 +138,9 @@ func TestGossipSubSpamRecordCache_Adjust(t *testing.T) {
 	require.Nil(t, record)
 }
 
-// TestGossipSubSpamRecordCache_Concurrent_Adjust tests if the cache can be adjusted concurrently. It adjusts the cache
+// TestGossipSubSpamRecordCache_Concurrent_Update tests if the cache can be updated concurrently. It updates the cache
 // with a number of records concurrently and then checks if the cache can retrieve all records.
-func TestGossipSubSpamRecordCache_Concurrent_Adjust(t *testing.T) {
+func TestGossipSubSpamRecordCache_Concurrent_Update(t *testing.T) {
 	cache := netcache.NewGossipSubSpamRecordCache(200, unittest.Logger(), metrics.NewNoopCollector())
 
 	// defines the number of records to update.
@@ -160,12 +160,12 @@ func TestGossipSubSpamRecordCache_Concurrent_Adjust(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numRecords)
 
-	// adjusts the records concurrently.
+	// updates the records concurrently.
 	for i := 0; i < numRecords; i++ {
 		go func(num int) {
 			defer wg.Done()
 			peerID := fmt.Sprintf("peer%d", num)
-			_, err := cache.Adjust(peer.ID(peerID), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+			_, err := cache.Update(peer.ID(peerID), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 				record.Penalty = 0.7 * float64(num)
 				record.Decay = 0.1 * float64(num)
 				return record
@@ -174,7 +174,7 @@ func TestGossipSubSpamRecordCache_Concurrent_Adjust(t *testing.T) {
 		}(i)
 	}
 
-	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "could not adjust all records concurrently on time")
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "could not update all records concurrently on time")
 
 	// checks if the cache can retrieve all records.
 	for i := 0; i < numRecords; i++ {
@@ -192,11 +192,11 @@ func TestGossipSubSpamRecordCache_Concurrent_Adjust(t *testing.T) {
 	}
 }
 
-// TestGossipSubSpamRecordCache_Adjust_With_Preprocess tests Adjust method of the GossipSubSpamRecordCache when the cache
+// TestGossipSubSpamRecordCache_Update_With_Preprocess tests Update method of the GossipSubSpamRecordCache when the cache
 // has preprocessor functions.
-// It tests when the cache has preprocessor functions, all preprocessor functions are called prior to the adjustment function.
+// It tests when the cache has preprocessor functions, all preprocessor functions are called prior to the update function.
 // Also, it tests if the pre-processor functions are called in the order they are added.
-func TestGossipSubSpamRecordCache_Adjust_With_Preprocess(t *testing.T) {
+func TestGossipSubSpamRecordCache_Update_With_Preprocess(t *testing.T) {
 	cache := netcache.NewGossipSubSpamRecordCache(200,
 		unittest.Logger(),
 		metrics.NewNoopCollector(),
@@ -215,8 +215,8 @@ func TestGossipSubSpamRecordCache_Adjust_With_Preprocess(t *testing.T) {
 		Penalty: 0.5,
 	}))
 
-	// tests adjusting the penalty of an existing record.
-	record, err := cache.Adjust(peer.ID(peerID), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+	// tests updating the penalty of an existing record.
+	record, err := cache.Update(peer.ID(peerID), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		record.Penalty += 0.7
 		return record
 	})
@@ -225,10 +225,10 @@ func TestGossipSubSpamRecordCache_Adjust_With_Preprocess(t *testing.T) {
 	require.Equal(t, 0.1, record.Decay)   // checks if the decay is not changed.
 }
 
-// TestGossipSubSpamRecordCache_Adjust_Preprocess_Error tests the Adjust method of the GossipSubSpamRecordCache.
-// It tests if any of the preprocessor functions returns an error, the adjustment function effect
+// TestGossipSubSpamRecordCache_Update_Preprocess_Error tests the Update method of the GossipSubSpamRecordCache.
+// It tests if any of the preprocessor functions returns an error, the update function effect
 // is reverted, and the error is returned.
-func TestGossipSubSpamRecordCache_Adjust_Preprocess_Error(t *testing.T) {
+func TestGossipSubSpamRecordCache_Update_Preprocess_Error(t *testing.T) {
 	secondPreprocessorCalled := false
 	cache := netcache.NewGossipSubSpamRecordCache(200,
 		unittest.Logger(),
@@ -253,12 +253,12 @@ func TestGossipSubSpamRecordCache_Adjust_Preprocess_Error(t *testing.T) {
 		Penalty: 0.5,
 	}))
 
-	// tests adjusting the penalty of an existing record.
-	record, err := cache.Adjust(peer.ID(peerID), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+	// tests updating the penalty of an existing record.
+	record, err := cache.Update(peer.ID(peerID), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		record.Penalty = 0.7
 		return record
 	})
-	// since the second preprocessor function returns an error, the adjustment function effect should be reverted.
+	// since the second preprocessor function returns an error, the update function effect should be reverted.
 	// the error should be returned.
 	require.Error(t, err)
 	require.Nil(t, record)
@@ -275,7 +275,7 @@ func TestGossipSubSpamRecordCache_Adjust_Preprocess_Error(t *testing.T) {
 // It updates the cache with a record and then modifies the record externally.
 // It then checks if the record in the cache is still the original record.
 // This is a desired behavior that is guaranteed by the underlying HeroCache library.
-// In other words, we don't desire the records to be externally mutable after they are added to the cache (unless by a subsequent call to Adjust).
+// In other words, we don't desire the records to be externally mutable after they are added to the cache (unless by a subsequent call to Update).
 func TestGossipSubSpamRecordCache_ByValue(t *testing.T) {
 	cache := netcache.NewGossipSubSpamRecordCache(200, unittest.Logger(), metrics.NewNoopCollector())
 

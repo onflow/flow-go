@@ -254,7 +254,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		lg.Trace().Str("peer_id", notification.PeerID.String()).Msg("application specific penalty initialized for peer")
 	}
 
-	record, err := r.spamScoreCache.Adjust(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		switch notification.MsgType {
 		case p2p.CtrlMsgGraft:
 			record.Penalty += r.penalty.Graft
