@@ -441,14 +441,6 @@ func withInvalidSubscriptions(peer peer.ID) func(cfg *scoring.GossipSubAppSpecif
 	}
 }
 
-// withDecayFunction returns a function that sets the decay function for the registry.
-// It is used for testing purposes.
-func withDecayFunction(decayFunction netcache.PreprocessorFunc) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
-	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
-		cfg.DecayFunction = decayFunction
-	}
-}
-
 func withInitFunction(initFunction func() p2p.GossipSubSpamRecord) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
 	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
 		cfg.Init = initFunction
@@ -460,12 +452,11 @@ func withInitFunction(initFunction func() p2p.GossipSubSpamRecord) func(cfg *sco
 func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.GossipSubAppSpecificScoreRegistryConfig)) (*scoring.GossipSubAppSpecificScoreRegistry, *netcache.GossipSubSpamRecordCache) {
 	cache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopCollector(), scoring.DefaultDecayFunction())
 	cfg := &scoring.GossipSubAppSpecificScoreRegistryConfig{
-		Logger:        unittest.Logger(),
-		DecayFunction: scoring.DefaultDecayFunction(),
-		Init:          scoring.InitAppScoreRecordState,
-		Penalty:       penaltyValueFixtures(),
-		IdProvider:    mock.NewIdentityProvider(t),
-		Validator:     mockp2p.NewSubscriptionValidator(t),
+		Logger:     unittest.Logger(),
+		Init:       scoring.InitAppScoreRecordState,
+		Penalty:    penaltyValueFixtures(),
+		IdProvider: mock.NewIdentityProvider(t),
+		Validator:  mockp2p.NewSubscriptionValidator(t),
 		CacheFactory: func() p2p.GossipSubSpamRecordCache {
 			return cache
 		},

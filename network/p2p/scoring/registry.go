@@ -93,9 +93,6 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	// authorized to subscribe to a topic.
 	Validator p2p.SubscriptionValidator
 
-	// DecayFunction is the decay function used to decay the spam penalty of peers.
-	DecayFunction netcache.PreprocessorFunc
-
 	// Penalty encapsulates the penalty unit for each control message type misbehaviour.
 	Penalty GossipSubCtrlMsgPenaltyValue
 
