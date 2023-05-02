@@ -96,7 +96,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("single collection", func(t *testing.T) {
 
 		execCtx := fvm.NewContext(
-			fvm.WithDerivedBlockData(derived.NewEmptyDerivedBlockData()),
+			fvm.WithDerivedBlockData(derived.NewEmptyDerivedBlockData(0)),
 		)
 
 		vm := &testVM{
@@ -178,7 +178,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			parentBlockExecutionResultID,
 			block,
 			nil,
-			derived.NewEmptyDerivedBlockData())
+			derived.NewEmptyDerivedBlockData(0))
 		assert.NoError(t, err)
 		assert.Len(t, result.AllExecutionSnapshots(), 1+1) // +1 system chunk
 
@@ -304,7 +304,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create an empty block
 		block := generateBlock(0, 0, rag)
-		derivedBlockData := derived.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(
@@ -354,7 +354,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		chain := flow.Localnet.Chain()
 		vm := fvm.NewVirtualMachine()
-		derivedBlockData := derived.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
 			fvm.WithDerivedBlockData(derivedBlockData),
@@ -467,7 +467,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
-		derivedBlockData := derived.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
 			Return(nil, nil, nil, nil).
@@ -660,7 +660,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				unittest.IdentifierFixture(),
 				block,
 				nil,
-				derived.NewEmptyDerivedBlockData(),
+				derived.NewEmptyDerivedBlockData(0),
 			)
 			require.NoError(t, err)
 
@@ -777,7 +777,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			unittest.IdentifierFixture(),
 			block,
 			snapshot.MapStorageSnapshot{key: value},
-			derived.NewEmptyDerivedBlockData())
+			derived.NewEmptyDerivedBlockData(0))
 		assert.NoError(t, err)
 		assert.Len(t, result.AllExecutionSnapshots(), collectionCount+1) // +1 system chunk
 	})
@@ -879,7 +879,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			unittest.IdentifierFixture(),
 			block,
 			snapshot.MapStorageSnapshot{key: value},
-			derived.NewEmptyDerivedBlockData())
+			derived.NewEmptyDerivedBlockData(0))
 		require.NoError(t, err)
 		assert.Len(t, result.AllExecutionSnapshots(), collectionCount+1) // +1 system chunk
 	})
@@ -1186,7 +1186,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		unittest.IdentifierFixture(),
 		block,
 		ledger,
-		derived.NewEmptyDerivedBlockData())
+		derived.NewEmptyDerivedBlockData(0))
 	assert.NoError(t, err)
 	assert.Len(t, result.AllExecutionSnapshots(), 1) // +1 system chunk
 	assert.Len(t, result.AllTransactionResults(), 1)
