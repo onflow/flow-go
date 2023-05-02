@@ -12,7 +12,7 @@ import (
 	fghash "github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -138,12 +138,12 @@ type AccountKeyUpdater interface {
 }
 
 type ParseRestrictedAccountKeyUpdater struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 	impl     AccountKeyUpdater
 }
 
 func NewParseRestrictedAccountKeyUpdater(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	impl AccountKeyUpdater,
 ) ParseRestrictedAccountKeyUpdater {
 	return ParseRestrictedAccountKeyUpdater{
@@ -259,7 +259,7 @@ type accountKeyUpdater struct {
 	meter  Meter
 
 	accounts Accounts
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 	env      Environment
 }
 
@@ -267,7 +267,7 @@ func NewAccountKeyUpdater(
 	tracer tracing.TracerSpan,
 	meter Meter,
 	accounts Accounts,
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	env Environment,
 ) *accountKeyUpdater {
 	return &accountKeyUpdater{

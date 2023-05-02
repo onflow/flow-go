@@ -102,7 +102,20 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.state, err = clusterkv.NewMutableState(clusterState, tracer, suite.headers, suite.payloads)
 	suite.Require().NoError(err)
 
-	state, err := pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
+	state, err := pbadger.Bootstrap(
+		metrics,
+		suite.db,
+		all.Headers,
+		all.Seals,
+		all.Results,
+		all.Blocks,
+		all.QuorumCertificates,
+		all.Setups,
+		all.EpochCommits,
+		all.Statuses,
+		all.VersionBeacons,
+		rootSnapshot,
+	)
 	require.NoError(suite.T(), err)
 
 	suite.protoState, err = pbadger.NewFollowerState(

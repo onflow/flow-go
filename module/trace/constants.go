@@ -76,7 +76,7 @@ const (
 	COLClusterStateMutatorExtendGetExtendCtx           SpanName = "col.state.mutator.extend.getExtendCtx"
 	COLClusterStateMutatorExtendCheckAncestry          SpanName = "col.state.mutator.extend.checkAncestry"
 	COLClusterStateMutatorExtendCheckReferenceBlock    SpanName = "col.state.mutator.extend.checkRefBlock"
-	COLClusterStateMutatorExtendCheckTransactionsValid SpanName = "col.state.mutator.extend.checkTransactions."
+	COLClusterStateMutatorExtendCheckTransactionsValid SpanName = "col.state.mutator.extend.checkTransactionsValid"
 	COLClusterStateMutatorExtendDBInsert               SpanName = "col.state.mutator.extend.dbInsert"
 
 	// Execution Node

@@ -1,7 +1,7 @@
 package reporters
 
 import (
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -10,8 +10,8 @@ import (
 // entries loaded from payloads (should only be used for migration)
 func NewStorageSnapshotFromPayload(
 	payloads []ledger.Payload,
-) state.MapStorageSnapshot {
-	snapshot := make(state.MapStorageSnapshot, len(payloads))
+) snapshot.MapStorageSnapshot {
+	snapshot := make(snapshot.MapStorageSnapshot, len(payloads))
 	for _, entry := range payloads {
 		key, err := entry.Key()
 		if err != nil {

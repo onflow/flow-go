@@ -51,7 +51,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/fvm"
-	fvmState "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
@@ -849,10 +849,6 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 	// state when the follower detects newly finalized blocks
 	final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, exeNode.followerState, node.Tracer)
 
-	packer := signature.NewConsensusSigDataPacker(exeNode.committee)
-	// initialize the verifier for the protocol consensus
-	verifier := verification.NewCombinedVerifier(exeNode.committee, packer)
-
 	finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 	if err != nil {
 		return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
@@ -864,10 +860,8 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 	// so that it gets notified upon each new finalized block
 	exeNode.followerCore, err = consensus.NewFollower(
 		node.Logger,
-		exeNode.committee,
 		node.Storage.Headers,
 		final,
-		verifier,
 		exeNode.finalizationDistributor,
 		node.RootBlock.Header,
 		node.RootQC,
@@ -1082,7 +1076,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 func getContractEpochCounter(
 	vm fvm.VM,
 	vmCtx fvm.Context,
-	snapshot fvmState.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) (
 	uint64,
 	error,
@@ -1101,7 +1095,7 @@ func getContractEpochCounter(
 	script := fvm.Script(scriptCode)
 
 	// execute the script
-	_, output, err := vm.RunV2(vmCtx, script, snapshot)
+	_, output, err := vm.Run(vmCtx, script, snapshot)
 	if err != nil {
 		return 0, fmt.Errorf("could not read epoch counter, internal error while executing script: %w", err)
 	}

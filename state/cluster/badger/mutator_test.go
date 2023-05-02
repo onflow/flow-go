@@ -79,7 +79,20 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
 
 	suite.protoGenesis = genesis.Header
-	state, err := pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
+	state, err := pbadger.Bootstrap(
+		metrics,
+		suite.db,
+		all.Headers,
+		all.Seals,
+		all.Results,
+		all.Blocks,
+		all.QuorumCertificates,
+		all.Setups,
+		all.EpochCommits,
+		all.Statuses,
+		all.VersionBeacons,
+		rootSnapshot,
+	)
 	require.NoError(suite.T(), err)
 	suite.protoState, err = pbadger.NewFollowerState(log, tracer, events.NewNoop(), state, all.Index, all.Payloads, protocolutil.MockBlockTimer())
 	require.NoError(suite.T(), err)

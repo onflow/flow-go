@@ -422,7 +422,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		return fnb.GossipSubInspectorNotifDistributor, nil
 	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		cf := conduit.NewDefaultConduitFactory()
+		cf := conduit.NewDefaultConduitFactory(fnb.Logger, fnb.Metrics.Network)
 		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
 		return fnb.InitFlowNetworkWithConduitFactory(node, cf, unicastRateLimiters, peerManagerFilters)
 	})
@@ -439,7 +439,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}, fnb.PeerManagerDependencies)
 }
 
-func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory, unicastRateLimiters *ratelimit.RateLimiters, peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
+func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
+	node *NodeConfig,
+	cf network.ConduitFactory,
+	unicastRateLimiters *ratelimit.RateLimiters,
+	peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
 	var mwOpts []middleware.MiddlewareOption
 	if len(fnb.MsgValidators) > 0 {
 		mwOpts = append(mwOpts, middleware.WithMessageValidators(fnb.MsgValidators...))
@@ -987,6 +991,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
 	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
+	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
 
 	fnb.Storage = Storage{
 		Headers:            headers,
@@ -1002,6 +1007,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		Collections:        collections,
 		Setups:             setups,
 		EpochCommits:       epochCommits,
+		VersionBeacons:     versionBeacons,
 		Statuses:           statuses,
 		Commits:            commits,
 	}
@@ -1074,6 +1080,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
+			fnb.Storage.VersionBeacons,
 		)
 		if err != nil {
 			return fmt.Errorf("could not open protocol state: %w", err)
@@ -1125,6 +1132,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
+			fnb.Storage.VersionBeacons,
 			fnb.RootSnapshot,
 			options...,
 		)
