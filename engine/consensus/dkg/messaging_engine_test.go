@@ -7,50 +7,63 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	module "github.com/onflow/flow-go/module/mock"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// Helper function to initialise an engine.
-func createTestEngine(t *testing.T) *MessagingEngine {
+// MessagingEngineSuite encapsulates unit tests for the MessagingEngine.
+type MessagingEngineSuite struct {
+	suite.Suite
+
+	conduit *mocknetwork.Conduit
+	network *mocknetwork.Network
+	me      *mockmodule.Local
+
+	engine *MessagingEngine
+}
+
+func TestMessagingEngine(t *testing.T) {
+	suite.Run(t, new(MessagingEngineSuite))
+}
+
+func (ms *MessagingEngineSuite) SetupTest() {
 	// setup mock conduit
-	conduit := mocknetwork.NewConduit(t)
-	network := mocknetwork.NewNetwork(t)
-	network.On("Register", mock.Anything, mock.Anything).
-		Return(conduit, nil).
+	ms.conduit = mocknetwork.NewConduit(ms.T())
+	ms.network = mocknetwork.NewNetwork(ms.T())
+	ms.network.On("Register", mock.Anything, mock.Anything).
+		Return(ms.conduit, nil).
 		Once()
 
 	// setup local with nodeID
 	nodeID := unittest.IdentifierFixture()
-	me := module.NewLocal(t)
-	me.On("NodeID").Return(nodeID).Maybe()
+	ms.me = mockmodule.NewLocal(ms.T())
+	ms.me.On("NodeID").Return(nodeID).Maybe()
 
 	engine, err := NewMessagingEngine(
 		unittest.Logger(),
-		network,
-		me,
+		ms.network,
+		ms.me,
 		dkg.NewBrokerTunnel(),
 		metrics.NewNoopCollector(),
 		DefaultMessagingEngineConfig(),
 	)
-	require.NoError(t, err)
-
-	return engine
+	require.NoError(ms.T(), err)
+	ms.engine = engine
 }
 
 // TestForwardOutgoingMessages checks that the engine correctly forwards
 // outgoing messages from the tunnel's Out channel to the network conduit.
-func TestForwardOutgoingMessages(t *testing.T) {
-	engine := createTestEngine(t)
-	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
-	engine.Start(ctx)
+func (ms *MessagingEngineSuite) TestForwardOutgoingMessages() {
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ms.T(), context.Background())
+	ms.engine.Start(ctx)
 	defer cancel()
 
 	// expected DKGMessage
@@ -61,25 +74,24 @@ func TestForwardOutgoingMessages(t *testing.T) {
 	)
 
 	done := make(chan struct{})
-	engine.conduit.(*mocknetwork.Conduit).On("Unicast", &expectedMsg, destinationID).
+	ms.conduit.On("Unicast", &expectedMsg, destinationID).
 		Run(func(_ mock.Arguments) { close(done) }).
 		Return(nil).
 		Once()
 
-	engine.tunnel.SendOut(msg.PrivDKGMessageOut{
+	ms.engine.tunnel.SendOut(msg.PrivDKGMessageOut{
 		DKGMessage: expectedMsg,
 		DestID:     destinationID,
 	})
 
-	unittest.RequireCloseBefore(t, done, time.Second, "message not sent")
+	unittest.RequireCloseBefore(ms.T(), done, time.Second, "message not sent")
 }
 
 // TestForwardIncomingMessages checks that the engine correctly forwards
-// messages from the conduit to the tunnel's In channel.
-func TestForwardIncomingMessages(t *testing.T) {
-	engine := createTestEngine(t)
-	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
-	engine.Start(ctx)
+// messages from the conduit to the tunnel's MsgChIn channel.
+func (ms *MessagingEngineSuite) TestForwardIncomingMessages() {
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ms.T(), context.Background())
+	ms.engine.Start(ctx)
 	defer cancel()
 
 	originID := unittest.IdentifierFixture()
@@ -88,17 +100,16 @@ func TestForwardIncomingMessages(t *testing.T) {
 		OriginID:   originID,
 	}
 
-	// launch a background routine to capture messages forwarded to the tunnel's
-	// In channel
-	doneCh := make(chan struct{})
+	// launch a background routine to capture messages forwarded to the tunnel's MsgChIn channel
+	done := make(chan struct{})
 	go func() {
-		receivedMsg := <-engine.tunnel.MsgChIn
-		require.Equal(t, expectedMsg, receivedMsg)
-		close(doneCh)
+		receivedMsg := <-ms.engine.tunnel.MsgChIn
+		require.Equal(ms.T(), expectedMsg, receivedMsg)
+		close(done)
 	}()
 
-	err := engine.Process(channels.DKGCommittee, originID, &expectedMsg.DKGMessage)
-	require.NoError(t, err)
+	err := ms.engine.Process(channels.DKGCommittee, originID, &expectedMsg.DKGMessage)
+	require.NoError(ms.T(), err)
 
-	unittest.RequireCloseBefore(t, doneCh, time.Second, "message not received")
+	unittest.RequireCloseBefore(ms.T(), done, time.Second, "message not received")
 }
