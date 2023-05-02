@@ -82,7 +82,9 @@ func NewLibp2pConnector(cfg *ConnectorConfig) (*Libp2pConnector, error) {
 // disconnects from any other connection that the libp2p node might have.
 func (l *Libp2pConnector) UpdatePeers(ctx context.Context, peerIDs peer.IDSlice) {
 	// connect to each of the peer.AddrInfo in pInfos
-	l.connectToPeers(ctx, peerIDs)
+	err := l.connectToPeers(ctx, peerIDs)
+	if err != nil {
+	}
 
 	if l.pruneConnections {
 		// disconnect from any other peers not in pInfos
@@ -100,9 +102,14 @@ func (l *Libp2pConnector) connectToPeers(ctx context.Context, peerIDs peer.IDSli
 
 	// first shuffle, and then stuff all the peer.AddrInfo it into the channel.
 	// shuffling is not in place.
-	rand.Shuffle(uint(len(peerIDs)), func(i, j uint) {
+	err := rand.Shuffle(uint(len(peerIDs)), func(i, j uint) {
 		peerIDs[i], peerIDs[j] = peerIDs[j], peerIDs[i]
 	})
+	if err != nil {
+		// this should never happen, but if it does, we should crash.
+		l.log.Fatal().Err(err).Msg("failed to shuffle peer IDs")
+	}
+
 	for _, peerID := range peerIDs {
 		peerCh <- peer.AddrInfo{ID: peerID}
 	}
