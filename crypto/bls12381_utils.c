@@ -277,12 +277,12 @@ void Fr_sum_vector(Fr* jointx, const Fr x[], const int len) {
 
 // internal type of BLST `pow256` uses bytes little endian.
 // input is bytes big endian as used by Flow crypto lib external scalars.
-static void pow256_from_be_bytes(pow256 ret, const unsigned char a[Fr_BYTES])
+static void pow256_from_be_bytes(pow256 ret, const byte a[Fr_BYTES])
 {
-    unsigned char* b = (unsigned char*)a + Fr_BYTES - 1;
+    byte* b = (byte*)a + Fr_BYTES - 1;
     if ((uptr_t)ret == (uptr_t)a) { // swap in place
         for (int i=0; i<Fr_BYTES/2; i++) {
-            unsigned char tmp = *ret;
+            byte tmp = *ret;
             *(ret++) = *b;
             *(b--) = tmp;
         }
@@ -294,6 +294,7 @@ static void pow256_from_be_bytes(pow256 ret, const unsigned char a[Fr_BYTES])
 }
 
 // internal type of BLST `pow256` uses bytes little endian.
+// TODO: check endianness!!
 static void pow256_from_Fr(pow256 ret, const Fr* in) {
     le_bytes_from_limbs(ret, (limb_t*)in, Fr_BYTES);
 }
@@ -310,12 +311,12 @@ BLST_ERROR Fr_read_bytes(Fr* a, const byte *bin, int len) {
     }
     pow256 tmp;
     // compare to r using the provided tool from BLST 
-    pow256_from_be_bytes(tmp, bin);
+    pow256_from_be_bytes(tmp, bin);  // TODO: check endianness!!
     if (!check_mod_256(tmp, BLS12_381_r)) {  // check_mod_256 compares pow256 against a vec256!
         return BLST_BAD_SCALAR;
     }
     vec_zero(tmp, sizeof(tmp));
-    limbs_from_be_bytes((limb_t*)a, bin, Fr_BYTES);
+    limbs_from_be_bytes((limb_t*)a, bin, Fr_BYTES); // TODO: check endianness!!
     return BLST_SUCCESS;
 }
 
@@ -1009,9 +1010,9 @@ void E2_mult(E2* res, const E2* p, const Fr* expo) {
 
 // Exponentiation of a generic point `a` in E2 by a byte exponent.
 void  E2_mult_small_expo(E2* res, const E2* p, const byte expo) {
-    pow256 pow_expo; // `pow256` uses bytes little endian.
-    pow_expo[0] = expo;
-    vec_zero(&pow_expo[1], 32-1);
+    pow256 pow_expo; 
+    vec_zero(&pow_expo, sizeof(pow256)); 
+    pow_expo[0] = expo; // `pow256` uses bytes little endian.
     // TODO: to bench against a specific version of mult with 8 bits expo
     POINTonE2_sign((POINTonE2*)res, (POINTonE2*)p, pow_expo);
 }
