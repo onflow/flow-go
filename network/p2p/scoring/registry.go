@@ -238,7 +238,11 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 	return 0
 }
 
+// OnInvalidControlMessageNotification is called when a new invalid control message notification is distributed.
+// Any error on consuming event must handle internally.
+// The implementation must be concurrency safe, but can be blocking.
 func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(notification *p2p.InvCtrlMsgNotif) {
+	// we use mutex to ensure the method is concurrency safe.
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
