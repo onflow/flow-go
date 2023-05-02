@@ -209,7 +209,7 @@ func (e *MessagingEngine) forwardOutboundMessagesWorker(ctx irrecoverable.Signal
 // After a limited number of attempts, we will log an error and exit.
 // The DKG protocol tolerates a number of failed private messages - these will
 // be resolved by broadcasting complaints in later phases.
-// ust be invoked as a goroutine.
+// Must be invoked as a goroutine.
 func (e *MessagingEngine) forwardOutboundMessage(ctx context.Context, message msg.PrivDKGMessageOut) {
 	backoff := retry.NewExponential(e.config.RetryBaseWait)
 	backoff = retry.WithMaxRetries(e.config.RetryMax, backoff)
