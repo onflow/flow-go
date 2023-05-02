@@ -82,9 +82,7 @@ func NewLibp2pConnector(cfg *ConnectorConfig) (*Libp2pConnector, error) {
 // disconnects from any other connection that the libp2p node might have.
 func (l *Libp2pConnector) UpdatePeers(ctx context.Context, peerIDs peer.IDSlice) {
 	// connect to each of the peer.AddrInfo in pInfos
-	err := l.connectToPeers(ctx, peerIDs)
-	if err != nil {
-	}
+	l.connectToPeers(ctx, peerIDs)
 
 	if l.pruneConnections {
 		// disconnect from any other peers not in pInfos
