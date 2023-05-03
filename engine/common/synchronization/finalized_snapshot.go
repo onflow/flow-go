@@ -16,7 +16,6 @@ import (
 
 // FinalizedHeaderCache represents the cached value of the latest finalized header.
 // It is used in Engine to access latest valid data.
-// Deprecated: use state.Final().Head() instead
 type FinalizedHeaderCache struct {
 	mu sync.RWMutex
 
