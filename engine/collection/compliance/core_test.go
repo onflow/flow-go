@@ -96,6 +96,13 @@ func (cs *CommonSuite) SetupTest() {
 			return nil
 		},
 	)
+	cs.headers.On("Exists", mock.Anything).Return(
+		func(blockID flow.Identifier) bool {
+			_, exists := cs.headerDB[blockID]
+			return exists
+		}, func(blockID flow.Identifier) error {
+			return nil
+		})
 
 	// set up protocol state mock
 	cs.state = &clusterstate.MutableState{}
@@ -436,7 +443,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	}
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(&parent, cs.head.Header)
+	err := cs.core.processBlockAndDescendants(&parent)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check that we submitted each child to hotstuff

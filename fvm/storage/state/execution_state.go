@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -15,8 +16,29 @@ const (
 	DefaultMaxValueSize = 256_000_000 // ~256MB
 )
 
-// TODO(patrick): make State implement the View interface.
-//
+// TOOD(patrick): rm View interface after delta view is deleted.
+type View interface {
+	NewChild() *ExecutionState
+
+	Finalize() *snapshot.ExecutionSnapshot
+	Merge(child *snapshot.ExecutionSnapshot) error
+
+	Storage
+}
+
+// TOOD(patrick): rm Storage interface after delta view is deleted.
+// Storage is the storage interface used by the virtual machine to read and
+// write register values.
+type Storage interface {
+	// TODO(patrick): remove once fvm.VM.Run() is deprecated
+	Peek(id flow.RegisterID) (flow.RegisterValue, error)
+
+	Set(id flow.RegisterID, value flow.RegisterValue) error
+	Get(id flow.RegisterID) (flow.RegisterValue, error)
+
+	DropChanges() error
+}
+
 // State represents the execution state
 // it holds draft of updates and captures
 // all register touches
@@ -101,7 +123,7 @@ func (controller *limitsController) RunWithAllLimitsDisabled(f func()) {
 
 // NewExecutionState constructs a new state
 func NewExecutionState(
-	snapshot StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 	params StateParameters,
 ) *ExecutionState {
 	m := meter.NewMeter(params.MeterParameters)
@@ -268,7 +290,7 @@ func (state *ExecutionState) TotalEmittedEventBytes() uint64 {
 	return state.meter.TotalEmittedEventBytes()
 }
 
-func (state *ExecutionState) Finalize() *ExecutionSnapshot {
+func (state *ExecutionState) Finalize() *snapshot.ExecutionSnapshot {
 	state.finalized = true
 	snapshot := state.spockState.Finalize()
 	snapshot.Meter = state.meter
@@ -276,7 +298,7 @@ func (state *ExecutionState) Finalize() *ExecutionSnapshot {
 }
 
 // MergeState the changes from a the given execution snapshot to this state.
-func (state *ExecutionState) Merge(other *ExecutionSnapshot) error {
+func (state *ExecutionState) Merge(other *snapshot.ExecutionSnapshot) error {
 	if state.finalized {
 		return fmt.Errorf("cannot Merge on a finalized state")
 	}

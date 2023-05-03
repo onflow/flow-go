@@ -21,8 +21,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -261,7 +261,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block1111, block12, block121, block1211 *flow.Block
 
 		block1Snapshot, block11Snapshot, block111Snapshot, block112Snapshot,
-		block12Snapshot, block121Snapshot storage.SnapshotTree
+		block12Snapshot, block121Snapshot snapshot.SnapshotTree
 	)
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
@@ -478,11 +478,11 @@ func createTestBlockAndRun(
 	engine *Manager,
 	parentBlock *flow.Block,
 	col flow.Collection,
-	snapshotTree storage.SnapshotTree,
+	snapshotTree snapshot.SnapshotTree,
 ) (
 	*flow.Block,
 	*execution.ComputationResult,
-	storage.SnapshotTree,
+	snapshot.SnapshotTree,
 ) {
 	guarantee := flow.CollectionGuarantee{
 		CollectionID: col.ID(),

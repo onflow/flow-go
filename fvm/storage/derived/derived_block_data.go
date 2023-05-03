@@ -59,31 +59,18 @@ type DerivedTransactionData struct {
 	meterParamOverrides *TableTransaction[struct{}, MeterParamOverrides]
 }
 
-func NewEmptyDerivedBlockData() *DerivedBlockData {
+func NewEmptyDerivedBlockData(
+	initialSnapshotTime logical.Time,
+) *DerivedBlockData {
 	return &DerivedBlockData{
 		programs: NewEmptyTable[
 			common.AddressLocation,
 			*Program,
-		](),
+		](initialSnapshotTime),
 		meterParamOverrides: NewEmptyTable[
 			struct{},
 			MeterParamOverrides,
-		](),
-	}
-}
-
-// This variant is needed by the chunk verifier, which does not start at the
-// beginning of the block.
-func NewEmptyDerivedBlockDataWithTransactionOffset(offset uint32) *DerivedBlockData {
-	return &DerivedBlockData{
-		programs: NewEmptyTableWithOffset[
-			common.AddressLocation,
-			*Program,
-		](offset),
-		meterParamOverrides: NewEmptyTableWithOffset[
-			struct{},
-			MeterParamOverrides,
-		](offset),
+		](initialSnapshotTime),
 	}
 }
 
