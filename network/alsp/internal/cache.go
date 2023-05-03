@@ -85,7 +85,7 @@ func (s *SpamRecordCache) Adjust(originId flow.Identifier, adjustFunc alsp.Recor
 		if !ok {
 			// sanity check
 			// This should never happen, because the cache only contains ProtocolSpamRecordEntity entities.
-			panic("invalid entity type, expected ProtocolSpamRecordEntity type")
+			panic(fmt.Sprintf("invalid entity type, expected ProtocolSpamRecordEntity type, got: %T", entity))
 		}
 
 		// Adjust the record.
