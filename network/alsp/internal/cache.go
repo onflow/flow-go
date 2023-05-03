@@ -13,6 +13,8 @@ import (
 	"github.com/onflow/flow-go/network/alsp"
 )
 
+var ErrSpamRecordNotFound = fmt.Errorf("spam record not found")
+
 // SpamRecordCache is a cache that stores spam records at the protocol layer for ALSP.
 type SpamRecordCache struct {
 	recordFactory func(flow.Identifier) alsp.ProtocolSpamRecord // recordFactory is a factory function that creates a new spam record.
@@ -70,7 +72,12 @@ func (s *SpamRecordCache) Init(originId flow.Identifier) bool {
 // - originId: the origin id of the spam record.
 // - adjustFunc: the function that adjusts the spam record.
 // Returns:
-// - Penalty value of the record after the adjustment.
+//   - Penalty value of the record after the adjustment.
+//   - error if the adjustFunc returns an error or if the record does not exist (ErrSpamRecordNotFound). Except the ErrSpamRecordNotFound,
+//     any other error should be treated as an irrecoverable error and indicates a bug.
+//
+// Note if Adjust is called under the assumption that the record exists, the ErrSpamRecordNotFound should be treated
+// as an irrecoverable error and indicates a bug.
 func (s *SpamRecordCache) Adjust(originId flow.Identifier, adjustFunc alsp.RecordAdjustFunc) (float64, error) {
 	var rErr error
 	adjustedEntity, adjusted := s.c.Adjust(originId, func(entity flow.Entity) flow.Entity {
@@ -97,7 +104,7 @@ func (s *SpamRecordCache) Adjust(originId flow.Identifier, adjustFunc alsp.Recor
 	}
 
 	if !adjusted {
-		return 0, fmt.Errorf("record does not exist")
+		return 0, ErrSpamRecordNotFound
 	}
 
 	return adjustedEntity.(ProtocolSpamRecordEntity).Penalty, nil
