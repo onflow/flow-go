@@ -3,6 +3,7 @@ package distributor
 import (
 	"sync"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
 )
 
@@ -16,7 +17,7 @@ type ClusterIDUpdateDistributor struct {
 var _ p2p.ClusterIDUpdateDistributor = (*ClusterIDUpdateDistributor)(nil)
 
 // DistributeClusterIDUpdate distributes the event to all the consumers.
-func (c *ClusterIDUpdateDistributor) DistributeClusterIDUpdate(clusterIDS p2p.ClusterIDUpdate) {
+func (c *ClusterIDUpdateDistributor) DistributeClusterIDUpdate(clusterIDS flow.ChainIDList) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	for _, consumer := range c.consumers {

@@ -437,7 +437,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	// setup cluster prefixed topic with an invalid cluster ID
 	unknownClusterID := channels.Topic(channels.SyncCluster("unknown-cluster-ID"))
 	// consume cluster ID update so that active cluster IDs set
-	validationInspector.OnClusterIDSUpdate(p2p.ClusterIDUpdate{"known-cluster-id"})
+	validationInspector.OnClusterIDSUpdate(flow.ChainIDList{"known-cluster-id"})
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}

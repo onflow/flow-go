@@ -109,9 +109,6 @@ type GossipSubInvalidControlMessageNotificationConsumer interface {
 	OnInvalidControlMessageNotification(*InvalidControlMessageNotification)
 }
 
-// ClusterIDUpdate list of active cluster IDS.
-type ClusterIDUpdate []string
-
 // ClusterIDUpdateConsumer  is the interface for the consumer that consumes cluster ID update events.
 // Cluster IDs are updated when a new set of epoch components start and the old set of epoch components stops.
 // A new list of cluster IDs will be assigned when the new set of epoch components are started, and the old set of cluster
@@ -120,7 +117,7 @@ type ClusterIDUpdateConsumer interface {
 	// OnClusterIDSUpdate is called when a new cluster ID update event is distributed.
 	// Any error on consuming event must handle internally.
 	// The implementation must be concurrency safe, but can be blocking.
-	OnClusterIDSUpdate(ClusterIDUpdate)
+	OnClusterIDSUpdate(flow.ChainIDList)
 }
 
 // ClusterIDUpdateDistributor is the interface for the distributor that distributes cluster ID update events to all consumers.
@@ -128,7 +125,7 @@ type ClusterIDUpdateConsumer interface {
 type ClusterIDUpdateDistributor interface {
 	// DistributeClusterIDUpdate distributes the event to all the consumers.
 	// Implementation must be concurrency safe, and non-blocking.
-	DistributeClusterIDUpdate(ClusterIDUpdate)
+	DistributeClusterIDUpdate(flow.ChainIDList)
 
 	// AddConsumer adds a consumer to the distributor. The consumer will be called when the distributor distributes a new event.
 	// AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.

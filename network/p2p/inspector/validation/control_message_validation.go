@@ -85,7 +85,7 @@ type ControlMsgValidationInspector struct {
 	// lock RW mutex used to synchronize access to the  clusterIDSProvider.
 	lock sync.RWMutex
 	// activeClusterIDS list of active cluster IDS used to validate cluster prefixed control messages.
-	activeClusterIDS []string
+	activeClusterIDS flow.ChainIDList
 	// config control message validation configurations.
 	config *ControlMsgValidationInspectorConfig
 	// distributor used to disseminate invalid RPC message notifications.
@@ -213,10 +213,10 @@ func (c *ControlMsgValidationInspector) Name() string {
 }
 
 // OnClusterIDSUpdate consumes cluster ID updates from the p2p.ClusterIDUpdateDistributor.
-func (c *ControlMsgValidationInspector) OnClusterIDSUpdate(clusterIDS p2p.ClusterIDUpdate) {
+func (c *ControlMsgValidationInspector) OnClusterIDSUpdate(clusterIDList flow.ChainIDList) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.activeClusterIDS = clusterIDS
+	c.activeClusterIDS = clusterIDList
 }
 
 // blockingPreprocessingRpc ensures the RPC control message count does not exceed the configured discard threshold.
@@ -332,7 +332,6 @@ func (c *ControlMsgValidationInspector) validateTopics(from peer.ID, ctrlMsgType
 // Expected error returns during normal operations:
 //   - channels.ErrInvalidTopic: if topic is invalid.
 //   - ErrActiveClusterIdsNotSet: if the cluster ID provider is not set.
-//   - ErrActiveClusterIDS: if an error is encountered while getting the active cluster IDs list. This error indicates an unexpected bug or state corruption.
 //   - channels.ErrUnknownClusterID: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
 //
 // This func returns an exception in case of unexpected bug or state corruption if cluster prefixed topic validation
@@ -359,7 +358,6 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 // validateClusterPrefixedTopic validates cluster prefixed topics.
 // Expected error returns during normal operations:
 //   - ErrActiveClusterIdsNotSet: if the cluster ID provider is not set.
-//   - ErrActiveClusterIDS: if an error is encountered while getting the active cluster IDs list. This error indicates an unexpected bug or state corruption.
 //   - channels.ErrInvalidTopic: if topic is invalid.
 //   - channels.ErrUnknownClusterID: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
 func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.ID, topic channels.Topic) error {

@@ -309,16 +309,16 @@ func sporkIdStrFromTopic(topic Topic) (string, error) {
 	return sporkId.String(), nil
 }
 
-// clusterIDStrFromTopic returns the pre-pended cluster ID for the cluster prefixed topic.
+// clusterIDStrFromTopic returns the pre-pended cluster ID in flow.ChainID format for the cluster prefixed topic.
 // A valid cluster-prefixed channel includes the cluster prefix and cluster ID suffix:
 //
 //	sync-cluster/some_cluster_id
 //
 // All errors returned from this function can be considered benign.
-func clusterIDStrFromTopic(topic Topic) (string, error) {
+func clusterIDStrFromTopic(topic Topic) (flow.ChainID, error) {
 	for prefix := range clusterChannelPrefixRoleMap {
 		if strings.HasPrefix(topic.String(), prefix) {
-			return strings.TrimPrefix(topic.String(), fmt.Sprintf("%s-", prefix)), nil
+			return flow.ChainID(strings.TrimPrefix(topic.String(), fmt.Sprintf("%s-", prefix))), nil
 		}
 	}
 	return "", fmt.Errorf("failed to get cluster ID from topic %s", topic)
@@ -358,7 +358,7 @@ func IsValidNonClusterFlowTopic(topic Topic, expectedSporkID flow.Identifier) er
 // Expected errors:
 // - ErrInvalidTopic if the topic is not a valid Flow topic or the cluster ID cannot be derived from the topic.
 // - ErrUnknownClusterID if the cluster ID from the topic is not in the activeClusterIDS list.
-func IsValidFlowClusterTopic(topic Topic, activeClusterIDS []string) error {
+func IsValidFlowClusterTopic(topic Topic, activeClusterIDS flow.ChainIDList) error {
 	err := isValidFlowTopic(topic)
 	if err != nil {
 		return err

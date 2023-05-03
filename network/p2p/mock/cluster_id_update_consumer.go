@@ -3,7 +3,7 @@
 package mockp2p
 
 import (
-	p2p "github.com/onflow/flow-go/network/p2p"
+	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -13,7 +13,7 @@ type ClusterIDUpdateConsumer struct {
 }
 
 // OnClusterIDSUpdate provides a mock function with given fields: _a0
-func (_m *ClusterIDUpdateConsumer) OnClusterIDSUpdate(_a0 p2p.ClusterIDUpdate) {
+func (_m *ClusterIDUpdateConsumer) OnClusterIDSUpdate(_a0 flow.ChainIDList) {
 	_m.Called(_a0)
 }
 

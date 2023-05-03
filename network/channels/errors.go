@@ -3,6 +3,8 @@ package channels
 import (
 	"errors"
 	"fmt"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // ErrInvalidTopic error wrapper that indicates an error when checking if a Topic is a valid Flow Topic.
@@ -28,8 +30,8 @@ func IsErrInvalidTopic(err error) bool {
 
 // ErrUnknownClusterID error wrapper that indicates an invalid topic with an unknown cluster ID prefix.
 type ErrUnknownClusterID struct {
-	clusterId        string
-	activeClusterIds []string
+	clusterId        flow.ChainID
+	activeClusterIds flow.ChainIDList
 }
 
 func (e ErrUnknownClusterID) Error() string {
@@ -37,7 +39,7 @@ func (e ErrUnknownClusterID) Error() string {
 }
 
 // NewUnknownClusterIdErr returns a new ErrUnknownClusterID
-func NewUnknownClusterIdErr(clusterId string, activeClusterIds []string) ErrUnknownClusterID {
+func NewUnknownClusterIdErr(clusterId flow.ChainID, activeClusterIds flow.ChainIDList) ErrUnknownClusterID {
 	return ErrUnknownClusterID{clusterId: clusterId, activeClusterIds: activeClusterIds}
 }
 
