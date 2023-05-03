@@ -1121,14 +1121,19 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 			// this ensures the DHT of each peer is bridged, forming a single larger network.
 			if len(builder.publicNetworkPeers) > 0 {
 				var ids flow.IdentityList
-				for _, peer := range builder.publicNetworkPeers {
-					id, err := flow.ParseIdentity(peer)
+				for _, idStr := range builder.publicNetworkPeers {
+					nodeID, err := flow.HexStringToIdentifier(idStr)
 					if err != nil {
-						return nil, fmt.Errorf("could not parse public network peer (id: %s): %w", peer, err)
+						return nil, fmt.Errorf("could not parse public network peer (id: %s): %w", idStr, err)
 					}
 
-					if _, ok := builder.IdentityProvider.ByNodeID(id.NodeID); !ok {
-						return nil, fmt.Errorf("public network peer must be a staked node (id: %s) in identity provider", peer)
+					id, ok := builder.IdentityProvider.ByNodeID(nodeID)
+					if !ok {
+						return nil, fmt.Errorf("public network peer must be a currently staked node (id: %s)", nodeID)
+					}
+
+					if id.Role != flow.RoleAccess {
+						return nil, fmt.Errorf("public network peer must be a staked access node (id: %s)", nodeID)
 					}
 
 					ids = append(ids, id)
