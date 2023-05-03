@@ -437,7 +437,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	// setup cluster prefixed topic with an invalid cluster ID
 	unknownClusterID := channels.Topic(channels.SyncCluster("unknown-cluster-ID"))
 	// consume cluster ID update so that active cluster IDs set
-	validationInspector.OnClusterIdsUpdated(flow.ChainIDList{"known-cluster-id"})
+	validationInspector.ClusterIdsUpdated(flow.ChainIDList{"known-cluster-id"})
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
@@ -460,8 +460,8 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 }
 
 // TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection ensures that an error is returned only after the cluster prefixed topics received for a peer exceed the configured
-// cluster prefix discard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error. This test involves Graft
-// control messages.
+// cluster prefix discard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error.
+// This test involves Graft control messages.
 func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
@@ -518,8 +518,8 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 }
 
 // TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection ensures that an error is returned only after the cluster prefixed topics received for a peer exceed the configured
-// cluster prefix discard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error. This test involves Prune
-// control messages.
+// cluster prefix discard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error.
+// This test involves Prune control messages.
 func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus

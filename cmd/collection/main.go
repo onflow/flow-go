@@ -46,6 +46,7 @@ import (
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -573,7 +574,7 @@ func main() {
 				rootQCVoter,
 				factory,
 				heightEvents,
-				node.ClusterIDUpdateDistributor,
+				node.ProtocolEvents,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create epoch manager: %w", err)
@@ -581,6 +582,12 @@ func main() {
 
 			// register the manager for protocol events
 			node.ProtocolEvents.AddConsumer(manager)
+
+			for _, rpcInspector := range node.GossipSubConfig.RPCInspectors {
+				if r, ok := rpcInspector.(p2p.GossipSubMsgValidationRpcInspector); ok {
+					node.ProtocolEvents.AddConsumer(r)
+				}
+			}
 
 			return manager, err
 		})

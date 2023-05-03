@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/p2p"
 )
 
 // TestErrInvalidTopicRoundTrip ensures correct error formatting for ErrInvalidTopic.
@@ -31,7 +30,7 @@ func TestErrInvalidTopicRoundTrip(t *testing.T) {
 // TestErrUnknownClusterIDRoundTrip ensures correct error formatting for ErrUnknownClusterID.
 func TestErrUnknownClusterIDRoundTrip(t *testing.T) {
 	clusterId := flow.ChainID("cluster-id")
-	activeClusterIds := p2p.ClusterIDList{"active", "cluster", "ids"}
+	activeClusterIds := flow.ChainIDList{"active", "cluster", "ids"}
 	err := NewUnknownClusterIdErr(clusterId, activeClusterIds)
 
 	// tests the error message formatting.

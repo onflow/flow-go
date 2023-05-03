@@ -18,6 +18,8 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector/internal"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -80,6 +82,7 @@ func (conf *ControlMsgValidationInspectorConfig) allCtrlMsgValidationConfig() Ct
 // when some validation rule is broken feedback is given via the Peer scoring notifier.
 type ControlMsgValidationInspector struct {
 	component.Component
+	events.Noop
 	logger  zerolog.Logger
 	sporkID flow.Identifier
 	// lock RW mutex used to synchronize access to the  clusterIDSProvider.
@@ -101,6 +104,7 @@ type ControlMsgValidationInspector struct {
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
 var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
+var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 
 // NewInspectMsgRequest returns a new *InspectMsgRequest.
 func NewInspectMsgRequest(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) (*InspectMsgRequest, error) {
@@ -212,8 +216,8 @@ func (c *ControlMsgValidationInspector) Name() string {
 	return rpcInspectorComponentName
 }
 
-// OnClusterIDSUpdate consumes cluster ID updates from the p2p.ClusterIDUpdateDistributor.
-func (c *ControlMsgValidationInspector) OnClusterIdsUpdated(clusterIDList flow.ChainIDList) {
+// ClusterIdsUpdated consumes cluster ID update protocol events.
+func (c *ControlMsgValidationInspector) ClusterIdsUpdated(clusterIDList flow.ChainIDList) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.activeClusterIDS = clusterIDList

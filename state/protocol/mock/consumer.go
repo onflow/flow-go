@@ -22,6 +22,11 @@ func (_m *Consumer) BlockProcessable(block *flow.Header, certifyingQC *flow.Quor
 	_m.Called(block, certifyingQC)
 }
 
+// ClusterIdsUpdated provides a mock function with given fields: _a0
+func (_m *Consumer) ClusterIdsUpdated(_a0 flow.ChainIDList) {
+	_m.Called(_a0)
+}
+
 // EpochCommittedPhaseStarted provides a mock function with given fields: currentEpochCounter, first
 func (_m *Consumer) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
 	_m.Called(currentEpochCounter, first)

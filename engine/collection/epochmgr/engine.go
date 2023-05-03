@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/util"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 )
@@ -57,10 +56,10 @@ type Engine struct {
 	epochs map[uint64]*RunningEpochComponents // epoch-scoped components per epoch
 
 	// internal event notifications
-	epochTransitionEvents        chan *flow.Header              // sends first block of new epoch
-	epochSetupPhaseStartedEvents chan *flow.Header              // sends first block of EpochSetup phase
-	epochStopEvents              chan uint64                    // sends counter of epoch to stop
-	clusterIDUpdateDistributor   p2p.ClusterIDUpdateDistributor // sends cluster ID updates to consumers
+	epochTransitionEvents        chan *flow.Header                // sends first block of new epoch
+	epochSetupPhaseStartedEvents chan *flow.Header                // sends first block of EpochSetup phase
+	epochStopEvents              chan uint64                      // sends counter of epoch to stop
+	clusterIDUpdateDistributor   protocol.ClusterIDUpdateConsumer // sends cluster ID updates to consumers
 	cm                           *component.ComponentManager
 	component.Component
 }
@@ -76,7 +75,7 @@ func New(
 	voter module.ClusterRootQCVoter,
 	factory EpochComponentsFactory,
 	heightEvents events.Heights,
-	clusterIDUpdateDistributor p2p.ClusterIDUpdateDistributor,
+	clusterIDUpdateDistributor protocol.ClusterIDUpdateConsumer,
 ) (*Engine, error) {
 	e := &Engine{
 		log:                          log.With().Str("engine", "epochmgr").Logger(),
@@ -462,7 +461,7 @@ func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, c
 		if err != nil {
 			return fmt.Errorf("failed to get active cluster IDs: %w", err)
 		}
-		e.clusterIDUpdateDistributor.DistributeClusterIDUpdate(activeClusterIDS)
+		e.clusterIDUpdateDistributor.ClusterIdsUpdated(activeClusterIDS)
 		return nil
 	case <-time.After(e.startupTimeout):
 		cancel() // cancel current context if we didn't start in time
@@ -492,7 +491,7 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 		if err != nil {
 			return fmt.Errorf("failed to get active cluster IDs: %w", err)
 		}
-		e.clusterIDUpdateDistributor.DistributeClusterIDUpdate(activeClusterIDS)
+		e.clusterIDUpdateDistributor.ClusterIdsUpdated(activeClusterIDS)
 		return nil
 	case <-time.After(e.startupTimeout):
 		return fmt.Errorf("could not stop epoch %d components after %s", counter, e.startupTimeout)

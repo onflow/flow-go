@@ -11,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 type ValidationResult int
@@ -93,8 +94,8 @@ type GossipSubRPCInspector interface {
 //   - be concurrency safe
 //   - be non-blocking
 type GossipSubMsgValidationRpcInspector interface {
+	protocol.Consumer
 	GossipSubRPCInspector
-	ClusterIDUpdateConsumer
 }
 
 // Topic is the abstraction of the underlying pubsub topic that is used by the Flow network.

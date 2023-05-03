@@ -24,11 +24,11 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
-	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	realcluster "github.com/onflow/flow-go/state/cluster"
 	cluster "github.com/onflow/flow-go/state/cluster/mock"
 	realprotocol "github.com/onflow/flow-go/state/protocol"
 	events "github.com/onflow/flow-go/state/protocol/events/mock"
+	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -170,8 +170,8 @@ func (suite *Suite) SetupTest() {
 		return herocache.NewTransactions(1000, suite.log, metrics.NewNoopCollector())
 	})
 
-	clusterIDUpdateDistributor := mockp2p.NewClusterIDUpdateDistributor(suite.T())
-	clusterIDUpdateDistributor.On("DistributeClusterIDUpdate", mock.AnythingOfType("p2p.ClusterIDUpdate")).Maybe()
+	clusterIDUpdateDistributor := mockprotocol.NewConsumer(suite.T())
+	clusterIDUpdateDistributor.On("ClusterIdsUpdated", mock.AnythingOfType("flow.ChainIDList")).Maybe()
 
 	var err error
 	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights, clusterIDUpdateDistributor)
@@ -263,8 +263,8 @@ func (suite *Suite) MockAsUnauthorizedNode(forEpoch uint64) {
 		Return(nil, nil, nil, nil, nil, nil, nil, ErrNotAuthorizedForEpoch)
 	suite.MockFactoryCreate(mock.MatchedBy(authorizedMatcher))
 
-	clusterIDUpdateDistributor := mockp2p.NewClusterIDUpdateDistributor(suite.T())
-	clusterIDUpdateDistributor.On("DistributeClusterIDUpdate", mock.AnythingOfType("p2p.ClusterIDUpdate")).Maybe()
+	clusterIDUpdateDistributor := mockprotocol.NewConsumer(suite.T())
+	clusterIDUpdateDistributor.On("ClusterIdsUpdated", mock.AnythingOfType("flow.ChainIDList")).Maybe()
 
 	var err error
 	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights, clusterIDUpdateDistributor)

@@ -48,7 +48,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
-	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
@@ -217,8 +216,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.CacheSize, "gossipsub-rpc-validation-inspector-cache-size", defaultConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.CacheSize, "cache size for gossipsub RPC validation inspector events worker pool queue.")
 	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.GraftLimits, "gossipsub-rpc-graft-limits", defaultConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.GraftLimits, fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC GRAFT message validation e.g: %s=1000,%s=100,%s=1000", validation.DiscardThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
 	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.PruneLimits, "gossipsub-rpc-prune-limits", defaultConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.PruneLimits, fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC PRUNE message validation e.g: %s=1000,%s=20,%s=1000", validation.DiscardThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
-	
-fnb.flags.Uint64Var(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.ClusterPrefixDiscardThreshold, "gossipsub-rpc-cluster-prefixed-discard-threshold", defaultConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.ClusterPrefixDiscardThreshold, "the maximum number of cluster-prefixed control messages allowed to be processed when the active cluster id is unset or a mismatch is detected, exceeding this threshold will result in node penalization by gossipsub.")
+
+	fnb.flags.Uint64Var(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.ClusterPrefixDiscardThreshold, "gossipsub-rpc-cluster-prefixed-discard-threshold", defaultConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.ClusterPrefixDiscardThreshold, "the maximum number of cluster-prefixed control messages allowed to be processed when the active cluster id is unset or a mismatch is detected, exceeding this threshold will result in node penalization by gossipsub.")
 	// gossipsub RPC control message metrics observer inspector configuration
 	fnb.flags.IntVar(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.MetricsInspectorConfigs.NumberOfWorkers, "gossipsub-rpc-metrics-inspector-workers", defaultConfig.GossipSubRPCInspectorsConfig.MetricsInspectorConfigs.NumberOfWorkers, "cache size for gossipsub RPC metrics inspector events worker pool queue.")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.MetricsInspectorConfigs.CacheSize, "gossipsub-rpc-metrics-inspector-cache-size", defaultConfig.GossipSubRPCInspectorsConfig.MetricsInspectorConfigs.CacheSize, "cache size for gossipsub RPC metrics inspector events worker pool.")
@@ -379,7 +378,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		}
 
 		fnb.GossipSubInspectorNotifDistributor = BuildGossipsubRPCValidationInspectorNotificationDisseminator(fnb.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
-		fnb.ClusterIDUpdateDistributor = distributor.NewClusterIDUpdateDistributor()
 
 		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.GossipSubRPCInspectorsConfig, fnb.GossipSubInspectorNotifDistributor)
 		rpcInspectors, err := rpcInspectorBuilder.
@@ -392,12 +390,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		// set rpc inspectors on gossipsub config
 		fnb.GossipSubConfig.RPCInspectors = rpcInspectors
-
-		for _, rpcInspector := range fnb.GossipSubConfig.RPCInspectors {
-			if r, ok := rpcInspector.(p2p.GossipSubMsgValidationRpcInspector); ok {
-				fnb.ClusterIDUpdateDistributor.AddConsumer(r)
-			}
-		}
 
 		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
 			fnb.Logger,

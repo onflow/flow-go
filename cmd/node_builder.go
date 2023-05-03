@@ -277,8 +277,6 @@ type NodeConfig struct {
 	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
 	// GossipSubInspectorNotifDistributor notifies consumers when an invalid RPC message is encountered.
 	GossipSubInspectorNotifDistributor p2p.GossipSubInspectorNotificationDistributor
-	// ClusterIDUpdateDistributor notifies consumers when cluster IDs have been updated.
-	ClusterIDUpdateDistributor p2p.ClusterIDUpdateDistributor
 }
 
 func DefaultBaseConfig() *BaseConfig {
