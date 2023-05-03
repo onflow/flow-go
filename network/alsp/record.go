@@ -1,8 +1,6 @@
 package alsp
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -32,20 +30,24 @@ type ProtocolSpamRecord struct {
 // In BFT setup, the returned error should be treated as a fatal error.
 type RecordAdjustFunc func(ProtocolSpamRecord) (ProtocolSpamRecord, error)
 
-// NewProtocolSpamRecord creates a new protocol spam record with the given origin id and Penalty value.
-// The Decay speed of the record is set to the initial Decay speed. The CutoffCounter value is set to zero.
-// The Penalty value should be a negative value.
-// If the Penalty value is not a negative value, an error is returned. The error is irrecoverable and indicates a
-// bug.
-func NewProtocolSpamRecord(originId flow.Identifier, penalty float64) (*ProtocolSpamRecord, error) {
-	if penalty >= 0 {
-		return nil, fmt.Errorf("penalty value must be negative: %f", penalty)
-	}
+// SpamRecordFactoryFunc is a function that creates a new protocol spam record with the given origin id and initial values.
+// Args:
+// - originId: the origin id of the spam record.
+// Returns:
+// - ProtocolSpamRecord, the created record.
+type SpamRecordFactoryFunc func(flow.Identifier) ProtocolSpamRecord
 
-	return &ProtocolSpamRecord{
-		OriginId:      originId,
-		Decay:         initialDecaySpeed,
-		CutoffCounter: uint64(0),
-		Penalty:       penalty,
-	}, nil
+// SpamRecordFactory returns the default factory function for creating a new protocol spam record.
+// Returns:
+// - SpamRecordFactoryFunc, the default factory function.
+// Note that the default factory function creates a new record with the initial values.
+func SpamRecordFactory() SpamRecordFactoryFunc {
+	return func(originId flow.Identifier) ProtocolSpamRecord {
+		return ProtocolSpamRecord{
+			OriginId:      originId,
+			Decay:         initialDecaySpeed,
+			CutoffCounter: uint64(0),
+			Penalty:       float64(0),
+		}
+	}
 }

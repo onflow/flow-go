@@ -17,8 +17,8 @@ var ErrSpamRecordNotFound = fmt.Errorf("spam record not found")
 
 // SpamRecordCache is a cache that stores spam records at the protocol layer for ALSP.
 type SpamRecordCache struct {
-	recordFactory func(flow.Identifier) alsp.ProtocolSpamRecord // recordFactory is a factory function that creates a new spam record.
-	c             *stdmap.Backend                               // c is the underlying cache.
+	recordFactory alsp.SpamRecordFactoryFunc // recordFactory is a factory function that creates a new spam record.
+	c             *stdmap.Backend            // c is the underlying cache.
 }
 
 var _ alsp.SpamRecordCache = (*SpamRecordCache)(nil)
@@ -35,7 +35,7 @@ var _ alsp.SpamRecordCache = (*SpamRecordCache)(nil)
 // expected to be small, we do not eject any records from the cache. The cache size must be large enough to hold all
 // the spam records of the authorized nodes. Also, this cache is keeping at most one record per origin id, so the
 // size of the cache must be at least the number of authorized nodes.
-func NewSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics, recordFactory func(flow.Identifier) alsp.ProtocolSpamRecord) *SpamRecordCache {
+func NewSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics, recordFactory alsp.SpamRecordFactoryFunc) *SpamRecordCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
 		// this cache is supposed to keep the spam record for the authorized (staked) nodes. Since the number of such nodes is
