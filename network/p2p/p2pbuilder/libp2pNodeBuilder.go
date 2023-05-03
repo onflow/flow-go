@@ -392,7 +392,12 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	var peerManager p2p.PeerManager
 	if builder.peerManagerUpdateInterval > 0 {
-		connector, err := connection.NewLibp2pConnector(builder.logger, h, builder.peerManagerEnablePruning)
+		connector, err := connection.NewLibp2pConnector(&connection.ConnectorConfig{
+			PruneConnections:        builder.peerManagerEnablePruning,
+			Logger:                  builder.logger,
+			Host:                    connection.NewConnectorHost(h),
+			BackoffConnectorFactory: connection.DefaultLibp2pBackoffConnectorFactory(h),
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
 		}

@@ -159,7 +159,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		var opts []nodeBuilderOption
 
 		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
-		opts = append(opts, withPeerManagerOptions(connection.ConnectionPruningEnabled, o.peerUpdateInterval))
+		opts = append(opts, withPeerManagerOptions(connection.PruningEnabled, o.peerUpdateInterval))
 		opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
 		opts = append(opts, withConnectionGater(o.connectionGater))
 		opts = append(opts, withUnicastManagerOpts(o.createStreamRetryInterval))

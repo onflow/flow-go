@@ -788,7 +788,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		state.NewLedgerStorageSnapshot(
 			ledger,
 			initialCommit),
-		derived.NewEmptyDerivedBlockData())
+		derived.NewEmptyDerivedBlockData(0))
 	require.NoError(t, err)
 
 	spockHasher := utils.NewSPOCKHasher()

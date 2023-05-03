@@ -975,6 +975,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
 	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
+	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
 
 	fnb.Storage = Storage{
 		Headers:            headers,
@@ -990,6 +991,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		Collections:        collections,
 		Setups:             setups,
 		EpochCommits:       epochCommits,
+		VersionBeacons:     versionBeacons,
 		Statuses:           statuses,
 		Commits:            commits,
 	}
@@ -1062,6 +1064,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
+			fnb.Storage.VersionBeacons,
 		)
 		if err != nil {
 			return fmt.Errorf("could not open protocol state: %w", err)
@@ -1113,6 +1116,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
+			fnb.Storage.VersionBeacons,
 			fnb.RootSnapshot,
 			options...,
 		)

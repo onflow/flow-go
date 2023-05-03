@@ -518,3 +518,18 @@ func EnsureNoPubsubExchangeBetweenGroups(t *testing.T, ctx context.Context, grou
 	// ensure no message exchange from group B to group A
 	EnsureNoPubsubMessageExchange(t, ctx, groupB, groupA, messageFactory)
 }
+
+// PeerIdSliceFixture returns a slice of random peer IDs for testing.
+// peer ID is the identifier of a node on the libp2p network.
+// Args:
+// - t: *testing.T instance
+// - n: number of peer IDs to generate
+// Returns:
+// - peer.IDSlice: slice of peer IDs
+func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
+	ids := make([]peer.ID, n)
+	for i := 0; i < n; i++ {
+		ids[i] = PeerIdFixture(t)
+	}
+	return ids
+}
