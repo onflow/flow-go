@@ -38,7 +38,7 @@ type RecordAdjustFunc func(ProtocolSpamRecord) (ProtocolSpamRecord, error)
 // bug.
 func NewProtocolSpamRecord(originId flow.Identifier, penalty float64) (*ProtocolSpamRecord, error) {
 	if penalty >= 0 {
-		return nil, fmt.Errorf("penalty value should be negative: %f", penalty)
+		return nil, fmt.Errorf("penalty value must be negative: %f", penalty)
 	}
 
 	return &ProtocolSpamRecord{
