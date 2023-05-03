@@ -336,10 +336,10 @@ func SyncCluster(clusterID flow.ChainID) Channel {
 	return Channel(fmt.Sprintf("%s-%s", SyncClusterPrefix, clusterID))
 }
 
-// IsValidFlowTopic ensures the topic is a valid Flow network topic and
+// IsValidNonClusterFlowTopic ensures the topic is a valid Flow network topic and
 // ensures the sporkID part of the Topic is equal to the current network sporkID.
 // All errors returned from this function can be considered benign.
-func IsValidFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
+func IsValidNonClusterFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
 	sporkID, err := sporkIdStrFromTopic(topic)
 	if err != nil {
 		return NewInvalidTopicErr(topic, fmt.Errorf("failed to get spork ID from topic: %w", err))
