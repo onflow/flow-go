@@ -127,7 +127,7 @@ func (s *SpamRecordCache) Get(originId flow.Identifier) (*alsp.ProtocolSpamRecor
 	if !ok {
 		// sanity check
 		// This should never happen, because the cache only contains ProtocolSpamRecordEntity entities.
-		panic("invalid entity type, expected ProtocolSpamRecordEntity type")
+		panic(fmt.Sprintf("invalid entity type, expected ProtocolSpamRecordEntity type, got: %T", entity))
 	}
 
 	// return a copy of the record (we do not want the caller to modify the record).
