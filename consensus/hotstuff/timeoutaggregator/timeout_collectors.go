@@ -2,6 +2,7 @@ package timeoutaggregator
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -15,23 +16,26 @@ import (
 // particular view is lazy (instances are created on demand).
 // This structure is concurrently safe.
 // TODO: once VoteCollectors gets updated to stop managing worker pool we can merge VoteCollectors and TimeoutCollectors using generics
-// TODO(active-pacemaker): add metrics for tracking size of collectors and active range
 type TimeoutCollectors struct {
-	log                zerolog.Logger
-	lock               sync.RWMutex
-	lowestRetainedView uint64                               // lowest view, for which we still retain a TimeoutCollector and process timeouts
-	collectors         map[uint64]hotstuff.TimeoutCollector // view -> TimeoutCollector
-	collectorFactory   hotstuff.TimeoutCollectorFactory     // factor for creating collectors
+	log                       zerolog.Logger
+	metrics                   module.HotstuffMetrics
+	lock                      sync.RWMutex
+	lowestRetainedView        uint64                               // lowest view, for which we still retain a TimeoutCollector and process timeouts
+	newestViewCachedCollector uint64                               // highest view, for which we have created a TimeoutCollector
+	collectors                map[uint64]hotstuff.TimeoutCollector // view -> TimeoutCollector
+	collectorFactory          hotstuff.TimeoutCollectorFactory     // factor for creating collectors
 }
 
 var _ hotstuff.TimeoutCollectors = (*TimeoutCollectors)(nil)
 
-func NewTimeoutCollectors(log zerolog.Logger, lowestRetainedView uint64, collectorFactory hotstuff.TimeoutCollectorFactory) *TimeoutCollectors {
+func NewTimeoutCollectors(log zerolog.Logger, metrics module.HotstuffMetrics, lowestRetainedView uint64, collectorFactory hotstuff.TimeoutCollectorFactory) *TimeoutCollectors {
 	return &TimeoutCollectors{
-		log:                log.With().Str("component", "timeout_collectors").Logger(),
-		lowestRetainedView: lowestRetainedView,
-		collectors:         make(map[uint64]hotstuff.TimeoutCollector),
-		collectorFactory:   collectorFactory,
+		log:                       log.With().Str("component", "timeout_collectors").Logger(),
+		metrics:                   metrics,
+		lowestRetainedView:        lowestRetainedView,
+		newestViewCachedCollector: lowestRetainedView,
+		collectors:                make(map[uint64]hotstuff.TimeoutCollector),
+		collectorFactory:          collectorFactory,
 	}
 }
 
@@ -70,8 +74,13 @@ func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutC
 		return clr, false, nil
 	}
 	t.collectors[view] = collector
+	if t.newestViewCachedCollector < view {
+		t.newestViewCachedCollector = view
+	}
 	t.lock.Unlock()
 
+	// report metrics outside lock and accept the fact that we might report not the same value observed in critical section.
+	t.metrics.TimeoutCollectorsRange(t.lowestRetainedView, t.newestViewCachedCollector, len(t.collectors))
 	t.log.Info().Uint64("view", view).Msg("timeout collector has been created")
 	return collector, true, nil
 }
@@ -97,13 +106,14 @@ func (t *TimeoutCollectors) getCollector(view uint64) (hotstuff.TimeoutCollector
 // kept and the method call is a NoOp.
 func (t *TimeoutCollectors) PruneUpToView(lowestRetainedView uint64) {
 	t.lock.Lock()
-	defer t.lock.Unlock()
 	if t.lowestRetainedView >= lowestRetainedView {
+		t.lock.Unlock()
 		return
 	}
 	sizeBefore := len(t.collectors)
 	if sizeBefore == 0 {
 		t.lowestRetainedView = lowestRetainedView
+		t.lock.Unlock()
 		return
 	}
 
@@ -124,11 +134,15 @@ func (t *TimeoutCollectors) PruneUpToView(lowestRetainedView uint64) {
 	}
 	from := t.lowestRetainedView
 	t.lowestRetainedView = lowestRetainedView
+	numCollectors := len(t.collectors)
+	t.lock.Unlock()
+
+	t.metrics.TimeoutCollectorsRange(lowestRetainedView, t.newestViewCachedCollector, numCollectors)
 
 	t.log.Debug().
 		Uint64("prior_lowest_retained_view", from).
 		Uint64("lowest_retained_view", lowestRetainedView).
 		Int("prior_size", sizeBefore).
-		Int("size", len(t.collectors)).
+		Int("size", numCollectors).
 		Msgf("pruned timeout collectors")
 }
