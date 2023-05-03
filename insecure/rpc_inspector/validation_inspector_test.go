@@ -87,9 +87,9 @@ func TestValidationInspector_SafetyThreshold(t *testing.T) {
 	}, 2*time.Second, 10*time.Millisecond)
 }
 
-// TestValidationInspector_DiscardThreshold ensures that when RPC control message count is above the configured discard threshold an invalid control message
+// TestValidationInspector_DiscardThreshold_Detection ensures that when RPC control message count is above the configured discard threshold an invalid control message
 // notification is disseminated with the expected error.
-func TestValidationInspector_DiscardThreshold(t *testing.T) {
+func TestValidationInspector_DiscardThreshold_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
@@ -149,9 +149,9 @@ func TestValidationInspector_DiscardThreshold(t *testing.T) {
 	require.Equal(t, uint64(1), invPruneNotifCount.Load())
 }
 
-// TestValidationInspector_RateLimitedPeer ensures that the control message validation inspector rate limits peers per control message type as expected and
+// TestValidationInspector_RateLimitedPeer_Detection ensures that the control message validation inspector rate limits peers per control message type as expected and
 // the expected invalid control message notification is disseminated with the expected error.
-func TestValidationInspector_RateLimitedPeer(t *testing.T) {
+func TestValidationInspector_RateLimitedPeer_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	// create our RPC validation inspector
@@ -222,13 +222,13 @@ func TestValidationInspector_RateLimitedPeer(t *testing.T) {
 	require.Equal(t, uint64(2), invPruneNotifCount.Load())
 }
 
-// TestValidationInspector_InvalidTopicID ensures that when an RPC control message contains an invalid topic ID an invalid control message
+// TestValidationInspector_InvalidTopicId_Detection ensures that when an RPC control message contains an invalid topic ID an invalid control message
 // notification is disseminated with the expected error.
 // An invalid topic ID could have any of the following properties:
 // - unknown topic: the topic is not a known Flow topic
 // - malformed topic: topic is malformed in some way
 // - invalid spork ID: spork ID prepended to topic and current spork ID do not match
-func TestValidationInspector_InvalidTopicId(t *testing.T) {
+func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
@@ -314,9 +314,9 @@ func TestValidationInspector_InvalidTopicId(t *testing.T) {
 	require.Equal(t, uint64(3), invPruneNotifCount.Load())
 }
 
-// TestValidationInspector_DuplicateTopicId ensures that when an RPC control message contains a duplicate topic ID an invalid control message
+// TestValidationInspector_DuplicateTopicId_Detection ensures that when an RPC control message contains a duplicate topic ID an invalid control message
 // notification is disseminated with the expected error.
-func TestValidationInspector_DuplicateTopicId(t *testing.T) {
+func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
@@ -386,9 +386,9 @@ func TestValidationInspector_DuplicateTopicId(t *testing.T) {
 	require.Equal(t, uint64(1), invPruneNotifCount.Load())
 }
 
-// TestValidationInspector_UnknownClusterId ensures that when an RPC control message contains a topic with an unknown cluster ID an invalid control message
+// TestValidationInspector_UnknownClusterId_Detection ensures that when an RPC control message contains a topic with an unknown cluster ID an invalid control message
 // notification is disseminated with the expected error.
-func TestValidationInspector_UnknownClusterId(t *testing.T) {
+func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
@@ -459,9 +459,9 @@ func TestValidationInspector_UnknownClusterId(t *testing.T) {
 	require.Equal(t, uint64(1), invPruneNotifCount.Load())
 }
 
-// TestValidationInspector_ActiveClusterIdsNotSet ensures that an error is returned only after the cluster prefixed topics received for a peer exceed the configured
+// TestValidationInspector_ActiveClusterIdsNotSet_Detection ensures that an error is returned only after the cluster prefixed topics received for a peer exceed the configured
 // cluster prefix discard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error.
-func TestValidationInspector_ActiveClusterIdsNotSet(t *testing.T) {
+func TestValidationInspector_ActiveClusterIdsNotSet_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
