@@ -36,7 +36,7 @@ type MisbehaviorReportOpt func(r *MisbehaviorReport) error
 func WithPenaltyAmplification(v float64) MisbehaviorReportOpt {
 	return func(r *MisbehaviorReport) error {
 		if v <= 0 || v > 100 {
-			return fmt.Errorf("penalty value should be between 1-100: %d", v)
+			return fmt.Errorf("penalty value should be between 1-100: %v", v)
 		}
 		r.penalty *= v
 		return nil
