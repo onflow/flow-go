@@ -263,11 +263,12 @@ func TestValidationInspector_InvalidTopicID(t *testing.T) {
 	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
 	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
+	// set safety thresholds to 0 to force inspector to validate all control messages
 	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
 	// set discard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
-	inspectorConfig.ClusterPrefixDiscardThreshold = 0
+	inspectorConfig.ClusterPrefixHardThreshold = 0
 	inspectorConfig.NumberOfWorkers = 1
 
 	// SafetyThreshold < messageCount < DiscardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
@@ -366,7 +367,7 @@ func TestValidationInspector_ActiveClusterIDSNotSet(t *testing.T) {
 	// create our RPC validation inspector
 	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
-	inspectorConfig.ClusterPrefixDiscardThreshold = 5
+	inspectorConfig.ClusterPrefixHardThreshold = 5
 	inspectorConfig.NumberOfWorkers = 1
 	controlMessageCount := int64(10)
 

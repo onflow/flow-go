@@ -51,12 +51,12 @@ type ControlMsgValidationInspectorConfig struct {
 	GraftValidationCfg *CtrlMsgValidationConfig
 	// PruneValidationCfg validation configuration for PRUNE control messages.
 	PruneValidationCfg *CtrlMsgValidationConfig
-	// ClusterPrefixDiscardThreshold the upper bound on the amount of cluster prefixed control messages that will be processed
+	// ClusterPrefixHardThreshold the upper bound on the amount of cluster prefixed control messages that will be processed
 	// before a node starts to get penalized. This allows LN nodes to process some cluster prefixed control messages during startup
 	// when the cluster ID's provider is set asynchronously. It also allows processing of some stale messages that may be sent by nodes
 	// that fall behind in the protocol. After the amount of cluster prefixed control messages processed exceeds this threshold the node
 	// will be pushed to the edge of the network mesh.
-	ClusterPrefixDiscardThreshold uint64
+	ClusterPrefixHardThreshold uint64
 }
 
 // getCtrlMsgValidationConfig returns the CtrlMsgValidationConfig for the specified p2p.ControlMessageType.
@@ -400,13 +400,13 @@ func (c *ControlMsgValidationInspector) validateTopicInlineFunc(from peer.ID, ct
 		err := c.validateTopic(from, topic)
 		if err != nil {
 			switch {
-			case channels.IsErrUnknownClusterID(err) && c.clusterPrefixTopicsReceivedTracker.Load(from) <= c.config.ClusterPrefixDiscardThreshold:
+			case channels.IsErrUnknownClusterID(err) && c.clusterPrefixTopicsReceivedTracker.Load(from) <= c.config.ClusterPrefixHardThreshold:
 				lg.Warn().
 					Err(err).
 					Str("topic", topic.String()).
 					Msg("processing unknown cluster prefixed topic received below cluster prefixed discard threshold peer may be behind in the protocol")
 				return nil
-			case IsErrActiveClusterIDsNotSet(err) && c.clusterPrefixTopicsReceivedTracker.Load(from) <= c.config.ClusterPrefixDiscardThreshold:
+			case IsErrActiveClusterIDsNotSet(err) && c.clusterPrefixTopicsReceivedTracker.Load(from) <= c.config.ClusterPrefixHardThreshold:
 				lg.Warn().
 					Err(err).
 					Str("topic", topic.String()).

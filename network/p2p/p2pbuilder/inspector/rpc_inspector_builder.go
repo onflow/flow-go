@@ -170,11 +170,11 @@ func (b *GossipSubInspectorBuilder) validationInspectorConfig(validationConfigs 
 
 	// setup gossip sub RPC control message inspector config
 	controlMsgRPCInspectorCfg := &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:               validationConfigs.NumberOfWorkers,
-		InspectMsgStoreOpts:           opts,
-		GraftValidationCfg:            graftValidationCfg,
-		PruneValidationCfg:            pruneValidationCfg,
-		ClusterPrefixDiscardThreshold: validationConfigs.ClusterPrefixDiscardThreshold,
+		NumberOfWorkers:            validationConfigs.NumberOfWorkers,
+		InspectMsgStoreOpts:        opts,
+		GraftValidationCfg:         graftValidationCfg,
+		PruneValidationCfg:         pruneValidationCfg,
+		ClusterPrefixHardThreshold: validationConfigs.ClusterPrefixDiscardThreshold,
 	}
 	return controlMsgRPCInspectorCfg, nil
 }
@@ -216,10 +216,10 @@ func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation
 	})
 
 	return &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:               validation.DefaultNumberOfWorkers,
-		InspectMsgStoreOpts:           opts,
-		GraftValidationCfg:            graftCfg,
-		PruneValidationCfg:            pruneCfg,
-		ClusterPrefixDiscardThreshold: validation.DefaultClusterPrefixDiscardThreshold,
+		NumberOfWorkers:            validation.DefaultNumberOfWorkers,
+		InspectMsgStoreOpts:        opts,
+		GraftValidationCfg:         graftCfg,
+		PruneValidationCfg:         pruneCfg,
+		ClusterPrefixHardThreshold: validation.DefaultClusterPrefixDiscardThreshold,
 	}
 }
