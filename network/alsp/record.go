@@ -17,8 +17,9 @@ type ProtocolSpamRecord struct {
 	// Decay speed of Penalty for this misbehaving node. Each node may have a different Decay speed based on its behavior.
 	Decay float64
 
-	// CutoffCounter is a counter that is used to determine how many times the misbehaving node has been slashed due to
+	// CutoffCounter is a counter that is used to determine how many times the connections to the node has been cut due to
 	// its Penalty value dropping below the disallow-listing threshold.
+	// Note that the cutoff connections are recovered after a certain amount of time.
 	CutoffCounter uint64
 
 	// total Penalty value of the misbehaving node. Should be a negative value.
