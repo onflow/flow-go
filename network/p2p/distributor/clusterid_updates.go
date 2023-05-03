@@ -21,7 +21,7 @@ func (c *ClusterIDUpdateDistributor) DistributeClusterIDUpdate(clusterIDS flow.C
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	for _, consumer := range c.consumers {
-		consumer.OnClusterIDSUpdate(clusterIDS)
+		consumer.OnClusterIdsUpdated(clusterIDS)
 	}
 }
 

@@ -213,7 +213,7 @@ func (c *ControlMsgValidationInspector) Name() string {
 }
 
 // OnClusterIDSUpdate consumes cluster ID updates from the p2p.ClusterIDUpdateDistributor.
-func (c *ControlMsgValidationInspector) OnClusterIDSUpdate(clusterIDList flow.ChainIDList) {
+func (c *ControlMsgValidationInspector) OnClusterIdsUpdated(clusterIDList flow.ChainIDList) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.activeClusterIDS = clusterIDList

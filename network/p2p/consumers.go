@@ -114,10 +114,10 @@ type GossipSubInvalidControlMessageNotificationConsumer interface {
 // A new list of cluster IDs will be assigned when the new set of epoch components are started, and the old set of cluster
 // IDs are removed when the current set of epoch components are stopped. The implementation must be concurrency safe and  non-blocking.
 type ClusterIDUpdateConsumer interface {
-	// OnClusterIDSUpdate is called when a new cluster ID update event is distributed.
+	// OnClusterIdsUpdated is called when a new cluster ID update event is distributed.
 	// Any error on consuming event must handle internally.
 	// The implementation must be concurrency safe, but can be blocking.
-	OnClusterIDSUpdate(flow.ChainIDList)
+	OnClusterIdsUpdated(flow.ChainIDList)
 }
 
 // ClusterIDUpdateDistributor is the interface for the distributor that distributes cluster ID update events to all consumers.

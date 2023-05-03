@@ -62,8 +62,8 @@ func (_m *GossipSubMsgValidationRpcInspector) Name() string {
 	return r0
 }
 
-// OnClusterIDSUpdate provides a mock function with given fields: _a0
-func (_m *GossipSubMsgValidationRpcInspector) OnClusterIDSUpdate(_a0 flow.ChainIDList) {
+// OnClusterIdsUpdated provides a mock function with given fields: _a0
+func (_m *GossipSubMsgValidationRpcInspector) OnClusterIdsUpdated(_a0 flow.ChainIDList) {
 	_m.Called(_a0)
 }
 

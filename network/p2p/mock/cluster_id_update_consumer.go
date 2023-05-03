@@ -12,8 +12,8 @@ type ClusterIDUpdateConsumer struct {
 	mock.Mock
 }
 
-// OnClusterIDSUpdate provides a mock function with given fields: _a0
-func (_m *ClusterIDUpdateConsumer) OnClusterIDSUpdate(_a0 flow.ChainIDList) {
+// OnClusterIdsUpdated provides a mock function with given fields: _a0
+func (_m *ClusterIDUpdateConsumer) OnClusterIdsUpdated(_a0 flow.ChainIDList) {
 	_m.Called(_a0)
 }
 
