@@ -13,6 +13,7 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	fvmState "github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
@@ -165,8 +166,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	context = fvm.NewContextFromParent(
 		context,
 		fvm.WithDerivedBlockData(
-			derived.NewEmptyDerivedBlockDataWithTransactionOffset(
-				transactionOffset)))
+			derived.NewEmptyDerivedBlockData(logical.Time(transactionOffset))))
 
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which
