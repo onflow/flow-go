@@ -135,7 +135,7 @@ Per convention, a vertex should throw any unexpected exceptions using the relate
           // finalized. We just bubble this sentinel up, as it already has the expected type.
           blockID, err := retrieveBlockIdByHeight(height)
           if err != nil {
-              return nil, err
+              return nil, fmt.Errorf("could not query block by height: %w", err)
           }
 
           // Step 2: retrieve full block by ID. Function `retrieveBlockByID` returns
