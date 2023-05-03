@@ -160,7 +160,7 @@ var BLS12381Order = []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33,
 	0x5B, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x01}
 
 func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
-	t.Run(fmt.Sprintf("encode/decode for %s", salg), func(t *testing.T) {
+	t.Run(fmt.Sprintf("generic encode/decode for %s", salg), func(t *testing.T) {
 		rand := getPRG(t)
 
 		t.Run("happy path tests", func(t *testing.T) {

@@ -180,29 +180,35 @@ func TestBLSEncodeDecode(t *testing.T) {
 	// specific tests for BLS
 
 	//  zero private key
-	skBytes := make([]byte, PrKeyLenBLSBLS12381)
-	sk, err := DecodePrivateKey(BLSBLS12381, skBytes)
-	require.Error(t, err, "decoding identity private key should fail")
-	assert.True(t, IsInvalidInputsError(err))
-	assert.Nil(t, sk)
+	t.Run("zero private key", func(t *testing.T) {
+		skBytes := make([]byte, PrKeyLenBLSBLS12381)
+		sk, err := DecodePrivateKey(BLSBLS12381, skBytes)
+		require.Error(t, err, "decoding identity private key should fail")
+		assert.True(t, IsInvalidInputsError(err))
+		assert.Nil(t, sk)
+	})
 
-	//  decode an identity public key
-	pkBytes := make([]byte, PubKeyLenBLSBLS12381)
-	pkBytes[0] = infinityPointHeader
-	pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
-	require.NoError(t, err, "decoding identity public key should succeed")
-	assert.True(t, pk.Equals(IdentityBLSPublicKey()))
-
-	// encode an identity public key
-	assert.Equal(t, pk.Encode(), pkBytes)
+	//  identity public key
+	t.Run("infinity public key", func(t *testing.T) {
+		//  decode an identity public key
+		pkBytes := make([]byte, PubKeyLenBLSBLS12381)
+		pkBytes[0] = infinityPointHeader
+		pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
+		require.NoError(t, err, "decoding identity public key should succeed")
+		assert.True(t, pk.Equals(IdentityBLSPublicKey()))
+		// encode an identity public key
+		assert.Equal(t, pk.Encode(), pkBytes)
+	})
 
 	// invalid point
-	pkBytes = make([]byte, PubKeyLenBLSBLS12381)
-	pkBytes[0] = invalidBLSSignatureHeader
-	pk, err = DecodePublicKey(BLSBLS12381, pkBytes)
-	require.Error(t, err, "the key decoding should fail - key value is invalid")
-	assert.True(t, IsInvalidInputsError(err))
-	assert.Nil(t, pk)
+	t.Run("invalid public key", func(t *testing.T) {
+		pkBytes := make([]byte, PubKeyLenBLSBLS12381)
+		pkBytes[0] = invalidBLSSignatureHeader
+		pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
+		require.Error(t, err, "the key decoding should fail - key value is invalid")
+		assert.True(t, IsInvalidInputsError(err))
+		assert.Nil(t, pk)
+	})
 
 	// Test a public key serialization with a point encoded with a coordinate x with
 	// x[0] or x[1] not reduced mod p.
@@ -213,21 +219,23 @@ func TestBLSEncodeDecode(t *testing.T) {
 	// Although uniqueness of public key respresentation isn't a security property, some implementations
 	// may implicitely rely on the property.
 
-	// valid pk with x[0] < p and x[1] < p
-	validPk, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b8038360809700d36d761cb266af6babe9a069dc7364d3502e84536bd893d5f09ec2dd4f07cae1f8a178ffacc450f9b9a2")
-	require.NoError(t, err)
-	_, err = DecodePublicKey(BLSBLS12381, validPk)
-	assert.NoError(t, err)
-	// invalidpk1 with x[0]+p and same x[1]
-	invalidPk1, err := hex.DecodeString("9B8E840277BE772540D913E47A94F94C00003BBE60C4CEEB0C0ABCC9E876034089000EC7AF5AB6D81AF62EC9363D5E63038360809700d36d761cb266af6babe9a069dc7364d3502e84536bd893d5f09ec2dd4f07cae1f8a178ffacc450f9b9a2")
-	require.NoError(t, err)
-	_, err = DecodePublicKey(BLSBLS12381, invalidPk1)
-	assert.Error(t, err)
-	// invalidpk1 with same x[0] and x[1]+p
-	invalidPk2, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b81D84726AD080BA07C1385A1CF2B758C104E127F8585862EDEB843E798A86E6C2E1894F067C35F8A132FEACC450F9644D")
-	require.NoError(t, err)
-	_, err = DecodePublicKey(BLSBLS12381, invalidPk2)
-	assert.Error(t, err)
+	t.Run("public key with non-reduced coordinates", func(t *testing.T) {
+		// valid pk with x[0] < p and x[1] < p
+		validPk, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b8038360809700d36d761cb266af6babe9a069dc7364d3502e84536bd893d5f09ec2dd4f07cae1f8a178ffacc450f9b9a2")
+		require.NoError(t, err)
+		_, err = DecodePublicKey(BLSBLS12381, validPk)
+		assert.NoError(t, err)
+		// invalidpk1 with x[0]+p and same x[1]
+		invalidPk1, err := hex.DecodeString("9B8E840277BE772540D913E47A94F94C00003BBE60C4CEEB0C0ABCC9E876034089000EC7AF5AB6D81AF62EC9363D5E63038360809700d36d761cb266af6babe9a069dc7364d3502e84536bd893d5f09ec2dd4f07cae1f8a178ffacc450f9b9a2")
+		require.NoError(t, err)
+		_, err = DecodePublicKey(BLSBLS12381, invalidPk1)
+		assert.Error(t, err)
+		// invalidpk1 with same x[0] and x[1]+p
+		invalidPk2, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b81D84726AD080BA07C1385A1CF2B758C104E127F8585862EDEB843E798A86E6C2E1894F067C35F8A132FEACC450F9644D")
+		require.NoError(t, err)
+		_, err = DecodePublicKey(BLSBLS12381, invalidPk2)
+		assert.Error(t, err)
+	})
 }
 
 // TestBLSEquals tests equal for BLS keys
