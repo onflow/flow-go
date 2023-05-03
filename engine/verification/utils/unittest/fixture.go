@@ -334,7 +334,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			unittest.IdentifierFixture(),
 			executableBlock,
 			snapshot,
-			derived.NewEmptyDerivedBlockData())
+			derived.NewEmptyDerivedBlockData(0))
 		require.NoError(t, err)
 
 		for _, snapshot := range computationResult.AllExecutionSnapshots() {

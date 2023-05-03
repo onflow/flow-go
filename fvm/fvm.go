@@ -155,8 +155,8 @@ func (vm *VirtualMachine) Run(
 ) {
 	derivedBlockData := ctx.DerivedBlockData
 	if derivedBlockData == nil {
-		derivedBlockData = derived.NewEmptyDerivedBlockDataWithTransactionOffset(
-			uint32(proc.ExecutionTime()))
+		derivedBlockData = derived.NewEmptyDerivedBlockData(
+			proc.ExecutionTime())
 	}
 
 	var derivedTxnData *derived.DerivedTransactionData
@@ -233,7 +233,7 @@ func (vm *VirtualMachine) GetAccount(
 
 	derivedBlockData := ctx.DerivedBlockData
 	if derivedBlockData == nil {
-		derivedBlockData = derived.NewEmptyDerivedBlockData()
+		derivedBlockData = derived.NewEmptyDerivedBlockData(0)
 	}
 
 	derivedTxnData := derivedBlockData.NewSnapshotReadDerivedTransactionData()
