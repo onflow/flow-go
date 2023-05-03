@@ -5,6 +5,16 @@ import (
 	"github.com/onflow/flow-go/network/alsp/model"
 )
 
+const (
+	// DefaultSpamRecordCacheSize is the default size of the spam record cache.
+	// It should be as big as the number of authorized nodes in Flow network.
+	// Recommendation: for small network sizes 10 * number of authorized nodes to ensure that the cache can hold all the spam records of the authorized nodes.
+	DefaultSpamRecordCacheSize = 10 * 1000 // considering max 1000 authorized nodes.
+
+	// Enabled is the default value indicating whether the ALSP module is enabled.
+	Enabled = true
+)
+
 // SpamRecordCache is a cache of spam records for the ALSP module.
 // It is used to keep track of the spam records of the nodes that have been reported for spamming.
 type SpamRecordCache interface {

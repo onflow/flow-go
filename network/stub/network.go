@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/conduit"
@@ -48,13 +49,18 @@ func WithConduitFactory(factory network.ConduitFactory) func(*Network) {
 // in order for a mock hub to find each other.
 func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Network)) *Network {
 	net := &Network{
-		ctx:            context.Background(),
-		myId:           myId,
-		hub:            hub,
-		engines:        make(map[channels.Channel]network.MessageProcessor),
-		seenEventIDs:   make(map[string]struct{}),
-		qCD:            make(chan struct{}),
-		conduitFactory: conduit.NewDefaultConduitFactory(unittest.Logger(), metrics.NewNoopCollector()),
+		ctx:          context.Background(),
+		myId:         myId,
+		hub:          hub,
+		engines:      make(map[channels.Channel]network.MessageProcessor),
+		seenEventIDs: make(map[string]struct{}),
+		qCD:          make(chan struct{}),
+		conduitFactory: conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
+			Enabled:      true,
+			Logger:       unittest.Logger(),
+			AlspMetrics:  metrics.NewNoopCollector(),
+			CacheMetrics: metrics.NewNoopCollector(),
+		}),
 	}
 
 	for _, opt := range opts {

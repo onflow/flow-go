@@ -1,4 +1,4 @@
-package manager_test
+package alspmgr_test
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/alsp"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -34,8 +35,12 @@ import (
 func TestHandleReportedMisbehavior(t *testing.T) {
 	misbehaviorReportManger := mocknetwork.NewMisbehaviorReportManager(t)
 	conduitFactory := conduit.NewDefaultConduitFactory(
-		unittest.Logger(),
-		metrics.NewNoopCollector(),
+		&alspmgr.MisbehaviorReportManagerConfig{
+			Enabled:      true,
+			Logger:       unittest.Logger(),
+			AlspMetrics:  metrics.NewNoopCollector(),
+			CacheMetrics: metrics.NewNoopCollector(),
+		},
 		conduit.WithMisbehaviorManager(misbehaviorReportManger))
 
 	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
@@ -89,8 +94,12 @@ func TestHandleReportedMisbehavior(t *testing.T) {
 func TestMisbehaviorReportMetrics(t *testing.T) {
 	alspMetrics := mockmodule.NewAlspMetrics(t)
 	conduitFactory := conduit.NewDefaultConduitFactory(
-		unittest.Logger(),
-		alspMetrics)
+		&alspmgr.MisbehaviorReportManagerConfig{
+			Enabled:      true,
+			Logger:       unittest.Logger(),
+			AlspMetrics:  metrics.NewNoopCollector(),
+			CacheMetrics: metrics.NewNoopCollector(),
+		})
 
 	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
 		t,

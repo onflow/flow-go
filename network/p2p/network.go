@@ -16,7 +16,9 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
@@ -24,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/network/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
@@ -123,16 +126,21 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 	}
 
 	n := &Network{
-		logger:                      param.Logger,
-		codec:                       param.Codec,
-		me:                          param.Me,
-		mw:                          mw,
-		receiveCache:                param.ReceiveCache,
-		topology:                    param.Topology,
-		metrics:                     param.Metrics,
-		subscriptionManager:         param.SubscriptionManager,
-		identityProvider:            param.IdentityProvider,
-		conduitFactory:              conduit.NewDefaultConduitFactory(param.Logger, param.Metrics),
+		logger:              param.Logger,
+		codec:               param.Codec,
+		me:                  param.Me,
+		mw:                  mw,
+		receiveCache:        param.ReceiveCache,
+		topology:            param.Topology,
+		metrics:             param.Metrics,
+		subscriptionManager: param.SubscriptionManager,
+		identityProvider:    param.IdentityProvider,
+		conduitFactory: conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
+			Enabled:      true,
+			Logger:       unittest.Logger(),
+			AlspMetrics:  metrics.NewNoopCollector(),
+			CacheMetrics: metrics.NewNoopCollector(),
+		}),
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
 	}

@@ -1,4 +1,4 @@
-package manager
+package alspmgr
 
 import (
 	"github.com/rs/zerolog"
@@ -21,6 +21,8 @@ type MisbehaviorReportManager struct {
 	logger  zerolog.Logger
 	metrics module.AlspMetrics
 	cache   alsp.SpamRecordCache
+	// enabled indicates whether the ALSP module is enabled. When disabled the ALSP module does not handle any misbehavior reports.
+	enabled bool
 }
 
 var _ network.MisbehaviorReportManager = (*MisbehaviorReportManager)(nil)
@@ -35,6 +37,8 @@ type MisbehaviorReportManagerConfig struct {
 	AlspMetrics module.AlspMetrics
 	// CacheMetrics is the metrics factory for the spam record cache.
 	CacheMetrics module.HeroCacheMetrics
+	// Enabled indicates whether the ALSP module is enabled. When disabled the ALSP module does not handle any misbehavior reports.
+	Enabled bool
 }
 
 // NewMisbehaviorReportManager creates a new instance of the MisbehaviorReportManager.
@@ -48,13 +52,21 @@ type MisbehaviorReportManagerConfig struct {
 //
 //	a new instance of the MisbehaviorReportManager.
 func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig) *MisbehaviorReportManager {
-	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
 
-	return &MisbehaviorReportManager{
+	m := &MisbehaviorReportManager{
 		logger:  cfg.Logger.With().Str("module", "misbehavior_report_manager").Logger(),
 		metrics: cfg.AlspMetrics,
-		cache:   cache,
+		enabled: cfg.Enabled,
 	}
+
+	if !m.enabled {
+		// when the ALSP module is disabled, the spam record cache is not needed.
+		m.logger.Warn().Msg("ALSP module is disabled")
+		return m
+	}
+
+	m.cache = internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+	return m
 }
 
 // HandleMisbehaviorReport is called upon a new misbehavior is reported.
@@ -64,13 +76,17 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig) *Misbehavi
 //
 //	and report the node to be disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
 func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Channel, report network.MisbehaviorReport) {
-	m.metrics.OnMisbehaviorReported(channel.String(), report.Reason().String())
-
-	m.logger.Debug().
+	lg := m.logger.With().
 		Str("channel", channel.String()).
 		Hex("misbehaving_id", logging.ID(report.OriginId())).
-		Str("reason", report.Reason().String()).
-		Msg("received misbehavior report")
+		Str("reason", report.Reason().String()).Logger()
+	m.metrics.OnMisbehaviorReported(channel.String(), report.Reason().String())
+
+	if !m.enabled {
+		// when disabled, the misbehavior is logged and metrics are updated, but no further actions are taken.
+		lg.Trace().Msg("discarding misbehavior report because ALSP module is disabled")
+		return
+	}
 
 	//_ := func() (float64, error) {
 	//	return m.cache.Adjust(report.OriginId(), func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
@@ -78,4 +94,6 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 	//		return record, nil
 	//	})
 	//}
+
+	lg.Debug().Msg("misbehavior report handled")
 }
