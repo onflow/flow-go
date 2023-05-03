@@ -160,7 +160,7 @@ func randFrStar(x *scalar, rand random.Rand) {
 	}
 }
 
-// mapToFr reads a scalar from a slice of bytes and maps it to Zr.
+// mapToFr reads a scalar from a slice of bytes and maps it to Fr using modular reduction.
 // The resulting element `k` therefore satisfies 0 <= k < r.
 // It returns true if scalar is zero and false otherwise.
 func mapToFr(x *scalar, src []byte) bool {

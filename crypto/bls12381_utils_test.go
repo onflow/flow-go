@@ -54,7 +54,6 @@ func BenchmarkScalarMultG1G2(b *testing.B) {
 
 // Sanity-check of the map-to-G1 with regards to the IETF draft hash-to-curve
 func TestMapToG1(t *testing.T) {
-
 	// test vectors from https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-14#appendix-J.9.1
 	dst := []byte("QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_")
 
@@ -160,5 +159,47 @@ func BenchmarkSubgroupCheck(b *testing.B) {
 		}
 		b.StopTimer()
 	})
+}
 
+// test some edge cases of MapToFr to validate modular reduction and endianness:
+//   - inputs `0` and curve order `r`
+//   - inputs `1` and `r+1`
+func TestMapToFr(t *testing.T) {
+	var x scalar
+	offset := 10
+	bytes := make([]byte, frBytesLen+offset)
+	expectedEncoding := make([]byte, frBytesLen)
+	// zero bytes
+	isZero := mapToFr(&x, bytes)
+	assert.True(t, isZero)
+	assert.True(t, x.isZero())
+	assert.Equal(t, expectedEncoding, newPrKeyBLSBLS12381(&x).Encode())
+	// curve order bytes
+	copy(bytes[offset:], BLS12381Order)
+	isZero = mapToFr(&x, bytes)
+	assert.True(t, isZero)
+	assert.True(t, x.isZero())
+	assert.Equal(t, expectedEncoding, newPrKeyBLSBLS12381(&x).Encode())
+	// curve order + 1
+	g1, err := hex.DecodeString("824aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb813e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e")
+	require.NoError(t, err)
+	bytes[len(bytes)-1] += 1
+	isZero = mapToFr(&x, bytes)
+	assert.False(t, isZero)
+	assert.False(t, x.isZero())
+	expectedEncoding[frBytesLen-1] = 1
+	sk := newPrKeyBLSBLS12381(&x)
+	assert.Equal(t, expectedEncoding, sk.Encode())
+	// check scalar is equal to "1" in the lower layer (scalar multiplication)
+	assert.Equal(t, sk.PublicKey().Encode(), g1, "scalar should be 1, check endianness in the C layer")
+	// 1
+	copy(bytes[offset:], expectedEncoding)
+	isZero = mapToFr(&x, bytes)
+	assert.False(t, isZero)
+	assert.False(t, x.isZero())
+	expectedEncoding[frBytesLen-1] = 1
+	sk = newPrKeyBLSBLS12381(&x)
+	assert.Equal(t, expectedEncoding, sk.Encode())
+	// check scalar is equal to "1" in the lower layer (scalar multiplication)
+	assert.Equal(t, sk.PublicKey().Encode(), g1, "scalar should be 1, check endianness in the C layer")
 }
