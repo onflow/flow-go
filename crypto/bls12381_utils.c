@@ -329,11 +329,12 @@ BLST_ERROR Fr_star_read_bytes(Fr* a, const byte *bin, int len) {
 
 // write Fr element `a` in big endian bytes.
 void Fr_write_bytes(byte *bin, const Fr* a) {
+    // be_bytes_from_limbs works for both limb endiannesses
     be_bytes_from_limbs(bin, (limb_t*)a, Fr_BYTES);
 }
 
 // maps big-endian bytes into an Fr element using modular reduction
-// Input is byte-big-endian, output is vec256 (also used as Fr)
+// Input is byte-big-endian, output is Fr (internally vec256)
 static void Fr_from_be_bytes(Fr* out, const byte *bytes, size_t n)
 {
     Fr digit, radix;
@@ -342,6 +343,7 @@ static void Fr_from_be_bytes(Fr* out, const byte *bytes, size_t n)
 
     byte* p = (byte*)bytes + n;
     while (n > Fr_BYTES) {
+        // limbs_from_be_bytes works for both limb endiannesses
         limbs_from_be_bytes((limb_t*)&digit, p -= Fr_BYTES, Fr_BYTES); // l_i
         Fr_mul_montg(&digit, &digit, &radix); // l_i * R^i  (i is the loop number starting at 1)
         Fr_add(out, out, &digit);
