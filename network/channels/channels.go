@@ -277,17 +277,36 @@ func ChannelFromTopic(topic Topic) (Channel, bool) {
 	return "", false
 }
 
-// sporkIDStrFromTopic returns the pre-pended spork ID for the topic.
-// A valid channel has a sporkID suffix:
+// sporkIdFromTopic returns the pre-pended spork ID flow identifier for the topic.
+// A valid channel has a spork ID suffix:
 //
 //	channel/spork_id
 //
 // All errors returned from this function can be considered benign.
-func sporkIDStrFromTopic(topic Topic) (string, error) {
+func sporkIdFromTopic(topic Topic) (flow.Identifier, error) {
 	if index := strings.LastIndex(topic.String(), "/"); index != -1 {
-		return string(topic)[index+1:], nil
+		id, err := flow.HexStringToIdentifier(string(topic)[index+1:])
+		if err != nil {
+			return flow.Identifier{}, fmt.Errorf("failed to get spork ID from topic %s", topic)
+		}
+
+		return id, nil
 	}
-	return "", fmt.Errorf("spork id missing from topic")
+	return flow.Identifier{}, fmt.Errorf("spork id missing from topic")
+}
+
+// sporkIdStrFromTopic returns the pre-pended spork ID string for the topic.
+// A valid channel has a spork ID suffix:
+//
+//	channel/spork_id
+//
+// All errors returned from this function can be considered benign.
+func sporkIdStrFromTopic(topic Topic) (string, error) {
+	sporkId, err := sporkIdFromTopic(topic)
+	if err != nil {
+		return "", err
+	}
+	return sporkId.String(), nil
 }
 
 // clusterIDStrFromTopic returns the pre-pended cluster ID for the cluster prefixed topic.
@@ -321,7 +340,7 @@ func SyncCluster(clusterID flow.ChainID) Channel {
 // ensures the sporkID part of the Topic is equal to the current network sporkID.
 // All errors returned from this function can be considered benign.
 func IsValidFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
-	sporkID, err := sporkIDStrFromTopic(topic)
+	sporkID, err := sporkIdStrFromTopic(topic)
 	if err != nil {
 		return NewInvalidTopicErr(topic, fmt.Errorf("failed to get spork ID from topic: %w", err))
 	}
