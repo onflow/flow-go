@@ -74,6 +74,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 			all.Setups,
 			all.EpochCommits,
 			all.Statuses,
+			all.VersionBeacons,
 		)
 		require.NoError(t, err)
 
@@ -154,6 +155,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 			all.Setups,
 			all.EpochCommits,
 			all.Statuses,
+			all.VersionBeacons,
 		)
 		require.NoError(t, err)
 
@@ -524,7 +526,20 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	db := unittest.BadgerDB(t, dir)
 	defer db.Close()
 	all := storutil.StorageLayer(t, db)
-	state, err := bprotocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
+	state, err := bprotocol.Bootstrap(
+		metrics,
+		db,
+		all.Headers,
+		all.Seals,
+		all.Results,
+		all.Blocks,
+		all.QuorumCertificates,
+		all.Setups,
+		all.EpochCommits,
+		all.Statuses,
+		all.VersionBeacons,
+		rootSnapshot,
+	)
 	f(state, err)
 }
 

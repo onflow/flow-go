@@ -15,11 +15,11 @@ import (
 )
 
 func newEmptyTestBlock() *DerivedDataTable[string, *string] {
-	return NewEmptyTable[string, *string]()
+	return NewEmptyTable[string, *string](0)
 }
 
 func TestDerivedDataTableWithTransactionOffset(t *testing.T) {
-	block := NewEmptyTableWithOffset[string, *string](18)
+	block := NewEmptyTable[string, *string](18)
 
 	require.Equal(
 		t,
@@ -62,7 +62,7 @@ func TestDerivedDataTableNormalTransactionInvalidSnapshotTime(t *testing.T) {
 }
 
 func TestDerivedDataTableToValidateTime(t *testing.T) {
-	block := NewEmptyTableWithOffset[string, *string](8)
+	block := NewEmptyTable[string, *string](8)
 	require.Equal(
 		t,
 		logical.Time(7),
@@ -963,7 +963,7 @@ func (computer *testValueComputer) Compute(
 }
 
 func TestDerivedDataTableGetOrCompute(t *testing.T) {
-	blockDerivedData := NewEmptyTable[flow.RegisterID, int]()
+	blockDerivedData := NewEmptyTable[flow.RegisterID, int](0)
 
 	key := flow.NewRegisterID("addr", "key")
 	value := 12345

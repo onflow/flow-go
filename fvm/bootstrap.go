@@ -928,7 +928,7 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 
 	// use new derived transaction data for each meta transaction.
 	// It's not necessary to cache during bootstrapping and most transactions are contract deploys anyway.
-	prog, err := derived.NewEmptyDerivedBlockData().
+	prog, err := derived.NewEmptyDerivedBlockData(0).
 		NewDerivedTransactionData(0, 0)
 
 	if err != nil {

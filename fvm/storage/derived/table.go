@@ -79,29 +79,17 @@ type TableTransaction[TKey comparable, TVal any] struct {
 	invalidators              chainedTableInvalidators[TKey, TVal]
 }
 
-func newEmptyTable[TKey comparable, TVal any](
-	latestCommit logical.Time,
-) *DerivedDataTable[TKey, TVal] {
-	return &DerivedDataTable[TKey, TVal]{
-		items:                     map[TKey]*invalidatableEntry[TVal]{},
-		latestCommitExecutionTime: latestCommit,
-		invalidators:              nil,
-	}
-}
-
-func NewEmptyTable[TKey comparable, TVal any]() *DerivedDataTable[TKey, TVal] {
-	return newEmptyTable[TKey, TVal](logical.ParentBlockTime)
-}
-
-// This variant is needed by the chunk verifier, which does not start at the
-// beginning of the block.
-func NewEmptyTableWithOffset[
+func NewEmptyTable[
 	TKey comparable,
 	TVal any,
 ](
-	offset uint32,
+	initialSnapshotTime logical.Time,
 ) *DerivedDataTable[TKey, TVal] {
-	return newEmptyTable[TKey, TVal](logical.Time(offset) - 1)
+	return &DerivedDataTable[TKey, TVal]{
+		items:                     map[TKey]*invalidatableEntry[TVal]{},
+		latestCommitExecutionTime: initialSnapshotTime - 1,
+		invalidators:              nil,
+	}
 }
 
 func (table *DerivedDataTable[TKey, TVal]) NewChildTable() *DerivedDataTable[TKey, TVal] {

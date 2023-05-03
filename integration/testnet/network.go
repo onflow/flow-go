@@ -1231,7 +1231,7 @@ func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 		return dkgmod.DKGData{}, err
 	}
 
-	dkg, err := dkg.RunFastKG(nConsensusNodes, dkgSeed)
+	dkg, err := dkg.RandomBeaconKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return dkgmod.DKGData{}, err
 	}
