@@ -138,8 +138,6 @@ type Snapshot interface {
 	Params() GlobalParams
 
 	// VersionBeacon returns the latest sealed version beacon.
-	// Returns the following errors:
-	// - state.NoVersionBeaconError when no version beacon is available
-	// - generic error in case of unexpected critical internal corruption or bugs
+	// Returns a generic error in case of unexpected critical internal corruption or bugs
 	VersionBeacon() (*flow.SealedVersionBeacon, error)
 }

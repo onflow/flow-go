@@ -1,7 +1,6 @@
 package badger
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -12,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -353,10 +351,11 @@ func validateClusterQC(cluster protocol.Cluster) error {
 func validateVersionBeacon(snap protocol.Snapshot) error {
 	versionBeacon, err := snap.VersionBeacon()
 	if err != nil {
-		if errors.Is(err, state.ErrNoVersionBeacon) {
-			return nil
-		}
 		return fmt.Errorf("could not get version beacon: %w", err)
+	}
+
+	if versionBeacon == nil {
+		return nil
 	}
 
 	head, err := snap.Head()

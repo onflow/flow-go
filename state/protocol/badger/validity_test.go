@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -152,7 +151,7 @@ func TestValidateVersionBeacon(t *testing.T) {
 	t.Run("no version beacon is ok", func(t *testing.T) {
 		snap := new(mock.Snapshot)
 
-		snap.On("VersionBeacon").Return(nil, state.ErrNoVersionBeacon)
+		snap.On("VersionBeacon").Return(nil, nil)
 
 		err := validateVersionBeacon(snap)
 		require.NoError(t, err)

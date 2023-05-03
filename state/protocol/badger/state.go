@@ -804,11 +804,11 @@ func (state *State) boostrapVersionBeacon(
 	return func(txn *badger.Txn) error {
 		versionBeacon, err := snapshot.VersionBeacon()
 		if err != nil {
-			// if there is no beacon, do nothing
-			if errors.Is(err, statepkg.ErrNoVersionBeacon) {
-				return nil
-			}
 			return err
+		}
+
+		if versionBeacon == nil {
+			return nil
 		}
 
 		return operation.IndexVersionBeaconByHeight(versionBeacon)(txn)

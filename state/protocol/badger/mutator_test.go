@@ -397,8 +397,9 @@ func TestVersionBeaconIndex(t *testing.T) {
 		versionBeacons := bstorage.NewVersionBeacons(db)
 
 		// No VB can be found before finalizing anything
-		_, err = versionBeacons.Highest(b7.Header.Height)
-		require.ErrorIs(t, err, storage.ErrNotFound)
+		vb, err := versionBeacons.Highest(b7.Header.Height)
+		require.NoError(t, err)
+		require.Nil(t, vb)
 
 		// finalizing b1 - b5
 		err = state.Finalize(context.Background(), b1.ID())
@@ -413,8 +414,9 @@ func TestVersionBeaconIndex(t *testing.T) {
 		require.NoError(t, err)
 
 		// No VB can be found after finalizing B5
-		_, err = versionBeacons.Highest(b7.Header.Height)
-		require.ErrorIs(t, err, storage.ErrNotFound)
+		vb, err = versionBeacons.Highest(b7.Header.Height)
+		require.NoError(t, err)
+		require.Nil(t, vb)
 
 		//  once B6 is finalized, events sealed by B5 are considered in effect, hence index should now find it
 		err = state.Finalize(context.Background(), b6.ID())

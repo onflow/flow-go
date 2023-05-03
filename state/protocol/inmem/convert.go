@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -86,11 +85,7 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	// convert version beacon
 	versionBeacon, err := from.VersionBeacon()
 	if err != nil {
-		if errors.Is(err, state.ErrNoVersionBeacon) {
-			snap.SealedVersionBeacon = nil
-		} else {
-			return nil, fmt.Errorf("could not get version beacon: %w", err)
-		}
+		return nil, fmt.Errorf("could not get version beacon: %w", err)
 	} else {
 		snap.SealedVersionBeacon = versionBeacon
 	}

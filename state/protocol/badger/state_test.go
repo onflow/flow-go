@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
-	pstate "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -83,8 +82,9 @@ func TestBootstrapAndOpen(t *testing.T) {
 
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
 
-		_, err = state.Final().VersionBeacon()
-		require.ErrorIs(t, err, pstate.ErrNoVersionBeacon)
+		vb, err := state.Final().VersionBeacon()
+		require.NoError(t, err)
+		require.Nil(t, vb)
 	})
 }
 

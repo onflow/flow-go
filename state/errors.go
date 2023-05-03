@@ -87,7 +87,3 @@ func IsUnverifiableExtensionError(err error) bool {
 	var errUnverifiableExtensionError UnverifiableExtensionError
 	return errors.As(err, &errUnverifiableExtensionError)
 }
-
-// ErrNoVersionBeacon is a sentinel error returned to indicate that no Version Beacon table exists.
-// This is generally expected at the beginning of sporks, and for the lifetime of transient networks.
-var ErrNoVersionBeacon = errors.New("no version beacon exists")
