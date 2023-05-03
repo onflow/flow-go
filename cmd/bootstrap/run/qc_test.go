@@ -50,7 +50,7 @@ func createSignerData(t *testing.T, n int) *ParticipantData {
 	networkingKeys := unittest.NetworkingKeys(n)
 	stakingKeys := unittest.StakingKeys(n)
 
-	seed := make([]byte, crypto.SeedMinLenDKG)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	_, err := rand.Read(seed)
 	require.NoError(t, err)
 	randomBSKs, randomBPKs, groupKey, err := crypto.BLSThresholdKeyGen(n,

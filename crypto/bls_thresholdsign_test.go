@@ -31,7 +31,7 @@ var thresholdSignatureMessage = []byte("random message")
 // centralized test of the stateful threshold signature using the threshold key generation.
 func testCentralizedStatefulAPI(t *testing.T) {
 	rand := getPRG(t)
-	seed := make([]byte, SeedMinLenDKG)
+	seed := make([]byte, KeyGenSeedMinLen)
 	_, err := rand.Read(seed)
 	n := 10
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
@@ -344,9 +344,9 @@ func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
 		chans[i] = make(chan *message, 2*n)
 	}
 	// start DKG in all participants
-	seed := make([]byte, SeedMinLenDKG)
+	seed := make([]byte, KeyGenSeedMinLen)
 	read, err := rand.Read(seed)
-	require.Equal(t, read, SeedMinLenDKG)
+	require.Equal(t, read, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sync.Add(n)
 	for current := 0; current < n; current++ {
@@ -404,9 +404,9 @@ func testDistributedStatefulAPI_JointFeldman(t *testing.T) {
 			chans[i] = make(chan *message, 2*n)
 		}
 		// start DKG in all participants but the
-		seed := make([]byte, SeedMinLenDKG)
+		seed := make([]byte, KeyGenSeedMinLen)
 		read, err := rand.Read(seed)
-		require.Equal(t, read, SeedMinLenDKG)
+		require.Equal(t, read, KeyGenSeedMinLen)
 		require.NoError(t, err)
 		sync.Add(n)
 		for current := 0; current < n; current++ {
@@ -544,13 +544,14 @@ type statelessKeys struct {
 
 // Centralized test of threshold signature protocol using the threshold key generation.
 func testCentralizedStatelessAPI(t *testing.T) {
-	rand := getPRG(t)
-	seed := make([]byte, SeedMinLenDKG)
-	_, err := rand.Read(seed)
-	require.NoError(t, err)
+
+	seed := make([]byte, KeyGenSeedMinLen)
 	n := 10
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		// generate threshold keys
+		rand := getPRG(t)
+		_, err := rand.Read(seed)
+		require.NoError(t, err)
 		skShares, pkShares, pkGroup, err := BLSThresholdKeyGen(n, threshold, seed)
 		require.NoError(t, err)
 		// signature hasher
@@ -608,7 +609,7 @@ func testCentralizedStatelessAPI(t *testing.T) {
 
 func BenchmarkSimpleKeyGen(b *testing.B) {
 	n := 60
-	seed := make([]byte, SeedMinLenDKG)
+	seed := make([]byte, KeyGenSeedMinLen)
 	_, err := crand.Read(seed)
 	require.NoError(b, err)
 	b.ResetTimer()
@@ -620,7 +621,7 @@ func BenchmarkSimpleKeyGen(b *testing.B) {
 
 func BenchmarkSignatureReconstruction(b *testing.B) {
 	n := 60
-	seed := make([]byte, SeedMinLenDKG)
+	seed := make([]byte, KeyGenSeedMinLen)
 	_, _ = crand.Read(seed)
 	threshold := 40
 	// generate threshold keys

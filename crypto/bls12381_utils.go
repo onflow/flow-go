@@ -33,9 +33,10 @@ package crypto
 //
 import "C"
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
+
+	"github.com/onflow/flow-go/crypto/random"
 )
 
 // Go wrappers around BLST C types
@@ -93,23 +94,6 @@ func (ct *ctx) initContext() error {
 	return nil
 }
 
-// seeds the internal relic random function.
-// relic context must be initialized before seeding.
-func seedRelic(seed []byte) error {
-	if len(seed) < (securityBits / 8) {
-		return invalidInputsErrorf(
-			"seed length needs to be larger than %d",
-			securityBits/8)
-	}
-	if len(seed) > maxRelicPrgSeed {
-		return invalidInputsErrorf(
-			"seed length needs to be less than %x",
-			maxRelicPrgSeed)
-	}
-	C.seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
-	return nil
-}
-
 // Exponentiation in G1 (scalar point multiplication)
 func (p *pointE1) scalarMultG1(res *pointE1, expo *scalar) {
 	C.ep_mult((*C.ep_st)(res), (*C.ep_st)(p), (*C.Fr)(expo))
@@ -154,39 +138,36 @@ func (p *pointE2) isInfinity() bool {
 	return C.E2_is_infty((*C.E2)(p)) != 0
 }
 
-// returns a random element of Fr in input pointer
-func randFr(x *scalar) error {
+// generates a random element in F_r using input random source,
+// and saves the random in `x`.
+// returns `true` if generated element is zero.
+func randFr(x *scalar, rand random.Rand) bool {
+	// use extra 128 bits to reduce the modular reduction bias
 	bytes := make([]byte, frBytesLen+securityBits/8)
-	_, err := rand.Read(bytes) // checking one output is enough
-	if err != nil {
-		return errors.New("internal rng failed")
-	}
-	_ = mapToZr(x, bytes)
-	return nil
+	rand.Read(bytes)
+	// modular reduction
+	return mapToFr(x, bytes)
 }
 
-// writes a random element of Fr* in input pointer
-func randFrStar(x *scalar) error {
-	bytes := make([]byte, frBytesLen+securityBits/8)
+// generates a random element in F_r* using input random source,
+// and saves the random in `x`.
+func randFrStar(x *scalar, rand random.Rand) {
 	isZero := true
+	// exteremely unlikely this loop runs more than once,
+	// but force the output to be non-zero instead of propagating an error.
 	for isZero {
-		_, err := rand.Read(bytes) // checking one output is enough
-		if err != nil {
-			return errors.New("internal rng failed")
-		}
-		isZero = mapToZr(x, bytes)
+		isZero = randFr(x, rand)
 	}
-	return nil
 }
 
-// mapToZr reads a scalar from a slice of bytes and maps it to Zr.
+// mapToFr reads a scalar from a slice of bytes and maps it to Fr using modular reduction.
 // The resulting element `k` therefore satisfies 0 <= k < r.
 // It returns true if scalar is zero and false otherwise.
-func mapToZr(x *scalar, src []byte) bool {
+func mapToFr(x *scalar, src []byte) bool {
 	isZero := C.map_bytes_to_Fr((*C.Fr)(x),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
-	return bool(isZero)
+	return isZero != (C.ulonglong)(0)
 }
 
 // writeScalar writes a scalar in a slice of bytes
@@ -273,16 +254,18 @@ func readPointE1(a *pointE1, src []byte) error {
 
 // checkMembershipG1 wraps a call to a subgroup check in G1 since cgo can't be used
 // in go test files.
-func checkMembershipG1(pt *pointE1) int {
-	return int(C.G1_check_membership((*C.ep_st)(pt)))
+func checkMembershipG1(pt *pointE1) bool {
+	//return C.E1_in_G1((*C.E1)(pt)) != (C.ulonglong)(0)
+	return true
 }
 
 // checkMembershipG2 wraps a call to a subgroup check in G2 since cgo can't be used
 // in go test files.
-func checkMembershipG2(pt *pointE2) int {
-	return int(C.G2_check_membership((*C.E2)(pt)))
+func checkMembershipG2(pt *pointE2) bool {
+	return C.E2_in_G2((*C.E2)(pt)) != (C.ulonglong)(0)
 }
 
+/*
 // randPointG1 wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in G1 and stores it in input point.
 func randPointG1(pt *pointE1) {
@@ -294,20 +277,20 @@ func randPointG1(pt *pointE1) {
 func randPointG1Complement(pt *pointE1) {
 	C.ep_rand_G1complement((*C.ep_st)(pt))
 }
-
-/*
-// randPointG2 wraps a call to C since cgo can't be used in go test files.
-// It generates a random point in G2 and stores it in input point.
-func randPointG2(pt *pointE2) {
-	C.ep2_rand_G2((*C.E2)(pt))
-}
-
-// randPointG1Complement wraps a call to C since cgo can't be used in go test files.
-// It generates a random point in E2\G2 and stores it in input point.
-func randPointG2Complement(pt *pointE2) {
-	C.ep2_rand_G2complement((*C.E2)(pt))
-}
 */
+
+// mapToG2 wraps a call to C since cgo can't be used in go test files.
+// It generates a random point in G2 and stores it in input point.
+func mapToG2(pt *pointE2, src []byte) {
+	C.map_bytes_to_G2((*C.E2)(pt), (*C.uchar)(&src[0]), (C.int)(len(src)))
+}
+
+// mapToG2Complement wraps a call to C since cgo can't be used in go test files.
+// It generates a random point in E2\G2 and stores it in input point.
+func mapToG2Complement(pt *pointE2, src []byte) bool {
+	res := C.map_bytes_to_G2complement((*C.E2)(pt), (*C.uchar)(&src[0]), (C.int)(len(src)))
+	return int(res) == blst_valid
+}
 
 // This is only a TEST function.
 // It hashes `data` to a G1 point using the tag `dst` and returns the G1 point serialization.

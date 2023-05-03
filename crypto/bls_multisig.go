@@ -4,6 +4,7 @@
 package crypto
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 
@@ -472,27 +473,27 @@ func VerifyBLSSignatureManyMessages(
 func BatchVerifyBLSSignaturesOneMessage(
 	pks []PublicKey, sigs []Signature, message []byte, kmac hash.Hasher,
 ) ([]bool, error) {
+	// boolean array returned when errors occur
+	falseSlice := make([]bool, len(sigs))
+
 	// empty list check
 	if len(pks) == 0 {
-		return []bool{}, fmt.Errorf("invalid list of public keys: %w", blsAggregateEmptyListError)
+		return falseSlice, fmt.Errorf("invalid list of public keys: %w", blsAggregateEmptyListError)
 	}
 
 	if len(pks) != len(sigs) {
-		return []bool{}, invalidInputsErrorf(
+		return falseSlice, invalidInputsErrorf(
 			"keys length %d and signatures length %d are mismatching",
 			len(pks),
 			len(sigs))
 	}
 
-	// return boolean array
 	returnBool := make([]bool, len(sigs))
-	// temporary boolean array to hold the return values till all the return values are set
-	tmpBool := make([]bool, len(sigs))
-	for i := range tmpBool {
-		tmpBool[i] = true // default to true
+	for i := range returnBool {
+		returnBool[i] = true // default to true
 	}
 	if err := checkBLSHasher(kmac); err != nil {
-		return returnBool, err
+		return falseSlice, err
 	}
 
 	// flatten the shares (required by the C layer)
@@ -507,14 +508,14 @@ func BatchVerifyBLSSignaturesOneMessage(
 	for i, pk := range pks {
 		pkBLS, ok := pk.(*pubKeyBLSBLS12381)
 		if !ok {
-			return returnBool, fmt.Errorf("key at index %d is invalid: %w", i, notBLSKeyError)
+			return falseSlice, fmt.Errorf("key at index %d is invalid: %w", i, notBLSKeyError)
 		}
 
 		if len(sigs[i]) != signatureLengthBLSBLS12381 || pkBLS.isIdentity {
 			// case of invalid signature: set the signature and public key at index `i`
 			// to identities so that there is no effect on the aggregation tree computation.
 			// However, the boolean return for index `i` is set to `false` and won't be overwritten.
-			tmpBool[i] = false
+			returnBool[i] = false
 			pkPoints = append(pkPoints, getIdentityPoint())
 			flatSigs = append(flatSigs, identityBLSSignature...)
 		} else {
@@ -525,28 +526,34 @@ func BatchVerifyBLSSignaturesOneMessage(
 
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(message)
-	verifInt := make([]byte, len(returnBool))
+	verifInt := make([]byte, len(sigs))
+	// internal non-determministic entropy source required by bls_batch_verify
+	// specific length of the seed is required by bls_batch_verify.
+	seed := make([]byte, (securityBits/8)*len(verifInt))
+	_, err := rand.Read(seed)
+	if err != nil {
+		return falseSlice, fmt.Errorf("generating randoms failed: %w", err)
+	}
 
-	C.bls_batchVerify(
+	C.bls_batch_verify(
 		(C.int)(len(verifInt)),
 		(*C.uchar)(&verifInt[0]),
 		(*C.E2)(&pkPoints[0]),
 		(*C.uchar)(&flatSigs[0]),
 		(*C.uchar)(&h[0]),
 		(C.int)(len(h)),
+		(*C.uchar)(&seed[0]),
 	)
 
 	for i, v := range verifInt {
 		if (C.int)(v) != valid && (C.int)(v) != invalid {
-			return returnBool, fmt.Errorf("batch verification failed")
+			return falseSlice, fmt.Errorf("batch verification failed")
 		}
-		if tmpBool[i] { // only overwrite if not previously written
-			tmpBool[i] = ((C.int)(v) == valid)
+		if returnBool[i] { // only overwrite if not previously set to false
+			returnBool[i] = ((C.int)(v) == valid)
 		}
 	}
 
-	// make sure returnBool is []false till this point
-	copy(returnBool, tmpBool)
 	return returnBool, nil
 }
 

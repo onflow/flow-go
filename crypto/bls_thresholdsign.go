@@ -413,7 +413,7 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 	}
 
 	// Lagrange Interpolate at point 0
-	result := C.G1_lagrangeInterpolateAtZero_serialized(
+	result := C.E1_lagrange_interpolate_at_zero_write(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&shares[0]),
 		(*C.uint8_t)(&signers[0]), (C.int)(s.threshold+1))
@@ -501,7 +501,7 @@ func BLSReconstructThresholdSignature(size int, threshold int,
 
 	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
 	// Lagrange Interpolate at point 0
-	if C.G1_lagrangeInterpolateAtZero_serialized(
+	if C.E1_lagrange_interpolate_at_zero_write(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&flatShares[0]),
 		(*C.uint8_t)(&indexSigners[0]), (C.int)(threshold+1),
@@ -533,11 +533,13 @@ func EnoughShares(threshold int, sharesNumber int) (bool, error) {
 //
 // The function returns :
 //   - (nil, nil, nil, invalidInputsErrorf) if:
+//   - seed is too short
 //   - n is not in [`ThresholdSignMinSize`, `ThresholdSignMaxSize`]
 //   - threshold value is not in interval [1, n-1]
 //   - (groupPrivKey, []pubKeyShares, groupPubKey, nil) otherwise
 func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	[]PublicKey, PublicKey, error) {
+
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
 		return nil, nil, nil, invalidInputsErrorf(
 			"size should be between %d and %d, got %d",
@@ -558,31 +560,18 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	y := make([]pointE2, size)
 	var X0 pointE2
 
-	// seed relic
-	if err := seedRelic(seed); err != nil {
-		return nil, nil, nil, fmt.Errorf("seeding relic failed: %w", err)
-	}
 	// Generate a polynomial P in Fr[X] of degree t
-	a := make([]scalar, threshold+1)
-	if err := randFrStar(&a[0]); err != nil { // non-identity key
-		return nil, nil, nil, fmt.Errorf("generating the random polynomial failed: %w", err)
+	a, err := generateFrPolynomial(seed, threshold)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to generate random polynomial: %w", err)
 	}
-	if threshold > 0 {
-		for i := 1; i < threshold; i++ {
-			if err := randFr(&a[i]); err != nil {
-				return nil, nil, nil, fmt.Errorf("generating the random polynomial failed: %w", err)
-			}
-		}
-		if err := randFrStar(&a[threshold]); err != nil { // enforce the polynomial degree
-			return nil, nil, nil, fmt.Errorf("generating the random polynomial failed: %w", err)
-		}
-	}
+
 	// compute the shares
 	for i := index(1); int(i) <= size; i++ {
 		C.Fr_polynomial_image(
 			(*C.Fr)(&x[i-1]),
 			(*C.E2)(&y[i-1]),
-			(*C.Fr)(&a[0]), (C.int)(len(a)),
+			(*C.Fr)(&a[0]), (C.int)(len(a)-1),
 			(C.uint8_t)(i),
 		)
 	}

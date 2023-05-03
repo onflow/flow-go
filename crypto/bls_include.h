@@ -20,9 +20,6 @@
 #define DOUBLE_PAIRING 1
 #define SINGLE_PAIRING (DOUBLE_PAIRING^1)
 
-// Signature and public key membership check
-#define MEMBERSHIP_CHECK 1
-
 // algorithm choice for hashing to G1 
 // both methods are similar implementations of the same optimized SSWU 
 // but offer different timings.
@@ -42,7 +39,7 @@ int      bls_verifyPerDistinctMessage(const byte*, const int, const byte*, const
 int      bls_verifyPerDistinctKey(const byte*, 
                          const int, const E2*, const uint32_t*,
                          const byte*, const uint32_t*);
-void     bls_batchVerify(const int, byte*, const E2*,
-            const byte*, const byte*, const int);
+void     bls_batch_verify(const int, byte*, const E2*,
+            const byte*, const byte*, const int, const byte*);
 
 #endif

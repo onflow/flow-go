@@ -10,7 +10,7 @@ import (
 )
 
 func TestRunDKG(t *testing.T) {
-	seedLen := crypto.SeedMinLenDKG
+	seedLen := crypto.KeyGenSeedMinLen
 	_, err := RunDKG(0, unittest.SeedFixtures(2, seedLen))
 	require.EqualError(t, err, "n needs to match the number of seeds (0 != 2)")
 
