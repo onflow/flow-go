@@ -106,6 +106,7 @@ import (
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type AccessNodeConfig struct {
 	supportsObserver             bool // True if this is an Access node that supports observers and consensus follower engines
+	publicNetworkPeers           []string
 	collectionGRPCPort           uint
 	executionGRPCPort            uint
 	pingEnabled                  bool
@@ -140,7 +141,6 @@ type PublicNetworkConfig struct {
 func DefaultAccessNodeConfig() *AccessNodeConfig {
 	homedir, _ := os.UserHomeDir()
 	return &AccessNodeConfig{
-		supportsObserver:   false,
 		collectionGRPCPort: 9000,
 		executionGRPCPort:  9000,
 		rpcConf: rpc.Config{
@@ -168,6 +168,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
 		},
 		stateStreamFilterConf:        nil,
+		supportsObserver:             false,
+		publicNetworkPeers:           []string{},
 		ExecutionNodeAddress:         "localhost:9000",
 		logTxTimeToFinalized:         false,
 		logTxTimeToExecuted:          false,
@@ -658,8 +660,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVarP(&builder.nodeInfoFile, "node-info-file", "", defaultConfig.nodeInfoFile, "full path to a json file which provides more details about nodes when reporting its reachability metrics")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
-		flags.BoolVar(&builder.supportsObserver, "supports-observer", defaultConfig.supportsObserver, "true if this staked access node supports observer or follower connections")
-		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
 
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
@@ -678,6 +678,11 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout, "state-stream-send-timeout", defaultConfig.stateStreamConf.ClientSendTimeout, "maximum wait before timing out while sending a response to a streaming client e.g. 30s")
 		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
 		flags.StringToIntVar(&builder.stateStreamFilterConf, "state-stream-event-filter-limits", defaultConfig.stateStreamFilterConf, "event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
+
+		// Public network config
+		flags.BoolVar(&builder.supportsObserver, "supports-observer", defaultConfig.supportsObserver, "true if this staked access node supports observer or follower connections")
+		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
+		flags.StringSliceVar(&builder.publicNetworkPeers, "public-network-peer-node-ids", defaultConfig.publicNetworkPeers, "comma separated list of access nodes ids to bridge to on the public network e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1108,8 +1113,33 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 
 			middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libp2pNode, msgValidators...)
 
-			// topology returns empty list since peers are not known upfront
-			top := topology.EmptyTopology{}
+			// by default, use an empty topology and discover peers using the DHT. this may result
+			// in fragmented public networks if there are no ANs/ONs that connect between them.
+			top := topology.NewEmptyTopology()
+
+			// if configured, seed the topology with a list of ANs to include in the topology.
+			// this ensures the DHT of each peer is bridged, forming a single larger network.
+			if len(builder.publicNetworkPeers) > 0 {
+				var ids flow.IdentityList
+				for _, peer := range builder.publicNetworkPeers {
+					id, err := flow.ParseIdentity(peer)
+					if err != nil {
+						return nil, fmt.Errorf("could not parse public network peer (id: %s): %w", peer, err)
+					}
+
+					if _, ok := builder.IdentityProvider.ByNodeID(id.NodeID); !ok {
+						return nil, fmt.Errorf("public network peer must be a staked node (id: %s) in identity provider", peer)
+					}
+
+					ids = append(ids, id)
+				}
+				top = topology.NewCustomTopology(ids)
+			}
+
+			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if builder.HeroCacheMetricsEnable {
+				heroCacheCollector = metrics.PublicNetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
+			}
 			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 				builder.Logger,
 				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork))
