@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
@@ -200,6 +201,17 @@ type NetworkConfig struct {
 	DisallowListNotificationCacheSize uint32
 	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
 	UnicastRateLimitersConfig *UnicastRateLimitersConfig
+	AlspConfig                *AlspConfig
+}
+
+// AlspConfig is the config for the Application Layer Spam Prevention (ALSP) protocol.
+type AlspConfig struct {
+	// Size of the cache for spam records. There is at most one spam record per authorized (i.e., staked) node.
+	// Recommended size is 10 * number of authorized nodes to allow for churn.
+	SpamRecordCacheSize uint32
+
+	// Enables the ALS protocol.
+	Enable bool
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
@@ -301,6 +313,10 @@ func DefaultBaseConfig() *BaseConfig {
 			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),
 			NetworkConnectionPruning:          connection.PruningEnabled,
 			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
+			AlspConfig: &AlspConfig{
+				SpamRecordCacheSize: alsp.DefaultSpamRecordCacheSize,
+				Enable:              alsp.Enabled,
+			},
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
