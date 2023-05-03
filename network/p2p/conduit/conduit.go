@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/alsp/manager"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	"github.com/onflow/flow-go/network/channels"
 )
 
