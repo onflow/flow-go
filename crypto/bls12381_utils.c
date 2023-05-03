@@ -116,10 +116,9 @@ prec_st* init_precomputed_data_BLS12_381() {
 // ------------------- Fr utilities
 
 // Montgomery constant R related to the curve order r
-const Fr BLS12_381_rR = {                   /* R mod r = (1<<256)%r */
-    TO_LIMB_T(0x1824b159acc5056f), TO_LIMB_T(0x998c4fefecbc4ff5),
-    TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe)
-};
+// R mod r = (1<<256)%r 
+const Fr BLS12_381_rR = { TO_LIMB_T(0x1824b159acc5056f), TO_LIMB_T(0x998c4fefecbc4ff5), \
+                          TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe), };
 
 // TODO: temp utility function to delete
 bn_st* Fr_blst_to_relic(const Fr* x) {

@@ -472,7 +472,6 @@ void bls_batch_verify(const int sigs_len, byte* results, const E2* pks_input,
     if (!sigs) goto out_sigs;
     for (int i=0; i < sigs_len; i++) {
         ep_new(sigs[i]);
-        ep2_new(pks[i]);
     }
 
     for (int i=0; i < sigs_len; i++) {
@@ -501,8 +500,6 @@ void bls_batch_verify(const int sigs_len, byte* results, const E2* pks_input,
             // r = random + 1
             Fr_set_limb(&one, 1);
             Fr_add(&r, &r, &one); 
-            /*char str[20]; sprintf(str, "r-%d", i);
-            Fr_print_(str, &r);*/
             // multiply public key and signature by the same random exponent r
             E2_mult(&pks[i], &pks_input[i], &r);  // TODO: faster version for short expos?
             bn_st* tmp = Fr_blst_to_relic(&r);
