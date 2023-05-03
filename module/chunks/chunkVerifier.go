@@ -12,8 +12,9 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	fvmState "github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/partial"
@@ -93,7 +94,7 @@ func (fcv *ChunkVerifier) Verify(
 }
 
 type partialLedgerStorageSnapshot struct {
-	snapshot fvmState.StorageSnapshot
+	snapshot snapshot.StorageSnapshot
 
 	unknownRegTouch map[flow.RegisterID]struct{}
 }
@@ -165,14 +166,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	context = fvm.NewContextFromParent(
 		context,
 		fvm.WithDerivedBlockData(
-			derived.NewEmptyDerivedBlockDataWithTransactionOffset(
-				transactionOffset)))
+			derived.NewEmptyDerivedBlockData(logical.Time(transactionOffset))))
 
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which
 	// are not expanded and values are unknown.
 	unknownRegTouch := make(map[flow.RegisterID]struct{})
-	snapshotTree := storage.NewSnapshotTree(
+	snapshotTree := snapshot.NewSnapshotTree(
 		&partialLedgerStorageSnapshot{
 			snapshot: executionState.NewLedgerStorageSnapshot(
 				psmt,

@@ -31,7 +31,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -295,7 +295,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
-	snapshot := state.NewReadFuncStorageSnapshot(
+	snapshot := snapshot.NewReadFuncStorageSnapshot(
 		func(id flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, fmt.Errorf("error getting register")
 		})
@@ -506,9 +506,9 @@ type PanickingVM struct{}
 func (p *PanickingVM) Run(
 	f fvm.Context,
 	procedure fvm.Procedure,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -518,7 +518,7 @@ func (p *PanickingVM) Run(
 func (p *PanickingVM) GetAccount(
 	ctx fvm.Context,
 	address flow.Address,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -533,15 +533,15 @@ type LongRunningVM struct {
 func (l *LongRunningVM) Run(
 	f fvm.Context,
 	procedure fvm.Procedure,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
 	time.Sleep(l.duration)
 
-	snapshot := &state.ExecutionSnapshot{}
+	snapshot := &snapshot.ExecutionSnapshot{}
 	output := fvm.ProcedureOutput{
 		Value: cadence.NewVoid(),
 	}
@@ -551,7 +551,7 @@ func (l *LongRunningVM) Run(
 func (l *LongRunningVM) GetAccount(
 	ctx fvm.Context,
 	address flow.Address,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -567,7 +567,7 @@ func (f *FakeBlockComputer) ExecuteBlock(
 	context.Context,
 	flow.Identifier,
 	*entity.ExecutableBlock,
-	state.StorageSnapshot,
+	snapshot.StorageSnapshot,
 	*derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,

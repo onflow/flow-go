@@ -375,6 +375,7 @@ func createNode(
 	setupsDB := storage.NewEpochSetups(metricsCollector, db)
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
 	statusesDB := storage.NewEpochStatuses(metricsCollector, db)
+	versionBeaconDB := storage.NewVersionBeacons(db)
 	consumer := events.NewDistributor()
 
 	localID := identity.ID()
@@ -395,6 +396,7 @@ func createNode(
 		setupsDB,
 		commitsDB,
 		statusesDB,
+		versionBeaconDB,
 		rootSnapshot,
 	)
 	require.NoError(t, err)

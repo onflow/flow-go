@@ -31,6 +31,12 @@ func (s *Suite) Ghost() *client.GhostClient {
 	return client
 }
 
+func (s *Suite) AccessClient() *testnet.Client {
+	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
+	s.NoError(err, "could not get access client")
+	return client
+}
+
 func (s *Suite) SetupTest() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
