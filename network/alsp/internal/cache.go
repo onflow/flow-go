@@ -11,14 +11,15 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network/alsp"
+	"github.com/onflow/flow-go/network/alsp/model"
 )
 
 var ErrSpamRecordNotFound = fmt.Errorf("spam record not found")
 
 // SpamRecordCache is a cache that stores spam records at the protocol layer for ALSP.
 type SpamRecordCache struct {
-	recordFactory alsp.SpamRecordFactoryFunc // recordFactory is a factory function that creates a new spam record.
-	c             *stdmap.Backend            // c is the underlying cache.
+	recordFactory model.SpamRecordFactoryFunc // recordFactory is a factory function that creates a new spam record.
+	c             *stdmap.Backend             // c is the underlying cache.
 }
 
 var _ alsp.SpamRecordCache = (*SpamRecordCache)(nil)
@@ -35,7 +36,7 @@ var _ alsp.SpamRecordCache = (*SpamRecordCache)(nil)
 // expected to be small, we do not eject any records from the cache. The cache size must be large enough to hold all
 // the spam records of the authorized nodes. Also, this cache is keeping at most one record per origin id, so the
 // size of the cache must be at least the number of authorized nodes.
-func NewSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics, recordFactory alsp.SpamRecordFactoryFunc) *SpamRecordCache {
+func NewSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics, recordFactory model.SpamRecordFactoryFunc) *SpamRecordCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
 		// this cache is supposed to keep the spam record for the authorized (staked) nodes. Since the number of such nodes is
@@ -78,7 +79,7 @@ func (s *SpamRecordCache) Init(originId flow.Identifier) bool {
 //
 // Note if Adjust is called under the assumption that the record exists, the ErrSpamRecordNotFound should be treated
 // as an irrecoverable error and indicates a bug.
-func (s *SpamRecordCache) Adjust(originId flow.Identifier, adjustFunc alsp.RecordAdjustFunc) (float64, error) {
+func (s *SpamRecordCache) Adjust(originId flow.Identifier, adjustFunc model.RecordAdjustFunc) (float64, error) {
 	var rErr error
 	adjustedEntity, adjusted := s.c.Adjust(originId, func(entity flow.Entity) flow.Entity {
 		record, ok := entity.(ProtocolSpamRecordEntity)
@@ -117,7 +118,7 @@ func (s *SpamRecordCache) Adjust(originId flow.Identifier, adjustFunc alsp.Recor
 // Returns:
 // - the record and true if the record exists, nil and false otherwise.
 // Note that the returned record is a copy of the record in the cache (we do not want the caller to modify the record).
-func (s *SpamRecordCache) Get(originId flow.Identifier) (*alsp.ProtocolSpamRecord, bool) {
+func (s *SpamRecordCache) Get(originId flow.Identifier) (*model.ProtocolSpamRecord, bool) {
 	entity, ok := s.c.ByID(originId)
 	if !ok {
 		return nil, false
@@ -131,7 +132,7 @@ func (s *SpamRecordCache) Get(originId flow.Identifier) (*alsp.ProtocolSpamRecor
 	}
 
 	// return a copy of the record (we do not want the caller to modify the record).
-	return &alsp.ProtocolSpamRecord{
+	return &model.ProtocolSpamRecord{
 		OriginId:      record.OriginId,
 		Decay:         record.Decay,
 		CutoffCounter: record.CutoffCounter,

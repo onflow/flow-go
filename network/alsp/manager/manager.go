@@ -1,12 +1,13 @@
-package alsp
+package manager
 
 import (
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/alsp/internal"
+	"github.com/onflow/flow-go/network/alsp/model"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -19,19 +20,21 @@ import (
 type MisbehaviorReportManager struct {
 	logger  zerolog.Logger
 	metrics module.AlspMetrics
-	cache   SpamRecordCache
+	cache   alsp.SpamRecordCache
 }
 
 var _ network.MisbehaviorReportManager = (*MisbehaviorReportManager)(nil)
 
 type MisbehaviorReportManagerConfig struct {
-	// Size is the size of the spam record cache.
-	Size   int
 	Logger zerolog.Logger
+	// SpamRecordsCacheSize is the size of the spam record cache that stores the spam records for the authorized nodes.
+	// It should be as big as the number of authorized nodes in Flow network.
+	// Recommendation: for small network sizes 10 * number of authorized nodes to ensure that the cache can hold all the spam records of the authorized nodes.
+	SpamRecordsCacheSize uint32
 	// AlspMetrics is the metrics instance for the alsp module (collecting spam reports).
 	AlspMetrics module.AlspMetrics
 	// CacheMetrics is the metrics factory for the spam record cache.
-	CacheMetricFactory module.HeroCacheMetrics
+	CacheMetrics module.HeroCacheMetrics
 }
 
 // NewMisbehaviorReportManager creates a new instance of the MisbehaviorReportManager.
@@ -44,19 +47,12 @@ type MisbehaviorReportManagerConfig struct {
 // Returns:
 //
 //	a new instance of the MisbehaviorReportManager.
-func NewMisbehaviorReportManager(logger zerolog.Logger, metrics module.AlspMetrics) *MisbehaviorReportManager {
-	cache := internal.NewSpamRecordCache(size, logger, herocacheFactory(), func(id flow.Identifier) ProtocolSpamRecord {
-		return ProtocolSpamRecord{
-			OriginId:      id,
-			Decay:         initialDecaySpeed,
-			CutoffCounter: 0,
-			Penalty:       0,
-		}
-	})
+func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig) *MisbehaviorReportManager {
+	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
 
 	return &MisbehaviorReportManager{
-		logger:  logger.With().Str("module", "misbehavior_report_manager").Logger(),
-		metrics: metrics,
+		logger:  cfg.Logger.With().Str("module", "misbehavior_report_manager").Logger(),
+		metrics: cfg.AlspMetrics,
 		cache:   cache,
 	}
 }
@@ -76,5 +72,10 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 		Str("reason", report.Reason().String()).
 		Msg("received misbehavior report")
 
-	// TODO: handle the misbehavior report and take actions accordingly.
+	//_ := func() (float64, error) {
+	//	return m.cache.Adjust(report.OriginId(), func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	//		record.Penalty -= report.Penalty()
+	//		return record, nil
+	//	})
+	//}
 }

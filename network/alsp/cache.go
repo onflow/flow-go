@@ -1,6 +1,9 @@
 package alsp
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/alsp/model"
+)
 
 // SpamRecordCache is a cache of spam records for the ALSP module.
 // It is used to keep track of the spam records of the nodes that have been reported for spamming.
@@ -13,7 +16,7 @@ type SpamRecordCache interface {
 	// Returns the Penalty value of the record after the adjustment.
 	// It returns an error if the adjustFunc returns an error or if the record does not exist.
 	// Assuming that adjust is always called when the record exists, the error is irrecoverable and indicates a bug.
-	Adjust(originId flow.Identifier, adjustFunc RecordAdjustFunc) (float64, error)
+	Adjust(originId flow.Identifier, adjustFunc model.RecordAdjustFunc) (float64, error)
 
 	// Identities returns the list of identities of the nodes that have a spam record in the cache.
 	Identities() []flow.Identifier
@@ -29,7 +32,7 @@ type SpamRecordCache interface {
 	// Returns:
 	// - the record and true if the record exists, nil and false otherwise.
 	// Note that the returned record is a copy of the record in the cache (we do not want the caller to modify the record).
-	Get(originId flow.Identifier) (*ProtocolSpamRecord, bool)
+	Get(originId flow.Identifier) (*model.ProtocolSpamRecord, bool)
 
 	// Size returns the number of records in the cache.
 	Size() uint

@@ -1,4 +1,4 @@
-package alsp
+package model
 
 import (
 	"github.com/onflow/flow-go/model/flow"
@@ -45,7 +45,7 @@ func SpamRecordFactory() SpamRecordFactoryFunc {
 	return func(originId flow.Identifier) ProtocolSpamRecord {
 		return ProtocolSpamRecord{
 			OriginId:      originId,
-			Decay:         initialDecaySpeed,
+			Decay:         InitialDecaySpeed,
 			CutoffCounter: uint64(0),
 			Penalty:       float64(0),
 		}

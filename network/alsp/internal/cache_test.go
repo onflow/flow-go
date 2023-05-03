@@ -12,8 +12,8 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/alsp/internal"
+	"github.com/onflow/flow-go/network/alsp/model"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -24,7 +24,7 @@ func TestNewSpamRecordCache(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 
@@ -39,8 +39,8 @@ func TestNewSpamRecordCache(t *testing.T) {
 // Returns:
 // - alsp.ProtocolSpamRecord, the created spam record.
 // Note that the returned spam record is not a valid spam record. It is used only for testing.
-func protocolSpamRecordFixture(id flow.Identifier) alsp.ProtocolSpamRecord {
-	return alsp.ProtocolSpamRecord{
+func protocolSpamRecordFixture(id flow.Identifier) model.ProtocolSpamRecord {
+	return model.ProtocolSpamRecord{
 		OriginId:      id,
 		Decay:         1000,
 		CutoffCounter: 0,
@@ -55,7 +55,7 @@ func TestSpamRecordCache_Init(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 
@@ -104,7 +104,7 @@ func TestSpamRecordCache_Adjust(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 
@@ -119,7 +119,7 @@ func TestSpamRecordCache_Adjust(t *testing.T) {
 	require.True(t, cache.Init(originID2))
 
 	// test adjusting the spam record for an existing origin ID
-	adjustFunc := func(record alsp.ProtocolSpamRecord) (alsp.ProtocolSpamRecord, error) {
+	adjustFunc := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 		record.Penalty -= 10
 		return record, nil
 	}
@@ -138,7 +138,7 @@ func TestSpamRecordCache_Adjust(t *testing.T) {
 	require.Error(t, err)
 
 	// test adjusting the spam record with an adjustFunc that returns an error
-	adjustFuncError := func(record alsp.ProtocolSpamRecord) (alsp.ProtocolSpamRecord, error) {
+	adjustFuncError := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 		return record, errors.New("adjustment error")
 	}
 	_, err = cache.Adjust(originID1, adjustFuncError)
@@ -159,7 +159,7 @@ func TestSpamRecordCache_Identities(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 
@@ -199,7 +199,7 @@ func TestSpamRecordCache_Remove(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 
@@ -240,7 +240,7 @@ func TestSpamRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 
@@ -254,7 +254,7 @@ func TestSpamRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 
 	// 2. Test adjusting a non-existent spam record
 	originID2 := unittest.IdentifierFixture()
-	_, err := cache.Adjust(originID2, func(record alsp.ProtocolSpamRecord) (alsp.ProtocolSpamRecord, error) {
+	_, err := cache.Adjust(originID2, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 		record.Penalty -= 10
 		return record, nil
 	})
@@ -275,7 +275,7 @@ func TestSpamRecordCache_ConcurrentInitialization(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 
@@ -314,7 +314,7 @@ func TestSpamRecordCache_ConcurrentSameRecordInitialization(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 
@@ -359,7 +359,7 @@ func TestSpamRecordCache_ConcurrentRemoval(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 
@@ -403,7 +403,7 @@ func TestSpamRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 
@@ -418,7 +418,7 @@ func TestSpamRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(len(originIDs) * 2)
 
-	adjustFunc := func(record alsp.ProtocolSpamRecord) (alsp.ProtocolSpamRecord, error) {
+	adjustFunc := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 		record.Penalty -= 1
 		return record, nil
 	}
@@ -460,7 +460,7 @@ func TestSpamRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 
@@ -519,7 +519,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAdjust(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 
@@ -535,7 +535,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAdjust(t *testing.T) {
 		cache.Init(originID)
 	}
 
-	adjustFunc := func(record alsp.ProtocolSpamRecord) (alsp.ProtocolSpamRecord, error) {
+	adjustFunc := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 		record.Penalty -= 1
 		return record, nil
 	}
@@ -582,7 +582,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAndAdjust(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 
@@ -625,7 +625,7 @@ func TestSpamRecordCache_ConcurrentInitRemoveAndAdjust(t *testing.T) {
 	for _, originID := range originIDsToAdjust {
 		go func(id flow.Identifier) {
 			defer wg.Done()
-			_, err := cache.Adjust(id, func(record alsp.ProtocolSpamRecord) (alsp.ProtocolSpamRecord, error) {
+			_, err := cache.Adjust(id, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 				record.Penalty -= 1
 				return record, nil
 			})
@@ -666,7 +666,7 @@ func TestSpamRecordCache_ConcurrentIdentitiesAndOperations(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	recordFactory := func(id flow.Identifier) alsp.ProtocolSpamRecord {
+	recordFactory := func(id flow.Identifier) model.ProtocolSpamRecord {
 		return protocolSpamRecordFixture(id)
 	}
 

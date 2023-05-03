@@ -1,4 +1,4 @@
-package alsp_test
+package manager_test
 
 import (
 	"context"
@@ -156,14 +156,14 @@ func TestReportCreation(t *testing.T) {
 	report, err = alsp.NewMisbehaviorReport(
 		unittest.IdentifierFixture(),
 		testutils.MisbehaviorTypeFixture(t),
-		alsp.WithPenaltyAmplification(rand.Intn(100)-101))
+		alsp.WithPenaltyAmplification(100*rand.Float64()-101))
 	require.Error(t, err)
 	require.Nil(t, report)
 
 	report, err = alsp.NewMisbehaviorReport(
 		unittest.IdentifierFixture(),
 		testutils.MisbehaviorTypeFixture(t),
-		alsp.WithPenaltyAmplification(rand.Int()+101))
+		alsp.WithPenaltyAmplification(100*rand.Float64()+101))
 	require.Error(t, err)
 	require.Nil(t, report)
 

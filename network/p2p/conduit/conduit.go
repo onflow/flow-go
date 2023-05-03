@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/alsp"
+	"github.com/onflow/flow-go/network/alsp/manager"
 	"github.com/onflow/flow-go/network/channels"
 )
 
@@ -46,7 +46,10 @@ func WithMisbehaviorManager(misbehaviorManager network.MisbehaviorReportManager)
 //	*DefaultConduitFactory, the created conduit factory.
 func NewDefaultConduitFactory(logger zerolog.Logger, metrics module.AlspMetrics, opts ...DefaultConduitFactoryOpt) *DefaultConduitFactory {
 	d := &DefaultConduitFactory{
-		misbehaviorManager: alsp.NewMisbehaviorReportManager(logger, metrics),
+		misbehaviorManager: manager.NewMisbehaviorReportManager(&manager.MisbehaviorReportManagerConfig{
+			Logger:      logger,
+			AlspMetrics: metrics,
+		}),
 	}
 
 	for _, apply := range opts {
