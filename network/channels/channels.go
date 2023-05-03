@@ -375,7 +375,7 @@ func IsValidFlowClusterTopic(topic Topic, activeClusterIDS []string) error {
 		}
 	}
 
-	return NewUnknownClusterIDErr(clusterID, activeClusterIDS)
+	return NewUnknownClusterIdErr(clusterID, activeClusterIDS)
 }
 
 // isValidFlowTopic ensures the topic is a valid Flow network topic.

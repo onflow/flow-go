@@ -331,7 +331,7 @@ func (c *ControlMsgValidationInspector) validateTopics(from peer.ID, ctrlMsgType
 // validateTopic ensures the topic is a valid flow topic/channel.
 // Expected error returns during normal operations:
 //   - channels.ErrInvalidTopic: if topic is invalid.
-//   - ErrActiveClusterIDsNotSet: if the cluster ID provider is not set.
+//   - ErrActiveClusterIdsNotSet: if the cluster ID provider is not set.
 //   - ErrActiveClusterIDS: if an error is encountered while getting the active cluster IDs list. This error indicates an unexpected bug or state corruption.
 //   - channels.ErrUnknownClusterID: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
 //
@@ -358,7 +358,7 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 
 // validateClusterPrefixedTopic validates cluster prefixed topics.
 // Expected error returns during normal operations:
-//   - ErrActiveClusterIDsNotSet: if the cluster ID provider is not set.
+//   - ErrActiveClusterIdsNotSet: if the cluster ID provider is not set.
 //   - ErrActiveClusterIDS: if an error is encountered while getting the active cluster IDs list. This error indicates an unexpected bug or state corruption.
 //   - channels.ErrInvalidTopic: if topic is invalid.
 //   - channels.ErrUnknownClusterID: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
@@ -368,7 +368,7 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 	if len(c.activeClusterIDS) == 0 {
 		// cluster IDs have not been updated yet
 		c.clusterPrefixTopicsReceivedTracker.Inc(from)
-		return NewActiveClusterIDsNotSetErr(topic)
+		return NewActiveClusterIdsNotSetErr(topic)
 	}
 
 	err := channels.IsValidFlowClusterTopic(topic, c.activeClusterIDS)
@@ -394,7 +394,7 @@ func (c *ControlMsgValidationInspector) validateTopicInlineFunc(from peer.ID, ct
 		Logger()
 	return func(topic channels.Topic) error {
 		if _, ok := seen[topic]; ok {
-			return NewIDuplicateTopicErr(topic)
+			return NewDuplicateTopicErr(topic)
 		}
 		seen[topic] = struct{}{}
 		err := c.validateTopic(from, topic)

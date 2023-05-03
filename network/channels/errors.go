@@ -28,18 +28,17 @@ func IsErrInvalidTopic(err error) bool {
 
 // ErrUnknownClusterID error wrapper that indicates an invalid topic with an unknown cluster ID prefix.
 type ErrUnknownClusterID struct {
-	topic            Topic
-	clusterID        string
-	activeClusterIDS []string
+	clusterId        string
+	activeClusterIds []string
 }
 
 func (e ErrUnknownClusterID) Error() string {
-	return fmt.Errorf("cluster ID %s for topic %s not found in active cluster IDs list %s", e.clusterID, e.topic, e.activeClusterIDS).Error()
+	return fmt.Errorf("cluster ID %s not found in active cluster IDs list %s", e.clusterId, e.activeClusterIds).Error()
 }
 
-// NewUnknownClusterIDErr returns a new ErrUnknownClusterID
-func NewUnknownClusterIDErr(clusterID string, activeClusterIDS []string) ErrUnknownClusterID {
-	return ErrUnknownClusterID{clusterID: clusterID, activeClusterIDS: activeClusterIDS}
+// NewUnknownClusterIdErr returns a new ErrUnknownClusterID
+func NewUnknownClusterIdErr(clusterId string, activeClusterIds []string) ErrUnknownClusterID {
+	return ErrUnknownClusterID{clusterId: clusterId, activeClusterIds: activeClusterIds}
 }
 
 // IsErrUnknownClusterID returns true if an error is ErrUnknownClusterID
