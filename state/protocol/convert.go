@@ -66,7 +66,7 @@ func ToEpochSetup(epoch Epoch) (*flow.EpochSetup, error) {
 // Error returns:
 // * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
 // * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-// * protocol.ErrEpochNotCommitted - if the epoch has not been committed.
+// * protocol.ErrNextEpochNotCommitted - if the epoch has not been committed.
 // * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 	counter, err := epoch.Counter()
@@ -177,7 +177,7 @@ func ToDKGParticipantLookup(dkg DKG, participants flow.IdentityList) (map[flow.I
 // Error returns:
 // * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
 // * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-// * protocol.ErrEpochNotCommitted - if the epoch has not been committed.
+// * protocol.ErrNextEpochNotCommitted - if the epoch has not been committed.
 // * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func DKGPhaseViews(epoch Epoch) (phase1FinalView uint64, phase2FinalView uint64, phase3FinalView uint64, err error) {
 	phase1FinalView, err = epoch.DKGPhase1FinalView()

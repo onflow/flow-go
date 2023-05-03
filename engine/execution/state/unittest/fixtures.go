@@ -3,24 +3,23 @@ package unittest
 import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func StateInteractionsFixture() *delta.SpockSnapshot {
-	return delta.NewDeltaView(nil).Interactions()
+func StateInteractionsFixture() *state.ExecutionSnapshot {
+	return &state.ExecutionSnapshot{}
 }
 
 func ComputationResultFixture(
 	parentBlockExecutionResultID flow.Identifier,
 	collectionsSignerIDs [][]flow.Identifier,
 ) *execution.ComputationResult {
-	block := unittest.ExecutableBlockFixture(collectionsSignerIDs)
+
 	startState := unittest.StateCommitmentFixture()
-	block.StartState = &startState
+	block := unittest.ExecutableBlockFixture(collectionsSignerIDs, &startState)
 
 	return ComputationResultForBlockFixture(
 		parentBlockExecutionResultID,
@@ -32,79 +31,33 @@ func ComputationResultForBlockFixture(
 	completeBlock *entity.ExecutableBlock,
 ) *execution.ComputationResult {
 	collections := completeBlock.Collections()
+	computationResult := execution.NewEmptyComputationResult(completeBlock)
 
-	numChunks := len(collections) + 1
-	stateViews := make([]*delta.SpockSnapshot, numChunks)
-	stateCommitments := make([]flow.StateCommitment, numChunks)
-	proofs := make([][]byte, numChunks)
-	events := make([]flow.EventsList, numChunks)
-	eventHashes := make([]flow.Identifier, numChunks)
-	spockHashes := make([]crypto.Signature, numChunks)
-	chunks := make([]*flow.Chunk, 0, numChunks)
-	chunkDataPacks := make([]*flow.ChunkDataPack, 0, numChunks)
-	chunkExecutionDatas := make(
-		[]*execution_data.ChunkExecutionData,
-		0,
-		numChunks)
-	for i := 0; i < numChunks; i++ {
-		stateViews[i] = StateInteractionsFixture()
-		stateCommitments[i] = *completeBlock.StartState
-		proofs[i] = unittest.RandomBytes(6)
-		events[i] = make(flow.EventsList, 0)
-		eventHashes[i] = unittest.IdentifierFixture()
-
-		chunk := flow.NewChunk(
-			completeBlock.ID(),
-			i,
+	numberOfChunks := len(collections) + 1
+	for i := 0; i < numberOfChunks; i++ {
+		computationResult.CollectionExecutionResultAt(i).UpdateExecutionSnapshot(StateInteractionsFixture())
+		computationResult.AppendCollectionAttestationResult(
 			*completeBlock.StartState,
-			0,
-			unittest.IdentifierFixture(),
-			*completeBlock.StartState)
-		chunks = append(chunks, chunk)
-
-		var collection *flow.Collection
-		if i < len(collections) {
-			colStruct := collections[i].Collection()
-			collection = &colStruct
-		}
-
-		chunkDataPacks = append(
-			chunkDataPacks,
-			flow.NewChunkDataPack(
-				chunk.ID(),
-				*completeBlock.StartState,
-				proofs[i],
-				collection))
-
-		chunkExecutionDatas = append(
-			chunkExecutionDatas,
-			&execution_data.ChunkExecutionData{
-				Collection: collection,
-				Events:     nil,
-				TrieUpdate: nil,
-			})
-	}
-	return &execution.ComputationResult{
-		TransactionResultIndex: make([]int, numChunks),
-		ExecutableBlock:        completeBlock,
-		StateSnapshots:         stateViews,
-		StateCommitments:       stateCommitments,
-		Proofs:                 proofs,
-		Events:                 events,
-		EventsHashes:           eventHashes,
-		SpockSignatures:        spockHashes,
-		Chunks:                 chunks,
-		ChunkDataPacks:         chunkDataPacks,
-		EndState:               *completeBlock.StartState,
-		BlockExecutionData: &execution_data.BlockExecutionData{
-			BlockID:             completeBlock.ID(),
-			ChunkExecutionDatas: chunkExecutionDatas,
-		},
-		ExecutionResult: flow.NewExecutionResult(
-			parentBlockExecutionResultID,
-			completeBlock.ID(),
-			chunks,
+			*completeBlock.StartState,
 			nil,
-			flow.ZeroID),
+			unittest.IdentifierFixture(),
+			nil,
+		)
+
 	}
+
+	executionResult := flow.NewExecutionResult(
+		parentBlockExecutionResultID,
+		completeBlock.ID(),
+		computationResult.AllChunks(),
+		nil,
+		flow.ZeroID)
+
+	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{
+		ExecutionResult:   *executionResult,
+		Spocks:            make([]crypto.Signature, numberOfChunks),
+		ExecutorSignature: crypto.Signature{},
+	}
+
+	return computationResult
 }

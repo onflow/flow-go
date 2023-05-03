@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -37,12 +37,12 @@ type BootstrapAccountCreator interface {
 // This ensures cadence can't access unexpected operations while parsing
 // programs.
 type ParseRestrictedAccountCreator struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     AccountCreator
 }
 
 func NewParseRestrictedAccountCreator(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	creator AccountCreator,
 ) AccountCreator {
 	return ParseRestrictedAccountCreator{
@@ -52,7 +52,7 @@ func NewParseRestrictedAccountCreator(
 }
 
 func (creator ParseRestrictedAccountCreator) CreateAccount(
-	payer common.Address,
+	runtimePayer common.Address,
 ) (
 	common.Address,
 	error,
@@ -61,18 +61,18 @@ func (creator ParseRestrictedAccountCreator) CreateAccount(
 		creator.txnState,
 		trace.FVMEnvCreateAccount,
 		creator.impl.CreateAccount,
-		payer)
+		runtimePayer)
 }
 
 type AccountCreator interface {
-	CreateAccount(payer common.Address) (common.Address, error)
+	CreateAccount(runtimePayer common.Address) (common.Address, error)
 }
 
 type NoAccountCreator struct {
 }
 
 func (NoAccountCreator) CreateAccount(
-	payer common.Address,
+	runtimePayer common.Address,
 ) (
 	common.Address,
 	error,
@@ -88,7 +88,7 @@ func (NoAccountCreator) CreateAccount(
 // updates the state when next address is called (This secondary functionality
 // is only used in utility command line).
 type accountCreator struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	chain    flow.Chain
 	accounts Accounts
 
@@ -102,7 +102,7 @@ type accountCreator struct {
 }
 
 func NewAddressGenerator(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	chain flow.Chain,
 ) AddressGenerator {
 	return &accountCreator{
@@ -112,7 +112,7 @@ func NewAddressGenerator(
 }
 
 func NewBootstrapAccountCreator(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	chain flow.Chain,
 	accounts Accounts,
 ) BootstrapAccountCreator {
@@ -124,7 +124,7 @@ func NewBootstrapAccountCreator(
 }
 
 func NewAccountCreator(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	chain flow.Chain,
 	accounts Accounts,
 	isServiceAccountEnabled bool,
@@ -252,7 +252,7 @@ func (creator *accountCreator) CreateBootstrapAccount(
 }
 
 func (creator *accountCreator) CreateAccount(
-	payer common.Address,
+	runtimePayer common.Address,
 ) (
 	common.Address,
 	error,
@@ -265,34 +265,34 @@ func (creator *accountCreator) CreateAccount(
 	}
 
 	// don't enforce limit during account creation
-	var addr common.Address
+	var address flow.Address
 	creator.txnState.RunWithAllLimitsDisabled(func() {
-		addr, err = creator.createAccount(payer)
+		address, err = creator.createAccount(flow.ConvertAddress(runtimePayer))
 	})
 
-	return addr, err
+	return common.MustBytesToAddress(address.Bytes()), err
 }
 
 func (creator *accountCreator) createAccount(
-	payer common.Address,
+	payer flow.Address,
 ) (
-	common.Address,
+	flow.Address,
 	error,
 ) {
-	flowAddress, err := creator.createBasicAccount(nil)
+	address, err := creator.createBasicAccount(nil)
 	if err != nil {
-		return common.Address{}, err
+		return flow.EmptyAddress, err
 	}
 
 	if creator.isServiceAccountEnabled {
 		_, invokeErr := creator.systemContracts.SetupNewAccount(
-			flowAddress,
+			address,
 			payer)
 		if invokeErr != nil {
-			return common.Address{}, invokeErr
+			return flow.EmptyAddress, invokeErr
 		}
 	}
 
 	creator.metrics.RuntimeSetNumberOfAccounts(creator.AddressCount())
-	return common.Address(flowAddress), nil
+	return address, nil
 }

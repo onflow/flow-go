@@ -52,10 +52,11 @@ const (
 	CONSealingProcessIncorporatedResult       SpanName = "con.sealing.processIncorporatedResult"
 	CONSealingProcessApproval                 SpanName = "con.sealing.processApproval"
 
-	//Follower Engine
-	FollowerOnBlockProposal        SpanName = "follower.onBlockProposal"
-	FollowerProcessBlockProposal   SpanName = "follower.processBlockProposal"
-	FollowerProcessPendingChildren SpanName = "follower.processPendingChildren"
+	// Follower Core
+	FollowerProcessFinalizedBlock  SpanName = "follower.processFinalizedBlock"
+	FollowerProcessCertifiedBlocks SpanName = "follower.processCertifiedBlocks"
+	FollowerExtendPendingTree      SpanName = "follower.extendPendingTree"
+	FollowerExtendProtocolState    SpanName = "follower.extendProtocolState"
 
 	// Collection Node
 	//
@@ -91,15 +92,11 @@ const (
 	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
 
 	EXEComputeBlock           SpanName = "exe.computer.computeBlock"
-	EXEMergeCollectionView    SpanName = "exe.computer.mergeCollectionView"
 	EXEComputeTransaction     SpanName = "exe.computer.computeTransaction"
 	EXEPostProcessTransaction SpanName = "exe.computer.postProcessTransaction"
-	EXEMergeTransactionView   SpanName = "exe.computer.mergeTransactionView"
 
 	EXEStateSaveExecutionResults          SpanName = "exe.state.saveExecutionResults"
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
-	EXEGetRegisters                       SpanName = "exe.state.getRegisters"
-	EXEGetRegistersWithProofs             SpanName = "exe.state.getRegistersWithProofs"
 	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
 
@@ -148,13 +145,12 @@ const (
 	VERVerGenerateResultApproval  SpanName = "ver.verify.GenerateResultApproval"
 
 	// Flow Virtual Machine
-	FVMVerifyTransaction             SpanName = "fvm.verifyTransaction"
-	FVMSeqNumCheckTransaction        SpanName = "fvm.seqNumCheckTransaction"
-	FVMExecuteTransaction            SpanName = "fvm.executeTransaction"
-	FVMDeductTransactionFees         SpanName = "fvm.deductTransactionFees"
-	FVMTransactionStorageUsedCheck   SpanName = "fvm.env.transactionStorageUsedCheck"
-	FVMInvokeContractFunction        SpanName = "fvm.invokeContractFunction"
-	FVMFrozenAccountCheckTransaction SpanName = "fvm.frozenAccountCheckTransaction"
+	FVMVerifyTransaction           SpanName = "fvm.verifyTransaction"
+	FVMSeqNumCheckTransaction      SpanName = "fvm.seqNumCheckTransaction"
+	FVMExecuteTransaction          SpanName = "fvm.executeTransaction"
+	FVMDeductTransactionFees       SpanName = "fvm.deductTransactionFees"
+	FVMTransactionStorageUsedCheck SpanName = "fvm.env.transactionStorageUsedCheck"
+	FVMInvokeContractFunction      SpanName = "fvm.invokeContractFunction"
 
 	FVMEnvValueExists                SpanName = "fvm.env.valueExists"
 	FVMEnvGetValue                   SpanName = "fvm.env.getValue"
@@ -168,8 +164,7 @@ const (
 	FVMEnvResolveLocation            SpanName = "fvm.env.resolveLocation"
 	FVMEnvGetCode                    SpanName = "fvm.env.getCode"
 	FVMEnvGetAccountContractNames    SpanName = "fvm.env.getAccountContractNames"
-	FVMEnvGetProgram                 SpanName = "fvm.env.getCachedProgram"
-	FVMEnvSetProgram                 SpanName = "fvm.env.cacheProgram"
+	FVMEnvGetOrLoadProgram           SpanName = "fvm.env.getOrLoadCachedProgram"
 	FVMEnvProgramLog                 SpanName = "fvm.env.programLog"
 	FVMEnvEmitEvent                  SpanName = "fvm.env.emitEvent"
 	FVMEnvGenerateUUID               SpanName = "fvm.env.generateUUID"
@@ -184,7 +179,6 @@ const (
 	FVMEnvGetBlockAtHeight           SpanName = "fvm.env.getBlockAtHeight"
 	FVMEnvUnsafeRandom               SpanName = "fvm.env.unsafeRandom"
 	FVMEnvCreateAccount              SpanName = "fvm.env.createAccount"
-	FVMEnvSetAccountFrozen           SpanName = "fvm.env.setAccountFrozen"
 	FVMEnvAddAccountKey              SpanName = "fvm.env.addAccountKey"
 	FVMEnvAddEncodedAccountKey       SpanName = "fvm.env.addEncodedAccountKey"
 	FVMEnvAccountKeysCount           SpanName = "fvm.env.accountKeysCount"

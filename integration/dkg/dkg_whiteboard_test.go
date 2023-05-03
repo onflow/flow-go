@@ -107,7 +107,7 @@ func createNode(
 	snapshot.On("Epochs").Return(epochQuery)
 	snapshot.On("Phase").Return(flow.EpochPhaseStaking, nil)
 	snapshot.On("Head").Return(firstBlock, nil)
-	state := new(protocolmock.MutableState)
+	state := new(protocolmock.ParticipantState)
 	state.On("AtBlockID", firstBlock.ID()).Return(snapshot)
 	state.On("Final").Return(snapshot)
 	core.State = state
@@ -298,8 +298,6 @@ func TestWithWhiteboard(t *testing.T) {
 
 	// shuffle the signatures and indices before constructing the group
 	// signature (since it only uses the first half signatures)
-	seed := time.Now().UnixNano()
-	rand.Seed(seed)
 	rand.Shuffle(len(signatures), func(i, j int) {
 		signatures[i], signatures[j] = signatures[j], signatures[i]
 		indices[i], indices[j] = indices[j], indices[i]

@@ -4,7 +4,7 @@
 package crypto
 
 import (
-	"crypto/rand"
+	crand "crypto/rand"
 	"encoding/hex"
 	"testing"
 
@@ -16,7 +16,8 @@ import (
 func BenchmarkScalarMultG1G2(b *testing.B) {
 
 	seed := make([]byte, securityBits/8)
-	_, _ = rand.Read(seed)
+	_, err := crand.Read(seed)
+	require.NoError(b, err)
 	_ = seedRelic(seed)
 	var expo scalar
 	_ = randFr(&expo)
@@ -103,7 +104,8 @@ func BenchmarkMapToG1(b *testing.B) {
 func TestSubgroupCheck(t *testing.T) {
 	// seed Relic PRG
 	seed := make([]byte, securityBits/8)
-	_, _ = rand.Read(seed)
+	_, err := crand.Read(seed)
+	require.NoError(t, err)
 	_ = seedRelic(seed)
 
 	/*t.Run("G1", func(t *testing.T) {

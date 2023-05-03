@@ -53,17 +53,7 @@ The following table lists all work streams and links to their home directory and
 
 ## Installation
 
-### Clone Repository
-
 - Clone this repository
-- Clone this repository's submodules:
-
-    ```bash
-    git submodule update --init --recursive
-    ```
-
-### Install Dependencies
-
 - Install [Go](https://golang.org/doc/install) (Flow supports Go 1.18 and later)
 - Install [CMake](https://cmake.org/install/), which is used for building the crypto library
 - Install [Docker](https://docs.docker.com/get-docker/), which is used for running a local network and integration tests

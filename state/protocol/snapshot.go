@@ -24,6 +24,8 @@ import (
 //
 // See https://github.com/dapperlabs/flow-go/issues/6368 for details and proposal
 //
+// A snapshot with an unknown reference block will return state.ErrUnknownSnapshotReference for all methods.
+//
 // TODO document error returns
 type Snapshot interface {
 
@@ -36,7 +38,10 @@ type Snapshot interface {
 
 	// QuorumCertificate returns a valid quorum certificate for the header at
 	// this snapshot, if one exists.
-	// TODO document error returns
+	// Expected error returns:
+	//   - storage.ErrNotFound is returned if the QC is unknown.
+	//   - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
+	// All other errors should be treated as exceptions.
 	QuorumCertificate() (*flow.QuorumCertificate, error)
 
 	// Identities returns a list of identities at the selected point of the
@@ -89,8 +94,9 @@ type Snapshot interface {
 	// missing from the payload. These missing execution results are stored on the
 	// flow.SealingSegment.ExecutionResults field.
 	// Expected errors during normal operations:
-	//   - protocol.ErrSealingSegmentBelowRootBlock if sealing segment would stretch beyond the node's local history cut-off
-	//   - protocol.UnfinalizedSealingSegmentError if sealing segment would contain unfinalized blocks (including orphaned blocks)
+	//  - protocol.ErrSealingSegmentBelowRootBlock if sealing segment would stretch beyond the node's local history cut-off
+	//  - protocol.UnfinalizedSealingSegmentError if sealing segment would contain unfinalized blocks (including orphaned blocks)
+	//  - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
 	SealingSegment() (*flow.SealingSegment, error)
 
 	// Descendants returns the IDs of all descendants of the Head block.
@@ -100,13 +106,18 @@ type Snapshot interface {
 	// No errors are expected under normal operation.
 	Descendants() ([]flow.Identifier, error)
 
-	// RandomSource returns the source of randomness derived from the Head block.
+	// RandomSource returns the source of randomness _for_ the snapshot's Head block.
+	// Note that the source of randomness for a block `H`, is contained in the
+	// QuorumCertificate [QC] for block `H` (QCs for H are distributed as part of child
+	// blocks, timeout messages or timeout certificates). While there might be different
+	// QCs for block H, they all yield exactly the same source of randomness (feature of
+	// threshold signatures used here). Therefore, it is a possibility that there is no
+	// QC known (yet) for the head block.
 	// NOTE: not to be confused with the epoch source of randomness!
-	// Error returns:
-	//  * NoValidChildBlockError indicates that no valid child block is known
-	//    (which contains the block's source of randomness)
-	//  * unexpected errors should be considered symptoms of internal bugs
-	// TODO document error returns
+	// Expected error returns:
+	//  - storage.ErrNotFound is returned if the QC is unknown.
+	//  - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
+	// All other errors should be treated as exceptions.
 	RandomSource() ([]byte, error)
 
 	// Phase returns the epoch phase for the current epoch, as of the Head block.
@@ -119,8 +130,10 @@ type Snapshot interface {
 	// For epochs that are in the future w.r.t. the Head block, some of Epoch's
 	// methods may return errors, since the Epoch Preparation Protocol may be
 	// in-progress and incomplete for the epoch.
+	// Returns invalid.Epoch with state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
 	Epochs() EpochQuery
 
 	// Params returns global parameters of the state this snapshot is taken from.
+	// Returns invalid.Params with state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
 	Params() GlobalParams
 }

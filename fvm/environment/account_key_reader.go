@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -22,22 +22,22 @@ type AccountKeyReader interface {
 	// the given index. An error is returned if the specified account does not
 	// exist, the provided index is not valid, or if the key retrieval fails.
 	GetAccountKey(
-		address common.Address,
+		runtimeAddress common.Address,
 		keyIndex int,
 	) (
 		*runtime.AccountKey,
 		error,
 	)
-	AccountKeysCount(address common.Address) (uint64, error)
+	AccountKeysCount(runtimeAddress common.Address) (uint64, error)
 }
 
 type ParseRestrictedAccountKeyReader struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransaction
 	impl     AccountKeyReader
 }
 
 func NewParseRestrictedAccountKeyReader(
-	txnState *state.TransactionState,
+	txnState state.NestedTransaction,
 	impl AccountKeyReader,
 ) AccountKeyReader {
 	return ParseRestrictedAccountKeyReader{
@@ -47,7 +47,7 @@ func NewParseRestrictedAccountKeyReader(
 }
 
 func (reader ParseRestrictedAccountKeyReader) GetAccountKey(
-	address common.Address,
+	runtimeAddress common.Address,
 	keyIndex int,
 ) (
 	*runtime.AccountKey,
@@ -57,16 +57,21 @@ func (reader ParseRestrictedAccountKeyReader) GetAccountKey(
 		reader.txnState,
 		trace.FVMEnvGetAccountKey,
 		reader.impl.GetAccountKey,
-		address,
+		runtimeAddress,
 		keyIndex)
 }
 
-func (reader ParseRestrictedAccountKeyReader) AccountKeysCount(address common.Address) (uint64, error) {
+func (reader ParseRestrictedAccountKeyReader) AccountKeysCount(
+	runtimeAddress common.Address,
+) (
+	uint64,
+	error,
+) {
 	return parseRestrict1Arg1Ret(
 		reader.txnState,
 		"AccountKeysCount",
 		reader.impl.AccountKeysCount,
-		address,
+		runtimeAddress,
 	)
 }
 
@@ -123,7 +128,7 @@ func (reader *accountKeyReader) GetAccountKey(
 		// no errors.  This is to be inline with the Cadence runtime. Otherwise,
 		// Cadence runtime cannot distinguish between a 'key not found error'
 		// vs other internal errors.
-		if errors.IsAccountAccountPublicKeyNotFoundError(err) {
+		if errors.IsAccountPublicKeyNotFoundError(err) {
 			return nil, nil
 		}
 

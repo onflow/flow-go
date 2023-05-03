@@ -1,8 +1,12 @@
 package corruptlibp2p
 
 import (
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsubpb "github.com/libp2p/go-libp2p-pubsub/pb"
+	"github.com/libp2p/go-libp2p/core/peer"
+	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -29,7 +33,7 @@ func WithIHave(msgCount int, msgSize int) GossipSubCtrlOption {
 	return func(msg *pubsubpb.ControlMessage) {
 		iHaves := make([]*pubsubpb.ControlIHave, msgCount)
 		for i := 0; i < msgCount; i++ {
-			topicId := gossipSubTopicIdFixture()
+			topicId := GossipSubTopicIdFixture()
 			iHaves[i] = &pubsubpb.ControlIHave{
 				TopicID:    &topicId,
 				MessageIDs: gossipSubMessageIdsFixture(msgSize),
@@ -39,14 +43,53 @@ func WithIHave(msgCount int, msgSize int) GossipSubCtrlOption {
 	}
 }
 
+// WithIWant adds iWant control messages of the given size and number to the control message.
+func WithIWant(msgCount int, msgSize int) GossipSubCtrlOption {
+	return func(msg *pubsubpb.ControlMessage) {
+		iWants := make([]*pubsubpb.ControlIWant, msgCount)
+		for i := 0; i < msgCount; i++ {
+			iWants[i] = &pubsubpb.ControlIWant{
+				MessageIDs: gossipSubMessageIdsFixture(msgSize),
+			}
+		}
+		msg.Iwant = iWants
+	}
+}
+
+// WithGraft adds GRAFT control messages with given topicID to the control message.
+func WithGraft(msgCount int, topicId string) GossipSubCtrlOption {
+	return func(msg *pubsubpb.ControlMessage) {
+		grafts := make([]*pubsubpb.ControlGraft, msgCount)
+		for i := 0; i < msgCount; i++ {
+			grafts[i] = &pubsubpb.ControlGraft{
+				TopicID: &topicId,
+			}
+		}
+		msg.Graft = grafts
+	}
+}
+
+// WithPrune adds PRUNE control messages with given topicID to the control message.
+func WithPrune(msgCount int, topicId string) GossipSubCtrlOption {
+	return func(msg *pubsubpb.ControlMessage) {
+		prunes := make([]*pubsubpb.ControlPrune, msgCount)
+		for i := 0; i < msgCount; i++ {
+			prunes[i] = &pubsubpb.ControlPrune{
+				TopicID: &topicId,
+			}
+		}
+		msg.Prune = prunes
+	}
+}
+
 // gossipSubMessageIdFixture returns a random gossipSub message ID.
 func gossipSubMessageIdFixture() string {
 	// TODO: messageID length should be a parameter.
 	return unittest.GenerateRandomStringWithLen(messageIDFixtureLen)
 }
 
-// gossipSubTopicIdFixture returns a random gossipSub topic ID.
-func gossipSubTopicIdFixture() string {
+// GossipSubTopicIdFixture returns a random gossipSub topic ID.
+func GossipSubTopicIdFixture() string {
 	// TODO: topicID length should be a parameter.
 	return unittest.GenerateRandomStringWithLen(topicIDFixtureLen)
 }
@@ -58,4 +101,26 @@ func gossipSubMessageIdsFixture(count int) []string {
 		msgIds[i] = gossipSubMessageIdFixture()
 	}
 	return msgIds
+}
+
+// CorruptInspectorFunc wraps a normal RPC inspector with a corrupt inspector func by translating corrupt.RPC -> pubsubpb.RPC
+// before calling Inspect func.
+func CorruptInspectorFunc(inspector p2p.GossipSubRPCInspector) func(id peer.ID, rpc *corrupt.RPC) error {
+	return func(id peer.ID, rpc *corrupt.RPC) error {
+		return inspector.Inspect(id, CorruptRPCToPubSubRPC(rpc))
+	}
+}
+
+// CorruptRPCToPubSubRPC translates a corrupt.RPC -> pubsub.RPC
+func CorruptRPCToPubSubRPC(rpc *corrupt.RPC) *pubsub.RPC {
+	return &pubsub.RPC{
+		RPC: pubsubpb.RPC{
+			Subscriptions:        rpc.Subscriptions,
+			Publish:              rpc.Publish,
+			Control:              rpc.Control,
+			XXX_NoUnkeyedLiteral: rpc.XXX_NoUnkeyedLiteral,
+			XXX_unrecognized:     rpc.XXX_unrecognized,
+			XXX_sizecache:        rpc.XXX_sizecache,
+		},
+	}
 }

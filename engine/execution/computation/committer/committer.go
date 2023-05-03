@@ -7,31 +7,48 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	execState "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
 type LedgerViewCommitter struct {
-	ldg    ledger.Ledger
+	ledger ledger.Ledger
 	tracer module.Tracer
 }
 
-func NewLedgerViewCommitter(ldg ledger.Ledger, tracer module.Tracer) *LedgerViewCommitter {
-	return &LedgerViewCommitter{ldg: ldg, tracer: tracer}
+func NewLedgerViewCommitter(
+	ledger ledger.Ledger,
+	tracer module.Tracer,
+) *LedgerViewCommitter {
+	return &LedgerViewCommitter{
+		ledger: ledger,
+		tracer: tracer,
+	}
 }
 
-func (s *LedgerViewCommitter) CommitView(view state.View, baseState flow.StateCommitment) (newCommit flow.StateCommitment, proof []byte, trieUpdate *ledger.TrieUpdate, err error) {
+func (committer *LedgerViewCommitter) CommitView(
+	snapshot *state.ExecutionSnapshot,
+	baseState flow.StateCommitment,
+) (
+	newCommit flow.StateCommitment,
+	proof []byte,
+	trieUpdate *ledger.TrieUpdate,
+	err error,
+) {
 	var err1, err2 error
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		proof, err2 = s.collectProofs(view, baseState)
+		proof, err2 = committer.collectProofs(snapshot, baseState)
 		wg.Done()
 	}()
 
-	newCommit, trieUpdate, err1 = s.commitView(view, baseState)
+	newCommit, trieUpdate, err1 = execState.CommitDelta(
+		committer.ledger,
+		snapshot,
+		baseState)
 	wg.Wait()
 
 	if err1 != nil {
@@ -43,13 +60,15 @@ func (s *LedgerViewCommitter) CommitView(view state.View, baseState flow.StateCo
 	return
 }
 
-func (s *LedgerViewCommitter) commitView(view state.View, baseState flow.StateCommitment) (newCommit flow.StateCommitment, update *ledger.TrieUpdate, err error) {
-	return execState.CommitDelta(s.ldg, view, baseState)
-}
-
-func (s *LedgerViewCommitter) collectProofs(view state.View, baseState flow.StateCommitment) (proof []byte, err error) {
+func (committer *LedgerViewCommitter) collectProofs(
+	snapshot *state.ExecutionSnapshot,
+	baseState flow.StateCommitment,
+) (
+	proof []byte,
+	err error,
+) {
 	// get all deduplicated register IDs
-	allIds := view.AllRegisterIDs()
+	allIds := snapshot.AllRegisterIDs()
 	keys := make([]ledger.Key, 0, len(allIds))
 	for _, id := range allIds {
 		keys = append(keys, execState.RegisterIDToKey(id))
@@ -60,5 +79,5 @@ func (s *LedgerViewCommitter) collectProofs(view state.View, baseState flow.Stat
 		return nil, fmt.Errorf("cannot create ledger query: %w", err)
 	}
 
-	return s.ldg.Prove(query)
+	return committer.ledger.Prove(query)
 }
