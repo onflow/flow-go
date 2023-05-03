@@ -459,9 +459,10 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	require.Equal(t, uint64(1), invPruneNotifCount.Load())
 }
 
-// TestValidationInspector_ActiveClusterIdsNotSet_Detection ensures that an error is returned only after the cluster prefixed topics received for a peer exceed the configured
-// cluster prefix discard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error.
-func TestValidationInspector_ActiveClusterIdsNotSet_Detection(t *testing.T) {
+// TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection ensures that an error is returned only after the cluster prefixed topics received for a peer exceed the configured
+// cluster prefix discard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error. This test involves Graft
+// control messages.
+func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
@@ -514,6 +515,64 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Detection(t *testing.T) {
 	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
 	// ensure we receive the expected number of invalid control message notifications for graft and prune control message types
 	require.Equal(t, uint64(5), invGraftNotifCount.Load())
+}
+
+// TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection ensures that an error is returned only after the cluster prefixed topics received for a peer exceed the configured
+// cluster prefix discard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error. This test involves Prune
+// control messages.
+func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T) {
+	t.Parallel()
+	role := flow.RoleConsensus
+	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
+	// create our RPC validation inspector
+	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
+	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
+	inspectorConfig.ClusterPrefixHardThreshold = 5
+	inspectorConfig.NumberOfWorkers = 1
+	controlMessageCount := int64(10)
+
+	count := atomic.NewInt64(0)
+	done := make(chan struct{})
+	expectedNumOfTotalNotif := 5
+	invPruneNotifCount := atomic.NewUint64(0)
+	inspectDisseminatedNotif := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
+		return func(args mockery.Arguments) {
+			count.Inc()
+			notification, ok := args[0].(*p2p.InvalidControlMessageNotification)
+			require.True(t, ok)
+			require.True(t, validation.IsErrActiveClusterIDsNotSet(notification.Err))
+			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
+			switch notification.MsgType {
+			case p2p.CtrlMsgPrune:
+				invPruneNotifCount.Inc()
+			}
+			require.Equal(t, uint64(1), notification.Count)
+			if count.Load() == int64(expectedNumOfTotalNotif) {
+				close(done)
+			}
+		}
+	}
+
+	signalerCtx, sporkID, cancelFunc, spammer, victimNode, _, validationInspector := setupTest(t, unittest.Logger(), role, inspectorConfig, withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif))
+
+	// we deliberately avoid setting the cluster IDs so that we eventually receive errors after we have exceeded the allowed cluster
+	// prefixed discard threshold
+	validationInspector.Start(signalerCtx)
+	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
+	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
+	spammer.Start(t)
+	defer stopNodesAndInspector(t, cancelFunc, nodes, validationInspector)
+	// generate multiple control messages with GRAFT's for randomly generated
+	// cluster prefixed channels, this ensures we do not encounter duplicate topic ID errors
+	ctlMsgs := spammer.GenerateCtlMessages(int(controlMessageCount),
+		corruptlibp2p.WithPrune(1, randomClusterPrefixedTopic().String()),
+	)
+	// start spamming the victim peer
+	spammer.SpamControlMessage(t, victimNode, ctlMsgs)
+
+	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
+	// ensure we receive the expected number of invalid control message notifications for graft and prune control message types
+	require.Equal(t, uint64(5), invPruneNotifCount.Load())
 }
 
 func randomClusterPrefixedTopic() channels.Topic {
