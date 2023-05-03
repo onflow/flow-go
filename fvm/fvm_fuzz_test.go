@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -32,7 +32,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 
 		tt := fuzzTransactionTypes[transactionType]
 
-		vmt.run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+		vmt.run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// create the transaction
 			txBody := tt.createTxBody(t, tctx)
 			// set the computation limit
@@ -55,7 +55,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 
 			// run the transaction
 			require.NotPanics(t, func() {
-				_, output, err = vm.RunV2(
+				_, output, err = vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -254,7 +254,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 	).withContextOptions(
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
-	).bootstrapWith(func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) (storage.SnapshotTree, error) {
+	).bootstrapWith(func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) (snapshot.SnapshotTree, error) {
 		// ==== Create an account ====
 		var txBody *flow.TransactionBody
 		privateKey, txBody = testutil.CreateAccountCreationTransaction(tb, chain)
@@ -264,7 +264,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 			return snapshotTree, err
 		}
 
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -298,7 +298,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		)
 		require.NoError(tb, err)
 
-		executionSnapshot, output, err = vm.RunV2(
+		executionSnapshot, output, err = vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)

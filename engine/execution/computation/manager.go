@@ -11,9 +11,9 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -32,7 +32,7 @@ type ComputationManager interface {
 		script []byte,
 		arguments [][]byte,
 		blockHeader *flow.Header,
-		snapshot state.StorageSnapshot,
+		snapshot snapshot.StorageSnapshot,
 	) (
 		[]byte,
 		error,
@@ -42,7 +42,7 @@ type ComputationManager interface {
 		ctx context.Context,
 		parentBlockExecutionResultID flow.Identifier,
 		block *entity.ExecutableBlock,
-		snapshot state.StorageSnapshot,
+		snapshot snapshot.StorageSnapshot,
 	) (
 		*execution.ComputationResult,
 		error,
@@ -52,7 +52,7 @@ type ComputationManager interface {
 		ctx context.Context,
 		addr flow.Address,
 		header *flow.Header,
-		snapshot state.StorageSnapshot,
+		snapshot snapshot.StorageSnapshot,
 	) (
 		*flow.Account,
 		error,
@@ -174,7 +174,7 @@ func (e *Manager) ComputeBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) (*execution.ComputationResult, error) {
 
 	e.log.Debug().
@@ -211,13 +211,12 @@ func (e *Manager) ExecuteScript(
 	code []byte,
 	arguments [][]byte,
 	blockHeader *flow.Header,
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) ([]byte, error) {
 	return e.queryExecutor.ExecuteScript(ctx,
 		code,
 		arguments,
 		blockHeader,
-		e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID()),
 		snapshot)
 }
 
@@ -225,7 +224,7 @@ func (e *Manager) GetAccount(
 	ctx context.Context,
 	address flow.Address,
 	blockHeader *flow.Header,
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,

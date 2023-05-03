@@ -6,11 +6,10 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
-	"github.com/onflow/flow-go/fvm/derived"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 )
 
@@ -49,13 +48,13 @@ type facadeEnvironment struct {
 	*Programs
 
 	accounts Accounts
-	txnState storage.Transaction
+	txnState storage.TransactionPreparer
 }
 
 func newFacadeEnvironment(
 	tracer tracing.TracerSpan,
 	params EnvironmentParams,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 	meter Meter,
 ) *facadeEnvironment {
 	accounts := NewAccounts(txnState)
@@ -79,6 +78,7 @@ func newFacadeEnvironment(
 		UnsafeRandomGenerator: NewUnsafeRandomGenerator(
 			tracer,
 			params.BlockHeader,
+			params.TxIndex,
 		),
 		CryptoLibrary: NewCryptoLibrary(tracer, meter),
 
@@ -141,43 +141,20 @@ func newFacadeEnvironment(
 	return env
 }
 
-// TODO(patrick): remove once emulator is updated.
-func NewScriptEnvironment(
-	ctx context.Context,
-	tracer tracing.TracerSpan,
-	params EnvironmentParams,
-	nestedTxn state.NestedTransaction,
-	derivedTxn derived.DerivedTransactionCommitter,
-) *facadeEnvironment {
-	return NewScriptEnv(
-		ctx,
-		tracer,
-		params,
-		storage.SerialTransaction{
-			NestedTransaction:           nestedTxn,
-			DerivedTransactionCommitter: derivedTxn,
-		})
-}
-
 // This is mainly used by command line tools, the emulator, and cadence tools
 // testing.
 func NewScriptEnvironmentFromStorageSnapshot(
 	params EnvironmentParams,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) *facadeEnvironment {
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
-	derivedTxn, err := derivedBlockData.NewSnapshotReadDerivedTransactionData(
-		logical.EndOfBlockExecutionTime,
-		logical.EndOfBlockExecutionTime)
-	if err != nil {
-		panic(err)
-	}
+	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
+	derivedTxn := derivedBlockData.NewSnapshotReadDerivedTransactionData()
 
 	txn := storage.SerialTransaction{
-		NestedTransaction: state.NewTransactionState(
-			delta.NewDeltaView(storageSnapshot),
+		NestedTransactionPreparer: state.NewTransactionState(
+			storageSnapshot,
 			state.DefaultParameters()),
-		DerivedTransactionCommitter: derivedTxn,
+		DerivedTransactionData: derivedTxn,
 	}
 
 	return NewScriptEnv(
@@ -191,7 +168,7 @@ func NewScriptEnv(
 	ctx context.Context,
 	tracer tracing.TracerSpan,
 	params EnvironmentParams,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
 		tracer,
@@ -207,7 +184,7 @@ func NewScriptEnv(
 func NewTransactionEnvironment(
 	tracer tracing.TracerSpan,
 	params EnvironmentParams,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
 		tracer,
