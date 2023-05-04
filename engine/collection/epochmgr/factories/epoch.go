@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/events"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/cluster/badger"
@@ -160,7 +159,6 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 
-	finalizationActor := events.NewFinalizationActor(hotstuffModules.FinalizationDistributor)
 	complianceEng, err := factory.compliance.Create(
 		metrics,
 		mutableState,
@@ -170,13 +168,13 @@ func (factory *EpochComponentsFactory) Create(
 		hotstuff,
 		hotstuffModules.VoteAggregator,
 		hotstuffModules.TimeoutAggregator,
-		finalizationActor,
 		validator,
 	)
 	if err != nil {
 		err = fmt.Errorf("could not create compliance engine: %w", err)
 		return
 	}
+	hotstuffModules.FinalizationDistributor.AddOnBlockFinalizedConsumer(complianceEng.OnBlockFinalized)
 	compliance = complianceEng
 
 	sync, err = factory.sync.Create(cluster.Members(), state, blocks, syncCore, complianceEng)

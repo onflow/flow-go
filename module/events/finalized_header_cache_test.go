@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -19,8 +18,6 @@ import (
 // TestFinalizedHeaderCache validates that the FinalizedHeaderCache can be constructed
 // with an initial value, and updated with events through the FinalizationActor.
 func TestFinalizedHeaderCache(t *testing.T) {
-	dist := pubsub.NewFinalizationDistributor()
-
 	final := unittest.BlockHeaderFixture()
 
 	state := protocolmock.NewState(t)
@@ -30,7 +27,7 @@ func TestFinalizedHeaderCache(t *testing.T) {
 		func() *flow.Header { return final },
 		func() error { return nil })
 
-	cache, worker, err := NewFinalizedHeaderCache(state, dist)
+	cache, worker, err := NewFinalizedHeaderCache(state)
 	require.NoError(t, err)
 
 	// cache should be initialized
@@ -44,7 +41,7 @@ func TestFinalizedHeaderCache(t *testing.T) {
 	final = unittest.BlockHeaderFixture(
 		unittest.HeaderWithView(final.View+1),
 		unittest.WithHeaderHeight(final.Height+1))
-	dist.OnFinalizedBlock(model.BlockFromFlow(final))
+	cache.OnBlockFinalized(model.BlockFromFlow(final))
 
 	// the cache should be updated
 	assert.Eventually(t, func() bool {

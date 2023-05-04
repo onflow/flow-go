@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/module/events"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -32,14 +31,12 @@ type EngineSuite struct {
 	cancel context.CancelFunc
 	errs   <-chan error
 	engine *Engine
-	actor  *events.FinalizationActor
 }
 
 func (cs *EngineSuite) SetupTest() {
 	cs.CommonSuite.SetupTest()
 
-	cs.actor = events.NewUnsubscribedFinalizationActor()
-	e, err := NewEngine(unittest.Logger(), cs.me, cs.core, cs.actor)
+	e, err := NewEngine(unittest.Logger(), cs.me, cs.core)
 	require.NoError(cs.T(), err)
 	cs.engine = e
 
@@ -131,6 +128,6 @@ func (cs *EngineSuite) TestOnFinalizedBlock() {
 		Run(func(_ mock.Arguments) { wg.Done() }).
 		Return(uint(0)).Once()
 
-	cs.actor.OnBlockFinalized(model.BlockFromFlow(finalizedBlock))
+	cs.engine.OnBlockFinalized(model.BlockFromFlow(finalizedBlock))
 	unittest.AssertReturnsBefore(cs.T(), wg.Wait, time.Second, "an expected call to block buffer wasn't made")
 }

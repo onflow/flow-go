@@ -2,7 +2,6 @@ package events
 
 import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module/component"
@@ -24,35 +23,18 @@ type FinalizationActor struct {
 	handler         OnBlockFinalized
 }
 
-// NewFinalizationActor creates a new FinalizationActor and subscribes it to the given event distributor.
-func NewFinalizationActor(distributor *pubsub.FinalizationDistributor) *FinalizationActor {
-	actor := NewUnsubscribedFinalizationActor()
-	distributor.AddOnBlockFinalizedConsumer(actor.OnBlockFinalized)
-	return actor
-}
-
-// NewUnsubscribedFinalizationActor creates a new FinalizationActor. The caller
-// is responsible for subscribing the actor.
-func NewUnsubscribedFinalizationActor() *FinalizationActor {
+// NewFinalizationActor creates a new FinalizationActor, and returns the worker routine
+// and event consumer required to operate it.
+// The caller MUST:
+//   - start the returned component.ComponentWorker function
+//   - subscribe the returned FinalizationActor to OnBlockFinalized events
+func NewFinalizationActor(handler OnBlockFinalized) (*FinalizationActor, component.ComponentWorker) {
 	actor := &FinalizationActor{
 		newestFinalized: tracker.NewNewestBlockTracker(),
 		notifier:        engine.NewNotifier(),
-		handler:         nil, // set with CreateWorker
+		handler:         handler,
 	}
-	return actor
-}
-
-// CreateWorker embeds the OnBlockFinalized handler function into the actor, which
-// means it is ready for use. A worker function is returned which should be added
-// to a ComponentBuilder during construction of the higher-level component.
-// One FinalizationActor instance provides exactly one worker, so CreateWorker will
-// panic if it is called more than once.
-func (actor *FinalizationActor) CreateWorker(handler OnBlockFinalized) component.ComponentWorker {
-	if actor.handler != nil {
-		panic("invoked CreatedWorker twice")
-	}
-	actor.handler = handler
-	return actor.worker
+	return actor, actor.worker
 }
 
 // worker is the worker function exposed by the FinalizationActor. It should be

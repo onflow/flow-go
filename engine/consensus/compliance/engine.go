@@ -30,6 +30,7 @@ const defaultBlockQueueCapacity = 10_000
 // Implements consensus.Compliance interface.
 type Engine struct {
 	*component.ComponentManager
+	*events.FinalizationActor
 	log                   zerolog.Logger
 	mempoolMetrics        module.MempoolMetrics
 	engineMetrics         module.EngineMetrics
@@ -49,7 +50,6 @@ func NewEngine(
 	log zerolog.Logger,
 	me module.Local,
 	core *Core,
-	actor *events.FinalizationActor,
 ) (*Engine, error) {
 
 	// Inbound FIFO queue for `messages.BlockProposal`s
@@ -74,11 +74,12 @@ func NewEngine(
 		core:                  core,
 		pendingBlocksNotifier: engine.NewNotifier(),
 	}
-
+	finalizationActor, finalizationWorker := events.NewFinalizationActor(eng.handleFinalizedBlock)
+	eng.FinalizationActor = finalizationActor
 	// create the component manager and worker threads
 	eng.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(eng.processBlocksLoop).
-		AddWorker(actor.CreateWorker(eng.handleFinalizedBlock)).
+		AddWorker(finalizationWorker).
 		Build()
 
 	return eng, nil

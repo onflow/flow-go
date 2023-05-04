@@ -5,7 +5,6 @@ import (
 	"sync/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/state/protocol"
@@ -19,7 +18,9 @@ import (
 // since the protocol state is shared among many components, there may be high contention on its cache.
 // The FinalizedHeaderCache can be used in place of state.Final().Head() to avoid read contention with other components.
 type FinalizedHeaderCache struct {
-	val *atomic.Pointer[flow.Header]
+	state              protocol.State
+	val                *atomic.Pointer[flow.Header]
+	*FinalizationActor // expose OnBlockFinalized method
 }
 
 // Get returns the most recently finalized block.
@@ -28,31 +29,36 @@ func (cache *FinalizedHeaderCache) Get() *flow.Header {
 	return cache.val.Load()
 }
 
+// update reads the latest finalized header and updates the cache.
+// No errors are expected during normal operation.
+func (cache *FinalizedHeaderCache) update() error {
+	final, err := cache.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not retrieve latest finalized header: %w", err)
+	}
+	cache.val.Store(final)
+	return nil
+}
+
 // NewFinalizedHeaderCache returns a new FinalizedHeaderCache subscribed to the given FinalizationDistributor,
 // and the ComponentWorker function to maintain the cache.
 // The caller MUST start the returned ComponentWorker in a goroutine to maintain the cache.
 // No errors are expected during normal operation.
-func NewFinalizedHeaderCache(state protocol.State, dist *pubsub.FinalizationDistributor) (*FinalizedHeaderCache, component.ComponentWorker, error) {
-	actor := NewFinalizationActor(dist)
-	// initialize the cache with the current finalized header
-	final, err := state.Final().Head()
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not retrieve latest finalized header: %w", err)
-	}
+func NewFinalizedHeaderCache(state protocol.State) (*FinalizedHeaderCache, component.ComponentWorker, error) {
 	cache := &FinalizedHeaderCache{
-		val: new(atomic.Pointer[flow.Header]),
+		state: state,
+		val:   new(atomic.Pointer[flow.Header]),
 	}
-	cache.val.Store(final)
+	// initialize the cache with the current finalized header
+	if err := cache.update(); err != nil {
+		return nil, nil, fmt.Errorf("could not initialize cache: %w", err)
+	}
 
 	// create a worker to continuously track the latest finalized header
-	worker := actor.CreateWorker(func(_ *model.Block) error {
-		final, err := state.Final().Head()
-		if err != nil {
-			return fmt.Errorf("could not retrieve latest finalized header: %w", err)
-		}
-		cache.val.Store(final)
-		return nil
+	actor, worker := NewFinalizationActor(func(_ *model.Block) error {
+		return cache.update()
 	})
+	cache.FinalizationActor = actor
 
 	return cache, worker, nil
 }

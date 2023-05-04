@@ -28,6 +28,7 @@ const defaultBlockQueueCapacity = 10_000
 // Implements collection.Compliance interface.
 type Engine struct {
 	*component.ComponentManager
+	*events.FinalizationActor
 	log                   zerolog.Logger
 	metrics               module.EngineMetrics
 	me                    module.Local
@@ -47,7 +48,6 @@ func NewEngine(
 	state protocol.State,
 	payloads storage.ClusterPayloads,
 	core *Core,
-	actor *events.FinalizationActor,
 ) (*Engine, error) {
 	engineLog := log.With().Str("cluster_compliance", "engine").Logger()
 
@@ -73,11 +73,13 @@ func NewEngine(
 		pendingBlocks:         blocksQueue,
 		pendingBlocksNotifier: engine.NewNotifier(),
 	}
+	finalizationActor, finalizationWorker := events.NewFinalizationActor(eng.handleFinalizedBlock)
+	eng.FinalizationActor = finalizationActor
 
 	// create the component manager and worker threads
 	eng.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(eng.processBlocksLoop).
-		AddWorker(actor.CreateWorker(eng.handleFinalizedBlock)).
+		AddWorker(finalizationWorker).
 		Build()
 
 	return eng, nil
