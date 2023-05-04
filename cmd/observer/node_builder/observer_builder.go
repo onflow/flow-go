@@ -63,6 +63,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -872,13 +873,14 @@ func (builder *ObserverServiceBuilder) initPublicLibP2PFactory(networkKey crypto
 			builder.IdentityProvider,
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
-		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubRPCInspectorsConfig, builder.GossipSubInspectorNotifDistributor)
-		rpcInspectors, err := rpcInspectorBuilder.
-			SetPublicNetwork(p2p.PublicNetworkEnabled).
-			SetMetrics(builder.Metrics.Network, builder.MetricsRegisterer).
-			SetMetricsEnabled(builder.MetricsEnabled).Build()
+		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector).
+			SetPublicNetwork(p2p.PublicNetwork).
+			SetMetrics(&p2pconfig.MetricsConfig{
+				HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+				Metrics:          builder.Metrics.Network,
+			}).Build()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors: %w", err)
+			return nil, fmt.Errorf("could not initialize gossipsub inspectors for observer node: %w", err)
 		}
 
 		node, err := p2pbuilder.NewNodeBuilder(
@@ -904,7 +906,7 @@ func (builder *ObserverServiceBuilder) initPublicLibP2PFactory(networkKey crypto
 			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
 			SetGossipSubTracer(meshTracer).
 			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
-			SetGossipSubRPCInspectors(rpcInspectors...).
+			SetGossipSubRpcInspectorSuite(rpcInspectorSuite).
 			Build()
 
 		if err != nil {
@@ -966,15 +968,11 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 			return libp2pNode, nil
 		}).
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-			if builder.HeroCacheMetricsEnable {
-				heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
-			}
 			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 				builder.Logger,
-				heroCacheCollector)
+				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork))
 
-			err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+			err := node.Metrics.Mempool.Register(metrics.PrependPublicPrefix(metrics.ResourceNetworkingReceiveCache), receiveCache.Size)
 			if err != nil {
 				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 			}
