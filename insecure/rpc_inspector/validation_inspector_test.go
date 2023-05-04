@@ -420,6 +420,9 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsInvalidSporkIDTopic)
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
 
+	// wait for two GossipSub heartbeat intervals to ensure that the victim node has penalized the spammer node.
+	time.Sleep(2 * time.Second)
+
 	// now we expect the detection and mitigation to kick in and the victim node to disconnect from the spammer node.
 	// so the spammer and victim nodes should not be able to exchange messages on the topic.
 	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{victimNode}, []p2p.LibP2PNode{spammer.SpammerNode}, func() (interface{}, channels.Topic) {
