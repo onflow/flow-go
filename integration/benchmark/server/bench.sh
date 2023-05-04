@@ -3,7 +3,10 @@
 set -x
 set -o pipefail
 
-# assumes flow-go was already cloned by user
+# this flow-go sub folder will be where all the TPS tests will be run
+# this will keep the TPS automation code separate from the code that's being tested so we won't run into issues
+# of having old versions of automation code just because we happen to be testing an older version flow-go
+git clone https://github.com/onflow/flow-go.git
 cd flow-go/integration/localnet
 
 git fetch
@@ -22,12 +25,17 @@ while read -r branch_hash; do
 
     echo "The current directory (middle of loop) is $PWD"
     make -C ../.. crypto_setup_gopath
-    make stop
+
+    # instead of running "make stop" which uses docker-compose for a lot of older versions,
+    # we explicitly run the command here with "docker compose"
+    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml down -v --remove-orphans
+
     rm -f docker-compose.nodes.yml
     rm -rf data profiler trie
     make clean-data
     echo "The current directory (middle2 of loop) is $PWD"
     make -e COLLECTION=12 VERIFICATION=12 NCLUSTERS=12 LOGLEVEL=INFO bootstrap
+
     DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml build || continue
     DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml up -d || continue
 
@@ -35,7 +43,10 @@ while read -r branch_hash; do
     sleep 30;
     go run -tags relic ../benchmark/cmd/ci -log-level debug -git-repo-path ../../ -tps-initial 800 -tps-min 1 -tps-max 1200 -duration 30m
 
-    make stop
+    # instead of running "make stop" which uses docker-compose for a lot of older versions,
+    # we explicitly run the command here with "docker compose"
+    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml down -v --remove-orphans
+
     docker system prune -a -f
     echo "The current directory (end of loop) is $PWD"
 done </opt/master.recent
