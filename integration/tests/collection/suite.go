@@ -132,7 +132,8 @@ func (s *CollectorSuite) TearDownTest() {
 
 // Ghost returns a client for the ghost node.
 func (suite *CollectorSuite) Ghost() *ghostclient.GhostClient {
-	client, err := suite.net.ContainerByID(suite.ghostID).GhostClient()
+	ghost := suite.net.ContainerByID(suite.ghostID)
+	client, err := lib.GetGhostClient(ghost)
 	require.NoError(suite.T(), err, "could not get ghost client")
 	return client
 }
@@ -320,7 +321,8 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 	suite.T().Fatalf("missing transactions: %v", missing)
 }
 
-// Collector returns the collector node with the given index in the given cluster.
+// Collector returns the collector node with the given index in the
+// given cluster.
 func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Container {
 
 	clusters := suite.Clusters()
@@ -334,7 +336,8 @@ func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Contai
 	return suite.net.ContainerByID(node.ID())
 }
 
-// ClusterStateFor returns a cluster state instance for the collector node with the given ID.
+// ClusterStateFor returns a cluster state instance for the collector node
+// with the given ID.
 func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateimpl.State {
 
 	myCluster, _, ok := suite.Clusters().ByNodeID(id)
@@ -349,9 +352,9 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 	require.Nil(suite.T(), err, "could not get node db")
 
 	rootQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(rootBlock.ID()))
-	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock, rootQC, setup.Counter)
+	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock, rootQC)
 	suite.NoError(err)
-	clusterState, err := clusterstateimpl.OpenState(db, nil, nil, nil, clusterStateRoot.ClusterID(), clusterStateRoot.EpochCounter())
+	clusterState, err := clusterstateimpl.OpenState(db, nil, nil, nil, clusterStateRoot.ClusterID())
 	require.NoError(suite.T(), err, "could not get cluster state")
 
 	return clusterState

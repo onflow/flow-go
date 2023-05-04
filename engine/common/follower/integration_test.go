@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/follower"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
@@ -52,20 +53,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		all := storageutil.StorageLayer(t, db)
 
 		// bootstrap root snapshot
-		state, err := pbadger.Bootstrap(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.QuorumCertificates,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses,
-			all.VersionBeacons,
-			rootSnapshot,
-		)
+		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		mockTimer := util.MockBlockTimer()
 
@@ -104,8 +92,12 @@ func TestFollowerHappyPath(t *testing.T) {
 		validator := mocks.NewValidator(t)
 		validator.On("ValidateProposal", mock.Anything).Return(nil)
 
+		// initialize the follower followerHotstuffLogic
+		followerHotstuffLogic, err := follower.New(unittest.Logger(), validator, forks)
+		require.NoError(t, err)
+
 		// initialize the follower loop
-		followerLoop, err := hotstuff.NewFollowerLoop(unittest.Logger(), forks)
+		followerLoop, err := hotstuff.NewFollowerLoop(unittest.Logger(), followerHotstuffLogic)
 		require.NoError(t, err)
 
 		syncCore := module.NewBlockRequester(t)
@@ -160,15 +152,8 @@ func TestFollowerHappyPath(t *testing.T) {
 		}
 		pendingBlocks := flowBlocksToBlockProposals(flowBlocks...)
 
-		// Regarding the block that we expect to be finalized based on 2-chain finalization rule, we consider the last few blocks in `pendingBlocks`
-		//  ... <-- X <-- Y <-- Z
-		//            ╰─────────╯
-		//          2-chain on top of X
-		// Hence, we expect X to be finalized, which has the index `len(pendingBlocks)-3`
-		// Note: the HotStuff Follower does not see block Z (as there is no QC for X proving its validity). Instead, it sees the certified block
-		//  [◄(X) Y] ◄(Y)
-		// where ◄(B) denotes a QC for block B
-		targetBlockHeight := pendingBlocks[len(pendingBlocks)-3].Block.Header.Height
+		// this block should be finalized based on 2-chain finalization rule
+		targetBlockHeight := pendingBlocks[len(pendingBlocks)-4].Block.Header.Height
 
 		// emulate syncing logic, where we push same blocks over and over.
 		originID := unittest.IdentifierFixture()

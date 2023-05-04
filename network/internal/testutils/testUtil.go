@@ -160,7 +160,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		var opts []nodeBuilderOption
 
 		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
-		opts = append(opts, withPeerManagerOptions(connection.PruningEnabled, o.peerUpdateInterval))
+		opts = append(opts, withPeerManagerOptions(connection.ConnectionPruningEnabled, o.peerUpdateInterval))
 		opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
 		opts = append(opts, withConnectionGater(o.connectionGater))
 		opts = append(opts, withUnicastManagerOpts(o.createStreamRetryInterval))
@@ -229,8 +229,7 @@ func GenerateNetworks(t *testing.T,
 	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
-	sms []network.SubscriptionManager,
-	opts ...p2p.NetworkOptFunction) []network.Network {
+	sms []network.SubscriptionManager) []network.Network {
 	count := len(ids)
 	nets := make([]network.Network, 0)
 
@@ -255,7 +254,6 @@ func GenerateNetworks(t *testing.T,
 			Metrics:             metrics.NewNoopCollector(),
 			IdentityProvider:    id.NewFixedIdentityProvider(ids),
 			ReceiveCache:        receiveCache,
-			Options:             opts,
 		})
 		require.NoError(t, err)
 
@@ -370,36 +368,16 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	return engs
 }
 
-// StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel.
-// Arguments:
-// - ctx: the irrecoverable context to use for starting the nodes and networks.
-// - t: the test object.
-// - nodes: the libp2p nodes to start.
-// - nets: the networks to start.
-// - timeout: the timeout to use for waiting for the nodes and networks to start.
-//
-// This function fails the test if the nodes or networks do not start within the given timeout.
-func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.Network, timeout time.Duration) {
-	StartNetworks(ctx, t, nets, timeout)
-
-	// start up nodes and Peer managers
-	StartNodes(ctx, t, nodes, timeout)
-}
-
-// StartNetworks starts the provided networks using the provided irrecoverable context
-// Arguments:
-// - ctx: the irrecoverable context to use for starting the networks.
-// - t: the test object.
-// - nets: the networks to start.
-// - duration: the timeout to use for waiting for the networks to start.
-//
-// This function fails the test if the networks do not start within the given timeout.
-func StartNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nets []network.Network, duration time.Duration) {
+// StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel
+func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.Network, duration time.Duration) {
 	// start up networks (this will implicitly start middlewares)
 	for _, net := range nets {
 		net.Start(ctx)
 		unittest.RequireComponentsReadyBefore(t, duration, net)
 	}
+
+	// start up nodes and Peer managers
+	StartNodes(ctx, t, nodes, duration)
 }
 
 // StartNodes starts the provided nodes and their peer managers using the provided irrecoverable context

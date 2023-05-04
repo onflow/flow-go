@@ -16,8 +16,8 @@ type ExecutionDataRequester struct {
 	mock.Mock
 }
 
-// AddOnExecutionDataReceivedConsumer provides a mock function with given fields: fn
-func (_m *ExecutionDataRequester) AddOnExecutionDataReceivedConsumer(fn state_synchronization.OnExecutionDataReceivedConsumer) {
+// AddOnExecutionDataFetchedConsumer provides a mock function with given fields: fn
+func (_m *ExecutionDataRequester) AddOnExecutionDataFetchedConsumer(fn state_synchronization.ExecutionDataReceivedCallback) {
 	_m.Called(fn)
 }
 

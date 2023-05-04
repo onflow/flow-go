@@ -9,7 +9,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -23,7 +23,7 @@ import (
 // ReadOnlyExecutionState allows to read the execution state
 type ReadOnlyExecutionState interface {
 	// NewStorageSnapshot creates a new ready-only view at the given state commitment.
-	NewStorageSnapshot(flow.StateCommitment) snapshot.StorageSnapshot
+	NewStorageSnapshot(flow.StateCommitment) fvmState.StorageSnapshot
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
@@ -37,6 +37,8 @@ type ReadOnlyExecutionState interface {
 	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
 
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
+
+	GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -154,7 +156,7 @@ type LedgerStorageSnapshot struct {
 func NewLedgerStorageSnapshot(
 	ldg ledger.Ledger,
 	commitment flow.StateCommitment,
-) snapshot.StorageSnapshot {
+) fvmState.StorageSnapshot {
 	return &LedgerStorageSnapshot{
 		ledger:     ldg,
 		commitment: commitment,
@@ -223,7 +225,7 @@ func (storage *LedgerStorageSnapshot) Get(
 
 func (s *state) NewStorageSnapshot(
 	commitment flow.StateCommitment,
-) snapshot.StorageSnapshot {
+) fvmState.StorageSnapshot {
 	return NewLedgerStorageSnapshot(s.ls, commitment)
 }
 
@@ -295,31 +297,36 @@ func (s *state) SaveExecutionResults(
 	// but it's the closest thing to atomicity we could have
 	batch := badgerstorage.NewBatch(s.db)
 
-	for _, chunkDataPack := range result.AllChunkDataPacks() {
+	for _, chunkDataPack := range result.ChunkDataPacks {
 		err := s.chunkDataPacks.BatchStore(chunkDataPack, batch)
 		if err != nil {
 			return fmt.Errorf("cannot store chunk data pack: %w", err)
 		}
+
+		err = s.headers.BatchIndexByChunkID(blockID, chunkDataPack.ChunkID, batch)
+		if err != nil {
+			return fmt.Errorf("cannot index chunk data pack by blockID: %w", err)
+		}
 	}
 
-	err := s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
+	err := s.commits.BatchStore(blockID, result.EndState, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store state commitment: %w", err)
 	}
 
-	err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
+	err = s.events.BatchStore(blockID, result.Events, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store events: %w", err)
 	}
 
-	err = s.serviceEvents.BatchStore(blockID, result.AllServiceEvents(), batch)
+	err = s.serviceEvents.BatchStore(blockID, result.ServiceEvents, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store service events: %w", err)
 	}
 
 	err = s.transactionResults.BatchStore(
 		blockID,
-		result.AllTransactionResults(),
+		result.TransactionResults,
 		batch)
 	if err != nil {
 		return fmt.Errorf("cannot store transaction result: %w", err)
@@ -352,6 +359,10 @@ func (s *state) SaveExecutionResults(
 		return fmt.Errorf("cannot update highest executed block: %w", err)
 	}
 	return nil
+}
+
+func (s *state) GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error) {
+	return s.headers.IDByChunkID(chunkID)
 }
 
 func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *flow.Header) error {

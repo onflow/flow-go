@@ -155,7 +155,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	}
 
 	// store the block.
-	err := e.forks.AddValidatedBlock(block)
+	err := e.forks.AddProposal(proposal)
 	if err != nil {
 		return fmt.Errorf("cannot add proposal to forks (%x): %w", block.BlockID, err)
 	}
@@ -261,10 +261,16 @@ func (e *EventHandler) OnPartialTcCreated(partialTC *hotstuff.PartialTcCreated) 
 // be executed by the same goroutine that also calls the other business logic
 // methods, or concurrency safety has to be implemented externally.
 func (e *EventHandler) Start(ctx context.Context) error {
+	// notify about commencing recovery procedure
 	e.notifier.OnStart(e.paceMaker.CurView())
 	defer e.notifier.OnEventProcessed()
 	e.paceMaker.Start(ctx)
-	err := e.proposeForNewViewIfPrimary()
+
+	err := e.processPendingBlocks()
+	if err != nil {
+		return fmt.Errorf("could not process pending blocks: %w", err)
+	}
+	err = e.proposeForNewViewIfPrimary()
 	if err != nil {
 		return fmt.Errorf("could not start new view: %w", err)
 	}
@@ -308,6 +314,47 @@ func (e *EventHandler) broadcastTimeoutObjectIfAuthorized() error {
 	return nil
 }
 
+// processPendingBlocks performs processing of pending blocks that were applied to chain state but weren't processed
+// by Hotstuff event loop. Due to asynchronous nature of our processing pipelines compliance engine can validate and apply
+// blocks to the chain state but fail to deliver them to EventHandler because of shutdown or crash. To recover those QCs and TCs
+// recovery logic puts them in Forks and EventHandler can traverse pending blocks by view to obtain them.
+func (e *EventHandler) processPendingBlocks() error {
+	newestView := e.forks.NewestView()
+	currentView := e.paceMaker.CurView()
+	for {
+		paceMakerActiveView := e.paceMaker.CurView()
+		if currentView < paceMakerActiveView {
+			currentView = paceMakerActiveView
+		}
+
+		if currentView > newestView {
+			return nil
+		}
+
+		// check if there are pending proposals for active view
+		pendingProposals := e.forks.GetProposalsForView(currentView)
+		// process all proposals for view, we are dealing only with valid QCs and TCs so no harm in processing
+		// double proposals here.
+		for _, proposal := range pendingProposals {
+			block := proposal.Block
+			_, err := e.paceMaker.ProcessQC(block.QC)
+			if err != nil {
+				return fmt.Errorf("could not process QC for block %x: %w", block.BlockID, err)
+			}
+
+			_, err = e.paceMaker.ProcessTC(proposal.LastViewTC)
+			if err != nil {
+				return fmt.Errorf("could not process TC for block %x: %w", block.BlockID, err)
+			}
+
+			// TODO(active-pacemaker): generally speaking we are only interested in QC and TC, but in some cases
+			// we might want to vote for blocks as well. Discuss if it's needed.
+		}
+
+		currentView++
+	}
+}
+
 // proposeForNewViewIfPrimary will only be called when we may able to propose a block, after processing a new event.
 //   - after entering a new view as a result of processing a QC or TC, then we may propose for the newly entered view
 //   - after receiving a proposal (but not changing view), if that proposal is referenced by our highest known QC,
@@ -334,8 +381,8 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	if e.committee.Self() != currentLeader {
 		return nil
 	}
-	for _, b := range e.forks.GetBlocksForView(curView) {
-		if b.ProposerID == e.committee.Self() {
+	for _, p := range e.forks.GetProposalsForView(curView) {
+		if p.Block.ProposerID == e.committee.Self() {
 			log.Debug().Msg("already proposed for current view")
 			return nil
 		}
@@ -345,7 +392,7 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	newestQC := e.paceMaker.NewestQC()
 	lastViewTC := e.paceMaker.LastViewTC()
 
-	_, found := e.forks.GetBlock(newestQC.BlockID)
+	_, found := e.forks.GetProposal(newestQC.BlockID)
 	if !found {
 		// we don't know anything about block referenced by our newest QC, in this case we can't
 		// create a valid proposal since we can't guarantee validity of block payload.
@@ -381,21 +428,23 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	if err != nil {
 		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 	}
-	proposedBlock := model.BlockFromFlow(flowProposal) // turn the signed flow header into a proposal
+	proposal := model.ProposalFromFlow(flowProposal) // turn the signed flow header into a proposal
 
 	// we want to store created proposal in forks to make sure that we don't create more proposals for
 	// current view. Due to asynchronous nature of our design it's possible that after creating proposal
 	// we will be asked to propose again for same view.
-	err = e.forks.AddValidatedBlock(proposedBlock)
+	err = e.forks.AddProposal(proposal)
 	if err != nil {
-		return fmt.Errorf("could not add newly created proposal (%v): %w", proposedBlock.BlockID, err)
+		return fmt.Errorf("could not add newly created proposal (%v): %w", proposal.Block.BlockID, err)
 	}
+
+	block := proposal.Block
 	log.Debug().
-		Uint64("block_view", proposedBlock.View).
-		Hex("block_id", proposedBlock.BlockID[:]).
+		Uint64("block_view", block.View).
+		Hex("block_id", block.BlockID[:]).
 		Uint64("parent_view", newestQC.View).
 		Hex("parent_id", newestQC.BlockID[:]).
-		Hex("signer", proposedBlock.ProposerID[:]).
+		Hex("signer", block.ProposerID[:]).
 		Msg("forwarding proposal to communicator for broadcasting")
 
 	// raise a notification with proposal (also triggers broadcast)
@@ -453,7 +502,7 @@ func (e *EventHandler) ownVote(proposal *model.Proposal, curView uint64, nextLea
 		Hex("signer", block.ProposerID[:]).
 		Logger()
 
-	_, found := e.forks.GetBlock(proposal.Block.QC.BlockID)
+	_, found := e.forks.GetProposal(proposal.Block.QC.BlockID)
 	if !found {
 		// we don't have parent for this proposal, we can't vote since we can't guarantee validity of proposals
 		// payload. Strictly speaking this shouldn't ever happen because compliance engine makes sure that we

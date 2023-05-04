@@ -68,6 +68,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
+		flagFastKG = true
 		flagRootChain = chainName
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootHeight = rootHeight
@@ -117,6 +118,8 @@ func TestFinalize_Deterministic(t *testing.T) {
 		flagPartnerNodeInfoDir = partnerDir
 		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
+
+		flagFastKG = true
 
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
 		flagRootParent = hex.EncodeToString(rootParent[:])
@@ -194,6 +197,8 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 		flagPartnerNodeInfoDir = partnerDir
 		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
+
+		flagFastKG = true
 
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
 		flagRootParent = hex.EncodeToString(rootParent[:])
@@ -302,6 +307,8 @@ func TestFinalize_InvalidRandomSeedLength(t *testing.T) {
 		flagPartnerNodeInfoDir = partnerDir
 		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
+
+		flagFastKG = true
 
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
 		flagRootParent = hex.EncodeToString(rootParent[:])

@@ -1,13 +1,13 @@
 package hash_test
 
 import (
-	"crypto/rand"
+	"math/rand"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/sha3"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	cryhash "github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger"
@@ -15,6 +15,10 @@ import (
 )
 
 func TestHash(t *testing.T) {
+	r := time.Now().UnixNano()
+	rand.Seed(r)
+	t.Logf("math rand seed is %d", r)
+
 	t.Run("lengthSanity", func(t *testing.T) {
 		assert.Equal(t, 32, hash.HashLen)
 	})
@@ -24,10 +28,8 @@ func TestHash(t *testing.T) {
 
 		for i := 0; i < 5000; i++ {
 			value := make([]byte, i)
-			_, err := rand.Read(path[:])
-			require.NoError(t, err)
-			_, err = rand.Read(value)
-			require.NoError(t, err)
+			rand.Read(path[:])
+			rand.Read(value)
 			h := hash.HashLeaf(path, value)
 
 			hasher := sha3.New256()
@@ -42,10 +44,8 @@ func TestHash(t *testing.T) {
 		var h1, h2 hash.Hash
 
 		for i := 0; i < 5000; i++ {
-			_, err := rand.Read(h1[:])
-			require.NoError(t, err)
-			_, err = rand.Read(h2[:])
-			require.NoError(t, err)
+			rand.Read(h1[:])
+			rand.Read(h2[:])
 			h := hash.HashInterNode(h1, h2)
 
 			hasher := sha3.New256()
@@ -94,8 +94,8 @@ func Test_ComputeCompactValue(t *testing.T) {
 func BenchmarkHash(b *testing.B) {
 
 	var h1, h2 hash.Hash
-	_, _ = rand.Read(h1[:])
-	_, _ = rand.Read(h2[:])
+	rand.Read(h1[:])
+	rand.Read(h2[:])
 
 	// customized sha3 for ledger
 	b.Run("LedgerSha3", func(b *testing.B) {

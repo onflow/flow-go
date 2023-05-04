@@ -23,15 +23,16 @@ type BlockData struct {
 
 func ComputationResultToBlockData(computationResult *execution.ComputationResult) *BlockData {
 
-	AllResults := computationResult.AllTransactionResults()
-	txResults := make([]*flow.TransactionResult, len(AllResults))
-	for i := 0; i < len(AllResults); i++ {
-		txResults[i] = &AllResults[i]
+	txResults := make([]*flow.TransactionResult, len(computationResult.TransactionResults))
+	for i := 0; i < len(computationResult.TransactionResults); i++ {
+		txResults[i] = &computationResult.TransactionResults[i]
 	}
 
 	events := make([]*flow.Event, 0)
-	for _, e := range computationResult.AllEvents() {
-		events = append(events, &e)
+	for _, eventsList := range computationResult.Events {
+		for i := 0; i < len(eventsList); i++ {
+			events = append(events, &eventsList[i])
+		}
 	}
 
 	trieUpdates := make(
@@ -48,7 +49,7 @@ func ComputationResultToBlockData(computationResult *execution.ComputationResult
 		TxResults:            txResults,
 		Events:               events,
 		TrieUpdates:          trieUpdates,
-		FinalStateCommitment: computationResult.CurrentEndState(),
+		FinalStateCommitment: computationResult.EndState,
 	}
 }
 

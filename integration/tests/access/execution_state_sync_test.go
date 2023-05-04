@@ -65,7 +65,8 @@ func (s *ExecutionStateSyncSuite) TearDownTest() {
 }
 
 func (s *ExecutionStateSyncSuite) Ghost() *client.GhostClient {
-	client, err := s.net.ContainerByID(s.ghostID).GhostClient()
+	ghost := s.net.ContainerByID(s.ghostID)
+	client, err := lib.GetGhostClient(ghost)
 	require.NoError(s.T(), err, "could not get ghost client")
 	return client
 }
@@ -76,8 +77,8 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 	bridgeANConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithID(s.bridgeID),
+		testnet.SupportsUnstakedNodes(),
 		testnet.WithLogLevel(zerolog.DebugLevel),
-		testnet.WithAdditionalFlag("--supports-observer=true"),
 		testnet.WithAdditionalFlag("--execution-data-sync-enabled=true"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir)),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),

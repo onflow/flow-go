@@ -164,7 +164,6 @@ type NetworkInboundQueueMetrics interface {
 // NetworkCoreMetrics encapsulates the metrics collectors for the core networking layer functionality.
 type NetworkCoreMetrics interface {
 	NetworkInboundQueueMetrics
-	AlspMetrics
 	// OutboundMessageSent collects metrics related to a message sent by the node.
 	OutboundMessageSent(sizeBytes int, topic string, protocol string, messageType string)
 	// InboundMessageReceived collects metrics related to a message received by the node.
@@ -189,18 +188,6 @@ type LibP2PConnectionMetrics interface {
 
 	// InboundConnections updates the metric tracking the number of inbound connections of this node
 	InboundConnections(connectionCount uint)
-}
-
-// AlspMetrics encapsulates the metrics collectors for the Application Layer Spam Prevention (ALSP) module, which
-// is part of the networking layer. ALSP is responsible to prevent spam attacks on the application layer messages that
-// appear to be valid for the networking layer but carry on a malicious intent on the application layer (i.e., Flow protocols).
-type AlspMetrics interface {
-	// OnMisbehaviorReported is called when a misbehavior is reported by the application layer to ALSP.
-	// An engine detecting a spamming-related misbehavior reports it to the ALSP module.
-	// Args:
-	// - channel: the channel on which the misbehavior was reported
-	// - misbehaviorType: the type of misbehavior reported
-	OnMisbehaviorReported(channel string, misbehaviorType string)
 }
 
 // NetworkMetrics is the blanket abstraction that encapsulates the metrics collectors for the networking layer.

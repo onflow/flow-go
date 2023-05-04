@@ -50,7 +50,6 @@ func (f *BuilderFactory) Create(
 	clusterHeaders storage.Headers,
 	clusterPayloads storage.ClusterPayloads,
 	pool mempool.Transactions,
-	epoch uint64,
 ) (module.Builder, *finalizer.Finalizer, error) {
 
 	build, err := builder.NewBuilder(
@@ -61,7 +60,6 @@ func (f *BuilderFactory) Create(
 		clusterPayloads,
 		pool,
 		f.log,
-		epoch,
 		f.opts...,
 	)
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
-func runBeaconKG(nodes []model.NodeInfo) dkg.DKGData {
+func runDKG(nodes []model.NodeInfo) dkg.DKGData {
 	n := len(nodes)
 
 	log.Info().Msgf("read %v node infos for DKG", n)
@@ -19,7 +19,11 @@ func runBeaconKG(nodes []model.NodeInfo) dkg.DKGData {
 	log.Debug().Msgf("will run DKG")
 	var dkgData dkg.DKGData
 	var err error
-	dkgData, err = bootstrapDKG.RandomBeaconKG(n, GenerateRandomSeed(crypto.SeedMinLenDKG))
+	if flagFastKG {
+		dkgData, err = bootstrapDKG.RunFastKG(n, flagBootstrapRandomSeed)
+	} else {
+		dkgData, err = bootstrapDKG.RunDKG(n, GenerateRandomSeeds(n, crypto.SeedMinLenDKG))
+	}
 	if err != nil {
 		log.Fatal().Err(err).Msg("error running DKG")
 	}

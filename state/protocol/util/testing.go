@@ -67,20 +67,7 @@ func RunWithBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		all := util.StorageLayer(t, db)
-		state, err := pbadger.Bootstrap(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.QuorumCertificates,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses,
-			all.VersionBeacons,
-			rootSnapshot,
-		)
+		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		f(db, state)
 	})
@@ -93,20 +80,7 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
 		all := util.StorageLayer(t, db)
-		state, err := pbadger.Bootstrap(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.QuorumCertificates,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses,
-			all.VersionBeacons,
-			rootSnapshot,
-		)
+		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
@@ -123,20 +97,7 @@ func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snap
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
 		all := util.StorageLayer(t, db)
-		state, err := pbadger.Bootstrap(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.QuorumCertificates,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses,
-			all.VersionBeacons,
-			rootSnapshot,
-		)
+		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
@@ -154,20 +115,7 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Sn
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
 		all := util.StorageLayer(t, db)
-		state, err := pbadger.Bootstrap(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.QuorumCertificates,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses,
-			all.VersionBeacons,
-			rootSnapshot,
-		)
+		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
@@ -184,20 +132,7 @@ func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, 
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
 		all := util.StorageLayer(t, db)
-		state, err := pbadger.Bootstrap(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.QuorumCertificates,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses,
-			all.VersionBeacons,
-			rootSnapshot,
-		)
+		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		mockTimer := MockBlockTimer()
 		followerState, err := pbadger.NewFollowerState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer)
@@ -212,20 +147,7 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		all := util.StorageLayer(t, db)
-		state, err := pbadger.Bootstrap(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.QuorumCertificates,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses,
-			all.VersionBeacons,
-			rootSnapshot,
-		)
+		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
@@ -241,20 +163,7 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		all := util.StorageLayer(t, db)
-		state, err := pbadger.Bootstrap(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.QuorumCertificates,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses,
-			all.VersionBeacons,
-			rootSnapshot,
-		)
+		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
@@ -272,20 +181,7 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
 		all := util.StorageLayer(t, db)
-		state, err := pbadger.Bootstrap(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.QuorumCertificates,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses,
-			all.VersionBeacons,
-			rootSnapshot,
-		)
+		state, err := pbadger.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		mockTimer := MockBlockTimer()
 		followerState, err := pbadger.NewFollowerState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer)

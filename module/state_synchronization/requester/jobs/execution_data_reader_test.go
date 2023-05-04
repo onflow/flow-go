@@ -56,7 +56,7 @@ func (suite *ExecutionDataReaderSuite) SetupTest() {
 		suite.block.Header.Height: suite.block,
 	}
 
-	suite.executionData = unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(suite.block.ID()))
+	suite.executionData = synctest.ExecutionDataFixture(suite.block.ID())
 
 	suite.highestAvailableHeight = func() uint64 { return suite.block.Header.Height + 1 }
 
@@ -130,10 +130,8 @@ func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 	suite.Run("returns successfully", func() {
 		suite.reset()
 		suite.runTest(func() {
-			ed := unittest.BlockExecutionDataFixture()
+			ed := synctest.ExecutionDataFixture(unittest.IdentifierFixture())
 			setExecutionDataGet(ed, nil)
-
-			edEntity := execution_data.NewBlockExecutionDataEntity(suite.executionDataID, ed)
 
 			job, err := suite.reader.AtIndex(suite.block.Header.Height)
 			require.NoError(suite.T(), err)
@@ -141,7 +139,7 @@ func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 			entry, err := JobToBlockEntry(job)
 			assert.NoError(suite.T(), err)
 
-			assert.Equal(suite.T(), edEntity, entry.ExecutionData)
+			assert.Equal(suite.T(), entry.ExecutionData, ed)
 		})
 	})
 

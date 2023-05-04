@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -31,7 +32,6 @@ import (
 
 	"github.com/onflow/flow-go/admin"
 	pb "github.com/onflow/flow-go/admin/admin"
-	"github.com/onflow/flow-go/integration/client"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -275,14 +275,18 @@ func (suite *CommandRunnerSuite) TestHTTPServer() {
 
 	suite.SetupCommandRunner()
 
-	adminClient := client.NewAdminClient(suite.httpAddress)
-
-	data := map[string]interface{}{"key": "value"}
-	resp, err := adminClient.RunCommand(context.Background(), "foo", data)
+	url := fmt.Sprintf("http://%s/admin/run_command", suite.httpAddress)
+	reqBody := bytes.NewBuffer([]byte(`{"commandName": "foo", "data": {"key": "value"}}`))
+	resp, err := http.Post(url, "application/json", reqBody)
 	require.NoError(suite.T(), err)
+	defer func() {
+		if resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	suite.True(called)
-	suite.EqualValues("ok", resp.Output)
+	suite.Equal("200 OK", resp.Status)
 }
 
 func (suite *CommandRunnerSuite) TestHTTPPProf() {
@@ -314,14 +318,21 @@ func (suite *CommandRunnerSuite) TestListCommands() {
 
 	suite.SetupCommandRunner()
 
-	adminClient := client.NewAdminClient(suite.httpAddress)
-
-	resp, err := adminClient.RunCommand(context.Background(), "list-commands", nil)
+	url := fmt.Sprintf("http://%s/admin/run_command", suite.httpAddress)
+	reqBody := bytes.NewBuffer([]byte(`{"commandName": "list-commands"}`))
+	resp, err := http.Post(url, "application/json", reqBody)
 	require.NoError(suite.T(), err)
+	defer func() {
+		if resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
-	output, ok := resp.Output.([]interface{})
-	suite.True(ok)
-	suite.Subset(output, []string{"foo", "bar", "baz"})
+	suite.Equal("200 OK", resp.Status)
+
+	var response map[string][]string
+	require.NoError(suite.T(), json.NewDecoder(resp.Body).Decode(&response))
+	suite.Subset(response["output"], []string{"foo", "bar", "baz"})
 }
 
 func generateCerts(t *testing.T) (tls.Certificate, *x509.CertPool, tls.Certificate, *x509.CertPool) {
@@ -462,18 +473,17 @@ func (suite *CommandRunnerSuite) TestTLS() {
 
 	suite.SetupCommandRunner(admin.WithTLS(serverConfig))
 
-	httpClient := &http.Client{
+	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: clientConfig,
 		},
 	}
-
-	adminClient := client.NewAdminClient(suite.httpAddress, client.WithTLS(true), client.WithHTTPClient(httpClient))
-
-	data := map[string]interface{}{"key": "value"}
-	resp, err := adminClient.RunCommand(context.Background(), "foo", data)
+	url := fmt.Sprintf("https://%s/admin/run_command", suite.httpAddress)
+	reqBody := bytes.NewBuffer([]byte(`{"commandName": "foo", "data": {"key": "value"}}`))
+	resp, err := client.Post(url, "application/json", reqBody)
 	require.NoError(suite.T(), err)
+	defer resp.Body.Close()
 
 	suite.True(called)
-	suite.EqualValues("ok", resp.Output)
+	suite.Equal("200 OK", resp.Status)
 }

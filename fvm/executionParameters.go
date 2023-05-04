@@ -9,12 +9,12 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/state"
 )
 
 // getBasicMeterParameters returns the set of meter parameters used for
@@ -45,7 +45,7 @@ func getBasicMeterParameters(
 func getBodyMeterParameters(
 	ctx Context,
 	proc Procedure,
-	txnState storage.TransactionPreparer,
+	txnState storage.Transaction,
 ) (
 	meter.MeterParameters,
 	error,
@@ -84,12 +84,12 @@ func getBodyMeterParameters(
 
 type MeterParamOverridesComputer struct {
 	ctx      Context
-	txnState storage.TransactionPreparer
+	txnState storage.Transaction
 }
 
 func NewMeterParamOverridesComputer(
 	ctx Context,
-	txnState storage.TransactionPreparer,
+	txnState storage.Transaction,
 ) MeterParamOverridesComputer {
 	return MeterParamOverridesComputer{
 		ctx:      ctx,
@@ -98,7 +98,7 @@ func NewMeterParamOverridesComputer(
 }
 
 func (computer MeterParamOverridesComputer) Compute(
-	_ state.NestedTransactionPreparer,
+	_ state.NestedTransaction,
 	_ struct{},
 ) (
 	derived.MeterParamOverrides,

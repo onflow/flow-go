@@ -453,18 +453,3 @@ func PeerIdFixture(t *testing.T) peer.ID {
 
 	return peer.ID(h)
 }
-
-// PeerIdSliceFixture returns a slice of random peer IDs for testing.
-// peer ID is the identifier of a node on the libp2p network.
-// Args:
-// - t: *testing.T instance
-// - n: number of peer IDs to generate
-// Returns:
-// - peer.IDSlice: slice of peer IDs
-func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
-	ids := make([]peer.ID, n)
-	for i := 0; i < n; i++ {
-		ids[i] = PeerIdFixture(t)
-	}
-	return ids
-}

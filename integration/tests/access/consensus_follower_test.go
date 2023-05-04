@@ -48,33 +48,33 @@ func (s *ConsensusFollowerSuite) TearDownTest() {
 	s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
-func (s *ConsensusFollowerSuite) SetupTest() {
-	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
-	s.log.Info().Msg("================> SetupTest")
-	s.ctx, s.cancel = context.WithCancel(context.Background())
-	s.buildNetworkConfig()
+func (suite *ConsensusFollowerSuite) SetupTest() {
+	suite.log = unittest.LoggerForTest(suite.Suite.T(), zerolog.InfoLevel)
+	suite.log.Info().Msg("================> SetupTest")
+	suite.ctx, suite.cancel = context.WithCancel(context.Background())
+	suite.buildNetworkConfig()
 	// start the network
-	s.net.Start(s.ctx)
+	suite.net.Start(suite.ctx)
 }
 
 // TestReceiveBlocks tests the following
 // 1. The consensus follower follows the chain and persists blocks in storage.
 // 2. The consensus follower can catch up if it is started after the chain has started producing blocks.
-func (s *ConsensusFollowerSuite) TestReceiveBlocks() {
-	ctx, cancel := context.WithCancel(s.ctx)
+func (suite *ConsensusFollowerSuite) TestReceiveBlocks() {
+	ctx, cancel := context.WithCancel(suite.ctx)
 	defer cancel()
 
 	receivedBlocks := make(map[flow.Identifier]struct{}, blockCount)
 
-	s.Run("consensus follower follows the chain", func() {
+	suite.Run("consensus follower follows the chain", func() {
 		// kick off the first follower
-		s.followerMgr1.startFollower(ctx)
+		suite.followerMgr1.startFollower(ctx)
 		var err error
 		receiveBlocks := func() {
 			for i := 0; i < blockCount; i++ {
-				blockID := <-s.followerMgr1.blockIDChan
+				blockID := <-suite.followerMgr1.blockIDChan
 				receivedBlocks[blockID] = struct{}{}
-				_, err = s.followerMgr1.getBlock(blockID)
+				_, err = suite.followerMgr1.getBlock(blockID)
 				if err != nil {
 					return
 				}
@@ -82,18 +82,18 @@ func (s *ConsensusFollowerSuite) TestReceiveBlocks() {
 		}
 
 		// wait for finalized blocks
-		unittest.AssertReturnsBefore(s.T(), receiveBlocks, 2*time.Minute) // waiting 2 minute for 5 blocks
+		unittest.AssertReturnsBefore(suite.T(), receiveBlocks, 2*time.Minute) // waiting 2 minute for 5 blocks
 
 		// all blocks were found in the storage
-		require.NoError(s.T(), err, "finalized block not found in storage")
+		require.NoError(suite.T(), err, "finalized block not found in storage")
 
 		// assert that blockCount number of blocks were received
-		require.Len(s.T(), receivedBlocks, blockCount)
+		require.Len(suite.T(), receivedBlocks, blockCount)
 	})
 
-	s.Run("consensus follower sync up with the chain", func() {
+	suite.Run("consensus follower sync up with the chain", func() {
 		// kick off the second follower
-		s.followerMgr2.startFollower(ctx)
+		suite.followerMgr2.startFollower(ctx)
 
 		// the second follower is now atleast blockCount blocks behind and should sync up and get all the missed blocks
 		receiveBlocks := func() {
@@ -101,7 +101,7 @@ func (s *ConsensusFollowerSuite) TestReceiveBlocks() {
 				select {
 				case <-ctx.Done():
 					return
-				case blockID := <-s.followerMgr2.blockIDChan:
+				case blockID := <-suite.followerMgr2.blockIDChan:
 					delete(receivedBlocks, blockID)
 					if len(receivedBlocks) == 0 {
 						return
@@ -110,19 +110,18 @@ func (s *ConsensusFollowerSuite) TestReceiveBlocks() {
 			}
 		}
 		// wait for finalized blocks
-		unittest.AssertReturnsBefore(s.T(), receiveBlocks, 2*time.Minute) // waiting 2 minute for the missing 5 blocks
+		unittest.AssertReturnsBefore(suite.T(), receiveBlocks, 2*time.Minute) // waiting 2 minute for the missing 5 blocks
 	})
 }
 
-func (s *ConsensusFollowerSuite) buildNetworkConfig() {
+func (suite *ConsensusFollowerSuite) buildNetworkConfig() {
 
 	// staked access node
-	unittest.IdentityFixture()
-	s.stakedID = unittest.IdentifierFixture()
+	suite.stakedID = unittest.IdentifierFixture()
 	stakedConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
-		testnet.WithID(s.stakedID),
-		testnet.WithAdditionalFlag("--supports-observer=true"),
+		testnet.WithID(suite.stakedID),
+		testnet.SupportsUnstakedNodes(),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	)
 
@@ -152,26 +151,26 @@ func (s *ConsensusFollowerSuite) buildNetworkConfig() {
 	}
 
 	unstakedKey1, err := UnstakedNetworkingKey()
-	require.NoError(s.T(), err)
+	require.NoError(suite.T(), err)
 	unstakedKey2, err := UnstakedNetworkingKey()
-	require.NoError(s.T(), err)
+	require.NoError(suite.T(), err)
 
 	followerConfigs := []testnet.ConsensusFollowerConfig{
-		testnet.NewConsensusFollowerConfig(s.T(), unstakedKey1, s.stakedID, consensus_follower.WithLogLevel("warn")),
-		testnet.NewConsensusFollowerConfig(s.T(), unstakedKey2, s.stakedID, consensus_follower.WithLogLevel("warn")),
+		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey1, suite.stakedID, consensus_follower.WithLogLevel("warn")),
+		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey2, suite.stakedID, consensus_follower.WithLogLevel("warn")),
 	}
 
 	// consensus followers
 	conf := testnet.NewNetworkConfig("consensus follower test", net, testnet.WithConsensusFollowers(followerConfigs...))
-	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
+	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf, flow.Localnet)
 
-	follower1 := s.net.ConsensusFollowerByID(followerConfigs[0].NodeID)
-	s.followerMgr1, err = newFollowerManager(s.T(), follower1)
-	require.NoError(s.T(), err)
+	follower1 := suite.net.ConsensusFollowerByID(followerConfigs[0].NodeID)
+	suite.followerMgr1, err = newFollowerManager(suite.T(), follower1)
+	require.NoError(suite.T(), err)
 
-	follower2 := s.net.ConsensusFollowerByID(followerConfigs[1].NodeID)
-	s.followerMgr2, err = newFollowerManager(s.T(), follower2)
-	require.NoError(s.T(), err)
+	follower2 := suite.net.ConsensusFollowerByID(followerConfigs[1].NodeID)
+	suite.followerMgr2, err = newFollowerManager(suite.T(), follower2)
+	require.NoError(suite.T(), err)
 }
 
 // TODO: Move this to unittest and resolve the circular dependency issue

@@ -39,7 +39,7 @@ func TestTransactionVerification(t *testing.T) {
 	run := func(
 		body *flow.TransactionBody,
 		ctx fvm.Context,
-		txn storage.TransactionPreparer,
+		txn storage.Transaction,
 	) error {
 		executor := fvm.Transaction(body, 0).NewExecutor(ctx, txn)
 		err := fvm.Run(executor)

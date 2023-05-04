@@ -137,7 +137,7 @@ func (s *CoreSuite) TestProcessingRangeHappyPath() {
 	wg.Add(len(blocks) - 1)
 	for i := 1; i < len(blocks); i++ {
 		s.state.On("ExtendCertified", mock.Anything, blocks[i-1], blocks[i].Header.QuorumCertificate()).Return(nil).Once()
-		s.follower.On("AddCertifiedBlock", blockWithID(blocks[i-1].ID())).Run(func(args mock.Arguments) {
+		s.follower.On("SubmitProposal", model.ProposalFromFlow(blocks[i-1].Header)).Run(func(args mock.Arguments) {
 			wg.Done()
 		}).Return().Once()
 	}
@@ -204,7 +204,7 @@ func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
 	var wg sync.WaitGroup
 	wg.Add(len(blocks) - 1)
 	for _, block := range blocks[:len(blocks)-1] {
-		s.follower.On("AddCertifiedBlock", blockWithID(block.ID())).Return().Run(func(args mock.Arguments) {
+		s.follower.On("SubmitProposal", model.ProposalFromFlow(block.Header)).Return().Run(func(args mock.Arguments) {
 			wg.Done()
 		}).Once()
 	}
@@ -266,10 +266,10 @@ func (s *CoreSuite) TestConcurrentAdd() {
 	s.validator.On("ValidateProposal", mock.Anything).Return(nil) // any proposal is valid
 	done := make(chan struct{})
 
-	s.follower.On("AddCertifiedBlock", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+	s.follower.On("SubmitProposal", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		// ensure that proposals are submitted in-order
-		block := args.Get(0).(*model.CertifiedBlock)
-		if block.ID() == targetSubmittedBlockID {
+		proposal := args.Get(0).(*model.Proposal)
+		if proposal.Block.BlockID == targetSubmittedBlockID {
 			close(done)
 		}
 	}).Return().Times(len(blocks) - 1) // all proposals have to be submitted
@@ -300,9 +300,4 @@ func (s *CoreSuite) TestConcurrentAdd() {
 
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "should submit blocks before timeout")
 	unittest.AssertClosesBefore(s.T(), done, time.Millisecond*500, "should process all blocks before timeout")
-}
-
-// blockWithID returns a testify `argumentMatcher` that only accepts blocks with the given ID
-func blockWithID(expectedBlockID flow.Identifier) interface{} {
-	return mock.MatchedBy(func(block *model.CertifiedBlock) bool { return expectedBlockID == block.ID() })
 }

@@ -6,13 +6,13 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
-	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -242,12 +242,12 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		memKind: memWeight,
 	}
 
-	snapshotTree := snapshot.NewSnapshotTree(nil)
+	snapshotTree := storage.NewSnapshotTree(nil)
 
 	ctx := fvm.NewContext(fvm.WithChain(flow.Testnet.Chain()))
 
 	vm := fvm.NewVirtualMachine()
-	executionSnapshot, _, err := vm.Run(
+	executionSnapshot, _, err := vm.RunV2(
 		ctx,
 		fvm.Bootstrap(
 			unittest.ServiceAccountPublicKey,
@@ -258,16 +258,16 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	require.NoError(t, err)
 
 	nestedTxn := state.NewTransactionState(
-		snapshotTree.Append(executionSnapshot),
+		delta.NewDeltaView(snapshotTree.Append(executionSnapshot)),
 		state.DefaultParameters())
 
-	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 	require.NoError(t, err)
 
 	txnState := storage.SerialTransaction{
-		NestedTransactionPreparer: nestedTxn,
-		DerivedTransactionData:    derivedTxnData,
+		NestedTransaction:           nestedTxn,
+		DerivedTransactionCommitter: derivedTxnData,
 	}
 	computer := fvm.NewMeterParamOverridesComputer(ctx, txnState)
 
@@ -288,7 +288,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	ctx.TxBody = &flow.TransactionBody{}
 
 	checkForUpdates := func(id flow.RegisterID, expected bool) {
-		snapshot := &snapshot.ExecutionSnapshot{
+		snapshot := &state.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
 				id: flow.RegisterValue("blah"),
 			},
@@ -301,7 +301,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		require.Equal(t, expected, invalidator.MeterParamOverridesUpdated)
 	}
 
-	executionSnapshot, err = txnState.FinalizeMainTransaction()
+	executionSnapshot, err = nestedTxn.FinalizeMainTransaction()
 	require.NoError(t, err)
 
 	for _, registerId := range executionSnapshot.AllRegisterIDs() {

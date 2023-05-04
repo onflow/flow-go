@@ -2,7 +2,6 @@ package flattener_test
 
 import (
 	"bytes"
-	crand "crypto/rand"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -161,8 +160,7 @@ func TestRandomLeafNodeEncodingDecoding(t *testing.T) {
 		height := rand.Intn(257)
 
 		var hashValue hash.Hash
-		_, err := crand.Read(hashValue[:])
-		require.NoError(t, err)
+		rand.Read(hashValue[:])
 
 		n := node.NewNode(height, nil, nil, paths[i], payloads[i], hashValue)
 

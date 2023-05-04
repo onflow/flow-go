@@ -15,7 +15,7 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
@@ -354,12 +354,12 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 
 type vmMock struct{}
 
-func (vm *vmMock) Run(
+func (vm *vmMock) RunV2(
 	ctx fvm.Context,
 	proc fvm.Procedure,
-	storage snapshot.StorageSnapshot,
+	storage state.StorageSnapshot,
 ) (
-	*snapshot.ExecutionSnapshot,
+	*state.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -369,7 +369,7 @@ func (vm *vmMock) Run(
 			"invokable is not a transaction")
 	}
 
-	snapshot := &snapshot.ExecutionSnapshot{}
+	snapshot := &state.ExecutionSnapshot{}
 	output := fvm.ProcedureOutput{}
 
 	id0 := flow.NewRegisterID("00", "")
@@ -410,10 +410,25 @@ func (vm *vmMock) Run(
 	return snapshot, output, nil
 }
 
+func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
+	snapshot, output, err := vm.RunV2(ctx, proc, nil)
+	if err != nil {
+		return err
+	}
+
+	err = led.Merge(snapshot)
+	if err != nil {
+		return err
+	}
+
+	proc.SetOutput(output)
+	return nil
+}
+
 func (vmMock) GetAccount(
 	_ fvm.Context,
 	_ flow.Address,
-	_ snapshot.StorageSnapshot,
+	_ state.StorageSnapshot,
 ) (
 	*flow.Account,
 	error) {
@@ -422,12 +437,12 @@ func (vmMock) GetAccount(
 
 type vmSystemOkMock struct{}
 
-func (vm *vmSystemOkMock) Run(
+func (vm *vmSystemOkMock) RunV2(
 	ctx fvm.Context,
 	proc fvm.Procedure,
-	storage snapshot.StorageSnapshot,
+	storage state.StorageSnapshot,
 ) (
-	*snapshot.ExecutionSnapshot,
+	*state.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -441,7 +456,7 @@ func (vm *vmSystemOkMock) Run(
 	id5 := flow.NewRegisterID("05", "")
 
 	// add "default" interaction expected in tests
-	snapshot := &snapshot.ExecutionSnapshot{
+	snapshot := &state.ExecutionSnapshot{
 		ReadSet: map[flow.RegisterID]struct{}{
 			id0: struct{}{},
 			id5: struct{}{},
@@ -458,10 +473,25 @@ func (vm *vmSystemOkMock) Run(
 	return snapshot, output, nil
 }
 
+func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
+	snapshot, output, err := vm.RunV2(ctx, proc, nil)
+	if err != nil {
+		return err
+	}
+
+	err = led.Merge(snapshot)
+	if err != nil {
+		return err
+	}
+
+	proc.SetOutput(output)
+	return nil
+}
+
 func (vmSystemOkMock) GetAccount(
 	_ fvm.Context,
 	_ flow.Address,
-	_ snapshot.StorageSnapshot,
+	_ state.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -471,12 +501,12 @@ func (vmSystemOkMock) GetAccount(
 
 type vmSystemBadMock struct{}
 
-func (vm *vmSystemBadMock) Run(
+func (vm *vmSystemBadMock) RunV2(
 	ctx fvm.Context,
 	proc fvm.Procedure,
-	storage snapshot.StorageSnapshot,
+	storage state.StorageSnapshot,
 ) (
-	*snapshot.ExecutionSnapshot,
+	*state.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -492,13 +522,28 @@ func (vm *vmSystemBadMock) Run(
 		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
 	}
 
-	return &snapshot.ExecutionSnapshot{}, output, nil
+	return &state.ExecutionSnapshot{}, output, nil
+}
+
+func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
+	snapshot, output, err := vm.RunV2(ctx, proc, nil)
+	if err != nil {
+		return err
+	}
+
+	err = led.Merge(snapshot)
+	if err != nil {
+		return err
+	}
+
+	proc.SetOutput(output)
+	return nil
 }
 
 func (vmSystemBadMock) GetAccount(
 	_ fvm.Context,
 	_ flow.Address,
-	_ snapshot.StorageSnapshot,
+	_ state.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,

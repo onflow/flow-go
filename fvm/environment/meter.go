@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/state"
 )
 
 const (
@@ -63,10 +63,10 @@ type Meter interface {
 }
 
 type meterImpl struct {
-	txnState state.NestedTransactionPreparer
+	txnState state.NestedTransaction
 }
 
-func NewMeter(txnState state.NestedTransactionPreparer) Meter {
+func NewMeter(txnState state.NestedTransaction) Meter {
 	return &meterImpl{
 		txnState: txnState,
 	}
@@ -115,7 +115,7 @@ type cancellableMeter struct {
 
 func NewCancellableMeter(
 	ctx context.Context,
-	txnState state.NestedTransactionPreparer,
+	txnState state.NestedTransaction,
 ) Meter {
 	return &cancellableMeter{
 		meterImpl: meterImpl{

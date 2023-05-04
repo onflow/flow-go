@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
@@ -55,8 +56,11 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	net.Start(ctx)
 	defer net.Remove()
 
+	// get the ghost container
+	ghostContainer := net.ContainerByID(ghostCollNode.Identifier)
+
 	// get a ghost client connected to the ghost node
-	ghostClient, err := net.ContainerByID(ghostCollNode.Identifier).GhostClient()
+	ghostClient, err := lib.GetGhostClient(ghostContainer)
 	assert.NoError(t, err)
 
 	// generate a test transaction
@@ -109,8 +113,11 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 		logger.Info().Msg("================> Finish TearDownTest")
 	}()
 
+	// get the ghost container
+	ghostContainer := net.ContainerByID(ghostExeNode.Identifier)
+
 	// get a ghost client connected to the ghost node
-	ghostClient, err := net.ContainerByID(ghostExeNode.Identifier).GhostClient()
+	ghostClient, err := lib.GetGhostClient(ghostContainer)
 	assert.NoError(t, err)
 
 	// subscribe to all the events the ghost execution node will receive

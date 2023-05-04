@@ -78,8 +78,8 @@ func (s BlockStatus) String() string {
 // therefore proves validity of the block. A certified block satisfies:
 // Block.View == QC.View and Block.BlockID == QC.BlockID
 type CertifiedBlock struct {
-	Block        *Block
-	CertifyingQC *QuorumCertificate
+	Block *Block
+	QC    *QuorumCertificate
 }
 
 // NewCertifiedBlock constructs a new certified block. It checks the consistency
@@ -93,18 +93,21 @@ func NewCertifiedBlock(block *Block, qc *QuorumCertificate) (CertifiedBlock, err
 	if block.ID() != qc.BlockID {
 		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", block.ID(), qc.BlockID)
 	}
-	return CertifiedBlock{Block: block, CertifyingQC: qc}, nil
+	return CertifiedBlock{
+		Block: block,
+		QC:    qc,
+	}, nil
 }
 
 // ID returns unique identifier for the block.
 // To avoid repeated computation, we use value from the QC.
 func (b *CertifiedBlock) ID() Identifier {
-	return b.CertifyingQC.BlockID
+	return b.QC.BlockID
 }
 
 // View returns view where the block was produced.
 func (b *CertifiedBlock) View() uint64 {
-	return b.CertifyingQC.View
+	return b.QC.View
 }
 
 // Height returns height of the block.

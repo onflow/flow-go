@@ -170,11 +170,6 @@ type InvalidBlockError struct {
 	Err     error
 }
 
-// NewInvalidBlockError instantiates an `InvalidBlockError`. Input `err` cannot be nil.
-func NewInvalidBlockError(blockID flow.Identifier, view uint64, err error) error {
-	return InvalidBlockError{BlockID: blockID, View: view, Err: err}
-}
-
 func (e InvalidBlockError) Error() string {
 	return fmt.Sprintf("invalid block %x at view %d: %s", e.BlockID, e.View, e.Err.Error())
 }
@@ -227,13 +222,10 @@ func (e InvalidVoteError) Unwrap() error {
 	return e.Err
 }
 
-// ByzantineThresholdExceededError is raised if HotStuff detects malicious conditions, which
-// prove that the Byzantine threshold of consensus replicas has been exceeded. Per definition,
-// this is the case when there are byzantine consensus replicas with ≥ 1/3 of the committee's
-// total weight. In this scenario, foundational consensus safety guarantees fail.
-// Generally, the protocol cannot continue in such conditions.
-// We represent this exception as with a dedicated type, so its occurrence can be detected by
-// higher-level logic and escalated to the node operator.
+// ByzantineThresholdExceededError is raised if HotStuff detects malicious conditions which
+// prove a Byzantine threshold of consensus replicas has been exceeded.
+// Per definition, the byzantine threshold is exceeded if there are byzantine consensus
+// replicas with _at least_ 1/3 weight.
 type ByzantineThresholdExceededError struct {
 	Evidence string
 }

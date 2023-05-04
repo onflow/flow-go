@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -44,9 +44,8 @@ func TestFungibleTokenTracker(t *testing.T) {
 	// bootstrap ledger
 	payloads := []ledger.Payload{}
 	chain := flow.Testnet.Chain()
-	view := state.NewExecutionState(
-		reporters.NewStorageSnapshotFromPayload(payloads),
-		state.DefaultParameters())
+	view := delta.NewDeltaView(
+		reporters.NewStorageSnapshotFromPayload(payloads))
 
 	vm := fvm.NewVirtualMachine()
 	opts := []fvm.Option{
@@ -63,7 +62,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 	}
 
-	snapshot, _, err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view)
+	snapshot, _, err := vm.RunV2(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOptions...), view)
 	require.NoError(t, err)
 
 	err = view.Merge(snapshot)
@@ -102,7 +101,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		AddAuthorizer(chain.ServiceAddress())
 
 	tx := fvm.Transaction(txBody, 0)
-	snapshot, output, err := vm.Run(ctx, tx, view)
+	snapshot, output, err := vm.RunV2(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, output.Err)
 
@@ -131,7 +130,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		AddAuthorizer(chain.ServiceAddress())
 
 	tx = fvm.Transaction(txBody, 0)
-	snapshot, output, err = vm.Run(ctx, tx, view)
+	snapshot, output, err = vm.RunV2(ctx, tx, view)
 	require.NoError(t, err)
 	require.NoError(t, output.Err)
 

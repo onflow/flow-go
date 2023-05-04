@@ -234,8 +234,6 @@ func (b *backendTransactions) GetTransactionsByBlockID(
 func (b *backendTransactions) GetTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
-	blockID flow.Identifier,
-	collectionID flow.Identifier,
 ) (*access.TransactionResult, error) {
 	// look up transaction from storage
 	start := time.Now()
@@ -260,17 +258,18 @@ func (b *backendTransactions) GetTransactionResult(
 		return nil, txErr
 	}
 
-	block, err := b.retrieveBlock(blockID, collectionID, txID)
-	if err != nil {
+	// find the block for the transaction
+	block, err := b.lookupBlock(txID)
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
+	var blockID flow.Identifier
 	var transactionWasExecuted bool
 	var events []flow.Event
 	var txError string
 	var statusCode uint32
 	var blockHeight uint64
-
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
 		blockID = block.ID()
@@ -278,18 +277,6 @@ func (b *backendTransactions) GetTransactionResult(
 		blockHeight = block.Header.Height
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
-		}
-
-		// an additional check to ensure the correctness of the collection ID.
-		expectedCollectionID, err := b.lookupCollectionIDInBlock(block, txID)
-		if err != nil {
-			return nil, rpc.ConvertStorageError(err)
-		}
-
-		if collectionID == flow.ZeroID {
-			collectionID = expectedCollectionID
-		} else if collectionID != expectedCollectionID {
-			return nil, status.Error(codes.InvalidArgument, "transaction not found in provided collection")
 		}
 	}
 
@@ -308,54 +295,8 @@ func (b *backendTransactions) GetTransactionResult(
 		ErrorMessage:  txError,
 		BlockID:       blockID,
 		TransactionID: txID,
-		CollectionID:  collectionID,
 		BlockHeight:   blockHeight,
 	}, nil
-}
-
-// lookupCollectionIDInBlock returns the collection ID based on the transaction ID. The lookup is performed in block
-// collections.
-func (b *backendTransactions) lookupCollectionIDInBlock(
-	block *flow.Block,
-	txID flow.Identifier,
-) (flow.Identifier, error) {
-	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := b.collections.LightByID(guarantee.ID())
-		if err != nil {
-			return flow.ZeroID, err
-		}
-
-		for _, collectionTxID := range collection.Transactions {
-			if collectionTxID == txID {
-				return collection.ID(), nil
-			}
-		}
-	}
-	return flow.ZeroID, status.Error(codes.NotFound, "transaction not found in block")
-}
-
-// retrieveBlock function returns a block based on the input argument. The block ID lookup has the highest priority,
-// followed by the collection ID lookup. If both are missing, the default lookup by transaction ID is performed.
-func (b *backendTransactions) retrieveBlock(
-	blockID flow.Identifier,
-	collectionID flow.Identifier,
-	txID flow.Identifier,
-) (*flow.Block, error) {
-	if blockID != flow.ZeroID {
-		return b.blocks.ByID(blockID)
-	}
-
-	if collectionID != flow.ZeroID {
-		return b.blocks.ByCollectionID(collectionID)
-	}
-
-	// find the block for the transaction
-	block, err := b.lookupBlock(txID)
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
-		return nil, err
-	}
-
-	return block, nil
 }
 
 func (b *backendTransactions) GetTransactionResultsByBlockID(

@@ -18,9 +18,7 @@ type Payload struct {
 	// the proposer may choose any reference block, so long as it is finalized
 	// and within the epoch the cluster is associated with. If a cluster was
 	// assigned for epoch E, then all of its reference blocks must have a view
-	// in the range [E.FirstView, E.FinalView]. However, if epoch fallback is
-	// triggered in epoch E, then any reference block with view ≥ E.FirstView
-	// may be used.
+	// in the range [E.FirstView, E.FinalView].
 	//
 	// This determines when the collection expires, using the same expiry rules
 	// as transactions. It is also used as the reference point for committee

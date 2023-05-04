@@ -3,6 +3,7 @@ package cmd
 var (
 	flagBootDir string
 
+	flagPayout            string
 	flagBucketNetworkName string
 
 	flagFlowSupplyIncreasePercentage string

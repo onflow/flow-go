@@ -19,9 +19,9 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -47,10 +47,10 @@ type testAccounts struct {
 func createAccounts(
 	b *testing.B,
 	vm fvm.VM,
-	snapshotTree snapshot.SnapshotTree,
+	snapshotTree storage.SnapshotTree,
 	num int,
 ) (
-	snapshot.SnapshotTree,
+	storage.SnapshotTree,
 	*testAccounts,
 ) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(num)
@@ -78,10 +78,15 @@ func createAccounts(
 func mustFundAccounts(
 	b *testing.B,
 	vm fvm.VM,
-	snapshotTree snapshot.SnapshotTree,
+	snapshotTree storage.SnapshotTree,
 	execCtx fvm.Context,
 	accs *testAccounts,
-) snapshot.SnapshotTree {
+) storage.SnapshotTree {
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	execCtx = fvm.NewContextFromParent(
+		execCtx,
+		fvm.WithDerivedBlockData(derivedBlockData))
+
 	var err error
 	for _, acc := range accs.accounts {
 		transferTx := testutil.CreateTokenTransferTransaction(chain, 1_000_000, acc.address, chain.ServiceAddress())
@@ -89,10 +94,10 @@ func mustFundAccounts(
 		require.NoError(b, err)
 		accs.seq++
 
-		executionSnapshot, output, err := vm.Run(
-			execCtx,
-			fvm.Transaction(transferTx, 0),
-			snapshotTree)
+		tx := fvm.Transaction(
+			transferTx,
+			derivedBlockData.NextTxIndexForTestingOnly())
+		executionSnapshot, output, err := vm.RunV2(execCtx, tx, snapshotTree)
 		require.NoError(b, err)
 		require.NoError(b, output.Err)
 		snapshotTree = snapshotTree.Append(executionSnapshot)
@@ -202,12 +207,12 @@ func BenchmarkComputeBlock(b *testing.B) {
 			elapsed += time.Since(start)
 			b.StopTimer()
 
-			for _, snapshot := range res.AllExecutionSnapshots() {
+			for _, snapshot := range res.StateSnapshots {
 				snapshotTree = snapshotTree.Append(snapshot)
 			}
 
 			require.NoError(b, err)
-			for j, r := range res.AllTransactionResults() {
+			for j, r := range res.TransactionResults {
 				// skip system transactions
 				if j >= cols*txes {
 					break

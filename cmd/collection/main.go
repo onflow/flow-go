@@ -273,11 +273,16 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
+			packer := hotsignature.NewConsensusSigDataPacker(mainConsensusCommittee)
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, packer)
 			// creates a consensus follower with noop consumer as the notifier
 			followerCore, err = consensus.NewFollower(
 				node.Logger,
+				mainConsensusCommittee,
 				node.Storage.Headers,
 				finalizer,
+				verifier,
 				finalizationDistributor,
 				node.RootBlock.Header,
 				node.RootQC,

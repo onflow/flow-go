@@ -15,8 +15,9 @@ import (
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -106,7 +107,7 @@ type BlockComputer interface {
 		ctx context.Context,
 		parentBlockExecutionResultID flow.Identifier,
 		block *entity.ExecutableBlock,
-		snapshot snapshot.StorageSnapshot,
+		snapshot state.StorageSnapshot,
 		derivedBlockData *derived.DerivedBlockData,
 	) (
 		*execution.ComputationResult,
@@ -181,7 +182,7 @@ func (e *blockComputer) ExecuteBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	snapshot snapshot.StorageSnapshot,
+	snapshot state.StorageSnapshot,
 	derivedBlockData *derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,
@@ -271,7 +272,7 @@ func (e *blockComputer) executeBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	baseSnapshot snapshot.StorageSnapshot,
+	baseSnapshot state.StorageSnapshot,
 	derivedBlockData *derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,
@@ -310,7 +311,7 @@ func (e *blockComputer) executeBlock(
 		e.colResCons)
 	defer collector.Stop()
 
-	snapshotTree := snapshot.NewSnapshotTree(baseSnapshot)
+	snapshotTree := storage.NewSnapshotTree(baseSnapshot)
 	for _, txn := range transactions {
 		txnExecutionSnapshot, output, err := e.executeTransaction(
 			blockSpan,
@@ -351,10 +352,10 @@ func (e *blockComputer) executeBlock(
 func (e *blockComputer) executeTransaction(
 	parentSpan otelTrace.Span,
 	txn transaction,
-	storageSnapshot snapshot.StorageSnapshot,
+	storageSnapshot state.StorageSnapshot,
 	collector *resultCollector,
 ) (
-	*snapshot.ExecutionSnapshot,
+	*state.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -384,7 +385,7 @@ func (e *blockComputer) executeTransaction(
 
 	txn.ctx = fvm.NewContextFromParent(txn.ctx, fvm.WithSpan(txSpan))
 
-	executionSnapshot, output, err := e.vm.Run(
+	executionSnapshot, output, err := e.vm.RunV2(
 		txn.ctx,
 		txn.TransactionProcedure,
 		storageSnapshot)

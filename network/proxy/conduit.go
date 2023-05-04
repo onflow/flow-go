@@ -12,8 +12,6 @@ type ProxyConduit struct {
 	targetNodeID flow.Identifier
 }
 
-var _ network.Conduit = (*ProxyConduit)(nil)
-
 func (c *ProxyConduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
 	return c.Conduit.Publish(event, c.targetNodeID)
 }

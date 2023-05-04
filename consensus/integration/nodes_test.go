@@ -314,7 +314,7 @@ func createConsensusIdentities(t *testing.T, n int) *run.ParticipantData {
 
 // completeConsensusIdentities runs KG process and fills nodeInfos with missing random beacon keys
 func completeConsensusIdentities(t *testing.T, nodeInfos []bootstrap.NodeInfo) *run.ParticipantData {
-	dkgData, err := bootstrapDKG.RandomBeaconKG(len(nodeInfos), unittest.RandomBytes(48))
+	dkgData, err := bootstrapDKG.RunFastKG(len(nodeInfos), unittest.RandomBytes(48))
 	require.NoError(t, err)
 
 	participantData := &run.ParticipantData{
@@ -375,7 +375,6 @@ func createNode(
 	setupsDB := storage.NewEpochSetups(metricsCollector, db)
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
 	statusesDB := storage.NewEpochStatuses(metricsCollector, db)
-	versionBeaconDB := storage.NewVersionBeacons(db)
 	consumer := events.NewDistributor()
 
 	localID := identity.ID()
@@ -396,7 +395,6 @@ func createNode(
 		setupsDB,
 		commitsDB,
 		statusesDB,
-		versionBeaconDB,
 		rootSnapshot,
 	)
 	require.NoError(t, err)

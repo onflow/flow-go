@@ -38,9 +38,7 @@ type Controller struct {
 	r              uint64  // failed rounds counter, higher value results in longer round duration
 }
 
-// NewController creates a new Controller. Note that the input Config is implemented such that
-// it can be passed by value, while still supporting updates of `BlockRateDelayMS` at runtime
-// (all configs share the same memory holding `BlockRateDelayMS`).
+// NewController creates a new Controller.
 func NewController(timeoutConfig Config) *Controller {
 	// the initial value for the timeout channel is a closed channel which returns immediately
 	// this prevents indefinite blocking when no timeout has been started

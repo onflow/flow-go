@@ -5,15 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	lru "github.com/hashicorp/golang-lru"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -97,7 +93,6 @@ func New(
 	fixedExecutionNodeIDs []string,
 	log zerolog.Logger,
 	snapshotHistoryLimit int,
-	archiveAddressList []string,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
@@ -113,14 +108,13 @@ func New(
 		state: state,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:            headers,
-			executionReceipts:  executionReceipts,
-			connFactory:        connFactory,
-			state:              state,
-			log:                log,
-			metrics:            transactionMetrics,
-			loggedScripts:      loggedScripts,
-			archiveAddressList: archiveAddressList,
+			headers:           headers,
+			executionReceipts: executionReceipts,
+			connFactory:       connFactory,
+			state:             state,
+			log:               log,
+			metrics:           transactionMetrics,
+			loggedScripts:     loggedScripts,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
@@ -230,27 +224,6 @@ func (b *Backend) Ping(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-// GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
-func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error) {
-	stateParams := b.state.Params()
-	sporkId, err := stateParams.SporkID()
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to read spork ID: %v", err)
-	}
-
-	protocolVersion, err := stateParams.ProtocolVersion()
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to read protocol version: %v", err)
-	}
-
-	return &access.NodeVersionInfo{
-		Semver:          build.Semver(),
-		Commit:          build.Commit(),
-		SporkId:         sporkId,
-		ProtocolVersion: uint64(protocolVersion),
-	}, nil
 }
 
 func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*flow.LightCollection, error) {

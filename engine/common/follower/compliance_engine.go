@@ -248,7 +248,7 @@ func (e *ComplianceEngine) processBlocksLoop(ctx irrecoverable.SignalerContext, 
 //     to overwhelm another node through synchronization messages and drown out new blocks
 //     for a node that is up-to-date.
 //   - On the flip side, new proposals are relatively infrequent compared to the load that
-//     synchronization produces for a node that is catching up. In other words, prioritizing
+//     synchronization produces for a note that is catching up. In other words, prioritizing
 //     the few new proposals first is probably not going to be much of a distraction.
 //     Proposals too far in the future are dropped (see parameter `SkipNewProposalsThreshold`
 //     in `compliance.Config`), to prevent memory overflow.

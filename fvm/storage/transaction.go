@@ -1,17 +1,17 @@
 package storage
 
 import (
-	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/state"
 )
 
-type TransactionPreparer interface {
-	state.NestedTransactionPreparer
-	derived.DerivedTransactionPreparer
+type Transaction interface {
+	state.NestedTransaction
+	derived.DerivedTransaction
 }
 
 type TransactionComitter interface {
-	TransactionPreparer
+	Transaction
 
 	// Validate returns nil if the transaction does not conflict with
 	// previously committed transactions.  It returns an error otherwise.
@@ -25,6 +25,6 @@ type TransactionComitter interface {
 
 // TODO(patrick): implement proper transaction.
 type SerialTransaction struct {
-	state.NestedTransactionPreparer
-	*derived.DerivedTransactionData
+	state.NestedTransaction
+	derived.DerivedTransactionCommitter
 }

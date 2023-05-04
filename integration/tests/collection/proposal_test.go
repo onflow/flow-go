@@ -8,10 +8,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/integration/convert"
+	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -48,7 +51,7 @@ func (suite *MultiClusterSuite) TestProposal_MultiCluster() {
 
 		for j := 0; j < clusterSize; j++ {
 			node := suite.Collector(uint(i), uint(j))
-			client, err := node.SDKClient()
+			client, err := client.NewClient(node.Addr(testnet.ColNodeAPIPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
 			suite.Require().NoError(err)
 			forCluster = append(forCluster, client)
 		}

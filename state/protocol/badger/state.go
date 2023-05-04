@@ -39,8 +39,6 @@ type State struct {
 		commits  storage.EpochCommits
 		statuses storage.EpochStatuses
 	}
-	versionBeacons storage.VersionBeacons
-
 	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
 	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
 	// larger than the height of the root block of the spork, (also cached below as
@@ -86,7 +84,6 @@ func Bootstrap(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
-	versionBeacons storage.VersionBeacons,
 	root protocol.Snapshot,
 	options ...BootstrapConfigOptions,
 ) (*State, error) {
@@ -104,19 +101,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
-	state := newState(
-		metrics,
-		db,
-		headers,
-		seals,
-		results,
-		blocks,
-		qcs,
-		setups,
-		commits,
-		statuses,
-		versionBeacons,
-	)
+	state := newState(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses)
 
 	if err := IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
@@ -585,7 +570,6 @@ func OpenState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
-	versionBeacons storage.VersionBeacons,
 ) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db)
 	if err != nil {
@@ -594,19 +578,8 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	state := newState(
-		metrics,
-		db,
-		headers,
-		seals,
-		results,
-		blocks,
-		qcs,
-		setups,
-		commits,
-		statuses,
-		versionBeacons,
-	) // populate the protocol state cache
+	state := newState(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses)
+	// populate the protocol state cache
 	err = state.populateCache()
 	if err != nil {
 		return nil, fmt.Errorf("failed to populate cache: %w", err)
@@ -657,7 +630,7 @@ func (state *State) Sealed() protocol.Snapshot {
 func (state *State) Final() protocol.Snapshot {
 	cached := state.cachedFinal.Load()
 	if cached == nil {
-		return invalid.NewSnapshotf("internal inconsistency: no cached final header")
+		invalid.NewSnapshotf("internal inconsistency: no cached final header")
 	}
 	return NewFinalizedSnapshot(state, cached.id, cached.header)
 }
@@ -714,7 +687,6 @@ func newState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
-	versionBeacons storage.VersionBeacons,
 ) *State {
 	return &State{
 		metrics: metrics,
@@ -733,8 +705,7 @@ func newState(
 			commits:  commits,
 			statuses: statuses,
 		},
-		versionBeacons: versionBeacons,
-		cachedFinal:    new(atomic.Pointer[cachedHeader]),
+		cachedFinal: new(atomic.Pointer[cachedHeader]),
 	}
 }
 

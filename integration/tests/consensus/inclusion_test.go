@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/signature"
@@ -34,7 +35,8 @@ type InclusionSuite struct {
 }
 
 func (is *InclusionSuite) Collection() *client.GhostClient {
-	client, err := is.net.ContainerByID(is.collID).GhostClient()
+	ghost := is.net.ContainerByID(is.collID)
+	client, err := lib.GetGhostClient(ghost)
 	require.NoError(is.T(), err, "could not get ghost client")
 	return client
 }

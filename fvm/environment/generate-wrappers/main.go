@@ -15,12 +15,12 @@ package environment
 
 import (
     "github.com/onflow/flow-go/fvm/errors"
-    "github.com/onflow/flow-go/fvm/storage/state"
+    "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/module/trace"
 )
 
 func parseRestricted(
-    txnState state.NestedTransactionPreparer,
+    txnState state.NestedTransaction,
     spanName trace.SpanName,
 ) error {
     if txnState.IsParseRestricted() {
@@ -84,7 +84,7 @@ func generateWrapper(numArgs int, numRets int, content *FileContent) {
 	l("](")
 	push()
 
-	l("txnState state.NestedTransactionPreparer,")
+	l("txnState state.NestedTransaction,")
 	l("spanName trace.SpanName,")
 
 	callbackRet := "error"

@@ -10,10 +10,10 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -29,7 +29,7 @@ type Programs struct {
 	meter   Meter
 	metrics MetricsReporter
 
-	txnState storage.TransactionPreparer
+	txnState storage.Transaction
 	accounts Accounts
 
 	// NOTE: non-address programs are not reusable across transactions, hence
@@ -45,7 +45,7 @@ func NewPrograms(
 	tracer tracing.TracerSpan,
 	meter Meter,
 	metrics MetricsReporter,
-	txnState storage.TransactionPreparer,
+	txnState storage.Transaction,
 	accounts Accounts,
 ) *Programs {
 	return &Programs{
@@ -220,7 +220,7 @@ func newProgramLoader(
 }
 
 func (loader *programLoader) Compute(
-	txState state.NestedTransactionPreparer,
+	txState state.NestedTransaction,
 	location common.AddressLocation,
 ) (
 	*derived.Program,

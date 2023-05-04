@@ -25,13 +25,14 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	state2 "github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -160,15 +161,15 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	hasUpdates := false
-	for _, snapshot := range returnedComputationResult.AllExecutionSnapshots() {
+	for _, snapshot := range returnedComputationResult.StateSnapshots {
 		if len(snapshot.WriteSet) > 0 {
 			hasUpdates = true
 			break
 		}
 	}
 	require.True(t, hasUpdates)
-	require.Equal(t, returnedComputationResult.BlockExecutionResult.Size(), 1+1) // 1 coll + 1 system chunk
-	assert.NotEmpty(t, returnedComputationResult.AllExecutionSnapshots()[0].UpdatedRegisters())
+	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
+	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].UpdatedRegisters())
 }
 
 func TestComputeBlock_Uploader(t *testing.T) {
@@ -210,13 +211,17 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		derivedChainData: derivedChainData,
 	}
 
+	view := delta.NewDeltaView(
+		state2.NewLedgerStorageSnapshot(
+			ledger,
+			flow.StateCommitment(ledger.InitialState())))
+	blockView := view.NewChild()
+
 	_, err = manager.ComputeBlock(
 		context.Background(),
 		unittest.IdentifierFixture(),
 		computationResult.ExecutableBlock,
-		state2.NewLedgerStorageSnapshot(
-			ledger,
-			flow.StateCommitment(ledger.InitialState())))
+		blockView)
 	require.NoError(t, err)
 }
 
@@ -295,7 +300,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
-	snapshot := snapshot.NewReadFuncStorageSnapshot(
+	snapshot := state.NewReadFuncStorageSnapshot(
 		func(id flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, fmt.Errorf("error getting register")
 		})
@@ -503,22 +508,26 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 
 type PanickingVM struct{}
 
-func (p *PanickingVM) Run(
+func (p *PanickingVM) RunV2(
 	f fvm.Context,
 	procedure fvm.Procedure,
-	storageSnapshot snapshot.StorageSnapshot,
+	storageSnapshot state.StorageSnapshot,
 ) (
-	*snapshot.ExecutionSnapshot,
+	*state.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
 
+func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {
+	panic("panic, but expected with sentinel for test: Verunsicherung ")
+}
+
 func (p *PanickingVM) GetAccount(
 	ctx fvm.Context,
 	address flow.Address,
-	storageSnapshot snapshot.StorageSnapshot,
+	storageSnapshot state.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -530,28 +539,38 @@ type LongRunningVM struct {
 	duration time.Duration
 }
 
-func (l *LongRunningVM) Run(
+func (l *LongRunningVM) RunV2(
 	f fvm.Context,
 	procedure fvm.Procedure,
-	storageSnapshot snapshot.StorageSnapshot,
+	storageSnapshot state.StorageSnapshot,
 ) (
-	*snapshot.ExecutionSnapshot,
+	*state.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
 	time.Sleep(l.duration)
 
-	snapshot := &snapshot.ExecutionSnapshot{}
+	snapshot := &state.ExecutionSnapshot{}
 	output := fvm.ProcedureOutput{
 		Value: cadence.NewVoid(),
 	}
 	return snapshot, output, nil
 }
 
+func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View) error {
+	time.Sleep(l.duration)
+	// satisfy value marshaller
+	if scriptProcedure, is := procedure.(*fvm.ScriptProcedure); is {
+		scriptProcedure.Value = cadence.NewVoid()
+	}
+
+	return nil
+}
+
 func (l *LongRunningVM) GetAccount(
 	ctx fvm.Context,
 	address flow.Address,
-	storageSnapshot snapshot.StorageSnapshot,
+	storageSnapshot state.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -567,7 +586,7 @@ func (f *FakeBlockComputer) ExecuteBlock(
 	context.Context,
 	flow.Identifier,
 	*entity.ExecutableBlock,
-	snapshot.StorageSnapshot,
+	state.StorageSnapshot,
 	*derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,
@@ -791,23 +810,19 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		snapshotTree)
 	require.NoError(t, err)
 
-	txResults := returnedComputationResult.AllTransactionResults()
-	require.Len(t, txResults, 4) // 2 txs + 1 system tx
+	require.Len(t, returnedComputationResult.Events, 2)             // 1 collection + 1 system chunk
+	require.Len(t, returnedComputationResult.TransactionResults, 4) // 2 txs + 1 system tx
 
-	require.Empty(t, txResults[0].ErrorMessage)
-	require.Contains(t, txResults[1].ErrorMessage, "I failed encoding")
-	require.Empty(t, txResults[2].ErrorMessage)
-
-	colRes := returnedComputationResult.CollectionExecutionResultAt(0)
-	events := colRes.Events()
-	require.Len(t, events, 2) // 1 collection + 1 system chunk
+	require.Empty(t, returnedComputationResult.TransactionResults[0].ErrorMessage)
+	require.Contains(t, returnedComputationResult.TransactionResults[1].ErrorMessage, "I failed encoding")
+	require.Empty(t, returnedComputationResult.TransactionResults[2].ErrorMessage)
 
 	// first event should be contract deployed
-	assert.EqualValues(t, "flow.AccountContractAdded", events[0].Type)
+	assert.EqualValues(t, "flow.AccountContractAdded", returnedComputationResult.Events[0][0].Type)
 
 	// second event should come from tx3 (index 2)  as tx2 (index 1) should fail encoding
-	hasValidEventValue(t, events[1], 1)
-	assert.Equal(t, events[1].TransactionIndex, uint32(2))
+	hasValidEventValue(t, returnedComputationResult.Events[0][1], 1)
+	assert.Equal(t, returnedComputationResult.Events[0][1].TransactionIndex, uint32(2))
 }
 
 type testingEventEncoder struct {
@@ -898,8 +913,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		cadence.NewPath("storage", "x"),
 	)
 
-	// the save should not update account storage by writing the updates
-	// back to the snapshotTree
+	// the save should not update account storage by writing the delta from the child view back to the parent
 	require.NoError(t, err)
 	require.Equal(t, nil, v)
 }

@@ -1,27 +1,38 @@
 package testutils
 
 import (
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
-	"github.com/onflow/flow-go/fvm/storage/state"
 )
+
+type SimpleTestTransaction struct {
+	*delta.View
+
+	storage.SerialTransaction
+}
 
 // NewSimpleTransaction returns a transaction which can be used to test
 // fvm evaluation.  The returned transaction should not be committed.
 func NewSimpleTransaction(
-	snapshot snapshot.StorageSnapshot,
-) *storage.SerialTransaction {
-	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
+	snapshot state.StorageSnapshot,
+) *SimpleTestTransaction {
+	view := delta.NewDeltaView(snapshot)
+
+	derivedBlockData := derived.NewEmptyDerivedBlockData()
 	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
 	if err != nil {
 		panic(err)
 	}
 
-	return &storage.SerialTransaction{
-		NestedTransactionPreparer: state.NewTransactionState(
-			snapshot,
-			state.DefaultParameters()),
-		DerivedTransactionData: derivedTxnData,
+	return &SimpleTestTransaction{
+		View: view,
+		SerialTransaction: storage.SerialTransaction{
+			NestedTransaction: state.NewTransactionState(
+				view,
+				state.DefaultParameters()),
+			DerivedTransactionCommitter: derivedTxnData,
+		},
 	}
 }

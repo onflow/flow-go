@@ -54,18 +54,3 @@ func TestDefaultConfig(t *testing.T) {
 	require.Equal(t, uint64(6), c.HappyPathMaxRoundFailures)
 	require.Equal(t, float64(0), c.BlockRateDelayMS.Load())
 }
-
-// Test_ConfigPassByValue tests timeout.Config can be passed by value
-// without breaking the ability to update `BlockRateDelayMS`
-func Test_ConfigPassByValue(t *testing.T) {
-	origConf := NewDefaultConfig()
-	err := origConf.SetBlockRateDelay(2227 * time.Millisecond)
-	require.NoError(t, err)
-
-	copiedConf := origConf
-	require.Equal(t, float64(2227), copiedConf.BlockRateDelayMS.Load())
-
-	err = origConf.SetBlockRateDelay(1011 * time.Millisecond)
-	require.NoError(t, err)
-	require.Equal(t, float64(1011), copiedConf.BlockRateDelayMS.Load())
-}

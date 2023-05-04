@@ -33,4 +33,18 @@ type Headers interface {
 	// might be unfinalized; if there is more than one, at least one of them has to
 	// be unfinalized.
 	ByParentID(parentID flow.Identifier) ([]*flow.Header, error)
+
+	// IndexByChunkID indexes block ID by chunk ID.
+	IndexByChunkID(headerID, chunkID flow.Identifier) error
+
+	// BatchIndexByChunkID indexes block ID by chunk ID in a given batch.
+	BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch BatchStorage) error
+
+	// IDByChunkID finds the ID of the block corresponding to given chunk ID.
+	IDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
+
+	// BatchRemoveChunkBlockIndexByChunkID removes block to chunk index entry keyed by a blockID in a provided batch
+	// No errors are expected during normal operation, even if no entries are matched.
+	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+	BatchRemoveChunkBlockIndexByChunkID(chunkID flow.Identifier, batch BatchStorage) error
 }

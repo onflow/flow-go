@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -37,12 +37,12 @@ type BootstrapAccountCreator interface {
 // This ensures cadence can't access unexpected operations while parsing
 // programs.
 type ParseRestrictedAccountCreator struct {
-	txnState state.NestedTransactionPreparer
+	txnState state.NestedTransaction
 	impl     AccountCreator
 }
 
 func NewParseRestrictedAccountCreator(
-	txnState state.NestedTransactionPreparer,
+	txnState state.NestedTransaction,
 	creator AccountCreator,
 ) AccountCreator {
 	return ParseRestrictedAccountCreator{
@@ -88,7 +88,7 @@ func (NoAccountCreator) CreateAccount(
 // updates the state when next address is called (This secondary functionality
 // is only used in utility command line).
 type accountCreator struct {
-	txnState state.NestedTransactionPreparer
+	txnState state.NestedTransaction
 	chain    flow.Chain
 	accounts Accounts
 
@@ -102,7 +102,7 @@ type accountCreator struct {
 }
 
 func NewAddressGenerator(
-	txnState state.NestedTransactionPreparer,
+	txnState state.NestedTransaction,
 	chain flow.Chain,
 ) AddressGenerator {
 	return &accountCreator{
@@ -112,7 +112,7 @@ func NewAddressGenerator(
 }
 
 func NewBootstrapAccountCreator(
-	txnState state.NestedTransactionPreparer,
+	txnState state.NestedTransaction,
 	chain flow.Chain,
 	accounts Accounts,
 ) BootstrapAccountCreator {
@@ -124,7 +124,7 @@ func NewBootstrapAccountCreator(
 }
 
 func NewAccountCreator(
-	txnState state.NestedTransactionPreparer,
+	txnState state.NestedTransaction,
 	chain flow.Chain,
 	accounts Accounts,
 	isServiceAccountEnabled bool,

@@ -16,7 +16,7 @@ import (
 type BlockEntry struct {
 	BlockID       flow.Identifier
 	Height        uint64
-	ExecutionData *execution_data.BlockExecutionDataEntity
+	ExecutionData *execution_data.BlockExecutionData
 }
 
 // ExecutionDataReader provides an abstraction for consumers to read blocks as job.
@@ -91,7 +91,7 @@ func (r *ExecutionDataReader) Head() (uint64, error) {
 
 // getExecutionData returns the ExecutionData for the given block height.
 // This is used by the execution data reader to get the ExecutionData for a block.
-func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerContext, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
+func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerContext, height uint64) (*execution_data.BlockExecutionData, error) {
 	header, err := r.headers.ByHeight(height)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lookup header for height %d: %w", height, err)
@@ -117,5 +117,5 @@ func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerC
 		return nil, fmt.Errorf("failed to get execution data for block %s: %w", header.ID(), err)
 	}
 
-	return execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, executionData), nil
+	return executionData, nil
 }

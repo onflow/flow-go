@@ -52,20 +52,6 @@ func RetrieveEpochFirstHeight(epoch uint64, height *uint64) func(*badger.Txn) er
 	return retrieve(makePrefix(codeEpochFirstHeight, epoch), height)
 }
 
-// RetrieveEpochLastHeight retrieves the height of the last block in the given epoch.
-// It's a more readable, but equivalent query to RetrieveEpochFirstHeight when interested in the last height of an epoch.
-// Returns storage.ErrNotFound if the first block of the epoch has not yet been finalized.
-func RetrieveEpochLastHeight(epoch uint64, height *uint64) func(*badger.Txn) error {
-	var nextEpochFirstHeight uint64
-	return func(tx *badger.Txn) error {
-		if err := retrieve(makePrefix(codeEpochFirstHeight, epoch+1), &nextEpochFirstHeight)(tx); err != nil {
-			return err
-		}
-		*height = nextEpochFirstHeight - 1
-		return nil
-	}
-}
-
 // InsertLastCompleteBlockHeightIfNotExists inserts the last full block height if it is not already set.
 // Calling this function multiple times is a no-op and returns no expected errors.
 func InsertLastCompleteBlockHeightIfNotExists(height uint64) func(*badger.Txn) error {

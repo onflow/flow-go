@@ -134,7 +134,6 @@ func (n CollectionNode) Start(t *testing.T) {
 	go unittest.FailOnIrrecoverableError(t, n.Ctx.Done(), n.Errs)
 	n.IngestionEngine.Start(n.Ctx)
 	n.EpochManagerEngine.Start(n.Ctx)
-	n.ProviderEngine.Start(n.Ctx)
 }
 
 func (n CollectionNode) Ready() <-chan struct{} {

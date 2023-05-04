@@ -67,7 +67,7 @@ func (factory *EpochComponentsFactory) Create(
 	err error,
 ) {
 
-	epochCounter, err := epoch.Counter()
+	counter, err := epoch.Counter()
 	if err != nil {
 		err = fmt.Errorf("could not get epoch counter: %w", err)
 		return
@@ -81,7 +81,7 @@ func (factory *EpochComponentsFactory) Create(
 	}
 	_, exists := identities.ByNodeID(factory.me.NodeID())
 	if !exists {
-		err = fmt.Errorf("%w (node_id=%x, epoch=%d)", epochmgr.ErrNotAuthorizedForEpoch, factory.me.NodeID(), epochCounter)
+		err = fmt.Errorf("%w (node_id=%x, epoch=%d)", epochmgr.ErrNotAuthorizedForEpoch, factory.me.NodeID(), counter)
 		return
 	}
 
@@ -109,7 +109,7 @@ func (factory *EpochComponentsFactory) Create(
 		blocks   storage.ClusterBlocks
 	)
 
-	stateRoot, err := badger.NewStateRoot(cluster.RootBlock(), cluster.RootQC(), cluster.EpochCounter())
+	stateRoot, err := badger.NewStateRoot(cluster.RootBlock(), cluster.RootQC())
 	if err != nil {
 		err = fmt.Errorf("could not create valid state root: %w", err)
 		return
@@ -123,9 +123,9 @@ func (factory *EpochComponentsFactory) Create(
 	}
 
 	// get the transaction pool for the epoch
-	pool := factory.pools.ForEpoch(epochCounter)
+	pool := factory.pools.ForEpoch(counter)
 
-	builder, finalizer, err := factory.builder.Create(headers, payloads, pool, epochCounter)
+	builder, finalizer, err := factory.builder.Create(headers, payloads, pool)
 	if err != nil {
 		err = fmt.Errorf("could not create builder/finalizer: %w", err)
 		return

@@ -34,25 +34,27 @@ type Suite struct {
 
 // Ghost returns a client to interact with the Ghost node on testnet.
 func (s *Suite) Ghost() *client.GhostClient {
-	client, err := s.net.ContainerByID(s.ghostID).GhostClient()
+	ghost := s.net.ContainerByID(s.ghostID)
+	cli, err := lib.GetGhostClient(ghost)
 	require.NoError(s.T(), err, "could not get ghost client")
-	return client
+	return cli
 }
 
 // AccessClient returns a client to interact with the access node api on testnet.
 func (s *Suite) AccessClient() *testnet.Client {
-	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
+	chain := s.net.Root().Header.ChainID.Chain()
+	cli, err := testnet.NewClient(fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
 	require.NoError(s.T(), err, "could not get access client")
-	return client
+	return cli
 }
 
 // AccessPort returns the port number of access node api on testnet.
 func (s *Suite) AccessPort() string {
-	return s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.GRPCPort)
+	return s.net.AccessPorts[testnet.AccessNodeAPIPort]
 }
 
 func (s *Suite) MetricsPort() string {
-	return s.net.ContainerByName("execution_1").Port(testnet.GRPCPort)
+	return s.net.AccessPorts[testnet.ExeNodeMetricsPort]
 }
 
 // SetupSuite runs a bare minimum Flow network to function correctly with the following roles:

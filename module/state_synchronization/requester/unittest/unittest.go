@@ -12,11 +12,19 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 )
+
+func ExecutionDataFixture(blockID flow.Identifier) *execution_data.BlockExecutionData {
+	return &execution_data.BlockExecutionData{
+		BlockID:             blockID,
+		ChunkExecutionDatas: []*execution_data.ChunkExecutionData{},
+	}
+}
 
 func MockBlobService(bs blockstore.Blockstore) *mocknetwork.BlobService {
 	bex := new(mocknetwork.BlobService)

@@ -62,7 +62,7 @@ func (limiter *rateLimiter) shouldRateLimit(tx *flow.TransactionBody) bool {
 
 	// skip rate limiting if it is turned off or the payer is unlimited
 	_, isUnlimited := limiter.unlimited[payer]
-	if limiter.rate <= 0 || isUnlimited {
+	if limiter.rate == 0 || isUnlimited {
 		return false
 	}
 

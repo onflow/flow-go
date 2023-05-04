@@ -103,20 +103,7 @@ func TestExtendValid(t *testing.T) {
 		rootSnapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 		require.NoError(t, err)
 
-		state, err := protocol.Bootstrap(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.QuorumCertificates,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses,
-			all.VersionBeacons,
-			rootSnapshot,
-		)
+		state, err := protocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 
 		fullState, err := protocol.NewFullConsensusState(
@@ -652,20 +639,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		all := storeutil.StorageLayer(t, db)
-		protoState, err := protocol.Bootstrap(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.QuorumCertificates,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses,
-			all.VersionBeacons,
-			rootSnapshot,
-		)
+		protoState, err := protocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 		receiptValidator := util.MockReceiptValidator()
 		sealValidator := util.MockSealValidator(all.Seals)
@@ -1758,20 +1732,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 
-		state, err := protocol.Bootstrap(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.QuorumCertificates,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses,
-			all.VersionBeacons,
-			rootSnapshot,
-		)
+		state, err := protocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 
 		head, err := rootSnapshot.Head()
@@ -2288,20 +2249,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		rootSnapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 		require.NoError(t, err)
 
-		state, err := protocol.Bootstrap(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.QuorumCertificates,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses,
-			all.VersionBeacons,
-			rootSnapshot,
-		)
+		state, err := protocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
 		require.NoError(t, err)
 
 		blockTimer := &mockprotocol.BlockTimer{}

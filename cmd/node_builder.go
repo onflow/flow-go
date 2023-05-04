@@ -307,7 +307,7 @@ func DefaultBaseConfig() *BaseConfig {
 			DNSCacheTTL:                       dns.DefaultTimeToLive,
 			LibP2PResourceManagerConfig:       p2pbuilder.DefaultResourceManagerConfig(),
 			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),
-			NetworkConnectionPruning:          connection.PruningEnabled,
+			NetworkConnectionPruning:          connection.ConnectionPruningEnabled,
 			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
 		},
 		nodeIDHex:        NotSet,

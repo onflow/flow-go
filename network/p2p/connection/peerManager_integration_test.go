@@ -49,12 +49,7 @@ func TestPeerManager_Integration(t *testing.T) {
 	}
 
 	// setup
-	connector, err := connection.NewLibp2pConnector(&connection.ConnectorConfig{
-		PruneConnections:        connection.PruningEnabled,
-		Logger:                  unittest.Logger(),
-		Host:                    connection.NewConnectorHost(thisNode.Host()),
-		BackoffConnectorFactory: connection.DefaultLibp2pBackoffConnectorFactory(thisNode.Host()),
-	})
+	connector, err := connection.NewLibp2pConnector(unittest.Logger(), thisNode.Host(), connection.ConnectionPruningEnabled)
 	require.NoError(t, err)
 
 	idTranslator, err := translator.NewFixedTableIdentityTranslator(identities)

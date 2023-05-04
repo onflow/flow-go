@@ -46,7 +46,7 @@ else
 	go run -tags relic \
 		-ldflags="-X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' \
 		-X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
-		builder/*.go \
+		bootstrap.go \
 		-loglevel=$(LOGLEVEL) \
 		-collection=$(COLLECTION) \
 		-consensus=$(CONSENSUS) \

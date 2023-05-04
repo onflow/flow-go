@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -590,6 +591,7 @@ func TestLedgerFunctionality(t *testing.T) {
 		checkpointsToKeep  = 1
 	)
 
+	rand.Seed(time.Now().UnixNano())
 	// You can manually increase this for more coverage
 	experimentRep := 2
 	metricsCollector := &metrics.NoopCollector{}

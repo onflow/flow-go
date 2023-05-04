@@ -135,7 +135,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			MaxHeightRange:            backend.DefaultMaxHeightRange,
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
-			ArchiveAddressList:        nil,
 			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
 		},
 		rpcMetricsEnabled:         false,
@@ -176,6 +175,7 @@ type ObserverServiceBuilder struct {
 	Finalized               *flow.Header
 	Pending                 []*flow.Header
 	FollowerCore            module.HotStuffFollower
+	Validator               hotstuff.Validator
 	ExecutionDataDownloader execution_data.Downloader
 	ExecutionDataRequester  state_synchronization.ExecutionDataRequester // for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
@@ -328,10 +328,17 @@ func (builder *ObserverServiceBuilder) buildFollowerCore() *ObserverServiceBuild
 		// state when the follower detects newly finalized blocks
 		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
 
+		packer := hotsignature.NewConsensusSigDataPacker(builder.Committee)
+		// initialize the verifier for the protocol consensus
+		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
+		builder.Validator = hotstuffvalidator.New(builder.Committee, verifier)
+
 		followerCore, err := consensus.NewFollower(
 			node.Logger,
+			builder.Committee,
 			node.Storage.Headers,
 			final,
+			verifier,
 			builder.FinalizationDistributor,
 			node.RootBlock.Header,
 			node.RootQC,
@@ -355,10 +362,6 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 		if node.HeroCacheMetricsEnable {
 			heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 		}
-		packer := hotsignature.NewConsensusSigDataPacker(builder.Committee)
-		verifier := verification.NewCombinedVerifier(builder.Committee, packer) // verifier for HotStuff signature constructs (QCs, TCs, votes)
-		val := hotstuffvalidator.New(builder.Committee, verifier)
-
 		core, err := follower.NewComplianceCore(
 			node.Logger,
 			node.Metrics.Mempool,
@@ -366,7 +369,7 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 			builder.FinalizationDistributor,
 			builder.FollowerState,
 			builder.FollowerCore,
-			val,
+			builder.Validator,
 			builder.SyncCore,
 			node.Tracer,
 		)
@@ -547,7 +550,7 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 	}
 	anb := &ObserverServiceBuilder{
 		ObserverServiceConfig:   config,
-		FlowNodeBuilder:         cmd.FlowNode("observer"),
+		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String()),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
 	anb.FinalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
@@ -1018,7 +1021,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.rpcMetricsEnabled,
 			builder.apiRatelimits,
 			builder.apiBurstlimits,
-			builder.Me,
 		)
 		if err != nil {
 			return nil, err
