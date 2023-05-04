@@ -281,10 +281,10 @@ func TestVersionBeaconIndex(t *testing.T) {
 		require.NoError(t, err)
 
 		// build a chain:
-		// G <- B1 <- B2 (resultB1(vb1)) <- B3 <- B4 (resultB2(vb2), resultB3(vb3)) <- B5 (sealB1) <- B6 (sealB2, sealB3) <- B7
+		// G <- B1 <- B2 (resultB1(vb1)) <- B3 <- B4 (resultB2(vb2), resultB3(vb3)) <- B5 (sealB1) <- B6 (sealB2, sealB3)
 		// up until and including finalization of B5 there should be no VBs indexed
-		//    when B6 is finalized, index VB1
-		//    when B7 is finalized, we can index VB2 and VB3, but the last one should be indexed for a height
+		//    when B5 is finalized, index VB1
+		//    when B6 is finalized, we can index VB2 and VB3, but the last one should be indexed for a height
 
 		// block 1
 		b1 := unittest.BlockWithParentFixture(rootHeader)
@@ -388,16 +388,10 @@ func TestVersionBeaconIndex(t *testing.T) {
 		err = state.Extend(context.Background(), b6)
 		require.NoError(t, err)
 
-		// block 7
-		b7 := unittest.BlockWithParentFixture(b6.Header)
-		b7.SetPayload(flow.EmptyPayload())
-		err = state.Extend(context.Background(), b7)
-		require.NoError(t, err)
-
 		versionBeacons := bstorage.NewVersionBeacons(db)
 
 		// No VB can be found before finalizing anything
-		vb, err := versionBeacons.Highest(b7.Header.Height)
+		vb, err := versionBeacons.Highest(b6.Header.Height)
 		require.NoError(t, err)
 		require.Nil(t, vb)
 
@@ -410,39 +404,37 @@ func TestVersionBeaconIndex(t *testing.T) {
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), b4.ID())
 		require.NoError(t, err)
-		err = state.Finalize(context.Background(), b5.ID())
-		require.NoError(t, err)
 
-		// No VB can be found after finalizing B5
-		vb, err = versionBeacons.Highest(b7.Header.Height)
+		// No VB can be found after finalizing B4
+		vb, err = versionBeacons.Highest(b6.Header.Height)
 		require.NoError(t, err)
 		require.Nil(t, vb)
 
 		//  once B6 is finalized, events sealed by B5 are considered in effect, hence index should now find it
-		err = state.Finalize(context.Background(), b6.ID())
+		err = state.Finalize(context.Background(), b5.ID())
 		require.NoError(t, err)
 
-		versionBeacon, err := versionBeacons.Highest(b7.Header.Height)
+		versionBeacon, err := versionBeacons.Highest(b6.Header.Height)
 		require.NoError(t, err)
 		require.Equal(t,
 			&flow.SealedVersionBeacon{
 				VersionBeacon: vb1,
-				SealHeight:    b6.Header.Height,
+				SealHeight:    b5.Header.Height,
 			},
 			versionBeacon,
 		)
 
-		// finalizing B7 should index events sealed by B6, so VB2 and VB3
+		// finalizing B6 should index events sealed by B6, so VB2 and VB3
 		// while we don't expect multiple VBs in one block, we index newest, so last one emitted - VB3
-		err = state.Finalize(context.Background(), b7.ID())
+		err = state.Finalize(context.Background(), b6.ID())
 		require.NoError(t, err)
 
-		versionBeacon, err = versionBeacons.Highest(b7.Header.Height)
+		versionBeacon, err = versionBeacons.Highest(b6.Header.Height)
 		require.NoError(t, err)
 		require.Equal(t,
 			&flow.SealedVersionBeacon{
 				VersionBeacon: vb3,
-				SealHeight:    b7.Header.Height,
+				SealHeight:    b6.Header.Height,
 			},
 			versionBeacon,
 		)

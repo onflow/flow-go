@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -156,12 +157,45 @@ func TestValidateVersionBeacon(t *testing.T) {
 		err := validateVersionBeacon(snap)
 		require.NoError(t, err)
 	})
+	t.Run("valid version beacon is ok", func(t *testing.T) {
+		snap := new(mock.Snapshot)
+		block := unittest.BlockFixture()
+		block.Header.Height = 100
+
+		vb := &flow.SealedVersionBeacon{
+			VersionBeacon: &flow.VersionBeacon{
+				VersionBoundaries: []flow.VersionBoundary{
+					{
+						BlockHeight: 1000,
+						Version:     "1.0.0",
+					},
+				},
+				Sequence: 50,
+			},
+			SealHeight: uint64(37),
+		}
+
+		snap.On("Head").Return(block.Header, nil)
+		snap.On("VersionBeacon").Return(vb, nil)
+
+		err := validateVersionBeacon(snap)
+		require.NoError(t, err)
+	})
 	t.Run("height must be below highest block", func(t *testing.T) {
 		snap := new(mock.Snapshot)
 		block := unittest.BlockFixture()
 		block.Header.Height = 12
 
 		vb := &flow.SealedVersionBeacon{
+			VersionBeacon: &flow.VersionBeacon{
+				VersionBoundaries: []flow.VersionBoundary{
+					{
+						BlockHeight: 1000,
+						Version:     "1.0.0",
+					},
+				},
+				Sequence: 50,
+			},
 			SealHeight: uint64(37),
 		}
 
@@ -170,6 +204,7 @@ func TestValidateVersionBeacon(t *testing.T) {
 
 		err := validateVersionBeacon(snap)
 		require.Error(t, err)
+		require.True(t, protocol.IsInvalidServiceEventError(err))
 	})
 	t.Run("version beacon must be valid", func(t *testing.T) {
 		snap := new(mock.Snapshot)
@@ -194,5 +229,6 @@ func TestValidateVersionBeacon(t *testing.T) {
 
 		err := validateVersionBeacon(snap)
 		require.Error(t, err)
+		require.True(t, protocol.IsInvalidServiceEventError(err))
 	})
 }

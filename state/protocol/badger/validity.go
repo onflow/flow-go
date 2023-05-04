@@ -348,10 +348,16 @@ func validateClusterQC(cluster protocol.Cluster) error {
 	return nil
 }
 
+// validateVersionBeacon returns an InvalidServiceEventError if the snapshot
+// version beacon is invalid
 func validateVersionBeacon(snap protocol.Snapshot) error {
+	errf := func(msg string, args ...any) error {
+		return protocol.NewInvalidServiceEventErrorf(msg, args)
+	}
+
 	versionBeacon, err := snap.VersionBeacon()
 	if err != nil {
-		return fmt.Errorf("could not get version beacon: %w", err)
+		return errf("could not get version beacon: %w", err)
 	}
 
 	if versionBeacon == nil {
@@ -360,17 +366,17 @@ func validateVersionBeacon(snap protocol.Snapshot) error {
 
 	head, err := snap.Head()
 	if err != nil {
-		return fmt.Errorf("could not get snapshot head: %w", err)
+		return errf("could not get snapshot head: %w", err)
 	}
 
 	// version beacon must be included in a past block to be effective
 	if versionBeacon.SealHeight > head.Height {
-		return fmt.Errorf("version table height higher than highest height")
+		return errf("version table height higher than highest height")
 	}
 
 	err = versionBeacon.Validate()
 	if err != nil {
-		return fmt.Errorf("version beacon is invalid: %w", err)
+		return errf("version beacon is invalid: %w", err)
 	}
 
 	return nil

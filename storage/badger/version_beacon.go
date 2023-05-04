@@ -2,6 +2,7 @@ package badger
 
 import (
 	"errors"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"

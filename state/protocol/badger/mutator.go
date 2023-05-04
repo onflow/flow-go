@@ -695,7 +695,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	}
 
 	// Extract and validate version beacon events from the block seals.
-	versionBeacons, err := m.versionBeaconOnBlockFinalized(header)
+	versionBeacons, err := m.versionBeaconOnBlockFinalized(block)
 	if err != nil {
 		return fmt.Errorf("cannot process version beacon: %w", err)
 	}
@@ -1002,19 +1002,11 @@ func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered b
 // The version beacons will be returned in the ascending height order of the seals.
 // Technically only the last seal is relevant.
 func (m *FollowerState) versionBeaconOnBlockFinalized(
-	header *flow.Header,
+	finalized *flow.Block,
 ) ([]*flow.SealedVersionBeacon, error) {
 	var versionBeacons []*flow.SealedVersionBeacon
 
-	parent, err := m.blocks.ByID(header.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"could not get parent (id=%x): %w",
-			header.ParentID,
-			err)
-	}
-
-	seals, err := protocol.OrderedSeals(parent.Payload, m.headers)
+	seals, err := protocol.OrderedSeals(finalized.Payload, m.headers)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, fmt.Errorf(
@@ -1047,15 +1039,18 @@ func (m *FollowerState) versionBeaconOnBlockFinalized(
 			if err != nil {
 				m.logger.Warn().
 					Err(err).
-					Str("block_id", parent.ID().String()).
+					Str("block_id", finalized.ID().String()).
 					Interface("event", ev).
 					Msg("invalid VersionBeacon service event")
 				continue
 			}
 
+			// The version beacon only becomes actionable/valid/active once the block
+			// containing the version beacon has been sealed. That is why we set the
+			// Seal height to the current block height.
 			versionBeacons = append(versionBeacons, &flow.SealedVersionBeacon{
 				VersionBeacon: ev,
-				SealHeight:    header.Height,
+				SealHeight:    finalized.Header.Height,
 			})
 		}
 	}
