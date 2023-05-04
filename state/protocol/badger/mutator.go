@@ -743,9 +743,11 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		return fmt.Errorf("could not persist finalization operations for block (%x): %w", blockID, err)
 	}
 
-	// update the header cache
+	// update the cache
 	m.State.cachedFinal.Store(&cachedHeader{blockID, header})
-	m.State.cachedSealed.Store(&cachedHeader{lastSeal.BlockID, sealed})
+	if len(block.Payload.Seals) > 0 {
+		m.State.cachedSealed.Store(&cachedHeader{lastSeal.BlockID, sealed})
+	}
 
 	// Emit protocol events after database transaction succeeds. Event delivery is guaranteed,
 	// _except_ in case of a crash. Hence, when recovering from a crash, consumers need to deduce
