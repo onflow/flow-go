@@ -264,18 +264,24 @@ func (e *Engine) SubmitLocal(event interface{}) {
 	})
 }
 
+// UnsecureGRPCAddress returns the listen address of the unsecure GRPC server.
+// Guaranteed to be non-nil after Engine.Ready is closed.
 func (e *Engine) UnsecureGRPCAddress() net.Addr {
 	e.addrLock.RLock()
 	defer e.addrLock.RUnlock()
 	return e.unsecureGrpcAddress
 }
 
+// SecureGRPCAddress returns the listen address of the secure GRPC server.
+// Guaranteed to be non-nil after Engine.Ready is closed.
 func (e *Engine) SecureGRPCAddress() net.Addr {
 	e.addrLock.RLock()
 	defer e.addrLock.RUnlock()
 	return e.secureGrpcAddress
 }
 
+// RestApiAddress returns the listen address of the REST API server.
+// Guaranteed to be non-nil after Engine.Ready is closed.
 func (e *Engine) RestApiAddress() net.Addr {
 	e.addrLock.RLock()
 	defer e.addrLock.RUnlock()

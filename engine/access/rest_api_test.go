@@ -127,13 +127,8 @@ func (suite *RestAPITestSuite) SetupTest() {
 
 	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
 	suite.rpcEng.Start(suite.ctx)
-	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
-
 	// wait for the server to startup
-	// TODO Ready should capture this
-	assert.Eventually(suite.T(), func() bool {
-		return suite.rpcEng.RestApiAddress() != nil
-	}, 5*time.Second, 10*time.Millisecond)
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 }
 
 func (suite *RestAPITestSuite) TearDownTest() {

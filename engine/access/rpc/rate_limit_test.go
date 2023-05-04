@@ -123,13 +123,8 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	assert.NoError(suite.T(), err)
 	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
 	suite.rpcEng.Start(suite.ctx)
-	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
-
 	// wait for the server to startup
-	// TODO Ready should capture this
-	assert.Eventually(suite.T(), func() bool {
-		return suite.rpcEng.UnsecureGRPCAddress() != nil
-	}, 5*time.Second, 10*time.Millisecond)
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
 	// create the access api client
 	suite.client, suite.closer, err = accessAPIClient(suite.rpcEng.UnsecureGRPCAddress().String())
