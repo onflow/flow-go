@@ -88,12 +88,28 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 		return
 	}
 
-	//_ := func() (float64, error) {
-	//	return m.cache.Adjust(report.OriginId(), func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
-	//		record.Penalty -= report.Penalty()
-	//		return record, nil
-	//	})
-	//}
+	applyPenalty := func() (float64, error) {
+		return m.cache.Adjust(report.OriginId(), func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+			record.Penalty -= report.Penalty()
+			return record, nil
+		})
+	}
 
-	lg.Debug().Msg("misbehavior report handled")
+	init := func() {
+		initialized := m.cache.Init(report.OriginId())
+		lg.Trace().Bool("initialized", initialized).Msg("initialized spam record")
+	}
+
+	// apply the penalty to the spam record of the misbehaving node.
+	// if the spam record does not exist, initialize it.
+	updatedPenalty, err := internal.TryWithRecoveryIfHitError(internal.ErrSpamRecordNotFound, applyPenalty, init)
+	if err != nil {
+		// this should never happen, unless there is a bug in the spam record cache implementation.
+		// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
+		// TODO: refactor to throwing error to the irrecoverable context.
+		lg.Fatal().Err(err).Msg("failed to apply penalty to spam record")
+		return
+	}
+
+	lg.Debug().Float64("updated_penalty", updatedPenalty).Msg("misbehavior report handled")
 }
