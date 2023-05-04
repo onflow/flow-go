@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"net"
-	"strconv"
 
 	"github.com/spf13/pflag"
 
@@ -13,13 +12,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
 // CorruptNetworkPort is the port number that gRPC server of the corrupt networking layer of the corrupted nodes is listening on.
-const CorruptNetworkPort = 4300
+const CorruptNetworkPort = "4300"
 
 // CorruptedNodeBuilder creates a general flow node builder with corrupt network.
 type CorruptedNodeBuilder struct {
@@ -71,22 +70,20 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
 		}
 
-		uniCfg := &p2pbuilder.UnicastConfig{
+		uniCfg := &p2pconfig.UnicastConfig{
 			StreamRetryInterval:    cnb.UnicastCreateStreamRetryDelay,
 			RateLimiterDistributor: cnb.UnicastRateLimiterDistributor,
 		}
 
-		connGaterCfg := &p2pbuilder.ConnectionGaterConfig{
+		connGaterCfg := &p2pconfig.ConnectionGaterConfig{
 			InterceptPeerDialFilters: []p2p.PeerFilter{}, // disable connection gater onInterceptPeerDialFilters
 			InterceptSecuredFilters:  []p2p.PeerFilter{}, // disable connection gater onInterceptSecuredFilters
 		}
 
-		peerManagerCfg := &p2pbuilder.PeerManagerConfig{
+		peerManagerCfg := &p2pconfig.PeerManagerConfig{
 			ConnectionPruning: cnb.NetworkConnectionPruning,
 			UpdateInterval:    cnb.PeerUpdateInterval,
 		}
-
-		cnb.GossipSubInspectorNotifDistributor = cmd.BuildGossipsubRPCValidationInspectorNotificationDisseminator(cnb.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize, cnb.MetricsRegisterer, cnb.Logger, cnb.MetricsEnabled)
 
 		// create default libp2p factory if corrupt node should enable the topic validator
 		libP2PNodeFactory := corruptlibp2p.NewCorruptLibP2PNodeFactory(
@@ -133,7 +130,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			return nil, fmt.Errorf("could not extract host address: %w", err)
 		}
 
-		address := net.JoinHostPort(host, strconv.Itoa(CorruptNetworkPort))
+		address := net.JoinHostPort(host, CorruptNetworkPort)
 		ccf := corruptnet.NewCorruptConduitFactory(cnb.FlowNodeBuilder.Logger, cnb.FlowNodeBuilder.RootChainID)
 
 		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Msg("corrupted conduit factory initiated")

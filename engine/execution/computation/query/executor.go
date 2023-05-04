@@ -13,8 +13,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/debug"
@@ -32,8 +32,7 @@ type Executor interface {
 		script []byte,
 		arguments [][]byte,
 		blockHeader *flow.Header,
-		derivedBlockData *derived.DerivedBlockData,
-		snapshot state.StorageSnapshot,
+		snapshot snapshot.StorageSnapshot,
 	) (
 		[]byte,
 		error,
@@ -43,7 +42,7 @@ type Executor interface {
 		ctx context.Context,
 		addr flow.Address,
 		header *flow.Header,
-		snapshot state.StorageSnapshot,
+		snapshot snapshot.StorageSnapshot,
 	) (
 		*flow.Account,
 		error,
@@ -102,8 +101,7 @@ func (e *QueryExecutor) ExecuteScript(
 	script []byte,
 	arguments [][]byte,
 	blockHeader *flow.Header,
-	derivedBlockData *derived.DerivedBlockData,
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) (
 	encodedValue []byte,
 	err error,
@@ -159,11 +157,12 @@ func (e *QueryExecutor) ExecuteScript(
 	}()
 
 	var output fvm.ProcedureOutput
-	_, output, err = e.vm.RunV2(
+	_, output, err = e.vm.Run(
 		fvm.NewContextFromParent(
 			e.vmCtx,
 			fvm.WithBlockHeader(blockHeader),
-			fvm.WithDerivedBlockData(derivedBlockData)),
+			fvm.WithDerivedBlockData(
+				e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID()))),
 		fvm.NewScriptWithContextAndArgs(script, requestCtx, arguments...),
 		snapshot)
 	if err != nil {
@@ -208,7 +207,7 @@ func (e *QueryExecutor) GetAccount(
 	ctx context.Context,
 	address flow.Address,
 	blockHeader *flow.Header,
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,

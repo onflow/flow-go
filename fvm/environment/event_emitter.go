@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/convert"
@@ -50,12 +50,12 @@ type EventEmitter interface {
 }
 
 type ParseRestrictedEventEmitter struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 	impl     EventEmitter
 }
 
 func NewParseRestrictedEventEmitter(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	impl EventEmitter,
 ) EventEmitter {
 	return ParseRestrictedEventEmitter{
@@ -197,6 +197,7 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 				payloadSize)
 
 			// skip limit if payer is service account
+			// TODO skip only limit-related errors
 			if !isServiceAccount && eventEmitError != nil {
 				return eventEmitError
 			}

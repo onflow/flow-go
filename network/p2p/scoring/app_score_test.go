@@ -217,7 +217,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	return p2pfixtures.HasSubReceivedMessage(t, ctx1s, proposalMsg, con2Sub)
 }
 
-// maliciousAppSpecificScore returns a malicious app specific score function that rewards the malicious node and
+// maliciousAppSpecificScore returns a malicious app specific penalty function that rewards the malicious node and
 // punishes the honest nodes.
 func maliciousAppSpecificScore(honestIds flow.IdentityList) func(peer.ID) float64 {
 	honestIdProvider := id.NewFixedIdentityProvider(honestIds)

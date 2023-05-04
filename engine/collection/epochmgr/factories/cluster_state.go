@@ -47,7 +47,7 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot) (
 	}
 	var clusterState *clusterkv.State
 	if isBootStrapped {
-		clusterState, err = clusterkv.OpenState(f.db, f.tracer, headers, payloads, stateRoot.ClusterID())
+		clusterState, err = clusterkv.OpenState(f.db, f.tracer, headers, payloads, stateRoot.ClusterID(), stateRoot.EpochCounter())
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("could not open cluster state: %w", err)
 		}

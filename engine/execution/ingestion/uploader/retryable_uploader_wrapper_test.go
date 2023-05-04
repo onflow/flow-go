@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
@@ -110,18 +109,20 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 	testBlockID := flow.HashToID([]byte{1, 2, 3})
 	testEDID := flow.HashToID([]byte{4, 5, 6})
 	testTrieUpdateRootHash, _ := ledger.ToRootHash([]byte{7, 8, 9})
+	testTrieUpdate := &ledger.TrieUpdate{
+		RootHash: testTrieUpdateRootHash,
+	}
 	testChunkExecutionDatas := []*execution_data.ChunkExecutionData{
 		{
-			TrieUpdate: &ledger.TrieUpdate{
-				RootHash: testTrieUpdateRootHash,
-			},
+			TrieUpdate: testTrieUpdate,
 		},
 	}
 	testEvents := []flow.Event{
-		unittest.EventFixture(flow.EventAccountCreated, 1, 0, flow.HashToID([]byte{11, 22, 33}), 200),
+		unittest.EventFixture(flow.EventAccountCreated, 0, 0, flow.HashToID([]byte{11, 22, 33}), 200),
 	}
 	testCollectionID := flow.HashToID([]byte{0xA, 0xB, 0xC})
 	testBlock := &flow.Block{
+		Header: &flow.Header{},
 		Payload: &flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{
 				{
@@ -196,40 +197,33 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 	reconstructedComputationResult, err := testRetryableUploaderWrapper.reconstructComputationResult(testBlockID)
 	assert.NilError(t, err)
 
-	expectedCompleteCollections := make(map[flow.Identifier]*entity.CompleteCollection)
-	expectedCompleteCollections[testCollectionID] = &entity.CompleteCollection{
+	expectedCompleteCollections := make([]*entity.CompleteCollection, 1)
+	expectedCompleteCollections[0] = &entity.CompleteCollection{
 		Guarantee: &flow.CollectionGuarantee{
 			CollectionID: testCollectionID,
 		},
 		Transactions: []*flow.TransactionBody{testTransactionBody},
 	}
-	expectedComputationResult := &execution.ComputationResult{
-		ExecutableBlock: &entity.ExecutableBlock{
-			Block:               testBlock,
-			CompleteCollections: expectedCompleteCollections,
-		},
-		Events: []flow.EventsList{testEvents},
-		TransactionResults: []flow.TransactionResult{
-			testTransactionResult,
-		},
-		BlockExecutionData: &execution_data.BlockExecutionData{
-			BlockID: testBlockID,
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-				&execution_data.ChunkExecutionData{
-					TrieUpdate: &ledger.TrieUpdate{
-						RootHash: testTrieUpdateRootHash,
-					},
-				},
-			},
-		},
-		EndState: testStateCommit,
+
+	expectedTestEvents := make([]*flow.Event, len(testEvents))
+	for i, event := range testEvents {
+		expectedTestEvents[i] = &event
+	}
+
+	expectedBlockData := &BlockData{
+		Block:                testBlock,
+		Collections:          expectedCompleteCollections,
+		TxResults:            []*flow.TransactionResult{&testTransactionResult},
+		Events:               expectedTestEvents,
+		TrieUpdates:          []*ledger.TrieUpdate{testTrieUpdate},
+		FinalStateCommitment: testStateCommit,
 	}
 
 	assert.DeepEqual(
 		t,
-		expectedComputationResult,
-		reconstructedComputationResult,
-		cmpopts.IgnoreUnexported(entity.ExecutableBlock{}))
+		expectedBlockData,
+		ComputationResultToBlockData(reconstructedComputationResult),
+	)
 }
 
 // createTestBadgerRetryableUploaderWrapper() create BadgerRetryableUploaderWrapper instance with given
@@ -288,9 +282,9 @@ func createTestBadgerRetryableUploaderWrapper(asyncUploader *AsyncUploader) *Bad
 
 // createTestComputationResult() creates ComputationResult with valid ExecutableBlock ID
 func createTestComputationResult() *execution.ComputationResult {
-	testComputationResult := &execution.ComputationResult{}
 	blockA := unittest.BlockHeaderFixture()
-	blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA)
-	testComputationResult.ExecutableBlock = blockB
+	start := unittest.StateCommitmentFixture()
+	blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA, &start)
+	testComputationResult := execution.NewEmptyComputationResult(blockB)
 	return testComputationResult
 }

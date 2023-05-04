@@ -16,11 +16,12 @@ import (
 type ValidationResult int
 
 const (
-	PublicNetworkEnabled  = true
-	PublicNetworkDisabled = false
-
-	MetricsEnabled  = true
-	MetricsDisabled = false
+	// PublicNetwork indicates that the unstaked public-side of the Flow blockchain that nodes can join and leave at will
+	// with no staking requirement.
+	PublicNetwork = true
+	// PrivateNetwork indicates that the staked private-side of the Flow blockchain that nodes can only join and leave
+	// with a staking requirement.
+	PrivateNetwork = false
 
 	ValidationAccept ValidationResult = iota
 	ValidationIgnore
@@ -60,11 +61,11 @@ type PubSubAdapterConfig interface {
 	WithSubscriptionFilter(SubscriptionFilter)
 	WithScoreOption(ScoreOptionBuilder)
 	WithMessageIdFunction(f func([]byte) string)
-	WithAppSpecificRpcInspectors(...GossipSubRPCInspector)
 	WithTracer(t PubSubTracer)
 	// WithScoreTracer sets the tracer for the underlying pubsub score implementation.
 	// This is used to expose the local scoring table of the GossipSub node to its higher level components.
 	WithScoreTracer(tracer PeerScoreTracer)
+	WithInspectorSuite(GossipSubInspectorSuite)
 }
 
 // GossipSubControlMetricsObserver funcs used to observe gossipsub related metrics.

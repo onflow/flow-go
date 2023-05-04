@@ -51,8 +51,8 @@ func GenesisBlockFromFlow(header *flow.Header) *Block {
 // therefore proves validity of the block. A certified block satisfies:
 // Block.View == QC.View and Block.BlockID == QC.BlockID
 type CertifiedBlock struct {
-	Block *Block
-	QC    *flow.QuorumCertificate
+	Block        *Block
+	CertifyingQC *flow.QuorumCertificate
 }
 
 // NewCertifiedBlock constructs a new certified block. It checks the consistency
@@ -66,19 +66,16 @@ func NewCertifiedBlock(block *Block, qc *flow.QuorumCertificate) (CertifiedBlock
 	if block.BlockID != qc.BlockID {
 		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", block.BlockID, qc.BlockID)
 	}
-	return CertifiedBlock{
-		Block: block,
-		QC:    qc,
-	}, nil
+	return CertifiedBlock{Block: block, CertifyingQC: qc}, nil
 }
 
 // ID returns unique identifier for the block.
 // To avoid repeated computation, we use value from the QC.
 func (b *CertifiedBlock) ID() flow.Identifier {
-	return b.QC.BlockID
+	return b.Block.BlockID
 }
 
 // View returns view where the block was proposed.
 func (b *CertifiedBlock) View() uint64 {
-	return b.QC.View
+	return b.Block.View
 }
