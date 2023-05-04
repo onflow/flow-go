@@ -1,5 +1,5 @@
 [Unit]
-Description=Flow TPS tests - control script to generate list of merge hashes
+Description=Flow TPS tests - generate list of merge commit hashes and run TPS tests against each one
 
 [Service]
 Type=oneshot
