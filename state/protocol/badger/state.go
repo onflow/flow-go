@@ -51,7 +51,8 @@ type State struct {
 	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
 	// know the spork's root block in full (though it will always know the height).
 	sporkRootBlockHeight uint64
-	// cache the latest finalized block
+	// cache the latest finalized block for fast reading. It can be cached because the protocol state is the 
+	// only gateway for updating the finalized block
 	cachedFinal *atomic.Pointer[cachedHeader]
 }
 
