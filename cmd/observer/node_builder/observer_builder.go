@@ -1050,6 +1050,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, err
 		}
+		builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnBlockFinalized)
 		return builder.RpcEng, nil
 	})
 }

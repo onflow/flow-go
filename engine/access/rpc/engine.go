@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/events"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -54,6 +55,7 @@ type Config struct {
 // port 8000) are brought up.
 type Engine struct {
 	component.Component
+	*events.FinalizationActor
 
 	unit               *engine.Unit
 	cm                 *component.ComponentManager
@@ -191,7 +193,12 @@ func NewBuilder(log zerolog.Logger,
 		config.ArchiveAddressList,
 	)
 
+	finalizedCache, finalizedCacheWorker, err := events.NewFinalizedHeaderCache(state)
+	if err != nil {
+		return nil, fmt.Errorf("could not create header cache: %w", err)
+	}
 	eng := &Engine{
+		FinalizationActor:  finalizedCache.FinalizationActor,
 		log:                log,
 		unit:               engine.NewUnit(),
 		backend:            backend,
@@ -202,7 +209,7 @@ func NewBuilder(log zerolog.Logger,
 		chain:              chainID.Chain(),
 	}
 
-	builder := NewRPCEngineBuilder(eng, me)
+	builder := NewRPCEngineBuilder(eng, me, finalizedCache)
 	if rpcMetricsEnabled {
 		builder.WithMetrics()
 	}
@@ -212,6 +219,7 @@ func NewBuilder(log zerolog.Logger,
 		AddWorker(eng.serveSecureGRPC).
 		AddWorker(eng.serveGRPCWebProxy).
 		AddWorker(eng.serveREST).
+		AddWorker(finalizedCacheWorker).
 		AddWorker(eng.shutdownWorker).
 		Build()
 	eng.Component = eng.cm

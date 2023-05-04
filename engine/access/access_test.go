@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/google/go-cmp/cmp"
@@ -23,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
@@ -31,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	factorymock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -48,31 +45,31 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 type Suite struct {
 	suite.Suite
-	state                   *protocol.State
-	sealedSnapshot          *protocol.Snapshot
-	finalSnapshot           *protocol.Snapshot
-	epochQuery              *protocol.EpochQuery
-	params                  *protocol.Params
-	signerIndicesDecoder    *hsmock.BlockSignerDecoder
-	signerIds               flow.IdentifierList
-	log                     zerolog.Logger
-	net                     *mocknetwork.Network
-	request                 *module.Requester
-	collClient              *accessmock.AccessAPIClient
-	execClient              *accessmock.ExecutionAPIClient
-	me                      *module.Local
-	rootBlock               *flow.Header
-	sealedBlock             *flow.Header
-	finalizedBlock          *flow.Header
-	chainID                 flow.ChainID
-	metrics                 *metrics.NoopCollector
-	backend                 *backend.Backend
-	finalizationDistributor *pubsub.FinalizationDistributor
-	finalizedHeaderCache    *synceng.FinalizedHeaderCache
+	state                *protocol.State
+	sealedSnapshot       *protocol.Snapshot
+	finalSnapshot        *protocol.Snapshot
+	epochQuery           *protocol.EpochQuery
+	params               *protocol.Params
+	signerIndicesDecoder *hsmock.BlockSignerDecoder
+	signerIds            flow.IdentifierList
+	log                  zerolog.Logger
+	net                  *mocknetwork.Network
+	request              *module.Requester
+	collClient           *accessmock.AccessAPIClient
+	execClient           *accessmock.ExecutionAPIClient
+	me                   *module.Local
+	rootBlock            *flow.Header
+	sealedBlock          *flow.Header
+	finalizedBlock       *flow.Header
+	chainID              flow.ChainID
+	metrics              *metrics.NoopCollector
+	finalizedHeaderCache access.FinalizedHeaderCache
+	backend              *backend.Backend
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -132,20 +129,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
-
-	suite.finalizationDistributor = pubsub.NewFinalizationDistributor()
-
-	var err error
-	suite.finalizedHeaderCache, err = synceng.NewFinalizedHeaderCache(suite.log, suite.state, suite.finalizationDistributor)
-	require.NoError(suite.T(), err)
-
-	unittest.RequireCloseBefore(suite.T(), suite.finalizedHeaderCache.Ready(), time.Second, "expect to start before timeout")
-}
-
-func (suite *Suite) TearDownTest() {
-	if suite.finalizedHeaderCache != nil {
-		unittest.RequireCloseBefore(suite.T(), suite.finalizedHeaderCache.Done(), time.Second, "expect to stop before timeout")
-	}
+	suite.finalizedHeaderCache = mocks.NewFinalizedHeaderCache(suite.T(), suite.state)
 }
 
 func (suite *Suite) RunTest(
@@ -678,7 +662,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, all.Blocks, all.Headers, collections, transactions, receipts,
 			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil, suite.me)
 		require.NoError(suite.T(), err)
-		rpcEng, err := rpcEngBuilder.WithFinalizedHeaderCache(suite.finalizedHeaderCache).WithLegacy().Build()
+		rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
@@ -844,7 +828,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			suite.me,
 		)
 		require.NoError(suite.T(), err)
-		rpcEng, err := rpcEngBuilder.WithLegacy().WithFinalizedHeaderCache(suite.finalizedHeaderCache).Build()
+		rpcEng, err := rpcEngBuilder.WithLegacy().Build()
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
@@ -1194,33 +1178,6 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 	})
 }
 
-// TestRpcEngineBuilderWithFinalizedHeaderCache test checks whether the RPC builder can construct the engine correctly
-// only when the WithFinalizedHeaderCache method has been called.
-func (suite *Suite) TestRpcEngineBuilderWithFinalizedHeaderCache() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
-		results := bstorage.NewExecutionResults(suite.metrics, db)
-		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
-
-		// initialize storage
-		metrics := metrics.NewNoopCollector()
-		transactions := bstorage.NewTransactions(metrics, db)
-		collections := bstorage.NewCollections(db, transactions)
-
-		rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, rpc.Config{}, nil, nil, all.Blocks, all.Headers, collections, transactions, receipts,
-			results, suite.chainID, metrics, metrics, 0, 0, false, false, nil, nil, suite.me)
-		require.NoError(suite.T(), err)
-
-		rpcEng, err := rpcEngBuilder.WithLegacy().WithBlockSignerDecoder(suite.signerIndicesDecoder).Build()
-		require.Error(suite.T(), err)
-		require.Nil(suite.T(), rpcEng)
-
-		rpcEng, err = rpcEngBuilder.WithFinalizedHeaderCache(suite.finalizedHeaderCache).Build()
-		require.NoError(suite.T(), err)
-		require.NotNil(suite.T(), rpcEng)
-	})
-}
-
 // TestLastFinalizedBlockHeightResult tests on example of the GetBlockHeaderByID function that the LastFinalizedBlock
 // field in the response matches the finalized header from cache. It also tests that the LastFinalizedBlock field is
 // updated correctly when a block with a greater height is finalized.
@@ -1255,9 +1212,6 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 		assertFinalizedBlockHeader(resp, err)
 
 		suite.finalizedBlock = newFinalizedBlock.Header
-		// report new finalized block to finalized blocks cache
-		suite.finalizationDistributor.OnFinalizedBlock(model.BlockFromFlow(suite.finalizedBlock))
-		time.Sleep(time.Millisecond * 100) // give enough time to process async event
 
 		resp, err = handler.GetBlockHeaderByID(context.Background(), req)
 		assertFinalizedBlockHeader(resp, err)
