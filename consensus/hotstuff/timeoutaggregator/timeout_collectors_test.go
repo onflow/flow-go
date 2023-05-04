@@ -3,6 +3,7 @@ package timeoutaggregator
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module/metrics"
 	"sync"
 	"testing"
 	"time"
@@ -54,7 +55,7 @@ func (s *TimeoutCollectorsTestSuite) SetupTest() {
 		}
 		return fmt.Errorf("mocked collector %v not found: %w", view, factoryError)
 	}).Maybe()
-	s.collectors = NewTimeoutCollectors(unittest.Logger(), s.lowestView, s.factoryMethod)
+	s.collectors = NewTimeoutCollectors(unittest.Logger(), metrics.NewNoopCollector(), s.lowestView, s.factoryMethod)
 }
 
 func (s *TimeoutCollectorsTestSuite) TearDownTest() {

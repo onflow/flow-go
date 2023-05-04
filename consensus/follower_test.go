@@ -2,6 +2,7 @@ package consensus_test
 
 import (
 	"context"
+	"github.com/onflow/flow-go/module/metrics"
 	"os"
 	"testing"
 	"time"
@@ -116,6 +117,7 @@ func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
 	var err error
 	s.follower, err = consensus.NewFollower(
 		zerolog.New(os.Stderr),
+		metrics.NewNoopCollector(),
 		s.headers,
 		s.finalizer,
 		s.notifier,

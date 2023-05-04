@@ -43,6 +43,7 @@ type HotstuffCollector struct {
 	signerComputationsDuration    prometheus.Histogram
 	validatorComputationsDuration prometheus.Histogram
 	payloadProductionDuration     prometheus.Histogram
+	timeoutCollectorsRange        *prometheus.GaugeVec
 }
 
 var _ module.HotstuffMetrics = (*HotstuffCollector)(nil)
@@ -276,4 +277,12 @@ func (hc *HotstuffCollector) ValidatorProcessingDuration(duration time.Duration)
 // spends in the module.Builder component, i.e. the with generating block payloads
 func (hc *HotstuffCollector) PayloadProductionDuration(duration time.Duration) {
 	hc.payloadProductionDuration.Observe(duration.Seconds()) // unit: seconds; with float64 precision
+}
+
+// TimeoutCollectorsRange reports information about state of timeout collectors, it measurers how many
+// timeout collectors were created and what is the lowest/highest retained view for them.
+func (hc *HotstuffCollector) TimeoutCollectorsRange(lowestRetainedView uint64, newestViewCreatedCollector uint64, activeCollectors int) {
+	hc.timeoutCollectorsRange.WithLabelValues("lowest_retained_view").Set(float64(lowestRetainedView))
+	hc.timeoutCollectorsRange.WithLabelValues("newest_view_of_created_collector").Set(float64(newestViewCreatedCollector))
+	hc.timeoutCollectorsRange.WithLabelValues("active_collectors").Set(float64(activeCollectors))
 }

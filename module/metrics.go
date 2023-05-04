@@ -326,7 +326,7 @@ type HotstuffMetrics interface {
 	PayloadProductionDuration(duration time.Duration)
 
 	// TimeoutCollectorsRange reports information about state of timeout collectors, it measurers how many
-	// timeout collectors were created and what is the lowest retained view for them.
+	// timeout collectors were created and what is the lowest/highest retained view for them.
 	TimeoutCollectorsRange(lowestRetainedView uint64, newestViewCreatedCollector uint64, activeCollectors int)
 }
 

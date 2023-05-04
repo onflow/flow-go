@@ -501,7 +501,12 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		collectorDistributor,
 		timeoutProcessorFactory,
 	)
-	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorFactory)
+	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(
+		log,
+		metricsCollector,
+		livenessData.CurrentView,
+		timeoutCollectorFactory,
+	)
 
 	// initialize the timeout aggregator
 	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(
