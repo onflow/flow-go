@@ -41,6 +41,26 @@ type MisbehaviorReportManagerConfig struct {
 	Enabled bool
 }
 
+type MisbehaviorReportManagerOption func(*MisbehaviorReportManager)
+
+// WithSpamRecordsCache sets the spam record cache for the MisbehaviorReportManager.
+// Args:
+//
+//	cache: the spam record cache instance.
+//
+// Returns:
+//
+//	a MisbehaviorReportManagerOption that sets the spam record cache for the MisbehaviorReportManager.
+//
+// Note: this option is used for testing purposes. The production version of the MisbehaviorReportManager should use the
+//
+//	NewSpamRecordCache function to create the spam record cache.
+func WithSpamRecordsCache(cache alsp.SpamRecordCache) MisbehaviorReportManagerOption {
+	return func(m *MisbehaviorReportManager) {
+		m.cache = cache
+	}
+}
+
 // NewMisbehaviorReportManager creates a new instance of the MisbehaviorReportManager.
 // Args:
 //
@@ -51,7 +71,7 @@ type MisbehaviorReportManagerConfig struct {
 // Returns:
 //
 //	a new instance of the MisbehaviorReportManager.
-func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig) *MisbehaviorReportManager {
+func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...MisbehaviorReportManagerOption) *MisbehaviorReportManager {
 
 	m := &MisbehaviorReportManager{
 		logger:  cfg.Logger.With().Str("module", "misbehavior_report_manager").Logger(),
@@ -66,6 +86,11 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig) *Misbehavi
 	}
 
 	m.cache = internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+
+	for _, opt := range opts {
+		opt(m)
+	}
+
 	return m
 }
 
