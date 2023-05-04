@@ -100,8 +100,10 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 		lg.Trace().Bool("initialized", initialized).Msg("initialized spam record")
 	}
 
-	// apply the penalty to the spam record of the misbehaving node.
-	// if the spam record does not exist, initialize it.
+	// we first try to apply the penalty to the spam record, if it does not exist, cache returns ErrSpamRecordNotFound.
+	// in this case, we initialize the spam record and try to apply the penalty again. We use an optimistic update by
+	// first assuming that the spam record exists and then initializing it if it does not exist. In this way, we avoid
+	// acquiring the lock twice per misbehavior report, reducing the contention on the lock and improving the performance.
 	updatedPenalty, err := internal.TryWithRecoveryIfHitError(internal.ErrSpamRecordNotFound, applyPenalty, init)
 	if err != nil {
 		// this should never happen, unless there is a bug in the spam record cache implementation.
