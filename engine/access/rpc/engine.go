@@ -215,9 +215,9 @@ func NewBuilder(log zerolog.Logger,
 	}
 
 	eng.cm = component.NewComponentManagerBuilder().
-		AddWorker(eng.serveUnsecureGRPC).
-		AddWorker(eng.serveSecureGRPC).
-		AddWorker(eng.serveGRPCWebProxy).
+		AddWorker(eng.serveUnsecureGRPCWorker).
+		AddWorker(eng.serveSecureGRPCWorker).
+		AddWorker(eng.serveGRPCWebProxyWorker).
 		AddWorker(eng.serveREST).
 		AddWorker(finalizedCacheWorker).
 		AddWorker(eng.shutdownWorker).
@@ -227,12 +227,15 @@ func NewBuilder(log zerolog.Logger,
 	return builder, nil
 }
 
+// shutdownWorker is a worker routine which shuts down all servers when the context is cancelled.
 func (e *Engine) shutdownWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 	<-ctx.Done()
 	e.shutdown()
 }
 
+// shutdown sequentially shuts down all servers managed by this engine.
+// Errors which occur while shutting down a server are logged and otherwise ignored.
 func (e *Engine) shutdown() {
 	// use unbounded context, rely on shutdown logic to have timeout
 	ctx := context.Background()
@@ -292,10 +295,9 @@ func (e *Engine) process(event interface{}) error {
 	}
 }
 
-// serveUnsecureGRPC starts the unsecure gRPC server
-// When this function returns, the server is considered ready.
-func (e *Engine) serveUnsecureGRPC(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
+// serveUnsecureGRPCWorker is a worker routine which starts the unsecure gRPC server.
+// The ready callback is called after the server address is bound and set.
+func (e *Engine) serveUnsecureGRPCWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	e.log.Info().Str("grpc_address", e.config.UnsecureGRPCListenAddr).Msg("starting grpc server on address")
 
 	l, err := net.Listen("tcp", e.config.UnsecureGRPCListenAddr)
@@ -311,6 +313,7 @@ func (e *Engine) serveUnsecureGRPC(ctx irrecoverable.SignalerContext, ready comp
 	e.unsecureGrpcAddress = l.Addr()
 	e.addrLock.Unlock()
 	e.log.Debug().Str("unsecure_grpc_address", e.unsecureGrpcAddress.String()).Msg("listening on port")
+	ready()
 
 	err = e.unsecureGrpcServer.Serve(l) // blocking call
 	if err != nil {
@@ -319,10 +322,9 @@ func (e *Engine) serveUnsecureGRPC(ctx irrecoverable.SignalerContext, ready comp
 	}
 }
 
-// serveSecureGRPC starts the secure gRPC server
-// When this function returns, the server is considered ready.
-func (e *Engine) serveSecureGRPC(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
+// serveSecureGRPCWorker is a worker routine which starts the secure gRPC server.
+// The ready callback is called after the server address is bound and set.
+func (e *Engine) serveSecureGRPCWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	e.log.Info().Str("secure_grpc_address", e.config.SecureGRPCListenAddr).Msg("starting grpc server on address")
 
 	l, err := net.Listen("tcp", e.config.SecureGRPCListenAddr)
@@ -337,6 +339,7 @@ func (e *Engine) serveSecureGRPC(ctx irrecoverable.SignalerContext, ready compon
 	e.addrLock.Unlock()
 
 	e.log.Debug().Str("secure_grpc_address", e.secureGrpcAddress.String()).Msg("listening on port")
+	ready()
 
 	err = e.secureGrpcServer.Serve(l) // blocking call
 	if err != nil {
@@ -345,13 +348,13 @@ func (e *Engine) serveSecureGRPC(ctx irrecoverable.SignalerContext, ready compon
 	}
 }
 
-// serveGRPCWebProxy starts the gRPC web proxy server
-func (e *Engine) serveGRPCWebProxy(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// serveGRPCWebProxyWorker is a worker routine which starts the gRPC web proxy server.
+func (e *Engine) serveGRPCWebProxyWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 	log := e.log.With().Str("http_proxy_address", e.config.HTTPListenAddr).Logger()
 	log.Info().Msg("starting http proxy server on address")
 
-	err := e.httpServer.ListenAndServe()
+	err := e.httpServer.ListenAndServe() // blocking call
 	if errors.Is(err, http.ErrServerClosed) {
 		return
 	}
@@ -361,10 +364,9 @@ func (e *Engine) serveGRPCWebProxy(ctx irrecoverable.SignalerContext, ready comp
 	}
 }
 
-// serveREST starts the HTTP REST server
+// serveREST is a worker routine which starts the HTTP REST server.
+// The ready callback is called after the server address is bound and set.
 func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
 	if e.config.RESTListenAddr == "" {
 		e.log.Debug().Msg("no REST API address specified - not starting the server")
 		return
@@ -392,6 +394,7 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 	e.addrLock.Unlock()
 
 	e.log.Debug().Str("rest_api_address", e.restAPIAddress.String()).Msg("listening on port")
+	ready()
 
 	err = e.restServer.Serve(l) // blocking call
 	if err != nil {
