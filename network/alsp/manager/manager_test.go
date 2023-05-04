@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -15,7 +17,9 @@ import (
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/alsp"
+	"github.com/onflow/flow-go/network/alsp/internal"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
+	"github.com/onflow/flow-go/network/alsp/model"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -183,4 +187,69 @@ func TestReportCreation(t *testing.T) {
 		alsp.WithPenaltyAmplification(0))
 	require.Error(t, err)
 	require.Nil(t, report)
+}
+
+// TestNewMisbehaviorReportManager tests the creation of a new ALSP manager.
+// It is a minimum viable test that ensures that a non-nil ALSP manager is created with expected set of inputs.
+// In other words, variation of input values do not cause a nil ALSP manager to be created or a panic.
+func TestNewMisbehaviorReportManager(t *testing.T) {
+	logger := zerolog.Nop()
+	alspMetrics := metrics.NewNoopCollector()
+	cacheMetrics := metrics.NewNoopCollector()
+	cacheSize := uint32(100)
+
+	t.Run("with default values", func(t *testing.T) {
+		cfg := &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:               logger,
+			SpamRecordsCacheSize: cacheSize,
+			AlspMetrics:          alspMetrics,
+			CacheMetrics:         cacheMetrics,
+			Enabled:              true,
+		}
+
+		m := alspmgr.NewMisbehaviorReportManager(cfg)
+		assert.NotNil(t, m)
+
+	})
+
+	t.Run("with a custom spam record cache", func(t *testing.T) {
+		customCache := internal.NewSpamRecordCache(100, logger, cacheMetrics, model.SpamRecordFactory())
+
+		cfg := &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:               logger,
+			SpamRecordsCacheSize: cacheSize,
+			AlspMetrics:          alspMetrics,
+			CacheMetrics:         cacheMetrics,
+			Enabled:              true,
+		}
+
+		m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(customCache))
+		assert.NotNil(t, m)
+	})
+
+	t.Run("with ALSP module enabled", func(t *testing.T) {
+		cfg := &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:               logger,
+			SpamRecordsCacheSize: cacheSize,
+			AlspMetrics:          alspMetrics,
+			CacheMetrics:         cacheMetrics,
+			Enabled:              true,
+		}
+
+		m := alspmgr.NewMisbehaviorReportManager(cfg)
+		assert.NotNil(t, m)
+	})
+
+	t.Run("with ALSP module disabled", func(t *testing.T) {
+		cfg := &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:               logger,
+			SpamRecordsCacheSize: cacheSize,
+			AlspMetrics:          alspMetrics,
+			CacheMetrics:         cacheMetrics,
+			Enabled:              false,
+		}
+
+		m := alspmgr.NewMisbehaviorReportManager(cfg)
+		assert.NotNil(t, m)
+	})
 }
