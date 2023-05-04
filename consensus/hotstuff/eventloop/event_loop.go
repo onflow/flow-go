@@ -92,17 +92,17 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 	return el, nil
 }
 
+// loop executes the core HotStuff logic in a single thread. It picks inputs from the various
+// inbound channels and executes the EventHandler's respective method for processing this input.
+// During normal operations, the EventHandler is not expected to return any errors, as all inputs
+// are assumed to be fully validated (or produced by trusted components within the node). Therefore,
+// any error is a symptom of state corruption, bugs or violation of API contracts. In all cases,
+// continuing operations is not an option, i.e. we exit the event loop and return an exception.
 func (el *EventLoop) loop(ctx context.Context) error {
 	err := el.eventHandler.Start(ctx) // must be called by the same go-routine that also executes the business logic!
 	if err != nil {
 		return fmt.Errorf("could not start event handler: %w", err)
 	}
-
-	// hotstuff will run in an event loop to process all events synchronously. And this is what will happen when hitting errors:
-	// if hotstuff hits a known critical error, it will exit the loop (for instance, there is a conflicting block with a QC against finalized blocks
-	// if hotstuff hits a known error indicating some assumption between components is broken, it will exit the loop (for instance, hotstuff receives a block whose parent is missing)
-	// if hotstuff hits a known error that is safe to be ignored, it will not exit the loop (for instance, invalid proposal)
-	// if hotstuff hits any unknown error, it will exit the loop
 
 	shutdownSignaled := ctx.Done()
 	timeoutCertificates := el.tcSubmittedNotifier.Channel()
@@ -129,39 +129,34 @@ func (el *EventLoop) loop(ctx context.Context) error {
 		case <-timeoutChannel:
 
 			processStart := time.Now()
-			err := el.eventHandler.OnLocalTimeout()
-
-			// measure how long it takes for a timeout event to be processed
-			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeLocalTimeout)
-
+			err = el.eventHandler.OnLocalTimeout()
 			if err != nil {
 				return fmt.Errorf("could not process timeout: %w", err)
 			}
+			// measure how long it takes for a timeout event to be processed
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeLocalTimeout)
 
 			// At this point, we have received and processed an event from the timeout channel.
-			// A timeout also means, we have made progress. A new timeout will have
-			// been started and el.eventHandler.TimeoutChannel() will be a NEW channel (for the just-started timeout)
+			// A timeout also means that we have made progress. A new timeout will have
+			// been started and el.eventHandler.TimeoutChannel() will be a NEW channel (for the just-started timeout).
 			// Very important to start the for loop from the beginning, to continue the with the new timeout channel!
 			continue
 
 		case <-partialTCs:
 
 			processStart := time.Now()
-			err := el.eventHandler.OnPartialTcCreated(el.newestSubmittedPartialTc.NewestPartialTc())
-
-			// measure how long it takes for a partial TC to be processed
-			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnPartialTc)
-
+			err = el.eventHandler.OnPartialTcCreated(el.newestSubmittedPartialTc.NewestPartialTc())
 			if err != nil {
 				return fmt.Errorf("could no process partial created TC event: %w", err)
 			}
+			// measure how long it takes for a partial TC to be processed
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnPartialTc)
 
 			// At this point, we have received and processed partial TC event, it could have resulted in several scenarios:
 			// 1. a view change with potential voting or proposal creation
 			// 2. a created and broadcast timeout object
 			// 3. QC and TC didn't result in view change and no timeout was created since we have already timed out or
 			// the partial TC was created for view different from current one.
-
 			continue
 
 		default:
@@ -184,15 +179,12 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
 			processStart := time.Now()
-
-			err := el.eventHandler.OnLocalTimeout()
-
-			// measure how long it takes for a timeout event to be processed
-			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeLocalTimeout)
-
+			err = el.eventHandler.OnLocalTimeout()
 			if err != nil {
 				return fmt.Errorf("could not process timeout: %w", err)
 			}
+			// measure how long it takes for a timeout event to be processed
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeLocalTimeout)
 
 		// if we have a new proposal, process it
 		case queuedItem := <-el.proposals:
@@ -205,17 +197,13 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
 			processStart := time.Now()
-
 			proposal := queuedItem.proposal
-
-			err := el.eventHandler.OnReceiveProposal(proposal)
-
-			// measure how long it takes for a proposal to be processed
-			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnProposal)
-
+			err = el.eventHandler.OnReceiveProposal(proposal)
 			if err != nil {
 				return fmt.Errorf("could not process proposal %v: %w", proposal.Block.BlockID, err)
 			}
+			// measure how long it takes for a proposal to be processed
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnProposal)
 
 			el.log.Info().
 				Dur("dur_ms", time.Since(processStart)).
@@ -230,14 +218,12 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
 			processStart := time.Now()
-			err := el.eventHandler.OnReceiveQc(el.newestSubmittedQc.NewestQC())
-
-			// measure how long it takes for a QC to be processed
-			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnQC)
-
+			err = el.eventHandler.OnReceiveQc(el.newestSubmittedQc.NewestQC())
 			if err != nil {
 				return fmt.Errorf("could not process QC: %w", err)
 			}
+			// measure how long it takes for a QC to be processed
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnQC)
 
 			// if we have a new TC, process it
 		case <-timeoutCertificates:
@@ -246,14 +232,12 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
 			processStart := time.Now()
-			err := el.eventHandler.OnReceiveTc(el.newestSubmittedTc.NewestTC())
-
-			// measure how long it takes for a TC to be processed
-			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnTC)
-
+			err = el.eventHandler.OnReceiveTc(el.newestSubmittedTc.NewestTC())
 			if err != nil {
 				return fmt.Errorf("could not process TC: %w", err)
 			}
+			// measure how long it takes for a TC to be processed
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnTC)
 
 		case <-partialTCs:
 			// measure how long the event loop was idle waiting for an
@@ -261,14 +245,12 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
 
 			processStart := time.Now()
-			err := el.eventHandler.OnPartialTcCreated(el.newestSubmittedPartialTc.NewestPartialTc())
-
-			// measure how long it takes for a partial TC to be processed
-			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnPartialTc)
-
+			err = el.eventHandler.OnPartialTcCreated(el.newestSubmittedPartialTc.NewestPartialTc())
 			if err != nil {
 				return fmt.Errorf("could no process partial created TC event: %w", err)
 			}
+			// measure how long it takes for a partial TC to be processed
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnPartialTc)
 		}
 	}
 }

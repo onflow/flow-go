@@ -189,7 +189,7 @@ func (h *Handler) GetTransactionResult(
 ) (*accessproto.TransactionResultResponse, error) {
 	id := convert.MessageToIdentifier(req.GetId())
 
-	result, err := h.api.GetTransactionResult(ctx, id)
+	result, err := h.api.GetTransactionResult(ctx, id, flow.ZeroID, flow.ZeroID)
 	if err != nil {
 		return nil, err
 	}

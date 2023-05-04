@@ -78,6 +78,7 @@ func newFacadeEnvironment(
 		UnsafeRandomGenerator: NewUnsafeRandomGenerator(
 			tracer,
 			params.BlockHeader,
+			params.TxIndex,
 		),
 		CryptoLibrary: NewCryptoLibrary(tracer, meter),
 
@@ -146,7 +147,7 @@ func NewScriptEnvironmentFromStorageSnapshot(
 	params EnvironmentParams,
 	storageSnapshot snapshot.StorageSnapshot,
 ) *facadeEnvironment {
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 	derivedTxn := derivedBlockData.NewSnapshotReadDerivedTransactionData()
 
 	txn := storage.SerialTransaction{

@@ -17,7 +17,8 @@ const (
 	// If the overall penalty of this node drops below this threshold, the node is reported to be disallow-listed by
 	// the networking layer, i.e., existing connections to the node are closed and the node is no longer allowed to connect till
 	// its penalty is decayed back to zero.
-	misbehaviorDisallowListingThreshold = -24 * 60 * 60 // maximum block-list period is 1 day
+	// maximum block-list period is 1 day
+	misbehaviorDisallowListingThreshold = -24 * 60 * 60 // (Don't change this value)
 
 	// defaultPenaltyValue is the default penalty value for misbehaving nodes.
 	// By default, each reported infringement will be penalized by this value. However, the penalty can be amplified
@@ -26,5 +27,21 @@ const (
 	// decrease the number of misbehavior/sec that will result in disallow-listing the node. For example, if the engine
 	// amplifies the penalty by 10, the number of misbehavior/sec that will result in disallow-listing the node will be
 	// 10 times less than the default penalty value and the node will be disallow-listed after 10 times more misbehavior/sec.
-	defaultPenaltyValue = 0.01 * misbehaviorDisallowListingThreshold
+	defaultPenaltyValue = 0.01 * misbehaviorDisallowListingThreshold // (Don't change this value)
+
+	// initialDecaySpeed is the initial decay speed of the penalty of a misbehaving node.
+	// The decay speed is applied on an arithmetic progression. The penalty value of the node is the first term of the
+	// progression and the decay speed is the common difference of the progression, i.e., p(n) = p(0) + n * d, where
+	// p(n) is the penalty value of the node after n decay intervals, p(0) is the initial penalty value of the node, and
+	// d is the decay speed. Decay intervals are set to 1 second (protocol invariant). Hence, with the initial decay speed
+	// of 1000, the penalty value of the node will be decreased by 1000 every second. This means that if a node misbehaves
+	// 100 times in a second, it gets disallow-listed, and takes 86.4 seconds to recover.
+	// In mature implementation of the protocol, the decay speed of a node is decreased by 90% each time the node is
+	// disallow-listed. This means that if a node is disallow-listed for the first time, it takes 86.4 seconds to recover.
+	// If the node is disallow-listed for the second time, its decay speed is decreased by 90% from 1000 to 100, and it
+	// takes around 15 minutes to recover. If the node is disallow-listed for the third time, its decay speed is decreased
+	// by 90% from 100 to 10, and it takes around 2.5 hours to recover. If the node is disallow-listed for the fourth time,
+	// its decay speed is decreased by 90% from 10 to 1, and it takes around a day to recover. From this point on, the decay
+	// speed is 1, and it takes around a day to recover from each disallow-listing.
+	initialDecaySpeed = 1000 // (Don't change this value)
 )

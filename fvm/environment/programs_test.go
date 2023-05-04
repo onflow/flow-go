@@ -127,7 +127,7 @@ func getTestContract(
 
 func Test_Programs(t *testing.T) {
 	vm := fvm.NewVirtualMachine()
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
 	mainSnapshot := setupProgramsTest(t)
 
@@ -584,7 +584,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 	snapshotTree := setupProgramsTest(t)
 
 	vm := fvm.NewVirtualMachine()
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
 	metrics := &metricsReporter{}
 	context := fvm.NewContext(

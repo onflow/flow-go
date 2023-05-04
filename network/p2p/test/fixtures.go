@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -56,10 +55,16 @@ func NodeFixture(
 	dhtPrefix string,
 	opts ...NodeFixtureParameterOption,
 ) (p2p.LibP2PNode, flow.Identity) {
-	// default parameters
+
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
-	rpcInspectors, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(logger)).Build()
+
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(
+		logger,
+		sporkID,
+		inspectorbuilder.DefaultGossipSubRPCInspectorsConfig()).
+		Build()
 	require.NoError(t, err)
+
 	parameters := &NodeFixtureParameters{
 		HandlerFunc:                      func(network.Stream) {},
 		Unicasts:                         nil,
@@ -71,7 +76,7 @@ func NodeFixture(
 		Metrics:                          metrics.NewNoopCollector(),
 		ResourceManager:                  testutils.NewResourceManager(t),
 		GossipSubPeerScoreTracerInterval: 0, // disabled by default
-		GossipSubRPCInspectors:           rpcInspectors,
+		GossipSubRPCInspector:            rpcInspectorSuite,
 	}
 
 	for _, opt := range opts {
@@ -107,7 +112,7 @@ func NodeFixture(
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
 		SetStreamCreationRetryInterval(parameters.CreateStreamRetryDelay).
 		SetResourceManager(parameters.ResourceManager).
-		SetGossipSubRPCInspectors(parameters.GossipSubRPCInspectors...)
+		SetGossipSubRpcInspectorSuite(parameters.GossipSubRPCInspector)
 
 	if parameters.ResourceManager != nil {
 		builder.SetResourceManager(parameters.ResourceManager)
@@ -183,7 +188,13 @@ type NodeFixtureParameters struct {
 	PubSubTracer                     p2p.PubSubTracer
 	GossipSubPeerScoreTracerInterval time.Duration // intervals at which the peer score is updated and logged.
 	CreateStreamRetryDelay           time.Duration
-	GossipSubRPCInspectors           []p2p.GossipSubRPCInspector
+	GossipSubRPCInspector            p2p.GossipSubInspectorSuite
+}
+
+func WithGossipSubRpcInspectorSuite(inspectorSuite p2p.GossipSubInspectorSuite) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.GossipSubRPCInspector = inspectorSuite
+	}
 }
 
 func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {
@@ -452,4 +463,73 @@ func PeerIdFixture(t *testing.T) peer.ID {
 	require.NoError(t, err)
 
 	return peer.ID(h)
+}
+
+// EnsureNotConnectedBetweenGroups ensures no connection exists between the given groups of nodes.
+func EnsureNotConnectedBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
+	// ensure no connection from group A to group B
+	p2pfixtures.EnsureNotConnected(t, ctx, groupA, groupB)
+	// ensure no connection from group B to group A
+	p2pfixtures.EnsureNotConnected(t, ctx, groupB, groupA)
+}
+
+// EnsureNoPubsubMessageExchange ensures that the no pubsub message is exchanged "from" the given nodes "to" the given nodes.
+func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
+	_, topic := messageFactory()
+
+	subs := make([]p2p.Subscription, len(to))
+	tv := validator.TopicValidator(
+		unittest.Logger(),
+		unittest.AllowAllPeerFilter())
+	var err error
+	for _, node := range from {
+		_, err = node.Subscribe(topic, tv)
+		require.NoError(t, err)
+	}
+
+	for i, node := range to {
+		s, err := node.Subscribe(topic, tv)
+		require.NoError(t, err)
+		subs[i] = s
+	}
+
+	// let subscriptions propagate
+	time.Sleep(1 * time.Second)
+
+	for _, node := range from {
+		// creates a unique message to be published by the node.
+		msg, _ := messageFactory()
+		channel, ok := channels.ChannelFromTopic(topic)
+		require.True(t, ok)
+		data := p2pfixtures.MustEncodeEvent(t, msg, channel)
+
+		// ensure the message is NOT received by any of the nodes.
+		require.NoError(t, node.Publish(ctx, topic, data))
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx, subs)
+		cancel()
+	}
+}
+
+// EnsureNoPubsubExchangeBetweenGroups ensures that no pubsub message is exchanged between the given groups of nodes.
+func EnsureNoPubsubExchangeBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
+	// ensure no message exchange from group A to group B
+	EnsureNoPubsubMessageExchange(t, ctx, groupA, groupB, messageFactory)
+	// ensure no message exchange from group B to group A
+	EnsureNoPubsubMessageExchange(t, ctx, groupB, groupA, messageFactory)
+}
+
+// PeerIdSliceFixture returns a slice of random peer IDs for testing.
+// peer ID is the identifier of a node on the libp2p network.
+// Args:
+// - t: *testing.T instance
+// - n: number of peer IDs to generate
+// Returns:
+// - peer.IDSlice: slice of peer IDs
+func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
+	ids := make([]peer.ID, n)
+	for i := 0; i < n; i++ {
+		ids[i] = PeerIdFixture(t)
+	}
+	return ids
 }
