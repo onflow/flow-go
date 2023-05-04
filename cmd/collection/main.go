@@ -285,6 +285,7 @@ func main() {
 			// creates a consensus follower with noop consumer as the notifier
 			followerCore, err = consensus.NewFollower(
 				node.Logger,
+				node.Metrics.Mempool,
 				node.Storage.Headers,
 				finalizer,
 				finalizationDistributor,

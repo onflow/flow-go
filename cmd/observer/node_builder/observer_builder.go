@@ -331,6 +331,7 @@ func (builder *ObserverServiceBuilder) buildFollowerCore() *ObserverServiceBuild
 
 		followerCore, err := consensus.NewFollower(
 			node.Logger,
+			node.Metrics.Mempool,
 			node.Storage.Headers,
 			final,
 			builder.FinalizationDistributor,

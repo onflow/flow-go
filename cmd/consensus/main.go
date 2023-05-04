@@ -683,6 +683,7 @@ func main() {
 			hot, err = consensus.NewParticipant(
 				createLogger(node.Logger, node.RootChainID),
 				mainMetrics,
+				node.Metrics.Mempool,
 				build,
 				finalizedBlock,
 				pending,

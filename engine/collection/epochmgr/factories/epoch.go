@@ -144,6 +144,7 @@ func (factory *EpochComponentsFactory) Create(
 		cluster,
 		state,
 		metrics,
+
 		builder,
 		headers,
 		hotstuffModules,

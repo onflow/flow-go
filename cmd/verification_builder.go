@@ -347,6 +347,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			// so that it gets notified upon each new finalized block
 			followerCore, err = flowconsensus.NewFollower(
 				node.Logger,
+				node.Metrics.Mempool,
 				node.Storage.Headers,
 				final,
 				finalizationDistributor,

@@ -860,6 +860,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 	// so that it gets notified upon each new finalized block
 	exeNode.followerCore, err = consensus.NewFollower(
 		node.Logger,
+		node.Metrics.Mempool,
 		node.Storage.Headers,
 		final,
 		exeNode.finalizationDistributor,
