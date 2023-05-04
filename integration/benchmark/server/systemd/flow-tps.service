@@ -5,5 +5,7 @@ Description=Flow TPS tests - control script to generate list of merge hashes
 Type=oneshot
 ExecStart=/opt/flow-go/integration/benchmark/server/control.sh
 ExecStart=/opt/flow-go/integration/benchmark/server/hello.sh
-WorkingDirectory=/opt
+ExecStart=/opt/flow-go/integration/benchmark/server/bench.sh
+WorkingDirectory=/opt/flow-go/integration/benchmark/server
+Environment="GOPATH=/opt/go" "GOCACHE=/opt/gocache"
 RemainAfterExit=no
