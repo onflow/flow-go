@@ -317,6 +317,10 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 
 	nonce, err := rand.Uint64()
 	if err != nil {
+		// TODO: this error should be returned by deliverChunkDataResponse
+		// it is logged for now since the only error possible is related to a failure
+		// of the system entropy generation. Such error is going to cause failures in other
+		// components where it's handled properly and will lead to crashing the module.
 		lg.Error().
 			Err(err).
 			Msg("could not generate nonce for chunk data response")

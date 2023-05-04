@@ -360,6 +360,10 @@ func (e *Engine) pollHeight() {
 
 	nonce, err := rand.Uint64()
 	if err != nil {
+		// TODO: this error should be returned by pollHeight()
+		// it is logged for now since the only error possible is related to a failure
+		// of the system entropy generation. Such error is going to cause failures in other
+		// components where it's handled properly and will lead to crashing the module.
 		e.log.Warn().Err(err).Msg("nonce generation failed during pollHeight")
 		return
 	}
@@ -388,6 +392,10 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 	for _, ran := range ranges {
 		nonce, err := rand.Uint64()
 		if err != nil {
+			// TODO: this error should be returned by sendRequests
+			// it is logged for now since the only error possible is related to a failure
+			// of the system entropy generation. Such error is going to cause failures in other
+			// components where it's handled properly and will lead to crashing the module.
 			e.log.Error().Err(err).Msg("nonce generation failed during range request")
 			return
 		}
@@ -413,6 +421,10 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 	for _, batch := range batches {
 		nonce, err := rand.Uint64()
 		if err != nil {
+			// TODO: this error should be returned by sendRequests
+			// it is logged for now since the only error possible is related to a failure
+			// of the system entropy generation. Such error is going to cause failures in other
+			// components where it's handled properly and will lead to crashing the module.
 			e.log.Error().Err(err).Msg("nonce generation failed during batch request")
 			return
 		}
