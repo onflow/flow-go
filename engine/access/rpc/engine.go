@@ -375,6 +375,7 @@ func (e *Engine) serveGRPCWebProxyWorker(ctx irrecoverable.SignalerContext, read
 func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	if e.config.RESTListenAddr == "" {
 		e.log.Debug().Msg("no REST API address specified - not starting the server")
+		ready()
 		return
 	}
 
