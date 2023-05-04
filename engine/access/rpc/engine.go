@@ -22,6 +22,8 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -51,7 +53,10 @@ type Config struct {
 // An unsecured GRPC server (default port 9000), a secure GRPC server (default port 9001) and an HTTP Web proxy (default
 // port 8000) are brought up.
 type Engine struct {
+	component.Component
+
 	unit               *engine.Unit
+	cm                 *component.ComponentManager
 	log                zerolog.Logger
 	backend            *backend.Backend // the gRPC service implementation
 	unsecureGrpcServer *grpc.Server     // the unsecure gRPC server
@@ -122,7 +127,7 @@ func NewBuilder(log zerolog.Logger,
 	// create an unsecured grpc server
 	unsecureGrpcServer := grpc.NewServer(grpcOpts...)
 
-	// create a secure server server by using the secure grpc credentials that are passed in as part of config
+	// create a secure server by using the secure grpc credentials that are passed in as part of config
 	grpcOpts = append(grpcOpts, grpc.Creds(config.TransportCredentials))
 	secureGrpcServer := grpc.NewServer(grpcOpts...)
 
@@ -202,42 +207,40 @@ func NewBuilder(log zerolog.Logger,
 		builder.WithMetrics()
 	}
 
+	eng.cm = component.NewComponentManagerBuilder().
+		AddWorker(eng.serveUnsecureGRPC).
+		AddWorker(eng.serveSecureGRPC).
+		AddWorker(eng.serveGRPCWebProxy).
+		AddWorker(eng.serveREST).
+		AddWorker(eng.shutdownWorker).
+		Build()
+	eng.Component = eng.cm
+
 	return builder, nil
 }
 
-// Ready returns a ready channel that is closed once the engine has fully
-// started. The RPC engine is ready when the gRPC server has successfully
-// started.
-func (e *Engine) Ready() <-chan struct{} {
-	e.unit.Launch(e.serveUnsecureGRPC)
-	e.unit.Launch(e.serveSecureGRPC)
-	e.unit.Launch(e.serveGRPCWebProxy)
-	if e.config.RESTListenAddr != "" {
-		e.unit.Launch(e.serveREST)
-	}
-	return e.unit.Ready()
+func (e *Engine) shutdownWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+	<-ctx.Done()
+	e.shutdown()
 }
 
-// Done returns a done channel that is closed once the engine has fully stopped.
-// It sends a signal to stop the gRPC server, then closes the channel.
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(
-		e.unsecureGrpcServer.GracefulStop,
-		e.secureGrpcServer.GracefulStop,
-		func() {
-			err := e.httpServer.Shutdown(context.Background())
-			if err != nil {
-				e.log.Error().Err(err).Msg("error stopping http server")
-			}
-		},
-		func() {
-			if e.restServer != nil {
-				err := e.restServer.Shutdown(context.Background())
-				if err != nil {
-					e.log.Error().Err(err).Msg("error stopping http REST server")
-				}
-			}
-		})
+func (e *Engine) shutdown() {
+	// use unbounded context, rely on shutdown logic to have timeout
+	ctx := context.Background()
+
+	e.unsecureGrpcServer.GracefulStop()
+	e.secureGrpcServer.GracefulStop()
+	err := e.httpServer.Shutdown(ctx)
+	if err != nil {
+		e.log.Error().Err(err).Msg("error stopping http server")
+	}
+	if e.restServer != nil {
+		err := e.restServer.Shutdown(ctx)
+		if err != nil {
+			e.log.Error().Err(err).Msg("error stopping http REST server")
+		}
+	}
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -283,13 +286,14 @@ func (e *Engine) process(event interface{}) error {
 
 // serveUnsecureGRPC starts the unsecure gRPC server
 // When this function returns, the server is considered ready.
-func (e *Engine) serveUnsecureGRPC() {
-
+func (e *Engine) serveUnsecureGRPC(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
 	e.log.Info().Str("grpc_address", e.config.UnsecureGRPCListenAddr).Msg("starting grpc server on address")
 
 	l, err := net.Listen("tcp", e.config.UnsecureGRPCListenAddr)
 	if err != nil {
 		e.log.Err(err).Msg("failed to start the grpc server")
+		ctx.Throw(err)
 		return
 	}
 
@@ -298,24 +302,25 @@ func (e *Engine) serveUnsecureGRPC() {
 	e.addrLock.Lock()
 	e.unsecureGrpcAddress = l.Addr()
 	e.addrLock.Unlock()
-
 	e.log.Debug().Str("unsecure_grpc_address", e.unsecureGrpcAddress.String()).Msg("listening on port")
 
 	err = e.unsecureGrpcServer.Serve(l) // blocking call
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("fatal error in unsecure grpc server")
+		e.log.Err(err).Msg("fatal error in unsecure grpc server")
+		ctx.Throw(err)
 	}
 }
 
 // serveSecureGRPC starts the secure gRPC server
 // When this function returns, the server is considered ready.
-func (e *Engine) serveSecureGRPC() {
-
+func (e *Engine) serveSecureGRPC(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
 	e.log.Info().Str("secure_grpc_address", e.config.SecureGRPCListenAddr).Msg("starting grpc server on address")
 
 	l, err := net.Listen("tcp", e.config.SecureGRPCListenAddr)
 	if err != nil {
 		e.log.Err(err).Msg("failed to start the grpc server")
+		ctx.Throw(err)
 		return
 	}
 
@@ -327,14 +332,15 @@ func (e *Engine) serveSecureGRPC() {
 
 	err = e.secureGrpcServer.Serve(l) // blocking call
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("fatal error in secure grpc server")
+		e.log.Err(err).Msg("fatal error in secure grpc server")
+		ctx.Throw(err)
 	}
 }
 
 // serveGRPCWebProxy starts the gRPC web proxy server
-func (e *Engine) serveGRPCWebProxy() {
+func (e *Engine) serveGRPCWebProxy(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
 	log := e.log.With().Str("http_proxy_address", e.config.HTTPListenAddr).Logger()
-
 	log.Info().Msg("starting http proxy server on address")
 
 	err := e.httpServer.ListenAndServe()
@@ -342,18 +348,26 @@ func (e *Engine) serveGRPCWebProxy() {
 		return
 	}
 	if err != nil {
-		e.log.Err(err).Msg("failed to start the http proxy server")
+		log.Err(err).Msg("failed to start the http proxy server")
+		ctx.Throw(err)
 	}
 }
 
 // serveREST starts the HTTP REST server
-func (e *Engine) serveREST() {
+func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	if e.config.RESTListenAddr == "" {
+		e.log.Debug().Msg("no REST API address specified - not starting the server")
+		return
+	}
 
 	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
 
 	r, err := rest.NewServer(e.backend, e.config.RESTListenAddr, e.log, e.chain)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
+		ctx.Throw(err)
 		return
 	}
 	e.restServer = r
@@ -361,6 +375,7 @@ func (e *Engine) serveREST() {
 	l, err := net.Listen("tcp", e.config.RESTListenAddr)
 	if err != nil {
 		e.log.Err(err).Msg("failed to start the REST server")
+		ctx.Throw(err)
 		return
 	}
 
@@ -375,6 +390,7 @@ func (e *Engine) serveREST() {
 		if errors.Is(err, http.ErrServerClosed) {
 			return
 		}
-		e.log.Error().Err(err).Msg("fatal error in REST server")
+		e.log.Err(err).Msg("fatal error in REST server")
+		ctx.Throw(err)
 	}
 }
