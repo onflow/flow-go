@@ -90,7 +90,13 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 
 	applyPenalty := func() (float64, error) {
 		return m.cache.Adjust(report.OriginId(), func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
-			record.Penalty -= report.Penalty()
+			if report.Penalty() > 0 {
+				// this should never happen, unless there is a bug in the misbehavior report handling logic.
+				// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
+				// TODO: refactor to throwing error to the irrecoverable context.
+				lg.Fatal().Float64("penalty", report.Penalty()).Msg("penalty value is positive, expected negative")
+			}
+			record.Penalty += report.Penalty() // penalty value is negative. We add it to the current penalty.
 			return record, nil
 		})
 	}
