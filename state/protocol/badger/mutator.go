@@ -630,11 +630,11 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// We also want to update the last sealed height. Retrieve the block
 	// seal indexed for the block and retrieve the block that was sealed by it.
-	last, err := m.seals.HighestInFork(blockID)
+	lastSeal, err := m.seals.HighestInFork(blockID)
 	if err != nil {
 		return fmt.Errorf("could not look up sealed header: %w", err)
 	}
-	sealed, err := m.headers.ByBlockID(last.BlockID)
+	sealed, err := m.headers.ByBlockID(lastSeal.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve sealed header: %w", err)
 	}
@@ -743,8 +743,9 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		return fmt.Errorf("could not persist finalization operations for block (%x): %w", blockID, err)
 	}
 
-	// update the finalized header cache
+	// update the header cache
 	m.State.cachedFinal.Store(&cachedHeader{blockID, header})
+	m.State.cachedSealed.Store(&cachedHeader{lastSeal.BlockID, sealed})
 
 	// Emit protocol events after database transaction succeeds. Event delivery is guaranteed,
 	// _except_ in case of a crash. Hence, when recovering from a crash, consumers need to deduce
