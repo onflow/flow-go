@@ -52,7 +52,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -212,16 +212,16 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.BoolVar(&fnb.BaseConfig.UnicastRateLimitersConfig.DryRun, "unicast-rate-limit-dry-run", defaultConfig.UnicastRateLimitersConfig.DryRun, "disable peer disconnects and connections gating when rate limiting peers")
 
 	// gossipsub RPC control message validation limits used for validation configuration and rate limiting
-	fnb.flags.IntVar(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.NumberOfWorkers, "gossipsub-rpc-validation-inspector-workers", defaultConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.NumberOfWorkers, "number of gossupsub RPC control message validation inspector component workers")
-	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.CacheSize, "gossipsub-rpc-validation-inspector-cache-size", defaultConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.CacheSize, "cache size for gossipsub RPC validation inspector events worker pool queue.")
-	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.GraftLimits, "gossipsub-rpc-graft-limits", defaultConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.GraftLimits, fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC GRAFT message validation e.g: %s=1000,%s=100,%s=1000", validation.DiscardThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
-	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.PruneLimits, "gossipsub-rpc-prune-limits", defaultConfig.GossipSubRPCInspectorsConfig.ValidationInspectorConfigs.PruneLimits, fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC PRUNE message validation e.g: %s=1000,%s=20,%s=1000", validation.DiscardThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
+	fnb.flags.IntVar(&fnb.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.NumberOfWorkers, "gossipsub-rpc-validation-inspector-workers", defaultConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.NumberOfWorkers, "number of gossupsub RPC control message validation inspector component workers")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.CacheSize, "gossipsub-rpc-validation-inspector-cache-size", defaultConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.CacheSize, "cache size for gossipsub RPC validation inspector events worker pool queue.")
+	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.GraftLimits, "gossipsub-rpc-graft-limits", defaultConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.GraftLimits, fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC GRAFT message validation e.g: %s=1000,%s=100,%s=1000", validation.DiscardThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
+	fnb.flags.StringToIntVar(&fnb.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.PruneLimits, "gossipsub-rpc-prune-limits", defaultConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.PruneLimits, fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC PRUNE message validation e.g: %s=1000,%s=20,%s=1000", validation.DiscardThresholdMapKey, validation.SafetyThresholdMapKey, validation.RateLimitMapKey))
 	// gossipsub RPC control message metrics observer inspector configuration
-	fnb.flags.IntVar(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.MetricsInspectorConfigs.NumberOfWorkers, "gossipsub-rpc-metrics-inspector-workers", defaultConfig.GossipSubRPCInspectorsConfig.MetricsInspectorConfigs.NumberOfWorkers, "cache size for gossipsub RPC metrics inspector events worker pool queue.")
-	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.MetricsInspectorConfigs.CacheSize, "gossipsub-rpc-metrics-inspector-cache-size", defaultConfig.GossipSubRPCInspectorsConfig.MetricsInspectorConfigs.CacheSize, "cache size for gossipsub RPC metrics inspector events worker pool.")
+	fnb.flags.IntVar(&fnb.BaseConfig.GossipSubConfig.RpcInspector.MetricsInspectorConfigs.NumberOfWorkers, "gossipsub-rpc-metrics-inspector-workers", defaultConfig.GossipSubConfig.RpcInspector.MetricsInspectorConfigs.NumberOfWorkers, "cache size for gossipsub RPC metrics inspector events worker pool queue.")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubConfig.RpcInspector.MetricsInspectorConfigs.CacheSize, "gossipsub-rpc-metrics-inspector-cache-size", defaultConfig.GossipSubConfig.RpcInspector.MetricsInspectorConfigs.CacheSize, "cache size for gossipsub RPC metrics inspector events worker pool.")
 
 	// networking event notifications
-	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize, "gossipsub-rpc-inspector-notification-cache-size", defaultConfig.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize, "cache size for notification events from gossipsub rpc inspector")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubConfig.RpcInspector.GossipSubRPCInspectorNotificationCacheSize, "gossipsub-rpc-inspector-notification-cache-size", defaultConfig.GossipSubConfig.RpcInspector.GossipSubRPCInspectorNotificationCacheSize, "cache size for notification events from gossipsub rpc inspector")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.DisallowListNotificationCacheSize, "disallow-list-notification-cache-size", defaultConfig.DisallowListNotificationCacheSize, "cache size for notification events from disallow list")
 
 	// unicast manager options
@@ -354,17 +354,17 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	// setup unicast rate limiters
 	unicastRateLimiters := ratelimit.NewRateLimiters(unicastRateLimiterOpts...)
 
-	uniCfg := &p2pbuilder.UnicastConfig{
+	uniCfg := &p2pconfig.UnicastConfig{
 		StreamRetryInterval:    fnb.UnicastCreateStreamRetryDelay,
 		RateLimiterDistributor: fnb.UnicastRateLimiterDistributor,
 	}
 
-	connGaterCfg := &p2pbuilder.ConnectionGaterConfig{
+	connGaterCfg := &p2pconfig.ConnectionGaterConfig{
 		InterceptPeerDialFilters: connGaterPeerDialFilters,
 		InterceptSecuredFilters:  connGaterInterceptSecureFilters,
 	}
 
-	peerManagerCfg := &p2pbuilder.PeerManagerConfig{
+	peerManagerCfg := &p2pconfig.PeerManagerConfig{
 		ConnectionPruning: fnb.NetworkConnectionPruning,
 		UpdateInterval:    fnb.PeerUpdateInterval,
 	}
@@ -375,27 +375,16 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
 
-		fnb.GossipSubInspectorNotifDistributor = BuildGossipsubRPCValidationInspectorNotificationDisseminator(fnb.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
-
-		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.GossipSubRPCInspectorsConfig, fnb.GossipSubInspectorNotifDistributor)
-		rpcInspectors, err := rpcInspectorBuilder.
-			SetPublicNetwork(p2p.PublicNetworkDisabled).
-			SetMetrics(fnb.Metrics.Network, fnb.MetricsRegisterer).
-			SetMetricsEnabled(fnb.MetricsEnabled).Build()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors: %w", err)
-		}
-
-		// set rpc inspectors on gossipsub config
-		fnb.GossipSubConfig.RPCInspectors = rpcInspectors
-
 		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
 			fnb.Logger,
 			myAddr,
 			fnb.NetworkKey,
 			fnb.SporkID,
 			fnb.IdentityProvider,
-			fnb.Metrics.Network,
+			&p2pconfig.MetricsConfig{
+				Metrics:          fnb.Metrics.Network,
+				HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
+			},
 			fnb.Resolver,
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
@@ -413,13 +402,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		fnb.LibP2PNode = libp2pNode
 
 		return libp2pNode, nil
-	})
-	fnb.Component("gossipsub inspector notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		// distributor is returned as a component to be started and stopped.
-		if fnb.GossipSubInspectorNotifDistributor == nil {
-			return nil, fmt.Errorf("gossipsub inspector notification distributor has not been set")
-		}
-		return fnb.GossipSubInspectorNotifDistributor, nil
 	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		cf := conduit.NewDefaultConduitFactory(fnb.Logger, fnb.Metrics.Network)
@@ -439,11 +421,17 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}, fnb.PeerManagerDependencies)
 }
 
-func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
-	node *NodeConfig,
-	cf network.ConduitFactory,
-	unicastRateLimiters *ratelimit.RateLimiters,
-	peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
+// HeroCacheMetricsFactory returns a HeroCacheMetricsFactory based on the MetricsEnabled flag.
+// If MetricsEnabled is true, it returns a HeroCacheMetricsFactory that will register metrics with the provided MetricsRegisterer.
+// If MetricsEnabled is false, it returns a no-op HeroCacheMetricsFactory that will not register any metrics.
+func (fnb *FlowNodeBuilder) HeroCacheMetricsFactory() metrics.HeroCacheMetricsFactory {
+	if fnb.MetricsEnabled {
+		return metrics.NewHeroCacheMetricsFactory(fnb.MetricsRegisterer)
+	}
+	return metrics.NewNoopHeroCacheMetricsFactory()
+}
+
+func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory, unicastRateLimiters *ratelimit.RateLimiters, peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
 	var mwOpts []middleware.MiddlewareOption
 	if len(fnb.MsgValidators) > 0 {
 		mwOpts = append(mwOpts, middleware.WithMessageValidators(fnb.MsgValidators...))
@@ -478,14 +466,10 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	fnb.Middleware = mw
 
 	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
-	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-	if fnb.HeroCacheMetricsEnable {
-		heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
-	}
 
 	receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
 		fnb.Logger,
-		heroCacheCollector)
+		metrics.NetworkReceiveCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), p2p.PrivateNetwork))
 
 	err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
 	if err != nil {
@@ -991,6 +975,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
 	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
+	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
 
 	fnb.Storage = Storage{
 		Headers:            headers,
@@ -1006,6 +991,7 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		Collections:        collections,
 		Setups:             setups,
 		EpochCommits:       epochCommits,
+		VersionBeacons:     versionBeacons,
 		Statuses:           statuses,
 		Commits:            commits,
 	}
@@ -1078,6 +1064,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
+			fnb.Storage.VersionBeacons,
 		)
 		if err != nil {
 			return fmt.Errorf("could not open protocol state: %w", err)
@@ -1129,6 +1116,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
+			fnb.Storage.VersionBeacons,
 			fnb.RootSnapshot,
 			options...,
 		)

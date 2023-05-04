@@ -82,10 +82,6 @@ func (c *CorruptPubSubAdapterConfig) WithScoreOption(_ p2p.ScoreOptionBuilder) {
 	// CorruptPubSub does not support score options. This is a no-op.
 }
 
-func (c *CorruptPubSubAdapterConfig) WithAppSpecificRpcInspectors(_ ...p2p.GossipSubRPCInspector) {
-	// CorruptPubSub receives its inspector at a different time than the original pubsub (i.e., at creation time).
-}
-
 func (c *CorruptPubSubAdapterConfig) WithTracer(_ p2p.PubSubTracer) {
 	// CorruptPubSub does not support tracer. This is a no-op. We can add this if needed,
 	// but feature-wise it is not needed for BFT testing and attack vector implementation.
@@ -96,8 +92,13 @@ func (c *CorruptPubSubAdapterConfig) WithMessageIdFunction(f func([]byte) string
 		return f(pmsg.Data)
 	}))
 }
+
 func (c *CorruptPubSubAdapterConfig) WithScoreTracer(_ p2p.PeerScoreTracer) {
 	// CorruptPubSub does not support score tracer. This is a no-op.
+}
+
+func (c *CorruptPubSubAdapterConfig) WithInspectorSuite(_ p2p.GossipSubInspectorSuite) {
+	// CorruptPubSub does not support inspector suite. This is a no-op.
 }
 
 func (c *CorruptPubSubAdapterConfig) Build() []corrupt.Option {

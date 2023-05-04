@@ -849,10 +849,6 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 	// state when the follower detects newly finalized blocks
 	final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, exeNode.followerState, node.Tracer)
 
-	packer := signature.NewConsensusSigDataPacker(exeNode.committee)
-	// initialize the verifier for the protocol consensus
-	verifier := verification.NewCombinedVerifier(exeNode.committee, packer)
-
 	finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 	if err != nil {
 		return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
@@ -864,10 +860,8 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 	// so that it gets notified upon each new finalized block
 	exeNode.followerCore, err = consensus.NewFollower(
 		node.Logger,
-		exeNode.committee,
 		node.Storage.Headers,
 		final,
-		verifier,
 		exeNode.finalizationDistributor,
 		node.RootBlock.Header,
 		node.RootQC,

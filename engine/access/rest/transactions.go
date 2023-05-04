@@ -21,7 +21,7 @@ func GetTransactionByID(r *request.Request, backend access.API, link models.Link
 	var txr *access.TransactionResult
 	// only lookup result if transaction result is to be expanded
 	if req.ExpandsResult {
-		txr, err = backend.GetTransactionResult(r.Context(), req.ID)
+		txr, err = backend.GetTransactionResult(r.Context(), req.ID, req.BlockID, req.CollectionID)
 		if err != nil {
 			return nil, err
 		}
@@ -39,7 +39,7 @@ func GetTransactionResultByID(r *request.Request, backend access.API, link model
 		return nil, NewBadRequestError(err)
 	}
 
-	txr, err := backend.GetTransactionResult(r.Context(), req.ID)
+	txr, err := backend.GetTransactionResult(r.Context(), req.ID, req.BlockID, req.CollectionID)
 	if err != nil {
 		return nil, err
 	}
