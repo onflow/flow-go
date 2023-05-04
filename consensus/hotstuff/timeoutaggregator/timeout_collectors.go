@@ -2,12 +2,12 @@ package timeoutaggregator
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module"
 	"sync"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 )
 

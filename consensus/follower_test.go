@@ -2,7 +2,6 @@ package consensus_test
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/metrics"
 	"os"
 	"testing"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
