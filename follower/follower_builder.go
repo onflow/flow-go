@@ -48,6 +48,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -114,7 +115,6 @@ type FollowerServiceBuilder struct {
 	Finalized               *flow.Header
 	Pending                 []*flow.Header
 	FollowerCore            module.HotStuffFollower
-	Validator               hotstuff.Validator
 	// for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -215,12 +215,7 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 		// state when the follower detects newly finalized blocks
 		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
 
-		packer := hotsignature.NewConsensusSigDataPacker(builder.Committee)
-		// initialize the verifier for the protocol consensus
-		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
-		builder.Validator = hotstuffvalidator.New(builder.Committee, verifier)
-
-		followerCore, err := consensus.NewFollower(node.Logger, builder.Committee, node.Storage.Headers, final, verifier,
+		followerCore, err := consensus.NewFollower(node.Logger, node.Storage.Headers, final,
 			builder.FinalizationDistributor, node.RootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize follower core: %w", err)
@@ -240,6 +235,10 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 			heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 		}
 
+		packer := hotsignature.NewConsensusSigDataPacker(builder.Committee)
+		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
+		val := hotstuffvalidator.New(builder.Committee, verifier) // verifier for HotStuff signature constructs (QCs, TCs, votes)
+
 		core, err := follower.NewComplianceCore(
 			node.Logger,
 			node.Metrics.Mempool,
@@ -247,7 +246,7 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 			builder.FinalizationDistributor,
 			builder.FollowerState,
 			builder.FollowerCore,
-			builder.Validator,
+			val,
 			builder.SyncCore,
 			node.Tracer,
 		)
@@ -604,11 +603,12 @@ func (builder *FollowerServiceBuilder) initPublicLibP2PFactory(networkKey crypto
 			builder.IdentityProvider,
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
-		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubRPCInspectorsConfig, builder.GossipSubInspectorNotifDistributor)
-		rpcInspectors, err := rpcInspectorBuilder.
-			SetPublicNetwork(p2p.PublicNetworkEnabled).
-			SetMetrics(builder.Metrics.Network, builder.MetricsRegisterer).
-			SetMetricsEnabled(builder.MetricsEnabled).Build()
+		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector).
+			SetPublicNetwork(p2p.PublicNetwork).
+			SetMetrics(&p2pconfig.MetricsConfig{
+				HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+				Metrics:          builder.Metrics.Network,
+			}).Build()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for public libp2p node: %w", err)
 		}
@@ -636,7 +636,7 @@ func (builder *FollowerServiceBuilder) initPublicLibP2PFactory(networkKey crypto
 			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
 			SetGossipSubTracer(meshTracer).
 			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
-			SetGossipSubRPCInspectors(rpcInspectors...).
+			SetGossipSubRpcInspectorSuite(rpcInspectorSuite).
 			Build()
 
 		if err != nil {
@@ -695,15 +695,11 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 			return libp2pNode, nil
 		}).
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-			if builder.HeroCacheMetricsEnable {
-				heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
-			}
 			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 				builder.Logger,
-				heroCacheCollector)
+				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork))
 
-			err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+			err := node.Metrics.Mempool.Register(metrics.PrependPublicPrefix(metrics.ResourceNetworkingReceiveCache), receiveCache.Size)
 			if err != nil {
 				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 			}

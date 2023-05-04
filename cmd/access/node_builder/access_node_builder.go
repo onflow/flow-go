@@ -68,6 +68,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -314,10 +315,8 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 
 		followerCore, err := consensus.NewFollower(
 			node.Logger,
-			builder.Committee,
 			node.Storage.Headers,
 			final,
-			verifier,
 			builder.FinalizationDistributor,
 			node.RootBlock.Header,
 			node.RootQC,
@@ -971,6 +970,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
+				builder.Me,
 			)
 			if err != nil {
 				return nil, err
@@ -979,6 +979,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.RpcEng, err = engineBuilder.
 				WithLegacy().
 				WithBlockSignerDecoder(signature.NewBlockSignerDecoder(builder.Committee)).
+				WithFinalizedHeaderCache(builder.FinalizedHeader).
 				Build()
 			if err != nil {
 				return nil, err
@@ -1109,16 +1110,11 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 
 			// topology returns empty list since peers are not known upfront
 			top := topology.EmptyTopology{}
-
-			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-			if builder.HeroCacheMetricsEnable {
-				heroCacheCollector = metrics.PublicNetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
-			}
 			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 				builder.Logger,
-				heroCacheCollector)
+				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork))
 
-			err := node.Metrics.Mempool.Register(metrics.ResourcePublicNetworkingReceiveCache, receiveCache.Size)
+			err := node.Metrics.Mempool.Register(metrics.PrependPublicPrefix(metrics.ResourceNetworkingReceiveCache), receiveCache.Size)
 			if err != nil {
 				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 			}
@@ -1160,13 +1156,15 @@ func (builder *FlowAccessNodeBuilder) initPublicLibP2PFactory(networkKey crypto.
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
 		// setup RPC inspectors
-		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubRPCInspectorsConfig, builder.GossipSubInspectorNotifDistributor)
-		rpcInspectors, err := rpcInspectorBuilder.
-			SetPublicNetwork(p2p.PublicNetworkEnabled).
-			SetMetrics(builder.Metrics.Network, builder.MetricsRegisterer).
-			SetMetricsEnabled(builder.MetricsEnabled).Build()
+		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector)
+		rpcInspectorSuite, err := rpcInspectorBuilder.
+			SetPublicNetwork(p2p.PublicNetwork).
+			SetMetrics(&p2pconfig.MetricsConfig{
+				HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+				Metrics:          builder.Metrics.Network,
+			}).Build()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors: %w", err)
+			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for access node: %w", err)
 		}
 
 		libp2pNode, err := p2pbuilder.NewNodeBuilder(
@@ -1194,11 +1192,11 @@ func (builder *FlowAccessNodeBuilder) initPublicLibP2PFactory(networkKey crypto.
 				)
 			}).
 			// disable connection pruning for the access node which supports the observer
-			SetPeerManagerOptions(connection.ConnectionPruningDisabled, builder.PeerUpdateInterval).
+			SetPeerManagerOptions(connection.PruningDisabled, builder.PeerUpdateInterval).
 			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
 			SetGossipSubTracer(meshTracer).
 			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
-			SetGossipSubRPCInspectors(rpcInspectors...).
+			SetGossipSubRpcInspectorSuite(rpcInspectorSuite).
 			Build()
 
 		if err != nil {

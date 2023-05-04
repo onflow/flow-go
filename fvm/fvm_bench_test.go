@@ -32,7 +32,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -132,7 +132,7 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 type BasicBlockExecutor struct {
 	blockComputer         computer.BlockComputer
 	derivedChainData      *derived.DerivedChainData
-	activeSnapshot        state.StorageSnapshot
+	activeSnapshot        snapshot.StorageSnapshot
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
 	serviceAccount        *TestBenchAccount

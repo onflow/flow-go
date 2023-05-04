@@ -266,6 +266,10 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 		Logger()
 	lg.Info().Msg("started processing chunk data pack request")
 
+	// TODO(ramtin): we might add a future logic to do extra checks on the origin of the request
+	// currently the networking layer checks that the requested is a valid node operator
+	// that has not been ejected.
+
 	// increases collector metric
 	e.metrics.ChunkDataPackRequestProcessed()
 	chunkDataPack, err := e.execState.ChunkDataPackByChunkID(request.ChunkId)
@@ -291,14 +295,6 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 		lg.Warn().
 			Dur("query_timout", e.chunkDataPackQueryTimeout).
 			Msg("chunk data pack query takes longer than expected timeout")
-	}
-
-	_, err = e.ensureAuthorized(chunkDataPack.ChunkID, request.RequesterId)
-	if err != nil {
-		lg.Error().
-			Err(err).
-			Msg("could not verify authorization of identity of chunk data pack request")
-		return
 	}
 
 	e.deliverChunkDataResponse(chunkDataPack, request.RequesterId)
@@ -356,36 +352,6 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 			Logger()
 	}
 	lg.Info().Msg("chunk data pack request successfully replied")
-}
-
-func (e *Engine) ensureAuthorized(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
-	blockID, err := e.execState.GetBlockIDByChunkID(chunkID)
-	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("cannot find blockID corresponding to chunk data pack: %w", err)
-	}
-
-	authorizedAt, err := e.checkAuthorizedAtBlock(blockID)
-	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("cannot check block staking status: %w", err)
-	}
-	if !authorizedAt {
-		return nil, engine.NewInvalidInputErrorf("this node is not authorized at the block (%s) corresponding to chunk data pack (%s)", blockID.String(), chunkID.String())
-	}
-
-	origin, err := e.state.AtBlockID(blockID).Identity(originID)
-	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
-	}
-
-	// only verifier nodes are allowed to request chunk data packs
-	if origin.Role != flow.RoleVerification {
-		return nil, engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
-	}
-
-	if origin.Weight == 0 {
-		return nil, engine.NewInvalidInputErrorf("node %s has zero weight at the block (%s) corresponding to chunk data pack (%s)", originID, blockID.String(), chunkID.String())
-	}
-	return origin, nil
 }
 
 func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {

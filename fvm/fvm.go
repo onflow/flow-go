@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -87,7 +88,7 @@ func Run(executor ProcedureExecutor) error {
 type Procedure interface {
 	NewExecutor(
 		ctx Context,
-		txnState storage.Transaction,
+		txnState storage.TransactionPreparer,
 	) ProcedureExecutor
 
 	ComputationLimit(ctx Context) uint64
@@ -109,14 +110,14 @@ type VM interface {
 	Run(
 		Context,
 		Procedure,
-		state.StorageSnapshot,
+		snapshot.StorageSnapshot,
 	) (
-		*state.ExecutionSnapshot,
+		*snapshot.ExecutionSnapshot,
 		ProcedureOutput,
 		error,
 	)
 
-	GetAccount(Context, flow.Address, state.StorageSnapshot) (*flow.Account, error)
+	GetAccount(Context, flow.Address, snapshot.StorageSnapshot) (*flow.Account, error)
 }
 
 var _ VM = (*VirtualMachine)(nil)
@@ -133,9 +134,9 @@ func NewVirtualMachine() *VirtualMachine {
 func (vm *VirtualMachine) RunV2(
 	ctx Context,
 	proc Procedure,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	ProcedureOutput,
 	error,
 ) {
@@ -146,19 +147,19 @@ func (vm *VirtualMachine) RunV2(
 func (vm *VirtualMachine) Run(
 	ctx Context,
 	proc Procedure,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	ProcedureOutput,
 	error,
 ) {
 	derivedBlockData := ctx.DerivedBlockData
 	if derivedBlockData == nil {
-		derivedBlockData = derived.NewEmptyDerivedBlockDataWithTransactionOffset(
-			uint32(proc.ExecutionTime()))
+		derivedBlockData = derived.NewEmptyDerivedBlockData(
+			proc.ExecutionTime())
 	}
 
-	var derivedTxnData derived.DerivedTransactionCommitter
+	var derivedTxnData *derived.DerivedTransactionData
 	var err error
 	switch proc.Type() {
 	case ScriptProcedureType:
@@ -187,8 +188,8 @@ func (vm *VirtualMachine) Run(
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize))
 
 	txnState := &storage.SerialTransaction{
-		NestedTransaction:           nestedTxn,
-		DerivedTransactionCommitter: derivedTxnData,
+		NestedTransactionPreparer: nestedTxn,
+		DerivedTransactionData:    derivedTxnData,
 	}
 
 	executor := proc.NewExecutor(ctx, txnState)
@@ -216,7 +217,7 @@ func (vm *VirtualMachine) Run(
 func (vm *VirtualMachine) GetAccount(
 	ctx Context,
 	address flow.Address,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -232,14 +233,14 @@ func (vm *VirtualMachine) GetAccount(
 
 	derivedBlockData := ctx.DerivedBlockData
 	if derivedBlockData == nil {
-		derivedBlockData = derived.NewEmptyDerivedBlockData()
+		derivedBlockData = derived.NewEmptyDerivedBlockData(0)
 	}
 
 	derivedTxnData := derivedBlockData.NewSnapshotReadDerivedTransactionData()
 
 	txnState := &storage.SerialTransaction{
-		NestedTransaction:           nestedTxn,
-		DerivedTransactionCommitter: derivedTxnData,
+		NestedTransactionPreparer: nestedTxn,
+		DerivedTransactionData:    derivedTxnData,
 	}
 
 	env := environment.NewScriptEnv(

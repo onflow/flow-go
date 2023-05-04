@@ -29,7 +29,7 @@ type Programs struct {
 	meter   Meter
 	metrics MetricsReporter
 
-	txnState storage.Transaction
+	txnState storage.TransactionPreparer
 	accounts Accounts
 
 	// NOTE: non-address programs are not reusable across transactions, hence
@@ -45,7 +45,7 @@ func NewPrograms(
 	tracer tracing.TracerSpan,
 	meter Meter,
 	metrics MetricsReporter,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 	accounts Accounts,
 ) *Programs {
 	return &Programs{
@@ -220,7 +220,7 @@ func newProgramLoader(
 }
 
 func (loader *programLoader) Compute(
-	txState state.NestedTransaction,
+	txState state.NestedTransactionPreparer,
 	location common.AddressLocation,
 ) (
 	*derived.Program,
