@@ -143,7 +143,7 @@ clean-data:
 	rm -f ./docker-compose.nodes.yml
 
 # deletes the stopped environment-clean container(s) - running this command inside another target doesn't delete the containers so it's isolated to run in a separate target
-# Note: running this target shows an error on the command line "make: *** [clean-data2] Error 1" but the container is still deletes
+# Note: running this target shows an error on the command line "make: *** [clean-data2] Error 1" but the container is still deleted
 .PHONY: clean-data2
 clean-data2:
 	docker rm $(shell docker ps -aq --filter ancestor=environment-clean)
