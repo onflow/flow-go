@@ -10,10 +10,10 @@ endif
 
 # Run the integration test suite
 .PHONY: integration-test
-integration-test: access-tests ghost-tests mvp-tests execution-tests verification-tests collection-tests epochs-tests network-tests consensus-tests
+integration-test: access-tests ghost-tests mvp-tests execution-tests verification-tests upgrades-tests collection-tests epochs-tests network-tests consensus-tests
 
 .PHONY: ci-integration-test
-ci-integration-test: access-tests ghost-tests mvp-tests epochs-tests consensus-tests execution-tests verification-tests network-tests collection-tests
+ci-integration-test: access-tests ghost-tests mvp-tests epochs-tests consensus-tests execution-tests verification-tests upgrades-tests network-tests collection-tests
 
 ############################################################################################
 # CAUTION: DO NOT MODIFY THE TARGETS BELOW! DOING SO WILL BREAK THE FLAKY TEST MONITOR
@@ -56,6 +56,10 @@ execution-tests:
 .PHONY: verification-tests
 verification-tests:
 	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/verification/...
+
+.PHONY: upgrades-tests
+upgrades-tests:
+	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/upgrades/...
 
 .PHONY: network-tests
 network-tests:

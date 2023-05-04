@@ -3,25 +3,51 @@ package state_stream
 import (
 	"fmt"
 	"net"
+	"time"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Config defines the configurable options for the ingress server.
 type Config struct {
-	ListenAddr              string
-	MaxExecutionDataMsgSize uint // in bytes
-	RpcMetricsEnabled       bool // enable GRPC metrics
+	EventFilterConfig
+
+	// ListenAddr is the address the GRPC server will listen on as host:port
+	ListenAddr string
+
+	// MaxExecutionDataMsgSize is the max message size for block execution data API
+	MaxExecutionDataMsgSize uint
+
+	// RpcMetricsEnabled specifies whether to enable the GRPC metrics
+	RpcMetricsEnabled bool
+
+	// MaxGlobalStreams defines the global max number of streams that can be open at the same time.
+	MaxGlobalStreams uint32
+
+	// ExecutionDataCacheSize is the max number of objects for the execution data cache.
+	ExecutionDataCacheSize uint32
+
+	// ClientSendTimeout is the timeout for sending a message to the client. After the timeout,
+	// the stream is closed with an error.
+	ClientSendTimeout time.Duration
+
+	// ClientSendBufferSize is the size of the response buffer for sending messages to the client.
+	ClientSendBufferSize uint
 }
 
 // Engine exposes the server with the state stream API.
@@ -36,21 +62,28 @@ type Engine struct {
 	chain   flow.Chain
 	handler *Handler
 
+	execDataBroadcaster *engine.Broadcaster
+	execDataCache       *herocache.BlockExecutionData
+
 	stateStreamGrpcAddress net.Addr
 }
 
-// New returns a new ingress server.
+// NewEng returns a new ingress server.
 func NewEng(
+	log zerolog.Logger,
 	config Config,
 	execDataStore execution_data.ExecutionDataStore,
+	state protocol.State,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
-	log zerolog.Logger,
 	chainID flow.ChainID,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, GetExecutionDataByBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, GetExecutionDataByBlockID->10
-) *Engine {
+	heroCacheMetrics module.HeroCacheMetrics,
+) (*Engine, error) {
+	logger := log.With().Str("engine", "state_stream_rpc").Logger()
+
 	// create a GRPC server to serve GRPC clients
 	grpcOpts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(int(config.MaxExecutionDataMsgSize)),
@@ -79,23 +112,46 @@ func NewEng(
 
 	server := grpc.NewServer(grpcOpts...)
 
-	backend := New(headers, seals, results, execDataStore)
+	execDataCache := herocache.NewBlockExecutionData(config.ExecutionDataCacheSize, logger, heroCacheMetrics)
+
+	broadcaster := engine.NewBroadcaster()
+
+	backend, err := New(logger, config, state, headers, seals, results, execDataStore, execDataCache, broadcaster)
+	if err != nil {
+		return nil, fmt.Errorf("could not create state stream backend: %w", err)
+	}
 
 	e := &Engine{
-		log:     log.With().Str("engine", "state_stream_rpc").Logger(),
-		backend: backend,
-		server:  server,
-		chain:   chainID.Chain(),
-		config:  config,
-		handler: NewHandler(backend, chainID.Chain()),
+		log:                 logger,
+		backend:             backend,
+		server:              server,
+		chain:               chainID.Chain(),
+		config:              config,
+		handler:             NewHandler(backend, chainID.Chain(), config.EventFilterConfig, config.MaxGlobalStreams),
+		execDataBroadcaster: broadcaster,
+		execDataCache:       execDataCache,
 	}
 
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(e.serve).
 		Build()
+
 	access.RegisterExecutionDataAPIServer(e.server, e.handler)
 
-	return e
+	return e, nil
+}
+
+// OnExecutionData is called to notify the engine when a new execution data is received.
+func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) {
+	lg := e.log.With().Hex("block_id", logging.ID(executionData.BlockID)).Logger()
+
+	lg.Trace().Msg("received execution data")
+
+	if ok := e.execDataCache.Add(executionData); !ok {
+		lg.Warn().Msg("failed to add execution data to cache")
+	}
+
+	e.execDataBroadcaster.Publish()
 }
 
 // serve starts the gRPC server.

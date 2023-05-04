@@ -5,13 +5,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash"
+	"io"
 	"sync"
 
 	"golang.org/x/crypto/hkdf"
 
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -26,18 +27,20 @@ type unsafeRandomGenerator struct {
 	tracer tracing.TracerSpan
 
 	blockHeader *flow.Header
+	txnIndex    uint32
 
-	prg      random.Rand
-	seedOnce sync.Once
+	prg        random.Rand
+	createOnce sync.Once
+	createErr  error
 }
 
 type ParseRestrictedUnsafeRandomGenerator struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 	impl     UnsafeRandomGenerator
 }
 
 func NewParseRestrictedUnsafeRandomGenerator(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	impl UnsafeRandomGenerator,
 ) UnsafeRandomGenerator {
 	return ParseRestrictedUnsafeRandomGenerator{
@@ -59,86 +62,95 @@ func (gen ParseRestrictedUnsafeRandomGenerator) UnsafeRandom() (
 func NewUnsafeRandomGenerator(
 	tracer tracing.TracerSpan,
 	blockHeader *flow.Header,
+	txnIndex uint32,
 ) UnsafeRandomGenerator {
 	gen := &unsafeRandomGenerator{
 		tracer:      tracer,
 		blockHeader: blockHeader,
+		txnIndex:    txnIndex,
 	}
 
 	return gen
 }
 
-// This function abstracts building the PRG seed from the entropy source `randomSource`.
-// It does not make assumptions about the quality of the source, nor about
-// its length (the source could be a fingerprint of entity, an ID of an entity,
-//
-//	a beacon signature..)
-//
-// It therefore uses a mechansim to extract the source entropy and expand it into
-// the required `seedLen` bytes (this can be a KDF, a MAC, a hash with extended-length output..)
-func seedFromEntropySource(randomSource []byte, seedLen int) ([]byte, error) {
-	// This implementation used HKDF,
-	// but other promitives with the 2 properties above could also be used.
-	hkdf := hkdf.New(func() hash.Hash { return sha256.New() }, randomSource, nil, nil)
-	seed := make([]byte, random.Chacha20SeedLen)
-	n, err := hkdf.Read(seed)
-	if n != len(seed) {
-		return nil, fmt.Errorf("extracting seed with HKDF failed, required %d bytes, got %d", random.Chacha20SeedLen, n)
+func (gen *unsafeRandomGenerator) createRandomGenerator() (
+	random.Rand,
+	error,
+) {
+	if gen.blockHeader == nil {
+		return nil, nil
 	}
+
+	// The block header ID is currently used as the entropy source.
+	// This should evolve to become the beacon signature (safer entropy
+	// source than the block ID)
+	source := gen.blockHeader.ID()
+
+	// Provide additional randomness for each transaction.
+	salt := make([]byte, 4)
+	binary.LittleEndian.PutUint32(salt, gen.txnIndex)
+
+	// Extract the entropy from the source and expand it into the required
+	// seed length.  Note that we can use any implementation which provide
+	// similar properties.
+	hkdf := hkdf.New(
+		func() hash.Hash { return sha256.New() },
+		source[:],
+		salt,
+		nil)
+	seed := make([]byte, random.Chacha20SeedLen)
+	_, err := io.ReadFull(hkdf, seed)
 	if err != nil {
 		return nil, fmt.Errorf("extracting seed with HKDF failed: %w", err)
 	}
-	return seed, nil
+
+	// initialize a fresh crypto-secure PRG with the seed (here ChaCha20)
+	// This PRG provides all outputs of Cadence UnsafeRandom.
+	prg, err := random.NewChacha20PRG(seed, []byte{})
+	if err != nil {
+		return nil, fmt.Errorf("creating random generator failed: %w", err)
+	}
+
+	return prg, nil
 }
 
-// seed seeds the pseudo-random number generator using the block header ID
-// as an entropy source.
-// The seed function is currently called for each tranaction, the PRG is used
-// to provide all the randoms the transaction needs through UnsafeRandom.
+// maybeCreateRandomGenerator seeds the pseudo-random number generator using the
+// block header ID and transaction index as an entropy source.  The seed
+// function is currently called for each tranaction, the PRG is used to
+// provide all the randoms the transaction needs through UnsafeRandom.
 //
-// This allows lazy seeding of the random number generator,
-// since not a lot of transactions/scripts use it and the time it takes to seed it is not negligible.
-func (gen *unsafeRandomGenerator) seed() {
-	gen.seedOnce.Do(func() {
-		if gen.blockHeader == nil {
-			return
-		}
-
-		// The block header ID is currently used as the entropy source.
-		// This should evolve to become the beacon signature (safer entropy source than
-		// the block ID)
-		// Extract the entropy from the source and expand it into the required seed length.
-		source := gen.blockHeader.ID()
-		seed, err := seedFromEntropySource(source[:], random.Chacha20SeedLen)
-		if err != nil {
-			return
-		}
-
-		// initialize a fresh crypto-secure PRG with the seed (here ChaCha20)
-		// This PRG provides all outputs of Cadence UnsafeRandom.
-		prg, err := random.NewChacha20PRG(seed, []byte{})
-		if err != nil {
-			return
-		}
-		gen.prg = prg
+// This allows lazy seeding of the random number generator, since not a lot of
+// transactions/scripts use it and the time it takes to seed it is not
+// negligible.
+func (gen *unsafeRandomGenerator) maybeCreateRandomGenerator() error {
+	gen.createOnce.Do(func() {
+		gen.prg, gen.createErr = gen.createRandomGenerator()
 	})
+
+	return gen.createErr
 }
 
-// UnsafeRandom returns a random uint64 using the underlying PRG (currently using a crypto-secure one).
-// this is not thread safe, due to the gen.prg instance currently used.
-// Its also not thread safe because each thread needs to be deterministically seeded with a different seed.
-// This is Ok because a single transaction has a single UnsafeRandomGenerator and is run in a single thread.
+// UnsafeRandom returns a random uint64 using the underlying PRG (currently
+// using a crypto-secure one).  This is not thread safe, due to the gen.prg
+// instance currently used.  Its also not thread safe because each thread needs
+// to be deterministically seeded with a different seed.  This is Ok because a
+// single transaction has a single UnsafeRandomGenerator and is run in a single
+// thread.
 func (gen *unsafeRandomGenerator) UnsafeRandom() (uint64, error) {
-	defer gen.tracer.StartExtensiveTracingChildSpan(trace.FVMEnvUnsafeRandom).End()
+	defer gen.tracer.StartExtensiveTracingChildSpan(
+		trace.FVMEnvUnsafeRandom).End()
 
 	// The internal seeding is only done once.
-	gen.seed()
+	err := gen.maybeCreateRandomGenerator()
+	if err != nil {
+		return 0, err
+	}
 
 	if gen.prg == nil {
 		return 0, errors.NewOperationNotSupportedError("UnsafeRandom")
 	}
 
 	buf := make([]byte, 8)
-	gen.prg.Read(buf)
+	gen.prg.Read(buf) // Note: prg.Read does not return error
 	return binary.LittleEndian.Uint64(buf), nil
 }

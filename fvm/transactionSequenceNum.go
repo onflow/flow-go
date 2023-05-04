@@ -16,7 +16,7 @@ type TransactionSequenceNumberChecker struct{}
 func (c TransactionSequenceNumberChecker) CheckAndIncrementSequenceNumber(
 	tracer tracing.TracerSpan,
 	proc *TransactionProcedure,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) error {
 	// TODO(Janez): verification is part of inclusion fees, not execution fees.
 	var err error
@@ -34,7 +34,7 @@ func (c TransactionSequenceNumberChecker) CheckAndIncrementSequenceNumber(
 func (c TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	tracer tracing.TracerSpan,
 	proc *TransactionProcedure,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) error {
 
 	defer tracer.StartChildSpan(trace.FVMSeqNumCheckTransaction).End()
