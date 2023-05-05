@@ -26,7 +26,7 @@ while read -r branch_hash; do
 
     # instead of running "make stop" which uses docker-compose for a lot of older versions,
     # we explicitly run the command here with "docker compose"
-    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml down -v --remove-orphans
+    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml down -v --remove-orphans
 
     make clean-data
     make -e COLLECTION=12 VERIFICATION=12 NCLUSTERS=12 LOGLEVEL=INFO bootstrap
@@ -39,7 +39,7 @@ while read -r branch_hash; do
 
     # instead of running "make stop" which uses docker-compose for a lot of older versions,
     # we explicitly run the command here with "docker compose"
-    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml down -v --remove-orphans
+    DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml down -v --remove-orphans
 
     docker system prune -a -f
     make clean-data
