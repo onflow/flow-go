@@ -1149,6 +1149,12 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		Return(nil).
 		Times(1) // block
 
+	metrics.On(
+		"ExecutionBlockExecutionEffortVectorComponent",
+		mock.Anything,
+		mock.Anything).
+		Return(nil)
+
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()
 

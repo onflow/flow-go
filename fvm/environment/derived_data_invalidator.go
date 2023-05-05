@@ -31,7 +31,6 @@ type DerivedDataInvalidator struct {
 
 var _ derived.TransactionInvalidator = DerivedDataInvalidator{}
 
-// TODO(patrick): extract contractKeys from executionSnapshot
 func NewDerivedDataInvalidator(
 	contractUpdates ContractUpdates,
 	serviceAddress flow.Address,
