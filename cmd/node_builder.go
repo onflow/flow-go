@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -186,8 +185,6 @@ type NetworkConfig struct {
 	NetworkConnectionPruning bool
 	// GossipSubConfig core gossipsub configuration.
 	GossipSubConfig *p2pbuilder.GossipSubConfig
-	// GossipSubRPCInspectorsConfig configuration for all gossipsub RPC control message inspectors.
-	GossipSubRPCInspectorsConfig *inspectorbuilder.GossipSubRPCInspectorsConfig
 	// PreferredUnicastProtocols list of unicast protocols in preferred order
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
@@ -260,6 +257,20 @@ type NodeConfig struct {
 
 	// root state information
 	RootSnapshot protocol.Snapshot
+	// cache of root snapshot and latest finalized snapshot properties
+	NodeConfigCache
+
+	// bootstrapping options
+	SkipNwAddressBasedValidations bool
+
+	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
+	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
+	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
+	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
+}
+
+// NodeConfigCache caches information about the root snapshot and latest finalized block for use in bootstrapping.
+type NodeConfigCache struct {
 	// cached properties of RootSnapshot for convenience
 	RootBlock   *flow.Block
 	RootQC      *flow.QuorumCertificate
@@ -269,16 +280,6 @@ type NodeConfig struct {
 	SporkID     flow.Identifier
 	// cached finalized block for use in bootstrapping
 	FinalizedHeader *flow.Header
-
-	// bootstrapping options
-	SkipNwAddressBasedValidations bool
-
-	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
-	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
-	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
-	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
-	// GossipSubInspectorNotifDistributor notifies consumers when an invalid RPC message is encountered.
-	GossipSubInspectorNotifDistributor p2p.GossipSubInspectorNotificationDistributor
 }
 
 func DefaultBaseConfig() *BaseConfig {
@@ -303,7 +304,6 @@ func DefaultBaseConfig() *BaseConfig {
 				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
 			},
 			GossipSubConfig:                   p2pbuilder.DefaultGossipSubConfig(),
-			GossipSubRPCInspectorsConfig:      inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(),
 			DNSCacheTTL:                       dns.DefaultTimeToLive,
 			LibP2PResourceManagerConfig:       p2pbuilder.DefaultResourceManagerConfig(),
 			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),

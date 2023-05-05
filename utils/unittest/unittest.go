@@ -122,15 +122,6 @@ func SkipBenchmarkUnless(b *testing.B, reason SkipBenchmarkReason, message strin
 	}
 }
 
-// ExpectPanic fails the test if the calling thread did not panic.
-// Must be invoked as a deferred function.
-func ExpectPanic(t *testing.T) {
-	if r := recover(); r != nil {
-		return
-	}
-	t.Error("expected panic")
-}
-
 // AssertReturnsBefore asserts that the given function returns before the
 // duration expires.
 func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration, msgAndArgs ...interface{}) bool {

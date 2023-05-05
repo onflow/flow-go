@@ -51,8 +51,10 @@ type State struct {
 	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
 	// know the spork's root block in full (though it will always know the height).
 	sporkRootBlockHeight uint64
-	// cache the latest finalized block
-	cachedFinal *atomic.Pointer[cachedHeader]
+	// cache the latest finalized and sealed block headers as these are common queries.
+	// It can be cached because the protocol state is solely responsible for updating these values.
+	cachedFinal  *atomic.Pointer[cachedHeader]
+	cachedSealed *atomic.Pointer[cachedHeader]
 }
 
 var _ protocol.State = (*State)(nil)
@@ -642,14 +644,11 @@ func (state *State) Params() protocol.Params {
 // Sealed returns a snapshot for the latest sealed block. A latest sealed block
 // must always exist, so this function always returns a valid snapshot.
 func (state *State) Sealed() protocol.Snapshot {
-	// retrieve the latest sealed height
-	var sealed uint64
-	err := state.db.View(operation.RetrieveSealedHeight(&sealed))
-	if err != nil {
-		// sealed height must always be set, all errors here are critical
-		return invalid.NewSnapshotf("could not retrieve sealed height: %w", err)
+	cached := state.cachedSealed.Load()
+	if cached == nil {
+		return invalid.NewSnapshotf("internal inconsistency: no cached sealed header")
 	}
-	return state.AtHeight(sealed)
+	return NewFinalizedSnapshot(state, cached.id, cached.header)
 }
 
 // Final returns a snapshot for the latest finalized block. A latest finalized
@@ -735,6 +734,7 @@ func newState(
 		},
 		versionBeacons: versionBeacons,
 		cachedFinal:    new(atomic.Pointer[cachedHeader]),
+		cachedSealed:   new(atomic.Pointer[cachedHeader]),
 	}
 }
 
@@ -821,21 +821,37 @@ func (state *State) populateCache() error {
 			return fmt.Errorf("could not get spork root block height: %w", err)
 		}
 		// finalized header
-		var height uint64
-		err = operation.RetrieveFinalizedHeight(&height)(tx)
+		var finalizedHeight uint64
+		err = operation.RetrieveFinalizedHeight(&finalizedHeight)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup finalized height: %w", err)
 		}
 		var cachedFinalHeader cachedHeader
-		err = operation.LookupBlockHeight(height, &cachedFinalHeader.id)(tx)
+		err = operation.LookupBlockHeight(finalizedHeight, &cachedFinalHeader.id)(tx)
 		if err != nil {
-			return fmt.Errorf("could not lookup finalized id (height=%d): %w", height, err)
+			return fmt.Errorf("could not lookup finalized id (height=%d): %w", finalizedHeight, err)
 		}
 		cachedFinalHeader.header, err = state.headers.ByBlockID(cachedFinalHeader.id)
 		if err != nil {
 			return fmt.Errorf("could not get finalized block (id=%x): %w", cachedFinalHeader.id, err)
 		}
 		state.cachedFinal.Store(&cachedFinalHeader)
+		// sealed header
+		var sealedHeight uint64
+		err = operation.RetrieveSealedHeight(&sealedHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup sealed height: %w", err)
+		}
+		var cachedSealedHeader cachedHeader
+		err = operation.LookupBlockHeight(finalizedHeight, &cachedSealedHeader.id)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup sealed id (height=%d): %w", finalizedHeight, err)
+		}
+		cachedSealedHeader.header, err = state.headers.ByBlockID(cachedSealedHeader.id)
+		if err != nil {
+			return fmt.Errorf("could not get sealed block (id=%x): %w", cachedFinalHeader.id, err)
+		}
+		state.cachedSealed.Store(&cachedSealedHeader)
 		return nil
 	})
 	if err != nil {
