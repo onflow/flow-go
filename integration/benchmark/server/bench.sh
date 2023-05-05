@@ -34,6 +34,7 @@ while read -r branch_hash; do
     DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml build || continue
     DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml up -d || continue
 
+    # sleep is workaround for slow initialization of some node types, so that benchmark does not quit immediately with "connection refused"
     sleep 30;
     go run -tags relic ../benchmark/cmd/ci -log-level debug -git-repo-path ../../ -tps-initial 800 -tps-min 1 -tps-max 1200 -duration 30m
 
