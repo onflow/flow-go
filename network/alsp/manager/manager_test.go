@@ -296,10 +296,10 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay) // the decay should be the default decay value.
 }
 
-// TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequential tests the handling of multiple misbehavior reports for a single peer.
+// TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentially tests the handling of multiple misbehavior reports for a single peer.
 // Reports are coming in sequentially.
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the peer in the cache.
-func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequential(t *testing.T) {
+func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentially(t *testing.T) {
 	logger := zerolog.Nop()
 	alspMetrics := metrics.NewNoopCollector()
 	cacheMetrics := metrics.NewNoopCollector()
@@ -399,9 +399,10 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
 }
 
-// TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers tests the handling of single misbehavior reports for multiple peers.
+// TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequentially tests the handling of single misbehavior reports for multiple peers.
+// Reports are coming in sequentially.
 // The test ensures that each misbehavior report is handled correctly and the penalties are applied to the corresponding peers in the cache.
-func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers(t *testing.T) {
+func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequentially(t *testing.T) {
 	logger := zerolog.Nop()
 	alspMetrics := metrics.NewNoopCollector()
 	cacheMetrics := metrics.NewNoopCollector()
@@ -430,6 +431,65 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers(t *testing
 	for _, report := range reports {
 		m.HandleMisbehaviorReport(channel, report)
 	}
+
+	// check if the misbehavior reports have been processed by verifying that the Adjust method was called on the cache
+	for _, report := range reports {
+		originID := report.OriginId()
+		record, ok := cache.Get(originID)
+		require.True(t, ok)
+		require.NotNil(t, record)
+
+		require.Equal(t, report.Penalty(), record.Penalty)
+		// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
+		require.Equal(t, uint64(0), record.CutoffCounter)
+		// the decay should be the default decay value.
+		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+	}
+}
+
+// TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrently tests the handling of single misbehavior reports for multiple peers.
+// Reports are coming in concurrently.
+// The test ensures that each misbehavior report is handled correctly and the penalties are applied to the corresponding peers in the cache.
+func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrently(t *testing.T) {
+	logger := zerolog.Nop()
+	alspMetrics := metrics.NewNoopCollector()
+	cacheMetrics := metrics.NewNoopCollector()
+	cacheSize := uint32(100)
+
+	cfg := &alspmgr.MisbehaviorReportManagerConfig{
+		Logger:               logger,
+		SpamRecordsCacheSize: cacheSize,
+		AlspMetrics:          alspMetrics,
+		CacheMetrics:         cacheMetrics,
+		Enabled:              true,
+	}
+
+	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+
+	// create a new MisbehaviorReportManager
+	m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+
+	// creates a list of single misbehavior reports for multiple peers (10 peers)
+	numPeers := 10
+	reports := createRandomMisbehaviorReports(t, numPeers)
+
+	channel := channels.Channel("test-channel")
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(reports))
+	// handle the misbehavior reports
+	totalPenalty := float64(0)
+	for _, report := range reports {
+		report := report // capture range variable
+		totalPenalty += report.Penalty()
+		go func() {
+			defer wg.Done()
+
+			m.HandleMisbehaviorReport(channel, report)
+		}()
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
 
 	// check if the misbehavior reports have been processed by verifying that the Adjust method was called on the cache
 	for _, report := range reports {
