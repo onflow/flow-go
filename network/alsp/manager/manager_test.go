@@ -389,6 +389,66 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers(t *testing
 	}
 }
 
+// TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers tests the handling of multiple misbehavior reports for multiple peers.
+// The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the corresponding peers in the cache.
+func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers(t *testing.T) {
+	logger := zerolog.Nop()
+	alspMetrics := metrics.NewNoopCollector()
+	cacheMetrics := metrics.NewNoopCollector()
+	cacheSize := uint32(100)
+
+	cfg := &alspmgr.MisbehaviorReportManagerConfig{
+		Logger:               logger,
+		SpamRecordsCacheSize: cacheSize,
+		AlspMetrics:          alspMetrics,
+		CacheMetrics:         cacheMetrics,
+		Enabled:              true,
+	}
+
+	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+
+	// create a new MisbehaviorReportManager
+	m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+
+	// create a map of origin IDs to their respective misbehavior reports (10 peers, 5 reports each)
+	numPeers := 10
+	numReportsPerPeer := 5
+	peersReports := make(map[flow.Identifier][]network.MisbehaviorReport)
+
+	for i := 0; i < numPeers; i++ {
+		originID := unittest.IdentifierFixture()
+		reports := createRandomMisbehaviorReportsForOriginId(t, originID, numReportsPerPeer)
+		peersReports[originID] = reports
+	}
+
+	channel := channels.Channel("test-channel")
+
+	// handle the misbehavior reports
+	for _, reports := range peersReports {
+		for _, report := range reports {
+			m.HandleMisbehaviorReport(channel, report)
+		}
+	}
+
+	// check if the misbehavior reports have been processed by verifying that the Adjust method was called on the cache
+	for originID, reports := range peersReports {
+		totalPenalty := float64(0)
+		for _, report := range reports {
+			totalPenalty += report.Penalty()
+		}
+
+		record, ok := cache.Get(originID)
+		require.True(t, ok)
+		require.NotNil(t, record)
+
+		require.Equal(t, totalPenalty, record.Penalty)
+		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
+		require.Equal(t, uint64(0), record.CutoffCounter)
+		// the decay should be the default decay value.
+		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+	}
+}
+
 // createMisbehaviorReportForOriginId creates a mock misbehavior report for a single origin id.
 // Args:
 // - t: the testing.T instance
