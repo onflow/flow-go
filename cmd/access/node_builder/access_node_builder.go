@@ -58,12 +58,14 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/middleware"
@@ -746,6 +748,13 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		Metrics:             networkMetrics,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
+		ConduitFactory: conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
+			Logger:               builder.Logger,
+			SpamRecordsCacheSize: builder.AlspConfig.SpamRecordCacheSize,
+			DisablePenalty:       builder.AlspConfig.DisablePenalty,
+			AlspMetrics:          builder.Metrics.Network,
+			CacheMetrics:         metrics.ApplicationLayerSpamRecordCacheMetricFactory(builder.HeroCacheMetricsFactory()),
+		}),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)

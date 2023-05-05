@@ -498,7 +498,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		Metrics:             fnb.Metrics.Network,
 		IdentityProvider:    fnb.IdentityProvider,
 		ReceiveCache:        receiveCache,
-		Options:             []p2p.NetworkOptFunction{p2p.WithConduitFactory(cf)},
+		ConduitFactory:      cf,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
