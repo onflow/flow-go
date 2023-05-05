@@ -10,8 +10,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var noop = func(*model.Block) error { return nil }
-
 // TestFinalizationActor_SubscribeDuringConstruction tests that the FinalizationActor
 // subscribes to the provided distributor at construction and can subsequently receive notifications.
 func TestFinalizationActor_SubscribeDuringConstruction(t *testing.T) {

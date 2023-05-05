@@ -257,6 +257,20 @@ type NodeConfig struct {
 
 	// root state information
 	RootSnapshot protocol.Snapshot
+	// cache of root snapshot and latest finalized snapshot properties
+	NodeConfigCache
+
+	// bootstrapping options
+	SkipNwAddressBasedValidations bool
+
+	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
+	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
+	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
+	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
+}
+
+// NodeConfigCache caches information about the root snapshot and latest finalized block for use in bootstrapping.
+type NodeConfigCache struct {
 	// cached properties of RootSnapshot for convenience
 	RootBlock   *flow.Block
 	RootQC      *flow.QuorumCertificate
@@ -266,14 +280,6 @@ type NodeConfig struct {
 	SporkID     flow.Identifier
 	// cached finalized block for use in bootstrapping
 	FinalizedHeader *flow.Header
-
-	// bootstrapping options
-	SkipNwAddressBasedValidations bool
-
-	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
-	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
-	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
-	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
 }
 
 func DefaultBaseConfig() *BaseConfig {
