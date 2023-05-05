@@ -1,3 +1,4 @@
 #!/bin/bash
 
-date +"Hello. The current date and time is %a %b %d %T %Z %Y" | tee -a /opt/hello.txt
+# keeps track of all the historical times TPS tests were run
+date +"Current date and time is %a %b %d %T %Z %Y" | tee -a /opt/hello.txt
