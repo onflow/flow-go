@@ -23,8 +23,11 @@ type MisbehaviorReportManager struct {
 	logger  zerolog.Logger
 	metrics module.AlspMetrics
 	cache   alsp.SpamRecordCache
-	// enabled indicates whether the ALSP module is enabled. When disabled the ALSP module does not handle any misbehavior reports.
-	enabled bool
+	// disablePenalty indicates whether applying the penalty to the misbehaving node is disabled.
+	// When disabled, the ALSP module logs the misbehavior reports and updates the metrics, but does not apply the penalty.
+	// This is useful for managing production incidents.
+	// Note: under normal circumstances, the ALSP module should not be disabled.
+	disablePenalty bool
 }
 
 var _ network.MisbehaviorReportManager = (*MisbehaviorReportManager)(nil)
@@ -39,8 +42,11 @@ type MisbehaviorReportManagerConfig struct {
 	AlspMetrics module.AlspMetrics
 	// CacheMetrics is the metrics factory for the spam record cache.
 	CacheMetrics module.HeroCacheMetrics
-	// Enabled indicates whether the ALSP module is enabled. When disabled the ALSP module does not handle any misbehavior reports.
-	Enabled bool
+	// DisablePenalty indicates whether applying the penalty to the misbehaving node is disabled.
+	// When disabled, the ALSP module logs the misbehavior reports and updates the metrics, but does not apply the penalty.
+	// This is useful for managing production incidents.
+	// Note: under normal circumstances, the ALSP module should not be disabled.
+	DisablePenalty bool
 }
 
 type MisbehaviorReportManagerOption func(*MisbehaviorReportManager)
@@ -76,14 +82,14 @@ func WithSpamRecordsCache(cache alsp.SpamRecordCache) MisbehaviorReportManagerOp
 func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...MisbehaviorReportManagerOption) *MisbehaviorReportManager {
 
 	m := &MisbehaviorReportManager{
-		logger:  cfg.Logger.With().Str("module", "misbehavior_report_manager").Logger(),
-		metrics: cfg.AlspMetrics,
-		enabled: cfg.Enabled,
+		logger:         cfg.Logger.With().Str("module", "misbehavior_report_manager").Logger(),
+		metrics:        cfg.AlspMetrics,
+		disablePenalty: cfg.DisablePenalty,
 	}
 
-	if !m.enabled {
-		// when the ALSP module is disabled, the spam record cache is not needed.
-		m.logger.Warn().Msg("ALSP module is disabled")
+	if !m.disablePenalty {
+		// when the penalty is enabled, the ALSP module is disabled only if the spam record cache is not set.
+		m.logger.Warn().Msg("penalty mechanism of alsp is disabled")
 		return m
 	}
 
@@ -109,8 +115,9 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 		Str("reason", report.Reason().String()).Logger()
 	m.metrics.OnMisbehaviorReported(channel.String(), report.Reason().String())
 
-	if !m.enabled {
-		// when disabled, the misbehavior is logged and metrics are updated, but no further actions are taken.
+	if m.disablePenalty {
+		// when penalty mechanism disabled, the misbehavior is logged and metrics are updated,
+		// but no further actions are taken.
 		lg.Trace().Msg("discarding misbehavior report because ALSP module is disabled")
 		return
 	}

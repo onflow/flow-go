@@ -229,7 +229,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastCreateStreamRetryDelay, "unicast-manager-create-stream-retry-delay", defaultConfig.NetworkConfig.UnicastCreateStreamRetryDelay, "Initial delay between failing to establish a connection with another node and retrying. This delay increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.")
 
 	// application layer spam prevention (alsp) protocol
-	fnb.flags.BoolVar(&fnb.BaseConfig.AlspConfig.Enable, "alsp-enable", defaultConfig.AlspConfig.Enable, "enable alsp protocol")
+	fnb.flags.BoolVar(&fnb.BaseConfig.AlspConfig.DisablePenalty, "alsp-enable", defaultConfig.AlspConfig.DisablePenalty, "disabling the penalty mechanism of the alsp protocol, recommended to be false (enable) for production")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.AlspConfig.SpamRecordCacheSize, "alsp-spam-record-cache-size", defaultConfig.AlspConfig.SpamRecordCacheSize, "size of spam record cache, recommended to be 10x the number of authorized nodes")
 }
 
@@ -412,6 +412,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		cf := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
 			Logger:               fnb.Logger,
 			SpamRecordsCacheSize: fnb.AlspConfig.SpamRecordCacheSize,
+			DisablePenalty:       fnb.AlspConfig.DisablePenalty,
 			AlspMetrics:          fnb.Metrics.Network,
 			CacheMetrics:         metrics.ApplicationLayerSpamRecordCacheMetricFactory(fnb.HeroCacheMetricsFactory()),
 		})

@@ -210,8 +210,11 @@ type AlspConfig struct {
 	// Recommended size is 10 * number of authorized nodes to allow for churn.
 	SpamRecordCacheSize uint32
 
-	// Enables the ALS protocol.
-	Enable bool
+	// DisablePenalty indicates whether applying the penalty to the misbehaving node is disabled.
+	// When disabled, the ALSP module logs the misbehavior reports and updates the metrics, but does not apply the penalty.
+	// This is useful for managing production incidents.
+	// Note: under normal circumstances, the ALSP module should not be disabled.
+	DisablePenalty bool
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
@@ -315,7 +318,7 @@ func DefaultBaseConfig() *BaseConfig {
 			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
 			AlspConfig: &AlspConfig{
 				SpamRecordCacheSize: alsp.DefaultSpamRecordCacheSize,
-				Enable:              alsp.Enabled,
+				DisablePenalty:      false, // by default, apply the penalty
 			},
 		},
 		nodeIDHex:        NotSet,

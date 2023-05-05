@@ -56,10 +56,10 @@ func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Netw
 		seenEventIDs: make(map[string]struct{}),
 		qCD:          make(chan struct{}),
 		conduitFactory: conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-			Enabled:      true,
-			Logger:       unittest.Logger(),
-			AlspMetrics:  metrics.NewNoopCollector(),
-			CacheMetrics: metrics.NewNoopCollector(),
+			DisablePenalty: true,
+			Logger:         unittest.Logger(),
+			AlspMetrics:    metrics.NewNoopCollector(),
+			CacheMetrics:   metrics.NewNoopCollector(),
 		}),
 	}
 

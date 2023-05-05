@@ -41,10 +41,10 @@ func TestHandleReportedMisbehavior(t *testing.T) {
 	misbehaviorReportManger := mocknetwork.NewMisbehaviorReportManager(t)
 	conduitFactory := conduit.NewDefaultConduitFactory(
 		&alspmgr.MisbehaviorReportManagerConfig{
-			Enabled:      true,
-			Logger:       unittest.Logger(),
-			AlspMetrics:  metrics.NewNoopCollector(),
-			CacheMetrics: metrics.NewNoopCollector(),
+			DisablePenalty: true,
+			Logger:         unittest.Logger(),
+			AlspMetrics:    metrics.NewNoopCollector(),
+			CacheMetrics:   metrics.NewNoopCollector(),
 		},
 		conduit.WithMisbehaviorManager(misbehaviorReportManger))
 
@@ -100,10 +100,10 @@ func TestMisbehaviorReportMetrics(t *testing.T) {
 	alspMetrics := mockmodule.NewAlspMetrics(t)
 	conduitFactory := conduit.NewDefaultConduitFactory(
 		&alspmgr.MisbehaviorReportManagerConfig{
-			Enabled:      true,
-			Logger:       unittest.Logger(),
-			AlspMetrics:  metrics.NewNoopCollector(),
-			CacheMetrics: metrics.NewNoopCollector(),
+			DisablePenalty: true,
+			Logger:         unittest.Logger(),
+			AlspMetrics:    metrics.NewNoopCollector(),
+			CacheMetrics:   metrics.NewNoopCollector(),
 		})
 
 	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
@@ -205,7 +205,7 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 			SpamRecordsCacheSize: cacheSize,
 			AlspMetrics:          alspMetrics,
 			CacheMetrics:         cacheMetrics,
-			Enabled:              true,
+			DisablePenalty:       true,
 		}
 
 		m := alspmgr.NewMisbehaviorReportManager(cfg)
@@ -221,7 +221,7 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 			SpamRecordsCacheSize: cacheSize,
 			AlspMetrics:          alspMetrics,
 			CacheMetrics:         cacheMetrics,
-			Enabled:              true,
+			DisablePenalty:       true,
 		}
 
 		m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(customCache))
@@ -234,7 +234,7 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 			SpamRecordsCacheSize: cacheSize,
 			AlspMetrics:          alspMetrics,
 			CacheMetrics:         cacheMetrics,
-			Enabled:              true,
+			DisablePenalty:       true,
 		}
 
 		m := alspmgr.NewMisbehaviorReportManager(cfg)
@@ -247,7 +247,7 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 			SpamRecordsCacheSize: cacheSize,
 			AlspMetrics:          alspMetrics,
 			CacheMetrics:         cacheMetrics,
-			Enabled:              false,
+			DisablePenalty:       false,
 		}
 
 		m := alspmgr.NewMisbehaviorReportManager(cfg)
@@ -268,7 +268,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 		SpamRecordsCacheSize: cacheSize,
 		AlspMetrics:          alspMetrics,
 		CacheMetrics:         cacheMetrics,
-		Enabled:              true,
+		DisablePenalty:       true,
 	}
 
 	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
@@ -310,7 +310,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentiall
 		SpamRecordsCacheSize: cacheSize,
 		AlspMetrics:          alspMetrics,
 		CacheMetrics:         cacheMetrics,
-		Enabled:              true,
+		DisablePenalty:       true,
 	}
 
 	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
@@ -357,7 +357,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 		SpamRecordsCacheSize: cacheSize,
 		AlspMetrics:          alspMetrics,
 		CacheMetrics:         cacheMetrics,
-		Enabled:              true,
+		DisablePenalty:       true,
 	}
 
 	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
@@ -413,7 +413,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequential
 		SpamRecordsCacheSize: cacheSize,
 		AlspMetrics:          alspMetrics,
 		CacheMetrics:         cacheMetrics,
-		Enabled:              true,
+		DisablePenalty:       true,
 	}
 
 	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
@@ -461,7 +461,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 		SpamRecordsCacheSize: cacheSize,
 		AlspMetrics:          alspMetrics,
 		CacheMetrics:         cacheMetrics,
-		Enabled:              true,
+		DisablePenalty:       true,
 	}
 
 	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
@@ -520,7 +520,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 		SpamRecordsCacheSize: cacheSize,
 		AlspMetrics:          alspMetrics,
 		CacheMetrics:         cacheMetrics,
-		Enabled:              true,
+		DisablePenalty:       true,
 	}
 
 	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
@@ -592,7 +592,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurre
 		SpamRecordsCacheSize: cacheSize,
 		AlspMetrics:          alspMetrics,
 		CacheMetrics:         cacheMetrics,
-		Enabled:              true,
+		DisablePenalty:       true,
 	}
 
 	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
