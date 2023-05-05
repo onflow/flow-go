@@ -87,7 +87,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 		disablePenalty: cfg.DisablePenalty,
 	}
 
-	if !m.disablePenalty {
+	if m.disablePenalty {
 		// when the penalty is enabled, the ALSP module is disabled only if the spam record cache is not set.
 		m.logger.Warn().Msg("penalty mechanism of alsp is disabled")
 		return m
@@ -112,7 +112,8 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 	lg := m.logger.With().
 		Str("channel", channel.String()).
 		Hex("misbehaving_id", logging.ID(report.OriginId())).
-		Str("reason", report.Reason().String()).Logger()
+		Str("reason", report.Reason().String()).
+		Float64("penalty", report.Penalty()).Logger()
 	m.metrics.OnMisbehaviorReported(channel.String(), report.Reason().String())
 
 	if m.disablePenalty {
