@@ -253,3 +253,44 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 		assert.NotNil(t, m)
 	})
 }
+
+// TestHandleMisbehaviorReport_SinglePenaltyReport tests the handling of a single misbehavior report.
+// The test ensures that the misbehavior report is handled correctly and the penalty is applied to the peer in the cache.
+func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
+	logger := zerolog.Nop()
+	alspMetrics := metrics.NewNoopCollector()
+	cacheMetrics := metrics.NewNoopCollector()
+	cacheSize := uint32(100)
+
+	cfg := &alspmgr.MisbehaviorReportManagerConfig{
+		Logger:               logger,
+		SpamRecordsCacheSize: cacheSize,
+		AlspMetrics:          alspMetrics,
+		CacheMetrics:         cacheMetrics,
+		Enabled:              true,
+	}
+
+	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+
+	// create a new MisbehaviorReportManager
+	m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+
+	// create a mock misbehavior report with a negative penalty value
+	penalty := float64(-5)
+	report := mocknetwork.NewMisbehaviorReport(t)
+	report.On("OriginId").Return(unittest.IdentifierFixture())
+	report.On("Reason").Return(alsp.InvalidMessage)
+	report.On("Penalty").Return(penalty)
+
+	channel := channels.Channel("test-channel")
+
+	// handle the misbehavior report
+	m.HandleMisbehaviorReport(channel, report)
+	// check if the misbehavior report has been processed by verifying that the Adjust method was called on the cache
+	record, ok := cache.Get(report.OriginId())
+	require.True(t, ok)
+	require.NotNil(t, record)
+	require.Equal(t, penalty, record.Penalty)
+	require.Equal(t, uint64(0), record.CutoffCounter)                                             // with just reporting a misbehavior, the cutoff counter should not be incremented.
+	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay) // the decay should be the default decay value.
+}
