@@ -20,9 +20,6 @@ type ScriptProcedure struct {
 	Script         []byte
 	Arguments      [][]byte
 	RequestContext context.Context
-
-	// TODO(patrick): remove
-	ProcedureOutput
 }
 
 func Script(code []byte) *ScriptProcedure {
@@ -74,10 +71,6 @@ func (proc *ScriptProcedure) NewExecutor(
 	txnState storage.TransactionPreparer,
 ) ProcedureExecutor {
 	return newScriptExecutor(ctx, proc, txnState)
-}
-
-func (proc *ScriptProcedure) SetOutput(output ProcedureOutput) {
-	proc.ProcedureOutput = output
 }
 
 func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
