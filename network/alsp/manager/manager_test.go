@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -293,4 +294,101 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 	require.Equal(t, penalty, record.Penalty)
 	require.Equal(t, uint64(0), record.CutoffCounter)                                             // with just reporting a misbehavior, the cutoff counter should not be incremented.
 	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay) // the decay should be the default decay value.
+}
+
+// TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer tests the handling of multiple misbehavior reports for a single peer.
+// The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the peer in the cache.
+func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer(t *testing.T) {
+	logger := zerolog.Nop()
+	alspMetrics := metrics.NewNoopCollector()
+	cacheMetrics := metrics.NewNoopCollector()
+	cacheSize := uint32(100)
+
+	cfg := &alspmgr.MisbehaviorReportManagerConfig{
+		Logger:               logger,
+		SpamRecordsCacheSize: cacheSize,
+		AlspMetrics:          alspMetrics,
+		CacheMetrics:         cacheMetrics,
+		Enabled:              true,
+	}
+
+	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+
+	// create a new MisbehaviorReportManager
+	m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+
+	// creates a list of mock misbehavior reports with negative penalty values for a single peer
+	originId := unittest.IdentifierFixture()
+	reports := createRandomMisbehaviorReportsForOriginId(t, originId, 5)
+
+	channel := channels.Channel("test-channel")
+
+	// handle the misbehavior reports
+	totalPenalty := float64(0)
+	for _, report := range reports {
+		totalPenalty += report.Penalty()
+		m.HandleMisbehaviorReport(channel, report)
+	}
+
+	// check if the misbehavior reports have been processed by verifying that the Adjust method was called on the cache
+	record, ok := cache.Get(originId)
+	require.True(t, ok)
+	require.NotNil(t, record)
+
+	require.Equal(t, totalPenalty, record.Penalty)
+	// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
+	require.Equal(t, uint64(0), record.CutoffCounter)
+	// the decay should be the default decay value.
+	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+}
+
+// createMisbehaviorReportForOriginId creates a mock misbehavior report for a single origin id.
+// Args:
+// - t: the testing.T instance
+// - originID: the origin id of the misbehavior report
+// Returns:
+// - network.MisbehaviorReport: the misbehavior report
+// Note: the penalty of the misbehavior report is randomly chosen between -1 and -10. 
+func createMisbehaviorReportForOriginId(t *testing.T, originID flow.Identifier) network.MisbehaviorReport {
+	report := mocknetwork.NewMisbehaviorReport(t)
+	report.On("OriginId").Return(originID)
+	report.On("Reason").Return(alsp.AllMisbehaviorTypes()[rand.Intn(len(alsp.AllMisbehaviorTypes()))])
+	report.On("Penalty").Return(float64(-1 * rand.Intn(10))) // random penalty between -1 and -10
+
+	return report
+}
+
+// createRandomMisbehaviorReportsForOriginId creates a slice of random misbehavior reports for a single origin id.
+// Args:
+// - t: the testing.T instance
+// - originID: the origin id of the misbehavior reports
+// - numReports: the number of misbehavior reports to create
+// Returns:
+// - []network.MisbehaviorReport: the slice of misbehavior reports
+// Note: the penalty of the misbehavior reports is randomly chosen between -1 and -10.
+func createRandomMisbehaviorReportsForOriginId(t *testing.T, originID flow.Identifier, numReports int) []network.MisbehaviorReport {
+	reports := make([]network.MisbehaviorReport, numReports)
+
+	for i := 0; i < numReports; i++ {
+		reports[i] = createMisbehaviorReportForOriginId(t, originID)
+	}
+
+	return reports
+}
+
+// createRandomMisbehaviorReports creates a slice of random misbehavior reports.
+// Args:
+// - t: the testing.T instance
+// - numReports: the number of misbehavior reports to create
+// Returns:
+// - []network.MisbehaviorReport: the slice of misbehavior reports
+// Note: the penalty of the misbehavior reports is randomly chosen between -1 and -10.
+func createRandomMisbehaviorReports(t *testing.T, numReports int) []network.MisbehaviorReport {
+	reports := make([]network.MisbehaviorReport, numReports)
+
+	for i := 0; i < numReports; i++ {
+		reports[i] = createMisbehaviorReportForOriginId(t, unittest.IdentifierFixture())
+	}
+
+	return reports
 }
