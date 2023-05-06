@@ -7,9 +7,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ProtocolViolationConsumer consumes outbound notifications about HotStuff-protocol violations.
-// Such notifications are produced by the active consensus participants and to a lesser
-// degree also the consensus follower.
+// ProtocolViolationConsumer consumes outbound notifications produced by compliance.
+// Notifications can be produced by consensus participants and followers.
+// Notifications are meant to report protocol violations that can be observed by executing compliance checks.
 //
 // Implementations must:
 //   - be concurrency safe
@@ -23,7 +23,6 @@ type ProtocolViolationConsumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnInvalidBlockDetected(err model.InvalidBlockError)
-
 	// OnDoubleProposeDetected notifications are produced by the Finalization Logic
 	// whenever a double block proposal (equivocation) was detected.
 	// Equivocation occurs when the same leader proposes two different blocks for the same view.
@@ -31,47 +30,12 @@ type ProtocolViolationConsumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnDoubleProposeDetected(*model.Block, *model.Block)
-
-	// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
-	// whenever a double voting (same voter voting for different blocks at the same view) was detected.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnDoubleVotingDetected(*model.Vote, *model.Vote)
-
-	// OnInvalidVoteDetected notifications are produced by the Vote Aggregation logic
-	// whenever an invalid vote was detected.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnInvalidVoteDetected(err model.InvalidVoteError)
-
-	// OnVoteForInvalidBlockDetected notifications are produced by the Vote Aggregation logic
-	// whenever vote for invalid proposal was detected.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal)
-
-	// OnDoubleTimeoutDetected notifications are produced by the Timeout Aggregation logic
-	// whenever a double timeout (same replica producing two different timeouts at the same view) was detected.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnDoubleTimeoutDetected(*model.TimeoutObject, *model.TimeoutObject)
-
-	// OnInvalidTimeoutDetected notifications are produced by the Timeout Aggregation logic
-	// whenever an invalid timeout was detected.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnInvalidTimeoutDetected(err model.InvalidTimeoutError)
 }
 
-// FinalizationConsumer consumes outbound notifications produced by the logic tracking
-// forks and finalization. Such notifications are produced by the active consensus
-// participants, and generally potentially relevant to the larger node. The notifications
-// are emitted in the order in which the finalization algorithm makes the respective steps.
+// FinalizationConsumer consumes outbound notifications produced by the finalization logic.
+// Notifications represent finalization-specific state changes which are potentially relevant
+// to the larger node. The notifications are emitted in the order in which the
+// finalization algorithm makes the respective steps.
 //
 // Implementations must:
 //   - be concurrency safe
@@ -93,13 +57,13 @@ type FinalizationConsumer interface {
 	OnFinalizedBlock(*model.Block)
 }
 
-// FollowerConsumer consumes outbound notifications produced by consensus followers.
+// ConsensusFollowerConsumer consumes outbound notifications produced by consensus followers.
 // It is a subset of the notifications produced by consensus participants.
 // Implementations must:
 //   - be concurrency safe
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
-type FollowerConsumer interface {
+type ConsensusFollowerConsumer interface {
 	ProtocolViolationConsumer
 	FinalizationConsumer
 }
@@ -114,19 +78,9 @@ type FollowerConsumer interface {
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
 type Consumer interface {
-	FollowerConsumer
+	ConsensusFollowerConsumer
 	CommunicatorConsumer
-	ParticipantConsumer
-}
 
-// ParticipantConsumer consumes outbound notifications produced by consensus participants
-// actively proposing blocks, voting, collecting & aggregating votes to QCs, and participating in
-// the pacemaker (sending timeouts, collecting & aggregating timeouts to TCs).
-// Implementations must:
-//   - be concurrency safe
-//   - be non-blocking
-//   - handle repetition of the same events (with some processing overhead).
-type ParticipantConsumer interface {
 	// OnEventProcessed notifications are produced by the EventHandler when it is done processing
 	// and hands control back to the EventLoop to wait for the next event.
 	// Prerequisites:
@@ -236,6 +190,41 @@ type ParticipantConsumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnCurrentViewDetails(currentView, finalizedView uint64, currentLeader flow.Identifier)
+
+	// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
+	// whenever a double voting (same voter voting for different blocks at the same view) was detected.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnDoubleVotingDetected(*model.Vote, *model.Vote)
+
+	// OnInvalidVoteDetected notifications are produced by the Vote Aggregation logic
+	// whenever an invalid vote was detected.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnInvalidVoteDetected(err model.InvalidVoteError)
+
+	// OnVoteForInvalidBlockDetected notifications are produced by the Vote Aggregation logic
+	// whenever vote for invalid proposal was detected.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal)
+
+	// OnDoubleTimeoutDetected notifications are produced by the Timeout Aggregation logic
+	// whenever a double timeout (same replica producing two different timeouts at the same view) was detected.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnDoubleTimeoutDetected(*model.TimeoutObject, *model.TimeoutObject)
+
+	// OnInvalidTimeoutDetected notifications are produced by the Timeout Aggregation logic
+	// whenever an invalid timeout was detected.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnInvalidTimeoutDetected(err model.InvalidTimeoutError)
 }
 
 // QCCreatedConsumer consumes outbound notifications produced by HotStuff and its components.

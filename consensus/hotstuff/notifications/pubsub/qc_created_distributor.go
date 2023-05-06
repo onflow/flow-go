@@ -24,7 +24,7 @@ func NewQCCreatedDistributor() *QCCreatedDistributor {
 	}
 }
 
-func (d *QCCreatedDistributor) AddQCCreatedConsumer(consumer hotstuff.QCCreatedConsumer) {
+func (d *QCCreatedDistributor) AddConsumer(consumer hotstuff.QCCreatedConsumer) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.qcCreatedConsumers = append(d.qcCreatedConsumers, consumer)

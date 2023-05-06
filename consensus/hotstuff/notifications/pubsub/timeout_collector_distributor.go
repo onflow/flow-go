@@ -7,8 +7,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TimeoutCollectorDistributor ingests events from hotstuff's VoteCollector
-// logic and distributes them to subscribers. Concurrently safe.
+// TimeoutCollectorDistributor ingests events from hotstuff and distributes them to subscribers.
+// Concurrently safe
 // TODO: investigate if this can be updated using atomics to prevent locking on mutex since we always add all consumers
 // before delivering events.
 type TimeoutCollectorDistributor struct {
@@ -19,10 +19,12 @@ type TimeoutCollectorDistributor struct {
 var _ hotstuff.TimeoutCollectorConsumer = (*TimeoutCollectorDistributor)(nil)
 
 func NewTimeoutCollectorDistributor() *TimeoutCollectorDistributor {
-	return &TimeoutCollectorDistributor{}
+	return &TimeoutCollectorDistributor{
+		consumers: make([]hotstuff.TimeoutCollectorConsumer, 0),
+	}
 }
 
-func (d *TimeoutCollectorDistributor) AddTimeoutCollectorConsumer(consumer hotstuff.TimeoutCollectorConsumer) {
+func (d *TimeoutCollectorDistributor) AddConsumer(consumer hotstuff.TimeoutCollectorConsumer) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.consumers = append(d.consumers, consumer)

@@ -59,7 +59,7 @@ var _ complianceCore = (*ComplianceCore)(nil)
 func NewComplianceCore(log zerolog.Logger,
 	mempoolMetrics module.MempoolMetrics,
 	heroCacheCollector module.HeroCacheMetrics,
-	followerConsumer hotstuff.FollowerConsumer,
+	followerConsumer hotstuff.ConsensusFollowerConsumer,
 	state protocol.FollowerState,
 	follower module.HotStuffFollower,
 	validator hotstuff.Validator,

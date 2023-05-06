@@ -531,7 +531,7 @@ func createNode(
 	require.NoError(t, err)
 
 	timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
-	timeoutCollectorDistributor.AddTimeoutCollectorConsumer(logConsumer)
+	timeoutCollectorDistributor.AddConsumer(logConsumer)
 
 	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(
 		log,

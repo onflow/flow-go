@@ -122,8 +122,8 @@ func NewParticipant(
 	}
 
 	// add observer, event loop needs to receive events from distributor
-	modules.QCCreatedDistributor.AddQCCreatedConsumer(loop)
-	modules.TimeoutCollectorDistributor.AddTimeoutCollectorConsumer(loop)
+	modules.QCCreatedDistributor.AddConsumer(loop)
+	modules.TimeoutCollectorDistributor.AddConsumer(loop)
 
 	return loop, nil
 }
@@ -139,7 +139,7 @@ func NewValidator(metrics module.HotstuffMetrics, committee hotstuff.DynamicComm
 }
 
 // NewForks recovers trusted root and creates new forks manager
-func NewForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FollowerConsumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*forks.Forks, error) {
+func NewForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.ConsensusFollowerConsumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*forks.Forks, error) {
 	// recover the trusted root
 	trustedRoot, err := recoverTrustedRoot(final, headers, rootHeader, rootQC)
 	if err != nil {
