@@ -19,7 +19,7 @@ import (
 // Forks is NOT safe for concurrent use by multiple goroutines.
 type Forks struct {
 	finalizationCallback module.Finalizer
-	notifier             hotstuff.ConsensusFollowerConsumer
+	notifier             hotstuff.FollowerConsumer
 	forest               forest.LevelledForest
 	trustedRoot          *model.CertifiedBlock
 
@@ -30,7 +30,7 @@ type Forks struct {
 
 var _ hotstuff.Forks = (*Forks)(nil)
 
-func New(trustedRoot *model.CertifiedBlock, finalizationCallback module.Finalizer, notifier hotstuff.ConsensusFollowerConsumer) (*Forks, error) {
+func New(trustedRoot *model.CertifiedBlock, finalizationCallback module.Finalizer, notifier hotstuff.FollowerConsumer) (*Forks, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.CertifyingQC.BlockID) || (trustedRoot.Block.View != trustedRoot.CertifyingQC.View) {
 		return nil, model.NewConfigurationErrorf("invalid root: root QC is not pointing to root block")
 	}

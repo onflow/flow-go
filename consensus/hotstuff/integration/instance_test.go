@@ -539,8 +539,8 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	)
 	require.NoError(t, err)
 
-	collectorDistributor.AddConsumer(logConsumer)
-	collectorDistributor.AddConsumer(&in)
+	collectorDistributor.AddTimeoutCollectorConsumer(logConsumer)
+	collectorDistributor.AddTimeoutCollectorConsumer(&in)
 
 	return &in
 }
