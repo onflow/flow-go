@@ -366,7 +366,7 @@ func main() {
 		}).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
-			followerDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
+			followerDistributor.AddProtocolViolationConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
 			return nil
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
