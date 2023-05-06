@@ -592,6 +592,7 @@ func (e *Engine) executeBlock(
 		Logger()
 
 	lg.Info().Msg("executing block")
+	// TODO:(leo) check whether the block has been executed already
 
 	startedAt := time.Now()
 
@@ -609,6 +610,7 @@ func (e *Engine) executeBlock(
 		return
 	}
 
+	// TODO(leo): use StoreHouseReader.BlockView(parentHeight, parentID) to create snapshot
 	snapshot := e.execState.NewStorageSnapshot(*executableBlock.StartState)
 
 	computationResult, err := e.computationManager.ComputeBlock(
@@ -1061,6 +1063,7 @@ func (e *Engine) ExecuteScriptAtBlockID(
 		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
 	}
 
+	// TODO(leo): use StoreHouseReader.BlockView to create snapshot
 	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
 
 	if e.extensiveLogging {
@@ -1095,6 +1098,7 @@ func (e *Engine) GetRegisterAtBlockID(
 		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
 	}
 
+	// TODO(leo): use StoreHouseReader.BlockView to create snapshot
 	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
 
 	id := flow.NewRegisterID(string(owner), string(key))
@@ -1132,6 +1136,7 @@ func (e *Engine) GetAccount(
 		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
 	}
 
+	// TODO(leo): use StoreHouseReader.BlockView to create snapshot
 	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
 
 	return e.computationManager.GetAccount(ctx, addr, block, blockSnapshot)

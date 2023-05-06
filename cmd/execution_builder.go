@@ -531,6 +531,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			blockID.String(),
 			err)
 	}
+	// TODO(leo): use StoreHouseReader.BlockView to create snapshot
 	blockSnapshot := exeNode.executionState.NewStorageSnapshot(stateCommit)
 
 	// Get the epoch counter from the smart contract at the last executed block.

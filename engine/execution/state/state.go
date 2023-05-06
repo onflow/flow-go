@@ -47,8 +47,6 @@ type ReadOnlyExecutionState interface {
 type ExecutionState interface {
 	ReadOnlyExecutionState
 
-	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
-
 	SaveExecutionResults(
 		ctx context.Context,
 		result *execution.ComputationResult,
@@ -221,6 +219,15 @@ func (storage *LedgerStorageSnapshot) Get(
 	return value, nil
 }
 
+// TODO(leo): convert to struct
+// StorehouseSnapshot is a snapshot for getting registers from storehouse
+type StorehouseSnapshot interface {
+	snapshot.StorageSnapshot
+	// BlockID flow.Identifier
+	// Height  uint64
+}
+
+// TODO(leo): return a storagesnapshot backed by forkaware storage
 func (s *state) NewStorageSnapshot(
 	commitment flow.StateCommitment,
 ) snapshot.StorageSnapshot {
@@ -280,10 +287,25 @@ func (s *state) SaveExecutionResults(
 	ctx context.Context,
 	result *execution.ComputationResult,
 ) error {
+
 	span, childCtx := s.tracer.StartSpanFromContext(
 		ctx,
 		trace.EXEStateSaveExecutionResults)
 	defer span.End()
+
+	// saving payload updates to storehouse
+	// it is done in another go routine because storehouse and badgerstorage
+	// are backed by two different storage engines
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// TODO(leo)
+		// read trie updates from
+		// result.BlockAttestationResult.BlockExecutionData.ChunkExecutionDatas
+		// and write register updates to storehouse
+
+	}()
 
 	header := result.ExecutableBlock.Block.Header
 	blockID := header.ID()
@@ -302,12 +324,7 @@ func (s *state) SaveExecutionResults(
 		}
 	}
 
-	err := s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
-	if err != nil {
-		return fmt.Errorf("cannot store state commitment: %w", err)
-	}
-
-	err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
+	err := s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store events: %w", err)
 	}
@@ -346,20 +363,26 @@ func (s *state) SaveExecutionResults(
 		return fmt.Errorf("batch flush error: %w", err)
 	}
 
+	// wait until payloads(registers) have been saved into storehouse before
+	// storing the statecommitment to indicate the block has been executed
+	// since IsBlockExecuted is implemented by checking whether statecommitment
+	// exists or not
+	wg.Wait()
+
+	err = s.commits.Store(blockID, result.CurrentEndState())
+	if err != nil {
+		return fmt.Errorf("cannot store state commitment: %w", err)
+	}
+
 	//outside batch because it requires read access
-	err = s.UpdateHighestExecutedBlockIfHigher(childCtx, header)
+	err = s.updateHighestExecutedBlockIfHigher(childCtx, header)
 	if err != nil {
 		return fmt.Errorf("cannot update highest executed block: %w", err)
 	}
 	return nil
 }
 
-func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *flow.Header) error {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEUpdateHighestExecutedBlockIfHigher)
-		defer span.End()
-	}
-
+func (s *state) updateHighestExecutedBlockIfHigher(ctx context.Context, header *flow.Header) error {
 	return operation.RetryOnConflict(s.db.Update, procedure.UpdateHighestExecutedBlockIfHigher(header))
 }
 
