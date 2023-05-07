@@ -76,12 +76,10 @@ func (f *HotStuffFactory) CreateModules(
 	log := f.createLogger(cluster)
 	metrics := f.createMetrics(cluster.ChainID())
 	notifier := pubsub.NewDistributor()
-	followerDistributor := pubsub.NewFollowerDistributor()
-	notifier.AddFollowerConsumer(followerDistributor)
 	notifier.AddConsumer(notifications.NewLogConsumer(log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
 	notifier.AddConsumer(notifications.NewTelemetryConsumer(log))
-	notifier.AddConsumer(notifications.NewSlashingViolationsConsumer(log))
+	notifier.AddProtocolViolationConsumer(notifications.NewSlashingViolationsConsumer(log))
 
 	var (
 		err       error
@@ -129,7 +127,7 @@ func (f *HotStuffFactory) CreateModules(
 		finalizedBlock.View+1,
 		notifier,
 		voteProcessorFactory,
-		followerDistributor,
+		notifier.FollowerDistributor,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -163,7 +161,7 @@ func (f *HotStuffFactory) CreateModules(
 		TimeoutAggregator:           timeoutAggregator,
 		QCCreatedDistributor:        qcDistributor,
 		TimeoutCollectorDistributor: timeoutCollectorDistributor,
-		FollowerDistributor:         followerDistributor,
+		FollowerDistributor:         notifier.FollowerDistributor,
 	}, metrics, nil
 }
 

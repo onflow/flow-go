@@ -21,7 +21,7 @@ type CommunicatorDistributor struct {
 
 var _ hotstuff.CommunicatorConsumer = (*CommunicatorDistributor)(nil)
 
-func NewCommunicatorConsumerDistributor() *CommunicatorDistributor {
+func NewCommunicatorDistributor() *CommunicatorDistributor {
 	return &CommunicatorDistributor{}
 }
 

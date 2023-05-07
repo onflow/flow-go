@@ -8,15 +8,19 @@ import (
 //
 // It allows thread-safe subscription of multiple consumers to events.
 type Distributor struct {
-	FollowerDistributor
-	CommunicatorDistributor
-	ParticipantDistributor
+	*FollowerDistributor
+	*CommunicatorDistributor
+	*ParticipantDistributor
 }
 
 var _ hotstuff.Consumer = (*Distributor)(nil)
 
 func NewDistributor() *Distributor {
-	return &Distributor{}
+	return &Distributor{
+		FollowerDistributor:     NewFollowerDistributor(),
+		CommunicatorDistributor: NewCommunicatorDistributor(),
+		ParticipantDistributor:  NewParticipantDistributor(),
+	}
 }
 
 // AddConsumer adds an event consumer to the Distributor
@@ -28,14 +32,17 @@ func (p *Distributor) AddConsumer(consumer hotstuff.Consumer) {
 
 // FollowerDistributor ingests consensus follower events and distributes it to subscribers.
 type FollowerDistributor struct {
-	ProtocolViolationDistributor
-	FinalizationDistributor
+	*ProtocolViolationDistributor
+	*FinalizationDistributor
 }
 
 var _ hotstuff.FollowerConsumer = (*FollowerDistributor)(nil)
 
 func NewFollowerDistributor() *FollowerDistributor {
-	return &FollowerDistributor{}
+	return &FollowerDistributor{
+		ProtocolViolationDistributor: NewProtocolViolationDistributor(),
+		FinalizationDistributor:      NewFinalizationDistributor(),
+	}
 }
 
 func (d *FollowerDistributor) AddFollowerConsumer(consumer hotstuff.FollowerConsumer) {

@@ -19,9 +19,7 @@ type QCCreatedDistributor struct {
 var _ hotstuff.QCCreatedConsumer = (*QCCreatedDistributor)(nil)
 
 func NewQCCreatedDistributor() *QCCreatedDistributor {
-	return &QCCreatedDistributor{
-		qcCreatedConsumers: make([]hotstuff.QCCreatedConsumer, 0),
-	}
+	return &QCCreatedDistributor{}
 }
 
 func (d *QCCreatedDistributor) AddQCCreatedConsumer(consumer hotstuff.QCCreatedConsumer) {

@@ -20,7 +20,7 @@ type ParticipantDistributor struct {
 
 var _ hotstuff.ParticipantConsumer = (*ParticipantDistributor)(nil)
 
-func NewConsensusParticipantDistributor() *ParticipantDistributor {
+func NewParticipantDistributor() *ParticipantDistributor {
 	return &ParticipantDistributor{}
 }
 

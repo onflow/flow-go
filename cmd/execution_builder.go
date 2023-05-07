@@ -854,7 +854,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 		return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 	}
 
-	exeNode.followerDistributor.AddFollowerConsumer(exeNode.checkerEng)
+	exeNode.followerDistributor.AddFinalizationConsumer(exeNode.checkerEng)
 
 	// creates a consensus follower with ingestEngine as the notifier
 	// so that it gets notified upon each new finalized block
