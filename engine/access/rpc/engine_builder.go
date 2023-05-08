@@ -17,7 +17,7 @@ import (
 type RPCEngineBuilder struct {
 	*Engine
 	me                   module.Local
-	finalizedHeaderCache access.FinalizedHeaderCache
+	finalizedHeaderCache module.FinalizedHeaderCache
 
 	// optional parameters, only one can be set during build phase
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
@@ -25,7 +25,7 @@ type RPCEngineBuilder struct {
 }
 
 // NewRPCEngineBuilder helps to build a new RPC engine.
-func NewRPCEngineBuilder(engine *Engine, me module.Local, finalizedHeaderCache access.FinalizedHeaderCache) *RPCEngineBuilder {
+func NewRPCEngineBuilder(engine *Engine, me module.Local, finalizedHeaderCache module.FinalizedHeaderCache) *RPCEngineBuilder {
 	// the default handler will use the engine.backend implementation
 	return &RPCEngineBuilder{
 		Engine:               engine,

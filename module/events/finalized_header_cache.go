@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -22,6 +23,8 @@ type FinalizedHeaderCache struct {
 	val                *atomic.Pointer[flow.Header]
 	*FinalizationActor // expose OnBlockFinalized method
 }
+
+var _ module.FinalizedHeaderCache = (*FinalizedHeaderCache)(nil)
 
 // Get returns the most recently finalized block.
 // Guaranteed to be non-nil after construction.

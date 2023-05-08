@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	module2 "github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -68,7 +69,7 @@ type Suite struct {
 	finalizedBlock       *flow.Header
 	chainID              flow.ChainID
 	metrics              *metrics.NoopCollector
-	finalizedHeaderCache access.FinalizedHeaderCache
+	finalizedHeaderCache module2.FinalizedHeaderCache
 	backend              *backend.Backend
 }
 
