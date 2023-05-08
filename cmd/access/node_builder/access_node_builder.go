@@ -1004,7 +1004,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.CollectionsToMarkFinalized,
 				builder.CollectionsToMarkExecuted,
 				builder.BlocksToMarkExecuted,
-				builder.RpcEng,
 			)
 			if err != nil {
 				return nil, err
