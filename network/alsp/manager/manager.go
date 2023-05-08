@@ -1,11 +1,15 @@
 package alspmgr
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/mempool/queue"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/alsp/internal"
@@ -15,8 +19,7 @@ import (
 )
 
 const (
-	FatalMsgNegativePositivePenalty = "penalty value is positive, expected negative"
-	FatalMsgFailedToApplyPenalty    = "failed to apply penalty to the spam record"
+	defaultMisbehaviorReportManagerWorkers = 2
 )
 
 // MisbehaviorReportManager is responsible for handling misbehavior reports.
@@ -34,6 +37,9 @@ type MisbehaviorReportManager struct {
 	// This is useful for managing production incidents.
 	// Note: under normal circumstances, the ALSP module should not be disabled.
 	disablePenalty bool
+
+	// workerPool is the worker pool for handling the misbehavior reports in a thread-safe and non-blocking manner.
+	workerPool *worker.Pool[*internal.ReportedMisbehaviorWork]
 }
 
 var _ network.MisbehaviorReportManager = (*MisbehaviorReportManager)(nil)
@@ -44,10 +50,13 @@ type MisbehaviorReportManagerConfig struct {
 	// It should be as big as the number of authorized nodes in Flow network.
 	// Recommendation: for small network sizes 10 * number of authorized nodes to ensure that the cache can hold all the spam records of the authorized nodes.
 	SpamRecordsCacheSize uint32
+	// SpamRecordQueueSize is the size of the queue that stores the spam records to be processed by the worker pool.
+	SpamRecordQueueSize uint32
 	// AlspMetrics is the metrics instance for the alsp module (collecting spam reports).
 	AlspMetrics module.AlspMetrics
-	// CacheMetrics is the metrics factory for the spam record cache.
-	CacheMetrics module.HeroCacheMetrics
+	// HeroCacheMetricsFactory is the metrics factory for the HeroCache-related metrics.
+	// Having factory as part of the config allows to create the metrics locally in the module.
+	HeroCacheMetricsFactory metrics.HeroCacheMetricsFactory
 	// DisablePenalty indicates whether applying the penalty to the misbehaving node is disabled.
 	// When disabled, the ALSP module logs the misbehavior reports and updates the metrics, but does not apply the penalty.
 	// This is useful for managing production incidents.
@@ -86,41 +95,56 @@ func WithSpamRecordsCache(cache alsp.SpamRecordCache) MisbehaviorReportManagerOp
 //
 //	a new instance of the MisbehaviorReportManager.
 func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...MisbehaviorReportManagerOption) *MisbehaviorReportManager {
-
+	lg := cfg.Logger.With().Str("module", "misbehavior_report_manager").Logger()
 	m := &MisbehaviorReportManager{
-		logger:         cfg.Logger.With().Str("module", "misbehavior_report_manager").Logger(),
+		logger:         lg,
 		metrics:        cfg.AlspMetrics,
 		disablePenalty: cfg.DisablePenalty,
 	}
 
-	if m.disablePenalty {
-		// when the penalty is enabled, the ALSP module is disabled only if the spam record cache is not set.
-		m.logger.Warn().Msg("penalty mechanism of alsp is disabled")
-		return m
-	}
+	m.cache = internal.NewSpamRecordCache(
+		cfg.SpamRecordsCacheSize,
+		lg.With().Str("component", "spam_record_cache").Logger(),
+		metrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory),
+		model.SpamRecordFactory())
 
-	m.cache = internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+	store := queue.NewHeroStore(
+		cfg.SpamRecordQueueSize,
+		lg.With().Str("component", "spam_record_queue").Logger(),
+		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory))
+
+	m.workerPool = worker.NewWorkerPoolBuilder[*internal.ReportedMisbehaviorWork](
+		cfg.Logger,
+		store,
+		m.processMisbehaviorReport).Build()
 
 	for _, opt := range opts {
 		opt(m)
 	}
 
-	builder := component.NewComponentManagerBuilder().AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		ready()
-
-		<-ctx.Done()
-	})
+	builder := component.NewComponentManagerBuilder()
+	for i := 0; i < defaultMisbehaviorReportManagerWorkers; i++ {
+		builder.AddWorker(m.workerPool.WorkerLogic())
+	}
 
 	m.Component = builder.Build()
 
+	if m.disablePenalty {
+		m.logger.Warn().Msg("penalty mechanism of alsp is disabled")
+	}
 	return m
 }
 
 // HandleMisbehaviorReport is called upon a new misbehavior is reported.
-// The current version is at the minimum viable product stage and only logs the reports.
 // The implementation of this function should be thread-safe and non-blocking.
-// TODO: the mature version should be able to handle the reports and take actions accordingly, i.e., penalize the misbehaving node
-// and report the node to be disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
+// Args:
+//
+//	channel: the channel on which the misbehavior is reported.
+//	report: the misbehavior report.
+//
+// Returns:
+//
+//	none.
 func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Channel, report network.MisbehaviorReport) {
 	lg := m.logger.With().
 		Str("channel", channel.String()).
@@ -129,28 +153,56 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 		Float64("penalty", report.Penalty()).Logger()
 	m.metrics.OnMisbehaviorReported(channel.String(), report.Reason().String())
 
+	if ok := m.workerPool.Submit(&internal.ReportedMisbehaviorWork{
+		Channel:  channel,
+		OriginId: report.OriginId(),
+		Reason:   report.Reason(),
+		Penalty:  report.Penalty(),
+	}); !ok {
+		lg.Warn().Msg("discarding misbehavior report because either the queue is full or the misbehavior report is duplicate")
+	}
+}
+
+// processMisbehaviorReport is the worker function that processes the misbehavior reports.
+// It is called by the worker pool.
+// It applies the penalty to the misbehaving node and updates the spam record cache.
+// Implementation must be thread-safe so that it can be called concurrently.
+// Args:
+//
+//	report: the misbehavior report to be processed.
+//
+// Returns:
+//
+//		error: the error that occurred during the processing of the misbehavior report. The returned error is
+//	 irrecoverable and the node should crash if it occurs (indicating a bug in the ALSP module).
+func (m *MisbehaviorReportManager) processMisbehaviorReport(report *internal.ReportedMisbehaviorWork) error {
+	lg := m.logger.With().
+		Str("channel", report.Channel.String()).
+		Hex("misbehaving_id", logging.ID(report.OriginId)).
+		Str("reason", report.Reason.String()).
+		Float64("penalty", report.Penalty).Logger()
+
 	if m.disablePenalty {
 		// when penalty mechanism disabled, the misbehavior is logged and metrics are updated,
 		// but no further actions are taken.
-		lg.Trace().Msg("discarding misbehavior report because ALSP module is disabled")
-		return
+		lg.Trace().Msg("discarding misbehavior report because alsp penalty is disabled")
+		return nil
 	}
 
 	applyPenalty := func() (float64, error) {
-		return m.cache.Adjust(report.OriginId(), func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
-			if report.Penalty() > 0 {
+		return m.cache.Adjust(report.OriginId, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+			if report.Penalty > 0 {
 				// this should never happen, unless there is a bug in the misbehavior report handling logic.
 				// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
-				// TODO: refactor to throwing error to the irrecoverable context.
-				lg.Fatal().Float64("penalty", report.Penalty()).Msg(FatalMsgNegativePositivePenalty)
+				return record, fmt.Errorf("penalty value is positive: %f", report.Penalty)
 			}
-			record.Penalty += report.Penalty() // penalty value is negative. We add it to the current penalty.
+			record.Penalty += report.Penalty // penalty value is negative. We add it to the current penalty.
 			return record, nil
 		})
 	}
 
 	init := func() {
-		initialized := m.cache.Init(report.OriginId())
+		initialized := m.cache.Init(report.OriginId)
 		lg.Trace().Bool("initialized", initialized).Msg("initialized spam record")
 	}
 
@@ -162,10 +214,9 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 	if err != nil {
 		// this should never happen, unless there is a bug in the spam record cache implementation.
 		// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
-		// TODO: refactor to throwing error to the irrecoverable context.
-		lg.Fatal().Err(err).Msg(FatalMsgFailedToApplyPenalty)
-		return
+		return fmt.Errorf("failed to apply penalty to the spam record: %w", err)
 	}
 
 	lg.Debug().Float64("updated_penalty", updatedPenalty).Msg("misbehavior report handled")
+	return nil
 }

@@ -99,6 +99,10 @@ func ApplicationLayerSpamRecordCacheMetricFactory(f HeroCacheMetricsFactory) mod
 	return f(namespaceNetwork, ResourceNetworkingApplicationLayerSpamRecordCache)
 }
 
+func ApplicationLayerSpamRecordQueueMetricsFactory(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
+	return f(namespaceNetwork, ResourceNetworkingApplicationLayerSpamRecordQueue)
+}
+
 func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
 	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
 	r := ResourceNetworkingRpcMetricsObserverInspectorQueue
