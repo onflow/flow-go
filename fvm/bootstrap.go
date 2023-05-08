@@ -251,10 +251,6 @@ func (b *BootstrapProcedure) NewExecutor(
 	return newBootstrapExecutor(b.BootstrapParams, ctx, txnState)
 }
 
-func (BootstrapProcedure) SetOutput(output ProcedureOutput) {
-	// do nothing
-}
-
 func (proc *BootstrapProcedure) ComputationLimit(_ Context) uint64 {
 	return math.MaxUint64
 }
@@ -940,7 +936,11 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 		DerivedTransactionData:    prog,
 	}
 
-	err = Run(tx.NewExecutor(ctx, txn))
+	executor := tx.NewExecutor(ctx, txn)
+	err = Run(executor)
+	if err != nil {
+		return nil, err
+	}
 
-	return tx.Err, err
+	return executor.Output().Err, err
 }
