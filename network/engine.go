@@ -50,8 +50,11 @@ type MessageProcessor interface {
 	// Implementations of Process should be non-blocking. In general, Process should
 	// only queue the message internally by the engine for later async processing.
 	//
-	// TODO should this function return an error? The networking layer just logs errors at the moment.
-	// If an engine encounters an unexpected error here, it should crash or restart itself internally.
-	// Returning the error to the networking layer is not really useful -- what is it going to do?
+	// TODO: This function should not return an error.
+	//  The networking layer's responsibility is fulfilled once it delivers a message to an engine.
+	//  It does not possess the context required to handle errors that may arise during an engine's processing
+	//  of the message, as error handling for message processing falls outside the domain of the networking layer.
+	//  Consequently, it is reasonable to remove the error from the Process function's signature,
+	//  since returning an error to the networking layer would not be useful in this context.
 	Process(channel channels.Channel, originID flow.Identifier, message interface{}) error
 }
