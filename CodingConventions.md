@@ -121,8 +121,7 @@ Per convention, a vertex should throw any unexpected exceptions using the relate
    * Use the special `irrecoverable.exception` [error type](https://github.com/onflow/flow-go/blob/master/module/irrecoverable/exception.go#L7-L26)
      to denote an unexpected error (and strip any sentinel information from the error stack).
    
-     This is for rare scenarios as follows: within a (typically larger) function body, there are multiple calls to other functions that could return sentinels of the same type. 
-     While for one call the sentinel type `T` is expected during normal operations, the same sentinel `T` returned from a different function call would mark a critical failure.
+     This is for any scenario when a higher-level function is interpreting a sentinel returned from a lower-level function as an exception.
      To construct an example, lets look at our `storage.Blocks` API, which has a [`ByHeight` method](https://github.com/onflow/flow-go/blob/a918616c7b541b772c254e7eaaae3573561e6c0a/storage/blocks.go#L24-L26)
      to retrieve _finalized_ blocks by height. The following could be a hypothetical implementation:
       ```golang
@@ -156,11 +155,13 @@ Per convention, a vertex should throw any unexpected exceptions using the relate
           return block, nil
       }
       ```
-     Note that this pattern should be used sparingly. In most cases, the default convention is fully satisfactory 
-     ```
-     If an error type is not explicitly documented as an _expected sentinel_ in the function header,
-     then it is a irrecoverable exception.
-     ``` 
+     Functions **may** use `irrecoverable.NewExceptionf` when:
+       - they are interpreting any error returning from a 3rd party module as unexpected
+       - they are reacting to an unexpected condition internal to their stack frame and returning a generic error
+  
+     Functions **must** usd `irrecoverable.NewExceptionf` when:
+       - they are interpreting any documented sentinel error returned from a flow-go module as unexpected
+
      For brief illustration, let us consider some function body, in which there are multiple subsequent calls to other lower-level functions.
      In most scenarios, a particular sentinel type is either always or never expected during normal operations.  If it is expected,
      then the sentinel type should be documented. If it is consistently not expected, the error should _not_ be mentioned in the 
