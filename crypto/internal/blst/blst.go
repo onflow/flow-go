@@ -1,5 +1,14 @@
 /*
- * Copied from https://github.com/supranational/blst
+ * This package is equivalent to the BLST Go package including all Go exported
+ * functions. BLST outer Go layer is used to cross-check flow-go/crypto BLS implementation.
+ * Note that flow-go/crypto uses BLST internal tools only to implement protocols based on BLS12-381,
+ * but does not use BLST outer layer and BLS implementation.
+ * Ideally, the cross-check tests would import github.com/supranational/blst. However this is
+ * not possible in Go as it causes multiple duplicated C objects. Creating the internal blst
+ * package is a workaround to achieve the same purpose. Note that the internal package
+ * implicitly uses the C objects declared by flow-go/crypto.
+ *
+ * Copied from https://github.com/supranational/blst.
  * Copyright Supranational LLC
  * Licensed under the Apache License, Version 2.0, see LICENSE for details.
  * SPDX-License-Identifier: Apache-2.0
