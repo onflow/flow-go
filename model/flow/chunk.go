@@ -30,10 +30,6 @@ type ChunkBody struct {
 type Chunk struct {
 	ChunkBody
 
-	// TODO(patrick): combine Index with body's CollectionIndex.  Also typedef
-	// ChunkIndex (chunk index is inconsistently represented as uint64, int,
-	// uint)
-
 	Index uint64 // chunk index inside the ER (starts from zero)
 	// EndState inferred from next chunk or from the ER
 	EndState StateCommitment

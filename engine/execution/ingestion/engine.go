@@ -683,10 +683,6 @@ func (e *Engine) executeBlock(
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
 
-	for computationKind, intensity := range computationResult.ComputationIntensities {
-		e.metrics.ExecutionBlockExecutionEffortVectorComponent(computationKind.String(), intensity)
-	}
-
 	err = e.onBlockExecuted(executableBlock, finalEndState)
 	if err != nil {
 		lg.Err(err).Msg("failed in process block's children")
