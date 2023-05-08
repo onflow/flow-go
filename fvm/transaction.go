@@ -13,8 +13,6 @@ func Transaction(
 	return NewTransaction(txn.ID(), txnIndex, txn)
 }
 
-// TODO(patrick): pass in initial snapshot time when we start supporting
-// speculative pre-processing / execution.
 func NewTransaction(
 	txnId flow.Identifier,
 	txnIndex uint32,
@@ -31,9 +29,6 @@ type TransactionProcedure struct {
 	ID          flow.Identifier
 	Transaction *flow.TransactionBody
 	TxIndex     uint32
-
-	// TODO(patrick): remove
-	ProcedureOutput
 }
 
 func (proc *TransactionProcedure) NewExecutor(
@@ -41,10 +36,6 @@ func (proc *TransactionProcedure) NewExecutor(
 	txnState storage.TransactionPreparer,
 ) ProcedureExecutor {
 	return newTransactionExecutor(ctx, proc, txnState)
-}
-
-func (proc *TransactionProcedure) SetOutput(output ProcedureOutput) {
-	proc.ProcedureOutput = output
 }
 
 func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {
