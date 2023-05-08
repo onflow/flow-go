@@ -34,6 +34,8 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+const MAX_RELOAD_BLOCK = 100_000 // load at most 100K blocks on startup.
+
 // An Engine receives and saves incoming blocks.
 type Engine struct {
 	psEvents.Noop // satisfy protocol events consumer interface
@@ -227,7 +229,8 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) (
 
 	firstUnexecuted := lastExecuted + 1
 
-	e.log.Info().Msgf("last finalized and executed height: %v", lastExecuted)
+	e.log.Info().Msgf("last finalized and executed height: %v, last final: %v",
+		lastExecuted, final.Height)
 
 	unexecuted := make([]flow.Identifier, 0)
 
@@ -368,16 +371,32 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 
 		log.Info().Msg("reloading unexecuted blocks")
 
-		for _, blockID := range unexecuted {
+		loaded := 0
+		for i, blockID := range unexecuted {
+			if i > MAX_RELOAD_BLOCK {
+				e.log.Warn().Msgf("too many unexecuted blocks to be reloaded, only loading the first %v, skip from %v",
+					MAX_RELOAD_BLOCK, blockID)
+
+				crashAtMaxLoaded := lastExecutedHeight + MAX_RELOAD_BLOCK
+				stopHeight, _ := e.stopControl.GetStopHeight()
+				if crashAtMaxLoaded < stopHeight {
+					// crash at the last reloaded height
+					e.stopControl.SetStopHeight(stopHeight, true)
+				}
+				e.log.Warn().Msgf("crash height set changed from %v to %v", stopHeight, crashAtMaxLoaded)
+
+				continue
+			}
 			err := e.reloadBlock(blockByCollection, executionQueues, blockID)
 			if err != nil {
 				return fmt.Errorf("could not reload block: %v, %w", blockID, err)
 			}
 
 			e.log.Debug().Hex("block_id", blockID[:]).Msg("reloaded block")
+			loaded++
 		}
 
-		log.Info().Msg("all unexecuted have been successfully reloaded")
+		log.Info().Int("count", loaded).Int("skpped", len(unexecuted)-loaded).Msg("all unexecuted have been successfully reloaded")
 
 		return nil
 	})

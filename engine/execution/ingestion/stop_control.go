@@ -3,6 +3,7 @@ package ingestion
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -75,6 +76,7 @@ func NewStopControl(
 		log:                    log,
 		state:                  state,
 		highestExecutingHeight: lastExecutedHeight,
+		stopHeight:             math.MaxUint64,
 	}
 }
 
