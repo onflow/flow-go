@@ -39,7 +39,7 @@ type CoreSuite struct {
 	follower         *module.HotStuffFollower
 	sync             *module.BlockRequester
 	validator        *hotstuff.Validator
-	followerConsumer *hotstuff.ConsensusFollowerConsumer
+	followerConsumer *hotstuff.FollowerConsumer
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -52,7 +52,7 @@ func (s *CoreSuite) SetupTest() {
 	s.follower = module.NewHotStuffFollower(s.T())
 	s.validator = hotstuff.NewValidator(s.T())
 	s.sync = module.NewBlockRequester(s.T())
-	s.followerConsumer = hotstuff.NewConsensusFollowerConsumer(s.T())
+	s.followerConsumer = hotstuff.NewFollowerConsumer(s.T())
 
 	s.originID = unittest.IdentifierFixture()
 	s.finalizedBlock = unittest.BlockHeaderFixture()

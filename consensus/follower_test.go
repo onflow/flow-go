@@ -58,7 +58,7 @@ type HotStuffFollowerSuite struct {
 
 	headers       *mockstorage.Headers
 	finalizer     *mockmodule.Finalizer
-	notifier      *mockhotstuff.ConsensusFollowerConsumer
+	notifier      *mockhotstuff.FollowerConsumer
 	rootHeader    *flow.Header
 	rootQC        *flow.QuorumCertificate
 	finalized     *flow.Header
@@ -84,7 +84,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	s.finalizer = mockmodule.NewFinalizer(s.T())
 
 	// mock consumer for finalization notifications
-	s.notifier = mockhotstuff.NewConsensusFollowerConsumer(s.T())
+	s.notifier = mockhotstuff.NewFollowerConsumer(s.T())
 
 	// root block and QC
 	parentID, err := flow.HexStringToIdentifier("aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70")
