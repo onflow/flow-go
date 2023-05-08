@@ -116,7 +116,7 @@ func NewController(
 ) *Controller {
 
 	logger := log.With().
-		Str("component", "dkg.controller").
+		Str("component", "dkg_controller").
 		Str("dkg_instance_id", dkgInstanceID).
 		Logger()
 

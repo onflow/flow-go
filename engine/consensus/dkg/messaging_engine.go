@@ -76,7 +76,7 @@ func NewMessagingEngine(
 	collector module.MempoolMetrics,
 	config MessagingEngineConfig,
 ) (*MessagingEngine, error) {
-	log = log.With().Str("engine", "dkg.messaging").Logger()
+	log = log.With().Str("engine", "dkg_messaging").Logger()
 
 	inbound, err := fifoqueue.NewFifoQueue(
 		1000,
