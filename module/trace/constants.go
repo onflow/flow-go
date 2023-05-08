@@ -96,9 +96,10 @@ const (
 	EXEComputeTransaction     SpanName = "exe.computer.computeTransaction"
 	EXEPostProcessTransaction SpanName = "exe.computer.postProcessTransaction"
 
-	EXEStateSaveExecutionResults SpanName = "exe.state.saveExecutionResults"
-	EXECommitDelta               SpanName = "exe.state.commitDelta"
-	EXEGetExecutionResultID      SpanName = "exe.state.getExecutionResultID"
+	EXEStateSaveExecutionResults          SpanName = "exe.state.saveExecutionResults"
+	EXECommitDelta                        SpanName = "exe.state.commitDelta"
+	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
+	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
 
 	// Verification node
 	//

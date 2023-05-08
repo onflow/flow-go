@@ -383,6 +383,11 @@ func (s *state) SaveExecutionResults(
 }
 
 func (s *state) updateHighestExecutedBlockIfHigher(ctx context.Context, header *flow.Header) error {
+	if s.tracer != nil {
+		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEUpdateHighestExecutedBlockIfHigher)
+		defer span.End()
+	}
+
 	return operation.RetryOnConflict(s.db.Update, procedure.UpdateHighestExecutedBlockIfHigher(header))
 }
 

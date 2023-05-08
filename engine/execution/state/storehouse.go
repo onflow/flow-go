@@ -46,7 +46,7 @@ type ForkAwareStorage interface {
 
 type NonForkAwareStorage interface {
 	// BlockView returns a blockView allowing to query register values for specific block
-	BlockView(height uint64, blockID flow.Identifier) (snapshot.StorageSnapshot, error)
+	BlockView(height uint64) (snapshot.StorageSnapshot, error)
 
 	// CommitBlock stores the updated registers to disk and index them by the given height.
 	// The given block must be finalized.
