@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/rpc"
@@ -55,9 +55,11 @@ type Config struct {
 // port 8000) are brought up.
 type Engine struct {
 	component.Component
-	*events.FinalizationActor
 
-	unit               *engine.Unit
+	finalizedHeaderCacheActor *events.FinalizationActor // consumes events to populate the finalized header cache
+	backendNotifierActor      *events.FinalizationActor // consumes events to notify the backend of finalized heights
+	finalizedHeaderCache      *events.FinalizedHeaderCache
+
 	log                zerolog.Logger
 	backend            *backend.Backend // the gRPC service implementation
 	unsecureGrpcServer *grpc.Server     // the unsecure gRPC server
@@ -196,22 +198,20 @@ func NewBuilder(log zerolog.Logger,
 	if err != nil {
 		return nil, fmt.Errorf("could not create header cache: %w", err)
 	}
-	eng := &Engine{
-		FinalizationActor:  finalizedCache.FinalizationActor,
-		log:                log,
-		unit:               engine.NewUnit(),
-		backend:            backend,
-		unsecureGrpcServer: unsecureGrpcServer,
-		secureGrpcServer:   secureGrpcServer,
-		httpServer:         httpServer,
-		config:             config,
-		chain:              chainID.Chain(),
-	}
 
-	builder := NewRPCEngineBuilder(eng, me, finalizedCache)
-	if rpcMetricsEnabled {
-		builder.WithMetrics()
+	eng := &Engine{
+		finalizedHeaderCache:      finalizedCache,
+		finalizedHeaderCacheActor: finalizedCache.FinalizationActor,
+		log:                       log,
+		backend:                   backend,
+		unsecureGrpcServer:        unsecureGrpcServer,
+		secureGrpcServer:          secureGrpcServer,
+		httpServer:                httpServer,
+		config:                    config,
+		chain:                     chainID.Chain(),
 	}
+	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.notifyBackendOnBlockFinalized)
+	eng.backendNotifierActor = backendNotifierActor
 
 	eng.Component = component.NewComponentManagerBuilder().
 		AddWorker(eng.serveUnsecureGRPCWorker).
@@ -219,8 +219,14 @@ func NewBuilder(log zerolog.Logger,
 		AddWorker(eng.serveGRPCWebProxyWorker).
 		AddWorker(eng.serveREST).
 		AddWorker(finalizedCacheWorker).
+		AddWorker(backendNotifierWorker).
 		AddWorker(eng.shutdownWorker).
 		Build()
+
+	builder := NewRPCEngineBuilder(eng, me, finalizedCache)
+	if rpcMetricsEnabled {
+		builder.WithMetrics()
+	}
 
 	return builder, nil
 }
@@ -252,14 +258,18 @@ func (e *Engine) shutdown() {
 	}
 }
 
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(event)
-		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
-		}
-	})
+// OnBlockFinalized responds to block finalization events.
+func (e *Engine) OnBlockFinalized(block *model.Block) {
+	e.finalizedHeaderCacheActor.OnBlockFinalized(block)
+	e.backendNotifierActor.OnBlockFinalized(block)
+}
+
+// notifyBackendOnBlockFinalized is invoked by the FinalizationActor when a new block is finalized.
+// It notifies the backend of the newly finalized block.
+func (e *Engine) notifyBackendOnBlockFinalized(_ *model.Block) error {
+	finalizedHeader := e.finalizedHeaderCache.Get()
+	e.backend.NotifyFinalizedBlockHeight(finalizedHeader.Height)
+	return nil
 }
 
 // UnsecureGRPCAddress returns the listen address of the unsecure GRPC server.
@@ -284,19 +294,6 @@ func (e *Engine) RestApiAddress() net.Addr {
 	e.addrLock.RLock()
 	defer e.addrLock.RUnlock()
 	return e.restAPIAddress
-}
-
-// process processes the given ingestion engine event. Events that are given
-// to this function originate within the expulsion engine on the node with the
-// given origin ID.
-func (e *Engine) process(event interface{}) error {
-	switch entity := event.(type) {
-	case *flow.Block:
-		e.backend.NotifyFinalizedBlockHeight(entity.Header.Height)
-		return nil
-	default:
-		return fmt.Errorf("invalid event type (%T)", event)
-	}
 }
 
 // serveUnsecureGRPCWorker is a worker routine which starts the unsecure gRPC server.
