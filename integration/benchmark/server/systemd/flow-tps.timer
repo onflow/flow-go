@@ -2,8 +2,14 @@
 Description=Run Flow TPS tests once per day
 
 [Timer]
+# Run timer once / day
 OnUnitActiveSec=1440min
+
+# Start service as soon as timer starts
 OnActiveSec=0
+
+# Run timer 1 minute after reboot
+OnBootSec=60
 
 [Install]
 WantedBy=timers.target
