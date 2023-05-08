@@ -78,6 +78,13 @@ func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(publicNetwork bool, 
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcMetricsObserverInspectorQueue, registrar)
 }
 
+func RPCValidationInspectorClusterPrefixedCacheMetricFactory(publicNetwork bool, registrar prometheus.Registerer) *HeroCacheCollector {
+	if publicNetwork {
+		return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingPublicRpcClusterPrefixReceivedCache, registrar)
+	}
+	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcClusterPrefixReceivedCache, registrar)
+}
+
 func RpcInspectorNotificationQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingRpcInspectorNotificationQueue, registrar)
 }

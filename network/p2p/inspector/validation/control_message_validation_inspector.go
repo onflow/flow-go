@@ -17,66 +17,11 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/inspector/internal"
+	"github.com/onflow/flow-go/network/p2p/inspector/cache"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
 )
-
-const (
-	// DefaultNumberOfWorkers default number of workers for the inspector component.
-	DefaultNumberOfWorkers = 5
-	// DefaultControlMsgValidationInspectorQueueCacheSize is the default size of the inspect message queue.
-	DefaultControlMsgValidationInspectorQueueCacheSize = 100
-	// rpcInspectorComponentName the rpc inspector component name.
-	rpcInspectorComponentName = "gossipsub_rpc_validation_inspector"
-)
-
-// InspectMsgRequest represents a short digest of an RPC control message. It is used for further message inspection by component workers.
-type InspectMsgRequest struct {
-	// Nonce adds random value so that when msg req is stored on hero store a unique ID can be created from the struct fields.
-	Nonce []byte
-	// Peer sender of the message.
-	Peer peer.ID
-	// CtrlMsg the control message that will be inspected.
-	ctrlMsg          *pubsub_pb.ControlMessage
-	validationConfig *CtrlMsgValidationConfig
-}
-
-// ControlMsgValidationInspectorConfig validation configuration for each type of RPC control message.
-type ControlMsgValidationInspectorConfig struct {
-	// NumberOfWorkers number of component workers to start for processing RPC messages.
-	NumberOfWorkers int
-	// InspectMsgStoreOpts options used to configure the underlying herocache message store.
-	InspectMsgStoreOpts []queue.HeroStoreConfigOption
-	// GraftValidationCfg validation configuration for GRAFT control messages.
-	GraftValidationCfg *CtrlMsgValidationConfig
-	// PruneValidationCfg validation configuration for PRUNE control messages.
-	PruneValidationCfg *CtrlMsgValidationConfig
-	// ClusterPrefixHardThreshold the upper bound on the amount of cluster prefixed control messages that will be processed
-	// before a node starts to get penalized. This allows LN nodes to process some cluster prefixed control messages during startup
-	// when the cluster ID's provider is set asynchronously. It also allows processing of some stale messages that may be sent by nodes
-	// that fall behind in the protocol. After the amount of cluster prefixed control messages processed exceeds this threshold the node
-	// will be pushed to the edge of the network mesh.
-	ClusterPrefixHardThreshold uint64
-}
-
-// getCtrlMsgValidationConfig returns the CtrlMsgValidationConfig for the specified p2p.ControlMessageType.
-func (conf *ControlMsgValidationInspectorConfig) getCtrlMsgValidationConfig(controlMsg p2p.ControlMessageType) (*CtrlMsgValidationConfig, bool) {
-	switch controlMsg {
-	case p2p.CtrlMsgGraft:
-		return conf.GraftValidationCfg, true
-	case p2p.CtrlMsgPrune:
-		return conf.PruneValidationCfg, true
-	default:
-		return nil, false
-	}
-}
-
-// allCtrlMsgValidationConfig returns all control message validation configs in a list.
-func (conf *ControlMsgValidationInspectorConfig) allCtrlMsgValidationConfig() CtrlMsgValidationConfigs {
-	return CtrlMsgValidationConfigs{conf.GraftValidationCfg, conf.PruneValidationCfg}
-}
 
 // ControlMsgValidationInspector RPC message inspector that inspects control messages and performs some validation on them,
 // when some validation rule is broken feedback is given via the Peer scoring notifier.
@@ -95,40 +40,26 @@ type ControlMsgValidationInspector struct {
 	distributor p2p.GossipSubInspectorNotificationDistributor
 	// workerPool queue that stores *InspectMsgRequest that will be processed by component workers.
 	workerPool *worker.Pool[*InspectMsgRequest]
-	// clusterPrefixTopicsReceivedTracker keeps track of the amount of cluster prefixed topics received. The counter is incremented in the following scenarios.
+	// clusterPrefixTopicsReceivedCache keeps track of the amount of cluster prefixed topics received. The counter is incremented in the following scenarios.
 	// - The cluster prefix topic was received while the inspector waits for the cluster IDs provider to be set.
 	// - The node sends cluster prefix topic where the cluster prefix does not match any of the active cluster IDs,
 	// the inspector will allow a configured number of these messages from
-	clusterPrefixTopicsReceivedTracker *ClusterPrefixedTopicsReceived
+	clusterPrefixTopicsReceivedTracker *cache.ClusterPrefixTopicsReceivedTracker
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
 var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
 var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 
-// NewInspectMsgRequest returns a new *InspectMsgRequest.
-func NewInspectMsgRequest(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) (*InspectMsgRequest, error) {
-	nonce, err := internal.Nonce()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get inspect message request nonce: %w", err)
-	}
-	return &InspectMsgRequest{Nonce: nonce, Peer: from, validationConfig: validationConfig, ctrlMsg: ctrlMsg}, nil
-}
-
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
-func NewControlMsgValidationInspector(
-	logger zerolog.Logger,
-	sporkID flow.Identifier,
-	config *ControlMsgValidationInspectorConfig,
-	distributor p2p.GossipSubInspectorNotificationDistributor,
-) *ControlMsgValidationInspector {
+func NewControlMsgValidationInspector(logger zerolog.Logger, sporkID flow.Identifier, config *ControlMsgValidationInspectorConfig, distributor p2p.GossipSubInspectorNotificationDistributor, trackerOpts ...cache.RecordCacheConfigOpt) *ControlMsgValidationInspector {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 	c := &ControlMsgValidationInspector{
 		logger:                             lg,
 		sporkID:                            sporkID,
 		config:                             config,
 		distributor:                        distributor,
-		clusterPrefixTopicsReceivedTracker: NewClusterPrefixedTopicsReceivedTracker(),
+		clusterPrefixTopicsReceivedTracker: cache.NewClusterPrefixTopicsReceivedTracker(logger, config.ClusterPrefixedTopicsReceivedCacheSize, trackerOpts...),
 	}
 
 	cfg := &queue.HeroStoreConfig{
@@ -367,9 +298,13 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.ID, topic channels.Topic) error {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+
 	if len(c.activeClusterIDS) == 0 {
 		// cluster IDs have not been updated yet
-		c.clusterPrefixTopicsReceivedTracker.Inc(from)
+		_, err := c.clusterPrefixTopicsReceivedTracker.Inc(from)
+		if err != nil {
+			return err
+		}
 		return NewActiveClusterIdsNotSetErr(topic)
 	}
 
@@ -377,14 +312,15 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 	if err != nil {
 		if channels.IsErrUnknownClusterID(err) {
 			// unknown cluster ID error could indicate that a node has fallen
-			// behind and needs to catchup increment to topics received tracker.
-			c.clusterPrefixTopicsReceivedTracker.Inc(from)
+			// behind and needs to catchup increment to topics received cache.
+			_, err = c.clusterPrefixTopicsReceivedTracker.Inc(from)
+			if err != nil {
+				return err
+			}
 		}
 		return err
 	}
 
-	// topic validation passed reset the prefix topics received tracker for this peer
-	c.clusterPrefixTopicsReceivedTracker.Reset(from)
 	return nil
 }
 

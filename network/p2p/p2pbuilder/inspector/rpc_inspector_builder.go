@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector"
+	"github.com/onflow/flow-go/network/p2p/inspector/cache"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 )
@@ -24,15 +25,17 @@ type metricsCollectorFactory func() *metrics.HeroCacheCollector
 type GossipSubRPCValidationInspectorConfigs struct {
 	// NumberOfWorkers number of worker pool workers.
 	NumberOfWorkers int
-	// CacheSize size of the queue used by worker pool for the control message validation inspector.
-	CacheSize uint32
+	// InspectMessageQueueCacheSize size of the queue used by worker pool for the control message validation inspector.
+	InspectMessageQueueCacheSize uint32
+	// ClusterPrefixedTopicsReceivedCacheSize size of the cache used to track the amount of cluster prefixed topics received by peers.
+	ClusterPrefixedTopicsReceivedCacheSize uint32
 	// GraftLimits GRAFT control message validation limits.
 	GraftLimits map[string]int
 	// PruneLimits PRUNE control message validation limits.
 	PruneLimits map[string]int
 	// ClusterPrefixDiscardThreshold the upper bound on the amount of cluster prefixed control messages that will be processed
 	// before a node starts to get penalized.
-	ClusterPrefixDiscardThreshold uint64
+	ClusterPrefixDiscardThreshold int64
 }
 
 // GossipSubRPCMetricsInspectorConfigs rpc metrics observer inspector configuration.
@@ -57,8 +60,10 @@ func DefaultGossipSubRPCInspectorsConfig() *GossipSubRPCInspectorsConfig {
 	return &GossipSubRPCInspectorsConfig{
 		GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
 		ValidationInspectorConfigs: &GossipSubRPCValidationInspectorConfigs{
-			NumberOfWorkers: validation.DefaultNumberOfWorkers,
-			CacheSize:       validation.DefaultControlMsgValidationInspectorQueueCacheSize,
+			NumberOfWorkers:                        validation.DefaultNumberOfWorkers,
+			InspectMessageQueueCacheSize:           validation.DefaultControlMsgValidationInspectorQueueCacheSize,
+			ClusterPrefixedTopicsReceivedCacheSize: validation.DefaultClusterPrefixedTopicsReceivedCacheSize,
+			ClusterPrefixDiscardThreshold:          validation.DefaultClusterPrefixDiscardThreshold,
 			GraftLimits: map[string]int{
 				validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
 				validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
@@ -69,7 +74,6 @@ func DefaultGossipSubRPCInspectorsConfig() *GossipSubRPCInspectorsConfig {
 				validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
 				validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
 			},
-			ClusterPrefixDiscardThreshold: validation.DefaultClusterPrefixDiscardThreshold,
 		},
 		MetricsInspectorConfigs: &GossipSubRPCMetricsInspectorConfigs{
 			NumberOfWorkers: inspector.DefaultControlMsgMetricsInspectorNumberOfWorkers,
@@ -170,23 +174,28 @@ func (b *GossipSubInspectorBuilder) validationInspectorConfig(validationConfigs 
 
 	// setup gossip sub RPC control message inspector config
 	controlMsgRPCInspectorCfg := &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:            validationConfigs.NumberOfWorkers,
-		InspectMsgStoreOpts:        opts,
-		GraftValidationCfg:         graftValidationCfg,
-		PruneValidationCfg:         pruneValidationCfg,
-		ClusterPrefixHardThreshold: validationConfigs.ClusterPrefixDiscardThreshold,
+		NumberOfWorkers:                        validationConfigs.NumberOfWorkers,
+		InspectMsgStoreOpts:                    opts,
+		GraftValidationCfg:                     graftValidationCfg,
+		PruneValidationCfg:                     pruneValidationCfg,
+		ClusterPrefixHardThreshold:             validationConfigs.ClusterPrefixDiscardThreshold,
+		ClusterPrefixedTopicsReceivedCacheSize: validationConfigs.ClusterPrefixedTopicsReceivedCacheSize,
 	}
 	return controlMsgRPCInspectorCfg, nil
 }
 
 // buildGossipSubValidationInspector builds the gossipsub rpc validation inspector.
 func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.GossipSubRPCInspector, error) {
-	rpcValidationInspectorHeroStoreOpts := b.heroStoreOpts(b.inspectorsConfig.ValidationInspectorConfigs.CacheSize, b.validationInspectorMetricsCollectorFactory())
+	rpcValidationInspectorHeroStoreOpts := b.heroStoreOpts(b.inspectorsConfig.ValidationInspectorConfigs.InspectMessageQueueCacheSize, b.validationInspectorMetricsCollectorFactory())
 	controlMsgRPCInspectorCfg, err := b.validationInspectorConfig(b.inspectorsConfig.ValidationInspectorConfigs, rpcValidationInspectorHeroStoreOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
 	}
-	rpcValidationInspector := validation.NewControlMsgValidationInspector(b.logger, b.sporkID, controlMsgRPCInspectorCfg, b.distributor)
+	trackerOpts := make([]cache.RecordCacheConfigOpt, 0)
+	if b.metricsEnabled {
+		trackerOpts = append(trackerOpts, cache.WithMetricsCollector(metrics.RPCValidationInspectorClusterPrefixedCacheMetricFactory(b.publicNetwork, b.metricsRegistry)))
+	}
+	rpcValidationInspector := validation.NewControlMsgValidationInspector(b.logger, b.sporkID, controlMsgRPCInspectorCfg, b.distributor, trackerOpts...)
 	return rpcValidationInspector, nil
 }
 

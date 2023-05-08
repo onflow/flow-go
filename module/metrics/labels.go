@@ -89,6 +89,8 @@ const (
 	ResourceNetworkingRpcMetricsObserverInspectorQueue       = "networking_rpc_metrics_observer_inspector_queue"
 	ResourceNetworkingPublicRpcValidationInspectorQueue      = "networking_public_rpc_validation_inspector_queue"
 	ResourceNetworkingPublicRpcMetricsObserverInspectorQueue = "networking_public_rpc_metrics_observer_inspector_queue"
+	ResourceNetworkingRpcClusterPrefixReceivedCache          = "networking_rpc_cluster_prefixed_received_cache"
+	ResourceNetworkingPublicRpcClusterPrefixReceivedCache    = "networking_public_rpc_cluster_prefixed_received_cache"
 
 	ResourceFollowerPendingBlocksCache = "follower_pending_block_cache"      // follower engine
 	ResourceClusterBlockProposalQueue  = "cluster_compliance_proposal_queue" // collection node, compliance engine
