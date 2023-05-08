@@ -49,3 +49,22 @@ func (d *FollowerDistributor) AddFollowerConsumer(consumer hotstuff.FollowerCons
 	d.FinalizationDistributor.AddFinalizationConsumer(consumer)
 	d.ProtocolViolationDistributor.AddProtocolViolationConsumer(consumer)
 }
+
+type TimeoutAggregationDistributor struct {
+	*TimeoutAggregationViolationDistributor
+	*TimeoutCollectorDistributor
+}
+
+var _ hotstuff.TimeoutAggregationConsumer = (*TimeoutAggregationDistributor)(nil)
+
+func NewTimeoutAggregationDistributor() *TimeoutAggregationDistributor {
+	return &TimeoutAggregationDistributor{
+		TimeoutAggregationViolationDistributor: NewTimeoutAggregationViolationDistributor(),
+		TimeoutCollectorDistributor:            NewTimeoutCollectorDistributor(),
+	}
+}
+
+func (d *TimeoutAggregationDistributor) AddTimeoutAggregationConsumer(consumer hotstuff.TimeoutAggregationConsumer) {
+	d.TimeoutAggregationViolationDistributor.AddTimeoutAggregationViolationConsumer(consumer)
+	d.TimeoutCollectorDistributor.AddTimeoutCollectorConsumer(consumer)
+}

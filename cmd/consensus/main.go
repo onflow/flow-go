@@ -583,6 +583,8 @@ func main() {
 			}
 
 			qcDistributor := pubsub.NewQCCreatedDistributor()
+			// TODO: connect to slashing violation consumer
+			voteAggregationViolationDistributor := pubsub.NewVoteAggregationViolationDistributor()
 			validator := consensus.NewValidator(mainMetrics, wrappedCommittee)
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(wrappedCommittee, qcDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
@@ -593,16 +595,18 @@ func main() {
 				node.Metrics.Mempool,
 				lowestViewForVoteProcessing,
 				notifier,
+				voteAggregationViolationDistributor,
 				voteProcessorFactory,
 				followerDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}
 
-			timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
+			// TODO: connect to slashing violation consumer
+			timeoutAggregationDistributor := pubsub.NewTimeoutAggregationDistributor()
 			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(
 				logger,
-				timeoutCollectorDistributor,
+				timeoutAggregationDistributor,
 				committee,
 				validator,
 				msig.ConsensusTimeoutTag,
@@ -614,7 +618,7 @@ func main() {
 				node.Metrics.Mempool,
 				notifier,
 				timeoutProcessorFactory,
-				timeoutCollectorDistributor,
+				timeoutAggregationDistributor,
 				lowestViewForVoteProcessing,
 			)
 			if err != nil {
@@ -628,7 +632,7 @@ func main() {
 				Persist:                     persist,
 				QCCreatedDistributor:        qcDistributor,
 				FollowerDistributor:         followerDistributor,
-				TimeoutCollectorDistributor: timeoutCollectorDistributor,
+				TimeoutCollectorDistributor: timeoutAggregationDistributor.TimeoutCollectorDistributor,
 				Forks:                       forks,
 				Validator:                   validator,
 				VoteAggregator:              voteAggregator,

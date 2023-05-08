@@ -19,7 +19,7 @@ type TimeoutCollector struct {
 	log               zerolog.Logger
 	notifier          hotstuff.Consumer
 	timeoutsCache     *TimeoutObjectsCache // cache for tracking double timeout and timeout equivocation
-	collectorNotifier hotstuff.TimeoutCollectorConsumer
+	collectorNotifier hotstuff.TimeoutAggregationConsumer
 	processor         hotstuff.TimeoutProcessor
 	newestReportedQC  counters.StrictMonotonousCounter // view of newest QC that was reported
 	newestReportedTC  counters.StrictMonotonousCounter // view of newest TC that was reported
@@ -31,7 +31,7 @@ var _ hotstuff.TimeoutCollector = (*TimeoutCollector)(nil)
 func NewTimeoutCollector(log zerolog.Logger,
 	view uint64,
 	notifier hotstuff.Consumer,
-	collectorNotifier hotstuff.TimeoutCollectorConsumer,
+	collectorNotifier hotstuff.TimeoutAggregationConsumer,
 	processor hotstuff.TimeoutProcessor,
 ) *TimeoutCollector {
 	return &TimeoutCollector{
@@ -64,7 +64,7 @@ func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
 			return nil
 		}
 		if doubleTimeoutErr, isDoubleTimeoutErr := model.AsDoubleTimeoutError(err); isDoubleTimeoutErr {
-			c.notifier.OnDoubleTimeoutDetected(doubleTimeoutErr.FirstTimeout, doubleTimeoutErr.ConflictingTimeout)
+			c.collectorNotifier.OnDoubleTimeoutDetected(doubleTimeoutErr.FirstTimeout, doubleTimeoutErr.ConflictingTimeout)
 			return nil
 		}
 		return fmt.Errorf("internal error adding timeout %v to cache for view: %d: %w", timeout.ID(), timeout.View, err)
@@ -85,12 +85,13 @@ func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 	err := c.processor.Process(timeout)
 	if err != nil {
 		if invalidTimeoutErr, ok := model.AsInvalidTimeoutError(err); ok {
-			c.notifier.OnInvalidTimeoutDetected(*invalidTimeoutErr)
+			c.collectorNotifier.OnInvalidTimeoutDetected(*invalidTimeoutErr)
 			return nil
 		}
 		return fmt.Errorf("internal error while processing timeout: %w", err)
 	}
 
+	// TODO: consider moving OnTimeoutProcessed to TimeoutAggregationConsumer, need to fix telemetry for this.
 	c.notifier.OnTimeoutProcessed(timeout)
 
 	// In the following, we emit notifications about new QCs, if their view is newer than any QC previously

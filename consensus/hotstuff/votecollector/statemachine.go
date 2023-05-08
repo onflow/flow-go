@@ -26,6 +26,7 @@ type VoteCollector struct {
 	log                      zerolog.Logger
 	workers                  hotstuff.Workers
 	notifier                 hotstuff.Consumer
+	violationConsumer        hotstuff.VoteAggregationViolationConsumer
 	createVerifyingProcessor VerifyingVoteProcessorFactory
 
 	votesCache     VotesCache
@@ -48,10 +49,11 @@ type atomicValueWrapper struct {
 func NewStateMachineFactory(
 	log zerolog.Logger,
 	notifier hotstuff.Consumer,
+	violationConsumer hotstuff.VoteAggregationViolationConsumer,
 	verifyingVoteProcessorFactory VerifyingVoteProcessorFactory,
 ) voteaggregator.NewCollectorFactoryMethod {
 	return func(view uint64, workers hotstuff.Workers) (hotstuff.VoteCollector, error) {
-		return NewStateMachine(view, log, workers, notifier, verifyingVoteProcessorFactory), nil
+		return NewStateMachine(view, log, workers, notifier, violationConsumer, verifyingVoteProcessorFactory), nil
 	}
 }
 
@@ -60,6 +62,7 @@ func NewStateMachine(
 	log zerolog.Logger,
 	workers hotstuff.Workers,
 	notifier hotstuff.Consumer,
+	violationConsumer hotstuff.VoteAggregationViolationConsumer,
 	verifyingVoteProcessorFactory VerifyingVoteProcessorFactory,
 ) *VoteCollector {
 	log = log.With().
@@ -70,6 +73,7 @@ func NewStateMachine(
 		log:                      log,
 		workers:                  workers,
 		notifier:                 notifier,
+		violationConsumer:        violationConsumer,
 		createVerifyingProcessor: verifyingVoteProcessorFactory,
 		votesCache:               *NewVotesCache(view),
 	}
@@ -92,7 +96,7 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 			return nil
 		}
 		if doubleVoteErr, isDoubleVoteErr := model.AsDoubleVoteError(err); isDoubleVoteErr {
-			m.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
+			m.violationConsumer.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
 			return nil
 		}
 		return fmt.Errorf("internal error adding vote %v to cache for block %v: %w",
@@ -131,7 +135,7 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 		err := processor.Process(vote)
 		if err != nil {
 			if invalidVoteErr, ok := model.AsInvalidVoteError(err); ok {
-				m.notifier.OnInvalidVoteDetected(*invalidVoteErr)
+				m.violationConsumer.OnInvalidVoteDetected(*invalidVoteErr)
 				return nil
 			}
 			// ATTENTION: due to how our logic is designed this situation is only possible

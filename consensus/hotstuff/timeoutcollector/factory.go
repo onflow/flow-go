@@ -13,7 +13,7 @@ import (
 type TimeoutCollectorFactory struct {
 	log               zerolog.Logger
 	notifier          hotstuff.Consumer
-	collectorNotifier hotstuff.TimeoutCollectorConsumer
+	collectorNotifier hotstuff.TimeoutAggregationConsumer
 	processorFactory  hotstuff.TimeoutProcessorFactory
 }
 
@@ -23,7 +23,7 @@ var _ hotstuff.TimeoutCollectorFactory = (*TimeoutCollectorFactory)(nil)
 // No error returns are expected during normal operations.
 func NewTimeoutCollectorFactory(log zerolog.Logger,
 	notifier hotstuff.Consumer,
-	collectorNotifier hotstuff.TimeoutCollectorConsumer,
+	collectorNotifier hotstuff.TimeoutAggregationConsumer,
 	createProcessor hotstuff.TimeoutProcessorFactory,
 ) *TimeoutCollectorFactory {
 	return &TimeoutCollectorFactory{

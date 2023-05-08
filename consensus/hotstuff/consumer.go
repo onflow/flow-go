@@ -31,7 +31,9 @@ type ProtocolViolationConsumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnDoubleProposeDetected(*model.Block, *model.Block)
+}
 
+type VoteAggregationViolationConsumer interface {
 	// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
 	// whenever a double voting (same voter voting for different blocks at the same view) was detected.
 	// Prerequisites:
@@ -52,7 +54,9 @@ type ProtocolViolationConsumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal)
+}
 
+type TimeoutAggregationViolationConsumer interface {
 	// OnDoubleTimeoutDetected notifications are produced by the Timeout Aggregation logic
 	// whenever a double timeout (same replica producing two different timeouts at the same view) was detected.
 	// Prerequisites:
@@ -302,6 +306,11 @@ type TimeoutCollectorConsumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnNewTcDiscovered(certificate *flow.TimeoutCertificate)
+}
+
+type TimeoutAggregationConsumer interface {
+	TimeoutAggregationViolationConsumer
+	TimeoutCollectorConsumer
 }
 
 // CommunicatorConsumer consumes outbound notifications produced by HotStuff and it's components.
