@@ -1,7 +1,6 @@
 package execution
 
 import (
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -13,9 +12,6 @@ type BlockExecutionResult struct {
 	*entity.ExecutableBlock
 
 	collectionExecutionResults []CollectionExecutionResult
-
-	// TODO(patrick): switch this to execution snapshot
-	ComputationIntensities meter.MeteredComputationIntensities
 }
 
 // NewPopulatedBlockExecutionResult constructs a new BlockExecutionResult,
@@ -25,7 +21,6 @@ func NewPopulatedBlockExecutionResult(eb *entity.ExecutableBlock) *BlockExecutio
 	return &BlockExecutionResult{
 		ExecutableBlock:            eb,
 		collectionExecutionResults: make([]CollectionExecutionResult, chunkCounts),
-		ComputationIntensities:     make(meter.MeteredComputationIntensities),
 	}
 }
 
