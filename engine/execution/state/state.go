@@ -302,12 +302,7 @@ func (s *state) SaveExecutionResults(
 		}
 	}
 
-	err := s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
-	if err != nil {
-		return fmt.Errorf("cannot store state commitment: %w", err)
-	}
-
-	err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
+	err := s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store events: %w", err)
 	}
@@ -339,6 +334,14 @@ func (s *state) SaveExecutionResults(
 	err = s.myReceipts.BatchStoreMyReceipt(result.ExecutionReceipt, batch)
 	if err != nil {
 		return fmt.Errorf("could not persist execution result: %w", err)
+	}
+
+	// the state commitment is the last data item to be stored, so that
+	// IsBlockExecuted can be implemented by checking whether state commitment exists
+	// in the database
+	err = s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
+	if err != nil {
+		return fmt.Errorf("cannot store state commitment: %w", err)
 	}
 
 	err = batch.Flush()
