@@ -12,7 +12,10 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const FatalMsgNegativePositivePenalty = "penalty value is positive, expected negative"
+const (
+	FatalMsgNegativePositivePenalty = "penalty value is positive, expected negative"
+	FatalMsgFailedToApplyPenalty    = "failed to apply penalty to the spam record"
+)
 
 // MisbehaviorReportManager is responsible for handling misbehavior reports.
 // The current version is at the minimum viable product stage and only logs the reports.
@@ -106,8 +109,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 // The current version is at the minimum viable product stage and only logs the reports.
 // The implementation of this function should be thread-safe and non-blocking.
 // TODO: the mature version should be able to handle the reports and take actions accordingly, i.e., penalize the misbehaving node
-//
-//	and report the node to be disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
+// and report the node to be disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
 func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Channel, report network.MisbehaviorReport) {
 	lg := m.logger.With().
 		Str("channel", channel.String()).
@@ -150,7 +152,7 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 		// this should never happen, unless there is a bug in the spam record cache implementation.
 		// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
 		// TODO: refactor to throwing error to the irrecoverable context.
-		lg.Fatal().Err(err).Msg("failed to apply penalty to spam record")
+		lg.Fatal().Err(err).Msg(FatalMsgFailedToApplyPenalty)
 		return
 	}
 
