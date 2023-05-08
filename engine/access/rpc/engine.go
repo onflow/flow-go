@@ -58,7 +58,6 @@ type Engine struct {
 	*events.FinalizationActor
 
 	unit               *engine.Unit
-	cm                 *component.ComponentManager
 	log                zerolog.Logger
 	backend            *backend.Backend // the gRPC service implementation
 	unsecureGrpcServer *grpc.Server     // the unsecure gRPC server
@@ -214,7 +213,7 @@ func NewBuilder(log zerolog.Logger,
 		builder.WithMetrics()
 	}
 
-	eng.cm = component.NewComponentManagerBuilder().
+	eng.Component = component.NewComponentManagerBuilder().
 		AddWorker(eng.serveUnsecureGRPCWorker).
 		AddWorker(eng.serveSecureGRPCWorker).
 		AddWorker(eng.serveGRPCWebProxyWorker).
@@ -222,7 +221,6 @@ func NewBuilder(log zerolog.Logger,
 		AddWorker(finalizedCacheWorker).
 		AddWorker(eng.shutdownWorker).
 		Build()
-	eng.Component = eng.cm
 
 	return builder, nil
 }
