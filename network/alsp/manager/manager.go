@@ -4,8 +4,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/alsp/internal"
@@ -25,7 +23,6 @@ const (
 //
 //	and report the node to be disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
 type MisbehaviorReportManager struct {
-	component.Component
 	logger  zerolog.Logger
 	metrics module.AlspMetrics
 	cache   alsp.SpamRecordCache
@@ -104,14 +101,6 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 	for _, opt := range opts {
 		opt(m)
 	}
-
-	builder := component.NewComponentManagerBuilder().AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		ready()
-
-		<-ctx.Done()
-	})
-
-	m.Component = builder.Build()
 
 	return m
 }
