@@ -95,7 +95,7 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
 	google.golang.org/protobuf v1.30.0
 	gotest.tools v2.2.0+incompatible
-	pgregory.net/rapid v0.5.7
+	pgregory.net/rapid v0.4.7
 )
 
 require (
