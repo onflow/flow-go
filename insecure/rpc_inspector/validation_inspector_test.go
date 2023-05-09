@@ -3,6 +3,7 @@ package rpc_inspector
 import (
 	"context"
 	"fmt"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"math/rand"
 	"os"
 	"testing"
@@ -17,12 +18,14 @@ import (
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -36,7 +39,7 @@ func TestValidationInspector_SafetyThreshold(t *testing.T) {
 	// if GRAFT/PRUNE message count is lower than safety threshold the RPC validation should pass
 	safetyThreshold := uint64(10)
 	// create our RPC validation inspector
-	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
+	inspectorConfig := inspector.DefaultRPCValidationConfig()
 	inspectorConfig.NumberOfWorkers = 1
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = safetyThreshold
 	inspectorConfig.PruneValidationCfg.SafetyThreshold = safetyThreshold
@@ -66,9 +69,10 @@ func TestValidationInspector_SafetyThreshold(t *testing.T) {
 	messageCount := 5
 	controlMessageCount := int64(2)
 
-	defer distributor.AssertNotCalled(t, "DistributeInvalidControlMessageNotification", mockery.Anything)
+	defer distributor.AssertNotCalled(t, "Distribute", mockery.Anything)
 
 	validationInspector.Start(signalerCtx)
+
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
@@ -95,7 +99,7 @@ func TestValidationInspector_DiscardThreshold_Detection(t *testing.T) {
 	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
 	discardThreshold := uint64(10)
 	// create our RPC validation inspector
-	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
+	inspectorConfig := inspector.DefaultRPCValidationConfig()
 	inspectorConfig.NumberOfWorkers = 1
 	inspectorConfig.GraftValidationCfg.DiscardThreshold = discardThreshold
 	inspectorConfig.PruneValidationCfg.DiscardThreshold = discardThreshold
@@ -110,7 +114,7 @@ func TestValidationInspector_DiscardThreshold_Detection(t *testing.T) {
 	inspectDisseminatedNotif := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
 		return func(args mockery.Arguments) {
 			count.Inc()
-			notification, ok := args[0].(*p2p.InvalidControlMessageNotification)
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.True(t, validation.IsErrDiscardThreshold(notification.Err))
@@ -155,7 +159,7 @@ func TestValidationInspector_RateLimitedPeer_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	// create our RPC validation inspector
-	inspectorConfig := inspectorbuilder.DefaultRPCValidationConfig()
+	inspectorConfig := inspector.DefaultRPCValidationConfig()
 	inspectorConfig.NumberOfWorkers = 1
 
 	// here we set the message count to the amount of flow channels
@@ -172,7 +176,7 @@ func TestValidationInspector_RateLimitedPeer_Detection(t *testing.T) {
 	inspectDisseminatedNotif := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
 		return func(args mockery.Arguments) {
 			count.Inc()
-			notification, ok := args[0].(*p2p.InvalidControlMessageNotification)
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.True(t, validation.IsErrRateLimitedControlMsg(notification.Err))
@@ -256,7 +260,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	inspectDisseminatedNotif := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
 		return func(args mockery.Arguments) {
 			count.Inc()
-			notification, ok := args[0].(*p2p.InvalidControlMessageNotification)
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.True(t, channels.IsErrInvalidTopic(notification.Err))
@@ -585,7 +589,7 @@ type mockDistributorOption func(*mockp2p.GossipSubInspectorNotificationDistribut
 func withExpectedNotificationDissemination(expectedNumOfTotalNotif int, f onNotificationDissemination) mockDistributorOption {
 	return func(distributor *mockp2p.GossipSubInspectorNotificationDistributor, spammer *corruptlibp2p.GossipSubRouterSpammer) {
 		distributor.
-			On("DistributeInvalidControlMessageNotification", mockery.Anything).
+			On("Distribute", mockery.Anything).
 			Times(expectedNumOfTotalNotif).
 			Run(f(spammer)).
 			Return(nil)
@@ -608,6 +612,7 @@ func setupTest(t *testing.T, logger zerolog.Logger, role flow.Role, inspectorCon
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
+	mockDistributorReadyDoneAware(distributor)
 	for _, mockDistributorOpt := range mockDistributorOpts {
 		mockDistributorOpt(distributor, spammer)
 	}
@@ -624,4 +629,116 @@ func setupTest(t *testing.T, logger zerolog.Logger, role flow.Role, inspectorCon
 	)
 
 	return signalerCtx, sporkID, cancel, spammer, victimNode, distributor, inspector
+}
+
+// TestGossipSubSpamMitigationIntegration tests that the spam mitigation feature of GossipSub is working as expected.
+// The test puts toghether the spam detection (through the GossipSubInspector) and the spam mitigation (through the
+// scoring system) and ensures that the mitigation is triggered when the spam detection detects spam.
+// The test scenario involves a spammer node that sends a large number of control messages to a victim node.
+// The victim node is configured to use the GossipSubInspector to detect spam and the scoring system to mitigate spam.
+// The test ensures that the victim node is disconnected from the spammer node on the GossipSub mesh after the spam detection is triggered.
+func TestGossipSubSpamMitigationIntegration(t *testing.T) {
+	t.Parallel()
+	idProvider := mock.NewIdentityProvider(t)
+	sporkID := unittest.IdentifierFixture()
+	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, flow.RoleConsensus)
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	victimNode, victimId := p2ptest.NodeFixture(
+		t,
+		sporkID,
+		t.Name(),
+		p2ptest.WithRole(flow.RoleConsensus),
+		p2ptest.WithPeerScoringEnabled(idProvider),
+	)
+
+	ids := flow.IdentityList{&victimId, &spammer.SpammerId}
+	provider := id.NewFixedIdentityProvider(ids)
+	idProvider.On("ByPeerID", mockery.Anything).Return(
+		func(peerId peer.ID) *flow.Identity {
+			identity, _ := provider.ByPeerID(peerId)
+			return identity
+		}, func(peerId peer.ID) bool {
+			_, ok := provider.ByPeerID(peerId)
+			return ok
+		})
+
+	spamRpcCount := 10            // total number of individual rpc messages to send
+	spamCtrlMsgCount := int64(10) // total number of control messages to send on each RPC
+
+	// unknownTopic is an unknown topic to the victim node but shaped like a valid topic (i.e., it has the correct prefix and spork ID).
+	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID))
+
+	// malformedTopic is a topic that is not shaped like a valid topic (i.e., it does not have the correct prefix and spork ID).
+	malformedTopic := channels.Topic("!@#$%^&**((")
+
+	// invalidSporkIDTopic is a topic that has a valid prefix but an invalid spork ID (i.e., not the current spork ID).
+	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture()))
+
+	// duplicateTopic is a valid topic that is used to send duplicate spam messages.
+	duplicateTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
+
+	// starting the nodes.
+	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	spammer.Start(t)
+
+	// wait for the nodes to discover each other
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+
+	// as nodes started fresh and no spamming has happened yet, the nodes should be able to exchange messages on the topic.
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
+		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkID)
+		return unittest.ProposalFixture(), blockTopic
+	})
+
+	// prepares spam graft and prune messages with different strategies.
+	graftCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithGraft(int(spamRpcCount), unknownTopic.String()))
+	graftCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithGraft(int(spamRpcCount), malformedTopic.String()))
+	graftCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithGraft(int(spamRpcCount), invalidSporkIDTopic.String()))
+	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithGraft(3, duplicateTopic.String()))
+
+	pruneCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithPrune(int(spamRpcCount), unknownTopic.String()))
+	pruneCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithPrune(int(spamRpcCount), malformedTopic.String()))
+	pruneCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithGraft(int(spamRpcCount), invalidSporkIDTopic.String()))
+	pruneCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(spamCtrlMsgCount), corruptlibp2p.WithPrune(3, duplicateTopic.String()))
+
+	// start spamming the victim peer
+	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsWithUnknownTopic)
+	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsWithMalformedTopic)
+	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsInvalidSporkIDTopic)
+	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsDuplicateTopic)
+
+	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsWithUnknownTopic)
+	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsWithMalformedTopic)
+	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsInvalidSporkIDTopic)
+	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
+
+	// wait for two GossipSub heartbeat intervals to ensure that the victim node has penalized the spammer node.
+	time.Sleep(2 * time.Second)
+
+	// now we expect the detection and mitigation to kick in and the victim node to disconnect from the spammer node.
+	// so the spammer and victim nodes should not be able to exchange messages on the topic.
+	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{victimNode}, []p2p.LibP2PNode{spammer.SpammerNode}, func() (interface{}, channels.Topic) {
+		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkID)
+		return unittest.ProposalFixture(), blockTopic
+	})
+}
+
+// mockDistributorReadyDoneAware mocks the Ready and Done methods of the distributor to return a channel that is already closed,
+// so that the distributor is considered ready and done when the test needs.
+func mockDistributorReadyDoneAware(d *mockp2p.GossipSubInspectorNotificationDistributor) {
+	d.On("Start", mockery.Anything).Return().Maybe()
+	d.On("Ready").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
+	d.On("Done").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
 }

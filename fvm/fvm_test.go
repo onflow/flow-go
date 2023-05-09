@@ -24,8 +24,7 @@ import (
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -64,7 +63,7 @@ func createChainAndVm(chainID flow.ChainID) (flow.Chain, fvm.VM) {
 }
 
 func (vmt vmTest) run(
-	f func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree),
+	f func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
 		baseOpts := []fvm.Option{
@@ -78,7 +77,7 @@ func (vmt vmTest) run(
 		chain := ctx.Chain
 		vm := fvm.NewVirtualMachine()
 
-		snapshotTree := storage.NewSnapshotTree(nil)
+		snapshotTree := snapshot.NewSnapshotTree(nil)
 
 		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
@@ -86,7 +85,7 @@ func (vmt vmTest) run(
 
 		bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
 
-		executionSnapshot, _, err := vm.RunV2(
+		executionSnapshot, _, err := vm.Run(
 			ctx,
 			fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
 			snapshotTree)
@@ -101,7 +100,7 @@ func (vmt vmTest) run(
 // bootstrapWith executes the bootstrap procedure and the custom bootstrap function
 // and returns a prepared bootstrappedVmTest with all the state needed
 func (vmt vmTest) bootstrapWith(
-	bootstrap func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) (storage.SnapshotTree, error),
+	bootstrap func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) (snapshot.SnapshotTree, error),
 ) (bootstrappedVmTest, error) {
 
 	baseOpts := []fvm.Option{
@@ -115,7 +114,7 @@ func (vmt vmTest) bootstrapWith(
 	chain := ctx.Chain
 	vm := fvm.NewVirtualMachine()
 
-	snapshotTree := storage.NewSnapshotTree(nil)
+	snapshotTree := snapshot.NewSnapshotTree(nil)
 
 	baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
@@ -123,7 +122,7 @@ func (vmt vmTest) bootstrapWith(
 
 	bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
 
-	executionSnapshot, _, err := vm.RunV2(
+	executionSnapshot, _, err := vm.Run(
 		ctx,
 		fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
 		snapshotTree)
@@ -144,12 +143,12 @@ func (vmt vmTest) bootstrapWith(
 type bootstrappedVmTest struct {
 	chain        flow.Chain
 	ctx          fvm.Context
-	snapshotTree storage.SnapshotTree
+	snapshotTree snapshot.SnapshotTree
 }
 
 // run Runs a test from the bootstrapped state, without changing the bootstrapped state
 func (vmt bootstrappedVmTest) run(
-	f func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree),
+	f func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
 		f(t, fvm.NewVirtualMachine(), vmt.chain, vmt.ctx, vmt.snapshotTree)
@@ -341,7 +340,7 @@ func TestHashing(t *testing.T) {
 				)
 			}
 
-			_, output, err := vm.RunV2(ctx, script, snapshotTree)
+			_, output, err := vm.Run(ctx, script, snapshotTree)
 			require.NoError(t, err)
 
 			byteResult := make([]byte, 0)
@@ -373,7 +372,7 @@ func TestHashing(t *testing.T) {
 				cadenceData,
 				jsoncdc.MustEncode(cadence.String("")),
 			)
-			_, output, err := vm.RunV2(ctx, script, snapshotTree)
+			_, output, err := vm.Run(ctx, script, snapshotTree)
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
 
@@ -388,7 +387,7 @@ func TestHashing(t *testing.T) {
 			script = script.WithArguments(
 				cadenceData,
 			)
-			_, output, err = vm.RunV2(ctx, script, snapshotTree)
+			_, output, err = vm.Run(ctx, script, snapshotTree)
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
 
@@ -419,14 +418,14 @@ func TestWithServiceAccount(t *testing.T) {
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
 
-	snapshotTree := storage.NewSnapshotTree(nil)
+	snapshotTree := snapshot.NewSnapshotTree(nil)
 
 	txBody := flow.NewTransactionBody().
 		SetScript([]byte(`transaction { prepare(signer: AuthAccount) { AuthAccount(payer: signer) } }`)).
 		AddAuthorizer(chain.ServiceAddress())
 
 	t.Run("With service account enabled", func(t *testing.T) {
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			ctxA,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -443,7 +442,7 @@ func TestWithServiceAccount(t *testing.T) {
 			ctxA,
 			fvm.WithServiceAccount(false))
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctxB,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -501,7 +500,7 @@ func TestEventLimits(t *testing.T) {
 		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress())
 
-	executionSnapshot, output, err := vm.RunV2(
+	executionSnapshot, output, err := vm.Run(
 		ctx,
 		fvm.Transaction(txBody, 0),
 		snapshotTree)
@@ -524,7 +523,7 @@ func TestEventLimits(t *testing.T) {
 	t.Run("With limits", func(t *testing.T) {
 		txBody.Payer = unittest.RandomAddressFixture()
 
-		executionSnapshot, output, err := vm.RunV2(
+		executionSnapshot, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -539,7 +538,7 @@ func TestEventLimits(t *testing.T) {
 	t.Run("With service account as payer", func(t *testing.T) {
 		txBody.Payer = chain.ServiceAddress()
 
-		_, output, err := vm.RunV2(
+		_, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),
 			snapshotTree)
@@ -557,7 +556,7 @@ func TestEventLimits(t *testing.T) {
 func TestHappyPathTransactionSigning(t *testing.T) {
 
 	newVMTest().run(
-		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// Create an account private key.
 			privateKey, err := testutil.GenerateAccountPrivateKey()
 			require.NoError(t, err)
@@ -584,7 +583,7 @@ func TestHappyPathTransactionSigning(t *testing.T) {
 			require.NoError(t, err)
 			txBody.AddEnvelopeSignature(accounts[0], 0, sig)
 
-			_, output, err := vm.RunV2(
+			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -595,7 +594,7 @@ func TestHappyPathTransactionSigning(t *testing.T) {
 }
 
 func TestTransactionFeeDeduction(t *testing.T) {
-	getBalance := func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree, address flow.Address) uint64 {
+	getBalance := func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree, address flow.Address) uint64 {
 
 		code := []byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
@@ -614,7 +613,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			jsoncdc.MustEncode(cadence.NewAddress(address)),
 		)
 
-		_, output, err := vm.RunV2(ctx, script, snapshotTree)
+		_, output, err := vm.Run(ctx, script, snapshotTree)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 		return output.Value.ToGoValue().(uint64)
@@ -910,15 +909,15 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		},
 	}
 
-	runTx := func(tc testCase) func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
-		return func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+	runTx := func(tc testCase) func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
+		return func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// ==== Create an account ====
 			privateKey, txBody := testutil.CreateAccountCreationTransaction(t, chain)
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			executionSnapshot, output, err := vm.RunV2(
+			executionSnapshot, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -956,7 +955,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			executionSnapshot, output, err = vm.RunV2(
+			executionSnapshot, output, err = vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -990,7 +989,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			executionSnapshot, output, err = vm.RunV2(
+			executionSnapshot, output, err = vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -1052,7 +1051,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			},
 		),
 	).run(
-		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
@@ -1072,7 +1071,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			_, output, err := vm.RunV2(
+			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -1100,7 +1099,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).withContextOptions(
 		fvm.WithMemoryLimit(10_000_000_000),
 	).run(
-		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// Create an account private key.
 			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 			require.NoError(t, err)
@@ -1129,7 +1128,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 			require.NoError(t, err)
 
-			_, output, err := vm.RunV2(
+			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -1150,7 +1149,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).withContextOptions(
 		fvm.WithMemoryLimit(10_000_000_000),
 	).run(
-		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
@@ -1167,7 +1166,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			_, output, err := vm.RunV2(
+			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -1194,7 +1193,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			memoryWeights,
 		),
 	).run(
-		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 			require.NoError(t, err)
 
@@ -1239,7 +1238,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
 			require.NoError(t, err)
 
-			_, output, err := vm.RunV2(
+			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -1261,7 +1260,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			},
 		),
 	).run(
-		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
@@ -1277,7 +1276,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			_, output, err := vm.RunV2(
+			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -1297,7 +1296,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			},
 		),
 	).run(
-		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
@@ -1314,7 +1313,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			_, output, err := vm.RunV2(
+			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -1334,7 +1333,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			},
 		),
 	).run(
-		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
@@ -1350,7 +1349,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			_, output, err := vm.RunV2(
+			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -1377,7 +1376,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithMemoryLimit(math.MaxUint64),
 	).run(
-		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// Use the maximum amount of computation so that the transaction still passes.
 			loops := uint64(997)
 			maxExecutionEffort := uint64(997)
@@ -1393,7 +1392,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			executionSnapshot, output, err := vm.RunV2(
+			executionSnapshot, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -1419,7 +1418,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			err = testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
 			require.NoError(t, err)
 
-			_, output, err = vm.RunV2(
+			_, output, err = vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -1491,10 +1490,10 @@ func TestStorageUsed(t *testing.T) {
 	status := environment.NewAccountStatus()
 	status.SetStorageUsed(5)
 
-	_, output, err := vm.RunV2(
+	_, output, err := vm.Run(
 		ctx,
 		fvm.Script(code),
-		state.MapStorageSnapshot{
+		snapshot.MapStorageSnapshot{
 			accountStatusId: status.ToBytes(),
 		})
 	require.NoError(t, err)
@@ -1600,7 +1599,7 @@ func TestEnforcingComputationLimit(t *testing.T) {
 			}
 			tx := fvm.Transaction(txBody, 0)
 
-			_, output, err := vm.RunV2(ctx, tx, nil)
+			_, output, err := vm.Run(ctx, tx, nil)
 			require.NoError(t, err)
 			require.Equal(t, test.expCompUsed, output.ComputationUsed)
 			if test.ok {
@@ -1629,7 +1628,7 @@ func TestStorageCapacity(t *testing.T) {
 			vm fvm.VM,
 			chain flow.Chain,
 			ctx fvm.Context,
-			snapshotTree storage.SnapshotTree,
+			snapshotTree snapshot.SnapshotTree,
 		) {
 			service := chain.ServiceAddress()
 			snapshotTree, signer := createAccount(
@@ -1654,7 +1653,7 @@ func TestStorageCapacity(t *testing.T) {
 				SetProposalKey(service, 0, 0).
 				SetPayer(service)
 
-			executionSnapshot, output, err := vm.RunV2(
+			executionSnapshot, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(transferTxBody, 0),
 				snapshotTree)
@@ -1670,7 +1669,7 @@ func TestStorageCapacity(t *testing.T) {
 				SetProposalKey(service, 0, 0).
 				SetPayer(service)
 
-			executionSnapshot, output, err = vm.RunV2(
+			executionSnapshot, output, err = vm.Run(
 				ctx,
 				fvm.Transaction(transferTxBody, 0),
 				snapshotTree)
@@ -1712,7 +1711,7 @@ func TestStorageCapacity(t *testing.T) {
 				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(target))).
 				AddAuthorizer(signer)
 
-			_, output, err = vm.RunV2(
+			_, output, err = vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -1730,7 +1729,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 	t.Run("contract additions are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 				require.NoError(t, err)
@@ -1759,7 +1758,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 					jsoncdc.MustEncode(address),
 				)
 
-				_, output, err := vm.RunV2(scriptCtx, script, snapshotTree)
+				_, output, err := vm.Run(scriptCtx, script, snapshotTree)
 				require.NoError(t, err)
 				require.Error(t, output.Err)
 				require.True(t, errors.IsCadenceRuntimeError(output.Err))
@@ -1771,7 +1770,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 	t.Run("contract removals are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 				privateKey := privateKeys[0]
@@ -1810,7 +1809,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 					chain.ServiceAddress(),
 					unittest.ServiceAccountPrivateKey)
 
-				executionSnapshot, output, err := vm.RunV2(
+				executionSnapshot, output, err := vm.Run(
 					subCtx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1829,7 +1828,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 					jsoncdc.MustEncode(address),
 				)
 
-				_, output, err = vm.RunV2(subCtx, script, snapshotTree)
+				_, output, err = vm.Run(subCtx, script, snapshotTree)
 				require.NoError(t, err)
 				require.Error(t, output.Err)
 				require.True(t, errors.IsCadenceRuntimeError(output.Err))
@@ -1841,7 +1840,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 	t.Run("contract updates are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 				privateKey := privateKeys[0]
@@ -1880,7 +1879,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 					chain.ServiceAddress(),
 					unittest.ServiceAccountPrivateKey)
 
-				executionSnapshot, output, err := vm.RunV2(
+				executionSnapshot, output, err := vm.Run(
 					subCtx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -1898,7 +1897,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 					jsoncdc.MustEncode(address),
 				)
 
-				_, output, err = vm.RunV2(subCtx, script, snapshotTree)
+				_, output, err = vm.Run(subCtx, script, snapshotTree)
 				require.NoError(t, err)
 				require.Error(t, output.Err)
 				require.True(t, errors.IsCadenceRuntimeError(output.Err))
@@ -1914,7 +1913,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 
 	t.Run("Account key additions are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 				require.NoError(t, err)
@@ -1949,7 +1948,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 					)),
 				)
 
-				_, output, err := vm.RunV2(scriptCtx, script, snapshotTree)
+				_, output, err := vm.Run(scriptCtx, script, snapshotTree)
 				require.NoError(t, err)
 				require.Error(t, output.Err)
 				require.True(t, errors.IsCadenceRuntimeError(output.Err))
@@ -1961,7 +1960,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 
 	t.Run("Account key removals are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 				require.NoError(t, err)
@@ -1988,7 +1987,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 					jsoncdc.MustEncode(address),
 				)
 
-				_, output, err := vm.RunV2(scriptCtx, script, snapshotTree)
+				_, output, err := vm.Run(scriptCtx, script, snapshotTree)
 				require.NoError(t, err)
 				require.Error(t, output.Err)
 				require.True(t, errors.IsCadenceRuntimeError(output.Err))
@@ -2058,7 +2057,7 @@ func TestInteractionLimit(t *testing.T) {
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 	).bootstrapWith(
-		func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) (storage.SnapshotTree, error) {
+		func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) (snapshot.SnapshotTree, error) {
 			// ==== Create an account ====
 			var txBody *flow.TransactionBody
 			privateKey, txBody = testutil.CreateAccountCreationTransaction(t, chain)
@@ -2068,7 +2067,7 @@ func TestInteractionLimit(t *testing.T) {
 				return snapshotTree, err
 			}
 
-			executionSnapshot, output, err := vm.RunV2(
+			executionSnapshot, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -2110,7 +2109,7 @@ func TestInteractionLimit(t *testing.T) {
 				return snapshotTree, err
 			}
 
-			executionSnapshot, output, err = vm.RunV2(
+			executionSnapshot, output, err = vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
 				snapshotTree)
@@ -2125,7 +2124,7 @@ func TestInteractionLimit(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, vmt.run(
-			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				// ==== Transfer funds with lowe interaction limit ====
 				txBody := transferTokensTx(chain).
 					AddAuthorizer(address).
@@ -2145,7 +2144,7 @@ func TestInteractionLimit(t *testing.T) {
 				// ==== IMPORTANT LINE ====
 				ctx.MaxStateInteractionSize = tc.interactionLimit
 
-				_, output, err := vm.RunV2(
+				_, output, err := vm.Run(
 					ctx,
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
@@ -2183,7 +2182,7 @@ func TestAuthAccountCapabilities(t *testing.T) {
 						vm fvm.VM,
 						chain flow.Chain,
 						ctx fvm.Context,
-						snapshotTree storage.SnapshotTree,
+						snapshotTree snapshot.SnapshotTree,
 					) {
 						// Create an account private key.
 						privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -2229,7 +2228,7 @@ func TestAuthAccountCapabilities(t *testing.T) {
 							chain.ServiceAddress(),
 							unittest.ServiceAccountPrivateKey)
 
-						_, output, err := vm.RunV2(
+						_, output, err := vm.Run(
 							ctx,
 							fvm.Transaction(txBody, 0),
 							snapshotTree)
@@ -2276,7 +2275,7 @@ func TestAuthAccountCapabilities(t *testing.T) {
 						vm fvm.VM,
 						chain flow.Chain,
 						ctx fvm.Context,
-						snapshotTree storage.SnapshotTree,
+						snapshotTree snapshot.SnapshotTree,
 					) {
 						// Create two private keys
 						privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
@@ -2321,7 +2320,7 @@ func TestAuthAccountCapabilities(t *testing.T) {
 						_ = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 						_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 
-						executionSnapshot, output, err := vm.RunV2(
+						executionSnapshot, output, err := vm.Run(
 							ctx,
 							fvm.Transaction(txBody, 0),
 							snapshotTree)
@@ -2360,7 +2359,7 @@ func TestAuthAccountCapabilities(t *testing.T) {
 						_ = testutil.SignPayload(txBody, accounts[1], privateKeys[1])
 						_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 
-						_, output, err = vm.RunV2(
+						_, output, err = vm.Run(
 							ctx,
 							fvm.Transaction(txBody, 1),
 							snapshotTree)
@@ -2410,7 +2409,7 @@ func TestAttachments(t *testing.T) {
 					vm fvm.VM,
 					chain flow.Chain,
 					ctx fvm.Context,
-					snapshotTree storage.SnapshotTree,
+					snapshotTree snapshot.SnapshotTree,
 				) {
 					script := fvm.Script([]byte(`
 
@@ -2425,7 +2424,7 @@ func TestAttachments(t *testing.T) {
 						}
 					`))
 
-					_, output, err := vm.RunV2(ctx, script, snapshotTree)
+					_, output, err := vm.Run(ctx, script, snapshotTree)
 					require.NoError(t, err)
 
 					if attachmentsEnabled {

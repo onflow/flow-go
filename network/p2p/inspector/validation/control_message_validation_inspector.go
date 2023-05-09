@@ -37,7 +37,7 @@ type ControlMsgValidationInspector struct {
 	// config control message validation configurations.
 	config *ControlMsgValidationInspectorConfig
 	// distributor used to disseminate invalid RPC message notifications.
-	distributor p2p.GossipSubInspectorNotificationDistributor
+	distributor p2p.GossipSubInspectorNotifDistributor
 	// workerPool queue that stores *InspectMsgRequest that will be processed by component workers.
 	workerPool *worker.Pool[*InspectMsgRequest]
 	// clusterPrefixTopicsReceivedCache keeps track of the amount of cluster prefixed topics received. The counter is incremented in the following scenarios.
@@ -52,7 +52,7 @@ var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
 var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
-func NewControlMsgValidationInspector(logger zerolog.Logger, sporkID flow.Identifier, config *ControlMsgValidationInspectorConfig, distributor p2p.GossipSubInspectorNotificationDistributor, trackerOpts ...cache.RecordCacheConfigOpt) *ControlMsgValidationInspector {
+func NewControlMsgValidationInspector(logger zerolog.Logger, sporkID flow.Identifier, config *ControlMsgValidationInspectorConfig, distributor p2p.GossipSubInspectorNotifDistributor, trackerOpts ...cache.RecordCacheConfigOpt) *ControlMsgValidationInspector {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 	c := &ControlMsgValidationInspector{
 		logger:                             lg,
@@ -77,6 +77,15 @@ func NewControlMsgValidationInspector(logger zerolog.Logger, sporkID flow.Identi
 	c.workerPool = pool
 
 	builder := component.NewComponentManagerBuilder()
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		distributor.Start(ctx)
+		select {
+		case <-ctx.Done():
+		case <-distributor.Ready():
+			ready()
+		}
+		<-distributor.Done()
+	})
 	// start rate limiters cleanup loop in workers
 	for _, conf := range c.config.allCtrlMsgValidationConfig() {
 		validationConfig := conf
@@ -172,7 +181,7 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 			Uint64("upper_threshold", discardThresholdErr.discardThreshold).
 			Bool(logging.KeySuspicious, true).
 			Msg("rejecting rpc control message")
-		err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, discardThresholdErr))
+		err := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, discardThresholdErr))
 		if err != nil {
 			lg.Error().
 				Err(err).
@@ -212,7 +221,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 			Err(validationErr).
 			Bool(logging.KeySuspicious, true).
 			Msg("rpc control message async inspection failed")
-		err := c.distributor.DistributeInvalidControlMessageNotification(p2p.NewInvalidControlMessageNotification(req.Peer, req.validationConfig.ControlMsg, count, validationErr))
+		err := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, req.validationConfig.ControlMsg, count, validationErr))
 		if err != nil {
 			lg.Error().
 				Err(err).

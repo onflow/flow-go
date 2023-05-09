@@ -20,9 +20,6 @@ type ScriptProcedure struct {
 	Script         []byte
 	Arguments      [][]byte
 	RequestContext context.Context
-
-	// TODO(patrick): remove
-	ProcedureOutput
 }
 
 func Script(code []byte) *ScriptProcedure {
@@ -71,13 +68,9 @@ func NewScriptWithContextAndArgs(
 
 func (proc *ScriptProcedure) NewExecutor(
 	ctx Context,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) ProcedureExecutor {
 	return newScriptExecutor(ctx, proc, txnState)
-}
-
-func (proc *ScriptProcedure) SetOutput(output ProcedureOutput) {
-	proc.ProcedureOutput = output
 }
 
 func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
@@ -115,7 +108,7 @@ func (proc *ScriptProcedure) ExecutionTime() logical.Time {
 type scriptExecutor struct {
 	ctx      Context
 	proc     *ScriptProcedure
-	txnState storage.Transaction
+	txnState storage.TransactionPreparer
 
 	env environment.Environment
 
@@ -125,7 +118,7 @@ type scriptExecutor struct {
 func newScriptExecutor(
 	ctx Context,
 	proc *ScriptProcedure,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) *scriptExecutor {
 	return &scriptExecutor{
 		ctx:      ctx,

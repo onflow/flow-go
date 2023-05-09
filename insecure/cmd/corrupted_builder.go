@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -70,22 +70,20 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
 		}
 
-		uniCfg := &p2pbuilder.UnicastConfig{
+		uniCfg := &p2pconfig.UnicastConfig{
 			StreamRetryInterval:    cnb.UnicastCreateStreamRetryDelay,
 			RateLimiterDistributor: cnb.UnicastRateLimiterDistributor,
 		}
 
-		connGaterCfg := &p2pbuilder.ConnectionGaterConfig{
+		connGaterCfg := &p2pconfig.ConnectionGaterConfig{
 			InterceptPeerDialFilters: []p2p.PeerFilter{}, // disable connection gater onInterceptPeerDialFilters
 			InterceptSecuredFilters:  []p2p.PeerFilter{}, // disable connection gater onInterceptSecuredFilters
 		}
 
-		peerManagerCfg := &p2pbuilder.PeerManagerConfig{
+		peerManagerCfg := &p2pconfig.PeerManagerConfig{
 			ConnectionPruning: cnb.NetworkConnectionPruning,
 			UpdateInterval:    cnb.PeerUpdateInterval,
 		}
-
-		cnb.GossipSubInspectorNotifDistributor = cmd.BuildGossipsubRPCValidationInspectorNotificationDisseminator(cnb.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize, cnb.MetricsRegisterer, cnb.Logger, cnb.MetricsEnabled)
 
 		// create default libp2p factory if corrupt node should enable the topic validator
 		libP2PNodeFactory := corruptlibp2p.NewCorruptLibP2PNodeFactory(

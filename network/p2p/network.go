@@ -109,6 +109,8 @@ type NetworkParameters struct {
 	Options             []NetworkOptFunction
 }
 
+var _ network.Network = (*Network)(nil)
+
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
 // using the given state & cache interfaces to track volatile information.
@@ -130,7 +132,7 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 		metrics:                     param.Metrics,
 		subscriptionManager:         param.SubscriptionManager,
 		identityProvider:            param.IdentityProvider,
-		conduitFactory:              conduit.NewDefaultConduitFactory(),
+		conduitFactory:              conduit.NewDefaultConduitFactory(param.Logger, param.Metrics),
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
 	}

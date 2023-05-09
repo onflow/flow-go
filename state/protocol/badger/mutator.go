@@ -630,11 +630,11 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// We also want to update the last sealed height. Retrieve the block
 	// seal indexed for the block and retrieve the block that was sealed by it.
-	last, err := m.seals.HighestInFork(blockID)
+	lastSeal, err := m.seals.HighestInFork(blockID)
 	if err != nil {
 		return fmt.Errorf("could not look up sealed header: %w", err)
 	}
-	sealed, err := m.headers.ByBlockID(last.BlockID)
+	sealed, err := m.headers.ByBlockID(lastSeal.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve sealed header: %w", err)
 	}
@@ -741,6 +741,12 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	})
 	if err != nil {
 		return fmt.Errorf("could not persist finalization operations for block (%x): %w", blockID, err)
+	}
+
+	// update the cache
+	m.State.cachedFinal.Store(&cachedHeader{blockID, header})
+	if len(block.Payload.Seals) > 0 {
+		m.State.cachedSealed.Store(&cachedHeader{lastSeal.BlockID, sealed})
 	}
 
 	// Emit protocol events after database transaction succeeds. Event delivery is guaranteed,
@@ -915,6 +921,8 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.B
 					return nil, nil, fmt.Errorf("could not retrieve setup event for next epoch: %w", err)
 				}
 				events = append(events, func() { m.metrics.CommittedEpochFinalView(nextEpochSetup.FinalView) })
+			case *flow.VersionBeacon:
+				// do nothing for now
 			default:
 				return nil, nil, fmt.Errorf("invalid service event type in payload (%T)", event)
 			}
@@ -1112,7 +1120,8 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 
 				// we'll insert the commit event when we insert the block
 				dbUpdates = append(dbUpdates, m.epoch.commits.StoreTx(ev))
-
+			case *flow.VersionBeacon:
+				// do nothing for now
 			default:
 				return nil, fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
 			}
