@@ -23,7 +23,7 @@ func NewQCCreatedDistributor() *VoteCollectorDistributor {
 	return &VoteCollectorDistributor{}
 }
 
-func (d *VoteCollectorDistributor) AddQCCreatedConsumer(consumer hotstuff.VoteCollectorConsumer) {
+func (d *VoteCollectorDistributor) AddVoteCollectorConsumer(consumer hotstuff.VoteCollectorConsumer) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.consumers = append(d.consumers, consumer)

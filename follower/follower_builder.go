@@ -357,7 +357,7 @@ func FlowConsensusFollowerService(opts ...FollowerOption) *FollowerServiceBuilde
 		FlowNodeBuilder:     cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
 		FollowerDistributor: pubsub.NewFollowerDistributor(),
 	}
-	ret.FollowerDistributor.AddProtocolViolationConsumer(notifications.NewSlashingViolationsConsumer(ret.Logger))
+	ret.FollowerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(ret.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	ret.FlowNodeBuilder.SkipNwAddressBasedValidations = true

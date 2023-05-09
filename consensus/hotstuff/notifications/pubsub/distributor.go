@@ -47,7 +47,7 @@ func NewFollowerDistributor() *FollowerDistributor {
 
 func (d *FollowerDistributor) AddFollowerConsumer(consumer hotstuff.FollowerConsumer) {
 	d.FinalizationDistributor.AddFinalizationConsumer(consumer)
-	d.ProtocolViolationDistributor.AddProtocolViolationConsumer(consumer)
+	d.ProtocolViolationDistributor.AddProposalViolationConsumer(consumer)
 }
 
 type TimeoutAggregationDistributor struct {
@@ -85,5 +85,5 @@ func NewVoteAggregationDistributor() *VoteAggregationDistributor {
 
 func (d *VoteAggregationDistributor) AddVoteAggregationConsumer(consumer hotstuff.VoteAggregationConsumer) {
 	d.VoteAggregationViolationDistributor.AddVoteAggregationViolationConsumer(consumer)
-	d.VoteCollectorDistributor.AddQCCreatedConsumer(consumer)
+	d.VoteCollectorDistributor.AddVoteCollectorConsumer(consumer)
 }

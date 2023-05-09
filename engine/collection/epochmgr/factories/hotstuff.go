@@ -79,7 +79,7 @@ func (f *HotStuffFactory) CreateModules(
 	notifier.AddConsumer(notifications.NewLogConsumer(log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
 	notifier.AddConsumer(notifications.NewTelemetryConsumer(log))
-	notifier.AddProtocolViolationConsumer(notifications.NewSlashingViolationsConsumer(log))
+	notifier.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(log))
 
 	var (
 		err       error
@@ -159,7 +159,7 @@ func (f *HotStuffFactory) CreateModules(
 		Persist:                     persister.New(f.db, cluster.ChainID()),
 		VoteAggregator:              voteAggregator,
 		TimeoutAggregator:           timeoutAggregator,
-		QCCreatedDistributor:        qcDistributor,
+		VoteCollectorDistributor:    qcDistributor,
 		TimeoutCollectorDistributor: timeoutCollectorDistributor,
 		FollowerDistributor:         notifier.FollowerDistributor,
 	}, metrics, nil

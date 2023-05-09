@@ -22,7 +22,7 @@ func NewProtocolViolationDistributor() *ProtocolViolationDistributor {
 	return &ProtocolViolationDistributor{}
 }
 
-func (d *ProtocolViolationDistributor) AddProtocolViolationConsumer(consumer hotstuff.ProposalViolationConsumer) {
+func (d *ProtocolViolationDistributor) AddProposalViolationConsumer(consumer hotstuff.ProposalViolationConsumer) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.subscribers = append(d.subscribers, consumer)

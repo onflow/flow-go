@@ -173,7 +173,7 @@ func main() {
 		PreInit(cmd.DynamicStartPreInit).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
-			followerDistributor.AddProtocolViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
+			followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
 			return nil
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {

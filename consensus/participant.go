@@ -122,7 +122,7 @@ func NewParticipant(
 	}
 
 	// add observer, event loop needs to receive events from distributor
-	modules.QCCreatedDistributor.AddQCCreatedConsumer(loop)
+	modules.VoteCollectorDistributor.AddVoteCollectorConsumer(loop)
 	modules.TimeoutCollectorDistributor.AddTimeoutCollectorConsumer(loop)
 
 	return loop, nil

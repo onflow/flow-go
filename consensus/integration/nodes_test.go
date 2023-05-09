@@ -566,7 +566,7 @@ func createNode(
 		Committee:                   committee,
 		Signer:                      signer,
 		Persist:                     persist,
-		QCCreatedDistributor:        qcDistributor,
+		VoteCollectorDistributor:    qcDistributor,
 		TimeoutCollectorDistributor: timeoutCollectorDistributor,
 		VoteAggregator:              voteAggregator,
 		TimeoutAggregator:           timeoutAggregator,

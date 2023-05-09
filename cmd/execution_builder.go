@@ -274,7 +274,7 @@ func (exeNode *ExecutionNode) LoadExecutionReceiptsStorage(
 
 func (exeNode *ExecutionNode) LoadFollowerDistributor(node *NodeConfig) error {
 	exeNode.followerDistributor = pubsub.NewFollowerDistributor()
-	exeNode.followerDistributor.AddProtocolViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
+	exeNode.followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
 	return nil
 }
 

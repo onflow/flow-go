@@ -366,7 +366,6 @@ func main() {
 		}).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
-			followerDistributor.AddProtocolViolationConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
 			return nil
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
@@ -554,12 +553,17 @@ func main() {
 			// create consensus logger
 			logger := createLogger(node.Logger, node.RootChainID)
 
+			telemetryConsumer := notifications.NewTelemetryConsumer(logger)
+			slashingViolationConsumer := notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger)
+			followerDistributor.AddProposalViolationConsumer(slashingViolationConsumer)
+
 			// initialize a logging notifier for hotstuff
 			notifier := createNotifier(
 				logger,
 				mainMetrics,
 			)
 
+			notifier.AddParticipantConsumer(telemetryConsumer)
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
@@ -582,8 +586,11 @@ func main() {
 				return nil, err
 			}
 
-			// TODO: connect to slashing violation consumer
+			// create producer and connect it to consumers
 			voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
+			voteAggregationDistributor.AddVoteCollectorConsumer(telemetryConsumer)
+			voteAggregationDistributor.AddVoteAggregationViolationConsumer(slashingViolationConsumer)
+
 			validator := consensus.NewValidator(mainMetrics, wrappedCommittee)
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(wrappedCommittee, voteAggregationDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
@@ -600,8 +607,11 @@ func main() {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}
 
-			// TODO: connect to slashing violation consumer
+			// create producer and connect it to consumers
 			timeoutAggregationDistributor := pubsub.NewTimeoutAggregationDistributor()
+			timeoutAggregationDistributor.AddTimeoutCollectorConsumer(telemetryConsumer)
+			timeoutAggregationDistributor.AddTimeoutAggregationViolationConsumer(slashingViolationConsumer)
+
 			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(
 				logger,
 				timeoutAggregationDistributor,
@@ -628,7 +638,7 @@ func main() {
 				Committee:                   wrappedCommittee,
 				Signer:                      signer,
 				Persist:                     persist,
-				QCCreatedDistributor:        voteAggregationDistributor.VoteCollectorDistributor,
+				VoteCollectorDistributor:    voteAggregationDistributor.VoteCollectorDistributor,
 				FollowerDistributor:         followerDistributor,
 				TimeoutCollectorDistributor: timeoutAggregationDistributor.TimeoutCollectorDistributor,
 				Forks:                       forks,
