@@ -323,6 +323,7 @@ func DefaultBaseConfig() *BaseConfig {
 			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
 			AlspConfig: &AlspConfig{
 				SpamRecordCacheSize: alsp.DefaultSpamRecordCacheSize,
+				SpamReportQueueSize: alsp.DefaultSpamRecordQueueSize,
 				DisablePenalty:      false, // by default, apply the penalty
 			},
 		},
