@@ -135,7 +135,7 @@ func NewBuilder(log zerolog.Logger,
 	secureGrpcServer := grpc.NewServer(grpcOpts...)
 
 	// wrap the unsecured server with an HTTP proxy server to serve HTTP clients
-	httpServer := NewHTTPServer(unsecureGrpcServer, config.HTTPListenAddr)
+	httpServer := newHTTPProxyServer(unsecureGrpcServer)
 
 	var cache *lru.Cache
 	cacheSize := config.ConnectionPoolSize
@@ -351,16 +351,23 @@ func (e *Engine) serveSecureGRPCWorker(ctx irrecoverable.SignalerContext, ready 
 
 // serveGRPCWebProxyWorker is a worker routine which starts the gRPC web proxy server.
 func (e *Engine) serveGRPCWebProxyWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
 	log := e.log.With().Str("http_proxy_address", e.config.HTTPListenAddr).Logger()
 	log.Info().Msg("starting http proxy server on address")
 
-	err := e.httpServer.ListenAndServe() // blocking call
-	if errors.Is(err, http.ErrServerClosed) {
+	l, err := net.Listen("tcp", e.config.HTTPListenAddr)
+	if err != nil {
+		e.log.Err(err).Msg("failed to start the grpc web proxy server")
+		ctx.Throw(err)
 		return
 	}
+	ready()
+
+	err = e.httpServer.Serve(l) // blocking call
 	if err != nil {
-		log.Err(err).Msg("failed to start the http proxy server")
+		if errors.Is(err, http.ErrServerClosed) {
+			return
+		}
+		log.Err(err).Msg("fatal error in grpc web proxy server")
 		ctx.Throw(err)
 	}
 }
