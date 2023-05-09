@@ -200,6 +200,8 @@ type NetworkConfig struct {
 	DisallowListNotificationCacheSize uint32
 	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
 	UnicastRateLimitersConfig *UnicastRateLimitersConfig
+	// GossipSubRpcInspectorSuite rpc inspector suite.
+	GossipSubRpcInspectorSuite p2p.GossipSubInspectorSuite
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.

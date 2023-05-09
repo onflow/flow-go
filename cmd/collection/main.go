@@ -581,7 +581,7 @@ func main() {
 			// register the manager for protocol events
 			node.ProtocolEvents.AddConsumer(manager)
 
-			for _, rpcInspector := range node.GossipSubConfig.RPCInspectors {
+			for _, rpcInspector := range node.GossipSubRpcInspectorSuite.Inspectors() {
 				if r, ok := rpcInspector.(p2p.GossipSubMsgValidationRpcInspector); ok {
 					node.ProtocolEvents.AddConsumer(r)
 				}

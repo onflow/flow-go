@@ -2,7 +2,6 @@ package inspector
 
 import (
 	"fmt"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -11,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector"
-	"github.com/onflow/flow-go/network/p2p/inspector/cache"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector/suite"
@@ -164,22 +162,18 @@ func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.Gos
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
 	}
-	trackerOpts := make([]cache.RecordCacheConfigOpt, 0)
-	if b.metricsEnabled {
-		trackerOpts = append(trackerOpts, cache.WithMetricsCollector(metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(b.metricsCfg.HeroCacheFactory, b.publicNetwork)))
-	}
-
 	notificationDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(
 		b.logger,
 		[]queue.HeroStoreConfigOption{
 			queue.WithHeroStoreSizeLimit(b.inspectorsConfig.GossipSubRPCInspectorNotificationCacheSize),
 			queue.WithHeroStoreCollector(metrics.GossipSubRPCInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.publicNetwork))}...)
-
+	clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(b.metricsCfg.HeroCacheFactory, b.publicNetwork)
 	rpcValidationInspector := validation.NewControlMsgValidationInspector(
 		b.logger,
 		b.sporkID,
 		controlMsgRPCInspectorCfg,
 		notificationDistributor,
+		clusterPrefixedCacheCollector,
 	)
 	return rpcValidationInspector, notificationDistributor, nil
 }

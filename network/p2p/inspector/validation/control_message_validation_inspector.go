@@ -11,13 +11,14 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/inspector/cache"
+	"github.com/onflow/flow-go/network/p2p/inspector/internal/cache"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
@@ -52,14 +53,14 @@ var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
 var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
-func NewControlMsgValidationInspector(logger zerolog.Logger, sporkID flow.Identifier, config *ControlMsgValidationInspectorConfig, distributor p2p.GossipSubInspectorNotifDistributor, trackerOpts ...cache.RecordCacheConfigOpt) *ControlMsgValidationInspector {
+func NewControlMsgValidationInspector(logger zerolog.Logger, sporkID flow.Identifier, config *ControlMsgValidationInspectorConfig, distributor p2p.GossipSubInspectorNotifDistributor, clusterPrefixedCacheCollector module.HeroCacheMetrics) *ControlMsgValidationInspector {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 	c := &ControlMsgValidationInspector{
 		logger:                             lg,
 		sporkID:                            sporkID,
 		config:                             config,
 		distributor:                        distributor,
-		clusterPrefixTopicsReceivedTracker: cache.NewClusterPrefixTopicsReceivedTracker(logger, config.ClusterPrefixedTopicsReceivedCacheSize, trackerOpts...),
+		clusterPrefixTopicsReceivedTracker: cache.NewClusterPrefixTopicsReceivedTracker(logger, config.ClusterPrefixedTopicsReceivedCacheSize, clusterPrefixedCacheCollector),
 	}
 
 	cfg := &queue.HeroStoreConfig{

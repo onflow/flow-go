@@ -53,6 +53,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -379,22 +380,35 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
 
+		metricsCfg := &p2pconfig.MetricsConfig{
+			Metrics:          fnb.Metrics.Network,
+			HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
+		}
+
+		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.GossipSubConfig.RpcInspector).
+			SetPublicNetwork(p2p.PrivateNetwork).
+			SetMetrics(metricsCfg).
+			Build()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for default libp2p node: %w", err)
+		}
+
+		fnb.GossipSubRpcInspectorSuite = rpcInspectorSuite
+
 		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
 			fnb.Logger,
 			myAddr,
 			fnb.NetworkKey,
 			fnb.SporkID,
 			fnb.IdentityProvider,
-			&p2pconfig.MetricsConfig{
-				Metrics:          fnb.Metrics.Network,
-				HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
-			},
+			metricsCfg,
 			fnb.Resolver,
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
 			peerManagerCfg,
 			// run peer manager with the specified interval and let it also prune connections
 			fnb.GossipSubConfig,
+			fnb.GossipSubRpcInspectorSuite,
 			fnb.LibP2PResourceManagerConfig,
 			uniCfg,
 		)

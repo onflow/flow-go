@@ -2,8 +2,8 @@ package cache
 
 import (
 	"fmt"
-
 	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -16,13 +16,6 @@ import (
 var ErrRecordNotFound = fmt.Errorf("record not found")
 
 type recordEntityFactory func(identifier flow.Identifier) RecordEntity
-type RecordCacheConfigOpt func(config *RecordCacheConfig)
-
-func WithMetricsCollector(collector module.HeroCacheMetrics) RecordCacheConfigOpt {
-	return func(config *RecordCacheConfig) {
-		config.collector = collector
-	}
-}
 
 type RecordCacheConfig struct {
 	sizeLimit uint32
@@ -71,13 +64,13 @@ func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityF
 // Init initializes the record cache for the given peer id if it does not exist.
 // Returns true if the record is initialized, false otherwise (i.e.: the record already exists).
 // Args:
-// - peerID: peer ID of the sender of the control message.
+// - originId: the origin id the sender of the control message.
 // Returns:
 // - true if the record is initialized, false otherwise (i.e.: the record already exists).
 // Note that if Init is called multiple times for the same peer id, the record is initialized only once, and the
 // subsequent calls return false and do not change the record (i.e.: the record is not re-initialized).
-func (r *RecordCache) Init(identifier flow.Identifier) bool {
-	entity := r.recordEntityFactory(identifier)
+func (r *RecordCache) Init(originId flow.Identifier) bool {
+	entity := r.recordEntityFactory(originId)
 	return r.c.Add(entity)
 }
 
@@ -87,7 +80,7 @@ func (r *RecordCache) Init(identifier flow.Identifier) bool {
 // It returns an error if the adjustFunc returns an error or if the record does not exist.
 // Assuming that adjust is always called when the record exists, the error is irrecoverable and indicates a bug.
 // Args:
-// - peerID: peer ID of the sender of the control message.
+// - originId: the origin id the sender of the control message.
 // - adjustFunc: the function that adjusts the record.
 // Returns:
 //   - The number of cluster prefix topics received after the adjustment.
@@ -96,10 +89,9 @@ func (r *RecordCache) Init(identifier flow.Identifier) bool {
 //
 // Note if Adjust is called under the assumption that the record exists, the ErrRecordNotFound should be treated
 // as an irrecoverable error and indicates a bug.
-func (r *RecordCache) Update(peerID peer.ID) (int64, error) {
-	id := entityID(peerID)
-	r.Init(id)
-	adjustedEntity, adjusted := r.c.Adjust(id, func(entity flow.Entity) flow.Entity {
+func (r *RecordCache) Update(originId flow.Identifier) (int64, error) {
+	r.Init(originId)
+	adjustedEntity, adjusted := r.c.Adjust(originId, func(entity flow.Entity) flow.Entity {
 		record, ok := entity.(RecordEntity)
 		if !ok {
 			// sanity check
@@ -123,21 +115,20 @@ func (r *RecordCache) Update(peerID peer.ID) (int64, error) {
 // Before the count is returned it is decayed using the configured decay function.
 // Returns the record and true if the record exists, nil and false otherwise.
 // Args:
-// - peerID: peer ID of the sender of the control message.
+// - originId: the origin id the sender of the control message.
 // Returns:
 // - The number of cluster prefix topics received after the decay and true if the record exists, 0 and false otherwise.
-func (r *RecordCache) Get(peerID peer.ID) (int64, bool) {
-	id := entityID(peerID)
-	if r.Init(id) {
+func (r *RecordCache) Get(originId flow.Identifier) (int64, bool) {
+	if r.Init(originId) {
 		return 0, true
 	}
 
-	entity, ok := r.c.ByID(id)
+	entity, ok := r.c.ByID(originId)
 	if !ok {
 		// sanity check
 		// This should never happen because the record should have been initialized in the step at line 114, we should
 		// expect the record to always exists before reaching this code.
-		panic(fmt.Sprintf("failed to get entity after initialization returned false for entity id %s", id))
+		panic(fmt.Sprintf("failed to get entity after initialization returned false for entity id %s", originId))
 	}
 
 	record, ok := entity.(RecordEntity)
@@ -159,12 +150,11 @@ func (r *RecordCache) Identities() []flow.Identifier {
 // Remove removes the record of the given peer id from the cache.
 // Returns true if the record is removed, false otherwise (i.e., the record does not exist).
 // Args:
-// - peerID: peer ID of the sender of the control message.
+// - originId: the origin id the sender of the control message.
 // Returns:
 // - true if the record is removed, false otherwise (i.e., the record does not exist).
-func (r *RecordCache) Remove(peerID peer.ID) bool {
-	id := entityID(peerID)
-	return r.c.Remove(id)
+func (r *RecordCache) Remove(originId flow.Identifier) bool {
+	return r.c.Remove(originId)
 }
 
 // Size returns the number of records in the cache.
