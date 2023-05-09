@@ -2,6 +2,7 @@ package inspector
 
 import (
 	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
