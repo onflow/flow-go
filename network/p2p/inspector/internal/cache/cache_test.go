@@ -16,11 +16,13 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const defaultDecay = 0.99
+
 // TestNewRecordCache tests the creation of a new RecordCache.
 // It ensures that the returned cache is not nil. It does not test the
 // functionality of the cache.
 func TestNewRecordCache(t *testing.T) {
-	cache := cacheFixture(100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	require.Equalf(t, uint(0), cache.Size(), "cache size must be 0")
 }
@@ -29,7 +31,7 @@ func TestNewRecordCache(t *testing.T) {
 // It ensures that the method returns true when a new record is initialized
 // and false when an existing record is initialized.
 func TestRecordCache_Init(t *testing.T) {
-	cache := cacheFixture(100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "expected cache to be empty")
 
@@ -39,7 +41,8 @@ func TestRecordCache_Init(t *testing.T) {
 	// test initializing a record for an origin ID that doesn't exist in the cache
 	initialized := cache.Init(originID1)
 	require.True(t, initialized, "expected record to be initialized")
-	counter, ok := cache.Get(originID1)
+	counter, ok, err := cache.Get(originID1)
+	require.NoError(t, err)
 	require.True(t, ok, "expected record to exist")
 	require.Zerof(t, counter, "expected counter to be 0")
 	require.Equal(t, cache.Size(), uint(1), "expected cache to have one record")
@@ -47,7 +50,7 @@ func TestRecordCache_Init(t *testing.T) {
 	// test initializing a record for an origin ID that already exists in the cache
 	initialized = cache.Init(originID1)
 	require.False(t, initialized, "expected record not to be initialized")
-	counterAgain, ok := cache.Get(originID1)
+	counterAgain, ok, err := cache.Get(originID1)
 	require.True(t, ok, "expected record to still exist")
 	require.Zerof(t, counterAgain, "expected same counter to be 0")
 	require.Equal(t, counter, counterAgain, "expected records to be the same")
@@ -56,7 +59,7 @@ func TestRecordCache_Init(t *testing.T) {
 	// test initializing a record for another origin ID
 	initialized = cache.Init(originID2)
 	require.True(t, initialized, "expected record to be initialized")
-	counter2, ok := cache.Get(originID2)
+	counter2, ok, err := cache.Get(originID2)
 	require.True(t, ok, "expected record to exist")
 	require.Zerof(t, counter2, "expected second counter to be 0")
 	require.Equal(t, cache.Size(), uint(2), "expected cache to have two records")
@@ -67,7 +70,7 @@ func TestRecordCache_Init(t *testing.T) {
 // 1. Multiple goroutines initializing records for different origin IDs.
 // 2. Ensuring that all records are correctly initialized.
 func TestRecordCache_ConcurrentInit(t *testing.T) {
-	cache := cacheFixture(100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "expected cache to be empty")
 
@@ -87,7 +90,7 @@ func TestRecordCache_ConcurrentInit(t *testing.T) {
 
 	// ensure that all records are correctly initialized
 	for _, originID := range originIDs {
-		count, found := cache.Get(originID)
+		count, found, _ := cache.Get(originID)
 		require.True(t, found)
 		require.Zerof(t, count, "expected all counters to be initialized to 0")
 	}
@@ -99,7 +102,7 @@ func TestRecordCache_ConcurrentInit(t *testing.T) {
 // 2. Only one goroutine successfully initializes the record, and others receive false on initialization.
 // 3. The record is correctly initialized in the cache and can be retrieved using the Get method.
 func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
-	cache := cacheFixture(100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "expected cache to be empty")
 
@@ -127,7 +130,7 @@ func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
 	require.Equal(t, int32(1), successCount.Load())
 
 	// ensure that the record is correctly initialized in the cache
-	count, found := cache.Get(originID)
+	count, found, _ := cache.Get(originID)
 	require.True(t, found)
 	require.Zero(t, count)
 }
@@ -138,7 +141,7 @@ func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
 // 2. Attempting to update a record counter  for a non-existing origin ID should not result in error. Update should always attempt to initialize the counter.
 // 3. Multiple updates on the same record only initialize the record once.
 func TestRecordCache_Update(t *testing.T) {
-	cache := cacheFixture(100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(100, 0, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "expected cache to be empty")
 
@@ -151,9 +154,9 @@ func TestRecordCache_Update(t *testing.T) {
 
 	count, err := cache.Update(originID1)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), count)
+	require.Equal(t, float64(1), count)
 
-	currentCount, ok := cache.Get(originID1)
+	currentCount, ok, err := cache.Get(originID1)
 	require.True(t, ok)
 	require.Equal(t, count, currentCount)
 
@@ -161,11 +164,38 @@ func TestRecordCache_Update(t *testing.T) {
 	originID3 := unittest.IdentifierFixture()
 	count2, err := cache.Update(originID3)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), count2)
+	require.Equal(t, float64(1), count2)
 
 	count2, err = cache.Update(originID3)
 	require.NoError(t, err)
-	require.Equal(t, int64(2), count2)
+	require.Equal(t, float64(2), count2)
+}
+
+// TestRecordCache_UpdateDecay tests the Update method of the RecordCache with the default cluster prefixed received decay value.
+// The test covers the following scenarios:
+// 1. Updating a record counter for an existing origin ID.
+// 3. Multiple updates on the same record only initialize the record once.
+func TestRecordCache_UpdateDecay(t *testing.T) {
+	cache := cacheFixture(100, 0.0001, zerolog.Nop(), metrics.NewNoopCollector())
+	require.NotNil(t, cache)
+	require.Zerof(t, cache.Size(), "expected cache to be empty")
+
+	originID1 := unittest.IdentifierFixture()
+
+	// initialize spam records for originID1 and originID2
+	require.True(t, cache.Init(originID1))
+
+	for i := 0; i < 1000; i++ {
+		_, err := cache.Update(originID1)
+		require.NoError(t, err)
+	}
+
+	for i := 0; i <= 1000; i++ {
+		count, ok, err := cache.Get(originID1)
+		require.True(t, ok)
+		require.NoError(t, err)
+		fmt.Println(count)
+	}
 }
 
 // TestRecordCache_Identities tests the Identities method of the RecordCache.
@@ -173,7 +203,7 @@ func TestRecordCache_Update(t *testing.T) {
 // 1. Initializing the cache with multiple records.
 // 2. Checking if the Identities method returns the correct set of origin IDs.
 func TestRecordCache_Identities(t *testing.T) {
-	cache := cacheFixture(100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "expected cache to be empty")
 
@@ -207,7 +237,7 @@ func TestRecordCache_Identities(t *testing.T) {
 // 3. Ensuring the other records are still in the cache after removal.
 // 4. Attempting to remove a non-existent origin ID.
 func TestRecordCache_Remove(t *testing.T) {
-	cache := cacheFixture(100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "expected cache to be empty")
 
@@ -227,9 +257,9 @@ func TestRecordCache_Remove(t *testing.T) {
 	require.NotContains(t, originID1, cache.Identities())
 
 	// check if the other origin IDs are still in the cache
-	_, exists := cache.Get(originID2)
+	_, exists, _ := cache.Get(originID2)
 	require.True(t, exists)
-	_, exists = cache.Get(originID3)
+	_, exists, _ = cache.Get(originID3)
 	require.True(t, exists)
 
 	// attempt to remove a non-existent origin ID
@@ -242,7 +272,7 @@ func TestRecordCache_Remove(t *testing.T) {
 // 1. Multiple goroutines removing records for different origin IDs concurrently.
 // 2. The records are correctly removed from the cache.
 func TestRecordCache_ConcurrentRemove(t *testing.T) {
-	cache := cacheFixture(100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "expected cache to be empty")
 
@@ -275,7 +305,7 @@ func TestRecordCache_ConcurrentRemove(t *testing.T) {
 // 2. Multiple goroutines getting records for different origin IDs concurrently.
 // 3. The adjusted records are correctly updated in the cache.
 func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
-	cache := cacheFixture(100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(100, 0, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "expected cache to be empty")
 
@@ -298,7 +328,7 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 		// get spam records concurrently
 		go func(id flow.Identifier) {
 			defer wg.Done()
-			record, found := cache.Get(id)
+			record, found, _ := cache.Get(id)
 			require.True(t, found)
 			require.NotNil(t, record)
 		}(originID)
@@ -308,9 +338,9 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 
 	// ensure that the records are correctly updated in the cache
 	for _, originID := range originIDs {
-		count, found := cache.Get(originID)
+		count, found, _ := cache.Get(originID)
 		require.True(t, found)
-		require.Equal(t, int64(1), count)
+		require.Equal(t, float64(1), count)
 	}
 }
 
@@ -321,7 +351,7 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 // 3. The initialized records are correctly added to the cache.
 // 4. The removed records are correctly removed from the cache.
 func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
-	cache := cacheFixture(100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "expected cache to be empty")
 
@@ -366,7 +396,7 @@ func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 // 2. Multiple goroutines removing records for different origin IDs concurrently.
 // 3. Multiple goroutines adjusting records for different origin IDs concurrently.
 func TestRecordCache_ConcurrentInitRemoveUpdate(t *testing.T) {
-	cache := cacheFixture(100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "expected cache to be empty")
 
@@ -416,7 +446,7 @@ func TestRecordCache_ConcurrentInitRemoveUpdate(t *testing.T) {
 // 2. Adjusting a non-existent record.
 // 3. Removing a record multiple times.
 func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
-	cache := cacheFixture(100, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "expected cache to be empty")
 
@@ -436,7 +466,8 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 		go func(id flow.Identifier) {
 			defer wg.Done()
 			require.True(t, cache.Init(id))
-			retrieved, ok := cache.Get(id)
+			retrieved, ok, err := cache.Get(id)
+			require.NoError(t, err)
 			require.True(t, ok)
 			require.Zero(t, retrieved)
 		}(originID)
@@ -474,21 +505,22 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 // Returns:
 // - RecordEntity: the created record entity.
 func recordEntityFixture(id flow.Identifier) RecordEntity {
-	return RecordEntity{ClusterPrefixTopicsReceivedRecord{
-		Identifier: id,
-		Counter:    atomic.NewInt64(0),
-	}}
+	return RecordEntity{
+		ClusterPrefixTopicsReceivedRecord: ClusterPrefixTopicsReceivedRecord{Identifier: id, Counter: atomic.NewFloat64(0)},
+		lastUpdated:                       time.Now(),
+	}
 }
 
 // cacheFixture returns a new *RecordCache.
-func cacheFixture(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *RecordCache {
+func cacheFixture(sizeLimit uint32, recordDecay float64, logger zerolog.Logger, collector module.HeroCacheMetrics) *RecordCache {
 	recordFactory := func(id flow.Identifier) RecordEntity {
 		return recordEntityFixture(id)
 	}
 	config := &RecordCacheConfig{
-		sizeLimit: sizeLimit,
-		logger:    logger,
-		collector: collector,
+		sizeLimit:   sizeLimit,
+		logger:      logger,
+		collector:   collector,
+		recordDecay: recordDecay,
 	}
 	return NewRecordCache(config, recordFactory)
 }

@@ -31,7 +31,9 @@ type GossipSubRPCValidationInspectorConfigs struct {
 	PruneLimits map[string]int
 	// ClusterPrefixDiscardThreshold the upper bound on the amount of cluster prefixed control messages that will be processed
 	// before a node starts to get penalized.
-	ClusterPrefixDiscardThreshold int64
+	ClusterPrefixDiscardThreshold float64
+	// ClusterPrefixedTopicsReceivedCacheDecay decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers.
+	ClusterPrefixedTopicsReceivedCacheDecay float64
 }
 
 // GossipSubRPCMetricsInspectorConfigs rpc metrics observer inspector configuration.
@@ -56,10 +58,11 @@ func DefaultGossipSubRPCInspectorsConfig() *GossipSubRPCInspectorsConfig {
 	return &GossipSubRPCInspectorsConfig{
 		GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
 		ValidationInspectorConfigs: &GossipSubRPCValidationInspectorConfigs{
-			NumberOfWorkers:                        validation.DefaultNumberOfWorkers,
-			InspectMessageQueueCacheSize:           validation.DefaultControlMsgValidationInspectorQueueCacheSize,
-			ClusterPrefixedTopicsReceivedCacheSize: validation.DefaultClusterPrefixedTopicsReceivedCacheSize,
-			ClusterPrefixDiscardThreshold:          validation.DefaultClusterPrefixDiscardThreshold,
+			NumberOfWorkers:                         validation.DefaultNumberOfWorkers,
+			InspectMessageQueueCacheSize:            validation.DefaultControlMsgValidationInspectorQueueCacheSize,
+			ClusterPrefixedTopicsReceivedCacheSize:  validation.DefaultClusterPrefixedTopicsReceivedCacheSize,
+			ClusterPrefixedTopicsReceivedCacheDecay: validation.DefaultClusterPrefixedTopicsReceivedCacheDecay,
+			ClusterPrefixDiscardThreshold:           validation.DefaultClusterPrefixDiscardThreshold,
 			GraftLimits: map[string]int{
 				validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
 				validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
@@ -205,11 +208,12 @@ func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation
 	})
 
 	return &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:                        validation.DefaultNumberOfWorkers,
-		InspectMsgStoreOpts:                    opts,
-		GraftValidationCfg:                     graftCfg,
-		PruneValidationCfg:                     pruneCfg,
-		ClusterPrefixHardThreshold:             validation.DefaultClusterPrefixDiscardThreshold,
-		ClusterPrefixedTopicsReceivedCacheSize: validation.DefaultClusterPrefixedTopicsReceivedCacheSize,
+		NumberOfWorkers:                         validation.DefaultNumberOfWorkers,
+		InspectMsgStoreOpts:                     opts,
+		GraftValidationCfg:                      graftCfg,
+		PruneValidationCfg:                      pruneCfg,
+		ClusterPrefixHardThreshold:              validation.DefaultClusterPrefixDiscardThreshold,
+		ClusterPrefixedTopicsReceivedCacheSize:  validation.DefaultClusterPrefixedTopicsReceivedCacheSize,
+		ClusterPrefixedTopicsReceivedCacheDecay: validation.DefaultClusterPrefixedTopicsReceivedCacheDecay,
 	}
 }

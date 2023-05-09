@@ -60,7 +60,7 @@ func NewControlMsgValidationInspector(logger zerolog.Logger, sporkID flow.Identi
 		sporkID:                            sporkID,
 		config:                             config,
 		distributor:                        distributor,
-		clusterPrefixTopicsReceivedTracker: cache.NewClusterPrefixTopicsReceivedTracker(logger, config.ClusterPrefixedTopicsReceivedCacheSize, clusterPrefixedCacheCollector),
+		clusterPrefixTopicsReceivedTracker: cache.NewClusterPrefixTopicsReceivedTracker(logger, config.ClusterPrefixedTopicsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedTopicsReceivedCacheDecay),
 	}
 
 	cfg := &queue.HeroStoreConfig{

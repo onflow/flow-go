@@ -618,8 +618,8 @@ func setupTest(t *testing.T, logger zerolog.Logger, role flow.Role, inspectorCon
 		mockDistributorOpt(distributor, spammer)
 	}
 
-	inspector := validation.NewControlMsgValidationInspector(logger, sporkID, inspectorConfig, distributor, metrics.NewNoopCollector())
-	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(inspector)
+	validationInspector := validation.NewControlMsgValidationInspector(logger, sporkID, inspectorConfig, distributor, metrics.NewNoopCollector())
+	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, _ := p2ptest.NodeFixture(
 		t,
 		sporkID,
@@ -629,7 +629,7 @@ func setupTest(t *testing.T, logger zerolog.Logger, role flow.Role, inspectorCon
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
 
-	return signalerCtx, sporkID, cancel, spammer, victimNode, distributor, inspector
+	return signalerCtx, sporkID, cancel, spammer, victimNode, distributor, validationInspector
 }
 
 // TestGossipSubSpamMitigationIntegration tests that the spam mitigation feature of GossipSub is working as expected.

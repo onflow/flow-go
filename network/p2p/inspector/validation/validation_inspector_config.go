@@ -12,6 +12,8 @@ const (
 	DefaultControlMsgValidationInspectorQueueCacheSize = 100
 	// DefaultClusterPrefixedTopicsReceivedCacheSize is the default size of the cluster prefixed topics received record cache.
 	DefaultClusterPrefixedTopicsReceivedCacheSize = 100
+	// DefaultClusterPrefixedTopicsReceivedCacheDecay the default cache decay value for cluster prefixed topics received cached counters.
+	DefaultClusterPrefixedTopicsReceivedCacheDecay = 0.1
 	// rpcInspectorComponentName the rpc inspector component name.
 	rpcInspectorComponentName = "gossipsub_rpc_validation_inspector"
 )
@@ -31,9 +33,11 @@ type ControlMsgValidationInspectorConfig struct {
 	// when the cluster ID's provider is set asynchronously. It also allows processing of some stale messages that may be sent by nodes
 	// that fall behind in the protocol. After the amount of cluster prefixed control messages processed exceeds this threshold the node
 	// will be pushed to the edge of the network mesh.
-	ClusterPrefixHardThreshold int64
+	ClusterPrefixHardThreshold float64
 	// ClusterPrefixedTopicsReceivedCacheSize size of the cache used to track the amount of cluster prefixed topics received by peers.
 	ClusterPrefixedTopicsReceivedCacheSize uint32
+	// ClusterPrefixedTopicsReceivedCacheDecay decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers.
+	ClusterPrefixedTopicsReceivedCacheDecay float64
 }
 
 // getCtrlMsgValidationConfig returns the CtrlMsgValidationConfig for the specified p2p.ControlMessageType.

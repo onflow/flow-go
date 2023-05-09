@@ -2,6 +2,7 @@ package cache
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
@@ -11,6 +12,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
 var ErrRecordNotFound = fmt.Errorf("record not found")
@@ -21,6 +23,8 @@ type RecordCacheConfig struct {
 	sizeLimit uint32
 	logger    zerolog.Logger
 	collector module.HeroCacheMetrics
+	// recordDecay decay factor used by the cache to perform geometric decay on counters.
+	recordDecay float64
 }
 
 // RecordCache is a cache that stores *ClusterPrefixTopicsReceivedRecord used by the control message validation inspector
@@ -30,6 +34,8 @@ type RecordCache struct {
 	recordEntityFactory recordEntityFactory
 	// c is the underlying cache.
 	c *stdmap.Backend
+	// decayFunc decay func used by the cache to perform decay on counters.
+	decayFunc preProcessingFunc
 }
 
 // NewRecordCache creates a new *RecordCache.
@@ -54,9 +60,9 @@ func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityF
 		heropool.NoEjection,
 		config.logger.With().Str("mempool", "gossipsub=cluster-prefix-topics-received-records").Logger(),
 		config.collector)
-
 	return &RecordCache{
 		recordEntityFactory: recordEntityFactory,
+		decayFunc:           defaultDecayFunction(config.recordDecay),
 		c:                   stdmap.NewBackend(stdmap.WithBackData(backData)),
 	}
 }
@@ -89,24 +95,16 @@ func (r *RecordCache) Init(originId flow.Identifier) bool {
 //
 // Note if Adjust is called under the assumption that the record exists, the ErrRecordNotFound should be treated
 // as an irrecoverable error and indicates a bug.
-func (r *RecordCache) Update(originId flow.Identifier) (int64, error) {
+func (r *RecordCache) Update(originId flow.Identifier) (float64, error) {
 	r.Init(originId)
-	adjustedEntity, adjusted := r.c.Adjust(originId, func(entity flow.Entity) flow.Entity {
-		record, ok := entity.(RecordEntity)
-		if !ok {
-			// sanity check
-			// This should never happen, because the cache only contains RecordEntity entities.
-			panic(fmt.Sprintf("invalid entity type, expected RecordEntity type, got: %T", entity))
-		}
-		record.Counter.Inc()
-		// Return the adjusted record.
-		return record
-	})
-
+	_, adjusted := r.c.Adjust(originId, r.decayAdjustment)
 	if !adjusted {
 		return 0, ErrRecordNotFound
 	}
-
+	adjustedEntity, adjusted := r.c.Adjust(originId, r.incrementAdjustment)
+	if !adjusted {
+		return 0, ErrRecordNotFound
+	}
 	return adjustedEntity.(RecordEntity).Counter.Load(), nil
 }
 
@@ -118,28 +116,25 @@ func (r *RecordCache) Update(originId flow.Identifier) (int64, error) {
 // - originId: the origin id the sender of the control message.
 // Returns:
 // - The number of cluster prefix topics received after the decay and true if the record exists, 0 and false otherwise.
-func (r *RecordCache) Get(originId flow.Identifier) (int64, bool) {
+func (r *RecordCache) Get(originId flow.Identifier) (float64, bool, error) {
 	if r.Init(originId) {
-		return 0, true
+		return 0, true, nil
 	}
 
-	entity, ok := r.c.ByID(originId)
-	if !ok {
-		// sanity check
-		// This should never happen because the record should have been initialized in the step at line 114, we should
-		// expect the record to always exists before reaching this code.
-		panic(fmt.Sprintf("failed to get entity after initialization returned false for entity id %s", originId))
+	adjustedEntity, adjusted := r.c.Adjust(originId, r.decayAdjustment)
+	if !adjusted {
+		return 0, false, ErrRecordNotFound
 	}
 
-	record, ok := entity.(RecordEntity)
+	record, ok := adjustedEntity.(RecordEntity)
 	if !ok {
 		// sanity check
 		// This should never happen, because the cache only contains RecordEntity entities.
-		panic(fmt.Sprintf("invalid entity type, expected RecordEntity type, got: %T", entity))
+		panic(fmt.Sprintf("invalid entity type, expected RecordEntity type, got: %T", adjustedEntity))
 	}
 
 	// perform decay on Counter
-	return record.Counter.Load(), true
+	return record.Counter.Load(), true, nil
 }
 
 // Identities returns the list of identities of the nodes that have a spam record in the cache.
@@ -162,8 +157,56 @@ func (r *RecordCache) Size() uint {
 	return r.c.Size()
 }
 
+func (r *RecordCache) incrementAdjustment(entity flow.Entity) flow.Entity {
+	record, ok := entity.(RecordEntity)
+	if !ok {
+		// sanity check
+		// This should never happen, because the cache only contains RecordEntity entities.
+		panic(fmt.Sprintf("invalid entity type, expected RecordEntity type, got: %T", entity))
+	}
+	record.Counter.Add(1)
+	record.lastUpdated = time.Now()
+	// Return the adjusted record.
+	return record
+}
+
+func (r *RecordCache) decayAdjustment(entity flow.Entity) flow.Entity {
+	record, ok := entity.(RecordEntity)
+	if !ok {
+		// sanity check
+		// This should never happen, because the cache only contains RecordEntity entities.
+		panic(fmt.Sprintf("invalid entity type, expected RecordEntity type, got: %T", entity))
+	}
+	var err error
+	record, err = r.decayFunc(record)
+	if err != nil {
+		return record
+	}
+	record.lastUpdated = time.Now()
+	// Return the adjusted record.
+	return record
+}
+
 // entityID converts peer ID to flow.Identifier.
 // HeroCache uses hash of peer.ID as the unique identifier of the record.
 func entityID(peerID peer.ID) flow.Identifier {
 	return flow.HashToID([]byte(peerID))
+}
+
+type preProcessingFunc func(recordEntity RecordEntity) (RecordEntity, error)
+
+// defaultDecayFunction is the default decay function that is used to decay the cluster prefixed topic received counter of a peer.
+func defaultDecayFunction(decay float64) preProcessingFunc {
+	return func(recordEntity RecordEntity) (RecordEntity, error) {
+		if recordEntity.Counter.Load() == 0 {
+			return recordEntity, nil
+		}
+
+		decayedVal, err := scoring.GeometricDecay(recordEntity.Counter.Load(), decay, recordEntity.lastUpdated)
+		if err != nil {
+			return recordEntity, fmt.Errorf("could not decay cluster prefixed topic received counter: %w", err)
+		}
+		recordEntity.Counter.Store(decayedVal)
+		return recordEntity, nil
+	}
 }

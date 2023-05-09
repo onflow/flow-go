@@ -1,6 +1,8 @@
 package cache
 
 import (
+	"time"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -10,6 +12,7 @@ import (
 // the records peer field for deduplication.
 type RecordEntity struct {
 	ClusterPrefixTopicsReceivedRecord
+	lastUpdated time.Time
 }
 
 var _ flow.Entity = (*RecordEntity)(nil)
@@ -19,6 +22,7 @@ var _ flow.Entity = (*RecordEntity)(nil)
 func NewRecordEntity(identifier flow.Identifier) RecordEntity {
 	return RecordEntity{
 		ClusterPrefixTopicsReceivedRecord: NewClusterPrefixTopicsReceivedRecord(identifier),
+		lastUpdated:                       time.Now(),
 	}
 }
 

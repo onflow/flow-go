@@ -10,12 +10,12 @@ import (
 // topics received from a peer.
 type ClusterPrefixTopicsReceivedRecord struct {
 	Identifier flow.Identifier
-	Counter    *atomic.Int64
+	Counter    *atomic.Float64
 }
 
 func NewClusterPrefixTopicsReceivedRecord(identifier flow.Identifier) ClusterPrefixTopicsReceivedRecord {
 	return ClusterPrefixTopicsReceivedRecord{
 		Identifier: identifier,
-		Counter:    atomic.NewInt64(0),
+		Counter:    atomic.NewFloat64(0),
 	}
 }

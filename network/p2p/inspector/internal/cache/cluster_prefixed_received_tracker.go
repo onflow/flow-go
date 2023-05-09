@@ -15,7 +15,7 @@ type ClusterPrefixTopicsReceivedTracker struct {
 }
 
 // NewClusterPrefixTopicsReceivedTracker returns a new *ClusterPrefixTopicsReceivedTracker.
-func NewClusterPrefixTopicsReceivedTracker(logger zerolog.Logger, sizeLimit uint32, clusterPrefixedCacheCollector module.HeroCacheMetrics) *ClusterPrefixTopicsReceivedTracker {
+func NewClusterPrefixTopicsReceivedTracker(logger zerolog.Logger, sizeLimit uint32, clusterPrefixedCacheCollector module.HeroCacheMetrics, decay float64) *ClusterPrefixTopicsReceivedTracker {
 	config := &RecordCacheConfig{
 		sizeLimit: sizeLimit,
 		logger:    logger,
@@ -25,7 +25,7 @@ func NewClusterPrefixTopicsReceivedTracker(logger zerolog.Logger, sizeLimit uint
 }
 
 // Inc increments the cluster prefixed topics received Counter for the peer.
-func (c *ClusterPrefixTopicsReceivedTracker) Inc(peerID peer.ID) (int64, error) {
+func (c *ClusterPrefixTopicsReceivedTracker) Inc(peerID peer.ID) (float64, error) {
 	id := entityID(peerID)
 	count, err := c.cache.Update(id)
 	if err != nil {
@@ -35,8 +35,8 @@ func (c *ClusterPrefixTopicsReceivedTracker) Inc(peerID peer.ID) (int64, error) 
 }
 
 // Load loads the current number of cluster prefixed topics received by a peer.
-func (c *ClusterPrefixTopicsReceivedTracker) Load(peerID peer.ID) int64 {
+func (c *ClusterPrefixTopicsReceivedTracker) Load(peerID peer.ID) float64 {
 	id := entityID(peerID)
-	count, _ := c.cache.Get(id)
+	count, _, _ := c.cache.Get(id)
 	return count
 }
