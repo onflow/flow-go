@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"crypto/rand"
 	"fmt"
 	"time"
 
@@ -13,8 +14,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 )
-
-var defaultActiveClusterIdsIdentifier = flow.ZeroID
 
 var ErrRecordNotFound = fmt.Errorf("record not found")
 
@@ -37,6 +36,8 @@ type RecordCache struct {
 	c *stdmap.Backend
 	// decayFunc decay func used by the cache to perform decay on counters.
 	decayFunc preProcessingFunc
+	// activeClusterIdsCacheId identifier used to store the active cluster Ids.
+	activeClusterIdsCacheId flow.Identifier
 }
 
 // NewRecordCache creates a new *RecordCache.
@@ -51,7 +52,7 @@ type RecordCache struct {
 // expected to be small, we do not eject any records from the cache. The cache size must be large enough to hold all
 // the records of the authorized nodes. Also, this cache is keeping at most one record per peer id, so the
 // size of the cache must be at least the number of authorized nodes.
-func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityFactory) *RecordCache {
+func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityFactory) (*RecordCache, error) {
 	backData := herocache.NewCache(config.sizeLimit,
 		herocache.DefaultOversizeFactor,
 		// this cache is supposed to keep the cluster prefix topics received record for the authorized (staked) nodes. Since the number of such nodes is
@@ -66,8 +67,14 @@ func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityF
 		decayFunc:           defaultDecayFunction(config.recordDecay),
 		c:                   stdmap.NewBackend(stdmap.WithBackData(backData)),
 	}
+	b := make([]byte, 100)
+	_, err := rand.Read(b)
+	if err != nil {
+		return nil, err
+	}
+	recordCache.activeClusterIdsCacheId = flow.HashToID(b)
 	recordCache.initActiveClusterIds()
-	return recordCache
+	return recordCache, nil
 }
 
 // Init initializes the record cache for the given peer id if it does not exist.
@@ -141,7 +148,7 @@ func (r *RecordCache) Get(originId flow.Identifier) (float64, bool, error) {
 }
 
 func (r *RecordCache) storeActiveClusterIds(clusterIDList flow.ChainIDList) flow.ChainIDList {
-	adjustedEntity, _ := r.c.Adjust(defaultActiveClusterIdsIdentifier, func(entity flow.Entity) flow.Entity {
+	adjustedEntity, _ := r.c.Adjust(r.activeClusterIdsCacheId, func(entity flow.Entity) flow.Entity {
 		record, ok := entity.(ActiveClusterIdsEntity)
 		if !ok {
 			// sanity check
@@ -157,7 +164,7 @@ func (r *RecordCache) storeActiveClusterIds(clusterIDList flow.ChainIDList) flow
 }
 
 func (r *RecordCache) getActiveClusterIds() flow.ChainIDList {
-	adjustedEntity, ok := r.c.ByID(defaultActiveClusterIdsIdentifier)
+	adjustedEntity, ok := r.c.ByID(r.activeClusterIdsCacheId)
 	if !ok {
 		// sanity check
 		// This should never happen, because cache should always contain a ActiveClusterIdsEntity
@@ -168,7 +175,7 @@ func (r *RecordCache) getActiveClusterIds() flow.ChainIDList {
 }
 
 func (r *RecordCache) initActiveClusterIds() {
-	activeClusterIdsEntity := NewActiveClusterIdsEntity(defaultActiveClusterIdsIdentifier, make(flow.ChainIDList, 0))
+	activeClusterIdsEntity := NewActiveClusterIdsEntity(r.activeClusterIdsCacheId, make(flow.ChainIDList, 0))
 	stored := r.c.Add(activeClusterIdsEntity)
 	if !stored {
 		panic("failed to initialize active cluster Ids in RecordCache")
@@ -223,6 +230,10 @@ func (r *RecordCache) decayAdjustment(entity flow.Entity) flow.Entity {
 	record.lastUpdated = time.Now()
 	// Return the adjusted record.
 	return record
+}
+
+func (r *RecordCache) getActiveClusterIdsCacheId() flow.Identifier {
+	return r.activeClusterIdsCacheId
 }
 
 type preProcessingFunc func(recordEntity RecordEntity) (RecordEntity, error)

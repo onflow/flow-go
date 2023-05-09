@@ -13,7 +13,7 @@ const (
 	// DefaultClusterPrefixedTopicsReceivedCacheSize is the default size of the cluster prefixed topics received record cache.
 	DefaultClusterPrefixedTopicsReceivedCacheSize = 100
 	// DefaultClusterPrefixedTopicsReceivedCacheDecay the default cache decay value for cluster prefixed topics received cached counters.
-	DefaultClusterPrefixedTopicsReceivedCacheDecay = 0.1
+	DefaultClusterPrefixedTopicsReceivedCacheDecay = 0.99
 	// rpcInspectorComponentName the rpc inspector component name.
 	rpcInspectorComponentName = "gossipsub_rpc_validation_inspector"
 )

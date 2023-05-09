@@ -22,7 +22,7 @@ const defaultDecay = 0.99
 // It ensures that the returned cache is not nil. It does not test the
 // functionality of the cache.
 func TestNewRecordCache(t *testing.T) {
-	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
 	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
@@ -32,7 +32,7 @@ func TestNewRecordCache(t *testing.T) {
 // It ensures that the method returns true when a new record is initialized
 // and false when an existing record is initialized.
 func TestRecordCache_Init(t *testing.T) {
-	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
 	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
@@ -74,7 +74,7 @@ func TestRecordCache_Init(t *testing.T) {
 // 1. Multiple goroutines initializing records for different origin IDs.
 // 2. Ensuring that all records are correctly initialized.
 func TestRecordCache_ConcurrentInit(t *testing.T) {
-	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
 	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
@@ -107,7 +107,7 @@ func TestRecordCache_ConcurrentInit(t *testing.T) {
 // 2. Only one goroutine successfully initializes the record, and others receive false on initialization.
 // 3. The record is correctly initialized in the cache and can be retrieved using the Get method.
 func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
-	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
 	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
@@ -147,7 +147,7 @@ func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
 // 2. Attempting to update a record counter  for a non-existing origin ID should not result in error. Update should always attempt to initialize the counter.
 // 3. Multiple updates on the same record only initialize the record once.
 func TestRecordCache_Update(t *testing.T) {
-	cache := cacheFixture(100, 0, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(t, 100, 0, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
 	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
@@ -179,12 +179,9 @@ func TestRecordCache_Update(t *testing.T) {
 	require.Equal(t, float64(2), count2)
 }
 
-// TestRecordCache_UpdateDecay tests the Update method of the RecordCache with the default cluster prefixed received decay value.
-// The test covers the following scenarios:
-// 1. Updating a record counter for an existing origin ID.
-// 3. Multiple updates on the same record only initialize the record once.
-func TestRecordCache_UpdateDecay(t *testing.T) {
-	cache := cacheFixture(100, 0.0001, zerolog.Nop(), metrics.NewNoopCollector())
+// TestRecordCache_UpdateDecay ensures that a counter in the record cache is eventually decayed back to 0 after some time.
+func TestRecordCache_Decay(t *testing.T) {
+	cache := cacheFixture(t, 100, 0.09, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
 	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
@@ -193,18 +190,22 @@ func TestRecordCache_UpdateDecay(t *testing.T) {
 
 	// initialize spam records for originID1 and originID2
 	require.True(t, cache.Init(originID1))
+	count, err := cache.Update(originID1)
+	require.Equal(t, float64(1), count)
 
-	for i := 0; i < 1000; i++ {
-		_, err := cache.Update(originID1)
-		require.NoError(t, err)
-	}
+	count, ok, err := cache.Get(originID1)
+	require.True(t, ok)
+	require.NoError(t, err)
+	// count should have been delayed slightly
+	require.True(t, count < float64(1))
 
-	for i := 0; i <= 1000; i++ {
-		count, ok, err := cache.Get(originID1)
-		require.True(t, ok)
-		require.NoError(t, err)
-		fmt.Println(count)
-	}
+	time.Sleep(time.Second)
+
+	count, ok, err = cache.Get(originID1)
+	require.True(t, ok)
+	require.NoError(t, err)
+	// count should have been delayed slightly, but closer to 0
+	require.Less(t, count, 0.1)
 }
 
 // TestRecordCache_Identities tests the Identities method of the RecordCache.
@@ -212,7 +213,7 @@ func TestRecordCache_UpdateDecay(t *testing.T) {
 // 1. Initializing the cache with multiple records.
 // 2. Checking if the Identities method returns the correct set of origin IDs.
 func TestRecordCache_Identities(t *testing.T) {
-	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
 	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
@@ -247,7 +248,7 @@ func TestRecordCache_Identities(t *testing.T) {
 // 3. Ensuring the other records are still in the cache after removal.
 // 4. Attempting to remove a non-existent origin ID.
 func TestRecordCache_Remove(t *testing.T) {
-	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
 	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
@@ -283,7 +284,7 @@ func TestRecordCache_Remove(t *testing.T) {
 // 1. Multiple goroutines removing records for different origin IDs concurrently.
 // 2. The records are correctly removed from the cache.
 func TestRecordCache_ConcurrentRemove(t *testing.T) {
-	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
 	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
@@ -317,7 +318,7 @@ func TestRecordCache_ConcurrentRemove(t *testing.T) {
 // 2. Multiple goroutines getting records for different origin IDs concurrently.
 // 3. The adjusted records are correctly updated in the cache.
 func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
-	cache := cacheFixture(100, 0, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(t, 100, 0, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
 	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
@@ -364,7 +365,7 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 // 3. The initialized records are correctly added to the cache.
 // 4. The removed records are correctly removed from the cache.
 func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
-	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
 	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
@@ -410,7 +411,7 @@ func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 // 2. Multiple goroutines removing records for different origin IDs concurrently.
 // 3. Multiple goroutines adjusting records for different origin IDs concurrently.
 func TestRecordCache_ConcurrentInitRemoveUpdate(t *testing.T) {
-	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
 	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
@@ -461,7 +462,7 @@ func TestRecordCache_ConcurrentInitRemoveUpdate(t *testing.T) {
 // 2. Adjusting a non-existent record.
 // 3. Removing a record multiple times.
 func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
-	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
+	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
 	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
@@ -507,8 +508,7 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 			require.True(t, len(ids) <= len(originIDs))
 			// the returned IDs should be a subset of the origin IDs
 			for _, id := range ids {
-				if id == flow.ZeroID {
-					// skip active cluster Ids stored entity
+				if id == cache.getActiveClusterIdsCacheId() {
 					continue
 				}
 				require.Contains(t, originIDs, id)
@@ -531,7 +531,7 @@ func recordEntityFixture(id flow.Identifier) RecordEntity {
 }
 
 // cacheFixture returns a new *RecordCache.
-func cacheFixture(sizeLimit uint32, recordDecay float64, logger zerolog.Logger, collector module.HeroCacheMetrics) *RecordCache {
+func cacheFixture(t *testing.T, sizeLimit uint32, recordDecay float64, logger zerolog.Logger, collector module.HeroCacheMetrics) *RecordCache {
 	recordFactory := func(id flow.Identifier) RecordEntity {
 		return recordEntityFixture(id)
 	}
@@ -541,5 +541,7 @@ func cacheFixture(sizeLimit uint32, recordDecay float64, logger zerolog.Logger, 
 		collector:   collector,
 		recordDecay: recordDecay,
 	}
-	return NewRecordCache(config, recordFactory)
+	r, err := NewRecordCache(config, recordFactory)
+	require.NoError(t, err)
+	return r
 }

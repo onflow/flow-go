@@ -50,12 +50,18 @@ var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
 func NewControlMsgValidationInspector(logger zerolog.Logger, sporkID flow.Identifier, config *ControlMsgValidationInspectorConfig, distributor p2p.GossipSubInspectorNotifDistributor, clusterPrefixedCacheCollector module.HeroCacheMetrics) *ControlMsgValidationInspector {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
+
+	tracker, err := cache.NewClusterPrefixTopicsReceivedTracker(logger, config.ClusterPrefixedTopicsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedTopicsReceivedCacheDecay)
+	if err != nil {
+		lg.Fatal().Err(err).Msg("failed to create cluster prefix topics received tracker")
+	}
+
 	c := &ControlMsgValidationInspector{
 		logger:                             lg,
 		sporkID:                            sporkID,
 		config:                             config,
 		distributor:                        distributor,
-		clusterPrefixTopicsReceivedTracker: cache.NewClusterPrefixTopicsReceivedTracker(logger, config.ClusterPrefixedTopicsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedTopicsReceivedCacheDecay),
+		clusterPrefixTopicsReceivedTracker: tracker,
 	}
 
 	cfg := &queue.HeroStoreConfig{

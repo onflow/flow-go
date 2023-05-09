@@ -15,14 +15,18 @@ type ClusterPrefixTopicsReceivedTracker struct {
 }
 
 // NewClusterPrefixTopicsReceivedTracker returns a new *ClusterPrefixTopicsReceivedTracker.
-func NewClusterPrefixTopicsReceivedTracker(logger zerolog.Logger, sizeLimit uint32, clusterPrefixedCacheCollector module.HeroCacheMetrics, decay float64) *ClusterPrefixTopicsReceivedTracker {
+func NewClusterPrefixTopicsReceivedTracker(logger zerolog.Logger, sizeLimit uint32, clusterPrefixedCacheCollector module.HeroCacheMetrics, decay float64) (*ClusterPrefixTopicsReceivedTracker, error) {
 	config := &RecordCacheConfig{
 		sizeLimit:   sizeLimit,
 		logger:      logger,
 		collector:   clusterPrefixedCacheCollector,
 		recordDecay: decay,
 	}
-	return &ClusterPrefixTopicsReceivedTracker{cache: NewRecordCache(config, NewRecordEntity)}
+	recordCache, err := NewRecordCache(config, NewRecordEntity)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new record cahe: %w", err)
+	}
+	return &ClusterPrefixTopicsReceivedTracker{cache: recordCache}, nil
 }
 
 // Inc increments the cluster prefixed topics received Counter for the peer.
