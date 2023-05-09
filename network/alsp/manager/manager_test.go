@@ -39,13 +39,16 @@ import (
 // without any duplicate reports and within a specified time.
 func TestHandleReportedMisbehavior(t *testing.T) {
 	misbehaviorReportManger := mocknetwork.NewMisbehaviorReportManager(t)
-	conduitFactory := conduit.NewDefaultConduitFactory(
+	conduitFactory, err := conduit.NewDefaultConduitFactory(
 		&alspmgr.MisbehaviorReportManagerConfig{
-			Logger:       unittest.Logger(),
-			AlspMetrics:  metrics.NewNoopCollector(),
-			CacheMetrics: metrics.NewNoopCollector(),
+			SpamReportQueueSize:     uint32(100),
+			SpamRecordCacheSize:     uint32(100),
+			Logger:                  unittest.Logger(),
+			AlspMetrics:             metrics.NewNoopCollector(),
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		},
 		conduit.WithMisbehaviorManager(misbehaviorReportManger))
+	require.NoError(t, err)
 
 	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
 		t,
@@ -97,13 +100,15 @@ func TestHandleReportedMisbehavior(t *testing.T) {
 // It fails the test if the metrics are not recorded or if they are recorded incorrectly.
 func TestMisbehaviorReportMetrics(t *testing.T) {
 	alspMetrics := mockmodule.NewAlspMetrics(t)
-	conduitFactory := conduit.NewDefaultConduitFactory(
+	conduitFactory, err := conduit.NewDefaultConduitFactory(
 		&alspmgr.MisbehaviorReportManagerConfig{
-			SpamRecordsCacheSize: uint32(100),
-			Logger:               unittest.Logger(),
-			AlspMetrics:          alspMetrics,
-			CacheMetrics:         metrics.NewNoopCollector(),
+			SpamRecordCacheSize:     uint32(100),
+			SpamReportQueueSize:     uint32(100),
+			Logger:                  unittest.Logger(),
+			AlspMetrics:             alspMetrics,
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		})
+	require.NoError(t, err)
 
 	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
 		t,
@@ -200,13 +205,14 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 
 	t.Run("with default values", func(t *testing.T) {
 		cfg := &alspmgr.MisbehaviorReportManagerConfig{
-			Logger:               logger,
-			SpamRecordsCacheSize: cacheSize,
-			AlspMetrics:          alspMetrics,
-			CacheMetrics:         cacheMetrics,
+			Logger:                  logger,
+			SpamRecordCacheSize:     cacheSize,
+			AlspMetrics:             alspMetrics,
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		}
 
-		m := alspmgr.NewMisbehaviorReportManager(cfg)
+		m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+		require.NoError(t, err)
 		assert.NotNil(t, m)
 
 	})
@@ -215,37 +221,40 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 		customCache := internal.NewSpamRecordCache(100, logger, cacheMetrics, model.SpamRecordFactory())
 
 		cfg := &alspmgr.MisbehaviorReportManagerConfig{
-			Logger:               logger,
-			SpamRecordsCacheSize: cacheSize,
-			AlspMetrics:          alspMetrics,
-			CacheMetrics:         cacheMetrics,
+			Logger:                  logger,
+			SpamRecordCacheSize:     cacheSize,
+			AlspMetrics:             alspMetrics,
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		}
 
-		m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(customCache))
+		m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(customCache))
+		require.NoError(t, err)
 		assert.NotNil(t, m)
 	})
 
 	t.Run("with ALSP module enabled", func(t *testing.T) {
 		cfg := &alspmgr.MisbehaviorReportManagerConfig{
-			Logger:               logger,
-			SpamRecordsCacheSize: cacheSize,
-			AlspMetrics:          alspMetrics,
-			CacheMetrics:         cacheMetrics,
+			Logger:                  logger,
+			SpamRecordCacheSize:     cacheSize,
+			AlspMetrics:             alspMetrics,
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		}
 
-		m := alspmgr.NewMisbehaviorReportManager(cfg)
+		m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+		require.NoError(t, err)
 		assert.NotNil(t, m)
 	})
 
 	t.Run("with ALSP module disabled", func(t *testing.T) {
 		cfg := &alspmgr.MisbehaviorReportManagerConfig{
-			Logger:               logger,
-			SpamRecordsCacheSize: cacheSize,
-			AlspMetrics:          alspMetrics,
-			CacheMetrics:         cacheMetrics,
+			Logger:                  logger,
+			SpamRecordCacheSize:     cacheSize,
+			AlspMetrics:             alspMetrics,
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		}
 
-		m := alspmgr.NewMisbehaviorReportManager(cfg)
+		m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+		require.NoError(t, err)
 		assert.NotNil(t, m)
 	})
 }
@@ -255,20 +264,24 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 	logger := unittest.Logger()
 	alspMetrics := metrics.NewNoopCollector()
-	cacheMetrics := metrics.NewNoopCollector()
 	cacheSize := uint32(100)
 
 	cfg := &alspmgr.MisbehaviorReportManagerConfig{
-		Logger:               logger,
-		SpamRecordsCacheSize: cacheSize,
-		AlspMetrics:          alspMetrics,
-		CacheMetrics:         cacheMetrics,
+		Logger:                  logger,
+		SpamRecordCacheSize:     cacheSize,
+		AlspMetrics:             alspMetrics,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+	cache := internal.NewSpamRecordCache(
+		cfg.SpamRecordCacheSize,
+		cfg.Logger,
+		metrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory),
+		model.SpamRecordFactory())
 
 	// create a new MisbehaviorReportManager
-	m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	require.NoError(t, err)
 
 	// create a mock misbehavior report with a negative penalty value
 	penalty := float64(-5)
@@ -294,22 +307,22 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 // The test ensures that the misbehavior is reported on metrics but the penalty is not applied to the peer in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReport_PenaltyDisable(t *testing.T) {
 	alspMetrics := mockmodule.NewAlspMetrics(t)
-	cacheMetrics := metrics.NewNoopCollector()
 	cacheSize := uint32(100)
 
 	cfg := &alspmgr.MisbehaviorReportManagerConfig{
-		Logger:               unittest.Logger(),
-		SpamRecordsCacheSize: cacheSize,
-		AlspMetrics:          alspMetrics,
-		CacheMetrics:         cacheMetrics,
-		DisablePenalty:       true, // disable penalty for misbehavior reports
+		Logger:                  unittest.Logger(),
+		SpamRecordCacheSize:     cacheSize,
+		AlspMetrics:             alspMetrics,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		DisablePenalty:          true, // disable penalty for misbehavior reports
 	}
 
 	// we use a mock cache but we do not expect any calls to the cache, since the penalty is disabled.
 	cache := mockalsp.NewSpamRecordCache(t)
 
 	// create a new MisbehaviorReportManager
-	m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	require.NoError(t, err)
 
 	// create a mock misbehavior report with a negative penalty value
 	penalty := float64(-5)
@@ -343,20 +356,24 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport_PenaltyDisable(t *testing.T
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the peer in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentially(t *testing.T) {
 	alspMetrics := metrics.NewNoopCollector()
-	cacheMetrics := metrics.NewNoopCollector()
 	cacheSize := uint32(100)
 
 	cfg := &alspmgr.MisbehaviorReportManagerConfig{
-		Logger:               unittest.Logger(),
-		SpamRecordsCacheSize: cacheSize,
-		AlspMetrics:          alspMetrics,
-		CacheMetrics:         cacheMetrics,
+		Logger:                  unittest.Logger(),
+		SpamRecordCacheSize:     cacheSize,
+		AlspMetrics:             alspMetrics,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+	cache := internal.NewSpamRecordCache(
+		cfg.SpamRecordCacheSize,
+		cfg.Logger,
+		metrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory),
+		model.SpamRecordFactory())
 
 	// create a new MisbehaviorReportManager
-	m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	require.NoError(t, err)
 
 	// creates a list of mock misbehavior reports with negative penalty values for a single peer
 	originId := unittest.IdentifierFixture()
@@ -388,20 +405,24 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentiall
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the peer in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrently(t *testing.T) {
 	alspMetrics := metrics.NewNoopCollector()
-	cacheMetrics := metrics.NewNoopCollector()
 	cacheSize := uint32(100)
 
 	cfg := &alspmgr.MisbehaviorReportManagerConfig{
-		Logger:               unittest.Logger(),
-		SpamRecordsCacheSize: cacheSize,
-		AlspMetrics:          alspMetrics,
-		CacheMetrics:         cacheMetrics,
+		Logger:                  unittest.Logger(),
+		SpamRecordCacheSize:     cacheSize,
+		AlspMetrics:             alspMetrics,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+	cache := internal.NewSpamRecordCache(
+		cfg.SpamRecordCacheSize,
+		cfg.Logger,
+		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory),
+		model.SpamRecordFactory())
 
 	// create a new MisbehaviorReportManager
-	m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	require.NoError(t, err)
 
 	// creates a list of mock misbehavior reports with negative penalty values for a single peer
 	originId := unittest.IdentifierFixture()
@@ -442,20 +463,24 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 // The test ensures that each misbehavior report is handled correctly and the penalties are applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequentially(t *testing.T) {
 	alspMetrics := metrics.NewNoopCollector()
-	cacheMetrics := metrics.NewNoopCollector()
 	cacheSize := uint32(100)
 
 	cfg := &alspmgr.MisbehaviorReportManagerConfig{
-		Logger:               unittest.Logger(),
-		SpamRecordsCacheSize: cacheSize,
-		AlspMetrics:          alspMetrics,
-		CacheMetrics:         cacheMetrics,
+		Logger:                  unittest.Logger(),
+		SpamRecordCacheSize:     cacheSize,
+		AlspMetrics:             alspMetrics,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+	cache := internal.NewSpamRecordCache(
+		cfg.SpamRecordCacheSize,
+		cfg.Logger,
+		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory),
+		model.SpamRecordFactory())
 
 	// create a new MisbehaviorReportManager
-	m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	require.NoError(t, err)
 
 	// creates a list of single misbehavior reports for multiple peers (10 peers)
 	numPeers := 10
@@ -488,20 +513,24 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequential
 // The test ensures that each misbehavior report is handled correctly and the penalties are applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrently(t *testing.T) {
 	alspMetrics := metrics.NewNoopCollector()
-	cacheMetrics := metrics.NewNoopCollector()
 	cacheSize := uint32(100)
 
 	cfg := &alspmgr.MisbehaviorReportManagerConfig{
-		Logger:               unittest.Logger(),
-		SpamRecordsCacheSize: cacheSize,
-		AlspMetrics:          alspMetrics,
-		CacheMetrics:         cacheMetrics,
+		Logger:                  unittest.Logger(),
+		SpamRecordCacheSize:     cacheSize,
+		AlspMetrics:             alspMetrics,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+	cache := internal.NewSpamRecordCache(
+		cfg.SpamRecordCacheSize,
+		cfg.Logger,
+		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory),
+		model.SpamRecordFactory())
 
 	// create a new MisbehaviorReportManager
-	m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	require.NoError(t, err)
 
 	// creates a list of single misbehavior reports for multiple peers (10 peers)
 	numPeers := 10
@@ -545,20 +574,24 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequentially(t *testing.T) {
 	alspMetrics := metrics.NewNoopCollector()
-	cacheMetrics := metrics.NewNoopCollector()
 	cacheSize := uint32(100)
 
 	cfg := &alspmgr.MisbehaviorReportManagerConfig{
-		Logger:               unittest.Logger(),
-		SpamRecordsCacheSize: cacheSize,
-		AlspMetrics:          alspMetrics,
-		CacheMetrics:         cacheMetrics,
+		Logger:                  unittest.Logger(),
+		SpamRecordCacheSize:     cacheSize,
+		AlspMetrics:             alspMetrics,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+	cache := internal.NewSpamRecordCache(
+		cfg.SpamRecordCacheSize,
+		cfg.Logger,
+		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory),
+		model.SpamRecordFactory())
 
 	// create a new MisbehaviorReportManager
-	m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	require.NoError(t, err)
 
 	// create a map of origin IDs to their respective misbehavior reports (10 peers, 5 reports each)
 	numPeers := 10
@@ -615,20 +648,24 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurrently(t *testing.T) {
 	alspMetrics := metrics.NewNoopCollector()
-	cacheMetrics := metrics.NewNoopCollector()
 	cacheSize := uint32(100)
 
 	cfg := &alspmgr.MisbehaviorReportManagerConfig{
-		Logger:               unittest.Logger(),
-		SpamRecordsCacheSize: cacheSize,
-		AlspMetrics:          alspMetrics,
-		CacheMetrics:         cacheMetrics,
+		Logger:                  unittest.Logger(),
+		SpamRecordCacheSize:     cacheSize,
+		AlspMetrics:             alspMetrics,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+	cache := internal.NewSpamRecordCache(
+		cfg.SpamRecordCacheSize,
+		cfg.Logger,
+		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory),
+		model.SpamRecordFactory())
 
 	// create a new MisbehaviorReportManager
-	m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	require.NoError(t, err)
 
 	// create a map of origin IDs to their respective misbehavior reports (10 peers, 5 reports each)
 	numPeers := 10
