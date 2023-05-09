@@ -102,9 +102,9 @@ func TestCommandsSetsValues(t *testing.T) {
 	_, err := cmd.Handler(context.TODO(), req)
 	require.NoError(t, err)
 
-	height, crash := stopControl.GetStopHeight()
+	s := stopControl.GetNextStop()
 
-	require.Equal(t, stopControl.GetState(), ingestion.StopControlSet)
-	require.Equal(t, uint64(37), height)
-	require.Equal(t, true, crash)
+	require.NotNil(t, s)
+	require.Equal(t, uint64(37), s.StopHeight)
+	require.Equal(t, true, s.ShouldCrash)
 }

@@ -21,34 +21,34 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 	t.Run("when processing block at stop height", func(t *testing.T) {
 		sc := NewStopControl(unittest.Logger(), 0)
 
-		require.Equal(t, sc.GetState(), StopControlOff)
+		require.Equal(t, sc.getState(), StopControlOff)
 
 		// first update is always successful
-		_, _, err := sc.SetStopHeight(21, false)
+		err := sc.SetStopHeight(21, false)
 		require.NoError(t, err)
 
-		require.Equal(t, sc.GetState(), StopControlSet)
+		require.Equal(t, sc.getState(), StopControlSet)
 
 		// no stopping has started yet, block below stop height
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
-		sc.blockProcessable(header)
+		sc.BlockProcessable(header)
 
-		require.Equal(t, sc.GetState(), StopControlSet)
+		require.Equal(t, sc.getState(), StopControlSet)
 
-		_, _, err = sc.SetStopHeight(37, false)
+		err = sc.SetStopHeight(37, false)
 		require.NoError(t, err)
 
 		// block at stop height, it should be skipped
 		header = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(37))
-		sc.blockProcessable(header)
+		sc.BlockProcessable(header)
 
-		require.Equal(t, sc.GetState(), StopControlCommenced)
+		require.Equal(t, sc.getState(), StopControlCommenced)
 
-		_, _, err = sc.SetStopHeight(2137, false)
+		err = sc.SetStopHeight(2137, false)
 		require.Error(t, err)
 
 		// state did not change
-		require.Equal(t, sc.GetState(), StopControlCommenced)
+		require.Equal(t, sc.getState(), StopControlCommenced)
 	})
 
 	t.Run("when processing finalized blocks", func(t *testing.T) {
@@ -57,12 +57,12 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		sc := NewStopControl(unittest.Logger(), 0)
 
-		require.Equal(t, sc.GetState(), StopControlOff)
+		require.Equal(t, sc.getState(), StopControlOff)
 
 		// first update is always successful
-		_, _, err := sc.SetStopHeight(21, false)
+		err := sc.SetStopHeight(21, false)
 		require.NoError(t, err)
-		require.Equal(t, sc.GetState(), StopControlSet)
+		require.Equal(t, sc.getState(), StopControlSet)
 
 		// make execution check pretends block has been executed
 		execState.On("StateCommitmentByBlockID", testifyMock.Anything, testifyMock.Anything).Return(nil, nil)
@@ -71,18 +71,18 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 		sc.blockFinalized(context.TODO(), execState, header)
 
-		_, _, err = sc.SetStopHeight(37, false)
+		err = sc.SetStopHeight(37, false)
 		require.NoError(t, err)
-		require.Equal(t, sc.GetState(), StopControlSet)
+		require.Equal(t, sc.getState(), StopControlSet)
 
 		// block at stop height, it should be trigger stop
 		header = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(37))
 		sc.blockFinalized(context.TODO(), execState, header)
 
 		// since we set shouldCrash to false, execution should be paused
-		require.Equal(t, sc.GetState(), StopControlPaused)
+		require.Equal(t, sc.getState(), StopControlPaused)
 
-		_, _, err = sc.SetStopHeight(2137, false)
+		err = sc.SetStopHeight(2137, false)
 		require.Error(t, err)
 
 		execState.AssertExpectations(t)
@@ -102,34 +102,34 @@ func TestExecutionFallingBehind(t *testing.T) {
 
 	sc := NewStopControl(unittest.Logger(), 0)
 
-	require.Equal(t, sc.GetState(), StopControlOff)
+	require.Equal(t, sc.getState(), StopControlOff)
 
 	// set stop at 22, so 21 is the last height which should be processed
-	_, _, err := sc.SetStopHeight(22, false)
+	err := sc.SetStopHeight(22, false)
 	require.NoError(t, err)
-	require.Equal(t, sc.GetState(), StopControlSet)
+	require.Equal(t, sc.getState(), StopControlSet)
 
 	execState.On("StateCommitmentByBlockID", testifyMock.Anything, headerC.ParentID).Return(nil, storage.ErrNotFound)
 
 	// finalize blocks first
 	sc.blockFinalized(context.TODO(), execState, headerA)
-	require.Equal(t, StopControlSet, sc.GetState())
+	require.Equal(t, StopControlSet, sc.getState())
 
 	sc.blockFinalized(context.TODO(), execState, headerB)
-	require.Equal(t, StopControlSet, sc.GetState())
+	require.Equal(t, StopControlSet, sc.getState())
 
 	sc.blockFinalized(context.TODO(), execState, headerC)
-	require.Equal(t, StopControlSet, sc.GetState())
+	require.Equal(t, StopControlSet, sc.getState())
 
 	sc.blockFinalized(context.TODO(), execState, headerD)
-	require.Equal(t, StopControlSet, sc.GetState())
+	require.Equal(t, StopControlSet, sc.getState())
 
 	// simulate execution
 	sc.blockExecuted(headerA)
-	require.Equal(t, StopControlSet, sc.GetState())
+	require.Equal(t, StopControlSet, sc.getState())
 
 	sc.blockExecuted(headerB)
-	require.Equal(t, StopControlPaused, sc.GetState())
+	require.Equal(t, StopControlPaused, sc.getState())
 
 	execState.AssertExpectations(t)
 }
@@ -141,18 +141,18 @@ func TestCannotSetHeightBelowLastExecuted(t *testing.T) {
 
 	sc := NewStopControl(unittest.Logger(), 0)
 
-	require.Equal(t, sc.GetState(), StopControlOff)
+	require.Equal(t, sc.getState(), StopControlOff)
 
 	sc.executingBlockHeight(20)
-	require.Equal(t, StopControlOff, sc.GetState())
+	require.Equal(t, StopControlOff, sc.getState())
 
-	_, _, err := sc.SetStopHeight(20, false)
+	err := sc.SetStopHeight(20, false)
 	require.Error(t, err)
-	require.Equal(t, StopControlOff, sc.GetState())
+	require.Equal(t, StopControlOff, sc.getState())
 
-	_, _, err = sc.SetStopHeight(25, false)
+	err = sc.SetStopHeight(25, false)
 	require.NoError(t, err)
-	require.Equal(t, StopControlSet, sc.GetState())
+	require.Equal(t, StopControlSet, sc.getState())
 }
 
 // StopControl started as paused will keep the state
@@ -160,16 +160,16 @@ func TestStartingPaused(t *testing.T) {
 
 	sc := NewStopControl(unittest.Logger(), 0)
 	sc.PauseExecution()
-	require.Equal(t, StopControlPaused, sc.GetState())
+	require.Equal(t, StopControlPaused, sc.getState())
 }
 
 func TestPausedStateRejectsAllBlocksAndChanged(t *testing.T) {
 
 	sc := NewStopControl(unittest.Logger(), 0)
 	sc.PauseExecution()
-	require.Equal(t, StopControlPaused, sc.GetState())
+	require.Equal(t, StopControlPaused, sc.getState())
 
-	_, _, err := sc.SetStopHeight(2137, true)
+	err := sc.SetStopHeight(2137, true)
 	require.Error(t, err)
 
 	// make sure we don't even query executed status if paused
@@ -179,7 +179,7 @@ func TestPausedStateRejectsAllBlocksAndChanged(t *testing.T) {
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 
 	sc.blockFinalized(context.TODO(), execState, header)
-	require.Equal(t, StopControlPaused, sc.GetState())
+	require.Equal(t, StopControlPaused, sc.getState())
 
 	execState.AssertExpectations(t)
 }

@@ -3,8 +3,6 @@ package execution
 import (
 	"context"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
@@ -36,13 +34,11 @@ type StopAtHeightReq struct {
 func (s *StopAtHeightCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	sah := req.ValidatorData.(StopAtHeightReq)
 
-	oldHeight, oldCrash, err := s.stopControl.SetStopHeight(sah.height, sah.crash)
+	err := s.stopControl.SetStopHeight(sah.height, sah.crash)
 
 	if err != nil {
 		return nil, err
 	}
-
-	log.Info().Msgf("admintool: EN will stop at height %d and crash: %t, previous values: %d %t", sah.height, sah.crash, oldHeight, oldCrash)
 
 	return "ok", nil
 }

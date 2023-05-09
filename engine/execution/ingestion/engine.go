@@ -439,7 +439,7 @@ func (e *Engine) reloadBlock(
 func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 
 	// skip if stopControl tells to skip
-	if !e.stopControl.blockProcessable(b) {
+	if !e.stopControl.BlockProcessable(b) {
 		return
 	}
 
