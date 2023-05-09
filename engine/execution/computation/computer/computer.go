@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -359,7 +358,6 @@ func (e *blockComputer) executeTransaction(
 	error,
 ) {
 	startedAt := time.Now()
-	memAllocBefore := debug.GetHeapAllocsBytes()
 
 	txSpan := e.tracer.StartSampledSpanFromParent(
 		parentSpan,
@@ -397,15 +395,9 @@ func (e *blockComputer) executeTransaction(
 			err)
 	}
 
-	postProcessSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEPostProcessTransaction)
-	defer postProcessSpan.End()
-
-	memAllocAfter := debug.GetHeapAllocsBytes()
-
 	logger = logger.With().
 		Uint64("computation_used", output.ComputationUsed).
 		Uint64("memory_used", output.MemoryEstimate).
-		Uint64("mem_alloc", memAllocAfter-memAllocBefore).
 		Int64("time_spent_in_ms", time.Since(startedAt).Milliseconds()).
 		Logger()
 
@@ -435,7 +427,6 @@ func (e *blockComputer) executeTransaction(
 		time.Since(startedAt),
 		output.ComputationUsed,
 		output.MemoryEstimate,
-		memAllocAfter-memAllocBefore,
 		len(output.Events),
 		flow.EventsList(output.Events).ByteSize(),
 		output.Err != nil,

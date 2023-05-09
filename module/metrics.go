@@ -648,7 +648,7 @@ type ExecutionMetrics interface {
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
 	ExecutionTransactionExecuted(dur time.Duration,
-		compUsed, memoryUsed, actualMemoryUsed uint64,
+		compUsed, memoryUsed uint64,
 		eventCounts, eventSize int,
 		failed bool)
 
