@@ -705,7 +705,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		checkAuthorizedAtBlock,
 		nil,
 		uploader,
-		ingestion.NewStopControl(node.Log.With().Str("compontent", "stop_control").Logger(), false, latestExecutedHeight),
+		ingestion.NewStopControl(node.Log, latestExecutedHeight),
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)

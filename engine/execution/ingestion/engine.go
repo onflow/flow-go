@@ -122,15 +122,17 @@ func New(
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	if !e.stopControl.IsPaused() {
-		if err := e.uploader.RetryUploads(); err != nil {
-			e.log.Warn().Msg("failed to re-upload all ComputationResults")
-		}
+	if e.stopControl.IsExecutionPaused() {
+		return e.unit.Ready()
+	}
 
-		err := e.reloadUnexecutedBlocks()
-		if err != nil {
-			e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
-		}
+	if err := e.uploader.RetryUploads(); err != nil {
+		e.log.Warn().Msg("failed to re-upload all ComputationResults")
+	}
+
+	err := e.reloadUnexecutedBlocks()
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
 	}
 
 	return e.unit.Ready()

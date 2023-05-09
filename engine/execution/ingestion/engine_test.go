@@ -202,7 +202,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
-	stopControl := NewStopControl(zerolog.Nop(), false, 0)
+	stopControl := NewStopControl(zerolog.Nop(), 0)
 
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
@@ -1084,7 +1084,7 @@ func TestStopAtHeight(t *testing.T) {
 			*blocks["B"].StartState,
 			nil)
 
-		assert.False(t, ctx.stopControl.IsPaused())
+		assert.False(t, ctx.stopControl.IsExecutionPaused())
 
 		wg.Add(1)
 		ctx.engine.BlockProcessable(blocks["A"].Block.Header, nil)
@@ -1098,14 +1098,14 @@ func TestStopAtHeight(t *testing.T) {
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
 		// we don't pause until a block has been finalized
-		assert.False(t, ctx.stopControl.IsPaused())
+		assert.False(t, ctx.stopControl.IsExecutionPaused())
 
 		ctx.engine.BlockFinalized(blocks["A"].Block.Header)
 		ctx.engine.BlockFinalized(blocks["B"].Block.Header)
 
-		assert.False(t, ctx.stopControl.IsPaused())
+		assert.False(t, ctx.stopControl.IsExecutionPaused())
 		ctx.engine.BlockFinalized(blocks["C"].Block.Header)
-		assert.True(t, ctx.stopControl.IsPaused())
+		assert.True(t, ctx.stopControl.IsExecutionPaused())
 
 		ctx.engine.BlockFinalized(blocks["D"].Block.Header)
 
@@ -1151,7 +1151,7 @@ func TestStopAtHeight(t *testing.T) {
 // TestStopAtHeightRaceFinalization test a possible race condition which happens
 // when block at stop height N is finalized while N-1 is being executed.
 // If execution finishes exactly between finalization checking execution state and
-// setting block ID to crash, it's possible to miss and never actually stop the EN
+// setting block ID to shouldCrash, it's possible to miss and never actually stop the EN
 func TestStopAtHeightRaceFinalization(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
@@ -1213,13 +1213,13 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 			*blocks["A"].StartState,
 			nil)
 
-		assert.False(t, ctx.stopControl.IsPaused())
+		assert.False(t, ctx.stopControl.IsExecutionPaused())
 
 		executionWg.Add(1)
 		ctx.engine.BlockProcessable(blocks["A"].Block.Header, nil)
 		ctx.engine.BlockProcessable(blocks["B"].Block.Header, nil)
 
-		assert.False(t, ctx.stopControl.IsPaused())
+		assert.False(t, ctx.stopControl.IsExecutionPaused())
 
 		finalizationWg.Add(1)
 		ctx.engine.BlockFinalized(blocks["B"].Block.Header)
@@ -1230,7 +1230,7 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		assert.False(t, more)
 
-		assert.True(t, ctx.stopControl.IsPaused())
+		assert.True(t, ctx.stopControl.IsExecutionPaused())
 
 		var ok bool
 
@@ -1567,7 +1567,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		checkAuthorizedAtBlock,
 		nil,
 		nil,
-		NewStopControl(zerolog.Nop(), false, 0),
+		NewStopControl(zerolog.Nop(), 0),
 	)
 
 	require.NoError(t, err)

@@ -22,7 +22,7 @@ type StopControl struct {
 	stopHeight uint64
 
 	// if the node should crash or just pause after reaching stopHeight
-	crash bool
+	shouldCrash bool
 
 	// This is the block ID of the block that should be executed last.
 	stopAfterExecuting flow.Identifier
@@ -63,17 +63,14 @@ const (
 // NewStopControl creates new empty NewStopControl
 func NewStopControl(
 	log zerolog.Logger,
-	paused bool,
 	lastExecutedHeight uint64,
 ) *StopControl {
-	state := StopControlOff
-	if paused {
-		state = StopControlPaused
-	}
-	log.Debug().Msgf("created StopControl module with paused = %t", paused)
+	log = log.With().Str("component", "stop_control").Logger()
+	log.Debug().Msgf("Created")
+
 	return &StopControl{
 		log:                    log,
-		state:                  state,
+		state:                  StopControlOff,
 		highestExecutingHeight: lastExecutedHeight,
 	}
 }
@@ -85,16 +82,26 @@ func (s *StopControl) GetState() StopControlState {
 	return s.state
 }
 
-// IsPaused returns true is block execution has been paused
-func (s *StopControl) IsPaused() bool {
-	s.RLock()
-	defer s.RUnlock()
-	return s.state == StopControlPaused
+// IsExecutionPaused returns true is block execution has been paused
+func (s *StopControl) IsExecutionPaused() bool {
+	st := s.GetState()
+	return st == StopControlPaused
 }
 
-// SetStopHeight sets new stopHeight and crash mode, and return old values:
+// PauseExecution sets the state to StopControlPaused
+func (s *StopControl) PauseExecution() {
+	s.Lock()
+	defer s.Unlock()
+
+	s.log.Debug().
+		Msgf("Setting execution to paused")
+
+	s.state = StopControlPaused
+}
+
+// SetStopHeight sets new stopHeight and shouldCrash mode, and return old values:
 //   - stopHeight
-//   - crash
+//   - shouldCrash
 //
 // Returns error if the stopping process has already commenced, new values will be rejected.
 func (s *StopControl) SetStopHeight(
@@ -105,14 +112,14 @@ func (s *StopControl) SetStopHeight(
 	defer s.Unlock()
 
 	oldHeight := s.stopHeight
-	oldCrash := s.crash
+	oldCrash := s.shouldCrash
 
 	if s.state == StopControlCommenced {
 		return oldHeight,
 			oldCrash,
 			fmt.Errorf(
 				"cannot update stopHeight, "+
-					"stopping commenced for stopHeight %d with crash=%t",
+					"stopping commenced for stopHeight %d with shouldCrash=%t",
 				oldHeight,
 				oldCrash,
 			)
@@ -124,6 +131,7 @@ func (s *StopControl) SetStopHeight(
 			fmt.Errorf("cannot update stopHeight, already paused")
 	}
 
+	// TODO: remove condition
 	// cannot set stopHeight to block which is already executing
 	// so the lowest possible stopHeight is highestExecutingHeight+1
 	if height <= s.highestExecutingHeight {
@@ -141,7 +149,7 @@ func (s *StopControl) SetStopHeight(
 		Int8("previous_state", int8(s.state)).
 		Int8("new_state", int8(StopControlSet)).
 		Uint64("stopHeight", height).
-		Bool("crash", crash).
+		Bool("shouldCrash", crash).
 		Uint64("old_height", oldHeight).
 		Bool("old_crash", oldCrash).
 		Msg("new stopHeight set")
@@ -149,7 +157,7 @@ func (s *StopControl) SetStopHeight(
 	s.state = StopControlSet
 
 	s.stopHeight = height
-	s.crash = crash
+	s.shouldCrash = crash
 	s.stopAfterExecuting = flow.ZeroID
 
 	return oldHeight, oldCrash, nil
@@ -157,14 +165,14 @@ func (s *StopControl) SetStopHeight(
 
 // GetStopHeight returns:
 //   - stopHeight
-//   - crash
+//   - shouldCrash
 //
 // Values are undefined if they were not previously set
 func (s *StopControl) GetStopHeight() (uint64, bool) {
 	s.RLock()
 	defer s.RUnlock()
 
-	return s.stopHeight, s.crash
+	return s.stopHeight, s.shouldCrash
 }
 
 // blockProcessable should be called when new block is processable.
@@ -215,37 +223,48 @@ func (s *StopControl) blockFinalized(
 		return
 	}
 
+	// TODO: Version Beacons integration:
+	// get VB from db index
+	// check current node version against VB boundaries to determine when the next
+	// stopping height should be. Move stopping height.
+	// If stopping height was set manually, only move it if the new height is earlier.
+	// Requirements:
+	// - inject current protocol version
+	// - inject a way to query VB from db index
+	// - add a field to know if stopping height was set manually or through VB
+
 	// Once finalization reached stopHeight we can be sure no other fork will be valid at this height,
-	// if this block's parent has been executed, we are safe to stop or crash.
+	// if this block's parent has been executed, we are safe to stop or shouldCrash.
 	// This will happen during normal execution, where blocks are executed before they are finalized.
 	// However, it is possible that EN block computation progress can fall behind. In this case,
-	// we want to crash only after the execution reached the stopHeight.
-	if h.Height == s.stopHeight {
+	// we want to shouldCrash only after the execution reached the stopHeight.
+	if h.Height != s.stopHeight {
+		return
+	}
 
-		executed, err := state.IsBlockExecuted(ctx, execState, h.ParentID)
-		if err != nil {
-			// any error here would indicate unexpected storage error, so we crash the node
-			// TODO: what if the error is due to the node being stopped?
-			// i.e. context cancelled?
-			s.log.Fatal().
-				Err(err).
-				Str("block_id", h.ID().String()).
-				Msg("failed to check if the block has been executed")
-			return
-		}
+	executed, err := state.IsBlockExecuted(ctx, execState, h.ParentID)
+	if err != nil {
+		// any error here would indicate unexpected storage error, so we crash the node
+		// TODO: what if the error is due to the node being stopped?
+		// i.e. context cancelled?
+		s.log.Fatal().
+			Err(err).
+			Str("block_id", h.ID().String()).
+			Msg("failed to check if the block has been executed")
+		return
+	}
 
-		if executed {
-			s.stopExecution()
-		} else {
-			s.stopAfterExecuting = h.ParentID
-			s.log.Info().
-				Msgf(
-					"Node scheduled to stop executing"+
-						" after executing block %s at height %d",
-					s.stopAfterExecuting.String(),
-					h.Height-1,
-				)
-		}
+	if executed {
+		s.stopExecution()
+	} else {
+		s.stopAfterExecuting = h.ParentID
+		s.log.Info().
+			Msgf(
+				"Node scheduled to stop executing"+
+					" after executing block %s at height %d",
+				s.stopAfterExecuting.String(),
+				h.Height-1,
+			)
 	}
 }
 
@@ -258,27 +277,30 @@ func (s *StopControl) blockExecuted(h *flow.Header) {
 		return
 	}
 
-	if s.stopAfterExecuting == h.ID() {
-		// double check. Even if requested stopHeight has been changed multiple times,
-		// as long as it matches this block we are safe to terminate
-		if h.Height == s.stopHeight-1 {
-			s.stopExecution()
-		} else {
-			s.log.Warn().
-				Msgf(
-					"Inconsistent stopping state. "+
-						"Scheduled to stop after executing block ID %s and height %d, "+
-						"but this block has a height %d. ",
-					h.ID().String(),
-					s.stopHeight-1,
-					h.Height,
-				)
-		}
+	if s.stopAfterExecuting != h.ID() {
+		return
 	}
+
+	// double check. Even if requested stopHeight has been changed multiple times,
+	// as long as it matches this block we are safe to terminate
+	if h.Height != s.stopHeight-1 {
+		s.log.Warn().
+			Msgf(
+				"Inconsistent stopping state. "+
+					"Scheduled to stop after executing block ID %s and height %d, "+
+					"but this block has a height %d. ",
+				h.ID().String(),
+				s.stopHeight-1,
+				h.Height,
+			)
+		return
+	}
+
+	s.stopExecution()
 }
 
 func (s *StopControl) stopExecution() {
-	if s.crash {
+	if s.shouldCrash {
 		s.log.Fatal().Msgf(
 			"Crashing as finalization reached requested "+
 				"stop height %d and the highest executed block is (%d - 1)",
