@@ -24,7 +24,8 @@ const defaultDecay = 0.99
 func TestNewRecordCache(t *testing.T) {
 	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
-	require.Equalf(t, uint(0), cache.Size(), "cache size must be 0")
+	// expect cache to be initialized with a empty active cluster IDs list
+	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
 }
 
 // TestRecordCache_Init tests the Init method of the RecordCache.
@@ -33,7 +34,8 @@ func TestNewRecordCache(t *testing.T) {
 func TestRecordCache_Init(t *testing.T) {
 	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
-	require.Zerof(t, cache.Size(), "expected cache to be empty")
+	// expect cache to be initialized with a empty active cluster IDs list
+	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
 
 	originID1 := unittest.IdentifierFixture()
 	originID2 := unittest.IdentifierFixture()
@@ -45,24 +47,26 @@ func TestRecordCache_Init(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok, "expected record to exist")
 	require.Zerof(t, counter, "expected counter to be 0")
-	require.Equal(t, cache.Size(), uint(1), "expected cache to have one record")
+	require.Equal(t, cache.Size(), uint(2), "expected cache to have one additional record")
 
 	// test initializing a record for an origin ID that already exists in the cache
 	initialized = cache.Init(originID1)
 	require.False(t, initialized, "expected record not to be initialized")
 	counterAgain, ok, err := cache.Get(originID1)
+	require.NoError(t, err)
 	require.True(t, ok, "expected record to still exist")
 	require.Zerof(t, counterAgain, "expected same counter to be 0")
 	require.Equal(t, counter, counterAgain, "expected records to be the same")
-	require.Equal(t, cache.Size(), uint(1), "expected cache to still have one record")
+	require.Equal(t, cache.Size(), uint(2), "expected cache to still have one additional record")
 
 	// test initializing a record for another origin ID
 	initialized = cache.Init(originID2)
 	require.True(t, initialized, "expected record to be initialized")
 	counter2, ok, err := cache.Get(originID2)
+	require.NoError(t, err)
 	require.True(t, ok, "expected record to exist")
 	require.Zerof(t, counter2, "expected second counter to be 0")
-	require.Equal(t, cache.Size(), uint(2), "expected cache to have two records")
+	require.Equal(t, cache.Size(), uint(3), "expected cache to have two additional records")
 }
 
 // TestRecordCache_ConcurrentInit tests the concurrent initialization of records.
@@ -72,7 +76,8 @@ func TestRecordCache_Init(t *testing.T) {
 func TestRecordCache_ConcurrentInit(t *testing.T) {
 	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
-	require.Zerof(t, cache.Size(), "expected cache to be empty")
+	// expect cache to be initialized with a empty active cluster IDs list
+	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
 
 	originIDs := unittest.IdentifierListFixture(10)
 
@@ -104,7 +109,8 @@ func TestRecordCache_ConcurrentInit(t *testing.T) {
 func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
 	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
-	require.Zerof(t, cache.Size(), "expected cache to be empty")
+	// expect cache to be initialized with a empty active cluster IDs list
+	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
 
 	originID := unittest.IdentifierFixture()
 	const concurrentAttempts = 10
@@ -143,7 +149,8 @@ func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
 func TestRecordCache_Update(t *testing.T) {
 	cache := cacheFixture(100, 0, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
-	require.Zerof(t, cache.Size(), "expected cache to be empty")
+	// expect cache to be initialized with a empty active cluster IDs list
+	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
 
 	originID1 := unittest.IdentifierFixture()
 	originID2 := unittest.IdentifierFixture()
@@ -157,6 +164,7 @@ func TestRecordCache_Update(t *testing.T) {
 	require.Equal(t, float64(1), count)
 
 	currentCount, ok, err := cache.Get(originID1)
+	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, count, currentCount)
 
@@ -178,7 +186,8 @@ func TestRecordCache_Update(t *testing.T) {
 func TestRecordCache_UpdateDecay(t *testing.T) {
 	cache := cacheFixture(100, 0.0001, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
-	require.Zerof(t, cache.Size(), "expected cache to be empty")
+	// expect cache to be initialized with a empty active cluster IDs list
+	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
 
 	originID1 := unittest.IdentifierFixture()
 
@@ -205,7 +214,8 @@ func TestRecordCache_UpdateDecay(t *testing.T) {
 func TestRecordCache_Identities(t *testing.T) {
 	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
-	require.Zerof(t, cache.Size(), "expected cache to be empty")
+	// expect cache to be initialized with a empty active cluster IDs list
+	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
 
 	// initialize spam records for a few origin IDs
 	originID1 := unittest.IdentifierFixture()
@@ -218,7 +228,7 @@ func TestRecordCache_Identities(t *testing.T) {
 
 	// check if the Identities method returns the correct set of origin IDs
 	identities := cache.Identities()
-	require.Equal(t, 3, len(identities))
+	require.Equal(t, 4, len(identities))
 
 	identityMap := make(map[flow.Identifier]struct{})
 	for _, id := range identities {
@@ -239,7 +249,8 @@ func TestRecordCache_Identities(t *testing.T) {
 func TestRecordCache_Remove(t *testing.T) {
 	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
-	require.Zerof(t, cache.Size(), "expected cache to be empty")
+	// expect cache to be initialized with a empty active cluster IDs list
+	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
 
 	// initialize spam records for a few origin IDs
 	originID1 := unittest.IdentifierFixture()
@@ -251,7 +262,7 @@ func TestRecordCache_Remove(t *testing.T) {
 	require.True(t, cache.Init(originID3))
 
 	numOfIds := uint(3)
-	require.Equal(t, cache.Size(), numOfIds, fmt.Sprintf("expected size of the cache to be %d", numOfIds))
+	require.Equal(t, numOfIds+1, cache.Size(), fmt.Sprintf("expected size of the cache to be %d", numOfIds+1))
 	// remove originID1 and check if the record is removed
 	require.True(t, cache.Remove(originID1))
 	require.NotContains(t, originID1, cache.Identities())
@@ -274,7 +285,8 @@ func TestRecordCache_Remove(t *testing.T) {
 func TestRecordCache_ConcurrentRemove(t *testing.T) {
 	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
-	require.Zerof(t, cache.Size(), "expected cache to be empty")
+	// expect cache to be initialized with a empty active cluster IDs list
+	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
 
 	originIDs := unittest.IdentifierListFixture(10)
 	for _, originID := range originIDs {
@@ -295,8 +307,8 @@ func TestRecordCache_ConcurrentRemove(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
 
-	// ensure that the cache is empty
-	require.Equal(t, uint(0), cache.Size())
+	// ensure cache only has default active cluster Ids stored
+	require.Equal(t, uint(1), cache.Size())
 }
 
 // TestRecordCache_ConcurrentUpdatesAndReads tests the concurrent adjustments and reads of records for different
@@ -307,7 +319,8 @@ func TestRecordCache_ConcurrentRemove(t *testing.T) {
 func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 	cache := cacheFixture(100, 0, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
-	require.Zerof(t, cache.Size(), "expected cache to be empty")
+	// expect cache to be initialized with a empty active cluster IDs list
+	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
 
 	originIDs := unittest.IdentifierListFixture(10)
 	for _, originID := range originIDs {
@@ -353,7 +366,8 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
-	require.Zerof(t, cache.Size(), "expected cache to be empty")
+	// expect cache to be initialized with a empty active cluster IDs list
+	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
 
 	originIDs := unittest.IdentifierListFixture(20)
 	originIDsToAdd := originIDs[:10]
@@ -387,7 +401,7 @@ func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 
 	// ensure that the initialized records are correctly added to the cache
 	// and removed records are correctly removed from the cache
-	require.Equal(t, uint(originIDsToAdd.Len()), cache.Size())
+	require.Equal(t, uint(originIDsToAdd.Len()+1), cache.Size())
 }
 
 // TestRecordCache_ConcurrentInitRemoveUpdate tests the concurrent initialization, removal, and adjustment of
@@ -398,7 +412,8 @@ func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 func TestRecordCache_ConcurrentInitRemoveUpdate(t *testing.T) {
 	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
-	require.Zerof(t, cache.Size(), "expected cache to be empty")
+	// expect cache to be initialized with a empty active cluster IDs list
+	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
 
 	originIDs := unittest.IdentifierListFixture(30)
 	originIDsToAdd := originIDs[:10]
@@ -448,7 +463,8 @@ func TestRecordCache_ConcurrentInitRemoveUpdate(t *testing.T) {
 func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 	cache := cacheFixture(100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
-	require.Zerof(t, cache.Size(), "expected cache to be empty")
+	// expect cache to be initialized with a empty active cluster IDs list
+	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
 
 	originIDs := unittest.IdentifierListFixture(20)
 	originIDsToAdd := originIDs[:10]
@@ -491,11 +507,14 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 			require.True(t, len(ids) <= len(originIDs))
 			// the returned IDs should be a subset of the origin IDs
 			for _, id := range ids {
+				if id == flow.ZeroID {
+					// skip active cluster Ids stored entity
+					continue
+				}
 				require.Contains(t, originIDs, id)
 			}
 		}()
 	}
-
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "timed out waiting for goroutines to finish")
 }
 

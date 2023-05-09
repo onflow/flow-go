@@ -2,8 +2,6 @@ package validation
 
 import (
 	"fmt"
-	"sync"
-
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -31,10 +29,6 @@ type ControlMsgValidationInspector struct {
 	events.Noop
 	logger  zerolog.Logger
 	sporkID flow.Identifier
-	// lock RW mutex used to synchronize access to the  clusterIDSProvider.
-	lock sync.RWMutex
-	// activeClusterIDS list of active cluster IDS used to validate cluster prefixed control messages.
-	activeClusterIDS flow.ChainIDList
 	// config control message validation configurations.
 	config *ControlMsgValidationInspectorConfig
 	// distributor used to disseminate invalid RPC message notifications.
@@ -159,9 +153,7 @@ func (c *ControlMsgValidationInspector) Name() string {
 
 // ClusterIdsUpdated consumes cluster ID update protocol events.
 func (c *ControlMsgValidationInspector) ClusterIdsUpdated(clusterIDList flow.ChainIDList) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	c.activeClusterIDS = clusterIDList
+	c.clusterPrefixTopicsReceivedTracker.StoreActiveClusterIds(clusterIDList)
 }
 
 // blockingPreprocessingRpc ensures the RPC control message count does not exceed the configured discard threshold.
@@ -251,7 +243,8 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 //   - ErrDuplicateTopic: if a duplicate topic ID is encountered.
 func (c *ControlMsgValidationInspector) validateTopics(from peer.ID, ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
 	seen := make(map[channels.Topic]struct{})
-	validateTopic := c.validateTopicInlineFunc(from, ctrlMsgType, seen)
+	activeClusterIDS := c.clusterPrefixTopicsReceivedTracker.GetActiveClusterIds()
+	validateTopic := c.validateTopicInlineFunc(from, ctrlMsgType, seen, activeClusterIDS)
 	switch ctrlMsgType {
 	case p2p.CtrlMsgGraft:
 		for _, graft := range ctrlMsg.GetGraft() {
@@ -281,7 +274,7 @@ func (c *ControlMsgValidationInspector) validateTopics(from peer.ID, ctrlMsgType
 //
 // This func returns an exception in case of unexpected bug or state corruption if cluster prefixed topic validation
 // fails due to unexpected error returned when getting the active cluster IDS.
-func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channels.Topic) error {
+func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) error {
 	channel, ok := channels.ChannelFromTopic(topic)
 	if !ok {
 		return channels.NewInvalidTopicErr(topic, fmt.Errorf("failed to get channel from topic"))
@@ -289,7 +282,7 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 
 	// handle cluster prefixed topics
 	if channels.IsClusterChannel(channel) {
-		return c.validateClusterPrefixedTopic(from, topic)
+		return c.validateClusterPrefixedTopic(from, topic, activeClusterIds)
 	}
 
 	// non cluster prefixed topic validation
@@ -305,25 +298,22 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 //   - ErrActiveClusterIdsNotSet: if the cluster ID provider is not set.
 //   - channels.ErrInvalidTopic: if topic is invalid.
 //   - channels.ErrUnknownClusterID: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
-func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.ID, topic channels.Topic) error {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	if len(c.activeClusterIDS) == 0 {
+func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) error {
+	if len(activeClusterIds) == 0 {
 		// cluster IDs have not been updated yet
-		_, err := c.clusterPrefixTopicsReceivedTracker.Inc(from)
+		_, err := c.clusterPrefixTopicsReceivedTracker.Inc(c.makeEntityId(from))
 		if err != nil {
 			return err
 		}
 		return NewActiveClusterIdsNotSetErr(topic)
 	}
 
-	err := channels.IsValidFlowClusterTopic(topic, c.activeClusterIDS)
+	err := channels.IsValidFlowClusterTopic(topic, activeClusterIds)
 	if err != nil {
 		if channels.IsErrUnknownClusterID(err) {
 			// unknown cluster ID error could indicate that a node has fallen
 			// behind and needs to catchup increment to topics received cache.
-			_, incErr := c.clusterPrefixTopicsReceivedTracker.Inc(from)
+			_, incErr := c.clusterPrefixTopicsReceivedTracker.Inc(c.makeEntityId(from))
 			if incErr != nil {
 				return incErr
 			}
@@ -335,7 +325,7 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 }
 
 // validateTopicInlineFunc returns a callback func that validates topics and keeps track of duplicates.
-func (c *ControlMsgValidationInspector) validateTopicInlineFunc(from peer.ID, ctrlMsgType p2p.ControlMessageType, seen map[channels.Topic]struct{}) func(topic channels.Topic) error {
+func (c *ControlMsgValidationInspector) validateTopicInlineFunc(from peer.ID, ctrlMsgType p2p.ControlMessageType, seen map[channels.Topic]struct{}, activeClusterIDS flow.ChainIDList) func(topic channels.Topic) error {
 	lg := c.logger.With().
 		Str("from", from.String()).
 		Str("ctrl_msg_type", string(ctrlMsgType)).
@@ -345,16 +335,16 @@ func (c *ControlMsgValidationInspector) validateTopicInlineFunc(from peer.ID, ct
 			return NewDuplicateTopicErr(topic)
 		}
 		seen[topic] = struct{}{}
-		err := c.validateTopic(from, topic)
+		err := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
 			switch {
-			case channels.IsErrUnknownClusterID(err) && c.clusterPrefixTopicsReceivedTracker.Load(from) <= c.config.ClusterPrefixHardThreshold:
+			case channels.IsErrUnknownClusterID(err) && c.clusterPrefixTopicsReceivedTracker.Load(c.makeEntityId(from)) <= c.config.ClusterPrefixHardThreshold:
 				lg.Warn().
 					Err(err).
 					Str("topic", topic.String()).
 					Msg("processing unknown cluster prefixed topic received below cluster prefixed discard threshold peer may be behind in the protocol")
 				return nil
-			case IsErrActiveClusterIDsNotSet(err) && c.clusterPrefixTopicsReceivedTracker.Load(from) <= c.config.ClusterPrefixHardThreshold:
+			case IsErrActiveClusterIDsNotSet(err) && c.clusterPrefixTopicsReceivedTracker.Load(c.makeEntityId(from)) <= c.config.ClusterPrefixHardThreshold:
 				lg.Warn().
 					Err(err).
 					Str("topic", topic.String()).
@@ -366,4 +356,8 @@ func (c *ControlMsgValidationInspector) validateTopicInlineFunc(from peer.ID, ct
 		}
 		return nil
 	}
+}
+
+func (c *ControlMsgValidationInspector) makeEntityId(peerID peer.ID) flow.Identifier {
+	return flow.HashToID([]byte(peerID))
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -14,6 +13,8 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 )
+
+var defaultActiveClusterIdsIdentifier = flow.ZeroID
 
 var ErrRecordNotFound = fmt.Errorf("record not found")
 
@@ -60,11 +61,13 @@ func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityF
 		heropool.NoEjection,
 		config.logger.With().Str("mempool", "gossipsub=cluster-prefix-topics-received-records").Logger(),
 		config.collector)
-	return &RecordCache{
+	recordCache := &RecordCache{
 		recordEntityFactory: recordEntityFactory,
 		decayFunc:           defaultDecayFunction(config.recordDecay),
 		c:                   stdmap.NewBackend(stdmap.WithBackData(backData)),
 	}
+	recordCache.initActiveClusterIds()
+	return recordCache
 }
 
 // Init initializes the record cache for the given peer id if it does not exist.
@@ -137,6 +140,41 @@ func (r *RecordCache) Get(originId flow.Identifier) (float64, bool, error) {
 	return record.Counter.Load(), true, nil
 }
 
+func (r *RecordCache) storeActiveClusterIds(clusterIDList flow.ChainIDList) flow.ChainIDList {
+	adjustedEntity, _ := r.c.Adjust(defaultActiveClusterIdsIdentifier, func(entity flow.Entity) flow.Entity {
+		record, ok := entity.(ActiveClusterIdsEntity)
+		if !ok {
+			// sanity check
+			// This should never happen, because cache should always contain a ActiveClusterIdsEntity
+			// stored at the flow.ZeroID
+			panic(fmt.Sprintf("invalid entity type, expected ActiveClusterIdsEntity type, got: %T", entity))
+		}
+		record.ActiveClusterIds = clusterIDList
+		// Return the adjusted record.
+		return record
+	})
+	return adjustedEntity.(ActiveClusterIdsEntity).ActiveClusterIds
+}
+
+func (r *RecordCache) getActiveClusterIds() flow.ChainIDList {
+	adjustedEntity, ok := r.c.ByID(defaultActiveClusterIdsIdentifier)
+	if !ok {
+		// sanity check
+		// This should never happen, because cache should always contain a ActiveClusterIdsEntity
+		// stored at the flow.ZeroID
+		panic(fmt.Sprintf("invalid entity type, expected ActiveClusterIdsEntity type, got: %T", adjustedEntity))
+	}
+	return adjustedEntity.(ActiveClusterIdsEntity).ActiveClusterIds
+}
+
+func (r *RecordCache) initActiveClusterIds() {
+	activeClusterIdsEntity := NewActiveClusterIdsEntity(defaultActiveClusterIdsIdentifier, make(flow.ChainIDList, 0))
+	stored := r.c.Add(activeClusterIdsEntity)
+	if !stored {
+		panic("failed to initialize active cluster Ids in RecordCache")
+	}
+}
+
 // Identities returns the list of identities of the nodes that have a spam record in the cache.
 func (r *RecordCache) Identities() []flow.Identifier {
 	return flow.GetIDs(r.c.All())
@@ -185,12 +223,6 @@ func (r *RecordCache) decayAdjustment(entity flow.Entity) flow.Entity {
 	record.lastUpdated = time.Now()
 	// Return the adjusted record.
 	return record
-}
-
-// entityID converts peer ID to flow.Identifier.
-// HeroCache uses hash of peer.ID as the unique identifier of the record.
-func entityID(peerID peer.ID) flow.Identifier {
-	return flow.HashToID([]byte(peerID))
 }
 
 type preProcessingFunc func(recordEntity RecordEntity) (RecordEntity, error)

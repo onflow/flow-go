@@ -17,7 +17,7 @@ type RecordEntity struct {
 
 var _ flow.Entity = (*RecordEntity)(nil)
 
-// NewRecordEntity returns a new *RecordEntity creating the Identifier from the ClusterPrefixTopicsReceivedRecord
+// NewRecordEntity returns a new RecordEntity creating the Identifier from the ClusterPrefixTopicsReceivedRecord
 // peer field.
 func NewRecordEntity(identifier flow.Identifier) RecordEntity {
 	return RecordEntity{
