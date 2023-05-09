@@ -8,7 +8,7 @@ require (
 	github.com/stretchr/testify v1.8.0
 	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
 	gonum.org/v1/gonum v0.6.1
-	pgregory.net/rapid v0.5.7
+	pgregory.net/rapid v0.4.7
 )
 
 require (
