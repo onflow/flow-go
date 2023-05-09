@@ -68,7 +68,7 @@ func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityF
 	}
 }
 
-// init initializes the record cache for the given peer id if it does not exist.
+// Init initializes the record cache for the given peer id if it does not exist.
 // Returns true if the record is initialized, false otherwise (i.e.: the record already exists).
 // Args:
 // - peerID: peer ID of the sender of the control message.
@@ -76,9 +76,8 @@ func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityF
 // - true if the record is initialized, false otherwise (i.e.: the record already exists).
 // Note that if Init is called multiple times for the same peer id, the record is initialized only once, and the
 // subsequent calls return false and do not change the record (i.e.: the record is not re-initialized).
-func (r *RecordCache) init(identifier flow.Identifier) bool {
+func (r *RecordCache) Init(identifier flow.Identifier) bool {
 	entity := r.recordEntityFactory(identifier)
-	fmt.Println(entity)
 	return r.c.Add(entity)
 }
 
@@ -99,7 +98,7 @@ func (r *RecordCache) init(identifier flow.Identifier) bool {
 // as an irrecoverable error and indicates a bug.
 func (r *RecordCache) Update(peerID peer.ID) (int64, error) {
 	id := entityID(peerID)
-	r.init(id)
+	r.Init(id)
 	adjustedEntity, adjusted := r.c.Adjust(id, func(entity flow.Entity) flow.Entity {
 		record, ok := entity.(RecordEntity)
 		if !ok {
@@ -129,7 +128,7 @@ func (r *RecordCache) Update(peerID peer.ID) (int64, error) {
 // - The number of cluster prefix topics received after the decay and true if the record exists, 0 and false otherwise.
 func (r *RecordCache) Get(peerID peer.ID) (int64, bool) {
 	id := entityID(peerID)
-	if r.init(id) {
+	if r.Init(id) {
 		return 0, true
 	}
 
@@ -149,7 +148,6 @@ func (r *RecordCache) Get(peerID peer.ID) (int64, bool) {
 	}
 
 	// perform decay on Counter
-
 	return record.Counter.Load(), true
 }
 

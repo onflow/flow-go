@@ -313,9 +313,9 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 		if channels.IsErrUnknownClusterID(err) {
 			// unknown cluster ID error could indicate that a node has fallen
 			// behind and needs to catchup increment to topics received cache.
-			_, err = c.clusterPrefixTopicsReceivedTracker.Inc(from)
-			if err != nil {
-				return err
+			_, incErr := c.clusterPrefixTopicsReceivedTracker.Inc(from)
+			if incErr != nil {
+				return incErr
 			}
 		}
 		return err
