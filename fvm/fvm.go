@@ -141,10 +141,7 @@ func (vm *VirtualMachine) Run(
 		proc.ExecutionTime(),
 		ctx.DerivedBlockData)
 
-	stateParameters := state.DefaultParameters().
-		WithMeterParameters(getBasicMeterParameters(ctx, proc)).
-		WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-		WithMaxValueSizeAllowed(ctx.MaxStateValueSize)
+	stateParameters := ProcedureStateParameters(ctx, proc)
 
 	var storageTxn storage.Transaction
 	var err error
