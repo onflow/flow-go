@@ -1,6 +1,7 @@
 package pubsub
 
 import (
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -57,5 +58,13 @@ func (d *TimeoutCollectorDistributor) OnNewTcDiscovered(tc *flow.TimeoutCertific
 	defer d.lock.RUnlock()
 	for _, consumer := range d.consumers {
 		consumer.OnNewTcDiscovered(tc)
+	}
+}
+
+func (d *TimeoutCollectorDistributor) OnTimeoutProcessed(timeout *model.TimeoutObject) {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	for _, subscriber := range d.consumers {
+		subscriber.OnTimeoutProcessed(timeout)
 	}
 }

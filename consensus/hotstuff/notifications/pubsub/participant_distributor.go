@@ -118,22 +118,6 @@ func (d *ParticipantDistributor) OnStartingTimeout(timerInfo model.TimerInfo) {
 	}
 }
 
-func (d *ParticipantDistributor) OnVoteProcessed(vote *model.Vote) {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-	for _, subscriber := range d.subscribers {
-		subscriber.OnVoteProcessed(vote)
-	}
-}
-
-func (d *ParticipantDistributor) OnTimeoutProcessed(timeout *model.TimeoutObject) {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-	for _, subscriber := range d.subscribers {
-		subscriber.OnTimeoutProcessed(timeout)
-	}
-}
-
 func (d *ParticipantDistributor) OnCurrentViewDetails(currentView, finalizedView uint64, currentLeader flow.Identifier) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()

@@ -185,20 +185,6 @@ type ParticipantConsumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnStartingTimeout(model.TimerInfo)
 
-	// OnVoteProcessed notifications are produced by the Vote Aggregation logic, each time
-	// we successfully ingest a valid vote.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnVoteProcessed(vote *model.Vote)
-
-	// OnTimeoutProcessed notifications are produced by the Timeout Aggregation logic,
-	// each time we successfully ingest a valid timeout.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnTimeoutProcessed(timeout *model.TimeoutObject)
-
 	// OnCurrentViewDetails notifications are produced by the EventHandler during the course of a view with auxiliary information.
 	// These notifications are generally not produced for all views (for example skipped views).
 	// These notifications are guaranteed to be produced for all views we enter after fully processing a message.
@@ -216,7 +202,7 @@ type ParticipantConsumer interface {
 	OnCurrentViewDetails(currentView, finalizedView uint64, currentLeader flow.Identifier)
 }
 
-// QCCreatedConsumer consumes outbound notifications produced by HotStuff and its components.
+// VoteCollectorConsumer consumes outbound notifications produced by HotStuff and its components.
 // Notifications are consensus-internal state changes which are potentially relevant to
 // the larger node in which HotStuff is running. The notifications are emitted
 // in the order in which the HotStuff algorithm makes the respective steps.
@@ -225,13 +211,20 @@ type ParticipantConsumer interface {
 //   - be concurrency safe
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
-type QCCreatedConsumer interface {
+type VoteCollectorConsumer interface {
 	// OnQcConstructedFromVotes notifications are produced by the VoteAggregator
 	// component, whenever it constructs a QC from votes.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnQcConstructedFromVotes(*flow.QuorumCertificate)
+
+	// OnVoteProcessed notifications are produced by the Vote Aggregation logic, each time
+	// we successfully ingest a valid vote.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnVoteProcessed(vote *model.Vote)
 }
 
 // TimeoutCollectorConsumer consumes outbound notifications produced by HotStuff's timeout aggregation
@@ -280,6 +273,13 @@ type TimeoutCollectorConsumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnNewTcDiscovered(certificate *flow.TimeoutCertificate)
+
+	// OnTimeoutProcessed notifications are produced by the Timeout Aggregation logic,
+	// each time we successfully ingest a valid timeout.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnTimeoutProcessed(timeout *model.TimeoutObject)
 }
 
 // CommunicatorConsumer consumes outbound notifications produced by HotStuff and it's components.
@@ -338,7 +338,7 @@ type Consumer interface {
 
 type VoteAggregationConsumer interface {
 	VoteAggregationViolationConsumer
-	QCCreatedConsumer
+	VoteCollectorConsumer
 }
 
 type TimeoutAggregationConsumer interface {

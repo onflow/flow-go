@@ -50,10 +50,6 @@ func (*NoopPartialConsumer) OnTcTriggeredViewChange(uint64, uint64, *flow.Timeou
 
 func (*NoopPartialConsumer) OnStartingTimeout(model.TimerInfo) {}
 
-func (*NoopPartialConsumer) OnVoteProcessed(*model.Vote) {}
-
-func (*NoopPartialConsumer) OnTimeoutProcessed(*model.TimeoutObject) {}
-
 func (*NoopPartialConsumer) OnCurrentViewDetails(uint64, uint64, flow.Identifier) {}
 
 // no-op implementation of hotstuff.FinalizationConsumer
@@ -81,6 +77,8 @@ func (*NoopTimeoutCollectorConsumer) OnNewQcDiscovered(*flow.QuorumCertificate) 
 
 func (*NoopTimeoutCollectorConsumer) OnNewTcDiscovered(*flow.TimeoutCertificate) {}
 
+func (*NoopTimeoutCollectorConsumer) OnTimeoutProcessed(*model.TimeoutObject) {}
+
 // no-op implementation of hotstuff.CommunicatorConsumer
 
 type NoopCommunicatorConsumer struct{}
@@ -93,13 +91,15 @@ func (*NoopCommunicatorConsumer) OnOwnTimeout(*model.TimeoutObject) {}
 
 func (*NoopCommunicatorConsumer) OnOwnProposal(*flow.Header, time.Time) {}
 
-// no-op implementation of hotstuff.QCCreatedConsumer
+// no-op implementation of hotstuff.VoteCollectorConsumer
 
-type NoopQCCreatedConsumer struct{}
+type NoopVoteCollectorConsumer struct{}
 
-var _ hotstuff.QCCreatedConsumer = (*NoopQCCreatedConsumer)(nil)
+var _ hotstuff.VoteCollectorConsumer = (*NoopVoteCollectorConsumer)(nil)
 
-func (*NoopQCCreatedConsumer) OnQcConstructedFromVotes(*flow.QuorumCertificate) {}
+func (*NoopVoteCollectorConsumer) OnQcConstructedFromVotes(*flow.QuorumCertificate) {}
+
+func (*NoopVoteCollectorConsumer) OnVoteProcessed(*model.Vote) {}
 
 // no-op implementation of hotstuff.ProposalViolationConsumer
 

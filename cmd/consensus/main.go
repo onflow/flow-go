@@ -593,7 +593,6 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				lowestViewForVoteProcessing,
-				notifier,
 				voteAggregationDistributor,
 				voteProcessorFactory,
 				followerDistributor)
@@ -629,7 +628,7 @@ func main() {
 				Committee:                   wrappedCommittee,
 				Signer:                      signer,
 				Persist:                     persist,
-				QCCreatedDistributor:        voteAggregationDistributor.QCCreatedDistributor,
+				QCCreatedDistributor:        voteAggregationDistributor.VoteCollectorDistributor,
 				FollowerDistributor:         followerDistributor,
 				TimeoutCollectorDistributor: timeoutAggregationDistributor.TimeoutCollectorDistributor,
 				Forks:                       forks,

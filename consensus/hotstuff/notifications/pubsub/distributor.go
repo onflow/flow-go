@@ -71,7 +71,7 @@ func (d *TimeoutAggregationDistributor) AddTimeoutAggregationConsumer(consumer h
 
 type VoteAggregationDistributor struct {
 	*VoteAggregationViolationDistributor
-	*QCCreatedDistributor
+	*VoteCollectorDistributor
 }
 
 var _ hotstuff.VoteAggregationConsumer = (*VoteAggregationDistributor)(nil)
@@ -79,11 +79,11 @@ var _ hotstuff.VoteAggregationConsumer = (*VoteAggregationDistributor)(nil)
 func NewVoteAggregationDistributor() *VoteAggregationDistributor {
 	return &VoteAggregationDistributor{
 		VoteAggregationViolationDistributor: NewVoteAggregationViolationDistributor(),
-		QCCreatedDistributor:                NewQCCreatedDistributor(),
+		VoteCollectorDistributor:            NewQCCreatedDistributor(),
 	}
 }
 
 func (d *VoteAggregationDistributor) AddVoteAggregationConsumer(consumer hotstuff.VoteAggregationConsumer) {
 	d.VoteAggregationViolationDistributor.AddVoteAggregationViolationConsumer(consumer)
-	d.QCCreatedDistributor.AddQCCreatedConsumer(consumer)
+	d.VoteCollectorDistributor.AddQCCreatedConsumer(consumer)
 }
