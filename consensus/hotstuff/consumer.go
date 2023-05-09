@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ProtocolViolationConsumer consumes outbound notifications about HotStuff-protocol violations.
+// ProposalViolationConsumer consumes outbound notifications about HotStuff-protocol violations.
 // Such notifications are produced by the active consensus participants and to a lesser
 // degree also the consensus follower.
 //
@@ -15,7 +15,7 @@ import (
 //   - be concurrency safe
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
-type ProtocolViolationConsumer interface {
+type ProposalViolationConsumer interface {
 	// OnInvalidBlockDetected notifications are produced by components that have detected
 	// that a block proposal is invalid and need to report it.
 	// Most of the time such block can be detected by calling Validator.ValidateProposal.
@@ -95,32 +95,6 @@ type FinalizationConsumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnFinalizedBlock(*model.Block)
-}
-
-// FollowerConsumer consumes outbound notifications produced by consensus followers.
-// It is a subset of the notifications produced by consensus participants.
-// Implementations must:
-//   - be concurrency safe
-//   - be non-blocking
-//   - handle repetition of the same events (with some processing overhead).
-type FollowerConsumer interface {
-	ProtocolViolationConsumer
-	FinalizationConsumer
-}
-
-// Consumer consumes outbound notifications produced by consensus participants.
-// Notifications are consensus-internal state changes which are potentially relevant to
-// the larger node in which HotStuff is running. The notifications are emitted
-// in the order in which the HotStuff algorithm makes the respective steps.
-//
-// Implementations must:
-//   - be concurrency safe
-//   - be non-blocking
-//   - handle repetition of the same events (with some processing overhead).
-type Consumer interface {
-	FollowerConsumer
-	CommunicatorConsumer
-	ParticipantConsumer
 }
 
 // ParticipantConsumer consumes outbound notifications produced by consensus participants
@@ -308,11 +282,6 @@ type TimeoutCollectorConsumer interface {
 	OnNewTcDiscovered(certificate *flow.TimeoutCertificate)
 }
 
-type TimeoutAggregationConsumer interface {
-	TimeoutAggregationViolationConsumer
-	TimeoutCollectorConsumer
-}
-
 // CommunicatorConsumer consumes outbound notifications produced by HotStuff and it's components.
 // Notifications allow the HotStuff core algorithm to communicate with the other actors of the consensus process.
 // Implementations must:
@@ -339,4 +308,40 @@ type CommunicatorConsumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time)
+}
+
+// FollowerConsumer consumes outbound notifications produced by consensus followers.
+// It is a subset of the notifications produced by consensus participants.
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
+type FollowerConsumer interface {
+	ProposalViolationConsumer
+	FinalizationConsumer
+}
+
+// Consumer consumes outbound notifications produced by consensus participants.
+// Notifications are consensus-internal state changes which are potentially relevant to
+// the larger node in which HotStuff is running. The notifications are emitted
+// in the order in which the HotStuff algorithm makes the respective steps.
+//
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
+type Consumer interface {
+	FollowerConsumer
+	CommunicatorConsumer
+	ParticipantConsumer
+}
+
+type VoteAggregationConsumer interface {
+	VoteAggregationViolationConsumer
+	QCCreatedConsumer
+}
+
+type TimeoutAggregationConsumer interface {
+	TimeoutAggregationViolationConsumer
+	TimeoutCollectorConsumer
 }

@@ -582,11 +582,10 @@ func main() {
 				return nil, err
 			}
 
-			qcDistributor := pubsub.NewQCCreatedDistributor()
 			// TODO: connect to slashing violation consumer
-			voteAggregationViolationDistributor := pubsub.NewVoteAggregationViolationDistributor()
+			voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
 			validator := consensus.NewValidator(mainMetrics, wrappedCommittee)
-			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(wrappedCommittee, qcDistributor.OnQcConstructedFromVotes)
+			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(wrappedCommittee, voteAggregationDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
 			voteAggregator, err := consensus.NewVoteAggregator(
 				logger,
@@ -595,7 +594,7 @@ func main() {
 				node.Metrics.Mempool,
 				lowestViewForVoteProcessing,
 				notifier,
-				voteAggregationViolationDistributor,
+				voteAggregationDistributor,
 				voteProcessorFactory,
 				followerDistributor)
 			if err != nil {
@@ -630,7 +629,7 @@ func main() {
 				Committee:                   wrappedCommittee,
 				Signer:                      signer,
 				Persist:                     persist,
-				QCCreatedDistributor:        qcDistributor,
+				QCCreatedDistributor:        voteAggregationDistributor.QCCreatedDistributor,
 				FollowerDistributor:         followerDistributor,
 				TimeoutCollectorDistributor: timeoutAggregationDistributor.TimeoutCollectorDistributor,
 				Forks:                       forks,

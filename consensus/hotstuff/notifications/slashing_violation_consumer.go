@@ -14,7 +14,7 @@ type SlashingViolationsConsumer struct {
 	log zerolog.Logger
 }
 
-var _ hotstuff.ProtocolViolationConsumer = (*SlashingViolationsConsumer)(nil)
+var _ hotstuff.ProposalViolationConsumer = (*SlashingViolationsConsumer)(nil)
 
 func NewSlashingViolationsConsumer(log zerolog.Logger) *SlashingViolationsConsumer {
 	return &SlashingViolationsConsumer{

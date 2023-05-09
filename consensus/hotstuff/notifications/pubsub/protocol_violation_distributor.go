@@ -12,17 +12,17 @@ import (
 // participants and to a lesser degree also the consensus follower.
 // Concurrently safe.
 type ProtocolViolationDistributor struct {
-	subscribers []hotstuff.ProtocolViolationConsumer
+	subscribers []hotstuff.ProposalViolationConsumer
 	lock        sync.RWMutex
 }
 
-var _ hotstuff.ProtocolViolationConsumer = (*ProtocolViolationDistributor)(nil)
+var _ hotstuff.ProposalViolationConsumer = (*ProtocolViolationDistributor)(nil)
 
 func NewProtocolViolationDistributor() *ProtocolViolationDistributor {
 	return &ProtocolViolationDistributor{}
 }
 
-func (d *ProtocolViolationDistributor) AddProtocolViolationConsumer(consumer hotstuff.ProtocolViolationConsumer) {
+func (d *ProtocolViolationDistributor) AddProtocolViolationConsumer(consumer hotstuff.ProposalViolationConsumer) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.subscribers = append(d.subscribers, consumer)
