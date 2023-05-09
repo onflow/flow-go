@@ -40,7 +40,7 @@ type Core struct {
 	mempoolMetrics            module.MempoolMetrics
 	hotstuffMetrics           module.HotstuffMetrics
 	collectionMetrics         module.CollectionMetrics
-	protocolViolationNotifier hotstuff.ProposalViolationConsumer
+	proposalViolationNotifier hotstuff.ProposalViolationConsumer
 	headers                   storage.Headers
 	state                     clusterkv.MutableState
 	// track latest finalized view/height - used to efficiently drop outdated or too-far-ahead blocks
@@ -61,7 +61,7 @@ func NewCore(
 	mempool module.MempoolMetrics,
 	hotstuffMetrics module.HotstuffMetrics,
 	collectionMetrics module.CollectionMetrics,
-	protocolViolationNotifier hotstuff.ProposalViolationConsumer,
+	proposalViolationNotifier hotstuff.ProposalViolationConsumer,
 	headers storage.Headers,
 	state clusterkv.MutableState,
 	pending module.PendingClusterBlockBuffer,
@@ -85,7 +85,7 @@ func NewCore(
 		mempoolMetrics:            mempool,
 		hotstuffMetrics:           hotstuffMetrics,
 		collectionMetrics:         collectionMetrics,
-		protocolViolationNotifier: protocolViolationNotifier,
+		proposalViolationNotifier: proposalViolationNotifier,
 		headers:                   headers,
 		state:                     state,
 		pending:                   pending,
@@ -314,7 +314,7 @@ func (c *Core) processBlockProposal(proposal *cluster.Block) error {
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
 		if invalidBlockErr, ok := model.AsInvalidBlockError(err); ok {
-			c.protocolViolationNotifier.OnInvalidBlockDetected(*invalidBlockErr)
+			c.proposalViolationNotifier.OnInvalidBlockDetected(*invalidBlockErr)
 			return engine.NewInvalidInputErrorf("invalid block proposal: %w", err)
 		}
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {

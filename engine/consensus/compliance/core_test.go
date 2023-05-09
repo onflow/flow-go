@@ -71,7 +71,7 @@ type CommonSuite struct {
 	pending                   *module.PendingBlockBuffer
 	hotstuff                  *module.HotStuff
 	sync                      *module.BlockRequester
-	protocolViolationNotifier *hotstuff.ProtocolViolationConsumer
+	proposalViolationNotifier *hotstuff.ProposalViolationConsumer
 	validator                 *hotstuff.Validator
 	voteAggregator            *hotstuff.VoteAggregator
 	timeoutAggregator         *hotstuff.TimeoutAggregator
@@ -253,7 +253,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.tracer = trace.NewNoopTracer()
 
 	// set up notifier for reporting protocol violations
-	cs.protocolViolationNotifier = hotstuff.NewProtocolViolationConsumer(cs.T())
+	cs.proposalViolationNotifier = hotstuff.NewProposalViolationConsumer(cs.T())
 
 	// initialize the engine
 	e, err := NewCore(
@@ -262,7 +262,7 @@ func (cs *CommonSuite) SetupTest() {
 		cs.metrics,
 		cs.metrics,
 		cs.metrics,
-		cs.protocolViolationNotifier,
+		cs.proposalViolationNotifier,
 		cs.tracer,
 		cs.headers,
 		cs.payloads,
@@ -369,7 +369,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		*cs.validator = *hotstuff.NewValidator(cs.T())
 		sentinelError := model.NewInvalidBlockErrorf(hotstuffProposal, "")
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(sentinelError)
-		cs.protocolViolationNotifier.On("OnInvalidBlockDetected", sentinelError).Return().Once()
+		cs.proposalViolationNotifier.On("OnInvalidBlockDetected", sentinelError).Return().Once()
 		// we should notify VoteAggregator about the invalid block
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
