@@ -52,10 +52,10 @@ var _ network.MisbehaviorReportManager = (*MisbehaviorReportManager)(nil)
 
 type MisbehaviorReportManagerConfig struct {
 	Logger zerolog.Logger
-	// SpamRecordsCacheSize is the size of the spam record cache that stores the spam records for the authorized nodes.
+	// SpamRecordCacheSize is the size of the spam record cache that stores the spam records for the authorized nodes.
 	// It should be as big as the number of authorized nodes in Flow network.
 	// Recommendation: for small network sizes 10 * number of authorized nodes to ensure that the cache can hold all the spam records of the authorized nodes.
-	SpamRecordsCacheSize uint32
+	SpamRecordCacheSize uint32
 	// SpamReportQueueSize is the size of the queue that stores the spam records to be processed by the worker pool.
 	SpamReportQueueSize uint32
 	// AlspMetrics is the metrics instance for the alsp module (collecting spam reports).
@@ -81,7 +81,7 @@ type MisbehaviorReportManagerConfig struct {
 //
 //	An error if the config is invalid.
 func (c MisbehaviorReportManagerConfig) validate() error {
-	if c.SpamRecordsCacheSize == 0 {
+	if c.SpamRecordCacheSize == 0 {
 		return fmt.Errorf("spam record cache size is not set")
 	}
 	if c.SpamReportQueueSize == 0 {
@@ -134,7 +134,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 	}
 
 	m.cache = internal.NewSpamRecordCache(
-		cfg.SpamRecordsCacheSize,
+		cfg.SpamRecordCacheSize,
 		lg.With().Str("component", "spam_record_cache").Logger(),
 		metrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory),
 		model.SpamRecordFactory())

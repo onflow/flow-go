@@ -39,10 +39,15 @@ func WithMisbehaviorManager(misbehaviorManager network.MisbehaviorReportManager)
 //
 // Returns:
 //
-//	a new instance of the DefaultConduitFactory.
-func NewDefaultConduitFactory(alspCfg *alspmgr.MisbehaviorReportManagerConfig, opts ...DefaultConduitFactoryOpt) *DefaultConduitFactory {
+//		a new instance of the DefaultConduitFactory.
+//	 an error if the initialization of the conduit factory fails. The error is irrecoverable.
+func NewDefaultConduitFactory(alspCfg *alspmgr.MisbehaviorReportManagerConfig, opts ...DefaultConduitFactoryOpt) (*DefaultConduitFactory, error) {
+	m, err := alspmgr.NewMisbehaviorReportManager(alspCfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not create misbehavior report manager: %w", err)
+	}
 	d := &DefaultConduitFactory{
-		misbehaviorManager: alspmgr.NewMisbehaviorReportManager(alspCfg),
+		misbehaviorManager: m,
 	}
 
 	for _, apply := range opts {
@@ -59,7 +64,7 @@ func NewDefaultConduitFactory(alspCfg *alspmgr.MisbehaviorReportManagerConfig, o
 
 	d.ComponentManager = cm
 
-	return d
+	return d, nil
 }
 
 // RegisterAdapter sets the Adapter component of the factory.
