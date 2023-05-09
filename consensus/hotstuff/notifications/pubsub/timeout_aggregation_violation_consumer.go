@@ -1,9 +1,10 @@
 package pubsub
 
 import (
+	"sync"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"sync"
 )
 
 // TimeoutAggregationViolationDistributor ingests notifications about HotStuff-protocol violations and
