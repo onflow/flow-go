@@ -18,7 +18,8 @@ type LogConsumer struct {
 }
 
 var _ hotstuff.Consumer = (*LogConsumer)(nil)
-var _ hotstuff.TimeoutCollectorConsumer = (*LogConsumer)(nil)
+var _ hotstuff.TimeoutAggregationConsumer = (*LogConsumer)(nil)
+var _ hotstuff.VoteAggregationConsumer = (*LogConsumer)(nil)
 
 func NewLogConsumer(log zerolog.Logger) *LogConsumer {
 	lc := &LogConsumer{
@@ -285,4 +286,11 @@ func (lc *LogConsumer) OnOwnProposal(header *flow.Header, targetPublicationTime 
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Time("target_publication_time", targetPublicationTime).
 		Msg("publishing HotStuff block proposal")
+}
+
+func (lc *LogConsumer) OnQcConstructedFromVotes(qc *flow.QuorumCertificate) {
+	lc.log.Info().
+		Uint64("view", qc.View).
+		Hex("block_id", qc.BlockID[:]).
+		Msg("QC constructed from votes")
 }
