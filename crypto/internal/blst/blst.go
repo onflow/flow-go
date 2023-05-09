@@ -8,6 +8,8 @@
  * package is a workaround to achieve the same purpose. Note that the internal package
  * implicitly uses the C objects declared by flow-go/crypto.
  *
+ * Note: linter staticcheck was added in two spots to avoid linter false positives.
+ *
  * Copied from https://github.com/supranational/blst.
  * Copyright Supranational LLC
  * Licensed under the Apache License, Version 2.0, see LICENSE for details.
@@ -587,6 +589,7 @@ func coreAggregateVerifyPkInG1(sigFn sigGetterP2, sigGroupcheck bool,
 					// main thread has completed its miller loop before
 					// proceeding.
 					mutex.Lock()
+					//nolint:staticcheck
 					mutex.Unlock()
 				}
 
@@ -1205,6 +1208,7 @@ func coreAggregateVerifyPkInG2(sigFn sigGetterP1, sigGroupcheck bool,
 					// main thread has completed its miller loop before
 					// proceeding.
 					mutex.Lock()
+					//nolint:staticcheck
 					mutex.Unlock()
 				}
 
