@@ -88,7 +88,7 @@ func TestCommandParsing(t *testing.T) {
 
 func TestCommandsSetsValues(t *testing.T) {
 
-	stopControl := ingestion.NewStopControl(zerolog.Nop(), 0)
+	stopControl := ingestion.NewStopControl(zerolog.Nop())
 
 	cmd := NewStopAtHeightCommand(stopControl)
 

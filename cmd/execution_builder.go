@@ -650,14 +650,8 @@ func (exeNode *ExecutionNode) LoadStopControl(
 	module.ReadyDoneAware,
 	error,
 ) {
-	lastExecutedHeight, _, err := exeNode.executionState.GetHighestExecutedBlockID(context.TODO())
-	if err != nil {
-		return nil, fmt.Errorf("cannot get the latest executed block height for stop control: %w", err)
-	}
 
-	exeNode.stopControl = ingestion.NewStopControl(
-		exeNode.builder.Logger,
-		lastExecutedHeight)
+	exeNode.stopControl = ingestion.NewStopControl(exeNode.builder.Logger)
 	if exeNode.exeConf.pauseExecution {
 		exeNode.stopControl.PauseExecution()
 	}

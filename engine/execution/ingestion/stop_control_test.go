@@ -19,7 +19,7 @@ import (
 func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 	t.Run("when processing block at stop height", func(t *testing.T) {
-		sc := NewStopControl(unittest.Logger(), 0)
+		sc := NewStopControl(unittest.Logger())
 
 		require.Equal(t, sc.getState(), StopControlOff)
 
@@ -55,7 +55,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		execState := new(mock.ReadOnlyExecutionState)
 
-		sc := NewStopControl(unittest.Logger(), 0)
+		sc := NewStopControl(unittest.Logger())
 
 		require.Equal(t, sc.getState(), StopControlOff)
 
@@ -100,7 +100,7 @@ func TestExecutionFallingBehind(t *testing.T) {
 	headerC := unittest.BlockHeaderWithParentFixture(headerB) // 22
 	headerD := unittest.BlockHeaderWithParentFixture(headerC) // 23
 
-	sc := NewStopControl(unittest.Logger(), 0)
+	sc := NewStopControl(unittest.Logger())
 
 	require.Equal(t, sc.getState(), StopControlOff)
 
@@ -134,38 +134,17 @@ func TestExecutionFallingBehind(t *testing.T) {
 	execState.AssertExpectations(t)
 }
 
-// TestCannotSetHeightBelowLastExecuted check if StopControl
-// tracks last executed height and prevents from setting stop height
-// below or too close to it
-func TestCannotSetHeightBelowLastExecuted(t *testing.T) {
-
-	sc := NewStopControl(unittest.Logger(), 0)
-
-	require.Equal(t, sc.getState(), StopControlOff)
-
-	sc.executingBlockHeight(20)
-	require.Equal(t, StopControlOff, sc.getState())
-
-	err := sc.SetStopHeight(20, false)
-	require.Error(t, err)
-	require.Equal(t, StopControlOff, sc.getState())
-
-	err = sc.SetStopHeight(25, false)
-	require.NoError(t, err)
-	require.Equal(t, StopControlSet, sc.getState())
-}
-
 // StopControl started as paused will keep the state
 func TestStartingPaused(t *testing.T) {
 
-	sc := NewStopControl(unittest.Logger(), 0)
+	sc := NewStopControl(unittest.Logger())
 	sc.PauseExecution()
 	require.Equal(t, StopControlPaused, sc.getState())
 }
 
 func TestPausedStateRejectsAllBlocksAndChanged(t *testing.T) {
 
-	sc := NewStopControl(unittest.Logger(), 0)
+	sc := NewStopControl(unittest.Logger())
 	sc.PauseExecution()
 	require.Equal(t, StopControlPaused, sc.getState())
 

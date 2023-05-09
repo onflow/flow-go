@@ -202,7 +202,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
-	stopControl := NewStopControl(zerolog.Nop(), 0)
+	stopControl := NewStopControl(zerolog.Nop())
 
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
@@ -1567,7 +1567,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		checkAuthorizedAtBlock,
 		nil,
 		nil,
-		NewStopControl(zerolog.Nop(), 0),
+		NewStopControl(zerolog.Nop()),
 	)
 
 	require.NoError(t, err)

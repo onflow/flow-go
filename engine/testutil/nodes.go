@@ -676,8 +676,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	followerDistributor := pubsub.NewFollowerDistributor()
-
-	latestExecutedHeight, _, err := execState.GetHighestExecutedBlockID(context.TODO())
 	require.NoError(t, err)
 
 	// disabled by default
@@ -705,7 +703,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		checkAuthorizedAtBlock,
 		nil,
 		uploader,
-		ingestion.NewStopControl(node.Log, latestExecutedHeight),
+		ingestion.NewStopControl(node.Log),
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)

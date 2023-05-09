@@ -609,8 +609,6 @@ func (e *Engine) executeBlock(
 
 	startedAt := time.Now()
 
-	e.stopControl.executingBlockHeight(executableBlock.Block.Header.Height)
-
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
 	defer span.End()
 
