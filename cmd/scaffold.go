@@ -231,6 +231,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	// application layer spam prevention (alsp) protocol
 	fnb.flags.BoolVar(&fnb.BaseConfig.AlspConfig.DisablePenalty, "alsp-enable", defaultConfig.AlspConfig.DisablePenalty, "disabling the penalty mechanism of the alsp protocol, recommended to be false (enable) for production")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.AlspConfig.SpamRecordCacheSize, "alsp-spam-record-cache-size", defaultConfig.AlspConfig.SpamRecordCacheSize, "size of spam record cache, recommended to be 10x the number of authorized nodes")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.AlspConfig.SpamReportQueueSize, "alsp-spam-report-queue-size", defaultConfig.AlspConfig.SpamReportQueueSize, "size of spam report queue, recommended to be 100x the number of authorized nodes")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
