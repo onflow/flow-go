@@ -19,10 +19,11 @@ package crypto
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/crypto/internal/blst"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
+
+	"github.com/onflow/flow-go/crypto/internal/blst"
 )
 
 // validPrivateKeyBytesFlow generates bytes of a valid private key in Flow library
