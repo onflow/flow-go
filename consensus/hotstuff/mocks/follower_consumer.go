@@ -22,16 +22,6 @@ func (_m *FollowerConsumer) OnDoubleProposeDetected(_a0 *model.Block, _a1 *model
 	_m.Called(_a0, _a1)
 }
 
-// OnDoubleTimeoutDetected provides a mock function with given fields: _a0, _a1
-func (_m *FollowerConsumer) OnDoubleTimeoutDetected(_a0 *model.TimeoutObject, _a1 *model.TimeoutObject) {
-	_m.Called(_a0, _a1)
-}
-
-// OnDoubleVotingDetected provides a mock function with given fields: _a0, _a1
-func (_m *FollowerConsumer) OnDoubleVotingDetected(_a0 *model.Vote, _a1 *model.Vote) {
-	_m.Called(_a0, _a1)
-}
-
 // OnFinalizedBlock provides a mock function with given fields: _a0
 func (_m *FollowerConsumer) OnFinalizedBlock(_a0 *model.Block) {
 	_m.Called(_a0)
@@ -40,21 +30,6 @@ func (_m *FollowerConsumer) OnFinalizedBlock(_a0 *model.Block) {
 // OnInvalidBlockDetected provides a mock function with given fields: err
 func (_m *FollowerConsumer) OnInvalidBlockDetected(err model.InvalidBlockError) {
 	_m.Called(err)
-}
-
-// OnInvalidTimeoutDetected provides a mock function with given fields: err
-func (_m *FollowerConsumer) OnInvalidTimeoutDetected(err model.InvalidTimeoutError) {
-	_m.Called(err)
-}
-
-// OnInvalidVoteDetected provides a mock function with given fields: err
-func (_m *FollowerConsumer) OnInvalidVoteDetected(err model.InvalidVoteError) {
-	_m.Called(err)
-}
-
-// OnVoteForInvalidBlockDetected provides a mock function with given fields: vote, invalidProposal
-func (_m *FollowerConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal) {
-	_m.Called(vote, invalidProposal)
 }
 
 type mockConstructorTestingTNewFollowerConsumer interface {

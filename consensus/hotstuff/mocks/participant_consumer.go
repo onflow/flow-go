@@ -71,19 +71,9 @@ func (_m *ParticipantConsumer) OnTcTriggeredViewChange(oldView uint64, newView u
 	_m.Called(oldView, newView, tc)
 }
 
-// OnTimeoutProcessed provides a mock function with given fields: timeout
-func (_m *ParticipantConsumer) OnTimeoutProcessed(timeout *model.TimeoutObject) {
-	_m.Called(timeout)
-}
-
 // OnViewChange provides a mock function with given fields: oldView, newView
 func (_m *ParticipantConsumer) OnViewChange(oldView uint64, newView uint64) {
 	_m.Called(oldView, newView)
-}
-
-// OnVoteProcessed provides a mock function with given fields: vote
-func (_m *ParticipantConsumer) OnVoteProcessed(vote *model.Vote) {
-	_m.Called(vote)
 }
 
 type mockConstructorTestingTNewParticipantConsumer interface {
