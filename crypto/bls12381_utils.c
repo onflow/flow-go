@@ -1073,7 +1073,6 @@ int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte*
     ep2_copy(elemsG2[0], tmp);
     free(tmp);
 
-#if DOUBLE_PAIRING  
     // elemsG2[0] = -pk2
     ep2_neg(elemsG2[0], elemsG2[0]);
 
@@ -1085,14 +1084,6 @@ int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte*
     // compare the result to 1
     int res = fp12_cmp_dig(pair, 1);
 
-#elif SINGLE_PAIRING   
-    fp12_t pair1, pair2;
-    fp12_new(&pair1); fp12_new(&pair2);
-    pp_map_oatep_k12(pair1, elemsG1[0], elemsG2[0]);
-    pp_map_oatep_k12(pair2, elemsG1[1], elemsG2[1]);
-
-    int res = fp12_cmp(pair1, pair2);
-#endif
     fp12_free(&one);
     ep_free(elemsG1[0]);
     ep_free(elemsG1[1]);

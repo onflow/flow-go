@@ -84,7 +84,6 @@ static int bls_verify_ep(const E2* pk, const ep_t s, const byte* data, const int
 
     int ret = UNDEFINED;
 
-#if DOUBLE_PAIRING  
     // elemsG2[0] = -g2
     ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded
 
@@ -95,15 +94,7 @@ static int bls_verify_ep(const E2* pk, const ep_t s, const byte* data, const int
 
     // compare the result to 1
     int res = fp12_cmp_dig(pair, 1);
-
-#elif SINGLE_PAIRING   
-    fp12_t pair1, pair2;
-    fp12_new(&pair1); fp12_new(&pair2);
-    pp_map_oatep_k12(pair1, elemsG1[0], core_get()->ep2_g);
-    pp_map_oatep_k12(pair2, elemsG1[1], elemsG2[1]);
-
-    int res = fp12_cmp(pair1, pair2);
-#endif   
+   
     if (core_get()->code == RLC_OK) {
         if (res == RLC_EQ) {
             ret = VALID;
