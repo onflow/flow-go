@@ -20,12 +20,6 @@ import (
 
 const (
 	defaultMisbehaviorReportManagerWorkers = 2
-	// DefaultSpamRecordQueueSize is the default size of the queue that stores the spam records to be processed by the
-	// worker pool. The queue size should be large enough to handle the spam records during attacks. The recommended
-	// size is 100 * number of nodes in the network. By default, the ALSP module will disallow-list the misbehaving
-	// node after 100 spam reports are received (if no penalty value are amplified). Therefore, the queue size should
-	// be at least 100 * number of nodes in the network.
-	DefaultSpamRecordQueueSize = 100 * 1000
 )
 
 // MisbehaviorReportManager is responsible for handling misbehavior reports.
