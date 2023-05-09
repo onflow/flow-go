@@ -20,6 +20,12 @@ import (
 
 const (
 	defaultMisbehaviorReportManagerWorkers = 2
+	// DefaultSpamRecordQueueSize is the default size of the queue that stores the spam records to be processed by the
+	// worker pool. The queue size should be large enough to handle the spam records during attacks. The recommended
+	// size is 100 * number of nodes in the network. By default, the ALSP module will disallow-list the misbehaving
+	// node after 100 spam reports are received (if no penalty value are amplified). Therefore, the queue size should
+	// be at least 100 * number of nodes in the network.
+	DefaultSpamRecordQueueSize = 100 * 1000
 )
 
 // MisbehaviorReportManager is responsible for handling misbehavior reports.
@@ -50,8 +56,8 @@ type MisbehaviorReportManagerConfig struct {
 	// It should be as big as the number of authorized nodes in Flow network.
 	// Recommendation: for small network sizes 10 * number of authorized nodes to ensure that the cache can hold all the spam records of the authorized nodes.
 	SpamRecordsCacheSize uint32
-	// SpamRecordQueueSize is the size of the queue that stores the spam records to be processed by the worker pool.
-	SpamRecordQueueSize uint32
+	// SpamReportQueueSize is the size of the queue that stores the spam records to be processed by the worker pool.
+	SpamReportQueueSize uint32
 	// AlspMetrics is the metrics instance for the alsp module (collecting spam reports).
 	AlspMetrics module.AlspMetrics
 	// HeroCacheMetricsFactory is the metrics factory for the HeroCache-related metrics.
@@ -62,6 +68,26 @@ type MisbehaviorReportManagerConfig struct {
 	// This is useful for managing production incidents.
 	// Note: under normal circumstances, the ALSP module should not be disabled.
 	DisablePenalty bool
+}
+
+// validate validates the MisbehaviorReportManagerConfig instance. It returns an error if the config is invalid.
+// It only validates the numeric fields of the config that may yield a stealth error in the production.
+// It does not validate the struct fields of the config against a nil value.
+// Args:
+//
+//	None.
+//
+// Returns:
+//
+//	An error if the config is invalid.
+func (c MisbehaviorReportManagerConfig) validate() error {
+	if c.SpamRecordsCacheSize == 0 {
+		return fmt.Errorf("spam record cache size is not set")
+	}
+	if c.SpamReportQueueSize == 0 {
+		return fmt.Errorf("spam report queue size is not set")
+	}
+	return nil
 }
 
 type MisbehaviorReportManagerOption func(*MisbehaviorReportManager)
@@ -93,8 +119,13 @@ func WithSpamRecordsCache(cache alsp.SpamRecordCache) MisbehaviorReportManagerOp
 //
 // Returns:
 //
-//	a new instance of the MisbehaviorReportManager.
-func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...MisbehaviorReportManagerOption) *MisbehaviorReportManager {
+//		A new instance of the MisbehaviorReportManager.
+//	 An error if the config is invalid. The error is considered irrecoverable.
+func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...MisbehaviorReportManagerOption) (*MisbehaviorReportManager, error) {
+	if err := cfg.validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration for MisbehaviorReportManager: %w", err)
+	}
+
 	lg := cfg.Logger.With().Str("module", "misbehavior_report_manager").Logger()
 	m := &MisbehaviorReportManager{
 		logger:         lg,
@@ -109,7 +140,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 		model.SpamRecordFactory())
 
 	store := queue.NewHeroStore(
-		cfg.SpamRecordQueueSize,
+		cfg.SpamReportQueueSize,
 		lg.With().Str("component", "spam_record_queue").Logger(),
 		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory))
 
@@ -132,7 +163,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 	if m.disablePenalty {
 		m.logger.Warn().Msg("penalty mechanism of alsp is disabled")
 	}
-	return m
+	return m, nil
 }
 
 // HandleMisbehaviorReport is called upon a new misbehavior is reported.
