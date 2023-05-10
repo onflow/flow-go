@@ -45,7 +45,7 @@ type StoreHouseReader interface {
 // Once one fork is finalized, then register updates for blocks on the finalized fork
 // can be moved to NonForkAwareStorage, and other conflicting forks can be pruned.
 type ForkAwareStore interface {
-	// GetRegsiter returns the latest register value for a given block
+	// GetRegsiter returns the latest register value for a given block,
 	// it will traverses along the fork of blocks until finding the latest updated value.
 	// for instance, there are two forks of blocks as below:
 	// A <- B <- C <- D
@@ -63,7 +63,7 @@ type ForkAwareStore interface {
 	// GetRegsiter(10, F, key3) will return NotFound, because the register value is not updated
 	// on the fork (A<-B<-E<-F). When register value is not found, the call needs to query it from
 	// NonForkAwareStorage
-	// TODO(leo): check NotFound error type
+	// It returns empty value (length = 0) if register is not found.
 	GetRegsiter(view uint64, blockID flow.Identifier, id flow.RegisterID) (flow.RegisterValue, error)
 
 	// AddForBlock add the register updates of a given block to ForkAwareStore
@@ -89,6 +89,7 @@ type ForkAwareStore interface {
 // NonForkAwareStorage stores register updates for finalized blocks into database
 type NonForkAwareStorage interface {
 	// GetRegsiter returns the latest register value for a given block
+	// It returns empty value (length = 0) if register is not found.
 	GetRegsiter(view uint64, blockID flow.Identifier, id flow.RegisterID) (flow.RegisterValue, error)
 
 	// CommitBlock stores the updated registers to disk and index them by the finalized view.
