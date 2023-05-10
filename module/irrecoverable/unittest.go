@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// MockSignalerContext is a SignalerContext which will immediately fail a test if an error is thrown.
 type MockSignalerContext struct {
 	context.Context
 	t *testing.T
