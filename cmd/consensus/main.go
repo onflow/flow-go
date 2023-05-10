@@ -639,7 +639,6 @@ func main() {
 				Signer:                      signer,
 				Persist:                     persist,
 				VoteCollectorDistributor:    voteAggregationDistributor.VoteCollectorDistributor,
-				FollowerDistributor:         followerDistributor,
 				TimeoutCollectorDistributor: timeoutAggregationDistributor.TimeoutCollectorDistributor,
 				Forks:                       forks,
 				Validator:                   validator,

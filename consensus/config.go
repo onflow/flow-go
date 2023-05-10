@@ -16,7 +16,6 @@ type HotstuffModules struct {
 	Signer                      hotstuff.Signer                     // signer of proposal & votes
 	Persist                     hotstuff.Persister                  // last state of consensus participant
 	Notifier                    *pubsub.Distributor                 // observer for hotstuff events
-	FollowerDistributor         *pubsub.FollowerDistributor         // observer for finalization events, used by compliance engine
 	VoteCollectorDistributor    *pubsub.VoteCollectorDistributor    // observer for vote aggregation events, used by leader
 	TimeoutCollectorDistributor *pubsub.TimeoutCollectorDistributor // observer for timeout aggregation events
 	Forks                       hotstuff.Forks                      // information about multiple forks

@@ -167,7 +167,6 @@ func (f *HotStuffFactory) CreateModules(
 		TimeoutAggregator:           timeoutAggregator,
 		VoteCollectorDistributor:    voteAggregationDistributor.VoteCollectorDistributor,
 		TimeoutCollectorDistributor: timeoutCollectorDistributor.TimeoutCollectorDistributor,
-		FollowerDistributor:         notifier.FollowerDistributor,
 	}, metrics, nil
 }
 
