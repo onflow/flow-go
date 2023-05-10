@@ -462,7 +462,7 @@ func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 // BlockFinalized implements part of state.protocol.Consumer interface.
 // Method gets called for every finalized block
 func (e *Engine) BlockFinalized(h *flow.Header) {
-	e.stopControl.blockFinalized(e.unit.Ctx(), e.execState, h)
+	e.stopControl.BlockFinalized(e.unit.Ctx(), e.execState, h)
 }
 
 // Main handling
@@ -704,9 +704,10 @@ func (e *Engine) executeBlock(
 		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
 	}
 
+	e.stopControl.OnBlockExecuted(executableBlock.Block.Header)
+
 	e.unit.Ctx()
 
-	e.stopControl.blockExecuted(executableBlock.Block.Header)
 }
 
 // we've executed the block, now we need to check:
