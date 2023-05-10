@@ -20,7 +20,7 @@ import (
 type FinalizedHeaderCache struct {
 	state              protocol.State
 	val                *atomic.Pointer[flow.Header]
-	*FinalizationActor // expose OnBlockFinalized method
+	*FinalizationActor // expose OnFinalizedBlock method
 }
 
 // Get returns the most recently finalized block.
@@ -40,10 +40,11 @@ func (cache *FinalizedHeaderCache) update() error {
 	return nil
 }
 
-// NewFinalizedHeaderCache returns a new FinalizedHeaderCache subscribed to the given FinalizationDistributor,
-// and the ComponentWorker function to maintain the cache.
-// The caller MUST start the returned ComponentWorker in a goroutine to maintain the cache.
-// No errors are expected during normal operation.
+// NewFinalizedHeaderCache returns a new FinalizedHeaderCache and the ComponentWorker function.
+// The caller MUST:
+//   - subscribe the `FinalizedHeaderCache` (first return value) to the `FinalizationDistributor`
+//     that is distributing the consensus logic's `OnFinalizedBlock` events
+//   - start the returned ComponentWorker logic (second return value) in a goroutine to maintain the cache.
 func NewFinalizedHeaderCache(state protocol.State) (*FinalizedHeaderCache, component.ComponentWorker, error) {
 	cache := &FinalizedHeaderCache{
 		state: state,

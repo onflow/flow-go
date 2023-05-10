@@ -34,13 +34,13 @@ func NewFinalizationActor(handler ProcessLatestFinalizedBlock) (*FinalizationAct
 		notifier:        engine.NewNotifier(),
 		handler:         handler,
 	}
-	return actor, actor.worker
+	return actor, actor.workerLogic
 }
 
-// worker is the worker function exposed by the FinalizationActor. It should be
-// attached to a ComponentBuilder by the higher-level component using CreateWorker.
+// workerLogic is the worker function exposed by the FinalizationActor. It should be
+// attached to a ComponentBuilder by the higher-level component.
 // It processes each new finalized block by invoking the ProcessLatestFinalizedBlock callback.
-func (actor *FinalizationActor) worker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (actor *FinalizationActor) workerLogic(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	doneSignal := ctx.Done()
