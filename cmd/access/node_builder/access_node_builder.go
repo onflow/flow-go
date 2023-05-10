@@ -165,7 +165,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
 			MaxGlobalStreams:        state_stream.DefaultMaxGlobalStreams,
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
-			ThrottleDelay:           state_stream.DefaultThrottleDelay,
+			ResponseLimit:           state_stream.DefaultResponseLimit,
 		},
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
@@ -678,10 +678,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize, "execution-data-cache-size", defaultConfig.stateStreamConf.ExecutionDataCacheSize, "block execution data cache size")
 		flags.Uint32Var(&builder.stateStreamConf.MaxGlobalStreams, "state-stream-global-max-streams", defaultConfig.stateStreamConf.MaxGlobalStreams, "global maximum number of concurrent streams")
 		flags.UintVar(&builder.stateStreamConf.MaxExecutionDataMsgSize, "state-stream-max-message-size", defaultConfig.stateStreamConf.MaxExecutionDataMsgSize, "maximum size for a gRPC message containing block execution data")
+		flags.StringToIntVar(&builder.stateStreamFilterConf, "state-stream-event-filter-limits", defaultConfig.stateStreamFilterConf, "event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
 		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout, "state-stream-send-timeout", defaultConfig.stateStreamConf.ClientSendTimeout, "maximum wait before timing out while sending a response to a streaming client e.g. 30s")
 		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
-		flags.StringToIntVar(&builder.stateStreamFilterConf, "state-stream-event-filter-limits", defaultConfig.stateStreamFilterConf, "event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
-		flags.DurationVar(&builder.stateStreamConf.ThrottleDelay, "state-stream-throttle-delay", defaultConfig.stateStreamConf.ThrottleDelay, "artificial delay to add after each streaming response. this helps manage resources consumed by each client querying data not in the cache e.g. 50ms")
+		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -722,6 +722,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 				default:
 					return errors.New("state-stream-event-filter-limits may only contain the keys EventTypes, Addresses, Contracts")
 				}
+			}
+			if builder.stateStreamConf.ResponseLimit < 0 {
+				return errors.New("state-stream-response-limit must be greater than or equal to 0")
 			}
 		}
 

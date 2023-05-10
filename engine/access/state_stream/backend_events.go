@@ -25,7 +25,7 @@ type EventsBackend struct {
 	headers        storage.Headers
 	broadcaster    *engine.Broadcaster
 	sendTimeout    time.Duration
-	throttleDelay  time.Duration
+	responseLimit  float64
 	sendBufferSize int
 
 	getExecutionData GetExecutionDataFunc
@@ -47,7 +47,7 @@ func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Id
 
 	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponseFactory(filter))
 
-	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.throttleDelay, sub).Stream(ctx)
+	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
 	return sub
 }

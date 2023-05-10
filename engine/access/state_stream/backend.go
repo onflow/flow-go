@@ -30,8 +30,9 @@ const (
 	// expires, the connection is closed.
 	DefaultSendTimeout = 30 * time.Second
 
-	// DefaultThrottleDelay is the default delay to inject between searching each block to throttle scans
-	DefaultThrottleDelay = time.Duration(0)
+	// DefaultResponseLimit is default max responses per second allowed on a stream. After exceeding
+	// the limit, the stream is paused until more capacity is available.
+	DefaultResponseLimit = float64(0)
 )
 
 type GetExecutionDataFunc func(context.Context, flow.Identifier) (*execution_data.BlockExecutionDataEntity, error)
@@ -86,7 +87,7 @@ func New(
 		headers:          headers,
 		broadcaster:      broadcaster,
 		sendTimeout:      config.ClientSendTimeout,
-		throttleDelay:    config.ThrottleDelay,
+		responseLimit:    config.ResponseLimit,
 		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
 		getStartHeight:   b.getStartHeight,
@@ -97,7 +98,7 @@ func New(
 		headers:          headers,
 		broadcaster:      broadcaster,
 		sendTimeout:      config.ClientSendTimeout,
-		throttleDelay:    config.ThrottleDelay,
+		responseLimit:    config.ResponseLimit,
 		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
 		getStartHeight:   b.getStartHeight,

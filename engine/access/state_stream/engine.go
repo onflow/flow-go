@@ -49,9 +49,10 @@ type Config struct {
 	// ClientSendBufferSize is the size of the response buffer for sending messages to the client.
 	ClientSendBufferSize uint
 
-	// ThrottleDelay is the delay to inject between searching each block to throttle scans of
-	// previous blocks. These searches can be CPU intensive, so this help reduce the impact.
-	ThrottleDelay time.Duration
+	// ResponseLimit is the max responses per second allowed on a stream. After exceeding the limit,
+	// the stream is paused until more capacity is available. Searches of past data can be CPU
+	// intensive, so this helps manage the impact.
+	ResponseLimit float64
 }
 
 // Engine exposes the server with the state stream API.
