@@ -102,11 +102,10 @@ func (s *StopControl) IsExecutionStopped() bool {
 	return s.stopped
 }
 
-// SetStopHeight sets new stopHeight and shouldCrash mode.
+// SetStop sets new stopHeight and shouldCrash mode.
 // Returns error if the stopping process has already commenced.
-func (s *StopControl) SetStopHeight(
-	height uint64,
-	crash bool,
+func (s *StopControl) SetStop(
+	stop StopParameters,
 ) error {
 	s.Lock()
 	defer s.Unlock()
@@ -120,14 +119,11 @@ func (s *StopControl) SetStopHeight(
 	}
 
 	if s.stopped {
-		return fmt.Errorf("cannot update stopHeight, already stopped")
+		return fmt.Errorf("cannot update stop parameters, already stopped")
 	}
 
 	stopBoundary := &stopBoundary{
-		StopParameters: StopParameters{
-			StopHeight:  height,
-			ShouldCrash: crash,
-		},
+		StopParameters: stop,
 	}
 
 	s.log.Info().
@@ -140,9 +136,9 @@ func (s *StopControl) SetStopHeight(
 	return nil
 }
 
-// GetNextStop returns the first upcoming stop boundary values are undefined
+// GetStop returns the first upcoming stop boundary values are undefined
 // if they were not previously set.
-func (s *StopControl) GetNextStop() *StopParameters {
+func (s *StopControl) GetStop() *StopParameters {
 	s.RLock()
 	defer s.RUnlock()
 

@@ -34,7 +34,10 @@ type StopAtHeightReq struct {
 func (s *StopAtHeightCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	sah := req.ValidatorData.(StopAtHeightReq)
 
-	err := s.stopControl.SetStopHeight(sah.height, sah.crash)
+	err := s.stopControl.SetStop(ingestion.StopParameters{
+		StopHeight:  sah.height,
+		ShouldCrash: sah.crash,
+	})
 
 	if err != nil {
 		return nil, err

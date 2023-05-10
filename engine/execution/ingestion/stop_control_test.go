@@ -21,19 +21,21 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 	t.Run("when processing block at stop height", func(t *testing.T) {
 		sc := NewStopControl(StopControlWithLogger(unittest.Logger()))
 
-		require.Nil(t, sc.GetNextStop())
+		require.Nil(t, sc.GetStop())
 
 		// first update is always successful
-		err := sc.SetStopHeight(21, false)
+		stop := StopParameters{StopHeight: 21}
+		err := sc.SetStop(stop)
 		require.NoError(t, err)
 
-		// TODO: check value of next stop
-		require.NotNil(t, sc.GetNextStop())
+		require.Equal(t, &stop, sc.GetStop())
 
 		// no stopping has started yet, block below stop height
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 		sc.BlockProcessable(header)
-		err = sc.SetStopHeight(37, false)
+
+		stop2 := StopParameters{StopHeight: 37}
+		err = sc.SetStop(stop2)
 		require.NoError(t, err)
 
 		// block at stop height, it should be skipped
@@ -41,11 +43,11 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 		sc.BlockProcessable(header)
 
 		// cannot set new stop height after stopping has started
-		err = sc.SetStopHeight(2137, false)
+		err = sc.SetStop(StopParameters{StopHeight: 2137})
 		require.Error(t, err)
 
 		// state did not change
-		// TODO: check value of next stop
+		require.Equal(t, &stop2, sc.GetStop())
 	})
 
 	t.Run("when processing finalized blocks", func(t *testing.T) {
@@ -54,13 +56,13 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		sc := NewStopControl(StopControlWithLogger(unittest.Logger()))
 
-		require.Nil(t, sc.GetNextStop())
+		require.Nil(t, sc.GetStop())
 
 		// first update is always successful
-		err := sc.SetStopHeight(21, false)
+		stop := StopParameters{StopHeight: 21}
+		err := sc.SetStop(stop)
 		require.NoError(t, err)
-		// TODO: check value of next stop
-		require.NotNil(t, sc.GetNextStop())
+		require.Equal(t, &stop, sc.GetStop())
 
 		// make execution check pretends block has been executed
 		execState.On("StateCommitmentByBlockID", testifyMock.Anything, testifyMock.Anything).Return(nil, nil)
@@ -69,10 +71,10 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 		sc.BlockFinalized(context.TODO(), execState, header)
 
-		err = sc.SetStopHeight(37, false)
+		stop2 := StopParameters{StopHeight: 37}
+		err = sc.SetStop(stop2)
 		require.NoError(t, err)
-		// TODO: check value of next stop
-		require.NotNil(t, sc.GetNextStop())
+		require.Equal(t, &stop2, sc.GetStop())
 
 		// block at stop height, it should be triggered stop
 		header = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(37))
@@ -81,7 +83,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 		// since we set shouldCrash to false, execution should be stopped
 		require.True(t, sc.IsExecutionStopped())
 
-		err = sc.SetStopHeight(2137, false)
+		err = sc.SetStop(StopParameters{StopHeight: 2137})
 		require.Error(t, err)
 
 		execState.AssertExpectations(t)
@@ -102,10 +104,10 @@ func TestExecutionFallingBehind(t *testing.T) {
 	sc := NewStopControl(StopControlWithLogger(unittest.Logger()))
 
 	// set stop at 22, so 21 is the last height which should be processed
-	err := sc.SetStopHeight(22, false)
+	stop := StopParameters{StopHeight: 22}
+	err := sc.SetStop(stop)
 	require.NoError(t, err)
-	// TODO: check value of next stop
-	require.NotNil(t, sc.GetNextStop())
+	require.Equal(t, &stop, sc.GetStop())
 
 	execState.
 		On("StateCommitmentByBlockID", testifyMock.Anything, headerC.ParentID).
@@ -137,7 +139,10 @@ func TestPausedStateRejectsAllBlocksAndChanged(t *testing.T) {
 	sc := NewStopControl(StopControlWithLogger(unittest.Logger()), StopControlWithStopped())
 	require.True(t, sc.IsExecutionStopped())
 
-	err := sc.SetStopHeight(2137, true)
+	err := sc.SetStop(StopParameters{
+		StopHeight:  2137,
+		ShouldCrash: true,
+	})
 	require.Error(t, err)
 
 	// make sure we don't even query executed status if paused
