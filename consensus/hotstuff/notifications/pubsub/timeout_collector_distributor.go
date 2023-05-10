@@ -8,10 +8,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TimeoutCollectorDistributor ingests events from hotstuff's VoteCollector
-// logic and distributes them to subscribers. Concurrently safe.
-// TODO: investigate if this can be updated using atomics to prevent locking on mutex since we always add all consumers
-// before delivering events.
+// TimeoutCollectorDistributor ingests notifications about timeout aggregation and
+// distributes them to consumers. Such notifications are produced by the timeout aggregation logic.
+// Concurrently safe.
 type TimeoutCollectorDistributor struct {
 	lock      sync.RWMutex
 	consumers []hotstuff.TimeoutCollectorConsumer

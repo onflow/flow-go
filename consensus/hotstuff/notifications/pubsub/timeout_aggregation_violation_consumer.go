@@ -7,13 +7,12 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
-// TimeoutAggregationViolationDistributor ingests notifications about HotStuff-protocol violations and
-// distributes them to subscribers. Such notifications are produced by the active consensus
-// participants and to a lesser degree also the consensus follower.
+// TimeoutAggregationViolationDistributor ingests notifications about timeout aggregation violations and
+// distributes them to consumers. Such notifications are produced by the timeout aggregation logic.
 // Concurrently safe.
 type TimeoutAggregationViolationDistributor struct {
-	subscribers []hotstuff.TimeoutAggregationViolationConsumer
-	lock        sync.RWMutex
+	consumers []hotstuff.TimeoutAggregationViolationConsumer
+	lock      sync.RWMutex
 }
 
 var _ hotstuff.TimeoutAggregationViolationConsumer = (*TimeoutAggregationViolationDistributor)(nil)
@@ -25,13 +24,13 @@ func NewTimeoutAggregationViolationDistributor() *TimeoutAggregationViolationDis
 func (d *TimeoutAggregationViolationDistributor) AddTimeoutAggregationViolationConsumer(consumer hotstuff.TimeoutAggregationViolationConsumer) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
-	d.subscribers = append(d.subscribers, consumer)
+	d.consumers = append(d.consumers, consumer)
 }
 
 func (d *TimeoutAggregationViolationDistributor) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, altTimeout *model.TimeoutObject) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
-	for _, subscriber := range d.subscribers {
+	for _, subscriber := range d.consumers {
 		subscriber.OnDoubleTimeoutDetected(timeout, altTimeout)
 	}
 }
@@ -39,7 +38,7 @@ func (d *TimeoutAggregationViolationDistributor) OnDoubleTimeoutDetected(timeout
 func (d *TimeoutAggregationViolationDistributor) OnInvalidTimeoutDetected(err model.InvalidTimeoutError) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
-	for _, subscriber := range d.subscribers {
+	for _, subscriber := range d.consumers {
 		subscriber.OnInvalidTimeoutDetected(err)
 	}
 }

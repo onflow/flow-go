@@ -8,8 +8,7 @@ import (
 )
 
 // ProposalViolationConsumer consumes outbound notifications about HotStuff-protocol violations.
-// Such notifications are produced by the active consensus participants and to a lesser
-// degree also the consensus follower.
+// Such notifications are produced by the active consensus participants and consensus follower.
 //
 // Implementations must:
 //   - be concurrency safe
@@ -33,6 +32,14 @@ type ProposalViolationConsumer interface {
 	OnDoubleProposeDetected(*model.Block, *model.Block)
 }
 
+// VoteAggregationViolationConsumer consumes outbound notifications about HotStuff-protocol violations specifically
+// invalid votes during processing.
+// Such notifications are produced by the Vote Aggregation logic.
+//
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
 type VoteAggregationViolationConsumer interface {
 	// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
 	// whenever a double voting (same voter voting for different blocks at the same view) was detected.
@@ -56,6 +63,14 @@ type VoteAggregationViolationConsumer interface {
 	OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal)
 }
 
+// TimeoutAggregationViolationConsumer consumes outbound notifications about Active Pacemaker violations specifically
+// invalid timeouts during processing.
+// Such notifications are produced by the Timeout Aggregation logic.
+//
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
 type TimeoutAggregationViolationConsumer interface {
 	// OnDoubleTimeoutDetected notifications are produced by the Timeout Aggregation logic
 	// whenever a double timeout (same replica producing two different timeouts at the same view) was detected.
@@ -202,10 +217,9 @@ type ParticipantConsumer interface {
 	OnCurrentViewDetails(currentView, finalizedView uint64, currentLeader flow.Identifier)
 }
 
-// VoteCollectorConsumer consumes outbound notifications produced by HotStuff and its components.
-// Notifications are consensus-internal state changes which are potentially relevant to
-// the larger node in which HotStuff is running. The notifications are emitted
-// in the order in which the HotStuff algorithm makes the respective steps.
+// VoteCollectorConsumer consumes outbound notifications produced by HotStuff's vote aggregation
+// component. These events are primarily intended for the HotStuff-internal state machine (EventHandler),
+// but might also be relevant to the larger node in which HotStuff is running.
 //
 // Implementations must:
 //   - be concurrency safe
@@ -336,11 +350,23 @@ type Consumer interface {
 	ParticipantConsumer
 }
 
+// VoteAggregationConsumer consumes outbound notifications produced by Vote Aggregation logic.
+// It is a subset of the notifications produced by consensus participants.
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
 type VoteAggregationConsumer interface {
 	VoteAggregationViolationConsumer
 	VoteCollectorConsumer
 }
 
+// TimeoutAggregationConsumer consumes outbound notifications produced by Vote Aggregation logic.
+// It is a subset of the notifications produced by consensus participants.
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
 type TimeoutAggregationConsumer interface {
 	TimeoutAggregationViolationConsumer
 	TimeoutCollectorConsumer

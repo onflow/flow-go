@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 )
 
-// Distributor distributes notifications to a list of subscribers (event consumers).
+// Distributor distributes notifications to a list of consumers (event consumers).
 //
 // It allows thread-safe subscription of multiple consumers to events.
 type Distributor struct {
@@ -30,9 +30,10 @@ func (p *Distributor) AddConsumer(consumer hotstuff.Consumer) {
 	p.ParticipantDistributor.AddParticipantConsumer(consumer)
 }
 
-// FollowerDistributor ingests consensus follower events and distributes it to subscribers.
+// FollowerDistributor ingests consensus follower events and distributes it to consumers.
+// It allows thread-safe subscription of multiple consumers to events.
 type FollowerDistributor struct {
-	*ProtocolViolationDistributor
+	*ProposalViolationDistributor
 	*FinalizationDistributor
 }
 
@@ -40,16 +41,18 @@ var _ hotstuff.FollowerConsumer = (*FollowerDistributor)(nil)
 
 func NewFollowerDistributor() *FollowerDistributor {
 	return &FollowerDistributor{
-		ProtocolViolationDistributor: NewProtocolViolationDistributor(),
+		ProposalViolationDistributor: NewProtocolViolationDistributor(),
 		FinalizationDistributor:      NewFinalizationDistributor(),
 	}
 }
 
 func (d *FollowerDistributor) AddFollowerConsumer(consumer hotstuff.FollowerConsumer) {
 	d.FinalizationDistributor.AddFinalizationConsumer(consumer)
-	d.ProtocolViolationDistributor.AddProposalViolationConsumer(consumer)
+	d.ProposalViolationDistributor.AddProposalViolationConsumer(consumer)
 }
 
+// TimeoutAggregationDistributor ingests timeout aggregation events and distributes it to consumers.
+// It allows thread-safe subscription of multiple consumers to events.
 type TimeoutAggregationDistributor struct {
 	*TimeoutAggregationViolationDistributor
 	*TimeoutCollectorDistributor
@@ -69,6 +72,8 @@ func (d *TimeoutAggregationDistributor) AddTimeoutAggregationConsumer(consumer h
 	d.TimeoutCollectorDistributor.AddTimeoutCollectorConsumer(consumer)
 }
 
+// VoteAggregationDistributor ingests vote aggregation events and distributes it to consumers.
+// It allows thread-safe subscription of multiple consumers to events.
 type VoteAggregationDistributor struct {
 	*VoteAggregationViolationDistributor
 	*VoteCollectorDistributor

@@ -8,10 +8,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// VoteCollectorDistributor ingests events about QC creation from hotstuff and distributes them to subscribers.
-// Objects are concurrency safe.
-// NOTE: it can be refactored to work without lock since usually we never subscribe after startup. Mostly
-// list of observers is static.
+// VoteCollectorDistributor ingests notifications about vote aggregation and
+// distributes them to consumers. Such notifications are produced by the vote aggregation logic.
+// Concurrently safe.
 type VoteCollectorDistributor struct {
 	consumers []hotstuff.VoteCollectorConsumer
 	lock      sync.RWMutex
