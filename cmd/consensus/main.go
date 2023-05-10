@@ -366,7 +366,6 @@ func main() {
 		}).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
-			followerDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
 			return nil
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
@@ -554,12 +553,17 @@ func main() {
 			// create consensus logger
 			logger := createLogger(node.Logger, node.RootChainID)
 
+			telemetryConsumer := notifications.NewTelemetryConsumer(logger)
+			slashingViolationConsumer := notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger)
+			followerDistributor.AddProposalViolationConsumer(slashingViolationConsumer)
+
 			// initialize a logging notifier for hotstuff
 			notifier := createNotifier(
 				logger,
 				mainMetrics,
 			)
 
+			notifier.AddParticipantConsumer(telemetryConsumer)
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
@@ -582,9 +586,13 @@ func main() {
 				return nil, err
 			}
 
-			qcDistributor := pubsub.NewQCCreatedDistributor()
+			// create producer and connect it to consumers
+			voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
+			voteAggregationDistributor.AddVoteCollectorConsumer(telemetryConsumer)
+			voteAggregationDistributor.AddVoteAggregationViolationConsumer(slashingViolationConsumer)
+
 			validator := consensus.NewValidator(mainMetrics, wrappedCommittee)
-			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(wrappedCommittee, qcDistributor.OnQcConstructedFromVotes)
+			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(wrappedCommittee, voteAggregationDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
 			voteAggregator, err := consensus.NewVoteAggregator(
 				logger,
@@ -592,17 +600,21 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				lowestViewForVoteProcessing,
-				notifier,
+				voteAggregationDistributor,
 				voteProcessorFactory,
 				followerDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}
 
-			timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
+			// create producer and connect it to consumers
+			timeoutAggregationDistributor := pubsub.NewTimeoutAggregationDistributor()
+			timeoutAggregationDistributor.AddTimeoutCollectorConsumer(telemetryConsumer)
+			timeoutAggregationDistributor.AddTimeoutAggregationViolationConsumer(slashingViolationConsumer)
+
 			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(
 				logger,
-				timeoutCollectorDistributor,
+				timeoutAggregationDistributor,
 				committee,
 				validator,
 				msig.ConsensusTimeoutTag,
@@ -614,7 +626,7 @@ func main() {
 				node.Metrics.Mempool,
 				notifier,
 				timeoutProcessorFactory,
-				timeoutCollectorDistributor,
+				timeoutAggregationDistributor,
 				lowestViewForVoteProcessing,
 			)
 			if err != nil {
@@ -626,9 +638,8 @@ func main() {
 				Committee:                   wrappedCommittee,
 				Signer:                      signer,
 				Persist:                     persist,
-				QCCreatedDistributor:        qcDistributor,
-				FollowerDistributor:         followerDistributor,
-				TimeoutCollectorDistributor: timeoutCollectorDistributor,
+				VoteCollectorDistributor:    voteAggregationDistributor.VoteCollectorDistributor,
+				TimeoutCollectorDistributor: timeoutAggregationDistributor.TimeoutCollectorDistributor,
 				Forks:                       forks,
 				Validator:                   validator,
 				VoteAggregator:              voteAggregator,

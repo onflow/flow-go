@@ -58,7 +58,7 @@ func NewComplianceEngineFactory(
 
 func (f *ComplianceEngineFactory) Create(
 	hotstuffMetrics module.HotstuffMetrics,
-	notifier hotstuff.ProtocolViolationConsumer,
+	notifier hotstuff.ProposalViolationConsumer,
 	clusterState cluster.MutableState,
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,

@@ -42,7 +42,7 @@ type Core struct {
 	mempoolMetrics            module.MempoolMetrics
 	hotstuffMetrics           module.HotstuffMetrics
 	complianceMetrics         module.ComplianceMetrics
-	protocolViolationNotifier hotstuff.ProtocolViolationConsumer
+	proposalViolationNotifier hotstuff.ProposalViolationConsumer
 	tracer                    module.Tracer
 	headers                   storage.Headers
 	payloads                  storage.Payloads
@@ -65,7 +65,7 @@ func NewCore(
 	mempool module.MempoolMetrics,
 	hotstuffMetrics module.HotstuffMetrics,
 	complianceMetrics module.ComplianceMetrics,
-	protocolViolationNotifier hotstuff.ProtocolViolationConsumer,
+	proposalViolationNotifier hotstuff.ProposalViolationConsumer,
 	tracer module.Tracer,
 	headers storage.Headers,
 	payloads storage.Payloads,
@@ -92,7 +92,7 @@ func NewCore(
 		mempoolMetrics:            mempool,
 		hotstuffMetrics:           hotstuffMetrics,
 		complianceMetrics:         complianceMetrics,
-		protocolViolationNotifier: protocolViolationNotifier,
+		proposalViolationNotifier: proposalViolationNotifier,
 		headers:                   headers,
 		payloads:                  payloads,
 		state:                     state,
@@ -324,7 +324,7 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
 		if invalidBlockErr, ok := model.AsInvalidBlockError(err); ok {
-			c.protocolViolationNotifier.OnInvalidBlockDetected(*invalidBlockErr)
+			c.proposalViolationNotifier.OnInvalidBlockDetected(*invalidBlockErr)
 			return engine.NewInvalidInputErrorf("invalid block proposal: %w", err)
 		}
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {

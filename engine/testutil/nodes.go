@@ -853,7 +853,7 @@ func createFollowerCore(
 	t *testing.T,
 	node *testmock.GenericNode,
 	followerState *badgerstate.FollowerState,
-	notifier hotstuff.ConsensusFollowerConsumer,
+	notifier hotstuff.FollowerConsumer,
 	rootHead *flow.Header,
 	rootQC *flow.QuorumCertificate,
 ) (module.HotStuffFollower, *confinalizer.Finalizer) {

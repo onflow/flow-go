@@ -25,7 +25,7 @@ import (
 func NewFollower(log zerolog.Logger,
 	headers storage.Headers,
 	updater module.Finalizer,
-	notifier hotstuff.ConsensusFollowerConsumer,
+	notifier hotstuff.FollowerConsumer,
 	rootHeader *flow.Header,
 	rootQC *flow.QuorumCertificate,
 	finalized *flow.Header,

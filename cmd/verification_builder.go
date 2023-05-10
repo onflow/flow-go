@@ -179,7 +179,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		}).
 		Module("follower distributor", func(node *NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
-			followerDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
+			followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
 			return nil
 		}).
 		Module("sync core", func(node *NodeConfig) error {

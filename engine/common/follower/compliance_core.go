@@ -41,7 +41,7 @@ type ComplianceCore struct {
 	log                       zerolog.Logger
 	mempoolMetrics            module.MempoolMetrics
 	tracer                    module.Tracer
-	protocolViolationNotifier hotstuff.ProtocolViolationConsumer
+	proposalViolationNotifier hotstuff.ProposalViolationConsumer
 	pendingCache              *cache.Cache
 	pendingTree               *pending_tree.PendingTree
 	state                     protocol.FollowerState
@@ -59,7 +59,7 @@ var _ complianceCore = (*ComplianceCore)(nil)
 func NewComplianceCore(log zerolog.Logger,
 	mempoolMetrics module.MempoolMetrics,
 	heroCacheCollector module.HeroCacheMetrics,
-	followerConsumer hotstuff.ConsensusFollowerConsumer,
+	followerConsumer hotstuff.FollowerConsumer,
 	state protocol.FollowerState,
 	follower module.HotStuffFollower,
 	validator hotstuff.Validator,
@@ -79,7 +79,7 @@ func NewComplianceCore(log zerolog.Logger,
 		log:                       log.With().Str("engine", "follower_core").Logger(),
 		mempoolMetrics:            mempoolMetrics,
 		state:                     state,
-		protocolViolationNotifier: followerConsumer,
+		proposalViolationNotifier: followerConsumer,
 		pendingCache:              cache.NewCache(log, defaultPendingBlocksCacheCapacity, heroCacheCollector, onEquivocation),
 		pendingTree:               pending_tree.NewPendingTree(finalizedBlock),
 		follower:                  follower,
@@ -145,7 +145,7 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 		if err != nil {
 			if invalidBlockError, ok := model.AsInvalidBlockError(err); ok {
 				// TODO: potential slashing
-				c.protocolViolationNotifier.OnInvalidBlockDetected(*invalidBlockError)
+				c.proposalViolationNotifier.OnInvalidBlockDetected(*invalidBlockError)
 				return nil
 			}
 			if errors.Is(err, model.ErrViewForUnknownEpoch) {

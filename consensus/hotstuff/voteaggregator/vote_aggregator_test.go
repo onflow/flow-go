@@ -29,7 +29,7 @@ type VoteAggregatorTestSuite struct {
 
 	aggregator     *VoteAggregator
 	collectors     *mocks.VoteCollectors
-	consumer       *mocks.Consumer
+	consumer       *mocks.VoteAggregationConsumer
 	stopAggregator context.CancelFunc
 	errs           <-chan error
 }
@@ -37,7 +37,7 @@ type VoteAggregatorTestSuite struct {
 func (s *VoteAggregatorTestSuite) SetupTest() {
 	var err error
 	s.collectors = mocks.NewVoteCollectors(s.T())
-	s.consumer = mocks.NewConsumer(s.T())
+	s.consumer = mocks.NewVoteAggregationConsumer(s.T())
 
 	s.collectors.On("Start", mock.Anything).Once()
 	unittest.ReadyDoneify(s.collectors)
