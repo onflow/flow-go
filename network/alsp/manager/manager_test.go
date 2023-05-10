@@ -261,6 +261,41 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 	})
 }
 
+// TestMisbehaviorReportManager_InitializationError tests the creation of a new ALSP manager with invalid inputs.
+// It is a minimum viable test that ensures that a nil ALSP manager is created with invalid set of inputs.
+func TestMisbehaviorReportManager_InitializationError(t *testing.T) {
+	logger := unittest.Logger()
+	alspMetrics := metrics.NewNoopCollector()
+
+	t.Run("missing spam report queue size", func(t *testing.T) {
+		cfg := &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  logger,
+			SpamRecordCacheSize:     uint32(100),
+			AlspMetrics:             alspMetrics,
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		}
+
+		m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+		require.Error(t, err)
+		require.ErrorIs(t, err, alspmgr.ErrSpamReportQueueSizeNotSet)
+		assert.Nil(t, m)
+	})
+
+	t.Run("missing spam record cache size", func(t *testing.T) {
+		cfg := &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  logger,
+			SpamReportQueueSize:     uint32(100),
+			AlspMetrics:             alspMetrics,
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		}
+
+		m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+		require.Error(t, err)
+		require.ErrorIs(t, err, alspmgr.ErrSpamRecordCacheSizeNotSet)
+		assert.Nil(t, m)
+	})
+}
+
 // TestHandleMisbehaviorReport_SinglePenaltyReport tests the handling of a single misbehavior report.
 // The test ensures that the misbehavior report is handled correctly and the penalty is applied to the peer in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
