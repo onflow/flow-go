@@ -20,7 +20,7 @@ func TestParseTransition_Valid(t *testing.T) {
 		transition: EpochTransitionTime{time.Wednesday, 8, 1},
 		str:        "wednesday@08:01",
 	}, {
-		transition: EpochTransitionTime{time.Friday, 23, 59},
+		transition: EpochTransitionTime{time.Monday, 23, 59},
 		str:        "monday@23:59",
 	}}
 
@@ -31,7 +31,7 @@ func TestParseTransition_Valid(t *testing.T) {
 			// 2 - the parsed transition should match the transition fixture
 			parsed, err := ParseTransition(c.str)
 			assert.NoError(t, err)
-			assert.Equal(t, c.transition, parsed)
+			assert.Equal(t, c.transition, *parsed)
 		})
 	}
 }

@@ -100,6 +100,6 @@ func ParseTransition(s string) (*EpochTransitionTime, error) {
 	return &EpochTransitionTime{
 		day:    day,
 		hour:   hour,
-		minute: hour,
+		minute: minute,
 	}, nil
 }
