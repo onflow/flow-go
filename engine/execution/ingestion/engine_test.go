@@ -1019,8 +1019,8 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		require.True(t, ok)
 
 		// make sure no stopping has been engaged, as it was not set
-		stopState := ctx.stopControl.getState()
-		require.Equal(t, stopState, StopControlOff)
+		require.False(t, ctx.stopControl.IsExecutionStopped())
+		require.Nil(t, ctx.stopControl.GetNextStop())
 	})
 }
 
@@ -1084,7 +1084,7 @@ func TestStopAtHeight(t *testing.T) {
 			*blocks["B"].StartState,
 			nil)
 
-		assert.False(t, ctx.stopControl.IsExecutionPaused())
+		assert.False(t, ctx.stopControl.IsExecutionStopped())
 
 		wg.Add(1)
 		ctx.engine.BlockProcessable(blocks["A"].Block.Header, nil)
@@ -1098,14 +1098,14 @@ func TestStopAtHeight(t *testing.T) {
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
 		// we don't pause until a block has been finalized
-		assert.False(t, ctx.stopControl.IsExecutionPaused())
+		assert.False(t, ctx.stopControl.IsExecutionStopped())
 
 		ctx.engine.BlockFinalized(blocks["A"].Block.Header)
 		ctx.engine.BlockFinalized(blocks["B"].Block.Header)
 
-		assert.False(t, ctx.stopControl.IsExecutionPaused())
+		assert.False(t, ctx.stopControl.IsExecutionStopped())
 		ctx.engine.BlockFinalized(blocks["C"].Block.Header)
-		assert.True(t, ctx.stopControl.IsExecutionPaused())
+		assert.True(t, ctx.stopControl.IsExecutionStopped())
 
 		ctx.engine.BlockFinalized(blocks["D"].Block.Header)
 
@@ -1213,13 +1213,13 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 			*blocks["A"].StartState,
 			nil)
 
-		assert.False(t, ctx.stopControl.IsExecutionPaused())
+		assert.False(t, ctx.stopControl.IsExecutionStopped())
 
 		executionWg.Add(1)
 		ctx.engine.BlockProcessable(blocks["A"].Block.Header, nil)
 		ctx.engine.BlockProcessable(blocks["B"].Block.Header, nil)
 
-		assert.False(t, ctx.stopControl.IsExecutionPaused())
+		assert.False(t, ctx.stopControl.IsExecutionStopped())
 
 		finalizationWg.Add(1)
 		ctx.engine.BlockFinalized(blocks["B"].Block.Header)
@@ -1230,7 +1230,7 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		assert.False(t, more)
 
-		assert.True(t, ctx.stopControl.IsExecutionPaused())
+		assert.True(t, ctx.stopControl.IsExecutionStopped())
 
 		var ok bool
 

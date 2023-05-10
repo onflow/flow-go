@@ -122,7 +122,7 @@ func New(
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	if e.stopControl.IsExecutionPaused() {
+	if e.stopControl.IsExecutionStopped() {
 		return e.unit.Ready()
 	}
 
