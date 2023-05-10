@@ -11,7 +11,7 @@ import (
 // NoopConsumer is an implementation of the notifications consumer that
 // doesn't do anything.
 type NoopConsumer struct {
-	NoopProtocolViolationConsumer
+	NoopProposalViolationConsumer
 	NoopFinalizationConsumer
 	NoopPartialConsumer
 	NoopCommunicatorConsumer
@@ -103,21 +103,21 @@ func (*NoopVoteCollectorConsumer) OnVoteProcessed(*model.Vote) {}
 
 // no-op implementation of hotstuff.ProposalViolationConsumer
 
-type NoopProtocolViolationConsumer struct{}
+type NoopProposalViolationConsumer struct{}
 
-var _ hotstuff.ProposalViolationConsumer = (*NoopProtocolViolationConsumer)(nil)
+var _ hotstuff.ProposalViolationConsumer = (*NoopProposalViolationConsumer)(nil)
 
-func (*NoopProtocolViolationConsumer) OnInvalidBlockDetected(model.InvalidBlockError) {}
+func (*NoopProposalViolationConsumer) OnInvalidBlockDetected(model.InvalidBlockError) {}
 
-func (*NoopProtocolViolationConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
+func (*NoopProposalViolationConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
 
-func (*NoopProtocolViolationConsumer) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
+func (*NoopProposalViolationConsumer) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
 
-func (*NoopProtocolViolationConsumer) OnInvalidVoteDetected(model.InvalidVoteError) {}
+func (*NoopProposalViolationConsumer) OnInvalidVoteDetected(model.InvalidVoteError) {}
 
-func (*NoopProtocolViolationConsumer) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal) {}
+func (*NoopProposalViolationConsumer) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal) {}
 
-func (*NoopProtocolViolationConsumer) OnDoubleTimeoutDetected(*model.TimeoutObject, *model.TimeoutObject) {
+func (*NoopProposalViolationConsumer) OnDoubleTimeoutDetected(*model.TimeoutObject, *model.TimeoutObject) {
 }
 
-func (*NoopProtocolViolationConsumer) OnInvalidTimeoutDetected(model.InvalidTimeoutError) {}
+func (*NoopProposalViolationConsumer) OnInvalidTimeoutDetected(model.InvalidTimeoutError) {}
