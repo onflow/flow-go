@@ -21,6 +21,7 @@ import (
 )
 
 const (
+	// defaultMisbehaviorReportManagerWorkers is the default number of workers in the worker pool.
 	defaultMisbehaviorReportManagerWorkers = 2
 )
 
