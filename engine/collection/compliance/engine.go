@@ -73,7 +73,7 @@ func NewEngine(
 		pendingBlocks:         blocksQueue,
 		pendingBlocksNotifier: engine.NewNotifier(),
 	}
-	finalizationActor, finalizationWorker := events.NewFinalizationActor(eng.handleFinalizedBlock)
+	finalizationActor, finalizationWorker := events.NewFinalizationActor(eng.processOnFinalizedBlock)
 	eng.FinalizationActor = finalizationActor
 
 	// create the component manager and worker threads
@@ -154,7 +154,11 @@ func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[*messages.Clust
 	}
 }
 
-func (e *Engine) handleFinalizedBlock(block *model.Block) error {
+// processOnFinalizedBlock informs compliance.Core about finalization of the respective block.
+// The input to this callback is treated as trusted. This method should be executed on
+// `OnFinalizedBlock` notifications from the node-internal consensus instance.
+// No errors expected during normal operations.
+func (e *Engine) processOnFinalizedBlock(block *model.Block) error {
 	// retrieve the latest finalized header, so we know the height
 	finalHeader, err := e.headers.ByBlockID(block.BlockID)
 	if err != nil { // no expected errors

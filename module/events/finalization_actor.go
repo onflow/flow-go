@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// OnBlockFinalized is invoked when a new block is finalized. It is possible that
-// blocks will be skipped.
-type OnBlockFinalized func(block *model.Block) error
+// ProcessLatestFinalizedBlock is invoked when a new block is finalized.
+// It is possible that blocks will be skipped.
+type ProcessLatestFinalizedBlock func(block *model.Block) error
 
 // FinalizationActor is an event responder worker which can be embedded in a component
 // to simplify the plumbing required to respond to block finalization events.
@@ -20,15 +20,15 @@ type OnBlockFinalized func(block *model.Block) error
 type FinalizationActor struct {
 	newestFinalized *tracker.NewestBlockTracker
 	notifier        engine.Notifier
-	handler         OnBlockFinalized
+	handler         ProcessLatestFinalizedBlock
 }
 
 // NewFinalizationActor creates a new FinalizationActor, and returns the worker routine
 // and event consumer required to operate it.
 // The caller MUST:
 //   - start the returned component.ComponentWorker function
-//   - subscribe the returned FinalizationActor to OnBlockFinalized events
-func NewFinalizationActor(handler OnBlockFinalized) (*FinalizationActor, component.ComponentWorker) {
+//   - subscribe the returned FinalizationActor to ProcessLatestFinalizedBlock events
+func NewFinalizationActor(handler ProcessLatestFinalizedBlock) (*FinalizationActor, component.ComponentWorker) {
 	actor := &FinalizationActor{
 		newestFinalized: tracker.NewNewestBlockTracker(),
 		notifier:        engine.NewNotifier(),
@@ -39,7 +39,7 @@ func NewFinalizationActor(handler OnBlockFinalized) (*FinalizationActor, compone
 
 // worker is the worker function exposed by the FinalizationActor. It should be
 // attached to a ComponentBuilder by the higher-level component using CreateWorker.
-// It processes each new finalized block by invoking the OnBlockFinalized callback.
+// It processes each new finalized block by invoking the ProcessLatestFinalizedBlock callback.
 func (actor *FinalizationActor) worker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -61,9 +61,9 @@ func (actor *FinalizationActor) worker(ctx irrecoverable.SignalerContext, ready 
 	}
 }
 
-// OnBlockFinalized receives block finalization events. It updates the newest finalized
+// OnFinalizedBlock receives block finalization events. It updates the newest finalized
 // block tracker and notifies the worker thread.
-func (actor *FinalizationActor) OnBlockFinalized(block *model.Block) {
+func (actor *FinalizationActor) OnFinalizedBlock(block *model.Block) {
 	if actor.newestFinalized.Track(block) {
 		actor.notifier.Notify()
 	}
