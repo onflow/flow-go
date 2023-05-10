@@ -266,11 +266,11 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 	logger := unittest.Logger()
 	alspMetrics := metrics.NewNoopCollector()
-	cacheSize := uint32(100)
 
 	cfg := &alspmgr.MisbehaviorReportManagerConfig{
 		Logger:                  logger,
-		SpamRecordCacheSize:     cacheSize,
+		SpamRecordCacheSize:     uint32(100),
+		SpamReportQueueSize:     uint32(100),
 		AlspMetrics:             alspMetrics,
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
@@ -285,6 +285,15 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
 	require.NoError(t, err)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
+	}()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	m.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
+
 	// create a mock misbehavior report with a negative penalty value
 	penalty := float64(-5)
 	report := mocknetwork.NewMisbehaviorReport(t)
@@ -296,13 +305,20 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 
 	// handle the misbehavior report
 	m.HandleMisbehaviorReport(channel, report)
-	// check if the misbehavior report has been processed by verifying that the Adjust method was called on the cache
-	record, ok := cache.Get(report.OriginId())
-	require.True(t, ok)
-	require.NotNil(t, record)
-	require.Equal(t, penalty, record.Penalty)
-	require.Equal(t, uint64(0), record.CutoffCounter)                                             // with just reporting a misbehavior, the cutoff counter should not be incremented.
-	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay) // the decay should be the default decay value.
+
+	require.Eventually(t, func() bool {
+		// check if the misbehavior report has been processed by verifying that the Adjust method was called on the cache
+		record, ok := cache.Get(report.OriginId())
+		if !ok {
+			return false
+		}
+		require.NotNil(t, record)
+		require.Equal(t, penalty, record.Penalty)
+		require.Equal(t, uint64(0), record.CutoffCounter)                                             // with just reporting a misbehavior, the cutoff counter should not be incremented.
+		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay) // the decay should be the default decay value.
+
+		return true
+	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 }
 
 // TestHandleMisbehaviorReport_SinglePenaltyReport_PenaltyDisable tests the handling of a single misbehavior report when the penalty is disabled.
