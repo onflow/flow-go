@@ -61,6 +61,9 @@ type Engine struct {
 	responseMessageHandler *engine.MessageHandler // message handler responsible for response processing
 }
 
+var _ network.MessageProcessor = (*Engine)(nil)
+var _ component.Component = (*Engine)(nil)
+
 // New creates a new main chain synchronization engine.
 func New(
 	log zerolog.Logger,
@@ -177,30 +180,6 @@ func (e *Engine) setupResponseMessageHandler() error {
 	)
 
 	return nil
-}
-
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	err := e.process(e.me.NodeID(), event)
-	if err != nil {
-		// receiving an input of incompatible type from a trusted internal component is fatal
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
-	err := e.Process(channel, originID, event)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.process(e.me.NodeID(), event)
 }
 
 // Process processes the given event from the node with the given origin ID in

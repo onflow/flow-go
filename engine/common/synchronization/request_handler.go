@@ -33,6 +33,17 @@ const defaultBatchRequestQueueCapacity = 500
 // defaultEngineRequestsWorkers number of workers to dispatch events for requests
 const defaultEngineRequestsWorkers = 8
 
+// RequestHandler encapsulates message queues and processing logic for the sync engine.
+// It logically separates request processing from active participation (sending requests),
+// primarily to simplify nodes which bridge the public and private networks.
+//
+// The RequestHandlerEngine embeds RequestHandler to create an engine which only responds
+// to requests on the public network (does not send requests over this network).
+// The Engine embeds RequestHandler and additionally includes logic for sending sync requests.
+//
+// Although the RequestHandler defines a notifier, message queue, and processing worker logic,
+// it is not itself a component.Component and does not manage any worker threads. The containing
+// engine is responsible for starting the worker threads for processing requests.
 type RequestHandler struct {
 	me      module.Local
 	log     zerolog.Logger
@@ -77,10 +88,10 @@ func NewRequestHandler(
 	return r
 }
 
-// Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
+// Process processes the given event from the node with the given origin ID in a blocking manner.
+// No errors are expected during normal operation.
 func (r *RequestHandler) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	err := r.process(originID, event)
+	err := r.requestMessageHandler.Process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
 			r.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
@@ -89,14 +100,6 @@ func (r *RequestHandler) Process(channel channels.Channel, originID flow.Identif
 		return fmt.Errorf("unexpected error while processing engine message: %w", err)
 	}
 	return nil
-}
-
-// process processes events for the synchronization request handler engine.
-// Error returns:
-//   - IncompatibleInputTypeError if input has unexpected type
-//   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
-func (r *RequestHandler) process(originID flow.Identifier, event interface{}) error {
-	return r.requestMessageHandler.Process(originID, event)
 }
 
 // setupRequestMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED requests.
@@ -367,7 +370,8 @@ func (r *RequestHandler) processAvailableRequests(ctx context.Context) error {
 }
 
 // requestProcessingWorker is a separate goroutine that performs processing of queued requests.
-// Multiple instances may be invoked. It is invoked and managed by the Engine.
+// Multiple instances may be invoked. It is invoked and managed by the Engine or RequestHandlerEngine
+// which embeds this RequestHandler.
 func (r *RequestHandler) requestProcessingWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 

@@ -55,6 +55,7 @@ type RequestHandlerEngine struct {
 }
 
 var _ network.MessageProcessor = (*RequestHandlerEngine)(nil)
+var _ component.Component = (*RequestHandlerEngine)(nil)
 
 func NewRequestHandlerEngine(
 	logger zerolog.Logger,

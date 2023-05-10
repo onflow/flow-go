@@ -524,7 +524,7 @@ func (ss *SyncSuite) TestStartStop() {
 func (ss *SyncSuite) TestProcessingMultipleItems() {
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
-	<-ss.e.Ready()
+	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
 	defer cancel()
 
 	originID := unittest.IdentifierFixture()
