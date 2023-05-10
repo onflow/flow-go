@@ -125,7 +125,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			mock.Anything, // duration
 			mock.Anything, // computation used
 			mock.Anything, // memory used
-			mock.Anything, // actual memory used
 			mock.Anything, // number of events
 			mock.Anything, // size of events
 			false).        // no failure
@@ -1129,7 +1128,6 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		mock.Anything, // duration
 		mock.Anything, // computation used
 		mock.Anything, // memory used
-		mock.Anything, // actual memory used
 		expectedNumberOfEvents,
 		expectedEventSize,
 		false).
