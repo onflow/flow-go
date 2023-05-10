@@ -2,6 +2,7 @@ package alspmgr
 
 import (
 	crand "crypto/rand"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -21,6 +22,15 @@ import (
 
 const (
 	defaultMisbehaviorReportManagerWorkers = 2
+)
+
+var (
+	// ErrSpamRecordCacheSizeNotSet is returned when the spam record cache size is not set, it is a fatal irrecoverable error,
+	// and the ALSP module cannot be initialized.
+	ErrSpamRecordCacheSizeNotSet = errors.New("spam record cache size is not set")
+	// ErrSpamReportQueueSizeNotSet is returned when the spam report queue size is not set, it is a fatal irrecoverable error,
+	// and the ALSP module cannot be initialized.
+	ErrSpamReportQueueSizeNotSet = errors.New("spam report queue size is not set")
 )
 
 // MisbehaviorReportManager is responsible for handling misbehavior reports.
@@ -77,10 +87,10 @@ type MisbehaviorReportManagerConfig struct {
 //	An error if the config is invalid.
 func (c MisbehaviorReportManagerConfig) validate() error {
 	if c.SpamRecordCacheSize == 0 {
-		return fmt.Errorf("spam record cache size is not set")
+		return ErrSpamRecordCacheSizeNotSet
 	}
 	if c.SpamReportQueueSize == 0 {
-		return fmt.Errorf("spam report queue size is not set")
+		return ErrSpamReportQueueSizeNotSet
 	}
 	return nil
 }
@@ -201,6 +211,8 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 	}); !ok {
 		lg.Warn().Msg("discarding misbehavior report because either the queue is full or the misbehavior report is duplicate")
 	}
+
+	fmt.Println("submited")
 }
 
 // processMisbehaviorReport is the worker function that processes the misbehavior reports.
@@ -222,6 +234,7 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 		Str("reason", report.Reason.String()).
 		Float64("penalty", report.Penalty).Logger()
 
+	fmt.Println("picked")
 	if m.disablePenalty {
 		// when penalty mechanism disabled, the misbehavior is logged and metrics are updated,
 		// but no further actions are taken.
@@ -258,5 +271,6 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 	}
 
 	lg.Debug().Float64("updated_penalty", updatedPenalty).Msg("misbehavior report handled")
+	fmt.Println("handled")
 	return nil
 }
