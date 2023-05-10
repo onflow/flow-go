@@ -285,6 +285,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
 	require.NoError(t, err)
 
+	// start the ALSP manager
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		cancel()
@@ -325,11 +326,11 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 // The test ensures that the misbehavior is reported on metrics but the penalty is not applied to the peer in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReport_PenaltyDisable(t *testing.T) {
 	alspMetrics := mockmodule.NewAlspMetrics(t)
-	cacheSize := uint32(100)
 
 	cfg := &alspmgr.MisbehaviorReportManagerConfig{
 		Logger:                  unittest.Logger(),
-		SpamRecordCacheSize:     cacheSize,
+		SpamRecordCacheSize:     uint32(100),
+		SpamReportQueueSize:     uint32(100),
 		AlspMetrics:             alspMetrics,
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		DisablePenalty:          true, // disable penalty for misbehavior reports
@@ -341,6 +342,16 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport_PenaltyDisable(t *testing.T
 	// create a new MisbehaviorReportManager
 	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
 	require.NoError(t, err)
+
+	// start the ALSP manager
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
+	}()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	m.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
 
 	// create a mock misbehavior report with a negative penalty value
 	penalty := float64(-5)
