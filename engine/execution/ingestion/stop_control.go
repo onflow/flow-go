@@ -13,7 +13,7 @@ import (
 )
 
 // StopControl is a specialized component used by ingestion.Engine to encapsulate
-// control of pausing/stopping blocks execution.
+// control of stopping blocks execution.
 // It is intended to work tightly with the Engine, not as a general mechanism or interface.
 // StopControl follows states described in StopState
 type StopControl struct {
@@ -26,11 +26,11 @@ type StopControl struct {
 }
 
 type StopParameters struct {
-	// desired stopHeight, the first value new version should be used,
+	// desired StopHeight, the first value new version should be used,
 	// so this height WON'T be executed
 	StopHeight uint64
 
-	// if the node should crash or just pause after reaching stopHeight
+	// if the node should crash or just pause after reaching StopHeight
 	ShouldCrash bool
 }
 
@@ -102,13 +102,17 @@ func (s *StopControl) IsExecutionStopped() bool {
 	return s.stopped
 }
 
-// SetStop sets new stopHeight and shouldCrash mode.
-// Returns error if the stopping process has already commenced.
+// SetStop sets new stop parameters.
+// Returns error if the stopping process has already commenced, or if already stopped.
 func (s *StopControl) SetStop(
 	stop StopParameters,
 ) error {
 	s.Lock()
 	defer s.Unlock()
+
+	if s.stopped {
+		return fmt.Errorf("cannot update stop parameters, already stopped")
+	}
 
 	if s.stopBoundary != nil && s.stopBoundary.cannotBeChanged {
 		return fmt.Errorf(
@@ -116,10 +120,6 @@ func (s *StopControl) SetStop(
 				"stopping commenced for %s",
 			s.stopBoundary,
 		)
-	}
-
-	if s.stopped {
-		return fmt.Errorf("cannot update stop parameters, already stopped")
 	}
 
 	stopBoundary := &stopBoundary{
@@ -136,8 +136,7 @@ func (s *StopControl) SetStop(
 	return nil
 }
 
-// GetStop returns the first upcoming stop boundary values are undefined
-// if they were not previously set.
+// GetStop returns the upcoming stop parameters or nil if no stop is set.
 func (s *StopControl) GetStop() *StopParameters {
 	s.RLock()
 	defer s.RUnlock()
@@ -146,8 +145,8 @@ func (s *StopControl) GetStop() *StopParameters {
 		return nil
 	}
 
-	b := s.stopBoundary.StopParameters
-	return &b
+	p := s.stopBoundary.StopParameters
+	return &p
 }
 
 // BlockProcessable should be called when new block is processable.
@@ -156,14 +155,18 @@ func (s *StopControl) BlockProcessable(b *flow.Header) bool {
 	s.Lock()
 	defer s.Unlock()
 
+	// don't process anymore blocks if stopped
 	if s.stopped {
 		return false
 	}
 
+	// if no stop is set process all blocks
 	if s.stopBoundary == nil {
 		return true
 	}
-	// skips blocks at or above requested stopHeight
+
+	// Skips blocks at or above requested stopHeight
+	// doing so means we have started the stopping process
 	if b.Height >= s.stopBoundary.StopHeight {
 		s.log.Warn().
 			Msgf(
@@ -218,6 +221,7 @@ func (s *StopControl) BlockFinalized(
 		// any error here would indicate unexpected storage error, so we crash the node
 		// TODO: what if the error is due to the node being stopped?
 		// i.e. context cancelled?
+		// do this more gracefully
 		s.log.Fatal().
 			Err(err).
 			Str("block_id", h.ID().String()).
@@ -226,6 +230,7 @@ func (s *StopControl) BlockFinalized(
 	}
 
 	if executed {
+		// we already reached the point where we should stop
 		s.stopExecution()
 		return
 	}
@@ -272,20 +277,18 @@ func (s *StopControl) OnBlockExecuted(h *flow.Header) {
 }
 
 func (s *StopControl) stopExecution() {
+	log := s.log.With().
+		Stringer("requested_stop", s.stopBoundary).
+		Uint64("last_executed_height", s.stopBoundary.StopHeight).
+		Stringer("last_executed_id", s.stopBoundary.stopAfterExecuting).
+		Logger()
+
 	if s.stopBoundary != nil && s.stopBoundary.ShouldCrash {
-		s.log.Fatal().Msgf(
-			"Crashing as finalization reached requested "+
-				"stop %s and the highest executed block is the previous one",
-			s.stopBoundary,
-		)
+		// TODO: crash more gracefully or at least in a more explicit way
+		log.Fatal().Msg("Crashing as finalization reached requested stop")
 		return
 	}
 
 	s.stopped = true
-
-	s.log.Warn().Msgf(
-		"Pausing execution as finalization reached "+
-			"the requested stop height %s",
-		s.stopBoundary,
-	)
+	log.Warn().Msg("Stopping as finalization reached requested stop")
 }

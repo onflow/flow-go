@@ -4,18 +4,16 @@ import (
 	"context"
 	"testing"
 
-	"github.com/onflow/flow-go/storage"
-
 	testifyMock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/state/mock"
-
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// If stopping mechanism has caused any changes to execution flow (skipping execution of blocks)
-// we disallow setting new values
+// If stopping mechanism has caused any changes to execution flow
+// (skipping execution of blocks) we disallow setting new values
 func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 	t.Run("when processing block at stop height", func(t *testing.T) {
@@ -127,14 +125,14 @@ func TestExecutionFallingBehind(t *testing.T) {
 	execState.AssertExpectations(t)
 }
 
-// StopControl started as paused will keep the state
-func TestStartingPaused(t *testing.T) {
+// StopControl created as stopped will keep the state
+func TestStartingStopped(t *testing.T) {
 
 	sc := NewStopControl(StopControlWithLogger(unittest.Logger()), StopControlWithStopped())
 	require.True(t, sc.IsExecutionStopped())
 }
 
-func TestPausedStateRejectsAllBlocksAndChanged(t *testing.T) {
+func TestStoppedStateRejectsAllBlocksAndChanged(t *testing.T) {
 
 	sc := NewStopControl(StopControlWithLogger(unittest.Logger()), StopControlWithStopped())
 	require.True(t, sc.IsExecutionStopped())
@@ -145,7 +143,7 @@ func TestPausedStateRejectsAllBlocksAndChanged(t *testing.T) {
 	})
 	require.Error(t, err)
 
-	// make sure we don't even query executed status if paused
+	// make sure we don't even query executed status if stopped
 	// mock should fail test on any method call
 	execState := new(mock.ReadOnlyExecutionState)
 
