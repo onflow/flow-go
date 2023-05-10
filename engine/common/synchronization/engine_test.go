@@ -1,6 +1,7 @@
 package synchronization
 
 import (
+	"context"
 	"io"
 	"math"
 	"math/rand"
@@ -20,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	synccore "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
@@ -511,15 +513,19 @@ func (ss *SyncSuite) TestSendRequests() {
 
 // test a synchronization engine can be started and stopped
 func (ss *SyncSuite) TestStartStop() {
-	unittest.AssertReturnsBefore(ss.T(), func() {
-		<-ss.e.Ready()
-		<-ss.e.Done()
-	}, time.Second)
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
+	ss.e.Start(ctx)
+	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
+	cancel()
+	unittest.AssertClosesBefore(ss.T(), ss.e.Done(), time.Second)
 }
 
 // TestProcessingMultipleItems tests that items are processed in async way
 func (ss *SyncSuite) TestProcessingMultipleItems() {
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
+	ss.e.Start(ctx)
 	<-ss.e.Ready()
+	defer cancel()
 
 	originID := unittest.IdentifierFixture()
 	for i := 0; i < 5; i++ {

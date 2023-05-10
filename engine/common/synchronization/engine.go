@@ -3,6 +3,7 @@
 package synchronization
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
@@ -18,7 +20,9 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	synccore "github.com/onflow/flow-go/module/chainsync"
-	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/events"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -34,20 +38,20 @@ const defaultBlockResponseQueueCapacity = 500
 
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
-	// TODO replace engine.Unit and lifecycle.LifecycleManager with component.ComponentManager
-	unit    *engine.Unit
-	lm      *lifecycle.LifecycleManager
-	log     zerolog.Logger
-	metrics module.EngineMetrics
-	me      module.Local
-	con     network.Conduit
-	blocks  storage.Blocks
-	comp    consensus.Compliance
+	component.Component
+	hotstuff.FinalizationConsumer
+
+	log                  zerolog.Logger
+	metrics              module.EngineMetrics
+	me                   module.Local
+	finalizedHeaderCache module.FinalizedHeaderCache
+	con                  network.Conduit
+	blocks               storage.Blocks
+	comp                 consensus.Compliance
 
 	pollInterval         time.Duration
 	scanInterval         time.Duration
 	core                 module.SyncCore
-	state                protocol.State
 	participantsProvider module.IdentifierProvider
 
 	requestHandler *RequestHandler // component responsible for handling requests
@@ -80,14 +84,18 @@ func New(
 		panic("must initialize synchronization engine with comp engine")
 	}
 
+	finalizedHeaderCache, finalizedCacheWorker, err := events.NewFinalizedHeaderCache(state)
+	if err != nil {
+		return nil, fmt.Errorf("could not create finalized header cache: %w", err)
+	}
+
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:                 engine.NewUnit(),
-		lm:                   lifecycle.NewLifecycleManager(),
+		FinalizationConsumer: finalizedHeaderCache,
 		log:                  log.With().Str("engine", "synchronization").Logger(),
 		metrics:              metrics,
 		me:                   me,
-		state:                state,
+		finalizedHeaderCache: finalizedHeaderCache,
 		blocks:               blocks,
 		comp:                 comp,
 		core:                 core,
@@ -96,19 +104,28 @@ func New(
 		participantsProvider: participantsProvider,
 	}
 
-	err := e.setupResponseMessageHandler()
-	if err != nil {
-		return nil, fmt.Errorf("could not setup message handler")
-	}
-
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(channels.SyncCommittee, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
+	e.requestHandler = NewRequestHandler(log, metrics, NewResponseSender(con), me, finalizedHeaderCache, blocks, core, true)
 
-	e.requestHandler = NewRequestHandler(log, metrics, NewResponseSender(con), me, state, blocks, core, true)
+	// set up worker routines
+	builder := component.NewComponentManagerBuilder().
+		AddWorker(finalizedCacheWorker).
+		AddWorker(e.checkLoop).
+		AddWorker(e.responseProcessingLoop)
+	for i := 0; i < defaultEngineRequestsWorkers; i++ {
+		builder.AddWorker(e.requestHandler.requestProcessingWorker)
+	}
+	e.Component = builder.Build()
+
+	err = e.setupResponseMessageHandler()
+	if err != nil {
+		return nil, fmt.Errorf("could not setup message handler")
+	}
 
 	return e, nil
 }
@@ -160,30 +177,6 @@ func (e *Engine) setupResponseMessageHandler() error {
 	)
 
 	return nil
-}
-
-// Ready returns a ready channel that is closed once the engine has fully started.
-func (e *Engine) Ready() <-chan struct{} {
-	e.lm.OnStart(func() {
-		e.unit.Launch(e.checkLoop)
-		e.unit.Launch(e.responseProcessingLoop)
-		// wait for request handler to startup
-		<-e.requestHandler.Ready()
-	})
-	return e.lm.Started()
-}
-
-// Done returns a done channel that is closed once the engine has fully stopped.
-func (e *Engine) Done() <-chan struct{} {
-	e.lm.OnStop(func() {
-		// signal the request handler to shutdown
-		requestHandlerDone := e.requestHandler.Done()
-		// wait for request sending and response processing routines to exit
-		<-e.unit.Done()
-		// wait for request handler shutdown to complete
-		<-requestHandlerDone
-	})
-	return e.lm.Stopped()
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -240,23 +233,26 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 // responseProcessingLoop is a separate goroutine that performs processing of queued responses
-func (e *Engine) responseProcessingLoop() {
+func (e *Engine) responseProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
 	notifier := e.responseMessageHandler.GetNotifier()
+	done := ctx.Done()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-done:
 			return
 		case <-notifier:
-			e.processAvailableResponses()
+			e.processAvailableResponses(ctx)
 		}
 	}
 }
 
 // processAvailableResponses is processor of pending events which drives events from networking layer to business logic.
-func (e *Engine) processAvailableResponses() {
+func (e *Engine) processAvailableResponses(ctx context.Context) {
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		default:
 		}
@@ -284,10 +280,7 @@ func (e *Engine) processAvailableResponses() {
 // onSyncResponse processes a synchronization response.
 func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) {
 	e.log.Debug().Str("origin_id", originID.String()).Msg("received sync response")
-	final, err := e.state.Final().Head()
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("unexpected fatal error retrieving latest finalized block")
-	}
+	final := e.finalizedHeaderCache.Get()
 	e.core.HandleHeight(final, res.Height)
 }
 
@@ -321,7 +314,9 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 }
 
 // checkLoop will regularly scan for items that need requesting.
-func (e *Engine) checkLoop() {
+func (e *Engine) checkLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
 	pollChan := make(<-chan time.Time)
 	if e.pollInterval > 0 {
 		poll := time.NewTicker(e.pollInterval)
@@ -329,42 +324,35 @@ func (e *Engine) checkLoop() {
 		defer poll.Stop()
 	}
 	scan := time.NewTicker(e.scanInterval)
+	defer scan.Stop()
 
+	done := ctx.Done()
 CheckLoop:
 	for {
 		// give the quit channel a priority to be selected
 		select {
-		case <-e.unit.Quit():
+		case <-done:
 			break CheckLoop
 		default:
 		}
 
 		select {
-		case <-e.unit.Quit():
+		case <-done:
 			break CheckLoop
 		case <-pollChan:
 			e.pollHeight()
 		case <-scan.C:
-			final, err := e.state.Final().Head()
-			if err != nil {
-				e.log.Fatal().Err(err).Msg("unexpected fatal error retrieving latest finalized block")
-			}
+			final := e.finalizedHeaderCache.Get()
 			participants := e.participantsProvider.Identifiers()
 			ranges, batches := e.core.ScanPending(final)
 			e.sendRequests(participants, ranges, batches)
 		}
 	}
-
-	// some minor cleanup
-	scan.Stop()
 }
 
 // pollHeight will send a synchronization request to three random nodes.
 func (e *Engine) pollHeight() {
-	final, err := e.state.Final().Head()
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("unexpected fatal error retrieving latest finalized block")
-	}
+	final := e.finalizedHeaderCache.Get()
 	participants := e.participantsProvider.Identifiers()
 
 	// send the request for synchronization
@@ -376,7 +364,7 @@ func (e *Engine) pollHeight() {
 		Uint64("height", req.Height).
 		Uint64("range_nonce", req.Nonce).
 		Msg("sending sync request")
-	err = e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
+	err := e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
 	if err != nil {
 		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
 		return

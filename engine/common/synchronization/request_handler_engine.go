@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/events"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
@@ -48,6 +50,7 @@ func NewResponseSender(con network.Conduit) *ResponseSenderImpl {
 }
 
 type RequestHandlerEngine struct {
+	component.Component
 	requestHandler *RequestHandler
 }
 
@@ -69,28 +72,25 @@ func NewRequestHandlerEngine(
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
+	finalizedHeaderCache, finalizedCacheWorker, err := events.NewFinalizedHeaderCache(state)
 	e.requestHandler = NewRequestHandler(
 		logger,
 		metrics,
 		NewResponseSender(con),
 		me,
-		state,
+		finalizedHeaderCache,
 		blocks,
 		core,
 		false,
 	)
+	builder := component.NewComponentManagerBuilder().AddWorker(finalizedCacheWorker)
+	for i := 0; i < defaultEngineRequestsWorkers; i++ {
+		builder.AddWorker(e.requestHandler.requestProcessingWorker)
+	}
 
 	return e, nil
 }
 
 func (r *RequestHandlerEngine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	return r.requestHandler.Process(channel, originID, event)
-}
-
-func (r *RequestHandlerEngine) Ready() <-chan struct{} {
-	return r.requestHandler.Ready()
-}
-
-func (r *RequestHandlerEngine) Done() <-chan struct{} {
-	return r.requestHandler.Done()
 }
