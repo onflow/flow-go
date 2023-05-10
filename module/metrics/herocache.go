@@ -113,6 +113,14 @@ func GossipSubRPCInspectorQueueMetricFactory(f HeroCacheMetricsFactory, publicNe
 	return f(namespaceNetwork, r)
 }
 
+func RpcInspectorNotificationQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+	r := ResourceNetworkingRpcInspectorNotificationQueue
+	if publicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
 func GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
 	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
 	r := ResourceNetworkingRpcClusterPrefixReceivedCache

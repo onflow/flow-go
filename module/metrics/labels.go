@@ -85,6 +85,7 @@ const (
 	ResourceNetworkingDnsTxtCache                      = "networking_dns_txt_cache"    // networking layer
 	ResourceNetworkingDisallowListNotificationQueue    = "networking_disallow_list_notification_queue"
 	ResourceNetworkingRpcValidationInspectorQueue      = "networking_rpc_validation_inspector_queue"
+	ResourceNetworkingRpcInspectorNotificationQueue    = "networking_rpc_inspector_notification_queue"
 	ResourceNetworkingRpcMetricsObserverInspectorQueue = "networking_rpc_metrics_observer_inspector_queue"
 	ResourceNetworkingRpcClusterPrefixReceivedCache    = "networking_rpc_cluster_prefixed_received_cache"
 
