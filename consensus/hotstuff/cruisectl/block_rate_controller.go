@@ -55,8 +55,8 @@ type BlockRateController struct {
 	blockRateDelay  *atomic.Float64 // the block rate delay value to use when proposing a block
 	epochInfo
 
-	viewChanges chan uint64            // OnViewChange events
-	epochSetups chan protocol.Snapshot // EpochSetupPhaseStarted events
+	viewChanges chan uint64       // OnViewChange events           (view entered)
+	epochSetups chan *flow.Header // EpochSetupPhaseStarted events (block header within setup phase)
 }
 
 // NewBlockRateController returns a new BlockRateController.
@@ -66,8 +66,8 @@ func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.S
 		config:      config,
 		log:         log,
 		state:       state,
-		viewChanges: make(chan uint64),
-		epochSetups: make(chan protocol.Snapshot),
+		viewChanges: make(chan uint64, 1),
+		epochSetups: make(chan *flow.Header, 1),
 	}
 
 	ctl.cm = component.NewComponentManagerBuilder().
@@ -78,6 +78,12 @@ func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.S
 	// TODO initialize epoch info
 
 	return ctl, nil
+}
+
+// BlockRateDelay returns the current block rate delay value to use when proposing, in milliseconds.
+// This function reflects the most recently computed output of the PID controller
+func (ctl *BlockRateController) BlockRateDelay() float64 {
+	return ctl.blockRateDelay.Load()
 }
 
 // processEventsWorker is a worker routine which processes events received from other components.
@@ -91,13 +97,14 @@ func (ctl *BlockRateController) processEventsWorker(ctx irrecoverable.SignalerCo
 		case <-done:
 			return
 		case enteredView := <-ctl.viewChanges:
-			err := ctl.handleOnViewChange(enteredView)
+			err := ctl.processOnViewChange(enteredView)
 			if err != nil {
 				ctl.log.Err(err).Msgf("fatal error handling OnViewChange event")
 				ctx.Throw(err)
 			}
-		case snapshot := <-ctl.epochSetups:
-			err := ctl.handleEpochSetupPhaseStarted(snapshot)
+		case block := <-ctl.epochSetups:
+			snapshot := ctl.state.AtHeight(block.Height)
+			err := ctl.processEpochSetupPhaseStarted(snapshot)
 			if err != nil {
 				ctl.log.Err(err).Msgf("fatal error handling EpochSetupPhaseStarted event")
 				ctx.Throw(err)
@@ -106,36 +113,40 @@ func (ctl *BlockRateController) processEventsWorker(ctx irrecoverable.SignalerCo
 	}
 }
 
-// handleOnViewChange processes OnViewChange events from HotStuff.
+// processOnViewChange processes OnViewChange events from HotStuff.
 // Whenever the view changes, we:
 //   - take a new measurement for instantaneous and EWMA block rate
 //   - compute a new target block rate (set-point)
 //   - compute error terms, compensation function output, and new block rate delay
 //   - updates epoch info, if this is the first observed view of a new epoch
-func (ctl *BlockRateController) handleOnViewChange(view uint64) error {
+func (ctl *BlockRateController) processOnViewChange(view uint64) error {
 	// TODO
 	return nil
 }
 
-// handleEpochSetupPhaseStarted processes EpochSetupPhaseStarted events from the protocol state.
+// processEpochSetupPhaseStarted processes EpochSetupPhaseStarted events from the protocol state.
 // Whenever we enter the EpochSetup phase, we:
 //   - store the next epoch's final view
-//     -
-func (ctl *BlockRateController) handleEpochSetupPhaseStarted(snapshot protocol.Snapshot) error {
+func (ctl *BlockRateController) processEpochSetupPhaseStarted(snapshot protocol.Snapshot) error {
 	// TODO
 	return nil
 }
 
 // OnViewChange responds to a view-change notification from HotStuff.
-// The event is queued for async processing by the worker.
-func (ctl *BlockRateController) OnViewChange(oldView, newView uint64) {
-	// TODO
+// The event is queued for async processing by the worker. If the channel is full,
+// the event is discarded - since we are taking an average it doesn't matter if
+// occasionally miss a sample.
+func (ctl *BlockRateController) OnViewChange(_, newView uint64) {
+	select {
+	case ctl.viewChanges <- newView:
+	default:
+	}
 }
 
 // EpochSetupPhaseStarted responds to the EpochSetup phase starting for the current epoch.
 // The event is queued for async processing by the worker.
-func (ctl *BlockRateController) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
-	// TODO
+func (ctl *BlockRateController) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
+	ctl.epochSetups <- first
 }
 
 // EpochEmergencyFallbackTriggered responds to epoch fallback mode being triggered.
