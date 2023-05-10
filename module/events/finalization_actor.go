@@ -1,6 +1,7 @@
 package events
 
 import (
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/engine"
@@ -22,6 +23,8 @@ type FinalizationActor struct {
 	notifier        engine.Notifier
 	handler         ProcessLatestFinalizedBlock
 }
+
+var _ hotstuff.FinalizationConsumer = (*FinalizationActor)(nil)
 
 // NewFinalizationActor creates a new FinalizationActor, and returns the worker routine
 // and event consumer required to operate it.
@@ -68,3 +71,6 @@ func (actor *FinalizationActor) OnFinalizedBlock(block *model.Block) {
 		actor.notifier.Notify()
 	}
 }
+
+func (actor *FinalizationActor) OnBlockIncorporated(*model.Block)                   {}
+func (actor *FinalizationActor) OnDoubleProposeDetected(*model.Block, *model.Block) {}

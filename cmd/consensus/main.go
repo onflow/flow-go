@@ -733,7 +733,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
-			finalizationDistributor.AddOnBlockFinalizedConsumer(comp.OnBlockFinalized)
+			finalizationDistributor.AddConsumer(comp)
 
 			return comp, nil
 		}).

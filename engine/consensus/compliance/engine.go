@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -29,8 +30,9 @@ const defaultBlockQueueCapacity = 10_000
 // `compliance.Core` implements the actual compliance logic.
 // Implements consensus.Compliance interface.
 type Engine struct {
-	*component.ComponentManager
-	*events.FinalizationActor
+	component.Component
+	hotstuff.FinalizationConsumer
+
 	log                   zerolog.Logger
 	mempoolMetrics        module.MempoolMetrics
 	engineMetrics         module.EngineMetrics
@@ -75,9 +77,9 @@ func NewEngine(
 		pendingBlocksNotifier: engine.NewNotifier(),
 	}
 	finalizationActor, finalizationWorker := events.NewFinalizationActor(eng.processOnFinalizedBlock)
-	eng.FinalizationActor = finalizationActor
+	eng.FinalizationConsumer = finalizationActor
 	// create the component manager and worker threads
-	eng.ComponentManager = component.NewComponentManagerBuilder().
+	eng.Component = component.NewComponentManagerBuilder().
 		AddWorker(eng.processBlocksLoop).
 		AddWorker(finalizationWorker).
 		Build()

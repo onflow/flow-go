@@ -174,7 +174,7 @@ func (factory *EpochComponentsFactory) Create(
 		err = fmt.Errorf("could not create compliance engine: %w", err)
 		return
 	}
-	hotstuffModules.FinalizationDistributor.AddOnBlockFinalizedConsumer(complianceEng.OnBlockFinalized)
+	hotstuffModules.FinalizationDistributor.AddConsumer(complianceEng)
 	compliance = complianceEng
 
 	sync, err = factory.sync.Create(cluster.Members(), state, blocks, syncCore, complianceEng)
