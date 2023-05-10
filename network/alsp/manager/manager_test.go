@@ -453,11 +453,11 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentiall
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the peer in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrently(t *testing.T) {
 	alspMetrics := metrics.NewNoopCollector()
-	cacheSize := uint32(100)
 
 	cfg := &alspmgr.MisbehaviorReportManagerConfig{
 		Logger:                  unittest.Logger(),
-		SpamRecordCacheSize:     cacheSize,
+		SpamRecordCacheSize:     uint32(100),
+		SpamReportQueueSize:     uint32(100),
 		AlspMetrics:             alspMetrics,
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
@@ -471,6 +471,16 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 	// create a new MisbehaviorReportManager
 	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
 	require.NoError(t, err)
+
+	// start the ALSP manager
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
+	}()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	m.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
 
 	// creates a list of mock misbehavior reports with negative penalty values for a single peer
 	originId := unittest.IdentifierFixture()
@@ -494,16 +504,25 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
 
-	// check if the misbehavior reports have been processed by verifying that the Adjust method was called on the cache
-	record, ok := cache.Get(originId)
-	require.True(t, ok)
-	require.NotNil(t, record)
+	require.Eventually(t, func() bool {
+		// check if the misbehavior report has been processed by verifying that the Adjust method was called on the cache
+		record, ok := cache.Get(originId)
+		if !ok {
+			return false
+		}
+		require.NotNil(t, record)
 
-	require.Equal(t, totalPenalty, record.Penalty)
-	// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
-	require.Equal(t, uint64(0), record.CutoffCounter)
-	// the decay should be the default decay value.
-	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		if totalPenalty != record.Penalty {
+			// all the misbehavior reports should be processed by now, so the penalty should be equal to the total penalty
+			return false
+		}
+		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
+		require.Equal(t, uint64(0), record.CutoffCounter)
+		// the decay should be the default decay value.
+		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+
+		return true
+	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 }
 
 // TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequentially tests the handling of single misbehavior reports for multiple peers.
