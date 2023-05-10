@@ -219,14 +219,6 @@ func (storage *LedgerStorageSnapshot) Get(
 	return value, nil
 }
 
-// TODO(leo): convert to struct
-// StorehouseSnapshot is a snapshot for getting registers from storehouse
-type StorehouseSnapshot interface {
-	snapshot.StorageSnapshot
-	// BlockID flow.Identifier
-	// Height  uint64
-}
-
 // TODO(leo): return a storagesnapshot backed by forkaware storage
 func (s *state) NewStorageSnapshot(
 	commitment flow.StateCommitment,

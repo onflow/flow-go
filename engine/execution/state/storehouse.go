@@ -81,7 +81,7 @@ type ForkAwareStore interface {
 	// A <- B <- C <- D
 	//        ^- E <- F
 	// if C is finalized, then PruneByFinalized(C) will prune [A, B, E, F],
-	// [A,B] are pruned becase they are below finalized view,
+	// [A,B] are pruned because they are below finalized view,
 	// [E,F] are pruned because they are conflicting with finalized block C.
 	PruneByFinalized(finalized *flow.Header) error
 }
