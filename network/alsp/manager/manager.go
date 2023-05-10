@@ -212,7 +212,7 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 		lg.Warn().Msg("discarding misbehavior report because either the queue is full or the misbehavior report is duplicate")
 	}
 
-	fmt.Println("submited")
+	lg.Debug().Msg("misbehavior report submitted")
 }
 
 // processMisbehaviorReport is the worker function that processes the misbehavior reports.
@@ -234,7 +234,6 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 		Str("reason", report.Reason.String()).
 		Float64("penalty", report.Penalty).Logger()
 
-	fmt.Println("picked")
 	if m.disablePenalty {
 		// when penalty mechanism disabled, the misbehavior is logged and metrics are updated,
 		// but no further actions are taken.
@@ -271,6 +270,5 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 	}
 
 	lg.Debug().Float64("updated_penalty", updatedPenalty).Msg("misbehavior report handled")
-	fmt.Println("handled")
 	return nil
 }
