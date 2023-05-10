@@ -54,12 +54,18 @@ func NewDefaultConduitFactory(alspCfg *alspmgr.MisbehaviorReportManagerConfig, o
 		apply(d)
 	}
 
-	// worker added so conduit factory doesn't immediately shut down when it's started
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
+			d.misbehaviorManager.Start(ctx)
+			select {
+			case <-ctx.Done():
+				return
+			case <-d.misbehaviorManager.Ready():
+				ready()
+			}
 
 			<-ctx.Done()
+			<-d.misbehaviorManager.Done()
 		}).Build()
 
 	d.ComponentManager = cm
