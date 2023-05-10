@@ -46,7 +46,8 @@ type epochInfo struct {
 // based on the measured block rate of the consensus committee as a whole, in
 // order to achieve a target overall block rate.
 type BlockRateController struct {
-	cm     *component.ComponentManager
+	component.Component
+
 	config *Config
 	state  protocol.State
 	log    zerolog.Logger
@@ -70,7 +71,7 @@ func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.S
 		epochSetups: make(chan *flow.Header, 1),
 	}
 
-	ctl.cm = component.NewComponentManagerBuilder().
+	ctl.Component = component.NewComponentManagerBuilder().
 		AddWorker(ctl.processEventsWorker).
 		Build()
 
