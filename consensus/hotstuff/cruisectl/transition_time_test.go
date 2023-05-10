@@ -7,38 +7,38 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestParseSwitchover_Valid tests that valid switchover configurations have
+// TestParseTransition_Valid tests that valid transition configurations have
 // consistent parsing and formatting behaviour.
-func TestParseSwitchover_Valid(t *testing.T) {
+func TestParseTransition_Valid(t *testing.T) {
 	cases := []struct {
-		switchover Switchover
+		transition EpochTransitionTime
 		str        string
 	}{{
-		switchover: Switchover{time.Sunday, 0, 0},
+		transition: EpochTransitionTime{time.Sunday, 0, 0},
 		str:        "sunday@00:00",
 	}, {
-		switchover: Switchover{time.Wednesday, 8, 1},
+		transition: EpochTransitionTime{time.Wednesday, 8, 1},
 		str:        "wednesday@08:01",
 	}, {
-		switchover: Switchover{time.Friday, 23, 59},
+		transition: EpochTransitionTime{time.Friday, 23, 59},
 		str:        "monday@23:59",
 	}}
 
 	for _, c := range cases {
 		t.Run(c.str, func(t *testing.T) {
 			// 1 - the computed string representation should match the string fixture
-			assert.Equal(t, c.str, c.switchover.String())
-			// 2 - the parsed switchover should match the switchover fixture
-			parsed, err := ParseSwitchover(c.str)
+			assert.Equal(t, c.str, c.transition.String())
+			// 2 - the parsed transition should match the transition fixture
+			parsed, err := ParseTransition(c.str)
 			assert.NoError(t, err)
-			assert.Equal(t, c.switchover, parsed)
+			assert.Equal(t, c.transition, parsed)
 		})
 	}
 }
 
-// TestParseSwitchover_Invalid tests that a selection of invalid switchover strings
+// TestParseTransition_Invalid tests that a selection of invalid transition strings
 // fail validation and return an error.
-func TestParseSwitchover_Invalid(t *testing.T) {
+func TestParseTransition_Invalid(t *testing.T) {
 	cases := []string{
 		// invalid WD part
 		"sundy@12:00",
@@ -66,9 +66,9 @@ func TestParseSwitchover_Invalid(t *testing.T) {
 		"wednesday@1200",
 	}
 
-	for _, c := range cases {
-		t.Run(c, func(t *testing.T) {
-			_, err := ParseSwitchover(c)
+	for _, transitionStr := range cases {
+		t.Run(transitionStr, func(t *testing.T) {
+			_, err := ParseTransition(transitionStr)
 			assert.Error(t, err)
 		})
 	}
