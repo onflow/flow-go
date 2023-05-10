@@ -257,8 +257,8 @@ type NodeConfig struct {
 
 	// root state information
 	RootSnapshot protocol.Snapshot
-	// cache of root snapshot and latest finalized snapshot properties
-	NodeConfigCache
+	// excerpt of root snapshot and latest finalized snapshot, when we boot up
+	StateExcerptAtBoot
 
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool
@@ -269,16 +269,16 @@ type NodeConfig struct {
 	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
 }
 
-// NodeConfigCache caches information about the root snapshot and latest finalized block for use in bootstrapping.
-type NodeConfigCache struct {
-	// cached properties of RootSnapshot for convenience
+// StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.
+type StateExcerptAtBoot struct {
+	// properties of RootSnapshot for convenience
 	RootBlock   *flow.Block
 	RootQC      *flow.QuorumCertificate
 	RootResult  *flow.ExecutionResult
 	RootSeal    *flow.Seal
 	RootChainID flow.ChainID
 	SporkID     flow.Identifier
-	// cached finalized block for use in bootstrapping
+	// finalized block for use in bootstrapping
 	FinalizedHeader *flow.Header
 }
 
