@@ -19,7 +19,7 @@ import (
 func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 	t.Run("when processing block at stop height", func(t *testing.T) {
-		sc := NewStopControl(unittest.Logger())
+		sc := NewStopControl(StopControlWithLogger(unittest.Logger()))
 
 		require.Nil(t, sc.GetNextStop())
 
@@ -52,7 +52,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		execState := new(mock.ReadOnlyExecutionState)
 
-		sc := NewStopControl(unittest.Logger())
+		sc := NewStopControl(StopControlWithLogger(unittest.Logger()))
 
 		require.Nil(t, sc.GetNextStop())
 
@@ -99,7 +99,7 @@ func TestExecutionFallingBehind(t *testing.T) {
 	headerC := unittest.BlockHeaderWithParentFixture(headerB) // 22
 	headerD := unittest.BlockHeaderWithParentFixture(headerC) // 23
 
-	sc := NewStopControl(unittest.Logger())
+	sc := NewStopControl(StopControlWithLogger(unittest.Logger()))
 
 	// set stop at 22, so 21 is the last height which should be processed
 	err := sc.SetStopHeight(22, false)
@@ -128,15 +128,13 @@ func TestExecutionFallingBehind(t *testing.T) {
 // StopControl started as paused will keep the state
 func TestStartingPaused(t *testing.T) {
 
-	sc := NewStopControl(unittest.Logger())
-	sc.StopExecution()
+	sc := NewStopControl(StopControlWithLogger(unittest.Logger()), StopControlWithStopped())
 	require.True(t, sc.IsExecutionStopped())
 }
 
 func TestPausedStateRejectsAllBlocksAndChanged(t *testing.T) {
 
-	sc := NewStopControl(unittest.Logger())
-	sc.StopExecution()
+	sc := NewStopControl(StopControlWithLogger(unittest.Logger()), StopControlWithStopped())
 	require.True(t, sc.IsExecutionStopped())
 
 	err := sc.SetStopHeight(2137, true)

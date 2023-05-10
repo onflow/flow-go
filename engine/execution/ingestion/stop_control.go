@@ -22,9 +22,6 @@ type StopControl struct {
 
 	stopBoundary *stopBoundary
 
-	// This is the block ID of the block that should be executed last.
-	stopAfterExecuting flow.Identifier
-
 	stopped bool
 }
 
@@ -42,6 +39,9 @@ type stopBoundary struct {
 
 	// once the StopParameters are reached they cannot be changed
 	cannotBeChanged bool
+
+	// This is the block ID of the block that should be executed last.
+	stopAfterExecuting flow.Identifier
 }
 
 // String returns string in the format "crash@20023"
@@ -62,16 +62,36 @@ func (s *stopBoundary) String() string {
 	return sb.String()
 }
 
+type StopControlOption func(*StopControl)
+
+func StopControlWithLogger(log zerolog.Logger) StopControlOption {
+	return func(s *StopControl) {
+		s.log = log.With().Str("component", "stop_control").Logger()
+	}
+}
+
+func StopControlWithStopped() StopControlOption {
+	return func(s *StopControl) {
+		s.stopped = true
+	}
+}
+
 // NewStopControl creates new empty NewStopControl
 func NewStopControl(
-	log zerolog.Logger,
+	options ...StopControlOption,
 ) *StopControl {
-	log = log.With().Str("component", "stop_control").Logger()
-	log.Debug().Msgf("Created")
 
-	return &StopControl{
-		log: log,
+	sc := &StopControl{
+		log: zerolog.Nop(),
 	}
+
+	for _, option := range options {
+		option(sc)
+	}
+
+	sc.log.Debug().Msgf("Created")
+
+	return sc
 }
 
 // IsExecutionStopped returns true is block execution has been stopped
@@ -80,14 +100,6 @@ func (s *StopControl) IsExecutionStopped() bool {
 	defer s.RUnlock()
 
 	return s.stopped
-}
-
-// StopExecution indicates that block execution should be stopped
-func (s *StopControl) StopExecution() {
-	s.Lock()
-	defer s.Unlock()
-
-	s.stopped = true
 }
 
 // SetStopHeight sets new stopHeight and shouldCrash mode.
@@ -124,7 +136,6 @@ func (s *StopControl) SetStopHeight(
 		Msg("new stopHeight set")
 
 	s.stopBoundary = stopBoundary
-	s.stopAfterExecuting = flow.ZeroID
 
 	return nil
 }
@@ -223,12 +234,12 @@ func (s *StopControl) BlockFinalized(
 		return
 	}
 
-	s.stopAfterExecuting = h.ParentID
+	s.stopBoundary.stopAfterExecuting = h.ParentID
 	s.log.Info().
 		Msgf(
 			"Node scheduled to stop executing"+
 				" after executing block %s at height %d",
-			s.stopAfterExecuting.String(),
+			s.stopBoundary.stopAfterExecuting.String(),
 			h.Height-1,
 		)
 }
@@ -242,7 +253,7 @@ func (s *StopControl) OnBlockExecuted(h *flow.Header) {
 		return
 	}
 
-	if s.stopAfterExecuting != h.ID() {
+	if s.stopBoundary.stopAfterExecuting != h.ID() {
 		return
 	}
 

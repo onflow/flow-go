@@ -651,10 +651,14 @@ func (exeNode *ExecutionNode) LoadStopControl(
 	error,
 ) {
 
-	exeNode.stopControl = ingestion.NewStopControl(exeNode.builder.Logger)
-	if exeNode.exeConf.pauseExecution {
-		exeNode.stopControl.StopExecution()
+	opts := []ingestion.StopControlOption{
+		ingestion.StopControlWithLogger(exeNode.builder.Logger),
 	}
+	if exeNode.exeConf.pauseExecution {
+		opts = append(opts, ingestion.StopControlWithStopped())
+	}
+
+	exeNode.stopControl = ingestion.NewStopControl(opts...)
 
 	return &module.NoopReadyDoneAware{}, nil
 }
