@@ -99,7 +99,7 @@ func NewBroker(
 
 	b := &Broker{
 		config:             config,
-		log:                log.With().Str("component", "broker").Str("dkg_instance_id", dkgInstanceID).Logger(),
+		log:                log.With().Str("component", "dkg_broker").Str("dkg_instance_id", dkgInstanceID).Logger(),
 		unit:               engine.NewUnit(),
 		dkgInstanceID:      dkgInstanceID,
 		committee:          committee,
