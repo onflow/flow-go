@@ -616,6 +616,16 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
 	require.NoError(t, err)
 
+	// start the ALSP manager
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
+	}()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	m.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
+
 	// creates a list of single misbehavior reports for multiple peers (10 peers)
 	numPeers := 10
 	reports := createRandomMisbehaviorReports(t, numPeers)
@@ -639,18 +649,24 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
 
 	// check if the misbehavior reports have been processed by verifying that the Adjust method was called on the cache
-	for _, report := range reports {
-		originID := report.OriginId()
-		record, ok := cache.Get(originID)
-		require.True(t, ok)
-		require.NotNil(t, record)
+	require.Eventually(t, func() bool {
+		for _, report := range reports {
+			originID := report.OriginId()
+			record, ok := cache.Get(originID)
+			if !ok {
+				return false
+			}
+			require.NotNil(t, record)
 
-		require.Equal(t, report.Penalty(), record.Penalty)
-		// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
-		require.Equal(t, uint64(0), record.CutoffCounter)
-		// the decay should be the default decay value.
-		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
-	}
+			require.Equal(t, report.Penalty(), record.Penalty)
+			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
+			require.Equal(t, uint64(0), record.CutoffCounter)
+			// the decay should be the default decay value.
+			require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		}
+
+		return true
+	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 }
 
 // TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequentially tests the handling of multiple misbehavior reports for multiple peers.
