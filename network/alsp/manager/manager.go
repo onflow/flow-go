@@ -1,6 +1,7 @@
 package alspmgr
 
 import (
+	crand "crypto/rand"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -39,7 +40,7 @@ type MisbehaviorReportManager struct {
 	disablePenalty bool
 
 	// workerPool is the worker pool for handling the misbehavior reports in a thread-safe and non-blocking manner.
-	workerPool *worker.Pool[*internal.ReportedMisbehaviorWork]
+	workerPool *worker.Pool[internal.ReportedMisbehaviorWork]
 }
 
 var _ network.MisbehaviorReportManager = (*MisbehaviorReportManager)(nil)
@@ -138,7 +139,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 		lg.With().Str("component", "spam_record_queue").Logger(),
 		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory))
 
-	m.workerPool = worker.NewWorkerPoolBuilder[*internal.ReportedMisbehaviorWork](
+	m.workerPool = worker.NewWorkerPoolBuilder[internal.ReportedMisbehaviorWork](
 		cfg.Logger,
 		store,
 		m.processMisbehaviorReport).Build()
@@ -178,11 +179,25 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 		Float64("penalty", report.Penalty()).Logger()
 	m.metrics.OnMisbehaviorReported(channel.String(), report.Reason().String())
 
-	if ok := m.workerPool.Submit(&internal.ReportedMisbehaviorWork{
+	nonce := [internal.NonceSize]byte{}
+	nonceSize, err := crand.Read(nonce[:])
+	if err != nil {
+		// this should never happen, but if it does, we should not continue
+		lg.Fatal().Err(err).Msg("failed to generate nonce")
+		return
+	}
+	if nonceSize != internal.NonceSize {
+		// this should never happen, but if it does, we should not continue
+		lg.Fatal().Msgf("nonce size mismatch: expected %d, got %d", internal.NonceSize, nonceSize)
+		return
+	}
+
+	if ok := m.workerPool.Submit(internal.ReportedMisbehaviorWork{
 		Channel:  channel,
 		OriginId: report.OriginId(),
 		Reason:   report.Reason(),
 		Penalty:  report.Penalty(),
+		Nonce:    nonce,
 	}); !ok {
 		lg.Warn().Msg("discarding misbehavior report because either the queue is full or the misbehavior report is duplicate")
 	}
@@ -200,7 +215,7 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 //
 //		error: the error that occurred during the processing of the misbehavior report. The returned error is
 //	 irrecoverable and the node should crash if it occurs (indicating a bug in the ALSP module).
-func (m *MisbehaviorReportManager) processMisbehaviorReport(report *internal.ReportedMisbehaviorWork) error {
+func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.ReportedMisbehaviorWork) error {
 	lg := m.logger.With().
 		Str("channel", report.Channel.String()).
 		Hex("misbehaving_id", logging.ID(report.OriginId)).
