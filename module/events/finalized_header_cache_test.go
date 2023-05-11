@@ -41,7 +41,7 @@ func TestFinalizedHeaderCache(t *testing.T) {
 	final = unittest.BlockHeaderFixture(
 		unittest.HeaderWithView(final.View+1),
 		unittest.WithHeaderHeight(final.Height+1))
-	cache.OnBlockFinalized(model.BlockFromFlow(final))
+	cache.OnFinalizedBlock(model.BlockFromFlow(final))
 
 	// the cache should be updated
 	assert.Eventually(t, func() bool {
