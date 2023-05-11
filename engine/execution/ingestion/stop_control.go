@@ -3,13 +3,16 @@ package ingestion
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 
+	"github.com/coreos/go-semver/semver"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 // StopControl is a specialized component used by ingestion.Engine to encapsulate
@@ -18,12 +21,18 @@ import (
 // StopControl follows states described in StopState
 type StopControl struct {
 	sync.RWMutex
-	log     zerolog.Logger
-	headers StopControlHeaders
+	log zerolog.Logger
 
+	stopped      bool
 	stopBoundary *stopBoundary
 
-	stopped bool
+	headers StopControlHeaders
+
+	nodeVersion    *semver.Version
+	versionBeacons storage.VersionBeacons
+	versionBeacon  *flow.SealedVersionBeacon
+
+	crashOnVersionBoundaryReached bool
 }
 
 type StopParameters struct {
@@ -43,9 +52,13 @@ type stopBoundary struct {
 
 	// This is the block ID of the block that should be executed last.
 	stopAfterExecuting flow.Identifier
+
+	// if the stop parameters were set by the version beacon
+	fromVersionBeacon bool
 }
 
-// String returns string in the format "crash@20023" or "crash@20023@blockID"
+// String returns string in the format "crash@20023[versionBeacon]" or
+// "crash@20023@blockID[versionBeacon]"
 // block ID is only present if stopAfterExecuting is set
 // the ID is from the block that should be executed last and has height one
 // less than StopHeight
@@ -67,6 +80,11 @@ func (s *stopBoundary) String() string {
 		sb.WriteString("@")
 		sb.WriteString(s.stopAfterExecuting.String())
 	}
+	if s.fromVersionBeacon {
+		sb.WriteString("[versionBeacon]")
+	} else {
+		sb.WriteString("[manual]")
+	}
 
 	return sb.String()
 }
@@ -82,6 +100,18 @@ func StopControlWithLogger(log zerolog.Logger) StopControlOption {
 func StopControlWithStopped() StopControlOption {
 	return func(s *StopControl) {
 		s.stopped = true
+	}
+}
+
+func StopControlWithVersionControl(
+	nodeVersion *semver.Version,
+	versionBeacons storage.VersionBeacons,
+	crashOnVersionBoundaryReached bool,
+) StopControlOption {
+	return func(s *StopControl) {
+		s.nodeVersion = nodeVersion
+		s.versionBeacons = versionBeacons
+		s.crashOnVersionBoundaryReached = crashOnVersionBoundaryReached
 	}
 }
 
@@ -106,7 +136,18 @@ func NewStopControl(
 		option(sc)
 	}
 
-	sc.log.Debug().Msgf("Created")
+	log := sc.log
+
+	if sc.nodeVersion != nil {
+		log = log.With().
+			Stringer("node_version", sc.nodeVersion).
+			Bool("crash_on_version_boundary_reached", sc.crashOnVersionBoundaryReached).
+			Logger()
+	}
+
+	log.Info().Msgf("Created")
+
+	// TODO: handle version beacon already indicating a stop
 
 	return sc
 }
@@ -127,11 +168,79 @@ func (s *StopControl) SetStop(
 	s.Lock()
 	defer s.Unlock()
 
+	stopBoundary := &stopBoundary{
+		StopParameters: stop,
+	}
+
+	return s.unsafeSetStop(stopBoundary)
+}
+
+// unsafeSetStop is the same as SetStop but without locking, so it can be
+// called internally
+func (s *StopControl) unsafeSetStop(
+	boundary *stopBoundary,
+) error {
+	log := s.log.With().
+		Stringer("old_stop", s.stopBoundary).
+		Stringer("new_stop", boundary).
+		Logger()
+
+	err := s.verifyCanChangeStop(
+		boundary.StopHeight,
+		boundary.fromVersionBeacon,
+	)
+	if err != nil {
+		log.Warn().Err(err).Msg("cannot set stopHeight")
+		return err
+	}
+
+	log.Info().Msg("stop set")
+	s.stopBoundary = boundary
+
+	return nil
+}
+
+// unsafeUnsetStop clears the stop
+// there is no locking
+// this is needed, because version beacons can change remove future stops
+func (s *StopControl) unsafeUnsetStop() error {
+	log := s.log.With().
+		Stringer("old_stop", s.stopBoundary).
+		Logger()
+
+	err := s.verifyCanChangeStop(
+		math.MaxUint64,
+		true,
+	)
+	if err != nil {
+		log.Warn().Err(err).Msg("cannot clear stopHeight")
+		return err
+	}
+
+	log.Info().Msg("stop cleared")
+	s.stopBoundary = nil
+
+	return nil
+}
+
+// verifyCanChangeStop verifies if the stop parameters can be changed
+// returns error if the parameters cannot be changed
+// if newHeight == math.MaxUint64 tha basically means that the stop is being removed
+func (s *StopControl) verifyCanChangeStop(
+	newHeight uint64,
+	fromVersionBeacon bool,
+) error {
+
 	if s.stopped {
 		return fmt.Errorf("cannot update stop parameters, already stopped")
 	}
 
-	if s.stopBoundary != nil && s.stopBoundary.cannotBeChanged {
+	if s.stopBoundary == nil {
+		// if there is no stop boundary set, we can set it to anything
+		return nil
+	}
+
+	if s.stopBoundary.cannotBeChanged {
 		return fmt.Errorf(
 			"cannot update stopHeight, "+
 				"stopping commenced for %s",
@@ -139,16 +248,17 @@ func (s *StopControl) SetStop(
 		)
 	}
 
-	stopBoundary := &stopBoundary{
-		StopParameters: stop,
+	if s.stopBoundary.fromVersionBeacon != fromVersionBeacon &&
+		newHeight > s.stopBoundary.StopHeight {
+		// if one stop was set by the version beacon and the other one was manual
+		// we can only update if the new stop is earlier
+
+		// this prevents users moving the stopHeight forward when a version boundary
+		// is earlier, and prevents version beacons from moving the stopHeight forward
+		// when a manual stop is earlier.
+		return fmt.Errorf("cannot update stopHeight, " +
+			"new stop height is later than the current one (or removing a stop)")
 	}
-
-	s.log.Info().
-		Stringer("old_stop", s.stopBoundary).
-		Stringer("new_stop", stopBoundary).
-		Msg("new stopHeight set")
-
-	s.stopBoundary = stopBoundary
 
 	return nil
 }
@@ -209,16 +319,6 @@ func (s *StopControl) BlockProcessable(b *flow.Header) bool {
 // before they are finalized. However, it is possible that EN block computation
 // progress can fall behind. In this case, we want to crash only after the execution
 // reached the stopHeight.
-//
-// TODO: Version Beacons integration:
-// get VB from db index
-// check current node version against VB boundaries to determine when the next
-// stopping height should be. Move stopping height.
-// If stopping height was set manually, only move it if the new height is earlier.
-// Requirements:
-// - inject current protocol version
-// - inject a way to query VB from db index
-// - add a field to know if stopping height was set manually or through VB
 func (s *StopControl) BlockFinalized(
 	ctx context.Context,
 	execState state.ReadOnlyExecutionState,
@@ -227,17 +327,15 @@ func (s *StopControl) BlockFinalized(
 	s.Lock()
 	defer s.Unlock()
 
-	if s.stopBoundary == nil || s.stopped {
+	// we already know the ID of the block that should be executed last nothing to do
+	// node is stopping
+	if s.stopBoundary != nil &&
+		s.stopBoundary.stopAfterExecuting != flow.ZeroID {
 		return
 	}
 
-	if s.stopBoundary.stopAfterExecuting != flow.ZeroID {
-		// we already know the ID of the block that should be executed last nothing to do
-		return
-	}
-
-	if h.Height < s.stopBoundary.StopHeight {
-		// we are not at the stop yet, nothing to do
+	// already stopped, nothing to do
+	if s.stopped {
 		return
 	}
 
@@ -245,6 +343,25 @@ func (s *StopControl) BlockFinalized(
 		Stringer("block_id", h.ID()).
 		Stringer("stop", s.stopBoundary).
 		Logger()
+
+	err := s.handleVersionBeacon(h.Height)
+	if err != nil {
+		// TODO: handle this error better
+		log.Fatal().
+			Err(err).
+			Msg("failed to process version beacons")
+		return
+	}
+
+	// no stop is set, nothing to do
+	if s.stopBoundary == nil {
+		return
+	}
+
+	// we are not at the stop yet, nothing to do
+	if h.Height < s.stopBoundary.StopHeight {
+		return
+	}
 
 	parentID := h.ParentID
 
@@ -332,12 +449,122 @@ func (s *StopControl) stopExecution() {
 		Stringer("last_executed_id", s.stopBoundary.stopAfterExecuting).
 		Logger()
 
+	s.stopped = true
+	log.Warn().Msg("Stopping as finalization reached requested stop")
+
 	if s.stopBoundary != nil && s.stopBoundary.ShouldCrash {
 		// TODO: crash more gracefully or at least in a more explicit way
 		log.Fatal().Msg("Crashing as finalization reached requested stop")
 		return
 	}
+}
 
-	s.stopped = true
-	log.Warn().Msg("Stopping as finalization reached requested stop")
+func (s *StopControl) handleVersionBeacon(
+	height uint64,
+) error {
+	if s.nodeVersion == nil || s.stopped {
+		return nil
+	}
+
+	if s.versionBeacon != nil && s.versionBeacon.SealHeight >= height {
+		// we already processed this or a higher version beacon
+		return nil
+	}
+
+	vb, err := s.versionBeacons.Highest(height)
+	if err != nil {
+		return fmt.Errorf("failed to get highest "+
+			"version beacon for stop control: %w", err)
+	}
+
+	if s.versionBeacon != nil && s.versionBeacon.SealHeight >= vb.SealHeight {
+		// we already processed this or a higher version beacon
+		return nil
+	}
+
+	s.log.Info().
+		Uint64("vb_seal_height", vb.SealHeight).
+		Uint64("vb_sequence", vb.Sequence).
+		Msg("New version beacon found")
+
+	// this is now the last handled version beacon
+	s.versionBeacon = vb
+
+	// this is a new version beacon check what boundary it sets
+	stopHeight, shouldBeSet, err := s.getVersionBeaconStopHeight(vb)
+	if err != nil {
+		return err
+	}
+
+	set := s.stopBoundary != nil
+
+	if shouldBeSet {
+		// we need to set the new boundary whether it was set before or not
+		// in case a stop has been set let the SetStop decide which is more important
+		err := s.unsafeSetStop(&stopBoundary{
+			StopParameters: StopParameters{
+				StopHeight:  stopHeight,
+				ShouldCrash: s.crashOnVersionBoundaryReached,
+			},
+			fromVersionBeacon: true,
+		})
+		if err != nil {
+			// Invalid stop condition. Either already stopped or stopping
+			//or a stop is scheduled earlier.
+			// This is ok, we just log it and ignore it
+			// TODO: clean this up, we should not use errors for this kind of control flow
+			s.log.Info().
+				Err(err).
+				Msg("Failed to set stop boundary from version beacon. ")
+
+		}
+		return nil
+	}
+
+	if !set {
+		// all good, no stop boundary set
+		return nil
+	}
+
+	// we need to remove the stop boundary,
+	// but only if it was set by a version beacon
+	err = s.unsafeUnsetStop()
+	if err != nil {
+		// Invalid stop condition. Either already stopped or stopping
+		//or a stop is scheduled earlier.
+		// This is ok, we just log it and ignore it
+		// TODO: clean this up, we should not use errors for this kind of control flow
+		s.log.Info().
+			Err(err).
+			Msg("Failed to set stop boundary from version beacon. ")
+	}
+	return nil
+}
+
+// getVersionBeaconStopHeight returns the stop height that should be set
+// based on the version beacon
+// error is not expected during normal operation since the version beacon
+// should have been validated when indexing
+func (s *StopControl) getVersionBeaconStopHeight(
+	vb *flow.SealedVersionBeacon,
+) (
+	uint64,
+	bool,
+	error,
+) {
+	// version boundaries are sorted by version
+	for _, boundary := range vb.VersionBoundaries {
+		ver, err := boundary.Semver()
+		if err != nil || ver == nil {
+			// this should never happen as we already validated the version beacon
+			// when indexing it
+			return 0, false, fmt.Errorf("failed to parse semver: %w", err)
+		}
+
+		if s.nodeVersion.LessThan(*ver) {
+			// we need to stop here
+			return boundary.BlockHeight, true, nil
+		}
+	}
+	return 0, false, nil
 }

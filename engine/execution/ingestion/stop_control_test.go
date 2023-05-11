@@ -3,7 +3,9 @@ package ingestion
 import (
 	"context"
 	"fmt"
+	"github.com/coreos/go-semver/semver"
 	"github.com/onflow/flow-go/model/flow"
+	storageMock "github.com/onflow/flow-go/storage/mock"
 	"testing"
 
 	testifyMock "github.com/stretchr/testify/mock"
@@ -233,6 +235,332 @@ func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
 	require.True(t, sc.IsExecutionStopped())
 
 	execState.AssertExpectations(t)
+}
+
+func TestStopControlWithVersionControl(t *testing.T) {
+	t.Run("normal case", func(t *testing.T) {
+		execState := new(mock.ReadOnlyExecutionState)
+		versionBeacons := new(storageMock.VersionBeacons)
+
+		headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
+		headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
+		headerC := unittest.BlockHeaderWithParentFixture(headerB) // 22
+
+		headers := &stopControlMockHeaders{
+			headers: map[uint64]*flow.Header{
+				headerA.Height: headerA,
+				headerB.Height: headerB,
+				headerC.Height: headerC,
+			},
+		}
+
+		sc := NewStopControl(
+			headers,
+			StopControlWithLogger(unittest.Logger()),
+			StopControlWithVersionControl(
+				semver.New("1.0.0"),
+				versionBeacons,
+				false,
+			),
+		)
+
+		// setting this means all finalized blocks are considered already executed
+		execState.
+			On("StateCommitmentByBlockID", testifyMock.Anything, headerC.ParentID).
+			Return(nil, nil)
+
+		versionBeacons.
+			On("Highest", testifyMock.Anything).
+			Return(&flow.SealedVersionBeacon{
+				VersionBeacon: unittest.VersionBeaconFixture(
+					unittest.WithBoundaries(
+						// zero boundary is expected if there
+						// is no boundary set by the contract yet
+						flow.VersionBoundary{
+							BlockHeight: 0,
+							Version:     "0.0.0",
+						}),
+				),
+				SealHeight: headerA.Height,
+			}, nil).Once()
+
+		// finalize first block
+		sc.BlockFinalized(context.TODO(), execState, headerA)
+		require.False(t, sc.IsExecutionStopped())
+		require.Nil(t, sc.GetStop())
+
+		// new version beacon
+		versionBeacons.
+			On("Highest", testifyMock.Anything).
+			Return(&flow.SealedVersionBeacon{
+				VersionBeacon: unittest.VersionBeaconFixture(
+					unittest.WithBoundaries(
+						// zero boundary is expected if there
+						// is no boundary set by the contract yet
+						flow.VersionBoundary{
+							BlockHeight: 0,
+							Version:     "0.0.0",
+						}, flow.VersionBoundary{
+							BlockHeight: 21,
+							Version:     "1.0.0",
+						}),
+				),
+				SealHeight: headerB.Height,
+			}, nil).Once()
+
+		// finalize second block. we are still ok as the node version
+		// is the same as the version beacon one
+		sc.BlockFinalized(context.TODO(), execState, headerB)
+		require.False(t, sc.IsExecutionStopped())
+		require.Nil(t, sc.GetStop())
+
+		// new version beacon
+		versionBeacons.
+			On("Highest", testifyMock.Anything).
+			Return(&flow.SealedVersionBeacon{
+				VersionBeacon: unittest.VersionBeaconFixture(
+					unittest.WithBoundaries(
+						// The previous version is included in the new version beacon
+						flow.VersionBoundary{
+							BlockHeight: 21,
+							Version:     "1.0.0",
+						}, flow.VersionBoundary{
+							BlockHeight: 22,
+							Version:     "2.0.0",
+						}),
+				),
+				SealHeight: headerC.Height,
+			}, nil).Once()
+		sc.BlockFinalized(context.TODO(), execState, headerC)
+		// should be stopped as this is height 22 and height 21 is already considered executed
+		require.True(t, sc.IsExecutionStopped())
+
+		execState.AssertExpectations(t)
+		versionBeacons.AssertExpectations(t)
+	})
+
+	t.Run("version boundary removed", func(t *testing.T) {
+
+		// future version boundaries can be removed
+		// in which case they will be missing from the version beacon
+		execState := new(mock.ReadOnlyExecutionState)
+		versionBeacons := new(storageMock.VersionBeacons)
+
+		headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
+		headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
+		headerC := unittest.BlockHeaderWithParentFixture(headerB) // 22
+
+		headers := &stopControlMockHeaders{
+			headers: map[uint64]*flow.Header{
+				headerA.Height: headerA,
+				headerB.Height: headerB,
+				headerC.Height: headerC,
+			},
+		}
+
+		sc := NewStopControl(
+			headers,
+			StopControlWithLogger(unittest.Logger()),
+			StopControlWithVersionControl(
+				semver.New("1.0.0"),
+				versionBeacons,
+				false,
+			),
+		)
+
+		versionBeacons.
+			On("Highest", testifyMock.Anything).
+			Return(&flow.SealedVersionBeacon{
+				VersionBeacon: unittest.VersionBeaconFixture(
+					unittest.WithBoundaries(
+						// set to stop at height 21
+						flow.VersionBoundary{
+							BlockHeight: 0,
+							Version:     "0.0.0",
+						}, flow.VersionBoundary{
+							BlockHeight: 21,
+							Version:     "2.0.0",
+						}),
+				),
+				SealHeight: headerA.Height,
+			}, nil).Once()
+
+		// finalize first block
+		sc.BlockFinalized(context.TODO(), execState, headerA)
+		require.False(t, sc.IsExecutionStopped())
+		require.Equal(t, &StopParameters{
+			StopHeight:  21,
+			ShouldCrash: false,
+		}, sc.GetStop())
+
+		// new version beacon
+		versionBeacons.
+			On("Highest", testifyMock.Anything).
+			Return(&flow.SealedVersionBeacon{
+				VersionBeacon: unittest.VersionBeaconFixture(
+					unittest.WithBoundaries(
+						// stop removed
+						flow.VersionBoundary{
+							BlockHeight: 0,
+							Version:     "0.0.0",
+						}),
+				),
+				SealHeight: headerB.Height,
+			}, nil).Once()
+
+		// finalize second block. we are still ok as the node version
+		// is the same as the version beacon one
+		sc.BlockFinalized(context.TODO(), execState, headerB)
+		require.False(t, sc.IsExecutionStopped())
+		require.Nil(t, sc.GetStop())
+
+		versionBeacons.AssertExpectations(t)
+	})
+
+	t.Run("manual not cleared by version beacon", func(t *testing.T) {
+		// future version boundaries can be removed
+		// in which case they will be missing from the version beacon
+		execState := new(mock.ReadOnlyExecutionState)
+		versionBeacons := new(storageMock.VersionBeacons)
+
+		headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
+		headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
+		headerC := unittest.BlockHeaderWithParentFixture(headerB) // 22
+
+		headers := &stopControlMockHeaders{
+			headers: map[uint64]*flow.Header{
+				headerA.Height: headerA,
+				headerB.Height: headerB,
+				headerC.Height: headerC,
+			},
+		}
+
+		sc := NewStopControl(
+			headers,
+			StopControlWithLogger(unittest.Logger()),
+			StopControlWithVersionControl(
+				semver.New("1.0.0"),
+				versionBeacons,
+				false,
+			),
+		)
+
+		versionBeacons.
+			On("Highest", testifyMock.Anything).
+			Return(&flow.SealedVersionBeacon{
+				VersionBeacon: unittest.VersionBeaconFixture(
+					unittest.WithBoundaries(
+						// set to stop at height 21
+						flow.VersionBoundary{
+							BlockHeight: 0,
+							Version:     "0.0.0",
+						}),
+				),
+				SealHeight: headerA.Height,
+			}, nil).Once()
+
+		// finalize first block
+		sc.BlockFinalized(context.TODO(), execState, headerA)
+		require.False(t, sc.IsExecutionStopped())
+		require.Nil(t, sc.GetStop())
+
+		// set manual stop
+		stop := StopParameters{
+			StopHeight:  22,
+			ShouldCrash: false,
+		}
+		err := sc.SetStop(stop)
+		require.NoError(t, err)
+		require.Equal(t, &stop, sc.GetStop())
+
+		// new version beacon
+		versionBeacons.
+			On("Highest", testifyMock.Anything).
+			Return(&flow.SealedVersionBeacon{
+				VersionBeacon: unittest.VersionBeaconFixture(
+					unittest.WithBoundaries(
+						// stop removed
+						flow.VersionBoundary{
+							BlockHeight: 0,
+							Version:     "0.0.0",
+						}),
+				),
+				SealHeight: headerB.Height,
+			}, nil).Once()
+
+		sc.BlockFinalized(context.TODO(), execState, headerB)
+		require.False(t, sc.IsExecutionStopped())
+		// stop is not cleared due to being set manually
+		require.Equal(t, &stop, sc.GetStop())
+
+		versionBeacons.AssertExpectations(t)
+	})
+
+	t.Run("version beacon not cleared by manual", func(t *testing.T) {
+		// future version boundaries can be removed
+		// in which case they will be missing from the version beacon
+		execState := new(mock.ReadOnlyExecutionState)
+		versionBeacons := new(storageMock.VersionBeacons)
+
+		headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
+		headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
+
+		headers := &stopControlMockHeaders{
+			headers: map[uint64]*flow.Header{
+				headerA.Height: headerA,
+				headerB.Height: headerB,
+			},
+		}
+
+		sc := NewStopControl(
+			headers,
+			StopControlWithLogger(unittest.Logger()),
+			StopControlWithVersionControl(
+				semver.New("1.0.0"),
+				versionBeacons,
+				false,
+			),
+		)
+
+		vbStop := StopParameters{
+			StopHeight:  22,
+			ShouldCrash: false,
+		}
+		versionBeacons.
+			On("Highest", testifyMock.Anything).
+			Return(&flow.SealedVersionBeacon{
+				VersionBeacon: unittest.VersionBeaconFixture(
+					unittest.WithBoundaries(
+						// set to stop at height 21
+						flow.VersionBoundary{
+							BlockHeight: 0,
+							Version:     "0.0.0",
+						}, flow.VersionBoundary{
+							BlockHeight: vbStop.StopHeight,
+							Version:     "2.0.0",
+						}),
+				),
+				SealHeight: headerA.Height,
+			}, nil).Once()
+
+		// finalize first block
+		sc.BlockFinalized(context.TODO(), execState, headerA)
+		require.False(t, sc.IsExecutionStopped())
+		require.Equal(t, &vbStop, sc.GetStop())
+
+		// set manual stop
+
+		stop := StopParameters{
+			StopHeight:  23,
+			ShouldCrash: false,
+		}
+		err := sc.SetStop(stop)
+		require.Error(t, err)
+		// stop is not cleared due to being set earlier by a version beacon
+		require.Equal(t, &vbStop, sc.GetStop())
+
+		versionBeacons.AssertExpectations(t)
+	})
 }
 
 // StopControl created as stopped will keep the state
