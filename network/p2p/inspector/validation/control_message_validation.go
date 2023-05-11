@@ -403,6 +403,11 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 				return err
 			}
 		}
+	default:
+		// sanity check
+		// This should never happen validateTopics is only used to validate GRAFT and PRUNE control message types
+		// if any other control message type is encountered here this indicates invalid state irrecoverable error.
+		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics expected %s or %s got %s", p2p.CtrlMsgGraft, p2p.CtrlMsgPrune, ctrlMsgType))
 	}
 	return nil
 }
@@ -422,6 +427,11 @@ func (c *ControlMsgValidationInspector) validateTopicsSample(ctrlMsgType p2p.Con
 				return NewInvalidTopicErr(topic, sampleSize, err)
 			}
 		}
+	default:
+		// sanity check
+		// This should never happen validateTopicsSample is only used to validate IHAVE control message types
+		// if any other control message type is encountered here this indicates invalid state irrecoverable error.
+		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics sample expected %s got %s", p2p.CtrlMsgIHave, ctrlMsgType))
 	}
 	return nil
 }
