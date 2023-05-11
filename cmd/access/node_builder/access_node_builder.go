@@ -967,7 +967,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, err
 			}
-			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnBlockFinalized)
+			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 
 			return builder.RpcEng, nil
 		}).

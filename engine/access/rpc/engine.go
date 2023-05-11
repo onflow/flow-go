@@ -258,10 +258,10 @@ func (e *Engine) shutdown() {
 	}
 }
 
-// OnBlockFinalized responds to block finalization events.
-func (e *Engine) OnBlockFinalized(block *model.Block) {
-	e.finalizedHeaderCacheActor.OnBlockFinalized(block)
-	e.backendNotifierActor.OnBlockFinalized(block)
+// OnFinalizedBlock responds to block finalization events.
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	e.finalizedHeaderCacheActor.OnFinalizedBlock(block)
+	e.backendNotifierActor.OnFinalizedBlock(block)
 }
 
 // notifyBackendOnBlockFinalized is invoked by the FinalizationActor when a new block is finalized.
