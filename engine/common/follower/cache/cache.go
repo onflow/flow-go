@@ -319,11 +319,10 @@ func (c *Cache) cache(blockID flow.Identifier, block *flow.Block) (equivocation 
 	// in which case also this node needs to process the block to continue following consensus.
 
 	// block is not a duplicate: store in the underlying HeroCache and add it to secondary indices
-	added := c.backend.Add(blockID, block)
-	if !added { // future proofing code: we allow an overflowing HeroCache to potentially eject the newly added element.
+	stored = c.backend.Add(blockID, block)
+	if !stored { // future proofing code: we allow an overflowing HeroCache to potentially eject the newly added element.
 		return
 	}
-	stored = true
 
 	// populate `byView` index
 	if !haveCachedBlocksAtView {
