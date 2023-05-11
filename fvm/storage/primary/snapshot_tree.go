@@ -3,7 +3,6 @@ package primary
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 )
@@ -18,7 +17,7 @@ type timestampedSnapshotTree struct {
 }
 
 func newTimestampedSnapshotTree(
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 	snapshotTime logical.Time,
 ) timestampedSnapshotTree {
 	return timestampedSnapshotTree{
@@ -30,7 +29,7 @@ func newTimestampedSnapshotTree(
 }
 
 func (tree timestampedSnapshotTree) Append(
-	executionSnapshot *state.ExecutionSnapshot,
+	executionSnapshot *snapshot.ExecutionSnapshot,
 ) timestampedSnapshotTree {
 	return timestampedSnapshotTree{
 		currentSnapshotTime: tree.currentSnapshotTime + 1,

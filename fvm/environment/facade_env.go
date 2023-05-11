@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
@@ -78,6 +77,7 @@ func newFacadeEnvironment(
 		UnsafeRandomGenerator: NewUnsafeRandomGenerator(
 			tracer,
 			params.BlockHeader,
+			params.TxIndex,
 		),
 		CryptoLibrary: NewCryptoLibrary(tracer, meter),
 
@@ -146,21 +146,13 @@ func NewScriptEnvironmentFromStorageSnapshot(
 	params EnvironmentParams,
 	storageSnapshot snapshot.StorageSnapshot,
 ) *facadeEnvironment {
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
-	derivedTxn := derivedBlockData.NewSnapshotReadDerivedTransactionData()
-
-	txn := storage.SerialTransaction{
-		NestedTransactionPreparer: state.NewTransactionState(
-			storageSnapshot,
-			state.DefaultParameters()),
-		DerivedTransactionData: derivedTxn,
-	}
+	blockDatabase := storage.NewBlockDatabase(storageSnapshot, 0, nil)
 
 	return NewScriptEnv(
 		context.Background(),
 		tracing.NewTracerSpan(),
 		params,
-		txn)
+		blockDatabase.NewSnapshotReadTransaction(state.DefaultParameters()))
 }
 
 func NewScriptEnv(

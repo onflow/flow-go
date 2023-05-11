@@ -13,7 +13,7 @@ type GossipSubInvalidControlMessageNotificationConsumer struct {
 }
 
 // OnInvalidControlMessageNotification provides a mock function with given fields: _a0
-func (_m *GossipSubInvalidControlMessageNotificationConsumer) OnInvalidControlMessageNotification(_a0 *p2p.InvalidControlMessageNotification) {
+func (_m *GossipSubInvalidControlMessageNotificationConsumer) OnInvalidControlMessageNotification(_a0 *p2p.InvCtrlMsgNotif) {
 	_m.Called(_a0)
 }
 

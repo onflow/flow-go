@@ -81,10 +81,9 @@ const (
 	ResourceEpochSetup                                       = "epoch_setup"
 	ResourceEpochCommit                                      = "epoch_commit"
 	ResourceEpochStatus                                      = "epoch_status"
-	ResourceNetworkingReceiveCache                           = "networking_received_message"        // networking layer
-	ResourcePublicNetworkingReceiveCache                     = "public_networking_received_message" // networking layer
-	ResourceNetworkingDnsIpCache                             = "networking_dns_ip_cache"            // networking layer
-	ResourceNetworkingDnsTxtCache                            = "networking_dns_txt_cache"           // networking layer
+	ResourceNetworkingReceiveCache                           = "networking_received_message" // networking layer
+	ResourceNetworkingDnsIpCache                             = "networking_dns_ip_cache"     // networking layer
+	ResourceNetworkingDnsTxtCache                            = "networking_dns_txt_cache"    // networking layer
 	ResourceNetworkingDisallowListNotificationQueue          = "networking_disallow_list_notification_queue"
 	ResourceNetworkingRpcInspectorNotificationQueue          = "networking_rpc_inspector_notification_queue"
 	ResourceNetworkingRpcValidationInspectorQueue            = "networking_rpc_validation_inspector_queue"
@@ -96,6 +95,7 @@ const (
 	ResourceClusterBlockProposalQueue  = "cluster_compliance_proposal_queue" // collection node, compliance engine
 	ResourceTransactionIngestQueue     = "ingest_transaction_queue"          // collection node, ingest engine
 	ResourceBeaconKey                  = "beacon-key"                        // consensus node, DKG engine
+	ResourceDKGMessage                 = "dkg_private_message"               // consensus, DKG messaging engine
 	ResourceApprovalQueue              = "sealing_approval_queue"            // consensus node, sealing engine
 	ResourceReceiptQueue               = "sealing_receipt_queue"             // consensus node, sealing engine
 	ResourceApprovalResponseQueue      = "sealing_approval_response_queue"   // consensus node, sealing engine

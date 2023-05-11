@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
@@ -249,10 +248,6 @@ func (b *BootstrapProcedure) NewExecutor(
 	txnState storage.TransactionPreparer,
 ) ProcedureExecutor {
 	return newBootstrapExecutor(b.BootstrapParams, ctx, txnState)
-}
-
-func (BootstrapProcedure) SetOutput(output ProcedureOutput) {
-	// do nothing
 }
 
 func (proc *BootstrapProcedure) ComputationLimit(_ Context) uint64 {
@@ -926,21 +921,8 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 		WithComputationLimit(math.MaxUint64),
 	)
 
-	// use new derived transaction data for each meta transaction.
-	// It's not necessary to cache during bootstrapping and most transactions are contract deploys anyway.
-	prog, err := derived.NewEmptyDerivedBlockData().
-		NewDerivedTransactionData(0, 0)
+	executor := tx.NewExecutor(ctx, b.txnState)
+	err := Run(executor)
 
-	if err != nil {
-		return nil, err
-	}
-
-	txn := &storage.SerialTransaction{
-		NestedTransactionPreparer: b.txnState,
-		DerivedTransactionData:    prog,
-	}
-
-	err = Run(tx.NewExecutor(ctx, txn))
-
-	return tx.Err, err
+	return executor.Output().Err, err
 }
