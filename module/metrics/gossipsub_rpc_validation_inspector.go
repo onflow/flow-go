@@ -59,8 +59,8 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 	return gc
 }
 
-// PreProcessingStarted increments the metric tracking the number of messages being pre-processed by the rpc validation inspector.
-func (c *GossipSubRpcValidationInspectorMetrics) PreProcessingStarted(msgType string, sampleSize uint) {
+// BlockingPreProcessingStarted increments the metric tracking the number of messages being pre-processed by the rpc validation inspector.
+func (c *GossipSubRpcValidationInspectorMetrics) BlockingPreProcessingStarted(msgType string, sampleSize uint) {
 	c.rpcCtrlMsgInBlockingPreProcessingGauge.WithLabelValues(msgType).Add(float64(sampleSize))
 }
 

@@ -151,8 +151,8 @@ type GossipSubScoringMetrics interface {
 
 // GossipSubRpcValidationInspectorMetrics encapsulates the metrics collectors for the gossipsub rpc validation control message inspectors.
 type GossipSubRpcValidationInspectorMetrics interface {
-	// PreProcessingStarted increments the metric tracking the number of messages being pre-processed by the rpc validation inspector.
-	PreProcessingStarted(msgType string, sampleSize uint)
+	// BlockingPreProcessingStarted increments the metric tracking the number of messages being pre-processed by the rpc validation inspector.
+	BlockingPreProcessingStarted(msgType string, sampleSize uint)
 	// PreProcessingFinished tracks the time spent by the rpc validation inspector to pre-process a message and decrements the metric tracking
 	// the number of messages being pre-processed by the rpc validation inspector.
 	PreProcessingFinished(msgType string, sampleSize uint, duration time.Duration)

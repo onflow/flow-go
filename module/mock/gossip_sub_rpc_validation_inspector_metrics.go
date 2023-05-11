@@ -23,14 +23,14 @@ func (_m *GossipSubRpcValidationInspectorMetrics) AsyncProcessingStarted(msgType
 	_m.Called(msgType)
 }
 
+// BlockingPreProcessingStarted provides a mock function with given fields: msgType, sampleSize
+func (_m *GossipSubRpcValidationInspectorMetrics) BlockingPreProcessingStarted(msgType string, sampleSize uint) {
+	_m.Called(msgType, sampleSize)
+}
+
 // PreProcessingFinished provides a mock function with given fields: msgType, sampleSize, duration
 func (_m *GossipSubRpcValidationInspectorMetrics) PreProcessingFinished(msgType string, sampleSize uint, duration time.Duration) {
 	_m.Called(msgType, sampleSize, duration)
-}
-
-// PreProcessingStarted provides a mock function with given fields: msgType, sampleSize
-func (_m *GossipSubRpcValidationInspectorMetrics) PreProcessingStarted(msgType string, sampleSize uint) {
-	_m.Called(msgType, sampleSize)
 }
 
 type mockConstructorTestingTNewGossipSubRpcValidationInspectorMetrics interface {

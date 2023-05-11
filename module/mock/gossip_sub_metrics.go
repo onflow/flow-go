@@ -24,6 +24,11 @@ func (_m *GossipSubMetrics) AsyncProcessingStarted(msgType string) {
 	_m.Called(msgType)
 }
 
+// BlockingPreProcessingStarted provides a mock function with given fields: msgType, sampleSize
+func (_m *GossipSubMetrics) BlockingPreProcessingStarted(msgType string, sampleSize uint) {
+	_m.Called(msgType, sampleSize)
+}
+
 // OnAppSpecificScoreUpdated provides a mock function with given fields: _a0
 func (_m *GossipSubMetrics) OnAppSpecificScoreUpdated(_a0 float64) {
 	_m.Called(_a0)
@@ -112,11 +117,6 @@ func (_m *GossipSubMetrics) OnTimeInMeshUpdated(_a0 channels.Topic, _a1 time.Dur
 // PreProcessingFinished provides a mock function with given fields: msgType, sampleSize, duration
 func (_m *GossipSubMetrics) PreProcessingFinished(msgType string, sampleSize uint, duration time.Duration) {
 	_m.Called(msgType, sampleSize, duration)
-}
-
-// PreProcessingStarted provides a mock function with given fields: msgType, sampleSize
-func (_m *GossipSubMetrics) PreProcessingStarted(msgType string, sampleSize uint) {
-	_m.Called(msgType, sampleSize)
 }
 
 // SetWarningStateCount provides a mock function with given fields: _a0

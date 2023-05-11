@@ -290,7 +290,7 @@ func (nc *NoopCollector) OnIPColocationFactorUpdated(f float64)                 
 func (nc *NoopCollector) OnAppSpecificScoreUpdated(f float64)                              {}
 func (nc *NoopCollector) OnOverallPeerScoreUpdated(f float64)                              {}
 
-func (nc *NoopCollector) PreProcessingStarted(string, uint)                 {}
+func (nc *NoopCollector) BlockingPreProcessingStarted(string, uint)         {}
 func (nc *NoopCollector) PreProcessingFinished(string, uint, time.Duration) {}
 func (nc *NoopCollector) AsyncProcessingStarted(string)                     {}
 func (nc *NoopCollector) AsyncProcessingFinished(string, time.Duration)     {}

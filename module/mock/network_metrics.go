@@ -100,6 +100,11 @@ func (_m *NetworkMetrics) BlockStream(p peer.ID, dir network.Direction) {
 	_m.Called(p, dir)
 }
 
+// BlockingPreProcessingStarted provides a mock function with given fields: msgType, sampleSize
+func (_m *NetworkMetrics) BlockingPreProcessingStarted(msgType string, sampleSize uint) {
+	_m.Called(msgType, sampleSize)
+}
+
 // DNSLookupDuration provides a mock function with given fields: duration
 func (_m *NetworkMetrics) DNSLookupDuration(duration time.Duration) {
 	_m.Called(duration)
@@ -303,11 +308,6 @@ func (_m *NetworkMetrics) OutboundMessageSent(sizeBytes int, topic string, _a2 s
 // PreProcessingFinished provides a mock function with given fields: msgType, sampleSize, duration
 func (_m *NetworkMetrics) PreProcessingFinished(msgType string, sampleSize uint, duration time.Duration) {
 	_m.Called(msgType, sampleSize, duration)
-}
-
-// PreProcessingStarted provides a mock function with given fields: msgType, sampleSize
-func (_m *NetworkMetrics) PreProcessingStarted(msgType string, sampleSize uint) {
-	_m.Called(msgType, sampleSize)
 }
 
 // QueueDuration provides a mock function with given fields: duration, priority

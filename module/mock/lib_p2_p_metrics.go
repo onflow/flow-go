@@ -100,6 +100,11 @@ func (_m *LibP2PMetrics) BlockStream(p peer.ID, dir network.Direction) {
 	_m.Called(p, dir)
 }
 
+// BlockingPreProcessingStarted provides a mock function with given fields: msgType, sampleSize
+func (_m *LibP2PMetrics) BlockingPreProcessingStarted(msgType string, sampleSize uint) {
+	_m.Called(msgType, sampleSize)
+}
+
 // DNSLookupDuration provides a mock function with given fields: duration
 func (_m *LibP2PMetrics) DNSLookupDuration(duration time.Duration) {
 	_m.Called(duration)
@@ -253,11 +258,6 @@ func (_m *LibP2PMetrics) OutboundConnections(connectionCount uint) {
 // PreProcessingFinished provides a mock function with given fields: msgType, sampleSize, duration
 func (_m *LibP2PMetrics) PreProcessingFinished(msgType string, sampleSize uint, duration time.Duration) {
 	_m.Called(msgType, sampleSize, duration)
-}
-
-// PreProcessingStarted provides a mock function with given fields: msgType, sampleSize
-func (_m *LibP2PMetrics) PreProcessingStarted(msgType string, sampleSize uint) {
-	_m.Called(msgType, sampleSize)
 }
 
 // RoutingTablePeerAdded provides a mock function with given fields:
