@@ -200,9 +200,10 @@ func TestValidationInspector_HardThresholdIHave(t *testing.T) {
 	controlMessageCount := int64(1)
 	logger := unittest.Logger()
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
+	mockDistributorReadyDoneAware(distributor)
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
-	distributor.On("DistributeInvalidControlMessageNotification", mockery.Anything).
+	distributor.On("Distribute", mockery.Anything).
 		Once().
 		Run(func(args mockery.Arguments) {
 			count.Inc()
@@ -370,7 +371,7 @@ func TestValidationInspector_InvalidTopicID(t *testing.T) {
 	expectedCount := 12
 	done := make(chan struct{})
 	distributor.On("Distribute", mockery.Anything).
-		Times(8).
+		Times(12).
 		Run(func(args mockery.Arguments) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)

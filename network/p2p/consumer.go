@@ -34,10 +34,6 @@ const (
 	CtrlMsgPrune ControlMessageType = "PRUNE"
 )
 
-func (c ControlMessageType) String() string {
-	return string(c)
-}
-
 // ControlMessageTypes returns list of all libp2p control message types.
 func ControlMessageTypes() []ControlMessageType {
 	return []ControlMessageType{CtrlMsgIHave, CtrlMsgIWant, CtrlMsgGraft, CtrlMsgPrune}
