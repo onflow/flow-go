@@ -102,7 +102,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		chunkConsumer           *chunkconsumer.ChunkConsumer
 		blockConsumer           *blockconsumer.BlockConsumer
 		finalizationDistributor *pubsub.FinalizationDistributor
-		finalizedHeader         *commonsync.FinalizedHeaderCache
 
 		committee    *committees.Consensus
 		followerCore *hotstuff.FollowerLoop     // follower hotstuff logic
@@ -313,15 +312,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			return blockConsumer, nil
 		}).
-		Component("finalized snapshot", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			var err error
-			finalizedHeader, err = commonsync.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
-			if err != nil {
-				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-			}
-
-			return finalizedHeader, nil
-		}).
 		Component("consensus committee", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
@@ -393,7 +383,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
-				finalizedHeader.Get(),
+				node.FinalizedHeader,
 				core,
 				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
@@ -409,10 +399,10 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
+				node.State,
 				node.Storage.Blocks,
 				followerEng,
 				syncCore,
-				finalizedHeader,
 				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {

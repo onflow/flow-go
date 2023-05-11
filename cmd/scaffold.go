@@ -1143,6 +1143,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 	if err != nil {
 		return fmt.Errorf("could not get last finalized block header: %w", err)
 	}
+	fnb.NodeConfig.FinalizedHeader = lastFinalized
 
 	fnb.Logger.Info().
 		Hex("root_block_id", logging.Entity(fnb.RootBlock)).
