@@ -227,10 +227,10 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 		Str("peer_id", from.String()).
 		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
 
-	c.metrics.PreProcessingStarted(validationConfig.ControlMsg.String(), uint(count))
+	c.metrics.BlockingPreProcessingStarted(validationConfig.ControlMsg.String(), uint(count))
 	start := time.Now()
 	defer func() {
-		c.metrics.PreProcessingFinished(validationConfig.ControlMsg.String(), uint(count), time.Since(start))
+		c.metrics.BlockingPreProcessingFinished(validationConfig.ControlMsg.String(), uint(count), time.Since(start))
 	}()
 
 	// if Count greater than hard threshold drop message and penalize
@@ -257,10 +257,10 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 
 // blockingPreprocessingSampleRpc blocking pre-processing of a sample of iHave control messages.
 func (c *ControlMsgValidationInspector) blockingIHaveSamplePreprocessing(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
-	c.metrics.PreProcessingStarted(p2p.CtrlMsgIHave.String(), sampleSize)
+	c.metrics.BlockingPreProcessingStarted(p2p.CtrlMsgIHave.String(), sampleSize)
 	start := time.Now()
 	defer func() {
-		c.metrics.PreProcessingFinished(p2p.CtrlMsgIHave.String(), sampleSize, time.Since(start))
+		c.metrics.BlockingPreProcessingFinished(p2p.CtrlMsgIHave.String(), sampleSize, time.Since(start))
 	}()
 
 	err := c.blockingPreprocessingSampleRpc(from, validationConfig, controlMessage, sampleSize)

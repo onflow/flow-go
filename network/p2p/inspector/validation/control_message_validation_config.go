@@ -17,22 +17,18 @@ const (
 	SafetyThresholdMapKey = "safetythreshold"
 	// RateLimitMapKey key used to set the rate limit config limit.
 	RateLimitMapKey = "ratelimit"
-	// DefaultGraftHardThreshold upper bound for graft messages, RPC control messages with a count
-	// above the hard threshold are automatically discarded.
+	// DefaultGraftHardThreshold upper bound for graft messages, if the RPC control message GRAFTs exceed this threshold  the RPC control message automatically discarded.
 	DefaultGraftHardThreshold = 30
-	// DefaultGraftSafetyThreshold a lower bound for graft messages, RPC control messages with a message count
-	// lower than the safety threshold bypass validation.
+	// DefaultGraftSafetyThreshold a lower bound for graft messages, if the amount of GRAFTs in an RPC control message is below this threshold those GRAFTs validation will be bypassed.
 	DefaultGraftSafetyThreshold = .5 * DefaultGraftHardThreshold
 	// DefaultGraftRateLimit the rate limit for graft control messages.
 	// Currently, the default rate limit is equal to the hard threshold amount.
 	// This will result in a rate limit of 30 grafts/sec.
 	DefaultGraftRateLimit = DefaultGraftHardThreshold
 
-	// DefaultPruneHardThreshold upper bound for prune messages, RPC control messages with a count
-	// above the hard threshold are automatically discarded.
+	// DefaultPruneHardThreshold upper bound for prune messages, if the RPC control message PRUNEs exceed this threshold  the RPC control message automatically discarded.
 	DefaultPruneHardThreshold = 30
-	// DefaultPruneSafetyThreshold a lower bound for prune messages, RPC control messages with a message count
-	// lower than the safety threshold bypass validation.
+	// DefaultPruneSafetyThreshold a lower bound for prune messages, if the amount of PRUNEs in an RPC control message is below this threshold those GRAFTs validation will be bypassed.
 	DefaultPruneSafetyThreshold = .5 * DefaultPruneHardThreshold
 	// DefaultPruneRateLimit the rate limit for prune control messages.
 	// Currently, the default rate limit is equal to the hard threshold amount.
@@ -44,8 +40,7 @@ const (
 	// ensures liveness of the network because there is no expected max number of ihave messages than can be
 	// received by a node.
 	DefaultIHaveHardThreshold = 100
-	// DefaultIHaveSafetyThreshold a lower bound for ihave messages, RPC control messages with a message count
-	// lower than the safety threshold bypass validation.
+	// DefaultIHaveSafetyThreshold a lower bound for ihave messages, if the amount of iHaves in an RPC control message is below this threshold those GRAFTs validation will be bypassed.
 	DefaultIHaveSafetyThreshold = .5 * DefaultIHaveHardThreshold
 	// DefaultIHaveRateLimit rate limiting for ihave control messages is disabled.
 	DefaultIHaveRateLimit = 0
@@ -82,17 +77,23 @@ type CtrlMsgValidationConfigOption func(*CtrlMsgValidationConfig)
 type CtrlMsgValidationConfig struct {
 	// ControlMsg the type of RPC control message.
 	ControlMsg p2p.ControlMessageType
-	// HardThreshold indicates the hard limit for size of the RPC control message
-	// any RPC messages with size > HardThreshold should be dropped.
+	// HardThreshold specifies the hard limit for the size of an RPC control message.
+	// While it is generally expected that RPC messages with a size greater than HardThreshold should be dropped,
+	// there are exceptions. For instance, if the message is an 'iHave', blocking processing is performed
+	// on a sample of the control message rather than dropping it.
 	HardThreshold uint64
-	// SafetyThreshold lower limit for the size of the RPC control message, any RPC messages
-	// with a size < SafetyThreshold can skip validation step to avoid resource wasting.
+	// SafetyThreshold specifies the lower limit for the size of the RPC control message, it is safe to skip validation for any RPC messages
+	// with a size < SafetyThreshold. These messages will be processed as soon as possible.
 	SafetyThreshold uint64
-	// IHaveSyncInspectSampleSizePercentage the percentage of topics to sample for sync pre-processing in float64 form.
+	// IHaveSyncInspectSampleSizePercentage the percentage of topics to sample for synchronous pre-processing of 'iHave' control messages. 'iHave' control messages
+	// don't have an upper bound on the amount of 'iHaves' expected from a peer during normal operation. Due to this fact it is important to validate a sample percentage
+	// of 'iHave' messages to ensure liveness of the network.
 	IHaveSyncInspectSampleSizePercentage float64
-	// IHaveAsyncInspectSampleSizePercentage  the percentage of topics to sample for async pre-processing in float64 form.
+	// IHaveAsyncInspectSampleSizePercentage  the percentage of topics to sample for asynchronous processing of 'iHave' control messages. 'iHave' control messages
+	// don't have an upper bound on the amount of 'iHaves' expected from a peer during normal operation. Due to this fact it is important to validate a sample percentage
+	// of 'iHave' messages to ensure liveness of the network.
 	IHaveAsyncInspectSampleSizePercentage float64
-	// IHaveInspectionMaxSampleSize the max number of ihave messages in a sample to be inspected.
+	// IHaveInspectionMaxSampleSize the maximum size of the sample set of 'iHave' messages that will be validated.
 	IHaveInspectionMaxSampleSize float64
 	// RateLimiter basic limiter without lockout duration.
 	RateLimiter p2p.BasicRateLimiter
