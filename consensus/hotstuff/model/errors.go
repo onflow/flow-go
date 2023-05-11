@@ -163,13 +163,52 @@ func (e InvalidTCError) Unwrap() error {
 	return e.Err
 }
 
+// InvalidProposalError indicates that the proposal is invalid
+type InvalidProposalError struct {
+	InvalidProposal *Proposal
+	Err             error
+}
+
+func NewInvalidProposalErrorf(proposal *Proposal, msg string, args ...interface{}) error {
+	return InvalidProposalError{
+		InvalidProposal: proposal,
+		Err:             fmt.Errorf(msg, args...),
+	}
+}
+
+func (e InvalidProposalError) Error() string {
+	return fmt.Sprintf(
+		"invalid proposal %x at view %d: %s",
+		e.InvalidProposal.Block.BlockID,
+		e.InvalidProposal.Block.View,
+		e.Err.Error(),
+	)
+}
+
+// IsInvalidProposalError returns whether an error is InvalidProposalError
+func IsInvalidProposalError(err error) bool {
+	var e InvalidProposalError
+	return errors.As(err, &e)
+}
+
+// AsInvalidProposalError determines whether the given error is a InvalidProposalError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsInvalidProposalError(err error) (*InvalidProposalError, bool) {
+	var e InvalidProposalError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
+	}
+	return nil, false
+}
+
 // InvalidBlockError indicates that the block is invalid
 type InvalidBlockError struct {
-	InvalidBlock *Proposal
+	InvalidBlock *Block
 	Err          error
 }
 
-func NewInvalidBlockErrorf(block *Proposal, msg string, args ...interface{}) error {
+func NewInvalidBlockErrorf(block *Block, msg string, args ...interface{}) error {
 	return InvalidBlockError{
 		InvalidBlock: block,
 		Err:          fmt.Errorf(msg, args...),
@@ -179,8 +218,8 @@ func NewInvalidBlockErrorf(block *Proposal, msg string, args ...interface{}) err
 func (e InvalidBlockError) Error() string {
 	return fmt.Sprintf(
 		"invalid block %x at view %d: %s",
-		e.InvalidBlock.Block.BlockID,
-		e.InvalidBlock.Block.View,
+		e.InvalidBlock.BlockID,
+		e.InvalidBlock.View,
 		e.Err.Error(),
 	)
 }
@@ -191,7 +230,7 @@ func IsInvalidBlockError(err error) bool {
 	return errors.As(err, &e)
 }
 
-// AsInvalidBlockError determines whether the given error is a InvalidBlockError
+// AsInvalidBlockError determines whether the given error is a InvalidProposalError
 // (potentially wrapped). It follows the same semantics as a checked type cast.
 func AsInvalidBlockError(err error) (*InvalidBlockError, bool) {
 	var e InvalidBlockError

@@ -21,8 +21,8 @@ func NewSlashingViolationsConsumer(log zerolog.Logger) *SlashingViolationsConsum
 		log: log,
 	}
 }
-func (c *SlashingViolationsConsumer) OnInvalidBlockDetected(err model.InvalidBlockError) {
-	block := err.InvalidBlock.Block
+func (c *SlashingViolationsConsumer) OnInvalidBlockDetected(err model.InvalidProposalError) {
+	block := err.InvalidProposal.Block
 	c.log.Warn().
 		Bool(logging.KeySuspicious, true).
 		Hex("proposer_id", block.ProposerID[:]).

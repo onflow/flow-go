@@ -18,7 +18,7 @@ func (_m *ProposalViolationConsumer) OnDoubleProposeDetected(_a0 *model.Block, _
 }
 
 // OnInvalidBlockDetected provides a mock function with given fields: err
-func (_m *ProposalViolationConsumer) OnInvalidBlockDetected(err model.InvalidBlockError) {
+func (_m *ProposalViolationConsumer) OnInvalidBlockDetected(err model.InvalidProposalError) {
 	_m.Called(err)
 }
 

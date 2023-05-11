@@ -284,11 +284,11 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	cs.Run("invalid block error", func() {
 		// the block fails HotStuff validation
 		*cs.validator = *hotstuff.NewValidator(cs.T())
-		sentinelError := model.NewInvalidBlockErrorf(hotstuffProposal, "")
+		sentinelError := model.NewInvalidProposalErrorf(hotstuffProposal, "")
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(sentinelError)
 		cs.proposalViolationNotifier.On("OnInvalidBlockDetected", sentinelError).Return().Once()
 		// we should notify VoteAggregator about the invalid block
-		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
+		cs.voteAggregator.On("InvalidProposal", hotstuffProposal).Return(nil)
 
 		// the expected error should be handled within the Core
 		err := cs.core.OnBlockProposal(originID, proposal)
@@ -361,7 +361,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		cs.state.On("Final").Return(func() clusterint.Snapshot { return cs.snapshot })
 		cs.state.On("Extend", mock.Anything).Return(state.NewInvalidExtensionError(""))
 		// we should notify VoteAggregator about the invalid block
-		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
+		cs.voteAggregator.On("InvalidProposal", hotstuffProposal).Return(nil)
 
 		// the expected error should be handled within the Core
 		err := cs.core.OnBlockProposal(originID, proposal)

@@ -28,7 +28,7 @@ func (_m *FollowerConsumer) OnFinalizedBlock(_a0 *model.Block) {
 }
 
 // OnInvalidBlockDetected provides a mock function with given fields: err
-func (_m *FollowerConsumer) OnInvalidBlockDetected(err model.InvalidBlockError) {
+func (_m *FollowerConsumer) OnInvalidBlockDetected(err model.InvalidProposalError) {
 	_m.Called(err)
 }
 

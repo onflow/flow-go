@@ -136,14 +136,14 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 		// 1. The block has been signed by the legitimate primary for the view. This is important in case
 		//    there are multiple blocks for the view. We need to differentiate the following byzantine cases:
 		//     (i) Some other consensus node that is _not_ primary is trying to publish a block.
-		//         This would result in the validation below failing with an `InvalidBlockError`.
+		//         This would result in the validation below failing with an `InvalidProposalError`.
 		//    (ii) The legitimate primary for the view is equivocating. In this case, the validity check
 		//         below would pass. Though, the `PendingTree` would eventually notice this, when we connect
 		//         the equivocating blocks to the latest finalized block.
 		// 2. The QC within the block is valid. A valid QC proves validity of all ancestors.
 		err := c.validator.ValidateProposal(hotstuffProposal)
 		if err != nil {
-			if invalidBlockError, ok := model.AsInvalidBlockError(err); ok {
+			if invalidBlockError, ok := model.AsInvalidProposalError(err); ok {
 				c.proposalViolationNotifier.OnInvalidBlockDetected(*invalidBlockError)
 				return nil
 			}

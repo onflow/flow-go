@@ -246,7 +246,7 @@ func (va *VoteAggregator) processQueuedBlock(block *model.Proposal) error {
 
 	err = collector.ProcessBlock(block)
 	if err != nil {
-		if model.IsInvalidBlockError(err) {
+		if model.IsInvalidProposalError(err) {
 			// We are attempting process a block which is invalid
 			// This should never happen, because any component that feeds blocks into VoteAggregator
 			// needs to make sure that it's submitting for processing ONLY valid blocks.

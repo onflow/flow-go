@@ -28,7 +28,7 @@ func (d *ProposalViolationDistributor) AddProposalViolationConsumer(consumer hot
 	d.consumers = append(d.consumers, consumer)
 }
 
-func (d *ProposalViolationDistributor) OnInvalidBlockDetected(err model.InvalidBlockError) {
+func (d *ProposalViolationDistributor) OnInvalidBlockDetected(err model.InvalidProposalError) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {

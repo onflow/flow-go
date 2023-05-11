@@ -21,7 +21,7 @@ type ProposalViolationConsumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnInvalidBlockDetected(err model.InvalidBlockError)
+	OnInvalidBlockDetected(err model.InvalidProposalError)
 
 	// OnDoubleProposeDetected notifications are produced by the Finalization Logic
 	// whenever a double block proposal (equivocation) was detected.

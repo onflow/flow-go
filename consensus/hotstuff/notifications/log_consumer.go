@@ -46,8 +46,8 @@ func (lc *LogConsumer) OnFinalizedBlock(block *model.Block) {
 		Msg("block finalized")
 }
 
-func (lc *LogConsumer) OnInvalidBlockDetected(err model.InvalidBlockError) {
-	invalidBlock := err.InvalidBlock.Block
+func (lc *LogConsumer) OnInvalidBlockDetected(err model.InvalidProposalError) {
+	invalidBlock := err.InvalidProposal.Block
 	lc.log.Warn().
 		Str(logging.KeySuspicious, "true").
 		Uint64("block_view", invalidBlock.View).

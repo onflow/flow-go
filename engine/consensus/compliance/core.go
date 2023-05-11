@@ -323,7 +323,7 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 	hotstuffProposal := model.ProposalFromFlow(header)
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
-		if invalidBlockErr, ok := model.AsInvalidBlockError(err); ok {
+		if invalidBlockErr, ok := model.AsInvalidProposalError(err); ok {
 			c.proposalViolationNotifier.OnInvalidBlockDetected(*invalidBlockErr)
 			return engine.NewInvalidInputErrorf("invalid block proposal: %w", err)
 		}

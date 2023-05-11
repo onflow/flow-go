@@ -107,7 +107,7 @@ type NoopProposalViolationConsumer struct{}
 
 var _ hotstuff.ProposalViolationConsumer = (*NoopProposalViolationConsumer)(nil)
 
-func (*NoopProposalViolationConsumer) OnInvalidBlockDetected(model.InvalidBlockError) {}
+func (*NoopProposalViolationConsumer) OnInvalidBlockDetected(model.InvalidProposalError) {}
 
 func (*NoopProposalViolationConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
 

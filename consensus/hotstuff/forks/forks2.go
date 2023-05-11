@@ -155,11 +155,7 @@ func (f *Forks) EnsureBlockIsValidExtension(block *model.Block) error {
 	err := f.forest.VerifyVertex(blockContainer)
 	if err != nil {
 		if forest.IsInvalidVertexError(err) {
-			return model.NewInvalidBlockErrorf(&model.Proposal{
-				Block:      block,
-				SigData:    nil,
-				LastViewTC: nil,
-			}, "not a valid vertex for block tree: %w", err)
+			return model.NewInvalidBlockErrorf(block, "not a valid vertex for block tree: %w", err)
 		}
 		return fmt.Errorf("block tree generated unexpected error validating vertex: %w", err)
 	}
