@@ -439,6 +439,7 @@ func main() {
 
 			builderFactory, err := factories.NewBuilderFactory(
 				node.DB,
+				node.State,
 				node.Storage.Headers,
 				node.Tracer,
 				colMetrics,
