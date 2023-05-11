@@ -89,15 +89,13 @@ var (
 )
 
 func setupProgramsTest(t *testing.T) snapshot.SnapshotTree {
-	txnState := storage.SerialTransaction{
-		NestedTransactionPreparer: state.NewTransactionState(
-			nil,
-			state.DefaultParameters()),
-	}
+	blockDatabase := storage.NewBlockDatabase(nil, 0, nil)
+	txnState, err := blockDatabase.NewTransaction(0, state.DefaultParameters())
+	require.NoError(t, err)
 
 	accounts := environment.NewAccounts(txnState)
 
-	err := accounts.Create(nil, addressA)
+	err = accounts.Create(nil, addressA)
 	require.NoError(t, err)
 
 	err = accounts.Create(nil, addressB)
@@ -127,7 +125,7 @@ func getTestContract(
 
 func Test_Programs(t *testing.T) {
 	vm := fvm.NewVirtualMachine()
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
 	mainSnapshot := setupProgramsTest(t)
 
@@ -584,7 +582,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 	snapshotTree := setupProgramsTest(t)
 
 	vm := fvm.NewVirtualMachine()
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
 	metrics := &metricsReporter{}
 	context := fvm.NewContext(

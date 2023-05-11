@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
@@ -40,7 +41,7 @@ type ViewCommitter interface {
 }
 
 type transactionResult struct {
-	transaction
+	transactionRequest
 	*snapshot.ExecutionSnapshot
 	fvm.ProcedureOutput
 }
@@ -74,6 +75,7 @@ type resultCollector struct {
 
 	blockStartTime time.Time
 	blockStats     module.ExecutionResultStats
+	blockMeter     *meter.Meter
 
 	currentCollectionStartTime time.Time
 	currentCollectionState     *state.ExecutionState
@@ -112,6 +114,7 @@ func newResultCollector(
 		consumers:                    consumers,
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
 		blockStartTime:               now,
+		blockMeter:                   meter.NewMeter(meter.DefaultParameters()),
 		currentCollectionStartTime:   now,
 		currentCollectionState:       state.NewExecutionState(nil, state.DefaultParameters()),
 		currentCollectionStats: module.ExecutionResultStats{
@@ -193,6 +196,7 @@ func (collector *resultCollector) commitCollection(
 		collector.currentCollectionStats)
 
 	collector.blockStats.Merge(collector.currentCollectionStats)
+	collector.blockMeter.MergeMeter(collectionExecutionSnapshot.Meter)
 
 	collector.currentCollectionStartTime = time.Now()
 	collector.currentCollectionState = state.NewExecutionState(nil, state.DefaultParameters())
@@ -211,7 +215,7 @@ func (collector *resultCollector) commitCollection(
 }
 
 func (collector *resultCollector) processTransactionResult(
-	txn transaction,
+	txn transactionRequest,
 	txnExecutionSnapshot *snapshot.ExecutionSnapshot,
 	output fvm.ProcedureOutput,
 ) error {
@@ -234,10 +238,6 @@ func (collector *resultCollector) processTransactionResult(
 			txnResult,
 		)
 
-	for computationKind, intensity := range output.ComputationIntensities {
-		collector.result.ComputationIntensities[computationKind] += intensity
-	}
-
 	err := collector.currentCollectionState.Merge(txnExecutionSnapshot)
 	if err != nil {
 		return fmt.Errorf("failed to merge into collection view: %w", err)
@@ -258,14 +258,14 @@ func (collector *resultCollector) processTransactionResult(
 }
 
 func (collector *resultCollector) AddTransactionResult(
-	txn transaction,
+	txn transactionRequest,
 	snapshot *snapshot.ExecutionSnapshot,
 	output fvm.ProcedureOutput,
 ) {
 	result := transactionResult{
-		transaction:       txn,
-		ExecutionSnapshot: snapshot,
-		ProcedureOutput:   output,
+		transactionRequest: txn,
+		ExecutionSnapshot:  snapshot,
+		ProcedureOutput:    output,
 	}
 
 	select {
@@ -281,7 +281,7 @@ func (collector *resultCollector) runResultProcessor() {
 
 	for result := range collector.processorInputChan {
 		err := collector.processTransactionResult(
-			result.transaction,
+			result.transactionRequest,
 			result.ExecutionSnapshot,
 			result.ProcedureOutput)
 		if err != nil {
@@ -340,6 +340,12 @@ func (collector *resultCollector) Finalize(
 	collector.metrics.ExecutionBlockExecuted(
 		time.Since(collector.blockStartTime),
 		collector.blockStats)
+
+	for kind, intensity := range collector.blockMeter.ComputationIntensities() {
+		collector.metrics.ExecutionBlockExecutionEffortVectorComponent(
+			kind.String(),
+			intensity)
+	}
 
 	return collector.result, nil
 }

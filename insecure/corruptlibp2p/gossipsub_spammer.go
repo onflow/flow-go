@@ -21,14 +21,16 @@ import (
 type GossipSubRouterSpammer struct {
 	router      *atomicRouter
 	SpammerNode p2p.LibP2PNode
+	SpammerId   flow.Identity
 }
 
 // NewGossipSubRouterSpammer is the main method tests call for spamming attacks.
 func NewGossipSubRouterSpammer(t *testing.T, sporkId flow.Identifier, role flow.Role) *GossipSubRouterSpammer {
-	spammerNode, router := createSpammerNode(t, sporkId, role)
+	spammerNode, spammerId, router := createSpammerNode(t, sporkId, role)
 	return &GossipSubRouterSpammer{
 		router:      router,
 		SpammerNode: spammerNode,
+		SpammerId:   spammerId,
 	}
 }
 
@@ -61,9 +63,9 @@ func (s *GossipSubRouterSpammer) Start(t *testing.T) {
 	s.router.set(s.router.Get())
 }
 
-func createSpammerNode(t *testing.T, sporkId flow.Identifier, role flow.Role) (p2p.LibP2PNode, *atomicRouter) {
+func createSpammerNode(t *testing.T, sporkId flow.Identifier, role flow.Role) (p2p.LibP2PNode, flow.Identity, *atomicRouter) {
 	router := newAtomicRouter()
-	spammerNode, _ := p2ptest.NodeFixture(
+	spammerNode, spammerId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
@@ -77,7 +79,7 @@ func createSpammerNode(t *testing.T, sporkId flow.Identifier, role flow.Role) (p
 				return nil
 			})),
 	)
-	return spammerNode, router
+	return spammerNode, spammerId, router
 }
 
 // atomicRouter is a wrapper around the corrupt.GossipSubRouter that allows atomic access to the router.

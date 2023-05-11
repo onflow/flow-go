@@ -101,7 +101,6 @@ require (
 require (
 	github.com/coreos/go-semver v0.3.0
 	github.com/slok/go-http-metrics v0.10.0
-	golang.org/x/mod v0.8.0
 	gonum.org/v1/gonum v0.8.2
 )
 
@@ -267,6 +266,7 @@ require (
 	go.uber.org/dig v1.15.0 // indirect
 	go.uber.org/fx v1.18.2 // indirect
 	go.uber.org/zap v1.24.0 // indirect
+	golang.org/x/mod v0.8.0 // indirect
 	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/oauth2 v0.6.0 // indirect
 	golang.org/x/term v0.6.0 // indirect

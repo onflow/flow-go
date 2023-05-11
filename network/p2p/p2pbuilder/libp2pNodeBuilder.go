@@ -24,6 +24,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -74,7 +76,7 @@ func DefaultGossipSubConfig() *GossipSubConfig {
 		PeerScoring:          defaultPeerScoringEnabled,
 		LocalMeshLogInterval: defaultMeshTracerLoggingInterval,
 		ScoreTracerInterval:  defaultGossipSubScoreTracerInterval,
-		RPCInspectors:        make([]p2p.GossipSubRPCInspector, 0),
+		RpcInspector:         inspector.DefaultGossipSubRPCInspectorsConfig(),
 	}
 }
 
@@ -94,14 +96,14 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metrics module.NetworkMetrics,
+	metricsCfg *p2pconfig.MetricsConfig,
 	resolver madns.BasicResolver,
 	role string,
-	connGaterCfg *ConnectionGaterConfig,
-	peerManagerCfg *PeerManagerConfig,
+	connGaterCfg *p2pconfig.ConnectionGaterConfig,
+	peerManagerCfg *p2pconfig.PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
-	uniCfg *UnicastConfig,
+	uniCfg *p2pconfig.UnicastConfig,
 ) p2p.LibP2PFactoryFunc {
 	return func() (p2p.LibP2PNode, error) {
 		builder, err := DefaultNodeBuilder(log,
@@ -109,7 +111,7 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger,
 			flowKey,
 			sporkId,
 			idProvider,
-			metrics,
+			metricsCfg,
 			resolver,
 			role,
 			connGaterCfg,
@@ -143,8 +145,8 @@ type GossipSubConfig struct {
 	ScoreTracerInterval time.Duration
 	// PeerScoring is whether to enable GossipSub peer scoring.
 	PeerScoring bool
-	// RPCInspectors gossipsub RPC control message inspectors
-	RPCInspectors []p2p.GossipSubRPCInspector
+	// RpcInspector configuration for all gossipsub RPC control message inspectors.
+	RpcInspector *inspector.GossipSubRPCInspectorsConfig
 }
 
 func DefaultResourceManagerConfig() *ResourceManagerConfig {
@@ -291,8 +293,8 @@ func (builder *LibP2PNodeBuilder) SetGossipSubScoreTracerInterval(interval time.
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubRPCInspectors(inspectors ...p2p.GossipSubRPCInspector) p2p.NodeBuilder {
-	builder.gossipSubBuilder.SetGossipSubRPCInspectors(inspectors...)
+func (builder *LibP2PNodeBuilder) SetGossipSubRpcInspectorSuite(inspectorSuite p2p.GossipSubInspectorSuite) p2p.NodeBuilder {
+	builder.gossipSubBuilder.SetGossipSubRPCInspectorSuite(inspectorSuite)
 	return builder
 }
 
@@ -390,7 +392,12 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	var peerManager p2p.PeerManager
 	if builder.peerManagerUpdateInterval > 0 {
-		connector, err := connection.NewLibp2pConnector(builder.logger, h, builder.peerManagerEnablePruning)
+		connector, err := connection.NewLibp2pConnector(&connection.ConnectorConfig{
+			PruneConnections:        builder.peerManagerEnablePruning,
+			Logger:                  builder.logger,
+			Host:                    connection.NewConnectorHost(h),
+			BackoffConnectorFactory: connection.DefaultLibp2pBackoffConnectorFactory(h),
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
 		}
@@ -526,16 +533,16 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metrics module.LibP2PMetrics,
+	metricsCfg *p2pconfig.MetricsConfig,
 	resolver madns.BasicResolver,
 	role string,
-	connGaterCfg *ConnectionGaterConfig,
-	peerManagerCfg *PeerManagerConfig,
+	connGaterCfg *p2pconfig.ConnectionGaterConfig,
+	peerManagerCfg *p2pconfig.PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
 	rCfg *ResourceManagerConfig,
-	uniCfg *UnicastConfig) (p2p.NodeBuilder, error) {
+	uniCfg *p2pconfig.UnicastConfig) (p2p.NodeBuilder, error) {
 
-	connManager, err := connection.NewConnManager(log, metrics, connection.DefaultConnManagerConfig())
+	connManager, err := connection.NewConnManager(log, metricsCfg.Metrics, connection.DefaultConnManagerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
@@ -549,25 +556,33 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
-	builder := NewNodeBuilder(log, metrics, address, flowKey, sporkId, rCfg).
+	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, gossipCfg.RpcInspector).
+		SetPublicNetwork(p2p.PrivateNetwork).
+		SetMetrics(metricsCfg).
+		Build()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for default libp2p node: %w", err)
+	}
+
+	builder := NewNodeBuilder(log, metricsCfg.Metrics, address, flowKey, sporkId, rCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
 		SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
-			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), log, metrics, dht.AsServer())
+			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), log, metricsCfg.Metrics, dht.AsServer())
 		}).
 		SetPeerManagerOptions(peerManagerCfg.ConnectionPruning, peerManagerCfg.UpdateInterval).
 		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
 		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor).
-		SetGossipSubRPCInspectors(gossipCfg.RPCInspectors...)
+		SetGossipSubRpcInspectorSuite(rpcInspectorSuite)
 
 	if gossipCfg.PeerScoring {
 		// currently, we only enable peer scoring with default parameters. So, we set the score parameters to nil.
 		builder.EnableGossipSubPeerScoring(idProvider, nil)
 	}
 
-	meshTracer := tracer.NewGossipSubMeshTracer(log, metrics, idProvider, gossipCfg.LocalMeshLogInterval)
+	meshTracer := tracer.NewGossipSubMeshTracer(log, metricsCfg.Metrics, idProvider, gossipCfg.LocalMeshLogInterval)
 	builder.SetGossipSubTracer(meshTracer)
 	builder.SetGossipSubScoreTracerInterval(gossipCfg.ScoreTracerInterval)
 

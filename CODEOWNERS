@@ -48,7 +48,6 @@
 /integration/benchmark/** @SaveTheRbtz @gomisha
 /integration/localnet/** @SaveTheRbtz
 /module/profiler/** @SaveTheRbtz @pattyshack
-/module/trace/** @SaveTheRbtz @pattyshack
 /module/tracer.go @SaveTheRbtz @pattyshack
 
 # Execution Sync
