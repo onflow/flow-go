@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -49,13 +50,20 @@ func NewResponseSender(con network.Conduit) *ResponseSenderImpl {
 	}
 }
 
+// RequestHandlerEngine is an engine which operates only the request-handling portion of the block sync protocol.
+// It is used by Access/Observer nodes attached to the public network, enabling them
+// to provide block synchronization data to nodes on the public network, but not
+// requesting any data from these nodes. (Requests are sent only on the private network.)
 type RequestHandlerEngine struct {
 	component.Component
+	hotstuff.FinalizationConsumer
+
 	requestHandler *RequestHandler
 }
 
 var _ network.MessageProcessor = (*RequestHandlerEngine)(nil)
 var _ component.Component = (*RequestHandlerEngine)(nil)
+var _ hotstuff.FinalizationConsumer = (*RequestHandlerEngine)(nil)
 
 func NewRequestHandlerEngine(
 	logger zerolog.Logger,
@@ -74,6 +82,7 @@ func NewRequestHandlerEngine(
 	}
 
 	finalizedHeaderCache, finalizedCacheWorker, err := events.NewFinalizedHeaderCache(state)
+	e.FinalizationConsumer = finalizedHeaderCache
 	e.requestHandler = NewRequestHandler(
 		logger,
 		metrics,

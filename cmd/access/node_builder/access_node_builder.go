@@ -1032,10 +1032,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Blocks,
 				builder.SyncCore,
 			)
-
 			if err != nil {
 				return nil, fmt.Errorf("could not create public sync request handler: %w", err)
 			}
+			builder.FinalizationDistributor.AddConsumer(syncRequestHandler)
 
 			return syncRequestHandler, nil
 		})

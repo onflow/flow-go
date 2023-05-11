@@ -185,7 +185,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	err := e.process(originID, event)
+	err := e.process(channel, originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
 			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
@@ -200,10 +200,10 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 // Error returns:
 //   - IncompatibleInputTypeError if input has unexpected type
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
-		return e.requestHandler.process(originID, event)
+		return e.requestHandler.Process(channel, originID, event)
 	case *messages.SyncResponse, *messages.BlockResponse:
 		return e.responseMessageHandler.Process(originID, event)
 	default:

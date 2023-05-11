@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -568,9 +567,4 @@ func (ss *SyncSuite) TestProcessUnsupportedMessageType() {
 		// shouldn't result in error since byzantine inputs are expected
 		require.NoError(ss.T(), err)
 	}
-
-	// in case of local processing error cannot be consumed since all inputs are trusted
-	err := ss.e.ProcessLocal(invalidEvent)
-	require.Error(ss.T(), err)
-	require.True(ss.T(), engine.IsIncompatibleInputTypeError(err))
 }
