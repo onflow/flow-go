@@ -407,7 +407,7 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 	return nil
 }
 
-// validateTopicsSample ensures all topics in the specified control message are valid flow topic/channel and no duplicate topics exist.
+// validateTopicsSample samples a subset of topics from the specified control message and ensures the sample contains only valid flow topic/channel and no duplicate topics exist.
 // Sample size ensures liveness of the network when validating messages with no upper bound on the amount of messages that may be received.
 // All errors returned from this function can be considered benign.
 func (c *ControlMsgValidationInspector) validateTopicsSample(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage, sampleSize uint) error {
