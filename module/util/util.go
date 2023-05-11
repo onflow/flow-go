@@ -187,9 +187,17 @@ func DetypeSlice[T any](typedSlice []T) []any {
 	return untypedSlice
 }
 
-// SampleN util func that computes a percentage of the provider number n. If the resulting
-// sample is greater than the provided max then the ceil of max is returned by default. If n
-// is less than or equal to 0 then 0 is returned.
+// SampleN computes a percentage of the given number 'n', and returns the result as an unsigned integer.
+// If the calculated sample is greater than the provided 'max' value, it returns the ceil of 'max'.
+// If 'n' is less than or equal to 0, it returns 0.
+//
+// Parameters:
+// - n: The input number, used as the base to compute the percentage.
+// - max: The maximum value that the computed sample should not exceed.
+// - percentage: The percentage (in range 0.0 to 1.0) to be applied to 'n'.
+//
+// Returns:
+// - The computed sample as an unsigned integer, with consideration to the given constraints.
 func SampleN(n int, max, percentage float64) uint {
 	if n <= 0 {
 		return 0
