@@ -18,7 +18,8 @@ import (
 // StopControl follows states described in StopState
 type StopControl struct {
 	sync.RWMutex
-	log zerolog.Logger
+	log     zerolog.Logger
+	headers StopControlHeaders
 
 	stopBoundary *stopBoundary
 
@@ -44,7 +45,10 @@ type stopBoundary struct {
 	stopAfterExecuting flow.Identifier
 }
 
-// String returns string in the format "crash@20023"
+// String returns string in the format "crash@20023" or "crash@20023@blockID"
+// block ID is only present if stopAfterExecuting is set
+// the ID is from the block that should be executed last and has height one
+// less than StopHeight
 func (s *stopBoundary) String() string {
 	if s == nil {
 		return "none"
@@ -54,10 +58,15 @@ func (s *stopBoundary) String() string {
 	if s.ShouldCrash {
 		sb.WriteString("crash")
 	} else {
-		sb.WriteString("pause")
+		sb.WriteString("stop")
 	}
 	sb.WriteString("@")
 	sb.WriteString(fmt.Sprintf("%d", s.StopHeight))
+
+	if s.stopAfterExecuting != flow.ZeroID {
+		sb.WriteString("@")
+		sb.WriteString(s.stopAfterExecuting.String())
+	}
 
 	return sb.String()
 }
@@ -76,13 +85,21 @@ func StopControlWithStopped() StopControlOption {
 	}
 }
 
+// StopControlHeaders is an interface for fetching headers
+// Its jut a small subset of storage.Headers for comments see storage.Headers
+type StopControlHeaders interface {
+	ByHeight(height uint64) (*flow.Header, error)
+}
+
 // NewStopControl creates new empty NewStopControl
 func NewStopControl(
+	headers StopControlHeaders,
 	options ...StopControlOption,
 ) *StopControl {
 
 	sc := &StopControl{
-		log: zerolog.Nop(),
+		log:     zerolog.Nop(),
+		headers: headers,
 	}
 
 	for _, option := range options {
@@ -185,6 +202,23 @@ func (s *StopControl) BlockProcessable(b *flow.Header) bool {
 }
 
 // BlockFinalized should be called when a block is marked as finalized
+//
+// Once finalization reached stopHeight we can be sure no other fork will be valid at
+// this height, if this block's parent has been executed, we are safe to stop.
+// This will happen during normal execution, where blocks are executed
+// before they are finalized. However, it is possible that EN block computation
+// progress can fall behind. In this case, we want to crash only after the execution
+// reached the stopHeight.
+//
+// TODO: Version Beacons integration:
+// get VB from db index
+// check current node version against VB boundaries to determine when the next
+// stopping height should be. Move stopping height.
+// If stopping height was set manually, only move it if the new height is earlier.
+// Requirements:
+// - inject current protocol version
+// - inject a way to query VB from db index
+// - add a field to know if stopping height was set manually or through VB
 func (s *StopControl) BlockFinalized(
 	ctx context.Context,
 	execState state.ReadOnlyExecutionState,
@@ -197,34 +231,58 @@ func (s *StopControl) BlockFinalized(
 		return
 	}
 
-	// TODO: Version Beacons integration:
-	// get VB from db index
-	// check current node version against VB boundaries to determine when the next
-	// stopping height should be. Move stopping height.
-	// If stopping height was set manually, only move it if the new height is earlier.
-	// Requirements:
-	// - inject current protocol version
-	// - inject a way to query VB from db index
-	// - add a field to know if stopping height was set manually or through VB
-
-	// Once finalization reached stopHeight we can be sure no other fork will be valid at this height,
-	// if this block's parent has been executed, we are safe to stop or shouldCrash.
-	// This will happen during normal execution, where blocks are executed before they are finalized.
-	// However, it is possible that EN block computation progress can fall behind. In this case,
-	// we want to crash only after the execution reached the stopHeight.
-	if h.Height != s.stopBoundary.StopHeight {
+	if s.stopBoundary.stopAfterExecuting != flow.ZeroID {
+		// we already know the ID of the block that should be executed last nothing to do
 		return
 	}
 
+	if h.Height < s.stopBoundary.StopHeight {
+		// we are not at the stop yet, nothing to do
+		return
+	}
+
+	log := s.log.With().
+		Stringer("block_id", h.ID()).
+		Stringer("stop", s.stopBoundary).
+		Logger()
+
+	parentID := h.ParentID
+
+	if h.Height != s.stopBoundary.StopHeight {
+		// we are past the stop. This can happen if stop was set before
+		// last finalized block
+		log.Warn().
+			Uint64("finalization_height", h.Height).
+			Msg("Block finalization already beyond stop.")
+
+		// Let's find the ID of the block that should be executed last
+		// which is the parent of the block at the stopHeight
+		header, err := s.headers.ByHeight(s.stopBoundary.StopHeight - 1)
+		if err != nil {
+			// TODO: handle this error better
+			log.Fatal().
+				Err(err).
+				Msg("failed to get header by height")
+			return
+		}
+		parentID = header.ID()
+	}
+
+	s.stopBoundary.stopAfterExecuting = parentID
+
+	log.Info().
+		Stringer("stop_after_executing", s.stopBoundary.stopAfterExecuting).
+		Msgf("Found ID of the block that should be executed last")
+
+	// check if the parent block has been executed then stop right away
 	executed, err := state.IsBlockExecuted(ctx, execState, h.ParentID)
 	if err != nil {
 		// any error here would indicate unexpected storage error, so we crash the node
 		// TODO: what if the error is due to the node being stopped?
 		// i.e. context cancelled?
 		// do this more gracefully
-		s.log.Fatal().
+		log.Fatal().
 			Err(err).
-			Str("block_id", h.ID().String()).
 			Msg("failed to check if the block has been executed")
 		return
 	}
@@ -234,15 +292,6 @@ func (s *StopControl) BlockFinalized(
 		s.stopExecution()
 		return
 	}
-
-	s.stopBoundary.stopAfterExecuting = h.ParentID
-	s.log.Info().
-		Msgf(
-			"Node scheduled to stop executing"+
-				" after executing block %s at height %d",
-			s.stopBoundary.stopAfterExecuting.String(),
-			h.Height-1,
-		)
 }
 
 // OnBlockExecuted should be called after a block has finished execution
@@ -260,7 +309,7 @@ func (s *StopControl) OnBlockExecuted(h *flow.Header) {
 
 	// double check. Even if requested stopHeight has been changed multiple times,
 	// as long as it matches this block we are safe to terminate
-	if s.stopBoundary != nil && h.Height != s.stopBoundary.StopHeight-1 {
+	if h.Height != s.stopBoundary.StopHeight-1 {
 		s.log.Warn().
 			Msgf(
 				"Inconsistent stopping state. "+

@@ -2,6 +2,8 @@ package ingestion
 
 import (
 	"context"
+	"fmt"
+	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	testifyMock "github.com/stretchr/testify/mock"
@@ -17,7 +19,7 @@ import (
 func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 	t.Run("when processing block at stop height", func(t *testing.T) {
-		sc := NewStopControl(StopControlWithLogger(unittest.Logger()))
+		sc := NewStopControl(nil, StopControlWithLogger(unittest.Logger()))
 
 		require.Nil(t, sc.GetStop())
 
@@ -52,7 +54,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		execState := new(mock.ReadOnlyExecutionState)
 
-		sc := NewStopControl(StopControlWithLogger(unittest.Logger()))
+		sc := NewStopControl(nil, StopControlWithLogger(unittest.Logger()))
 
 		require.Nil(t, sc.GetStop())
 
@@ -99,7 +101,7 @@ func TestExecutionFallingBehind(t *testing.T) {
 	headerC := unittest.BlockHeaderWithParentFixture(headerB) // 22
 	headerD := unittest.BlockHeaderWithParentFixture(headerC) // 23
 
-	sc := NewStopControl(StopControlWithLogger(unittest.Logger()))
+	sc := NewStopControl(nil, StopControlWithLogger(unittest.Logger()))
 
 	// set stop at 22, so 21 is the last height which should be processed
 	stop := StopParameters{StopHeight: 22}
@@ -125,16 +127,124 @@ func TestExecutionFallingBehind(t *testing.T) {
 	execState.AssertExpectations(t)
 }
 
+type stopControlMockHeaders struct {
+	headers map[uint64]*flow.Header
+}
+
+func (m *stopControlMockHeaders) ByHeight(height uint64) (*flow.Header, error) {
+	h, ok := m.headers[height]
+	if !ok {
+		return nil, fmt.Errorf("header not found")
+	}
+	return h, nil
+}
+
+func TestAddStopForPastBlocks(t *testing.T) {
+	execState := new(mock.ReadOnlyExecutionState)
+
+	headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
+	headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
+	headerC := unittest.BlockHeaderWithParentFixture(headerB) // 22
+	headerD := unittest.BlockHeaderWithParentFixture(headerC) // 23
+
+	headers := &stopControlMockHeaders{
+		headers: map[uint64]*flow.Header{
+			headerA.Height: headerA,
+			headerB.Height: headerB,
+			headerC.Height: headerC,
+			headerD.Height: headerD,
+		},
+	}
+
+	sc := NewStopControl(headers, StopControlWithLogger(unittest.Logger()))
+
+	// finalize blocks first
+	sc.BlockFinalized(context.TODO(), execState, headerA)
+	sc.BlockFinalized(context.TODO(), execState, headerB)
+	sc.BlockFinalized(context.TODO(), execState, headerC)
+
+	// simulate execution
+	sc.OnBlockExecuted(headerA)
+	sc.OnBlockExecuted(headerB)
+	sc.OnBlockExecuted(headerC)
+
+	// block is executed
+	execState.
+		On("StateCommitmentByBlockID", testifyMock.Anything, headerD.ParentID).
+		Return(nil, nil)
+
+	// set stop at 22, but finalization and execution is at 23
+	// so stop right away
+	stop := StopParameters{StopHeight: 22}
+	err := sc.SetStop(stop)
+	require.NoError(t, err)
+	require.Equal(t, &stop, sc.GetStop())
+
+	// finalize one more block after stop is set
+	sc.BlockFinalized(context.TODO(), execState, headerD)
+
+	require.True(t, sc.IsExecutionStopped())
+
+	execState.AssertExpectations(t)
+}
+
+func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
+
+	execState := new(mock.ReadOnlyExecutionState)
+
+	headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
+	headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
+	headerC := unittest.BlockHeaderWithParentFixture(headerB) // 22
+	headerD := unittest.BlockHeaderWithParentFixture(headerC) // 23
+
+	headers := &stopControlMockHeaders{
+		headers: map[uint64]*flow.Header{
+			headerA.Height: headerA,
+			headerB.Height: headerB,
+			headerC.Height: headerC,
+			headerD.Height: headerD,
+		},
+	}
+
+	sc := NewStopControl(headers, StopControlWithLogger(unittest.Logger()))
+
+	execState.
+		On("StateCommitmentByBlockID", testifyMock.Anything, headerD.ParentID).
+		Return(nil, storage.ErrNotFound)
+
+	// finalize blocks first
+	sc.BlockFinalized(context.TODO(), execState, headerA)
+	sc.BlockFinalized(context.TODO(), execState, headerB)
+	sc.BlockFinalized(context.TODO(), execState, headerC)
+
+	// set stop at 22, but finalization is at 23 so 21
+	// is the last height which wil be executed
+	stop := StopParameters{StopHeight: 22}
+	err := sc.SetStop(stop)
+	require.NoError(t, err)
+	require.Equal(t, &stop, sc.GetStop())
+
+	// finalize one more block after stop is set
+	sc.BlockFinalized(context.TODO(), execState, headerD)
+
+	// simulate execution
+	sc.OnBlockExecuted(headerA)
+	sc.OnBlockExecuted(headerB)
+	require.True(t, sc.IsExecutionStopped())
+
+	execState.AssertExpectations(t)
+}
+
 // StopControl created as stopped will keep the state
 func TestStartingStopped(t *testing.T) {
 
-	sc := NewStopControl(StopControlWithLogger(unittest.Logger()), StopControlWithStopped())
+	sc := NewStopControl(nil, StopControlWithLogger(unittest.Logger()), StopControlWithStopped())
 	require.True(t, sc.IsExecutionStopped())
 }
 
 func TestStoppedStateRejectsAllBlocksAndChanged(t *testing.T) {
 
-	sc := NewStopControl(StopControlWithLogger(unittest.Logger()), StopControlWithStopped())
+	sc := NewStopControl(nil, StopControlWithLogger(unittest.Logger()), StopControlWithStopped())
 	require.True(t, sc.IsExecutionStopped())
 
 	err := sc.SetStop(StopParameters{

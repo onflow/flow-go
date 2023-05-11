@@ -651,6 +651,10 @@ func (exeNode *ExecutionNode) LoadStopControl(
 	error,
 ) {
 
+	// node.RootSnapshot.VersionBeacon()
+	// node.Storage.VersionBeacons.Highest()
+	//
+
 	opts := []ingestion.StopControlOption{
 		ingestion.StopControlWithLogger(exeNode.builder.Logger),
 	}
@@ -658,7 +662,7 @@ func (exeNode *ExecutionNode) LoadStopControl(
 		opts = append(opts, ingestion.StopControlWithStopped())
 	}
 
-	exeNode.stopControl = ingestion.NewStopControl(opts...)
+	exeNode.stopControl = ingestion.NewStopControl(node.Storage.Headers, opts...)
 
 	return &module.NoopReadyDoneAware{}, nil
 }

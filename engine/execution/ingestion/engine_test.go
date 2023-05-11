@@ -150,6 +150,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	headers := storage.NewMockHeaders(ctrl)
 	blocks := storage.NewMockBlocks(ctrl)
+	headers := storage.NewMockHeaders(ctrl)
 	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
 	events := storage.NewMockEvents(ctrl)
@@ -201,7 +202,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
-	stopControl := NewStopControl()
+	stopControl := NewStopControl(headers)
 
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
@@ -1537,6 +1538,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 
 	headers := storage.NewMockHeaders(ctrl)
 	blocks := storage.NewMockBlocks(ctrl)
+	headers := storage.NewMockHeaders(ctrl)
 	collections := storage.NewMockCollections(ctrl)
 	events := storage.NewMockEvents(ctrl)
 	serviceEvents := storage.NewMockServiceEvents(ctrl)
@@ -1570,7 +1572,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		checkAuthorizedAtBlock,
 		nil,
 		nil,
-		NewStopControl(),
+		NewStopControl(headers),
 	)
 
 	require.NoError(t, err)
