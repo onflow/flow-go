@@ -92,9 +92,8 @@ const (
 
 	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
 
-	EXEComputeBlock           SpanName = "exe.computer.computeBlock"
-	EXEComputeTransaction     SpanName = "exe.computer.computeTransaction"
-	EXEPostProcessTransaction SpanName = "exe.computer.postProcessTransaction"
+	EXEComputeBlock       SpanName = "exe.computer.computeBlock"
+	EXEComputeTransaction SpanName = "exe.computer.computeTransaction"
 
 	EXEStateSaveExecutionResults          SpanName = "exe.state.saveExecutionResults"
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"

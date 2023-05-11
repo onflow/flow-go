@@ -91,6 +91,7 @@ func main() {
 		requiredApprovalsForSealConstruction uint
 		emergencySealing                     bool
 		dkgControllerConfig                  dkgmodule.ControllerConfig
+		dkgMessagingEngineConfig             = dkgeng.DefaultMessagingEngineConfig()
 		startupTimeString                    string
 		startupTime                          time.Time
 
@@ -118,7 +119,6 @@ func main() {
 		finalizationDistributor *pubsub.FinalizationDistributor
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
-		finalizedHeader         *synceng.FinalizedHeaderCache
 		committee               *committees.Consensus
 		epochLookup             *epochs.EpochLookup
 		hotstuffModules         *consensus.HotstuffModules
@@ -153,6 +153,9 @@ func main() {
 		flags.DurationVar(&dkgControllerConfig.BaseStartDelay, "dkg-controller-base-start-delay", dkgmodule.DefaultBaseStartDelay, "used to define the range for jitter prior to DKG start (eg. 500µs) - the base value is scaled quadratically with the # of DKG participants")
 		flags.DurationVar(&dkgControllerConfig.BaseHandleFirstBroadcastDelay, "dkg-controller-base-handle-first-broadcast-delay", dkgmodule.DefaultBaseHandleFirstBroadcastDelay, "used to define the range for jitter prior to DKG handling the first broadcast messages (eg. 50ms) - the base value is scaled quadratically with the # of DKG participants")
 		flags.DurationVar(&dkgControllerConfig.HandleSubsequentBroadcastDelay, "dkg-controller-handle-subsequent-broadcast-delay", dkgmodule.DefaultHandleSubsequentBroadcastDelay, "used to define the constant delay introduced prior to DKG handling subsequent broadcast messages (eg. 2s)")
+		flags.DurationVar(&dkgMessagingEngineConfig.RetryBaseWait, "dkg-messaging-engine-retry-base-wait", dkgMessagingEngineConfig.RetryBaseWait, "the inter-attempt wait time for the first attempt (base of exponential retry)")
+		flags.Uint64Var(&dkgMessagingEngineConfig.RetryMax, "dkg-messaging-engine-retry-max", dkgMessagingEngineConfig.RetryMax, "the maximum number of retry attempts for an outbound DKG message")
+		flags.Uint64Var(&dkgMessagingEngineConfig.RetryJitterPercent, "dkg-messaging-engine-retry-jitter-percent", dkgMessagingEngineConfig.RetryJitterPercent, "the percentage of jitter to apply to each inter-attempt wait time")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 1996-04-24T15:04:05-07:00)")
 	}).ValidateFlags(func() error {
 		nodeBuilder.Logger.Info().Str("startup_time_str", startupTimeString).Msg("got startup_time_str")
@@ -730,8 +733,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
-
-			finalizationDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
+			finalizationDistributor.AddConsumer(comp)
 
 			return comp, nil
 		}).
@@ -754,24 +756,16 @@ func main() {
 			hotstuffModules.Notifier.AddConsumer(messageHub)
 			return messageHub, nil
 		}).
-		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
-			if err != nil {
-				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-			}
-
-			return finalizedHeader, nil
-		}).
 		Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
+				node.State,
 				node.Storage.Blocks,
 				comp,
 				syncCore,
-				finalizedHeader,
 				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {
@@ -797,6 +791,8 @@ func main() {
 				node.Network,
 				node.Me,
 				dkgBrokerTunnel,
+				node.Metrics.Mempool,
+				dkgMessagingEngineConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize DKG messaging engine: %w", err)

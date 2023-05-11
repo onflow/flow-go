@@ -175,7 +175,6 @@ type ObserverServiceBuilder struct {
 	SyncCore                *chainsync.Core
 	RpcEng                  *rpc.Engine
 	FinalizationDistributor *pubsub.FinalizationDistributor
-	FinalizedHeader         *synceng.FinalizedHeaderCache
 	Committee               hotstuff.DynamicCommittee
 	Finalized               *flow.Header
 	Pending                 []*flow.Header
@@ -399,20 +398,6 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 	return builder
 }
 
-func (builder *ObserverServiceBuilder) buildFinalizedHeader() *ObserverServiceBuilder {
-	builder.Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FinalizationDistributor)
-		if err != nil {
-			return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-		}
-		builder.FinalizedHeader = finalizedHeader
-
-		return builder.FinalizedHeader, nil
-	})
-
-	return builder
-}
-
 func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder {
 	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		sync, err := synceng.New(
@@ -420,10 +405,10 @@ func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder
 			node.Metrics.Engine,
 			node.Network,
 			node.Me,
+			node.State,
 			node.Storage.Blocks,
 			builder.FollowerEng,
 			builder.SyncCore,
-			builder.FinalizedHeader,
 			builder.SyncEngineParticipantsProviderFactory(),
 		)
 		if err != nil {
@@ -445,7 +430,6 @@ func (builder *ObserverServiceBuilder) BuildConsensusFollower() cmd.NodeBuilder 
 		buildLatestHeader().
 		buildFollowerCore().
 		buildFollowerEngine().
-		buildFinalizedHeader().
 		buildSyncEngine()
 
 	return builder
@@ -1073,6 +1057,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, err
 		}
+		builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 		return builder.RpcEng, nil
 	})
 }
