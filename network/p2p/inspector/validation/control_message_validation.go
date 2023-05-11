@@ -337,13 +337,9 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 	switch {
 	case !req.validationConfig.RateLimiter.Allow(req.Peer, int(count)): // check if Peer RPC messages are rate limited
 		validationErr = NewRateLimitedControlMsgErr(req.validationConfig.ControlMsg)
-	case count > req.validationConfig.SafetyThreshold && req.validationConfig.ControlMsg == p2p.CtrlMsgIHave:
-		// we only perform async inspection on a sample size of iHave messages
-		sampleSize := util.SampleN(len(req.ctrlMsg.GetIhave()), req.validationConfig.IHaveInspectionMaxSampleSize, req.validationConfig.IHaveAsyncInspectSampleSizePercentage)
-		validationErr = c.validateTopicsSample(req.validationConfig.ControlMsg, req.ctrlMsg, sampleSize)
 	case count > req.validationConfig.SafetyThreshold:
 		// check if Peer RPC messages Count greater than safety threshold further inspect each message individually
-		validationErr = c.validateTopics(req.validationConfig.ControlMsg, req.ctrlMsg)
+		validationErr = c.validateTopics(req.validationConfig, req.ctrlMsg)
 	default:
 		lg.Trace().
 			Uint64("hard_threshold", req.validationConfig.HardThreshold).
@@ -383,10 +379,11 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 
 // validateTopics ensures all topics in the specified control message are valid flow topic/channel and no duplicate topics exist.
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
+func (c *ControlMsgValidationInspector) validateTopics(validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) error {
 	seen := make(map[channels.Topic]struct{})
 	validateTopic := c.validateTopicInlineFunc(seen)
-	switch ctrlMsgType {
+	controlMsg := validationConfig.ControlMsg
+	switch controlMsg {
 	case p2p.CtrlMsgGraft:
 		for _, graft := range ctrlMsg.GetGraft() {
 			topic := channels.Topic(graft.GetTopicID())
@@ -403,11 +400,15 @@ func (c *ControlMsgValidationInspector) validateTopics(ctrlMsgType p2p.ControlMe
 				return err
 			}
 		}
+	case p2p.CtrlMsgIHave:
+		// we only perform async inspection on a sample size of iHave messages
+		sampleSize := util.SampleN(len(ctrlMsg.GetIhave()), validationConfig.IHaveInspectionMaxSampleSize, validationConfig.IHaveAsyncInspectSampleSizePercentage)
+		return c.validateTopicsSample(controlMsg, ctrlMsg, sampleSize)
 	default:
 		// sanity check
 		// This should never happen validateTopics is only used to validate GRAFT and PRUNE control message types
 		// if any other control message type is encountered here this indicates invalid state irrecoverable error.
-		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics expected %s or %s got %s", p2p.CtrlMsgGraft, p2p.CtrlMsgPrune, ctrlMsgType))
+		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics expected %s, %s or %s got %s", p2p.CtrlMsgGraft, p2p.CtrlMsgPrune, p2p.CtrlMsgIHave, controlMsg))
 	}
 	return nil
 }
