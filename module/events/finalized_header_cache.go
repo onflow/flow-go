@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -24,6 +25,7 @@ type FinalizedHeaderCache struct {
 	*FinalizationActor // implement hotstuff.FinalizationConsumer
 }
 
+var _ module.FinalizedHeaderCache = (*FinalizedHeaderCache)(nil)
 var _ hotstuff.FinalizationConsumer = (*FinalizedHeaderCache)(nil)
 
 // Get returns the most recently finalized block.
