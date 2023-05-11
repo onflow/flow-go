@@ -376,7 +376,7 @@ func createNode(
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
 	statusesDB := storage.NewEpochStatuses(metricsCollector, db)
 	versionBeaconDB := storage.NewVersionBeacons(db)
-	consumer := events.NewDistributor()
+	protocolStateEvents := events.NewDistributor()
 
 	localID := identity.ID()
 
@@ -407,7 +407,7 @@ func createNode(
 	fullState, err := bprotocol.NewFullConsensusState(
 		log,
 		tracer,
-		consumer,
+		protocolStateEvents,
 		state,
 		indexDB,
 		payloadsDB,
@@ -434,9 +434,11 @@ func createNode(
 
 	// log with node index
 	logConsumer := notifications.NewLogConsumer(log)
-	notifier := pubsub.NewDistributor()
-	notifier.AddConsumer(counterConsumer)
-	notifier.AddConsumer(logConsumer)
+	hotstuffDistributor := pubsub.NewDistributor()
+	hotstuffDistributor.AddConsumer(counterConsumer)
+	hotstuffDistributor.AddConsumer(logConsumer)
+	finalizationDistributor := pubsub.NewFinalizationDistributor()
+	hotstuffDistributor.AddConsumer(finalizationDistributor)
 
 	require.Equal(t, participant.nodeInfo.NodeID, localID)
 	privateKeys, err := participant.nodeInfo.PrivateKeys()
@@ -474,7 +476,7 @@ func createNode(
 	// selector := filter.HasRole(flow.RoleConsensus)
 	committee, err := committees.NewConsensusCommittee(state, localID)
 	require.NoError(t, err)
-	consumer.AddConsumer(committee)
+	protocolStateEvents.AddConsumer(committee)
 
 	// initialize the block finalizer
 	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
@@ -484,7 +486,7 @@ func createNode(
 
 	qcDistributor := pubsub.NewQCCreatedDistributor()
 
-	forks, err := consensus.NewForks(rootHeader, headersDB, final, notifier, rootHeader, rootQC)
+	forks, err := consensus.NewForks(rootHeader, headersDB, final, hotstuffDistributor, rootHeader, rootQC)
 	require.NoError(t, err)
 
 	validator := consensus.NewValidator(metricsCollector, committee)
@@ -518,7 +520,7 @@ func createNode(
 
 	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 
-	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
+	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, hotstuffDistributor, voteProcessorFactory.Create)
 	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
 	voteAggregator, err := voteaggregator.NewVoteAggregator(
@@ -526,7 +528,7 @@ func createNode(
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		notifier,
+		hotstuffDistributor,
 		livenessData.CurrentView,
 		voteCollectors,
 	)
@@ -544,7 +546,7 @@ func createNode(
 	)
 	timeoutCollectorsFactory := timeoutcollector.NewTimeoutCollectorFactory(
 		log,
-		notifier,
+		hotstuffDistributor,
 		timeoutCollectorDistributor,
 		timeoutProcessorFactory,
 	)
@@ -555,7 +557,7 @@ func createNode(
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		notifier,
+		hotstuffDistributor,
 		livenessData.CurrentView,
 		timeoutCollectors,
 	)
@@ -564,11 +566,12 @@ func createNode(
 	hotstuffModules := &consensus.HotstuffModules{
 		Forks:                       forks,
 		Validator:                   validator,
-		Notifier:                    notifier,
+		Notifier:                    hotstuffDistributor,
 		Committee:                   committee,
 		Signer:                      signer,
 		Persist:                     persist,
 		QCCreatedDistributor:        qcDistributor,
+		FinalizationDistributor:     finalizationDistributor,
 		TimeoutCollectorDistributor: timeoutCollectorDistributor,
 		VoteAggregator:              voteAggregator,
 		TimeoutAggregator:           timeoutAggregator,
@@ -652,7 +655,7 @@ func createNode(
 	)
 	require.NoError(t, err)
 
-	notifier.AddConsumer(messageHub)
+	hotstuffDistributor.AddConsumer(messageHub)
 
 	node.compliance = comp
 	node.sync = sync

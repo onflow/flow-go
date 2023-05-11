@@ -750,6 +750,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
+	finalizationDistributor.AddConsumer(syncEngine)
 
 	return testmock.ExecutionNode{
 		GenericNode:         node,

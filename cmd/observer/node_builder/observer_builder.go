@@ -413,6 +413,7 @@ func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
 		builder.SyncEng = sync
+		builder.FinalizationDistributor.AddConsumer(sync)
 
 		return builder.SyncEng, nil
 	})
