@@ -213,6 +213,7 @@ func (en ExecutionNode) Ready(ctx context.Context) {
 	en.ReceiptsEngine.Start(irctx)
 	en.FollowerCore.Start(irctx)
 	en.FollowerEngine.Start(irctx)
+	en.SyncEngine.Start(irctx)
 
 	<-util.AllReady(
 		en.Ledger,
