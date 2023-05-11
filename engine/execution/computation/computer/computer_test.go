@@ -305,15 +305,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(0, 0, rag)
 		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
-		// TODO(patrick): switch to NewExecutor.
-		// vm.On("NewExecutor", mock.Anything, mock.Anything, mock.Anything).
-		//	Return(noOpExecutor{}).
-		//	Once() // just system chunk
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-			Return(
-				&snapshot.ExecutionSnapshot{},
-				fvm.ProcedureOutput{},
-				nil).
+		vm.On("NewExecutor", mock.Anything, mock.Anything, mock.Anything).
+			Return(noOpExecutor{}).
 			Once() // just system chunk
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
