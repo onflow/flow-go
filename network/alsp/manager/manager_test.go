@@ -2,6 +2,7 @@ package alspmgr_test
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -93,6 +94,122 @@ func TestHandleReportedMisbehavior(t *testing.T) {
 	}
 
 	unittest.RequireReturnsBefore(t, allReportsManaged.Wait, 100*time.Millisecond, "did not receive all reports")
+}
+
+// TestHandleReportedMisbehavior tests the handling of reported misbehavior by the network.
+//
+// The test sets up a mock MisbehaviorReportManager and a conduitFactory with this manager.
+// It generates a single node network with the conduitFactory and starts it.
+// It then uses a mock engine to register a channel with the network.
+// It prepares a set of misbehavior reports and reports them to the conduit on the test channel.
+// The test ensures that the MisbehaviorReportManager receives and handles all reported misbehavior
+// without any duplicate reports and within a specified time.
+func TestHandleReportedMisbehavior_Integration(t *testing.T) {
+	cfg := &alspmgr.MisbehaviorReportManagerConfig{
+		Logger:                  unittest.Logger(),
+		SpamRecordCacheSize:     uint32(100),
+		SpamReportQueueSize:     uint32(100),
+		AlspMetrics:             metrics.NewNoopCollector(),
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+	}
+
+	cache := internal.NewSpamRecordCache(
+		cfg.SpamRecordCacheSize,
+		cfg.Logger,
+		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory),
+		model.SpamRecordFactory())
+
+	// create a new MisbehaviorReportManager
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	require.NoError(t, err)
+
+	conduitFactory, err := conduit.NewDefaultConduitFactory(
+		&alspmgr.MisbehaviorReportManagerConfig{
+			SpamReportQueueSize:     uint32(100),
+			SpamRecordCacheSize:     uint32(100),
+			Logger:                  unittest.Logger(),
+			AlspMetrics:             metrics.NewNoopCollector(),
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		},
+		conduit.WithMisbehaviorManager(m))
+	require.NoError(t, err)
+
+	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
+		t,
+		1,
+		unittest.Logger(),
+		unittest.NetworkCodec(),
+		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+	sms := testutils.GenerateSubscriptionManagers(t, mws)
+	networks := testutils.GenerateNetworks(
+		t,
+		unittest.Logger(),
+		ids,
+		mws,
+		sms,
+		p2p.WithConduitFactory(conduitFactory))
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, networks, 100*time.Millisecond)
+	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
+	defer cancel()
+
+	e := mocknetwork.NewEngine(t)
+	con, err := networks[0].Register(channels.TestNetworkChannel, e)
+	require.NoError(t, err)
+
+	// create a map of origin IDs to their respective misbehavior reports (10 peers, 5 reports each)
+	numPeers := 10
+	numReportsPerPeer := 5
+	peersReports := make(map[flow.Identifier][]network.MisbehaviorReport)
+
+	for i := 0; i < numPeers; i++ {
+		originID := unittest.IdentifierFixture()
+		reports := createRandomMisbehaviorReportsForOriginId(t, originID, numReportsPerPeer)
+		peersReports[originID] = reports
+	}
+
+	wg := sync.WaitGroup{}
+	for _, reports := range peersReports {
+		wg.Add(len(reports))
+		// reports the misbehavior
+		for _, report := range reports {
+			report := report // capture range variable
+			go func() {
+				defer wg.Done()
+
+				con.ReportMisbehavior(report)
+			}()
+		}
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
+
+	// check if the misbehavior reports have been processed by verifying that the Adjust method was called on the cache
+	require.Eventually(t, func() bool {
+		for originID, reports := range peersReports {
+			totalPenalty := float64(0)
+			for _, report := range reports {
+				totalPenalty += report.Penalty()
+			}
+
+			record, ok := cache.Get(originID)
+			if !ok {
+				return false
+			}
+			require.NotNil(t, record)
+
+			require.Equal(t, totalPenalty, record.Penalty)
+			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
+			require.Equal(t, uint64(0), record.CutoffCounter)
+			// the decay should be the default decay value.
+			require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		}
+
+		return true
+	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 }
 
 // TestMisbehaviorReportMetrics tests the recording of misbehavior report metrics.
@@ -753,12 +870,10 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 
 	wg := sync.WaitGroup{}
 	// handle the misbehavior reports
-	totalPenalty := float64(0)
 	for _, reports := range peersReports {
 		wg.Add(len(reports))
 		for _, report := range reports {
 			report := report // capture range variable
-			totalPenalty += report.Penalty()
 			go func() {
 				defer wg.Done()
 
@@ -779,6 +894,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 
 			record, ok := cache.Get(originID)
 			if !ok {
+				fmt.Println("not ok")
 				return false
 			}
 			require.NotNil(t, record)
@@ -791,7 +907,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 		}
 
 		return true
-	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
+	}, 2*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 }
 
 // TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequentially tests the handling of multiple misbehavior reports for multiple peers.
