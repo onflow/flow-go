@@ -23,7 +23,7 @@ func TestFinalizationActor_SubscribeDuringConstruction(t *testing.T) {
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
 	defer cancel()
 	go worker(ctx, func() {})
-	actor.OnBlockFinalized(nil)
+	actor.OnFinalizedBlock(nil)
 
 	unittest.AssertClosesBefore(t, done, time.Second)
 }
