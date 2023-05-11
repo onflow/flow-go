@@ -144,7 +144,6 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 		err := c.validator.ValidateProposal(hotstuffProposal)
 		if err != nil {
 			if invalidBlockError, ok := model.AsInvalidBlockError(err); ok {
-				// TODO: potential slashing
 				c.proposalViolationNotifier.OnInvalidBlockDetected(*invalidBlockError)
 				return nil
 			}

@@ -46,6 +46,7 @@ func NewFollowerDistributor() *FollowerDistributor {
 	}
 }
 
+// AddFollowerConsumer registers the input `consumer` to be notified on `hotstuff.ConsensusFollowerConsumer` events.
 func (d *FollowerDistributor) AddFollowerConsumer(consumer hotstuff.FollowerConsumer) {
 	d.FinalizationDistributor.AddFinalizationConsumer(consumer)
 	d.ProposalViolationDistributor.AddProposalViolationConsumer(consumer)
