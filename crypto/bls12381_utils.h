@@ -131,6 +131,7 @@ void     ep_mult(ep_t, const ep_t, const Fr*);
 void     ep_sum_vector(ep_t, ep_st*, const int);
 int      ep_sum_vector_byte(byte*, const byte*, const int);
 int      E1_in_G1(const ep_t);
+bool_t   E1_is_infty(const E1*);
 int      G1_simple_subgroup_check(const ep_t);
 void     map_bytes_to_G1(E1*, const uint8_t*, int);
 void     map_bytes_to_G1complement(E1*, const uint8_t*, int);
@@ -156,6 +157,10 @@ void        E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len)
 bool_t      E2_in_G2(const E2*);
 void        map_bytes_to_G2(E2*, const uint8_t*, int);
 BLST_ERROR  map_bytes_to_G2complement(E2*, const uint8_t*, int);
+
+// pairing and Fp12
+bool_t      Fp12_is_one(Fp12*);
+void        multi_pairing(Fp12*, const E1*, const E2*, const int);
 
 // Utility functions
 ctx_t*   relic_init_BLS12_381();

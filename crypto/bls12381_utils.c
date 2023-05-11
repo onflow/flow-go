@@ -158,6 +158,9 @@ void Fr_set_limb(Fr* a, const limb_t l){
 }
 
 void Fr_copy(Fr* res, const Fr* a) {
+    if ((uptr_t)a==(uptr_t)res) {
+        return;
+    }
     vec_copy((byte*)res, (byte*)a, sizeof(Fr));
 }
 
@@ -386,6 +389,9 @@ void Fp_set_limb(Fp* a, const limb_t l){
 }
 
 void Fp_copy(Fp* res, const Fp* a) {
+    if ((uptr_t)a==(uptr_t)res) {
+        return;
+    }
     vec_copy((byte*)res, (byte*)a, sizeof(Fp));
 }
 
@@ -577,6 +583,31 @@ void Fp2_write_bytes(byte *bin, const Fp2* a) {
 }
 
 // ------------------- G1 utilities
+
+// res = p
+void  E1_copy(E1* res, const E1* p) {
+    if ((uptr_t)p==(uptr_t)res) {
+        return;
+    }
+    vec_copy(res, p, sizeof(E1));
+}
+
+// check if `p` is infinity
+bool_t E1_is_infty(const E1* p) {
+    // BLST infinity points are defined by Z=0
+    return vec_is_zero(p->z, sizeof(p->z));
+}
+
+// converts an E1 point from Jacobian into affine coordinates (z=1)
+void E1_to_affine(E1* res, const E1* p) {
+    // optimization in case coordinates are already affine
+    if (vec_is_equal(p->z, BLS12_381_pR, sizeof(p->z))) {
+        E1_copy(res, p);
+        return;
+    }
+    // convert from Jacobian
+    POINTonE1_from_Jacobian((POINTonE1*)res, (const POINTonE1*)p);   
+}
 
 // ep_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
 // len is the size of the input buffer.
@@ -967,13 +998,16 @@ bool_t E2_is_equal(const E2* p1, const E2* p2) {
 
 // res = p
 void  E2_copy(E2* res, const E2* p) {
+    if ((uptr_t)p==(uptr_t)res) {
+        return;
+    }
     vec_copy(res, p, sizeof(E2));
 }
 
 // converts an E2 point from Jacobian into affine coordinates (z=1)
 void E2_to_affine(E2* res, const E2* p) {
-    // minor optimization in case coordinates are already affine
-    if (vec_is_equal(p->z, BLS12_381_Rx.p2, Fp2_BYTES)) {
+    // optimization in case coordinates are already affine
+    if (vec_is_equal(p->z, BLS12_381_Rx.p2, sizeof(p->z))) {
         E2_copy(res, p);
         return;
     }
@@ -1295,6 +1329,80 @@ BLST_ERROR map_bytes_to_G2complement(E2* p, const uint8_t* bytes, int len) {
     assert(E2_affine_on_curve(p));  // sanity check to make sure p is in E2
     return BLST_SUCCESS;
 }
+
+// ------------------- Pairing utilities 
+
+bool_t Fp12_is_one(Fp12 *a) {
+    return vec_is_equal(a[0][0], BLS12_381_Rx.p2, sizeof(a[0][0])) &
+           vec_is_zero(a[0][1], sizeof(a) - sizeof(a[0][0]));
+}
+
+static void Fp12_set_one(Fp12 *a) {
+    vec_copy(a[0][0], BLS12_381_Rx.p2, sizeof(a[0][0]));
+    vec_zero(a[0][1], sizeof(a) - sizeof(a[0][0]));
+}
+
+// computes e(p[0], q[0]) * ... * e(q[len-1], q[len-1]) 
+// by optimizing a common final exponentiation for all pairings.
+// result is stored in `res`.
+// It assumes `p` and `q` are correctly initialized and all 
+// p[i] and q[i] are respectively on G1 and G2 (it does not
+// check their memberships).
+void multi_pairing(Fp12 *res, const E1 *p, const E2 *q, const int len) {
+    // N_MAX is defined within BLST. It should represent a good tradeoff of the max number
+    // of miller loops to be batched in one call to `miller_loop_n`.
+    E1 p_[N_MAX];
+    E2 q_[N_MAX];
+    int n = 0; // the number of couples (p,q) held p_ and q_
+    int init_flag = 0;
+
+    // easier access pointers
+    vec384fp6* res_vec = (vec384fp6*)res;
+    POINTonE1_affine* p_POINT =  (POINTonE1_affine*)p_;
+    POINTonE2_affine* q_POINT =  (POINTonE2_affine*)q_;
+
+
+    for (int i=0; i<len; i++) {
+        if (E1_is_infty(p + i) || E2_is_infty(q + i)) {
+            continue;
+        }
+        // `miller_loop_n` expects affine coordinates
+        E1_to_affine(p_ + i, p + i); E2_to_affine(q_ + i, q + i);
+        n++;
+        if (n==N_MAX) {  // if p_ and q_ are filled batch `N_MAX` miller loops
+            if (!init_flag) {
+                miller_loop_n(res_vec, q_POINT, p_POINT, N_MAX); 
+                init_flag = 1;
+            } else {
+                vec384fp12 tmp;
+                miller_loop_n(tmp, q_POINT, p_POINT, N_MAX);
+                mul_fp12(res_vec, res_vec, tmp);
+            }
+            n = 0;
+        }
+    }
+    // if p_ and q_ aren't empty,
+    // remaining couples are also batched in `n` miller loops
+    if (n > 0) {
+        if (!init_flag) {
+            miller_loop_n(res_vec, q_POINT, p_POINT, n); 
+            init_flag = 1;
+        } else {
+            vec384fp12 tmp;
+            miller_loop_n(tmp, q_POINT, p_POINT, n);
+            mul_fp12(res_vec, res_vec, tmp);
+        } 
+    }
+
+    // check if no miller loop was computed
+    if (!init_flag) {
+        Fp12_set_one(res);
+    }
+
+    final_exp(res_vec, res_vec);
+}
+
+
 
 // This is a testing function.
 // It wraps a call to a Relic macro since cgo can't call macros.
