@@ -148,6 +148,9 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 	}
 
 	n.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// add conduit factory
+		}).
 		AddWorker(n.runMiddleware).
 		AddWorker(n.processRegisterEngineRequests).
 		AddWorker(n.processRegisterBlobServiceRequests).Build()
