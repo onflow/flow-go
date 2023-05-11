@@ -77,6 +77,10 @@ func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.S
 
 	// TODO initialize last measurement
 	// TODO initialize epoch info
+	_ = ctl.lastMeasurement
+	_ = ctl.curEpochTargetSwitchover
+	_ = ctl.curEpochFinalView
+	_ = ctl.nextEpochFinalView
 
 	return ctl, nil
 }
