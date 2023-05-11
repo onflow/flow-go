@@ -64,9 +64,9 @@ func (c *GossipSubRpcValidationInspectorMetrics) BlockingPreProcessingStarted(ms
 	c.rpcCtrlMsgInBlockingPreProcessingGauge.WithLabelValues(msgType).Add(float64(sampleSize))
 }
 
-// PreProcessingFinished tracks the time spent by the rpc validation inspector to pre-process a message and decrements the metric tracking
+// BlockingPreProcessingFinished tracks the time spent by the rpc validation inspector to pre-process a message and decrements the metric tracking
 // the number of messages being processed by the rpc validation inspector.
-func (c *GossipSubRpcValidationInspectorMetrics) PreProcessingFinished(msgType string, sampleSize uint, duration time.Duration) {
+func (c *GossipSubRpcValidationInspectorMetrics) BlockingPreProcessingFinished(msgType string, sampleSize uint, duration time.Duration) {
 	c.rpcCtrlMsgInBlockingPreProcessingGauge.WithLabelValues(msgType).Sub(float64(sampleSize))
 	c.rpcCtrlMsgBlockingProcessingTimeHistogram.WithLabelValues(msgType).Observe(duration.Seconds())
 }
