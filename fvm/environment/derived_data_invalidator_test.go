@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -241,7 +242,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		memKind: memWeight,
 	}
 
-	snapshotTree := storage.NewSnapshotTree(nil)
+	snapshotTree := snapshot.NewSnapshotTree(nil)
 
 	ctx := fvm.NewContext(fvm.WithChain(flow.Testnet.Chain()))
 
@@ -256,18 +257,14 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		snapshotTree)
 	require.NoError(t, err)
 
-	nestedTxn := state.NewTransactionState(
+	blockDatabase := storage.NewBlockDatabase(
 		snapshotTree.Append(executionSnapshot),
-		state.DefaultParameters())
+		0,
+		nil)
 
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
-	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
+	txnState, err := blockDatabase.NewTransaction(0, state.DefaultParameters())
 	require.NoError(t, err)
 
-	txnState := storage.SerialTransaction{
-		NestedTransaction:           nestedTxn,
-		DerivedTransactionCommitter: derivedTxnData,
-	}
 	computer := fvm.NewMeterParamOverridesComputer(ctx, txnState)
 
 	overrides, err := computer.Compute(txnState, struct{}{})
@@ -287,7 +284,7 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	ctx.TxBody = &flow.TransactionBody{}
 
 	checkForUpdates := func(id flow.RegisterID, expected bool) {
-		snapshot := &state.ExecutionSnapshot{
+		snapshot := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
 				id: flow.RegisterValue("blah"),
 			},

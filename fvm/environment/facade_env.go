@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 )
@@ -47,13 +47,13 @@ type facadeEnvironment struct {
 	*Programs
 
 	accounts Accounts
-	txnState storage.Transaction
+	txnState storage.TransactionPreparer
 }
 
 func newFacadeEnvironment(
 	tracer tracing.TracerSpan,
 	params EnvironmentParams,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 	meter Meter,
 ) *facadeEnvironment {
 	accounts := NewAccounts(txnState)
@@ -77,6 +77,7 @@ func newFacadeEnvironment(
 		UnsafeRandomGenerator: NewUnsafeRandomGenerator(
 			tracer,
 			params.BlockHeader,
+			params.TxIndex,
 		),
 		CryptoLibrary: NewCryptoLibrary(tracer, meter),
 
@@ -143,30 +144,22 @@ func newFacadeEnvironment(
 // testing.
 func NewScriptEnvironmentFromStorageSnapshot(
 	params EnvironmentParams,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) *facadeEnvironment {
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
-	derivedTxn := derivedBlockData.NewSnapshotReadDerivedTransactionData()
-
-	txn := storage.SerialTransaction{
-		NestedTransaction: state.NewTransactionState(
-			storageSnapshot,
-			state.DefaultParameters()),
-		DerivedTransactionCommitter: derivedTxn,
-	}
+	blockDatabase := storage.NewBlockDatabase(storageSnapshot, 0, nil)
 
 	return NewScriptEnv(
 		context.Background(),
 		tracing.NewTracerSpan(),
 		params,
-		txn)
+		blockDatabase.NewSnapshotReadTransaction(state.DefaultParameters()))
 }
 
 func NewScriptEnv(
 	ctx context.Context,
 	tracer tracing.TracerSpan,
 	params EnvironmentParams,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
 		tracer,
@@ -182,7 +175,7 @@ func NewScriptEnv(
 func NewTransactionEnvironment(
 	tracer tracing.TracerSpan,
 	params EnvironmentParams,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
 		tracer,

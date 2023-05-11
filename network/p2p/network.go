@@ -132,7 +132,7 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 		metrics:                     param.Metrics,
 		subscriptionManager:         param.SubscriptionManager,
 		identityProvider:            param.IdentityProvider,
-		conduitFactory:              conduit.NewDefaultConduitFactory(param.Logger),
+		conduitFactory:              conduit.NewDefaultConduitFactory(param.Logger, param.Metrics),
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
 	}

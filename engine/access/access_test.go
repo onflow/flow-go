@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/cmd/build"
 	hsmock "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
@@ -727,6 +728,275 @@ func (suite *Suite) TestGetSealedTransaction() {
 	})
 }
 
+// TestGetTransactionResult tests different approaches to using the GetTransactionResult query, including using
+// transaction ID, block ID, and collection ID.
+func (suite *Suite) TestGetTransactionResult() {
+	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+		all := util.StorageLayer(suite.T(), db)
+		results := bstorage.NewExecutionResults(suite.metrics, db)
+		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
+
+		originID := unittest.IdentifierFixture()
+
+		*suite.state = protocol.State{}
+
+		// create block -> collection -> transactions
+		block, collection := suite.createChain()
+		blockNegative, collectionNegative := suite.createChain()
+		blockId := block.ID()
+		blockNegativeId := blockNegative.ID()
+
+		finalSnapshot := new(protocol.Snapshot)
+		finalSnapshot.On("Head").Return(block.Header, nil)
+
+		suite.state.On("Params").Return(suite.params)
+		suite.state.On("Final").Return(finalSnapshot)
+		suite.state.On("Sealed").Return(suite.sealedSnapshot)
+		sealedBlock := unittest.GenesisFixture().Header
+		// specifically for this test we will consider that sealed block is far behind finalized, so we get EXECUTED status
+		suite.sealedSnapshot.On("Head").Return(sealedBlock, nil)
+
+		err := all.Blocks.Store(block)
+		require.NoError(suite.T(), err)
+		err = all.Blocks.Store(blockNegative)
+		require.NoError(suite.T(), err)
+
+		suite.state.On("AtBlockID", blockId).Return(suite.sealedSnapshot)
+
+		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
+		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+
+		enNodeIDs := enIdentities.NodeIDs()
+		allIdentities := append(colIdentities, enIdentities...)
+		finalSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil)
+
+		// assume execution node returns an empty list of events
+		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&execproto.GetTransactionResultResponse{
+			Events: nil,
+		}, nil)
+
+		// setup mocks
+		conduit := new(mocknetwork.Conduit)
+		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).Once()
+		suite.request.On("Request", mock.Anything, mock.Anything).Return()
+
+		// create a mock connection factory
+		connFactory := new(factorymock.ConnectionFactory)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
+		// initialize storage
+		metrics := metrics.NewNoopCollector()
+		transactions := bstorage.NewTransactions(metrics, db)
+		collections := bstorage.NewCollections(db, transactions)
+		err = collections.Store(collectionNegative)
+		require.NoError(suite.T(), err)
+		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+		blocksToMarkExecuted, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+
+		backend := backend.New(suite.state,
+			suite.collClient,
+			nil,
+			all.Blocks,
+			all.Headers,
+			collections,
+			transactions,
+			receipts,
+			results,
+			suite.chainID,
+			suite.metrics,
+			connFactory,
+			false,
+			backend.DefaultMaxHeightRange,
+			nil,
+			enNodeIDs.Strings(),
+			suite.log,
+			backend.DefaultSnapshotHistoryLimit,
+			nil,
+		)
+
+		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
+
+		rpcEngBuilder, err := rpc.NewBuilder(
+			suite.log,
+			suite.state,
+			rpc.Config{},
+			nil,
+			nil,
+			all.Blocks,
+			all.Headers,
+			collections,
+			transactions,
+			receipts,
+			results,
+			suite.chainID,
+			metrics,
+			metrics,
+			0,
+			0,
+			false,
+			false,
+			nil,
+			nil,
+			suite.me,
+		)
+		require.NoError(suite.T(), err)
+		rpcEng, err := rpcEngBuilder.WithLegacy().WithFinalizedHeaderCache(suite.finalizedHeaderCache).Build()
+		require.NoError(suite.T(), err)
+
+		// create the ingest engine
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
+			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
+		require.NoError(suite.T(), err)
+
+		background, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ctx := irrecoverable.NewMockSignalerContext(suite.T(), background)
+		ingestEng.Start(ctx)
+		<-ingestEng.Ready()
+
+		processExecutionReceipts := func(
+			block *flow.Block,
+			collection *flow.Collection,
+			enNodeIDs flow.IdentifierList,
+			originID flow.Identifier,
+			ingestEng *ingestion.Engine,
+		) {
+			executionReceipts := unittest.ReceiptsForBlockFixture(block, enNodeIDs)
+			// Ingest engine was notified by the follower engine about a new block.
+			// Follower engine --> Ingest engine
+			mb := &model.Block{
+				BlockID: block.ID(),
+			}
+			ingestEng.OnFinalizedBlock(mb)
+
+			// Ingest engine receives the requested collection and all the execution receipts
+			ingestEng.OnCollection(originID, collection)
+
+			for _, r := range executionReceipts {
+				err = ingestEng.Process(channels.ReceiveReceipts, enNodeIDs[0], r)
+				require.NoError(suite.T(), err)
+			}
+		}
+		processExecutionReceipts(block, collection, enNodeIDs, originID, ingestEng)
+		processExecutionReceipts(blockNegative, collectionNegative, enNodeIDs, originID, ingestEng)
+
+		txId := collection.Transactions[0].ID()
+		collectionId := collection.ID()
+		txIdNegative := collectionNegative.Transactions[0].ID()
+		collectionIdNegative := collectionNegative.ID()
+
+		assertTransactionResult := func(
+			resp *accessproto.TransactionResultResponse,
+			err error,
+		) {
+			require.NoError(suite.T(), err)
+			actualTxId := flow.HashToID(resp.TransactionId)
+			require.Equal(suite.T(), txId, actualTxId)
+			actualBlockId := flow.HashToID(resp.BlockId)
+			require.Equal(suite.T(), blockId, actualBlockId)
+			actualCollectionId := flow.HashToID(resp.CollectionId)
+			require.Equal(suite.T(), collectionId, actualCollectionId)
+		}
+
+		// Test behaviour with transactionId provided
+		// POSITIVE
+		suite.Run("Get transaction result by transaction ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id: txId[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			assertTransactionResult(resp, err)
+		})
+
+		// Test behaviour with blockId provided
+		suite.Run("Get transaction result by block ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id:      txId[:],
+				BlockId: blockId[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			assertTransactionResult(resp, err)
+		})
+
+		suite.Run("Get transaction result with wrong transaction ID and correct block ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id:      txIdNegative[:],
+				BlockId: blockId[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			require.Error(suite.T(), err)
+			require.Nil(suite.T(), resp)
+		})
+
+		suite.Run("Get transaction result with wrong block ID and correct transaction ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id:      txId[:],
+				BlockId: blockNegativeId[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			require.Error(suite.T(), err)
+			require.Nil(suite.T(), resp)
+		})
+
+		// Test behaviour with collectionId provided
+		suite.Run("Get transaction result by collection ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id:           txId[:],
+				CollectionId: collectionId[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			assertTransactionResult(resp, err)
+		})
+
+		suite.Run("Get transaction result with wrong collection ID but correct transaction ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id:           txId[:],
+				CollectionId: collectionIdNegative[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			require.Error(suite.T(), err)
+			require.Nil(suite.T(), resp)
+		})
+
+		suite.Run("Get transaction result with wrong transaction ID and correct collection ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id:           txIdNegative[:],
+				CollectionId: collectionId[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			require.Error(suite.T(), err)
+			require.Nil(suite.T(), resp)
+		})
+
+		// Test behaviour with blockId and collectionId provided
+		suite.Run("Get transaction result by block ID and collection ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id:           txId[:],
+				BlockId:      blockId[:],
+				CollectionId: collectionId[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			assertTransactionResult(resp, err)
+		})
+
+		suite.Run("Get transaction result by block ID with wrong collection ID", func() {
+			getReq := &accessproto.GetTransactionRequest{
+				Id:           txId[:],
+				BlockId:      blockId[:],
+				CollectionId: collectionIdNegative[:],
+			}
+			resp, err := handler.GetTransactionResult(context.Background(), getReq)
+			require.Error(suite.T(), err)
+			require.Nil(suite.T(), resp)
+		})
+	})
+}
+
 // TestExecuteScript tests the three execute Script related calls to make sure that the execution api is called with
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
@@ -899,6 +1169,31 @@ func (suite *Suite) TestExecuteScript() {
 	})
 }
 
+// TestAPICallNodeVersionInfo tests the GetNodeVersionInfo query and check response returns correct node version
+// information
+func (suite *Suite) TestAPICallNodeVersionInfo() {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+		sporkId := unittest.IdentifierFixture()
+		protocolVersion := uint(unittest.Uint64InRange(10, 30))
+
+		suite.params.On("SporkID").Return(sporkId, nil)
+		suite.params.On("ProtocolVersion").Return(protocolVersion, nil)
+
+		req := &accessproto.GetNodeVersionInfoRequest{}
+		resp, err := handler.GetNodeVersionInfo(context.Background(), req)
+		require.NoError(suite.T(), err)
+		require.NotNil(suite.T(), resp)
+
+		respNodeVersionInfo := resp.Info
+		suite.Require().Equal(respNodeVersionInfo, &entitiesproto.NodeVersionInfo{
+			Semver:          build.Semver(),
+			Commit:          build.Commit(),
+			SporkId:         sporkId[:],
+			ProtocolVersion: uint64(protocolVersion),
+		})
+	})
+}
+
 // TestRpcEngineBuilderWithFinalizedHeaderCache test checks whether the RPC builder can construct the engine correctly
 // only when the WithFinalizedHeaderCache method has been called.
 func (suite *Suite) TestRpcEngineBuilderWithFinalizedHeaderCache() {
@@ -926,8 +1221,9 @@ func (suite *Suite) TestRpcEngineBuilderWithFinalizedHeaderCache() {
 	})
 }
 
-// TestLastFinalizedBlockHeightResult test checks whether the response from a GetBlockHeaderByID request contains
-// the finalized block height and ID even when the finalized block height has been changed.
+// TestLastFinalizedBlockHeightResult tests on example of the GetBlockHeaderByID function that the LastFinalizedBlock
+// field in the response matches the finalized header from cache. It also tests that the LastFinalizedBlock field is
+// updated correctly when a block with a greater height is finalized.
 func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
 		block := unittest.BlockWithParentFixture(suite.finalizedBlock)
@@ -968,9 +1264,6 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 	})
 }
 
-// TestLastFinalizedBlockHeightResult tests on example of the GetBlockHeaderByID function that the LastFinalizedBlock
-// field in the response matches the finalized header from cache. It also tests that the LastFinalizedBlock field is
-// updated correctly when a block with a greater height is finalized.
 func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 	collection := unittest.CollectionFixture(10)
 	refBlockID := unittest.IdentifierFixture()

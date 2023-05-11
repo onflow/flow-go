@@ -13,10 +13,10 @@ import (
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 )
 
 // NewCorruptLibP2PNodeFactory wrapper around the original DefaultLibP2PNodeFactory. Nodes returned from this factory func will be corrupted libp2p nodes.
@@ -27,12 +27,12 @@ func NewCorruptLibP2PNodeFactory(
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metrics module.LibP2PMetrics,
+	metricsCfg module.LibP2PMetrics,
 	resolver madns.BasicResolver,
 	role string,
-	connGaterCfg *p2pbuilder.ConnectionGaterConfig,
-	peerManagerCfg *p2pbuilder.PeerManagerConfig,
-	uniCfg *p2pbuilder.UnicastConfig,
+	connGaterCfg *p2pconfig.ConnectionGaterConfig,
+	peerManagerCfg *p2pconfig.PeerManagerConfig,
+	uniCfg *p2pconfig.UnicastConfig,
 	gossipSubCfg *p2pbuilder.GossipSubConfig,
 	topicValidatorDisabled,
 	withMessageSigning,
@@ -43,20 +43,16 @@ func NewCorruptLibP2PNodeFactory(
 			panic("illegal chain id for using corrupt libp2p node")
 		}
 
-		rpcInspectorBuilder := inspectorbuilder.NewGossipSubInspectorBuilder(log, sporkId, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(log))
-		rpcInspectors, err := rpcInspectorBuilder.Build()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for public libp2p node: %w", err)
-		}
-		gossipSubCfg.RPCInspectors = rpcInspectors
-
 		builder, err := p2pbuilder.DefaultNodeBuilder(
 			log,
 			address,
 			flowKey,
 			sporkId,
 			idProvider,
-			metrics,
+			&p2pconfig.MetricsConfig{
+				HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+				Metrics:          metricsCfg,
+			},
 			resolver,
 			role,
 			connGaterCfg,
