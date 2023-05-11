@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -118,23 +119,27 @@ func (suite *RateLimitTestSuite) SetupTest() {
 
 	rpcEngBuilder, err := NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,
 		nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt, suite.me)
-	assert.NoError(suite.T(), err)
+	require.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
-	assert.NoError(suite.T(), err)
+	require.NoError(suite.T(), err)
 	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
 	suite.rpcEng.Start(suite.ctx)
 	// wait for the server to startup
-	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
+	unittest.RequireCloseBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second, "engine not ready at startup")
 
 	// create the access api client
 	suite.client, suite.closer, err = accessAPIClient(suite.rpcEng.UnsecureGRPCAddress().String())
-	assert.NoError(suite.T(), err)
+	require.NoError(suite.T(), err)
 }
 
 func (suite *RateLimitTestSuite) TearDownTest() {
-	suite.cancel()
+	if suite.cancel != nil {
+		suite.cancel()
+	}
 	// close the client
-	suite.closer.Close()
+	if suite.closer != nil {
+		suite.closer.Close()
+	}
 	// close the server
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
 }
