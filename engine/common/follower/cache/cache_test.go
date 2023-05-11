@@ -166,8 +166,8 @@ func (s *CacheSuite) TestAddBatch() {
 	require.Equal(s.T(), blocks[len(blocks)-1].Header.QuorumCertificate(), certifyingQC)
 }
 
-// TestDuplicatedBatch checks that processing redundant inputs rejects batches that were previously rejected
-// but accepts batches that have at least one new block.
+// TestDuplicatedBatch checks that processing redundant inputs rejects batches where all blocks
+// already reside in the cache. Batches that have at least one new block should be accepted.
 func (s *CacheSuite) TestDuplicatedBatch() {
 	blocks := unittest.ChainFixtureFrom(10, unittest.BlockHeaderFixture())
 

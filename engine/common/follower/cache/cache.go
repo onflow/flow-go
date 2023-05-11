@@ -155,8 +155,8 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 	//    (result stored in `batchContext.batchParent`)
 	//  * check whether last block in batch has a child already in the cache
 	//    (result stored in `batchContext.batchChild`)
-	//  * check if input is redundant, meaning that ALL blocks are already known
-	//    (result stored in `batchContext.redundant`)
+	//  * check if input is redundant (indicated by `batchContext.redundant`), i.e. ALL blocks
+	//    are already known: then skip further processing
 	bc := c.unsafeAtomicAdd(blockIDs, batch)
 	if bc.redundant {
 		return nil, nil, nil
@@ -304,16 +304,19 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.B
 func (c *Cache) cache(blockID flow.Identifier, block *flow.Block) (equivocation *flow.Block, stored bool) {
 	cachedBlocksAtView, haveCachedBlocksAtView := c.byView[block.Header.View]
 	// Check whether there is a block with the same view already in the cache.
-	// During happy-path operations `cachedBlocksAtView` contains usually zero blocks or exactly one block
-	// which is `fullBlock` (duplicate). Larger sets of blocks can only be caused by slashable byzantine actions.
+	// During happy-path operations `cachedBlocksAtView` contains usually zero blocks or exactly one block, which
+	// is our input `block` (duplicate). Larger sets of blocks can only be caused by slashable byzantine actions.
 	for otherBlockID, otherBlock := range cachedBlocksAtView {
 		if otherBlockID == blockID {
 			return nil, false // already stored
 		}
 		// have two blocks for the same view but with different IDs => equivocation!
 		equivocation = otherBlock
-		break // we care whether the
+		break // we care whether we find an equivocation, but don't need to enumerate all equivocations
 	}
+	// Note: Even if this node detects an equivocation, we still have to process the block. This is because
+	// the node might be the only one seeing the equivocation, and other nodes might certify the block,
+	// in which case also this node needs to process the block to continue following consensus.
 
 	// block is not a duplicate: store in the underlying HeroCache and add it to secondary indices
 	added := c.backend.Add(blockID, block)
