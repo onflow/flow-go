@@ -220,6 +220,7 @@ func (cs *EngineSuite) TestOnFinalizedBlock() {
 		Run(func(_ mock.Arguments) { wg.Done() }).
 		Return(uint(0)).Once()
 
-	cs.engine.OnBlockFinalized(model.BlockFromFlow(finalizedBlock.Header))
+	err := cs.engine.processOnFinalizedBlock(model.BlockFromFlow(finalizedBlock.Header))
+	require.NoError(cs.T(), err)
 	unittest.AssertReturnsBefore(cs.T(), wg.Wait, time.Second, "an expected call to block buffer wasn't made")
 }
