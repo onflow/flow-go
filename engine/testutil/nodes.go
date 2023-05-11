@@ -323,6 +323,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 
 	builderFactory, err := factories.NewBuilderFactory(
 		node.PublicDB,
+		node.State,
 		node.Headers,
 		node.Tracer,
 		node.Metrics,

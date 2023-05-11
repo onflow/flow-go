@@ -43,7 +43,7 @@ import (
 //
 // The requester is made up of 3 subcomponents:
 //
-// * OnBlockFinalized:     receives block finalized events from the finalization distributor and
+// * OnFinalizedBlock:     receives block finalized events from the finalization distributor and
 //                         forwards them to the blockConsumer.
 //
 // * blockConsumer:        is a jobqueue that receives block finalization events. On each event,
@@ -60,7 +60,7 @@ import (
 //                         consecutive height at least once.
 //
 //    +------------------+      +---------------+       +----------------------+
-// -->| OnBlockFinalized |----->| blockConsumer |   +-->| notificationConsumer |
+// -->| OnFinalizedBlock |----->| blockConsumer |   +-->| notificationConsumer |
 //    +------------------+      +-------+-------+   |   +-----------+----------+
 //                                      |           |               |
 //                               +------+------+    |        +------+------+
