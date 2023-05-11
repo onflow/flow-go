@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection"
@@ -27,8 +28,9 @@ const defaultBlockQueueCapacity = 10_000
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 // Implements collection.Compliance interface.
 type Engine struct {
-	*component.ComponentManager
-	*events.FinalizationActor
+	component.Component
+	hotstuff.FinalizationConsumer
+
 	log                   zerolog.Logger
 	metrics               module.EngineMetrics
 	me                    module.Local
@@ -73,11 +75,11 @@ func NewEngine(
 		pendingBlocks:         blocksQueue,
 		pendingBlocksNotifier: engine.NewNotifier(),
 	}
-	finalizationActor, finalizationWorker := events.NewFinalizationActor(eng.handleFinalizedBlock)
-	eng.FinalizationActor = finalizationActor
+	finalizationActor, finalizationWorker := events.NewFinalizationActor(eng.processOnFinalizedBlock)
+	eng.FinalizationConsumer = finalizationActor
 
 	// create the component manager and worker threads
-	eng.ComponentManager = component.NewComponentManagerBuilder().
+	eng.Component = component.NewComponentManagerBuilder().
 		AddWorker(eng.processBlocksLoop).
 		AddWorker(finalizationWorker).
 		Build()
@@ -154,7 +156,11 @@ func (e *Engine) OnSyncedClusterBlock(syncedBlock flow.Slashable[*messages.Clust
 	}
 }
 
-func (e *Engine) handleFinalizedBlock(block *model.Block) error {
+// processOnFinalizedBlock informs compliance.Core about finalization of the respective block.
+// The input to this callback is treated as trusted. This method should be executed on
+// `OnFinalizedBlock` notifications from the node-internal consensus instance.
+// No errors expected during normal operations.
+func (e *Engine) processOnFinalizedBlock(block *model.Block) error {
 	// retrieve the latest finalized header, so we know the height
 	finalHeader, err := e.headers.ByBlockID(block.BlockID)
 	if err != nil { // no expected errors

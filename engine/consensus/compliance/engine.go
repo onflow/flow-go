@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -29,8 +30,9 @@ const defaultBlockQueueCapacity = 10_000
 // `compliance.Core` implements the actual compliance logic.
 // Implements consensus.Compliance interface.
 type Engine struct {
-	*component.ComponentManager
-	*events.FinalizationActor
+	component.Component
+	hotstuff.FinalizationConsumer
+
 	log                   zerolog.Logger
 	mempoolMetrics        module.MempoolMetrics
 	engineMetrics         module.EngineMetrics
@@ -74,10 +76,10 @@ func NewEngine(
 		core:                  core,
 		pendingBlocksNotifier: engine.NewNotifier(),
 	}
-	finalizationActor, finalizationWorker := events.NewFinalizationActor(eng.handleFinalizedBlock)
-	eng.FinalizationActor = finalizationActor
+	finalizationActor, finalizationWorker := events.NewFinalizationActor(eng.processOnFinalizedBlock)
+	eng.FinalizationConsumer = finalizationActor
 	// create the component manager and worker threads
-	eng.ComponentManager = component.NewComponentManagerBuilder().
+	eng.Component = component.NewComponentManagerBuilder().
 		AddWorker(eng.processBlocksLoop).
 		AddWorker(finalizationWorker).
 		Build()
@@ -162,11 +164,16 @@ func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]
 	}
 }
 
-func (e *Engine) handleFinalizedBlock(block *model.Block) error {
-	header, err := e.headers.ByBlockID(block.BlockID)
-	if err != nil {
-		return fmt.Errorf("could not get finalized block %x: %w", block.BlockID, err)
+// processOnFinalizedBlock informs compliance.Core about finalization of the respective block.
+// The input to this callback is treated as trusted. This method should be executed on
+// `OnFinalizedBlock` notifications from the node-internal consensus instance.
+// No errors expected during normal operations.
+func (e *Engine) processOnFinalizedBlock(block *model.Block) error {
+	// retrieve the latest finalized header, so we know the height
+	finalHeader, err := e.headers.ByBlockID(block.BlockID)
+	if err != nil { // no expected errors
+		return fmt.Errorf("could not get finalized header: %w", err)
 	}
-	e.core.ProcessFinalizedBlock(header)
+	e.core.ProcessFinalizedBlock(finalHeader)
 	return nil
 }
