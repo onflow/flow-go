@@ -1,0 +1,85 @@
+# Network Configuration
+# Connection pruning determines whether connections to nodes
+# that are not part of protocol state should be trimmed
+networking-connection-pruning: true
+# Preferred unicasts protocols list of unicast protocols in preferred order
+preferred-unicasts-protocols: [ ]
+received-message-cache-size: 10e4
+peer-update-interval: 10m
+unicast-message-timeout: 5s
+# Unicast create stream retry delay is initial delay used in the exponential backoff for create stream retries
+unicast-create-stream-retry-delay: 1s
+dns-cache-ttl: 5m
+# The size of the queue for notifications about new peers in the disallow list.
+disallow-list-notification-cache-size: 100
+# unicast rate limiters config
+# Setting this to true will disable connection disconnects and gating when unicast rate limiters are configured
+unicast-dry-run: true
+# The number of seconds a peer will be forced to wait before being allowed to successfully reconnect to the node after being rate limited
+unicast-lockout-duration: 10s
+# Amount of unicast messages that can be sent by a peer per second
+unicast-message-rate-limit: 0
+# Bandwidth size in bytes a peer is allowed to send via unicast streams per second
+unicast-bandwidth-rate-limit: 0
+# Bandwidth size in bytes a peer is allowed to send via unicast streams at once
+unicast-bandwidth-burst-limit: 1e9
+# Resource manager config
+# Maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
+libp2p-fd-ratio: 0.2
+# Maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
+libp2p-memory-limit: 0.5
+# The maximum amount of allowed inbound connections per peer
+libp2p-inbound-conns-limit: 1
+# Connection manager config
+# HighWatermark and LowWatermark govern the number of connections are maintained by the ConnManager.
+# When the peer count exceeds the HighWatermark, as many peers will be pruned (and
+# their connections terminated) until LowWatermark peers remain. In other words, whenever the
+# peer count is x > HighWatermark, the ConnManager will prune x - LowWatermark peers.
+# The pruning algorithm is as follows:
+# 1. The ConnManager will not prune any peers that have been connected for less than GracePeriod.
+# 2. The ConnManager will not prune any peers that are protected.
+# 3. The ConnManager will sort the peers based on their number of streams and direction of connections, and
+# prunes the peers with the least number of streams. If there are ties, the peer with the incoming connection
+# will be pruned. If both peers have incoming connections, and there are still ties, one of the peers will be
+# pruned at random.
+# Algorithm implementation is in https://github.com/libp2p/go-libp2p/blob/master/p2p/net/connmgr/connmgr.go#L262-L318
+libp2p-connmgr-high: 500
+libp2p-connmgr-low: 450
+# The time to wait before start pruning connections
+libp2p-connmgr-grace: 1m
+# The time to wait before pruning a new connection
+libp2p-connmgr-silence: 10s
+# Gossipsub config
+# Peer scoring is the default value for enabling peer scoring
+peer-scoring-enabled: true
+# The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes
+gossipsub-local-mesh-logging-interval: 1m
+# The default interval at which the gossipsub score tracer logs the peer scores, this is used for debugging and forensics purposes
+gossipsub-score-tracer-interval: 1m
+# Gossipsub rpc inspectors configs
+# The size of the queue for notifications about invalid RPC messages
+gossipsub-rpc-inspector-notification-cache-size: 10000
+# Rpc validation inspector number of pool workers
+gossipsub-rpc-validation-inspector-workers: 5
+# The size of the queue used by worker pool for the control message validation inspector
+gossipsub-rpc-validation-inspector-queue-cache-size: 100
+# The size of the cache used to track the amount of cluster prefixed topics received by peers
+gossipsub-cluster-prefix-tracker-cache-size: 100
+# The decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers
+gossipsub-cluster-prefix-tracker-cache-decay: 0.99
+# The upper bound on the amount of cluster prefixed control messages that will be processed
+gossipsub-rpc-cluster-prefixed-discard-threshold: 100
+# GRAFT control message validation limits
+gossipsub-rpc-graft-limits:
+  discardthreshold: 30
+  safetythreshold: 15
+  ratelimit: 30
+# PRUNE control message validation limits
+gossipsub-rpc-prune-limits:
+  discardthreshold: 30
+  safetythreshold: 15
+  ratelimit: 30
+# The number of metrics inspector pool workers
+gossipsub-rpc-metrics-inspector-workers: 1
+# The size of the queue used by worker pool for the control message metrics inspector
+gossipsub-rpc-metrics-inspector-cache-size: 100

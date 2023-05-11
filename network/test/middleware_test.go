@@ -224,7 +224,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// burst per interval
 	burst := 5
 
-	messageRateLimiter := ratelimiter.NewRateLimiter(limit, burst, 3)
+	messageRateLimiter := ratelimiter.NewRateLimiter(limit, burst, 3*time.Second)
 
 	// we only expect messages from the first middleware on the test suite
 	expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
