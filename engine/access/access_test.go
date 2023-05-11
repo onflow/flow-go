@@ -31,11 +31,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
-	module2 "github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	module "github.com/onflow/flow-go/module/mock"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -59,16 +59,16 @@ type Suite struct {
 	signerIds            flow.IdentifierList
 	log                  zerolog.Logger
 	net                  *mocknetwork.Network
-	request              *module.Requester
+	request              *mockmodule.Requester
 	collClient           *accessmock.AccessAPIClient
 	execClient           *accessmock.ExecutionAPIClient
-	me                   *module.Local
+	me                   *mockmodule.Local
 	rootBlock            *flow.Header
 	sealedBlock          *flow.Header
 	finalizedBlock       *flow.Header
 	chainID              flow.ChainID
 	metrics              *metrics.NoopCollector
-	finalizedHeaderCache module2.FinalizedHeaderCache
+	finalizedHeaderCache module.FinalizedHeaderCache
 	backend              *backend.Backend
 }
 
@@ -113,10 +113,10 @@ func (suite *Suite) SetupTest() {
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
 
-	suite.request = new(module.Requester)
+	suite.request = new(mockmodule.Requester)
 	suite.request.On("EntityByID", mock.Anything, mock.Anything)
 
-	suite.me = new(module.Local)
+	suite.me = new(mockmodule.Local)
 
 	suite.signerIds = unittest.IdentifierListFixture(4)
 	suite.signerIndicesDecoder = new(hsmock.BlockSignerDecoder)
