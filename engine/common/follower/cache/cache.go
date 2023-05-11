@@ -31,7 +31,7 @@ type batchContext struct {
 	// cached blocks. An equivocation are two blocks for the same view that have different block IDs.
 	equivocatingBlocks [][2]*flow.Block
 
-	// redundant marks if processed ALL blocks in batch are already stored in cache, meaning that
+	// redundant marks if ALL blocks in batch are already stored in cache, meaning that
 	// such input is identical to what was previously processed.
 	redundant bool
 }
