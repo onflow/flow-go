@@ -82,6 +82,9 @@ func NewRequestHandlerEngine(
 	}
 
 	finalizedHeaderCache, finalizedCacheWorker, err := events.NewFinalizedHeaderCache(state)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize finalized header cache: %w", err)
+	}
 	e.FinalizationConsumer = finalizedHeaderCache
 	e.requestHandler = NewRequestHandler(
 		logger,
@@ -97,6 +100,7 @@ func NewRequestHandlerEngine(
 	for i := 0; i < defaultEngineRequestsWorkers; i++ {
 		builder.AddWorker(e.requestHandler.requestProcessingWorker)
 	}
+	e.Component = builder.Build()
 
 	return e, nil
 }
