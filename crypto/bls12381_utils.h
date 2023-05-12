@@ -123,10 +123,17 @@ void    Fp_mul_montg(Fp *, const Fp *, const Fp *);
 void    Fp_squ_montg(Fp *, const Fp *);
 
 // E1 and G1 utilities
-int      E1_in_G1(const ep_t);
-int      G1_simple_subgroup_check(const ep_t);
-void     E1_mult(E1*, const E1*, const Fr*);
-void     G1_mult_gen(E1*, const Fr*);
+void        E1_copy(E1*, const E1*);
+void        E1_set_infty(E1*);
+bool_t      E1_is_infty(const E1*);
+void        E1_to_affine(E1*, const E1*);
+bool_t      E1_affine_on_curve(const E1*);
+bool_t      E1_in_G1(const ep_t);
+int         G1_simple_subgroup_check(const ep_t);
+void        E1_mult(E1*, const E1*, const Fr*);
+void        G1_mult_gen(E1*, const Fr*);
+BLST_ERROR  E1_read_bytes(E1*, const byte *,  const int); 
+void        E1_write_bytes(byte *, const E1*);
 
 int      ep_read_bin_compact(ep_t, const byte *, const int);
 void     ep_write_bin_compact(byte *, const ep_t,  const int);

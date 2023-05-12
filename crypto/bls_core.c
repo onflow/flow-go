@@ -21,7 +21,7 @@ int get_sk_len() {
 
 // Checks if input point p is in the subgroup G1. 
 // The function assumes the input is known to be on the curve E1.
-int E1_in_G1(const ep_t p){
+bool_t E1_in_G1(const ep_t p){
 // TODO: to upadte
 /*
     #if MEMBERSHIP_CHECK_G1 == EXP_ORDER
@@ -42,7 +42,8 @@ static void bls_sign_ep(byte* s, const Fr* sk, const ep_t h) {
     ep_new(p);
 
     // s = h^sk
-    ep_mult(p, h, sk);
+    //ep_mult(p, h, sk);
+    ep_copy(p, h);
     ep_write_bin_compact(s, p, SIGNATURE_LEN);
     ep_free(p);
 }
