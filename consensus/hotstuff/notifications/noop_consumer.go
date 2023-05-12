@@ -13,7 +13,7 @@ import (
 type NoopConsumer struct {
 	NoopProposalViolationConsumer
 	NoopFinalizationConsumer
-	NoopPartialConsumer
+	NoopParticipantConsumer
 	NoopCommunicatorConsumer
 }
 
@@ -26,31 +26,31 @@ func NewNoopConsumer() *NoopConsumer {
 
 // no-op implementation of hotstuff.Consumer(but not nested interfaces)
 
-type NoopPartialConsumer struct{}
+type NoopParticipantConsumer struct{}
 
-func (*NoopPartialConsumer) OnEventProcessed() {}
+func (*NoopParticipantConsumer) OnEventProcessed() {}
 
-func (*NoopPartialConsumer) OnStart(uint64) {}
+func (*NoopParticipantConsumer) OnStart(uint64) {}
 
-func (*NoopPartialConsumer) OnReceiveProposal(uint64, *model.Proposal) {}
+func (*NoopParticipantConsumer) OnReceiveProposal(uint64, *model.Proposal) {}
 
-func (*NoopPartialConsumer) OnReceiveQc(uint64, *flow.QuorumCertificate) {}
+func (*NoopParticipantConsumer) OnReceiveQc(uint64, *flow.QuorumCertificate) {}
 
-func (*NoopPartialConsumer) OnReceiveTc(uint64, *flow.TimeoutCertificate) {}
+func (*NoopParticipantConsumer) OnReceiveTc(uint64, *flow.TimeoutCertificate) {}
 
-func (*NoopPartialConsumer) OnPartialTc(uint64, *hotstuff.PartialTcCreated) {}
+func (*NoopParticipantConsumer) OnPartialTc(uint64, *hotstuff.PartialTcCreated) {}
 
-func (*NoopPartialConsumer) OnLocalTimeout(uint64) {}
+func (*NoopParticipantConsumer) OnLocalTimeout(uint64) {}
 
-func (*NoopPartialConsumer) OnViewChange(uint64, uint64) {}
+func (*NoopParticipantConsumer) OnViewChange(uint64, uint64) {}
 
-func (*NoopPartialConsumer) OnQcTriggeredViewChange(uint64, uint64, *flow.QuorumCertificate) {}
+func (*NoopParticipantConsumer) OnQcTriggeredViewChange(uint64, uint64, *flow.QuorumCertificate) {}
 
-func (*NoopPartialConsumer) OnTcTriggeredViewChange(uint64, uint64, *flow.TimeoutCertificate) {}
+func (*NoopParticipantConsumer) OnTcTriggeredViewChange(uint64, uint64, *flow.TimeoutCertificate) {}
 
-func (*NoopPartialConsumer) OnStartingTimeout(model.TimerInfo) {}
+func (*NoopParticipantConsumer) OnStartingTimeout(model.TimerInfo) {}
 
-func (*NoopPartialConsumer) OnCurrentViewDetails(uint64, uint64, flow.Identifier) {}
+func (*NoopParticipantConsumer) OnCurrentViewDetails(uint64, uint64, flow.Identifier) {}
 
 // no-op implementation of hotstuff.FinalizationConsumer
 
