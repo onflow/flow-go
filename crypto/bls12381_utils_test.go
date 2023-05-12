@@ -97,7 +97,7 @@ func BenchmarkMapToG1(b *testing.B) {
 // test subgroup membership check in G1 and G2
 func TestSubgroupCheck(t *testing.T) {
 	prg := getPRG(t)
-	seed := make([]byte, securityBits/8)
+	seed := make([]byte, PubKeyLenBLSBLS12381)
 	_, err := prg.Read(seed)
 	require.NoError(t, err)
 
@@ -113,9 +113,6 @@ func TestSubgroupCheck(t *testing.T) {
 
 	t.Run("G2", func(t *testing.T) {
 		var p pointE2
-		seed := make([]byte, PubKeyLenBLSBLS12381)
-		_, err := mrand.Read(seed)
-		require.NoError(t, err)
 		mapToG2(&p, seed) // point in G2
 		assert.True(t, checkMembershipG2(&p))
 

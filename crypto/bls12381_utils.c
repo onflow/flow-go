@@ -87,10 +87,10 @@ prec_st* init_precomputed_data_BLS12_381() {
 
 // Montgomery constant R related to the curve order r
 // R mod r = (1<<256)%r 
-const Fr BLS12_381_rR = {  \
+const Fr BLS12_381_rR = {{  \
     TO_LIMB_T(0x1824b159acc5056f), TO_LIMB_T(0x998c4fefecbc4ff5), \
     TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe), \
-    };
+    }};
 
 // TODO: temp utility function to delete
 bn_st* Fr_blst_to_relic(const Fr* x) {
@@ -187,6 +187,7 @@ void Fr_inv_montg_eucl(Fr *res, const Fr *a) {
 // if base = b*R, res = b^expo * R
 // In general, res = base^expo * R^(-expo+1)
 // `expo` is encoded as a little-endian limb_t table of length `expo_len`.
+// TODO: clean up?
 void Fr_exp_montg(Fr *res, const Fr* base, const limb_t* expo, const int expo_len) {
     // mask of the most significant bit
 	const limb_t msb_mask =  (limb_t)1<<((sizeof(limb_t)<<3)-1);
@@ -307,6 +308,7 @@ void Fr_write_bytes(byte *bin, const Fr* a) {
 
 // maps big-endian bytes into an Fr element using modular reduction
 // Input is byte-big-endian, output is Fr (internally vec256)
+// TODO: check redc_mont_256(vec256 ret, const vec512 a, const vec256 p, limb_t n0);
 static void Fr_from_be_bytes(Fr* out, const byte *bytes, size_t n)
 {
     Fr digit, radix;
@@ -336,7 +338,7 @@ static void Fr_from_be_bytes(Fr* out, const byte *bytes, size_t n)
 // Reads a scalar from an array and maps it to Fr using modular reduction.
 // Input is byte-big-endian as used by the external APIs.
 // It returns true if scalar is zero and false otherwise.
-bool_t map_bytes_to_Fr(Fr* a, const uint8_t* bin, int len) {
+bool_t map_bytes_to_Fr(Fr* a, const byte* bin, int len) {
     Fr_from_be_bytes(a, bin, len);
     return Fr_is_zero(a);
 }
@@ -443,7 +445,7 @@ void Fp_write_bytes(byte *bin, const Fp* a) {
 // Unlike Relic's versions, the function does not reduce the read integer modulo p and does
 // not throw an exception for an integer larger than p. The function returns RLC_OK if the input
 // corresponds to a field element, and returns RLC_ERR otherwise. 
-static int fp_read_bin_safe(fp_t a, const uint8_t *bin, int len) {
+static int fp_read_bin_safe(fp_t a, const byte *bin, int len) {
     if (len != Fp_BYTES) {
         return RLC_ERR;
     }
@@ -872,6 +874,20 @@ void G1_mult_gen(E1* res, const Fr* expo) {
     vec_zero(&tmp, sizeof(tmp));
 }
 
+ 
+// Reads a scalar bytes and maps it to Fp using modular reduction.
+// output is in Montgomery form. 
+// `len` must be less or equal to 96 bytes and must be a multiple of 8.
+// This function is only used by `map_to_G1` where input is 64 bytes.
+// input `len` is not checked to satisfy the conditions above.
+static void map_96_bytes_to_Fp(Fp* a, const byte* bin, int len) {
+    vec768 tmp ;
+    vec_zero(&tmp, sizeof(tmp));
+    limbs_from_be_bytes((limb_t*)tmp, bin, len);
+    redc_mont_384((limb_t*)a, tmp, BLS12_381_P, p0); // aR^(-2)
+    Fp_mul_montg(a, a, (Fp*)BLS12_381_RRRR); // aR
+}
+
 // maps bytes input `hash` to G1.
 // `hash` must be `MAP_TO_G1_INPUT_LEN` (128 bytes)
 // It uses construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
@@ -881,10 +897,11 @@ int map_to_G1(E1* h, const byte* hash, const int len) {
         return INVALID;
     }
     // map to field elements
-    Fr u[2];
-    map_bytes_to_Fr(&u[0], hash, MAP_TO_G1_INPUT_LEN/2);
-    map_bytes_to_Fr(&u[1], hash + MAP_TO_G1_INPUT_LEN/2, MAP_TO_G1_INPUT_LEN/2);
+    Fp u[2];
+    map_96_bytes_to_Fp(&u[0], hash, MAP_TO_G1_INPUT_LEN/2);
+    map_96_bytes_to_Fp(&u[1], hash + MAP_TO_G1_INPUT_LEN/2, MAP_TO_G1_INPUT_LEN/2);
     // map field elements to G1
+    // inputs must be in Montgomery form
     map_to_g1((POINTonE1 *)h, (limb_t *)&u[0], (limb_t *)&u[1]);
     return VALID;
 }
@@ -892,7 +909,7 @@ int map_to_G1(E1* h, const byte* hash, const int len) {
 // ------------------- E2 utilities
 
 // TODO: to delete
-static int fp2_read_bin_safe(fp2_t a, const uint8_t *bin, int len) {
+static int fp2_read_bin_safe(fp2_t a, const byte *bin, int len) {
     if (len != Fp2_BYTES) {
         return RLC_ERR;
     }
@@ -1327,7 +1344,7 @@ mem_error:
 /*
 // maps the bytes to a point in G1
 // this is a testing file only, should not be used in any protocol!
-void map_bytes_to_G1(ep_t p, const uint8_t* bytes, int len) {
+void map_bytes_to_G1(ep_t p, const byte* bytes, int len) {
     // map to Fr
     Fr log;
     map_bytes_to_Fr(&log, bytes, len);
@@ -1338,7 +1355,7 @@ void map_bytes_to_G1(ep_t p, const uint8_t* bytes, int len) {
 
 // generates a point in E1\G1 and stores it in p
 // this is a testing file only, should not be used in any protocol!
-void map_bytes_to_G1complement(ep_t p, const uint8_t* bytes, int len) {
+void map_bytes_to_G1complement(ep_t p, const byte* bytes, int len) {
     // generate a random point in E1
     p->coord = BASIC;
     fp_set_dig(p->z, 1);
@@ -1361,7 +1378,7 @@ void map_bytes_to_G1complement(ep_t p, const uint8_t* bytes, int len) {
 // maps the bytes to a point in G2.
 // `len` should be at least Fr_BYTES.
 // this is a testing tool only, it should not be used in any protocol!
-void map_bytes_to_G2(E2* p, const uint8_t* bytes, int len) {
+void map_bytes_to_G2(E2* p, const byte* bytes, int len) {
     assert(len > Fr_BYTES);
     // map to Fr
     Fr log;
@@ -1375,7 +1392,7 @@ void map_bytes_to_G2(E2* p, const uint8_t* bytes, int len) {
 // succeeds.
 // For now, function only works when E2 serialization is compressed.
 // this is a testing tool only, it should not be used in any protocol!
-BLST_ERROR map_bytes_to_G2complement(E2* p, const uint8_t* bytes, int len) {
+BLST_ERROR map_bytes_to_G2complement(E2* p, const byte* bytes, int len) {
     assert(G2_SERIALIZATION == COMPRESSED);
     assert(len >= G2_SER_BYTES);
 
@@ -1386,13 +1403,14 @@ BLST_ERROR map_bytes_to_G2complement(E2* p, const uint8_t* bytes, int len) {
     copy[0] |= 1<<7;        // set compression bit
     copy[0] &= ~(1<<6);     // clear infinity bit - point is not infinity
 
-    BLST_ERROR ser = E2_read_bytes(p, copy, len);
+    BLST_ERROR ser = E2_read_bytes(p, copy, G2_SER_BYTES);
     if (ser != BLST_SUCCESS) {
         return ser;
     }
 
     // map the point to E2\G2 by clearing G2 order
     E2_mult(p, p, (const Fr*)BLS12_381_r);
+    E2_to_affine(p, p);
 
     assert(E2_affine_on_curve(p));  // sanity check to make sure p is in E2
     return BLST_SUCCESS;
