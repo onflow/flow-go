@@ -3,10 +3,6 @@ package access
 import (
 	"context"
 	"fmt"
-
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-
 	"math/rand"
 	"net/http"
 	"os"
@@ -27,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
@@ -63,6 +60,9 @@ type RestAPITestSuite struct {
 	transactions     *storagemock.Transactions
 	receipts         *storagemock.ExecutionReceipts
 	executionResults *storagemock.ExecutionResults
+
+	ctx    irrecoverable.SignalerContext
+	cancel context.CancelFunc
 }
 
 func (suite *RestAPITestSuite) SetupTest() {
@@ -118,24 +118,22 @@ func (suite *RestAPITestSuite) SetupTest() {
 		RESTListenAddr:         unittest.DefaultAddress,
 	}
 
-	followerDistributor := pubsub.NewFollowerDistributor()
-
-	var err error
-	finalizedHeaderCache, err := synceng.NewFinalizedHeaderCache(suite.log, suite.state, followerDistributor)
-	require.NoError(suite.T(), err)
-
 	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
 		nil, suite.executionResults, suite.chainID, suite.metrics, suite.metrics, 0, 0, false,
 		false, nil, nil, suite.me)
 	assert.NoError(suite.T(), err)
-	suite.rpcEng, err = rpcEngBuilder.WithLegacy().WithFinalizedHeaderCache(finalizedHeaderCache).Build()
+	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)
-	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
+	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
+	suite.rpcEng.Start(suite.ctx)
 	// wait for the server to startup
-	assert.Eventually(suite.T(), func() bool {
-		return suite.rpcEng.RestApiAddress() != nil
-	}, 5*time.Second, 10*time.Millisecond)
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
+}
+
+func (suite *RestAPITestSuite) TearDownTest() {
+	suite.cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
 }
 
 func TestRestAPI(t *testing.T) {
@@ -346,13 +344,6 @@ func (suite *RestAPITestSuite) TestRequestSizeRestriction() {
 	}
 	_, resp, err := client.ScriptsApi.ScriptsPost(ctx, script, nil)
 	assertError(suite.T(), resp, err, http.StatusBadRequest, "request body too large")
-}
-
-func (suite *RestAPITestSuite) TearDownTest() {
-	// close the server
-	if suite.rpcEng != nil {
-		unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
-	}
 }
 
 // restAPIClient creates a REST API client

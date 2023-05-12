@@ -110,7 +110,6 @@ type FollowerServiceBuilder struct {
 	FollowerState       protocol.FollowerState
 	SyncCore            *synchronization.Core
 	FollowerDistributor *pubsub.FollowerDistributor
-	FinalizedHeader     *synceng.FinalizedHeaderCache
 	Committee           hotstuff.DynamicCommittee
 	Finalized           *flow.Header
 	Pending             []*flow.Header
@@ -275,20 +274,6 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 	return builder
 }
 
-func (builder *FollowerServiceBuilder) buildFinalizedHeader() *FollowerServiceBuilder {
-	builder.Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FollowerDistributor)
-		if err != nil {
-			return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-		}
-		builder.FinalizedHeader = finalizedHeader
-
-		return builder.FinalizedHeader, nil
-	})
-
-	return builder
-}
-
 func (builder *FollowerServiceBuilder) buildSyncEngine() *FollowerServiceBuilder {
 	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		sync, err := synceng.New(
@@ -296,10 +281,10 @@ func (builder *FollowerServiceBuilder) buildSyncEngine() *FollowerServiceBuilder
 			node.Metrics.Engine,
 			node.Network,
 			node.Me,
+			node.State,
 			node.Storage.Blocks,
 			builder.FollowerEng,
 			builder.SyncCore,
-			builder.FinalizedHeader,
 			builder.SyncEngineParticipantsProviderFactory(),
 		)
 		if err != nil {
@@ -321,7 +306,6 @@ func (builder *FollowerServiceBuilder) BuildConsensusFollower() cmd.NodeBuilder 
 		buildLatestHeader().
 		buildFollowerCore().
 		buildFollowerEngine().
-		buildFinalizedHeader().
 		buildSyncEngine()
 
 	return builder

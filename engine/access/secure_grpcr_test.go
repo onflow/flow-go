@@ -7,11 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -24,6 +19,7 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
@@ -56,6 +52,9 @@ type SecureGRPCTestSuite struct {
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
+
+	ctx    irrecoverable.SignalerContext
+	cancel context.CancelFunc
 }
 
 func (suite *SecureGRPCTestSuite) SetupTest() {
@@ -109,22 +108,20 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	followerDistributor := pubsub.NewFollowerDistributor()
-
-	finalizedHeaderCache, err := synceng.NewFinalizedHeaderCache(suite.log, suite.state, followerDistributor)
-	require.NoError(suite.T(), err)
-
 	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,
 		nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, nil, nil, suite.me)
 	assert.NoError(suite.T(), err)
-	suite.rpcEng, err = rpcEngBuilder.WithLegacy().WithFinalizedHeaderCache(finalizedHeaderCache).Build()
+	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)
-	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
-
+	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
+	suite.rpcEng.Start(suite.ctx)
 	// wait for the server to startup
-	assert.Eventually(suite.T(), func() bool {
-		return suite.rpcEng.SecureGRPCAddress() != nil
-	}, 5*time.Second, 10*time.Millisecond)
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
+}
+
+func (suite *SecureGRPCTestSuite) TearDownTest() {
+	suite.cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
 }
 
 func TestSecureGRPC(t *testing.T) {
@@ -155,13 +152,6 @@ func (suite *SecureGRPCTestSuite) TestAPICallUsingSecureGRPC() {
 		_, err := client.Ping(ctx, req)
 		assert.Error(suite.T(), err)
 	})
-}
-
-func (suite *SecureGRPCTestSuite) TearDownTest() {
-	// close the server
-	if suite.rpcEng != nil {
-		unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
-	}
 }
 
 // secureGRPCClient creates a secure GRPC client using the given public key

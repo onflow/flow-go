@@ -119,7 +119,6 @@ func main() {
 		followerDistributor *pubsub.FollowerDistributor
 		dkgBrokerTunnel     *dkgmodule.BrokerTunnel
 		blockTimer          protocol.BlockTimer
-		finalizedHeader     *synceng.FinalizedHeaderCache
 		committee           *committees.Consensus
 		epochLookup         *epochs.EpochLookup
 		hotstuffModules     *consensus.HotstuffModules
@@ -746,7 +745,6 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
-
 			followerDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
 
 			return comp, nil
@@ -770,24 +768,16 @@ func main() {
 			hotstuffModules.Notifier.AddConsumer(messageHub)
 			return messageHub, nil
 		}).
-		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, followerDistributor)
-			if err != nil {
-				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-			}
-
-			return finalizedHeader, nil
-		}).
 		Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
+				node.State,
 				node.Storage.Blocks,
 				comp,
 				syncCore,
-				finalizedHeader,
 				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {

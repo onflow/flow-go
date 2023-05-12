@@ -125,7 +125,7 @@ func (factory *EpochComponentsFactory) Create(
 	// get the transaction pool for the epoch
 	pool := factory.pools.ForEpoch(epochCounter)
 
-	builder, finalizer, err := factory.builder.Create(headers, payloads, pool, epochCounter)
+	builder, finalizer, err := factory.builder.Create(state, headers, payloads, pool, epochCounter)
 	if err != nil {
 		err = fmt.Errorf("could not create builder/finalizer: %w", err)
 		return
