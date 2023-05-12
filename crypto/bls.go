@@ -320,7 +320,7 @@ const invalidBLSSignatureHeader = byte(0xE0)
 // makes the verification fail early. The verification would return (false, nil).
 func BLSInvalidSignature() Signature {
 	signature := make([]byte, SignatureLenBLSBLS12381)
-	signature[0] = invalidBLSSignatureHeader // invalid header as per C.ep_read_bin_compact
+	signature[0] = invalidBLSSignatureHeader // invalid header as per the Zcash serialization
 	return signature
 }
 

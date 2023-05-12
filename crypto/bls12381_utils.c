@@ -87,8 +87,10 @@ prec_st* init_precomputed_data_BLS12_381() {
 
 // Montgomery constant R related to the curve order r
 // R mod r = (1<<256)%r 
-const Fr BLS12_381_rR = { TO_LIMB_T(0x1824b159acc5056f), TO_LIMB_T(0x998c4fefecbc4ff5), \
-                          TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe), };
+const Fr BLS12_381_rR = {  \
+    TO_LIMB_T(0x1824b159acc5056f), TO_LIMB_T(0x998c4fefecbc4ff5), \
+    TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe), \
+    };
 
 // TODO: temp utility function to delete
 bn_st* Fr_blst_to_relic(const Fr* x) {
@@ -560,7 +562,17 @@ void Fp2_write_bytes(byte *bin, const Fp2* a) {
     Fp_write_bytes(bin + Fp_BYTES, &imag(a));
 }
 
-// ------------------- G1 utilities
+// ------------------- E1 utilities
+
+// TODO: temp utility function to delete
+ep_st* E1_blst_to_relic(const E1* x) {
+    ep_st* out = (ep_st*)malloc(sizeof(ep_st)); 
+    byte* data = (byte*)malloc(G1_SER_BYTES);
+    E1_write_bytes(data, x);
+    ep_read_bin_compact(out, data, G1_SER_BYTES);
+    free(data);
+    return out;
+}
 
 // TODO: to delete, only used by temporary E2_blst_to_relic
 int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
@@ -831,12 +843,25 @@ void E1_write_bytes(byte *bin, const E1* a) {
     bin[0] |= (G1_SERIALIZATION << 7);
 }
 
+// generic point addition that must handle doubling and points at infinity
+void E1_add(E1* res, const E1* a, const E1* b) {
+    POINTonE1_dadd((POINTonE1*)res, (POINTonE1*)a, (POINTonE1*)b, NULL); 
+}
+
 // Exponentiation of a generic point `a` in E1, res = expo.a
 void E1_mult(E1* res, const E1* p, const Fr* expo) {
     pow256 tmp;
     pow256_from_Fr(tmp, expo);
     POINTonE1_mult_glv((POINTonE1*)res, (POINTonE1*)p, tmp);
     vec_zero(&tmp, sizeof(tmp));
+}
+
+// computes the sum of the E1 array elements `y[i]` and writes it in `sum`.
+void E1_sum_vector(E1* sum, const E1* y, const int len){
+    E1_set_infty(sum);
+    for (int i=0; i<len; i++){
+        E1_add(sum, sum, &y[i]);
+    }
 }
 
 // Exponentiation of generator g1 of G1, res = expo.g1
@@ -1162,11 +1187,11 @@ bool_t E2_in_G2(const E2* p){
     return POINTonE2_in_G2((const POINTonE2*)p);
 }
 
-// computes the sum of the G2 array elements y and writes the sum in jointy
-void E2_sum_vector(E2* jointy, const E2* y, const int len){
-    E2_set_infty(jointy);
+// computes the sum of the E2 array elements `y[i]` and writes it in `sum`
+void E2_sum_vector(E2* sum, const E2* y, const int len){
+    E2_set_infty(sum);
     for (int i=0; i<len; i++){
-        E2_add(jointy, jointy, &y[i]);
+        E2_add(sum, sum, &y[i]);
     }
 }
 
@@ -1178,7 +1203,7 @@ void E2_sum_vector(E2* jointy, const E2* y, const int len){
 // Membership check in G2 of both keys is not verified in this function.
 // the membership check in G2 is separated to allow optimizing multiple verifications 
 // using the same public keys.
-int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte* sig2) {  
+/*int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte* sig2) {  
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
 
@@ -1244,7 +1269,7 @@ int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte*
         return INVALID;
     }
     return UNDEFINED;
-}
+}*/
 
 // Subtracts all G2 array elements `y` from an element `x` and writes the 
 // result in res
@@ -1297,22 +1322,6 @@ out:
     free(sigs);
 mem_error:
     return error;
-}
-
-// uses a simple scalar multiplication by G1's order
-// to check whether a point on the curve E1 is in G1.
-int G1_simple_subgroup_check(const ep_t p){
-    ep_t inf;
-    ep_new(inf);
-    // check p^order == infinity
-    // use basic double & add as lwnaf reduces the expo modulo r
-    ep_mul_basic(inf, p, &core_get()->ep_r);
-    if (!ep_is_infty(inf)){
-        ep_free(inf);
-        return INVALID;
-    }
-    ep_free(inf);
-    return VALID;
 }
 
 /*
