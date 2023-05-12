@@ -540,17 +540,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			collectionCount := 2
 			transactionsPerCollection := 2
 
-			totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 // +1 for system chunk
-
 			// create a block with 2 collections with 2 transactions each
 			block := generateBlock(collectionCount, transactionsPerCollection, rag)
-
-			ordinaryEvent := cadence.Event{
-				EventType: &cadence.EventType{
-					Location:            stdlib.FlowLocation{},
-					QualifiedIdentifier: "what.ever",
-				},
-			}
 
 			serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
 			require.NoError(t, err)
@@ -588,26 +579,55 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 			serviceEventC.EventType.QualifiedIdentifier = serviceEvents.VersionBeacon.QualifiedIdentifier()
 
+			transactions := []*flow.TransactionBody{}
+			for _, col := range block.Collections() {
+				transactions = append(transactions, col.Transactions...)
+			}
+
 			// events to emit for each iteration/transaction
-			events := make([][]cadence.Event, totalTransactionCount)
-			events[0] = nil
-			events[1] = []cadence.Event{serviceEventA, ordinaryEvent}
-			events[2] = []cadence.Event{ordinaryEvent}
-			events[3] = nil
-			events[4] = []cadence.Event{serviceEventB, serviceEventC}
+			events := map[common.Location][]cadence.Event{
+				common.TransactionLocation(transactions[0].ID()): nil,
+				common.TransactionLocation(transactions[1].ID()): []cadence.Event{
+					serviceEventA,
+					cadence.Event{
+						EventType: &cadence.EventType{
+							Location:            stdlib.FlowLocation{},
+							QualifiedIdentifier: "what.ever",
+						},
+					},
+				},
+				common.TransactionLocation(transactions[2].ID()): []cadence.Event{
+					cadence.Event{
+						EventType: &cadence.EventType{
+							Location:            stdlib.FlowLocation{},
+							QualifiedIdentifier: "what.ever",
+						},
+					},
+				},
+				common.TransactionLocation(transactions[3].ID()): nil,
+			}
+
+			systemTransactionEvents := []cadence.Event{
+				serviceEventB,
+				serviceEventC,
+			}
 
 			emittingRuntime := &testRuntime{
 				executeTransaction: func(
 					script runtime.Script,
 					context runtime.Context,
 				) error {
-					for _, e := range events[0] {
+					scriptEvents, ok := events[context.Location]
+					if !ok {
+						scriptEvents = systemTransactionEvents
+					}
+
+					for _, e := range scriptEvents {
 						err := context.Interface.EmitEvent(e)
 						if err != nil {
 							return err
 						}
 					}
-					events = events[1:]
 					return nil
 				},
 				readStored: func(
@@ -802,15 +822,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		const collectionCount = 2
 		const transactionCount = 2
+		block := generateBlock(collectionCount, transactionCount, rag)
 
-		var executionCalls int
+		normalTransactions := map[common.Location]struct{}{}
+		for _, col := range block.Collections() {
+			for _, txn := range col.Transactions {
+				loc := common.TransactionLocation(txn.ID())
+				normalTransactions[loc] = struct{}{}
+			}
+		}
 
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				executionCalls++
-
-				// NOTE: set a program and revert all transactions but the system chunk transaction
+				// NOTE: set a program and revert all transactions but the
+				// system chunk transaction
 				_, err := r.Interface.GetOrLoadProgram(
 					contractLocation,
 					func() (*interpreter.Program, error) {
@@ -819,13 +845,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				)
 				require.NoError(t, err)
 
-				if executionCalls > collectionCount*transactionCount {
-					return nil
+				_, ok := normalTransactions[r.Location]
+				if ok {
+					return runtime.Error{
+						Err: fmt.Errorf("TX reverted"),
+					}
 				}
 
-				return runtime.Error{
-					Err: fmt.Errorf("TX reverted"),
-				}
+				return nil
 			},
 			readStored: func(
 				address common.Address,
@@ -870,8 +897,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			prov,
 			nil)
 		require.NoError(t, err)
-
-		block := generateBlock(collectionCount, transactionCount, rag)
 
 		key := flow.AccountStatusRegisterID(
 			flow.BytesToAddress(address.Bytes()))
