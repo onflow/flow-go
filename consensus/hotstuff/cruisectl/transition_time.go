@@ -19,7 +19,7 @@ var weekdays = map[string]time.Weekday{
 
 var transitionFmt = "%s@%02d:%02d" // example: wednesday@08:00
 
-// EpochTransitionTime represents the target epoch transition time.
+// EpochTransitionTime represents the target epochInfo transition time.
 // Epochs last one week, so the transition is defined in terms of a day-of-week and time-of-day.
 // The target time is always in UTC to avoid confusion resulting from different
 // representations of the same transition time and around daylight savings time.
@@ -29,7 +29,7 @@ type EpochTransitionTime struct {
 	minute uint8        // minute of the hour to target epoch transition
 }
 
-// DefaultEpochTransitionTime is the default epoch transition target.
+// DefaultEpochTransitionTime is the default epochInfo transition target.
 // The target switchover is Wednesday 12:00 PDT, which is 19:00 UTC.
 // The string representation is `wednesday@19:00`.
 func DefaultEpochTransitionTime() *EpochTransitionTime {
@@ -43,8 +43,8 @@ func DefaultEpochTransitionTime() *EpochTransitionTime {
 // String returns the canonical string representation of the transition time.
 // This is the format expected as user input, when this value is configured manually.
 // See ParseSwitchover for details of the format.
-func (s *EpochTransitionTime) String() string {
-	return fmt.Sprintf(transitionFmt, strings.ToLower(s.day.String()), s.hour, s.minute)
+func (tt *EpochTransitionTime) String() string {
+	return fmt.Sprintf(transitionFmt, strings.ToLower(tt.day.String()), tt.hour, tt.minute)
 }
 
 // newInvalidTransitionStrError returns an informational error about an invalid transition string.
@@ -102,4 +102,62 @@ func ParseTransition(s string) (*EpochTransitionTime, error) {
 		hour:   hour,
 		minute: minute,
 	}, nil
+}
+
+// inferTargetEndTime infers the target end time for the current epoch, based on
+// the current progress through the epoch and the current time.
+// We do this in 3 steps:
+//  1. find the 3 candidate target end times nearest to the current time.
+//  2. compute the estimated end time for the current epoch.
+//  3. select the candidate target end time which is nearest to the estimated end time.
+//
+// NOTE 1: This method is effective only if the node's local notion of current view and
+// time are accurate. If a node is, for example, catching up from a very old state, it
+// will infer incorrect target end times. Since catching-up nodes don't produce usable
+// proposals, this is OK.
+// NOTE 2: In the long run, the target end time should be specified by the smart contract
+// and stored along with the other protocol.Epoch information. This would remove the
+// need for this imperfect inference logic.
+func (tt *EpochTransitionTime) inferTargetEndTime(curView uint64, curTime time.Time, epoch *epochInfo) time.Time {
+	now := curTime
+	// find the nearest target end time, plus the targets one week before and after
+	nearestTargetDate := tt.findNearestTargetTime(now)
+	earlierTargetDate := nearestTargetDate.AddDate(0, 0, -7)
+	laterTargetDate := nearestTargetDate.AddDate(0, 0, 7)
+
+	estimatedTimeRemainingInEpoch := time.Duration(float64(epoch.curEpochFinalView-curView) / float64(epoch.curEpochFinalView-epoch.curEpochFinalView) * float64(time.Hour*24*7))
+	estimatedEpochEndTime := now.Add(estimatedTimeRemainingInEpoch)
+
+	minDiff := estimatedEpochEndTime.Sub(nearestTargetDate).Abs()
+	inferredTargetEndTime := nearestTargetDate
+	for _, date := range []time.Time{earlierTargetDate, laterTargetDate} {
+		// compare estimate to actual based on the target
+		diff := estimatedEpochEndTime.Sub(date).Abs()
+		if diff < minDiff {
+			minDiff = diff
+			inferredTargetEndTime = date
+		}
+	}
+
+	return inferredTargetEndTime
+}
+
+// findNearestTargetTime interprets ref as a date (ignores time-of-day portion)
+// and finds the nearest date, either before or after ref, which has the given weekday.
+// We then return a time.Time with this date and the hour/minute specified by the EpochTransitionTime.
+// For example, inputs ref="Wed Jul 2", weekday=Sunday would yield "Sun June 29". todo needed??
+func (tt *EpochTransitionTime) findNearestTargetTime(ref time.Time) time.Time {
+	hour := int(tt.hour)
+	minute := int(tt.minute)
+	date := time.Date(ref.Year(), ref.Month(), ref.Day(), hour, minute, 0, 0, time.UTC)
+	walk := 0 // how many days we should walk each loop
+	for date.Weekday() != tt.day {
+		walk++
+		if walk%2 == 0 {
+			date = date.AddDate(0, 0, walk)
+		} else {
+			date = date.AddDate(0, 0, -walk)
+		}
+	}
+	return date
 }

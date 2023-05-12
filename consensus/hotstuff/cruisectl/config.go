@@ -8,11 +8,7 @@ import (
 // DefaultConfig returns the default config for the BlockRateController.
 func DefaultConfig() *Config {
 	return &Config{
-		TargetTransition: EpochTransitionTime{
-			day:    time.Wednesday,
-			hour:   19,
-			minute: 0,
-		},
+		TargetTransition: DefaultEpochTransitionTime(),
 		// TODO confirm default values
 		DefaultBlockRateDelay: 500 * time.Millisecond,
 		MaxDelay:              1000 * time.Millisecond,
@@ -28,10 +24,10 @@ func DefaultConfig() *Config {
 // Config defines configuration for the BlockRateController.
 type Config struct {
 	// TargetTransition defines the target time to transition epochs each week.
-	TargetTransition EpochTransitionTime
+	TargetTransition *EpochTransitionTime
 	// DefaultBlockRateDelay is the baseline block rate delay. It is used:
 	//  - when Enabled is false
-	//  - when epoch fallback has been triggered
+	//  - when epochInfo fallback has been triggered
 	//  - as the initial block rate delay value, to which the compensation computed
 	//    by the PID controller is added
 	DefaultBlockRateDelay time.Duration
@@ -54,4 +50,9 @@ type Config struct {
 	// KI adjusts the integral term (responds to the magnitude and duration of error over time).
 	// KD adjusts the derivative term (responds to the instantaneous rate of change of the error).
 	KP, KI, KD float64
+}
+
+// alpha returns the sample inclusion proportion used when calculating the exponentially moving average.
+func (c Config) alpha() float64 {
+	return 2.0 / float64(c.N+1)
 }
