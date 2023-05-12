@@ -109,38 +109,38 @@ type ExecutionNode struct {
 	builder *FlowNodeBuilder // This is needed for accessing the ShutdownFunc
 	exeConf *ExecutionConfig
 
-	collector               module.ExecutionMetrics
-	executionState          state.ExecutionState
-	followerState           protocol.FollowerState
-	committee               hotstuff.DynamicCommittee
-	ledgerStorage           *ledger.Ledger
-	events                  *storage.Events
-	serviceEvents           *storage.ServiceEvents
-	txResults               *storage.TransactionResults
-	results                 *storage.ExecutionResults
-	myReceipts              *storage.MyExecutionReceipts
-	providerEngine          *exeprovider.Engine
-	checkerEng              *checker.Engine
-	syncCore                *chainsync.Core
-	syncEngine              *synchronization.Engine
-	followerCore            *hotstuff.FollowerLoop        // follower hotstuff logic
-	followerEng             *followereng.ComplianceEngine // to sync blocks from consensus nodes
-	computationManager      *computation.Manager
-	collectionRequester     *requester.Engine
-	ingestionEng            *ingestion.Engine
-	finalizationDistributor *pubsub.FinalizationDistributor
-	checkAuthorizedAtBlock  func(blockID flow.Identifier) (bool, error)
-	diskWAL                 *wal.DiskWAL
-	blockDataUploader       *uploader.Manager
-	executionDataStore      execution_data.ExecutionDataStore
-	toTriggerCheckpoint     *atomic.Bool           // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
-	stopControl             *ingestion.StopControl // stop the node at given block height
-	executionDataDatastore  *badger.Datastore
-	executionDataPruner     *pruner.Pruner
-	executionDataBlobstore  blobs.Blobstore
-	executionDataTracker    tracker.Storage
-	blobService             network.BlobService
-	blobserviceDependable   *module.ProxiedReadyDoneAware
+	collector              module.ExecutionMetrics
+	executionState         state.ExecutionState
+	followerState          protocol.FollowerState
+	committee              hotstuff.DynamicCommittee
+	ledgerStorage          *ledger.Ledger
+	events                 *storage.Events
+	serviceEvents          *storage.ServiceEvents
+	txResults              *storage.TransactionResults
+	results                *storage.ExecutionResults
+	myReceipts             *storage.MyExecutionReceipts
+	providerEngine         *exeprovider.Engine
+	checkerEng             *checker.Engine
+	syncCore               *chainsync.Core
+	syncEngine             *synchronization.Engine
+	followerCore           *hotstuff.FollowerLoop        // follower hotstuff logic
+	followerEng            *followereng.ComplianceEngine // to sync blocks from consensus nodes
+	computationManager     *computation.Manager
+	collectionRequester    *requester.Engine
+	ingestionEng           *ingestion.Engine
+	followerDistributor    *pubsub.FollowerDistributor
+	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
+	diskWAL                *wal.DiskWAL
+	blockDataUploader      *uploader.Manager
+	executionDataStore     execution_data.ExecutionDataStore
+	toTriggerCheckpoint    *atomic.Bool           // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	stopControl            *ingestion.StopControl // stop the node at given block height
+	executionDataDatastore *badger.Datastore
+	executionDataPruner    *pruner.Pruner
+	executionDataBlobstore blobs.Blobstore
+	executionDataTracker   tracker.Storage
+	blobService            network.BlobService
+	blobserviceDependable  *module.ProxiedReadyDoneAware
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
@@ -172,7 +172,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("execution metrics", exeNode.LoadExecutionMetrics).
 		Module("sync core", exeNode.LoadSyncCore).
 		Module("execution receipts storage", exeNode.LoadExecutionReceiptsStorage).
-		Module("finalization distributor", exeNode.LoadFinalizationDistributor).
+		Module("follower distributor", exeNode.LoadFollowerDistributor).
 		Module("authorization checking function", exeNode.LoadAuthorizationCheckingFunction).
 		Module("execution data datastore", exeNode.LoadExecutionDataDatastore).
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
@@ -270,9 +270,9 @@ func (exeNode *ExecutionNode) LoadExecutionReceiptsStorage(
 	return nil
 }
 
-func (exeNode *ExecutionNode) LoadFinalizationDistributor(node *NodeConfig) error {
-	exeNode.finalizationDistributor = pubsub.NewFinalizationDistributor()
-	exeNode.finalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
+func (exeNode *ExecutionNode) LoadFollowerDistributor(node *NodeConfig) error {
+	exeNode.followerDistributor = pubsub.NewFollowerDistributor()
+	exeNode.followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
 	return nil
 }
 
@@ -852,7 +852,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 		return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 	}
 
-	exeNode.finalizationDistributor.AddConsumer(exeNode.checkerEng)
+	exeNode.followerDistributor.AddFinalizationConsumer(exeNode.checkerEng)
 
 	// creates a consensus follower with ingestEngine as the notifier
 	// so that it gets notified upon each new finalized block
@@ -860,7 +860,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 		node.Logger,
 		node.Storage.Headers,
 		final,
-		exeNode.finalizationDistributor,
+		exeNode.followerDistributor,
 		node.RootBlock.Header,
 		node.RootQC,
 		finalized,
@@ -893,7 +893,7 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		node.Logger,
 		node.Metrics.Mempool,
 		heroCacheCollector,
-		exeNode.finalizationDistributor,
+		exeNode.followerDistributor,
 		exeNode.followerState,
 		exeNode.followerCore,
 		validator,

@@ -207,7 +207,7 @@ type FlowAccessNodeBuilder struct {
 	FollowerState              protocol.FollowerState
 	SyncCore                   *chainsync.Core
 	RpcEng                     *rpc.Engine
-	FinalizationDistributor    *consensuspubsub.FinalizationDistributor
+	FollowerDistributor        *consensuspubsub.FollowerDistributor
 	CollectionRPC              access.AccessAPIClient
 	TransactionTimings         *stdmap.TransactionTimings
 	CollectionsToMarkFinalized *stdmap.Times
@@ -316,7 +316,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 			node.Logger,
 			node.Storage.Headers,
 			final,
-			builder.FinalizationDistributor,
+			builder.FollowerDistributor,
 			node.RootBlock.Header,
 			node.RootQC,
 			builder.Finalized,
@@ -344,7 +344,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			node.Logger,
 			node.Metrics.Mempool,
 			heroCacheCollector,
-			builder.FinalizationDistributor,
+			builder.FollowerDistributor,
 			builder.FollowerState,
 			builder.FollowerCore,
 			builder.Validator,
@@ -540,7 +540,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				builder.executionDataConfig,
 			)
 
-			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 			builder.ExecutionDataRequester.AddOnExecutionDataReceivedConsumer(execDataDistributor.OnExecutionDataReceived)
 
 			return builder.ExecutionDataRequester, nil
@@ -593,12 +593,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 }
 
 func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
-	dist := consensuspubsub.NewFinalizationDistributor()
-	dist.AddConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
+	dist := consensuspubsub.NewFollowerDistributor()
+	dist.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
 	return &FlowAccessNodeBuilder{
-		AccessNodeConfig:        DefaultAccessNodeConfig(),
-		FlowNodeBuilder:         nodeBuilder,
-		FinalizationDistributor: dist,
+		AccessNodeConfig:    DefaultAccessNodeConfig(),
+		FlowNodeBuilder:     nodeBuilder,
+		FollowerDistributor: dist,
 	}
 }
 
@@ -967,7 +967,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, err
 			}
-			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 
 			return builder.RpcEng, nil
 		}).
@@ -1009,7 +1009,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, err
 			}
 			builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
-			builder.FinalizationDistributor.AddConsumer(builder.IngestEng)
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
 
 			return builder.IngestEng, nil
 		}).
