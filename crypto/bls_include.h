@@ -20,11 +20,6 @@
 #define DOUBLE_PAIRING 1
 #define SINGLE_PAIRING (DOUBLE_PAIRING^1)
 
-// algorithm choice for hashing to G1 
-#define BLST_SSWU 1       // BLST implementation
-#define LOCAL_SSWU 2      // local implementation 
-#define hashToPoint BLST_SSWU
-
 // bls core (functions in bls_core.c)
 int      get_signature_len();
 int      get_pk_len();

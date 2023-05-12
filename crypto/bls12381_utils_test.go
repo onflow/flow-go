@@ -69,7 +69,7 @@ func TestMapToG1(t *testing.T) {
 
 	for i, msg := range msgs {
 		pointBytes := hashToG1Bytes(msg, dst)
-		require.NonNil(t, pointBytes)
+		require.NotNil(t, pointBytes)
 
 		expectedPointBytes, err := hex.DecodeString(expectedPointString[i])
 		require.NoError(t, err)
@@ -90,7 +90,7 @@ func BenchmarkMapToG1(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		p = mapToG1(input)
 	}
-	require.NonNil(b, p)
+	require.NotNil(b, p)
 	b.StopTimer()
 }
 

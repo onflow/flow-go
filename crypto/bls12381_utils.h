@@ -48,29 +48,8 @@
 #define MEMBERSHIP_CHECK_G2 EXP_ORDER
 
 
-// constants used in the optimized SWU hash to curve
-#if (hashToPoint == LOCAL_SSWU)
-    #define ELLP_Nx_LEN 12
-    #define ELLP_Dx_LEN 10
-    #define ELLP_Ny_LEN 16
-    #define ELLP_Dy_LEN 15
-#endif
-
-
 // Structure of precomputed data
 typedef struct prec_ {
-    #if (hashToPoint == LOCAL_SSWU)
-    // constants needed in optimized SSWU
-    bn_st p_3div4;
-    fp_st sqrt_z;
-    // related hardcoded constants for faster access,
-    // where a1 is the coefficient of isogenous curve E1
-    fp_st minus_a1;
-    fp_st a1z;
-    // coefficients of the isogeny map
-    fp_st iso_Nx[ELLP_Nx_LEN];
-    fp_st iso_Ny[ELLP_Ny_LEN];
-    #endif
     #if  (MEMBERSHIP_CHECK_G1 == BOWE)
     bn_st beta;
     bn_st z2_1_by3;

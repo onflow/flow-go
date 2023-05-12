@@ -61,12 +61,6 @@ ctx_t* relic_init_BLS12_381() {
 prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
 
-// required constants for the optimized SWU hash to curve
-#if (hashToPoint == LOCAL_SSWU)
-extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_LIMBS];
-extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_LIMBS];
-#endif
-
 #if (MEMBERSHIP_CHECK_G1 == BOWE)
 extern const uint64_t beta_data[Fp_LIMBS];
 extern const uint64_t z2_1_by3_data[2];
@@ -83,27 +77,11 @@ void precomputed_data_set(const prec_st* p) {
 
 // pre-compute some data required for curve BLS12-381
 prec_st* init_precomputed_data_BLS12_381() {
-
     bls_prec = &bls_prec_st;
     ctx_t* ctx = core_get();
 
     // (p-1)/2
     bn_div_dig(&bls_prec->p_1div2, &ctx->prime, 2);
-    #if (hashToPoint == LOCAL_SSWU)
-    // (p-3)/4
-    bn_div_dig(&bls_prec->p_3div4, &bls_prec->p_1div2, 2);
-    // sqrt(-z)
-    fp_neg(bls_prec->sqrt_z, ctx->ep_map_u);
-    fp_srt(bls_prec->sqrt_z, bls_prec->sqrt_z);
-    // -a1 and a1*z
-    fp_neg(bls_prec->minus_a1, ctx->ep_iso.a);
-    fp_mul(bls_prec->a1z, ctx->ep_iso.a, ctx->ep_map_u);
-    
-    for (int i=0; i<ELLP_Nx_LEN; i++)  
-        fp_read_raw(bls_prec->iso_Nx[i], iso_Nx_data[i]);
-    for (int i=0; i<ELLP_Ny_LEN; i++)  
-        fp_read_raw(bls_prec->iso_Ny[i], iso_Ny_data[i]);
-    #endif
 
     #if (MEMBERSHIP_CHECK_G1 == BOWE)
     bn_new(&bls_prec->beta);
@@ -879,6 +857,23 @@ void G1_mult_gen(E1* res, const Fr* expo) {
     pow256_from_Fr(tmp, expo);
     POINTonE1_mult_glv((POINTonE1*)res, &BLS12_381_G1, tmp);
     vec_zero(&tmp, sizeof(tmp));
+}
+
+// maps bytes input `hash` to G1.
+// `hash` must be `MAP_TO_G1_INPUT_LEN` (128 bytes)
+// It uses construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
+int map_to_G1(E1* h, const byte* hash, const int len) {
+    // sanity check of length
+    if (len != MAP_TO_G1_INPUT_LEN) {
+        return INVALID;
+    }
+    // map to field elements
+    Fr u[2];
+    map_bytes_to_Fr(&u[0], hash, MAP_TO_G1_INPUT_LEN/2);
+    map_bytes_to_Fr(&u[1], hash + MAP_TO_G1_INPUT_LEN/2, MAP_TO_G1_INPUT_LEN/2);
+    // map field elements to G1
+    map_to_g1((POINTonE1 *)h, (limb_t *)&u[0], (limb_t *)&u[1]);
+    return VALID;
 }
 
 // ------------------- E2 utilities

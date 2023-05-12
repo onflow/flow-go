@@ -81,7 +81,7 @@ const (
 // hash_to_curve algorithm (and the map to G1 step)
 //
 // (Cgo does not export C macros)
-var expandMsgOutput = C.get_mapToG1_input_len()
+var expandMsgOutput = int(C.get_mapToG1_input_len())
 
 // blsBLS12381Algo, embeds SignAlgo
 type blsBLS12381Algo struct {
@@ -554,8 +554,7 @@ func (a *blsBLS12381Algo) init() error {
 func mapToG1(data []byte) *pointE1 {
 	l := len(data)
 	var h pointE1
-	ret := C.map_to_G1((*C.E1)(&h), (*C.uchar)(&data[0]), (C.int)(l))
-	if int(ret) != valid {
+	if C.map_to_G1((*C.E1)(&h), (*C.uchar)(&data[0]), (C.int)(l)) != valid {
 		return nil
 	}
 	return &h

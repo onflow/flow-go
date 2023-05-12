@@ -302,8 +302,7 @@ func hashToG1Bytes(data, dst []byte) []byte {
 
 	// map the hash to G1
 	var point pointE1
-	ret := C.map_to_G1((*C.E1)(&point), (*C.uchar)(&hash[0]), (C.int)(len(hash)))
-	if int(ret) != valid {
+	if C.map_to_G1((*C.E1)(&point), (*C.uchar)(&hash[0]), (C.int)(len(hash))) != valid {
 		return nil
 	}
 
