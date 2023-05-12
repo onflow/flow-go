@@ -1,8 +1,6 @@
 package cache
 
 import (
-	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"math/rand"
 	"sync"
 	"testing"
@@ -13,6 +11,8 @@ import (
 	"go.uber.org/atomic"
 	"golang.org/x/exp/slices"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"

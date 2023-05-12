@@ -2,12 +2,12 @@ package cache
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"sync"
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
