@@ -377,7 +377,11 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 
 		log.Info().Msg("reloading unexecuted blocks")
 
-		for _, blockID := range unexecuted {
+		for i, blockID := range unexecuted {
+			if i > 1000 {
+				e.log.Warn().Msgf("too many unexecuted blocks (%v), loading first 1000", len(unexecuted))
+				break
+			}
 			err := e.reloadBlock(blockByCollection, executionQueues, blockID)
 			if err != nil {
 				return fmt.Errorf("could not reload block: %v, %w", blockID, err)
