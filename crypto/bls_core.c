@@ -48,10 +48,10 @@ int bls_sign(byte* s, const Fr* sk, const byte* data, const int len) {
 }
 
 // Verifies a BLS signature (G1 point) against a public key (G2 point)
-// and a message data.
-// The signature and public key are assumed to be in G1 and G2 respectively. This 
+// and a message hash `h` (G1 point).
+// Hash, signature and public key are assumed to be in G1, G1 and G2 respectively. This 
 // function only checks the pairing equality. 
-static int bls_verify_ep(const E2* pk, const ep_t s, const byte* data, const int len) {    
+static int bls_verify_ep(const E2* pk, const ep_t s, const ep_t h) {    
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
 
@@ -70,10 +70,7 @@ static int bls_verify_ep(const E2* pk, const ep_t s, const byte* data, const int
     ep2_copy(elemsG2[1], pk_tmp);
 
     // elemsG1[1] = h
-    if (map_to_G1(elemsG1[1], data, len) != VALID) {
-        ret = INVALID;
-        goto out;
-    }
+    ep_copy(elemsG1[1], h);
 
 #if DOUBLE_PAIRING  
     // elemsG2[0] = -g2
@@ -314,8 +311,8 @@ outG1:
 // the membership check in G2 is separated to optimize multiple verifications using the same key.
 // `data` represents the hashed message with length `len` equal to `MAP_TO_G1_INPUT_LEN`. 
 int bls_verify(const E2* pk, const byte* sig, const byte* data, const int len) {  
-    ep_t s;
-    ep_new(s);
+    ep_t s, h;
+    ep_new(s) ep_new(h);
     
     // deserialize the signature into a curve point
     int read_ret = ep_read_bin_compact(s, sig, SIGNATURE_LEN);
@@ -327,8 +324,12 @@ int bls_verify(const E2* pk, const byte* sig, const byte* data, const int len) {
     if (E1_in_G1(s) != VALID) {
         return INVALID;
     }
+
+    if (map_to_G1(h, data, len) != VALID) {
+        return INVALID;
+    }
     
-    return bls_verify_ep(pk, s, data, len);
+    return bls_verify_ep(pk, s, h);
 }
 
 
@@ -413,10 +414,9 @@ error:
 }
 
 // verify the binary tree and fill the results using recursive batch verifications.
-static void bls_batch_verify_tree(const node* root, const int len, byte* results, 
-        const byte* data, const int data_len) {
+static void bls_batch_verify_tree(const node* root, const int len, byte* results, const ep_t h) {
     // verify the aggregated signature against the aggregated public key.
-    int res =  bls_verify_ep(root->pk, root->sig, data, data_len);
+    int res =  bls_verify_ep(root->pk, root->sig, h);
 
     // if the result is valid, all the subtree signatures are valid.
     if (res == VALID) {
@@ -436,8 +436,8 @@ static void bls_batch_verify_tree(const node* root, const int len, byte* results
     // use the binary tree structure to find the invalid signatures. 
     int right_len = len/2;
     int left_len = len - right_len;
-    bls_batch_verify_tree(root->left, left_len, &results[0], data, data_len);
-    bls_batch_verify_tree(root->right, right_len, &results[left_len], data, data_len);
+    bls_batch_verify_tree(root->left, left_len, &results[0], h);
+    bls_batch_verify_tree(root->right, right_len, &results[left_len], h);
 }
 
 // Batch verifies the validity of a multiple BLS signatures of the 
@@ -503,11 +503,19 @@ void bls_batch_verify(const int sigs_len, byte* results, const E2* pks_input,
     node* root = build_tree(sigs_len, &pks[0], &sigs[0]);
     if (!root) goto out;
 
+    ep_t h;
+    ep_new(h);
+    if (map_to_G1(h, data, data_len) != VALID) {
+        goto out_map;
+    }
+
     // verify the binary tree and fill the results using batch verification
-    bls_batch_verify_tree(root, sigs_len, &results[0], data, data_len);
+    bls_batch_verify_tree(root, sigs_len, &results[0], h);
     // free the allocated tree 
     free_tree(root);
-    
+
+out_map: 
+    ep_free(h);
 out:
     bn_free(r);  
     for (int i=0; i < sigs_len; i++) {
