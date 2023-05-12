@@ -327,12 +327,25 @@ static void map_to_G1_local(ep_t p, const uint8_t *msg, int len) {
 }
 #endif
 
-// computes a hash of input data to G1
-// construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
-void map_to_G1(ep_t h, const byte* data, const int len) {
+// maps input `hash` bytes to G1.
+// `hash` must be `MAP_TO_G1_INPUT_LEN` (128 bytes)
+// It uses construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
+int map_to_G1(E1* h, const byte* hash, const int len) {
+    // sanity check of length
+    if (len != MAP_TO_G1_INPUT_LEN) {
+        return INVALID;
+    }
+
     #if hashToPoint==LOCAL_SSWU
     map_to_G1_local(h, data, len);
-    #elif hashToPoint==RELIC_SSWU
-    ep_map_from_field(h, data, len);
+
+    #elif hashToPoint==BLST_SSWU
+    // map to field elements
+    Fr u[2];
+    map_bytes_to_Fr(&u[0], hash, MAP_TO_G1_INPUT_LEN/2);
+    map_bytes_to_Fr(&u[1], hash + MAP_TO_G1_INPUT_LEN/2, MAP_TO_G1_INPUT_LEN/2);
+    // map field elements to G1
+    map_to_g1(h, (POINTonE1 *)&u[0], (POINTonE1 *)&u[1]);
     #endif
+    return VALID;
 }

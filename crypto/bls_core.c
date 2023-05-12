@@ -19,23 +19,6 @@ int get_sk_len() {
     return SK_LEN;
 }
 
-// Checks if input point p is in the subgroup G1. 
-// The function assumes the input is known to be on the curve E1.
-bool_t E1_in_G1(const ep_t p){
-// TODO: to upadte
-/*
-    #if MEMBERSHIP_CHECK_G1 == EXP_ORDER
-    return G1_simple_subgroup_check(p);
-    #elif MEMBERSHIP_CHECK_G1 == BOWE
-    // section 3.2 from https://eprint.iacr.org/2019/814.pdf
-    return bowe_subgroup_check_G1(p);
-    #else
-    return UNDEFINED;
-    #endif
-*/
-    return VALID;
-}
-
 // Computes a BLS signature from a G1 point 
 static void bls_sign_ep(byte* s, const Fr* sk, const ep_t h) {
     ep_t p;
@@ -49,14 +32,19 @@ static void bls_sign_ep(byte* s, const Fr* sk, const ep_t h) {
 }
 
 // Computes a BLS signature from a hash
-void bls_sign(byte* s, const Fr* sk, const byte* data, const int len) {
+// `data` represents the hashed message with length `len` equal to
+//  `MAP_TO_G1_INPUT_LEN`. 
+int bls_sign(byte* s, const Fr* sk, const byte* data, const int len) {
     ep_t h;
     ep_new(h);
     // hash to G1
-    map_to_G1(h, data, len);
+    if (map_to_G1(h, data, len) != VALID) {
+        return INVALID;
+    }
     // s = h^sk
     bls_sign_ep(s, sk, h);
     ep_free(h);
+    return VALID;
 }
 
 // Verifies a BLS signature (G1 point) against a public key (G2 point)
@@ -67,23 +55,25 @@ static int bls_verify_ep(const E2* pk, const ep_t s, const byte* data, const int
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
 
-    // elemsG1[0] = s
     ep_new(elemsG1[0]);
-    ep_copy(elemsG1[0], (ep_st*)s);
-
-    // elemsG1[1] = h
     ep_new(elemsG1[1]);
-    // hash to G1 
-    map_to_G1(elemsG1[1], data, len); 
-
-    ep2_st* pk_tmp = E2_blst_to_relic(pk);
-
-    // elemsG2[1] = pk
     ep2_new(elemsG2[1]);
-    ep2_copy(elemsG2[1], pk_tmp);
     ep2_new(&elemsG2[0]);
 
     int ret = UNDEFINED;
+
+    // elemsG1[0] = s
+    ep_copy(elemsG1[0], (ep_st*)s);
+
+    // elemsG2[1] = pk
+    ep2_st* pk_tmp = E2_blst_to_relic(pk);
+    ep2_copy(elemsG2[1], pk_tmp);
+
+    // elemsG1[1] = h
+    if (map_to_G1(elemsG1[1], data, len) != VALID) {
+        ret = INVALID;
+        goto out;
+    }
 
 #if DOUBLE_PAIRING  
     // elemsG2[0] = -g2
@@ -321,7 +311,8 @@ outG1:
 // Verifies a BLS signature in a byte buffer.
 // membership check of the signature in G1 is verified.
 // membership check of pk in G2 is not verified in this function.
-// the membership check in G2 is separated to allow optimizing multiple verifications using the same key.
+// the membership check in G2 is separated to optimize multiple verifications using the same key.
+// `data` represents the hashed message with length `len` equal to `MAP_TO_G1_INPUT_LEN`. 
 int bls_verify(const E2* pk, const byte* sig, const byte* data, const int len) {  
     ep_t s;
     ep_new(s);

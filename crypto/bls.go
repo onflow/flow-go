@@ -66,8 +66,6 @@ const (
 	PubKeyLenBLSBLS12381 = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
 
 	// Hash to curve params
-	// expandMsgOutput is the output length of the expand_message step as required by the hash_to_curve algorithm
-	expandMsgOutput = 2 * (fieldSize + (securityBits / 8))
 	// hash to curve suite ID of the form : CurveID_ || HashID_ || MapID_ || encodingVariant_
 	h2cSuiteID = "BLS12381G1_XOF:KMAC128_SSWU_RO_"
 	// scheme implemented as a countermasure for rogue attacks of the form : SchemeTag_
@@ -78,6 +76,12 @@ const (
 	// The PoP cipher suite is guaranteed to be different than all signature ciphersuites
 	blsPOPCipherSuite = "BLS_POP_" + h2cSuiteID + schemeTag
 )
+
+// expandMsgOutput is the output length of the expand_message step as required by the
+// hash_to_curve algorithm (and the map to G1 step)
+//
+// (Cgo does not export C macros)
+var expandMsgOutput = C.get_mapToG1_input_len()
 
 // blsBLS12381Algo, embeds SignAlgo
 type blsBLS12381Algo struct {
@@ -546,11 +550,14 @@ func (a *blsBLS12381Algo) init() error {
 }
 
 // This is only a TEST/DEBUG/BENCH function.
-// It returns the hash to G1 point from a slice of 128 bytes
+// It returns the hash-to-G1 point from a slice of 128 bytes
 func mapToG1(data []byte) *pointE1 {
 	l := len(data)
 	var h pointE1
-	C.map_to_G1((*C.E1)(&h), (*C.uchar)(&data[0]), (C.int)(l))
+	ret := C.map_to_G1((*C.E1)(&h), (*C.uchar)(&data[0]), (C.int)(l))
+	if int(ret) != valid {
+		return nil
+	}
 	return &h
 }
 

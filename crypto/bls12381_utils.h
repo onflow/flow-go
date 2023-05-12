@@ -10,6 +10,7 @@
 #include "relic.h"
 #include "blst_include.h"
 
+#define SEC_BITS  128
 #define VALID     RLC_OK
 #define INVALID   RLC_ERR
 #define UNDEFINED (((VALID&1)^1) | ((INVALID&2)^2)) // different value than RLC_OK and RLC_ERR
@@ -21,7 +22,6 @@
 #define MIN(a,b) ((a)>(b)?(b):(a))
 
 // Fields and Group serialization lengths
-#define SEC_BITS  128
 #define Fp_BITS   381
 #define Fp2_BYTES (2*Fp_BYTES)
 #define Fp_LIMBS  BITS_TO_LIMBS(Fp_BITS)
@@ -88,12 +88,14 @@ ep2_st* E2_blst_to_relic(const E2* x);
 int      get_valid();
 int      get_invalid();
 int      get_Fr_BYTES();
+int      get_mapToG1_input_len();
 
 // BLS based SPoCK
 int bls_spock_verify(const E2*, const byte*, const E2*, const byte*);
 
 // hash to curve functions (functions in bls12381_hashtocurve.c)
-void     map_to_G1(ep_t, const byte*, const int);
+#define MAP_TO_G1_INPUT_LEN (2*(Fp_BYTES + SEC_BITS/8))
+int     map_to_G1(E1*, const byte*, const int);
 
 // Fr utilities
 extern const Fr BLS12_381_rR;

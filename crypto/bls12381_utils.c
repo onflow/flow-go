@@ -25,6 +25,10 @@ int get_Fr_BYTES() {
     return Fr_BYTES;
 }
 
+int get_mapToG1_input_len() {
+    return MAP_TO_G1_INPUT_LEN;
+}
+
 
 // Initializes Relic context with BLS12-381 parameters
 ctx_t* relic_init_BLS12_381() { 
@@ -411,7 +415,7 @@ static bool_t Fp_sqrt_montg(Fp *res, const Fp* a) {
    return sqrt_fp((limb_t*)res, (limb_t*)a);
 }
 
-static bool check_Fp(const Fp* in) {
+static bool Fp_check(const Fp* in) {
     // use same method as in BLST internal function
     // which seems the most efficient. The method uses the assembly-based 
     // modular addition instead of limbs comparison
@@ -453,7 +457,7 @@ BLST_ERROR Fp_read_bytes(Fp* a, const byte *bin, int len) {
     }
     limbs_from_be_bytes((limb_t*)a, bin, Fp_BYTES);
     // compare read scalar to p
-    if (!check_Fp(a)) {
+    if (!Fp_check(a)) {
         return BLST_BAD_ENCODING;
     }       
     return BLST_SUCCESS;
