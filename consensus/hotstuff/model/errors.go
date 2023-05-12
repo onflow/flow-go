@@ -185,6 +185,10 @@ func (e InvalidProposalError) Error() string {
 	)
 }
 
+func (e InvalidProposalError) Unwrap() error {
+	return e.Err
+}
+
 // IsInvalidProposalError returns whether an error is InvalidProposalError
 func IsInvalidProposalError(err error) bool {
 	var e InvalidProposalError
