@@ -15,6 +15,8 @@ type SlashingViolationsConsumer struct {
 }
 
 var _ hotstuff.ProposalViolationConsumer = (*SlashingViolationsConsumer)(nil)
+var _ hotstuff.VoteAggregationViolationConsumer = (*SlashingViolationsConsumer)(nil)
+var _ hotstuff.TimeoutAggregationViolationConsumer = (*SlashingViolationsConsumer)(nil)
 
 func NewSlashingViolationsConsumer(log zerolog.Logger) *SlashingViolationsConsumer {
 	return &SlashingViolationsConsumer{
