@@ -3,9 +3,9 @@ Description=Flow TPS tests - generate list of merge commit hashes and run TPS te
 
 [Service]
 Type=oneshot
-ExecStart=/opt/flow-go/integration/benchmark/server/runs.sh
-ExecStart=/opt/flow-go/integration/benchmark/server/control.sh
-ExecStart=/opt/flow-go/integration/benchmark/server/bench.sh
-WorkingDirectory=/opt/flow-go/integration/benchmark/server
-Environment="GOPATH=/opt/go" "GOCACHE=/opt/gocache"
+ExecStart=/mnt/sdb/flow-go/integration/benchmark/server/runs.sh
+ExecStart=/mnt/sdb/flow-go/integration/benchmark/server/control.sh
+ExecStart=/mnt/sdb/flow-go/integration/benchmark/server/bench.sh
+WorkingDirectory=/mnt/sdb/flow-go/integration/benchmark/server
+Environment="GOPATH=/mnt/sdb/go" "GOCACHE=/mnt/sdb/gocache"
 RemainAfterExit=no
