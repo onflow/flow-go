@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/coreos/go-semver/semver"
+	"github.com/onflow/flow-go/cmd/build"
 	"math"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -551,6 +554,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results := storage.NewExecutionResults(node.Metrics, node.PublicDB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.PublicDB, results, storage.DefaultCacheSize)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.PublicDB, receipts)
+	versionBeacons := storage.NewVersionBeacons(node.PublicDB)
+
 	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return protocol.IsNodeAuthorizedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 	}
@@ -681,6 +686,33 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	// disabled by default
 	uploader := uploader.NewManager(node.Tracer)
 
+	// TODO: package into a function
+	opts := []ingestion.StopControlOption{
+		ingestion.StopControlWithLogger(node.Log),
+	}
+	sem := build.Semver()
+	if build.IsDefined(sem) {
+		// for now our versions have a "v" prefix, but semver doesn't like that
+		// so we strip it out
+		sem = strings.TrimPrefix(sem, "v")
+
+		ver, err := semver.NewVersion(sem)
+		require.NoError(t, err, "node semver should be valid if set")
+
+		opts = append(opts, ingestion.StopControlWithVersionControl(
+			ver,
+			versionBeacons,
+			true,
+		))
+	}
+
+	stopControl := ingestion.NewStopControl(
+		node.Headers,
+		opts...,
+	)
+
+	node.Log.Info().Msg("stop control initialized")
+
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
 		node.Log,
@@ -703,7 +735,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		checkAuthorizedAtBlock,
 		nil,
 		uploader,
-		ingestion.NewStopControl(node.Headers, ingestion.StopControlWithLogger(node.Log)),
+		stopControl,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)

@@ -136,12 +136,16 @@ func NewStopControl(
 		option(sc)
 	}
 
-	log := sc.log
+	log := sc.log.With().
+		Bool("node_will_react_to_version_beacon",
+			sc.nodeVersion != nil).
+		Logger()
 
 	if sc.nodeVersion != nil {
 		log = log.With().
 			Stringer("node_version", sc.nodeVersion).
-			Bool("crash_on_version_boundary_reached", sc.crashOnVersionBoundaryReached).
+			Bool("crash_on_version_boundary_reached",
+				sc.crashOnVersionBoundaryReached).
 			Logger()
 	}
 
@@ -339,19 +343,20 @@ func (s *StopControl) BlockFinalized(
 		return
 	}
 
+	err := s.handleVersionBeacon(h.Height)
+	if err != nil {
+		// TODO: handle this error better
+		s.log.Fatal().
+			Err(err).
+			Stringer("block_id", h.ID()).
+			Msg("failed to process version beacons")
+		return
+	}
+
 	log := s.log.With().
 		Stringer("block_id", h.ID()).
 		Stringer("stop", s.stopBoundary).
 		Logger()
-
-	err := s.handleVersionBeacon(h.Height)
-	if err != nil {
-		// TODO: handle this error better
-		log.Fatal().
-			Err(err).
-			Msg("failed to process version beacons")
-		return
-	}
 
 	// no stop is set, nothing to do
 	if s.stopBoundary == nil {
@@ -475,6 +480,17 @@ func (s *StopControl) handleVersionBeacon(
 	if err != nil {
 		return fmt.Errorf("failed to get highest "+
 			"version beacon for stop control: %w", err)
+	}
+
+	if vb == nil {
+		// no version beacon found
+		// this is unexpected as there should always be at least the
+		// starting version beacon, but not fatal.
+		// It can happen if the node starts before bootstrap is finished.
+		s.log.Info().
+			Uint64("height", height).
+			Msg("No version beacon found for stop control")
+		return nil
 	}
 
 	if s.versionBeacon != nil && s.versionBeacon.SealHeight >= vb.SealHeight {

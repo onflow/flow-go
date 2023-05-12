@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/coreos/go-semver/semver"
+	"github.com/onflow/flow-go/cmd/build"
 	"os"
 	"path"
 	"path/filepath"
@@ -662,7 +664,32 @@ func (exeNode *ExecutionNode) LoadStopControl(
 		opts = append(opts, ingestion.StopControlWithStopped())
 	}
 
+	sem := build.Semver()
+	if build.IsDefined(sem) {
+		// for now our versions have a "v" prefix, but semver doesn't like that
+		// so we strip it out
+		sem = strings.TrimPrefix(sem, "v")
+
+		ver, err := semver.NewVersion(sem)
+		if err != nil {
+			exeNode.builder.Logger.
+				Err(err).
+				Str("semver", sem).
+				Msg("failed to parse semver")
+
+			return nil, fmt.Errorf("failed to parse semver: %w", err)
+		}
+
+		opts = append(opts, ingestion.StopControlWithVersionControl(
+			ver,
+			node.Storage.VersionBeacons,
+			true,
+		))
+	}
+
 	exeNode.stopControl = ingestion.NewStopControl(node.Storage.Headers, opts...)
+
+	exeNode.builder.Logger.Info().Msg("stop control initialized")
 
 	return &module.NoopReadyDoneAware{}, nil
 }
