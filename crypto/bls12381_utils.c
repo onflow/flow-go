@@ -701,26 +701,20 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     bin[0] |= (G1_SERIALIZATION << 7);
  }
 
-// Exponentiation of a generic point p in G1
-void ep_mult(ep_t res, const ep_t p, const Fr *expo) {
-    bn_st* tmp_expo = Fr_blst_to_relic(expo);
-    // Using window NAF of size 2 
-    ep_mul_lwnaf(res, p, tmp_expo);
-    free(tmp_expo);
+// Exponentiation of a generic point `a` in E1, res = expo.a
+void E1_mult(E1* res, const E1* p, const Fr* expo) {
+    pow256 tmp;
+    pow256_from_Fr(tmp, expo);
+    POINTonE1_mult_glv((POINTonE1*)res, (POINTonE1*)p, tmp);
+    vec_zero(&tmp, sizeof(tmp));
 }
 
-// Exponentiation of generator g1 in G1
-// These two function are here for bench purposes only
-void ep_mult_gen_bench(ep_t res, const Fr* expo) {
-    bn_st* tmp_expo = Fr_blst_to_relic(expo);
-    // Using precomputed table of size 4
-    ep_mul_gen(res, tmp_expo);
-    free(tmp_expo);
-}
-
-void ep_mult_generic_bench(ep_t res, const Fr* expo) {
-    // generic point multiplication
-    ep_mult(res, &core_get()->ep_g, expo);
+// Exponentiation of generator g1 of G1, res = expo.g1
+void G1_mult_gen(E1* res, const Fr* expo) {
+    pow256 tmp;
+    pow256_from_Fr(tmp, expo);
+    POINTonE1_mult_gls((POINTonE1*)res, &BLS12_381_G1, tmp);
+    vec_zero(&tmp, sizeof(tmp));
 }
 
 // ------------------- E2 utilities
@@ -996,7 +990,8 @@ static void E2_neg(E2* a) {
 void E2_mult(E2* res, const E2* p, const Fr* expo) {
     pow256 tmp;
     pow256_from_Fr(tmp, expo);
-    POINTonE2_sign((POINTonE2*)res, (POINTonE2*)p, tmp);
+    POINTonE2_mult_gls((POINTonE2*)res, (POINTonE2*)p, tmp);
+    vec_zero(&tmp, sizeof(tmp)); 
 }
 
 // Exponentiation of a generic point `a` in E2 by a byte exponent.
@@ -1005,14 +1000,16 @@ void  E2_mult_small_expo(E2* res, const E2* p, const byte expo) {
     vec_zero(&pow_expo, sizeof(pow256)); 
     pow_expo[0] = expo; // `pow256` uses bytes little endian.
     // TODO: to bench against a specific version of mult with 8 bits expo
-    POINTonE2_sign((POINTonE2*)res, (POINTonE2*)p, pow_expo);
+    POINTonE2_mult_gls((POINTonE2*)res, (POINTonE2*)p, pow_expo);
+    pow_expo[0] = 0;
 }
 
 // Exponentiation of generator g2 of G2, res = expo.g2
 void G2_mult_gen(E2* res, const Fr* expo) {
     pow256 tmp;
     pow256_from_Fr(tmp, expo);
-    POINTonE2_sign((POINTonE2*)res, &BLS12_381_G2, tmp);
+    POINTonE2_mult_gls((POINTonE2*)res, &BLS12_381_G2, tmp);
+    vec_zero(&tmp, sizeof(tmp));
 }
 
 // checks if input E2 point is on the subgroup G2.

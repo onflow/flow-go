@@ -123,15 +123,15 @@ void    Fp_mul_montg(Fp *, const Fp *, const Fp *);
 void    Fp_squ_montg(Fp *, const Fp *);
 
 // E1 and G1 utilities
-int      ep_read_bin_compact(ep_t, const byte *, const int);
-void     ep_write_bin_compact(byte *, const ep_t,  const int);
-void     ep_mult_gen_bench(ep_t, const Fr*);
-void     ep_mult_generic_bench(ep_t, const Fr*);
-void     ep_mult(ep_t, const ep_t, const Fr*);
-void     ep_sum_vector(ep_t, ep_st*, const int);
-int      ep_sum_vector_byte(byte*, const byte*, const int);
 int      E1_in_G1(const ep_t);
 int      G1_simple_subgroup_check(const ep_t);
+void     E1_mult(E1*, const E1*, const Fr*);
+void     G1_mult_gen(E1*, const Fr*);
+
+int      ep_read_bin_compact(ep_t, const byte *, const int);
+void     ep_write_bin_compact(byte *, const ep_t,  const int);
+void     ep_sum_vector(ep_t, ep_st*, const int);
+int      ep_sum_vector_byte(byte*, const byte*, const int);
 void     map_bytes_to_G1(E1*, const uint8_t*, int);
 void     map_bytes_to_G1complement(E1*, const uint8_t*, int);
 #if  (MEMBERSHIP_CHECK_G1 == BOWE)

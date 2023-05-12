@@ -13,7 +13,7 @@ import (
 )
 
 // G1 and G2 scalar multiplication
-func BenchmarkScalarMultG1G2(b *testing.B) {
+func BenchmarkScalarMult(b *testing.B) {
 	seed := make([]byte, securityBits/8)
 	_, err := mrand.Read(seed)
 	require.NoError(b, err)
@@ -22,7 +22,9 @@ func BenchmarkScalarMultG1G2(b *testing.B) {
 	_ = mapToFr(&expo, seed)
 
 	// G1 generator multiplication
-	b.Run("G1 gen", func(b *testing.B) {
+	// Note that generator and random point multiplications
+	// are implemented with the same algorithm
+	b.Run("G1", func(b *testing.B) {
 		var res pointE1
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -31,18 +33,10 @@ func BenchmarkScalarMultG1G2(b *testing.B) {
 		b.StopTimer()
 	})
 
-	// G1 base point multiplication
-	b.Run("G1 generic", func(b *testing.B) {
-		var res pointE1
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			genericScalarMultG1(&res, &expo)
-		}
-		b.StopTimer()
-	})
-
-	// G2 base point multiplication
-	b.Run("G2 gen", func(b *testing.B) {
+	// G2 generator multiplication
+	// Note that generator and random point multiplications
+	// are implemented with the same algorithm
+	b.Run("G2", func(b *testing.B) {
 		var res pointE2
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
