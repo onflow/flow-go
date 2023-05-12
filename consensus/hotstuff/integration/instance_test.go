@@ -84,7 +84,8 @@ type Instance struct {
 }
 
 type MockedCommunicatorConsumer struct {
-	notifications.NoopPartialConsumer
+	notifications.NoopProposalViolationConsumer
+	notifications.NoopParticipantConsumer
 	notifications.NoopFinalizationConsumer
 	*mocks.CommunicatorConsumer
 }
@@ -431,7 +432,8 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			)
 		}, nil).Maybe()
 
-	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
+	voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
+	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, voteAggregationDistributor, voteProcessorFactory.Create)
 	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
 	metricsCollector := metrics.NewNoopCollector()
@@ -442,14 +444,14 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		notifier,
+		voteAggregationDistributor,
 		livenessData.CurrentView,
 		voteCollectors,
 	)
 	require.NoError(t, err)
 
 	// initialize factories for timeout collector and timeout processor
-	collectorDistributor := pubsub.NewTimeoutCollectorDistributor()
+	timeoutAggregationDistributor := pubsub.NewTimeoutAggregationDistributor()
 	timeoutProcessorFactory := mocks.NewTimeoutProcessorFactory(t)
 	timeoutProcessorFactory.On("Create", mock.Anything).Return(
 		func(view uint64) hotstuff.TimeoutProcessor {
@@ -490,15 +492,14 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				in.committee,
 				in.validator,
 				aggregator,
-				collectorDistributor,
+				timeoutAggregationDistributor,
 			)
 			require.NoError(t, err)
 			return p
 		}, nil).Maybe()
 	timeoutCollectorFactory := timeoutcollector.NewTimeoutCollectorFactory(
 		unittest.Logger(),
-		notifier,
-		collectorDistributor,
+		timeoutAggregationDistributor,
 		timeoutProcessorFactory,
 	)
 	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorFactory)
@@ -509,7 +510,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		notifier,
 		livenessData.CurrentView,
 		timeoutCollectors,
 	)
@@ -538,8 +538,10 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	)
 	require.NoError(t, err)
 
-	collectorDistributor.AddConsumer(logConsumer)
-	collectorDistributor.AddConsumer(&in)
+	timeoutAggregationDistributor.AddTimeoutCollectorConsumer(logConsumer)
+	timeoutAggregationDistributor.AddTimeoutCollectorConsumer(&in)
+
+	voteAggregationDistributor.AddVoteCollectorConsumer(logConsumer)
 
 	return &in
 }
@@ -664,3 +666,5 @@ func (in *Instance) OnNewQcDiscovered(qc *flow.QuorumCertificate) {
 func (in *Instance) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
 	in.queue <- tc
 }
+
+func (in *Instance) OnTimeoutProcessed(*model.TimeoutObject) {}
