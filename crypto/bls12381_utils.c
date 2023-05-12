@@ -61,11 +61,6 @@ ctx_t* relic_init_BLS12_381() {
 prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
 
-#if (MEMBERSHIP_CHECK_G1 == BOWE)
-extern const uint64_t beta_data[Fp_LIMBS];
-extern const uint64_t z2_1_by3_data[2];
-#endif
-
 // sets the global variable to input
 void precomputed_data_set(const prec_st* p) {
     bls_prec = (prec_st*)p;
@@ -82,13 +77,6 @@ prec_st* init_precomputed_data_BLS12_381() {
 
     // (p-1)/2
     bn_div_dig(&bls_prec->p_1div2, &ctx->prime, 2);
-
-    #if (MEMBERSHIP_CHECK_G1 == BOWE)
-    bn_new(&bls_prec->beta);
-    bn_read_raw(&bls_prec->beta, beta_data, Fp_LIMBS);
-    bn_new(&bls_prec->z2_1_by3);
-    bn_read_raw(&bls_prec->z2_1_by3, z2_1_by3_data, 2);
-    #endif
 
     // Montgomery constant R
     fp_set_dig(bls_prec->r, 1);
@@ -1326,62 +1314,6 @@ int G1_simple_subgroup_check(const ep_t p){
     ep_free(inf);
     return VALID;
 }
-
-#if (MEMBERSHIP_CHECK_G1 == BOWE)
-// beta such that beta^3 == 1 mod p
-// beta is in the Montgomery form
-const uint64_t beta_data[Fp_LIMBS] = { 
-    0xcd03c9e48671f071, 0x5dab22461fcda5d2, 0x587042afd3851b95,
-    0x8eb60ebe01bacb9e, 0x03f97d6e83d050d2, 0x18f0206554638741,
-};
-
-
-// (z^2-1)/3 with z being the parameter of bls12-381
-const uint64_t z2_1_by3_data[2] = { 
-    0x0000000055555555, 0x396c8c005555e156  
-};
-
-// uses Bowe's check from section 3.2 from https://eprint.iacr.org/2019/814.pdf
-// to check whether a point on the curve E1 is in G1.
-int bowe_subgroup_check_G1(const ep_t p){
-    if (ep_is_infty(p) == 1) 
-        return VALID;
-    fp_t b;
-    dv_copy(b, beta_data, Fp_LIMBS); 
-    ep_t sigma, sigma2, p_inv;
-    ep_new(sigma);
-    ep_new(sigma2);
-    ep_new(p_inv);
-
-    // si(p) 
-    ep_copy(sigma, p);
-    fp_mul(sigma[0].x, sigma[0].x, b);
-    // -si^2(p)
-    ep_copy(sigma2, sigma);
-    fp_mul(sigma2[0].x, sigma2[0].x, b);
-    fp_neg(sigma2[0].y, sigma2[0].y);
-    ep_dbl(sigma, sigma);
-    // -p
-    ep_copy(p_inv, p);
-    fp_neg(p_inv[0].y, p_inv[0].y);
-    // (z^2-1)/3 (2*si(p) - p - si^2(p)) - si^2(p)
-    ep_add(sigma, sigma, p_inv);
-    ep_add(sigma, sigma, sigma2);
-    // TODO: multiplication using a chain?
-    ep_mul_lwnaf(sigma, sigma, &bls_prec->z2_1_by3);
-    ep_add(sigma, sigma, sigma2);
-    
-    ep_free(sigma2);
-    ep_free(p_inv);
-    // check result against infinity
-    if (!ep_is_infty(sigma)){
-        ep_free(sigma);
-        return INVALID;
-    }
-    ep_free(sigma);
-    return VALID;
-}
-#endif
 
 /*
 // maps the bytes to a point in G1

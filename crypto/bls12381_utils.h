@@ -41,19 +41,9 @@
 #define G1_SER_BYTES        (G1_BYTES/(G1_SERIALIZATION+1))
 #define G2_SER_BYTES        (G2_BYTES/(G2_SERIALIZATION+1))
 
-// Subgroup membership check method
-#define EXP_ORDER 0
-#define BOWE 1
-#define MEMBERSHIP_CHECK_G1 BOWE
-#define MEMBERSHIP_CHECK_G2 EXP_ORDER
-
 
 // Structure of precomputed data
 typedef struct prec_ {
-    #if  (MEMBERSHIP_CHECK_G1 == BOWE)
-    bn_st beta;
-    bn_st z2_1_by3;
-    #endif
     // other field-related constants
     bn_st p_1div2;
     fp_t r;   // Montgomery multiplication constant
@@ -122,9 +112,6 @@ void     ep_sum_vector(ep_t, ep_st*, const int);
 int      ep_sum_vector_byte(byte*, const byte*, const int);
 void     map_bytes_to_G1(E1*, const uint8_t*, int);
 void     map_bytes_to_G1complement(E1*, const uint8_t*, int);
-#if  (MEMBERSHIP_CHECK_G1 == BOWE)
-int      bowe_subgroup_check_G1(const ep_t);
-#endif
 
 // E2 and G2 utilities
 void        E2_set_infty(E2* p);
