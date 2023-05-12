@@ -500,7 +500,7 @@ func (a *pubKeyBLSBLS12381) EncodeCompressed() []byte {
 		panic("library is not configured to use compressed public key serialization")
 	}
 	dest := make([]byte, pubKeyLengthBLSBLS12381)
-	writePointG2(dest, &a.point)
+	writePointE2(dest, &a.point)
 	return dest
 }
 

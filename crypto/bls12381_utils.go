@@ -77,7 +77,7 @@ func (a *scalar) String() string {
 
 func (p *pointE2) String() string {
 	encoding := make([]byte, pubKeyLengthBLSBLS12381)
-	writePointG2(encoding, p)
+	writePointE2(encoding, p)
 	return fmt.Sprintf("%#x", encoding)
 }
 
@@ -166,21 +166,18 @@ func writeScalar(dest []byte, x *scalar) {
 	C.Fr_write_bytes((*C.uchar)(&dest[0]), (*C.Fr)(x))
 }
 
-// writePointG2 writes a G2 point in a slice of bytes
+// writePointE2 writes a G2 point in a slice of bytes
 // The slice should be of size PubKeyLenBLSBLS12381 and the serialization
 // follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
-func writePointG2(dest []byte, a *pointE2) {
+func writePointE2(dest []byte, a *pointE2) {
 	C.E2_write_bytes((*C.uchar)(&dest[0]), (*C.E2)(a))
 }
 
-// writePointG1 writes a G1 point in a slice of bytes
-// The slice should be of size SignatureLenBLSBLS12381 and the serialization will
-// follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
-func writePointG1(dest []byte, a *pointE1) {
-	C.ep_write_bin_compact((*C.uchar)(&dest[0]),
-		(*C.E1)(a),
-		(C.int)(signatureLengthBLSBLS12381),
-	)
+// writePointE1 writes a G1 point in a slice of bytes
+// The slice should be of size SignatureLenBLSBLS12381 and the serialization
+// follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
+func writePointE1(dest []byte, a *pointE1) {
+	C.E1_write_bytes((*C.uchar)(&dest[0]), (*C.E1)(a))
 }
 
 // read an Fr* element from a byte slice
@@ -218,11 +215,11 @@ func readPointE2(a *pointE2, src []byte) error {
 	case blst_valid:
 		return nil
 	case blst_bad_encoding, blst_bad_scalar:
-		return invalidInputsErrorf("input could not deserialize to a G2 point")
+		return invalidInputsErrorf("input could not deserialize to a E2 point")
 	case blst_point_not_on_curve:
 		return invalidInputsErrorf("input is not a point on curve E2")
 	default:
-		return errors.New("reading a G2 point failed")
+		return errors.New("reading E2 point failed")
 	}
 }
 
@@ -231,23 +228,26 @@ func readPointE2(a *pointE2, src []byte) error {
 // follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves.
 // No G1 membership check is performed.
 func readPointE1(a *pointE1, src []byte) error {
-	switch C.ep_read_bin_compact((*C.E1)(a),
+	read := C.E1_read_bytes((*C.E1)(a),
 		(*C.uchar)(&src[0]),
-		(C.int)(len(src))) {
-	case valid:
+		(C.int)(len(src)))
+
+	switch int(read) {
+	case blst_valid:
 		return nil
-	case invalid:
-		return invalidInputsErrorf("input is not a G1 point")
+	case blst_bad_encoding, blst_bad_scalar:
+		return invalidInputsErrorf("input could not deserialize to a E1 point")
+	case blst_point_not_on_curve:
+		return invalidInputsErrorf("input is not a point on curve E1")
 	default:
-		return errors.New("reading a G1 point failed")
+		return errors.New("reading E1 point failed")
 	}
 }
 
 // checkMembershipG1 wraps a call to a subgroup check in G1 since cgo can't be used
 // in go test files.
 func checkMembershipG1(pt *pointE1) bool {
-	//return C.E1_in_G1((*C.E1)(pt)) != (C.ulonglong)(0)
-	return true
+	return C.E1_in_G1((*C.E1)(pt)) != (C.ulonglong)(0)
 }
 
 // checkMembershipG2 wraps a call to a subgroup check in G2 since cgo can't be used
@@ -302,10 +302,10 @@ func hashToG1Bytes(data, dst []byte) []byte {
 
 	// map the hash to G1
 	var point pointE1
-	C.map_to_G1((*C.E1)(&point), (*C.uchar)(&hash[0]), (C.int)(len(hash)))
+	C.map_to_G1((*C.ep_st)(&point), (*C.uchar)(&hash[0]), (C.int)(len(hash)))
 
 	// serialize the point
 	pointBytes := make([]byte, signatureLengthBLSBLS12381)
-	writePointG1(pointBytes, &point)
+	writePointE1(pointBytes, &point)
 	return pointBytes
 }

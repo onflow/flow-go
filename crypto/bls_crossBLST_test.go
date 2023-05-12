@@ -158,7 +158,7 @@ func testEncodeDecodeG1CrossBLST(t *rapid.T) {
 	// check both serializations of G1 points are equal
 	if flowPass && blstPass {
 		sigFlowOutBytes := make([]byte, signatureLengthBLSBLS12381)
-		writePointG1(sigFlowOutBytes, &pointFlow)
+		writePointE1(sigFlowOutBytes, &pointFlow)
 		sigBLSTOutBytes := pointBLST.Compress()
 
 		assert.Equal(t, sigFlowOutBytes, sigBLSTOutBytes)

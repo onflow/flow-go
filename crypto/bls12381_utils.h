@@ -128,7 +128,7 @@ void        E1_set_infty(E1*);
 bool_t      E1_is_infty(const E1*);
 void        E1_to_affine(E1*, const E1*);
 bool_t      E1_affine_on_curve(const E1*);
-bool_t      E1_in_G1(const ep_t);
+bool_t      E1_in_G1(const E1*);
 int         G1_simple_subgroup_check(const ep_t);
 void        E1_mult(E1*, const E1*, const Fr*);
 void        G1_mult_gen(E1*, const Fr*);

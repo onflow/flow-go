@@ -735,6 +735,13 @@ bool_t E1_affine_on_curve(const E1* p) {
     return POINTonE1_affine_on_curve((POINTonE1_affine*)p) | E1_is_infty(p);
 }
 
+// checks if input E1 point is on the subgroup G1.
+// It assumes input `p` is on E1.
+bool_t E1_in_G1(const E1* p){
+    // currently uses Scott method
+    return POINTonE1_in_G1((const POINTonE1*)p);
+}
+
 // E1_read_bytes imports a E1(Fp) point from a buffer in a compressed or uncompressed form.
 // The resulting point is guaranteed to be on curve E1 (no G1 check is included).
 // Expected serialization follows:
