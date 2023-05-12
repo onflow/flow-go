@@ -41,17 +41,15 @@ import (
 
 // Go wrappers around BLST C types
 // Go wrappers around Relic C types
-type pointE1 C.ep_st
+type pointE1 C.E1
 type pointE2 C.E2
 type scalar C.Fr
 
-// BLS12-381 related lengths
-var frBytesLen = int(C.get_Fr_BYTES())
-
 // TODO: For now scalars are represented as field elements Fr since all scalars
 // are less than r - check if distinguishing two types in necessary
-//type pointG1_blst C.E1
-//type pointG2_blst C.E2
+
+// BLS12-381 related lengths
+var frBytesLen = int(C.get_Fr_BYTES())
 
 // context required for the BLS set-up
 type ctx struct {
@@ -94,24 +92,17 @@ func (ct *ctx) initContext() error {
 	return nil
 }
 
-// Exponentiation in G1 (scalar point multiplication)
+// Scalar multiplication of a generic point `p` in G1
 func (p *pointE1) scalarMultG1(res *pointE1, expo *scalar) {
-	C.ep_mult((*C.ep_st)(res), (*C.ep_st)(p), (*C.Fr)(expo))
+	C.E1_mult((*C.E1)(res), (*C.E1)(p), (*C.Fr)(expo))
 }
 
-// This function is for TEST only
-// Exponentiation of g1 in G1
+// Scalar multiplication of generator g1 in G1
 func generatorScalarMultG1(res *pointE1, expo *scalar) {
-	C.ep_mult_gen_bench((*C.ep_st)(res), (*C.Fr)(expo))
+	C.G1_mult_gen((*C.E1)(res), (*C.Fr)(expo))
 }
 
-// This function is for TEST only
-// Generic Exponentiation G1
-func genericScalarMultG1(res *pointE1, expo *scalar) {
-	C.ep_mult_generic_bench((*C.ep_st)(res), (*C.Fr)(expo))
-}
-
-// Exponentiation of g2 in G2
+// Scalar multiplication of generator g2 in G2
 func generatorScalarMultG2(res *pointE2, expo *scalar) {
 	C.G2_mult_gen((*C.E2)(res), (*C.Fr)(expo))
 }
@@ -187,7 +178,7 @@ func writePointG2(dest []byte, a *pointE2) {
 // follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func writePointG1(dest []byte, a *pointE1) {
 	C.ep_write_bin_compact((*C.uchar)(&dest[0]),
-		(*C.ep_st)(a),
+		(*C.E1)(a),
 		(C.int)(signatureLengthBLSBLS12381),
 	)
 }
@@ -240,7 +231,7 @@ func readPointE2(a *pointE2, src []byte) error {
 // follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves.
 // No G1 membership check is performed.
 func readPointE1(a *pointE1, src []byte) error {
-	switch C.ep_read_bin_compact((*C.ep_st)(a),
+	switch C.ep_read_bin_compact((*C.E1)(a),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src))) {
 	case valid:
@@ -269,13 +260,13 @@ func checkMembershipG2(pt *pointE2) bool {
 // randPointG1 wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in G1 and stores it in input point.
 func randPointG1(pt *pointE1) {
-	C.ep_rand_G1((*C.ep_st)(pt))
+	C.ep_rand_G1((*C.E1)(pt))
 }
 
 // randPointG1Complement wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in E1\G1 and stores it in input point.
 func randPointG1Complement(pt *pointE1) {
-	C.ep_rand_G1complement((*C.ep_st)(pt))
+	C.ep_rand_G1complement((*C.E1)(pt))
 }
 */
 
@@ -311,7 +302,7 @@ func hashToG1Bytes(data, dst []byte) []byte {
 
 	// map the hash to G1
 	var point pointE1
-	C.map_to_G1((*C.ep_st)(&point), (*C.uchar)(&hash[0]), (C.int)(len(hash)))
+	C.map_to_G1((*C.E1)(&point), (*C.uchar)(&hash[0]), (C.int)(len(hash)))
 
 	// serialize the point
 	pointBytes := make([]byte, signatureLengthBLSBLS12381)

@@ -550,7 +550,7 @@ func (a *blsBLS12381Algo) init() error {
 func mapToG1(data []byte) *pointE1 {
 	l := len(data)
 	var h pointE1
-	C.map_to_G1((*C.ep_st)(&h), (*C.uchar)(&data[0]), (C.int)(l))
+	C.map_to_G1((*C.E1)(&h), (*C.uchar)(&data[0]), (C.int)(l))
 	return &h
 }
 
