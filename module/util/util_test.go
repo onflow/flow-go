@@ -303,14 +303,15 @@ func TestDetypeSlice(t *testing.T) {
 		assert.Equal(t, slice[i], detyped[i].(int))
 	}
 }
+
 // TestSampleN contains a series of test cases to validate the behavior of the util.SampleN function.
 // The test cases cover different scenarios:
-// 1. "returns expected sample": Checks if the function returns the expected sample value when
-//    given a valid input.
-// 2. "returns max value when sample greater than max": Verifies that the function returns the
-//    maximum allowed value when the calculated sample exceeds the maximum limit.
-// 3. "returns 0 when n is less than or equal to 0": Asserts that the function returns 0 when
-//    the input 'n' is less than or equal to 0, which represents an invalid input.
+//  1. "returns expected sample": Checks if the function returns the expected sample value when
+//     given a valid input.
+//  2. "returns max value when sample greater than max": Verifies that the function returns the
+//     maximum allowed value when the calculated sample exceeds the maximum limit.
+//  3. "returns 0 when n is less than or equal to 0": Asserts that the function returns 0 when
+//     the input 'n' is less than or equal to 0, which represents an invalid input.
 func TestSampleN(t *testing.T) {
 	t.Run("returns expected sample", func(t *testing.T) {
 		n := 8
