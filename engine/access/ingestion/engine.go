@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -83,8 +82,6 @@ type Engine struct {
 	collectionsToMarkFinalized *stdmap.Times
 	collectionsToMarkExecuted  *stdmap.Times
 	blocksToMarkExecuted       *stdmap.Times
-
-	rpcEngine *rpc.Engine
 }
 
 // New creates a new access ingestion engine
@@ -104,7 +101,6 @@ func New(
 	collectionsToMarkFinalized *stdmap.Times,
 	collectionsToMarkExecuted *stdmap.Times,
 	blocksToMarkExecuted *stdmap.Times,
-	rpcEngine *rpc.Engine,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -156,7 +152,6 @@ func New(
 		collectionsToMarkFinalized: collectionsToMarkFinalized,
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
 		blocksToMarkExecuted:       blocksToMarkExecuted,
-		rpcEngine:                  rpcEngine,
 
 		// queue / notifier for execution receipts
 		executionReceiptsNotifier: engine.NewNotifier(),
@@ -382,9 +377,6 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 		return fmt.Errorf("failed to lookup block: %w", err)
 	}
 
-	// Notify rpc handler of new finalized block height
-	e.rpcEngine.SubmitLocal(block)
-
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
 
@@ -573,14 +565,6 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 		e.log.Error().Err(err).Msg("could not handle collection")
 		return
 	}
-}
-
-// OnBlockIncorporated is a noop for this engine since access node is only dealing with finalized blocks
-func (e *Engine) OnBlockIncorporated(*model.Block) {
-}
-
-// OnDoubleProposeDetected is a noop for this engine since access node is only dealing with finalized blocks
-func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {
 }
 
 // requestMissingCollections requests missing collections for all blocks in the local db storage once at startup

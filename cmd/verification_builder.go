@@ -94,15 +94,14 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		processedBlockHeight *badger.ConsumerProgress // used in block consumer
 		chunkQueue           *badger.ChunksQueue      // used in chunk consumer
 
-		syncCore                *chainsync.Core   // used in follower engine
-		assignerEngine          *assigner.Engine  // the assigner engine
-		fetcherEngine           *fetcher.Engine   // the fetcher engine
-		requesterEngine         *requester.Engine // the requester engine
-		verifierEng             *verifier.Engine  // the verifier engine
-		chunkConsumer           *chunkconsumer.ChunkConsumer
-		blockConsumer           *blockconsumer.BlockConsumer
-		finalizationDistributor *pubsub.FinalizationDistributor
-		finalizedHeader         *commonsync.FinalizedHeaderCache
+		syncCore            *chainsync.Core   // used in follower engine
+		assignerEngine      *assigner.Engine  // the assigner engine
+		fetcherEngine       *fetcher.Engine   // the fetcher engine
+		requesterEngine     *requester.Engine // the requester engine
+		verifierEng         *verifier.Engine  // the verifier engine
+		chunkConsumer       *chunkconsumer.ChunkConsumer
+		blockConsumer       *blockconsumer.BlockConsumer
+		followerDistributor *pubsub.FollowerDistributor
 
 		committee    *committees.Consensus
 		followerCore *hotstuff.FollowerLoop     // follower hotstuff logic
@@ -177,9 +176,9 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			return nil
 		}).
-		Module("finalization distributor", func(node *NodeConfig) error {
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
-			finalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
+		Module("follower distributor", func(node *NodeConfig) error {
+			followerDistributor = pubsub.NewFollowerDistributor()
+			followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
 			return nil
 		}).
 		Module("sync core", func(node *NodeConfig) error {
@@ -313,15 +312,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			return blockConsumer, nil
 		}).
-		Component("finalized snapshot", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			var err error
-			finalizedHeader, err = commonsync.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
-			if err != nil {
-				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-			}
-
-			return finalizedHeader, nil
-		}).
 		Component("consensus committee", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
@@ -341,7 +331,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
-			finalizationDistributor.AddConsumer(blockConsumer)
+			followerDistributor.AddOnBlockFinalizedConsumer(blockConsumer.OnFinalizedBlock)
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
@@ -349,7 +339,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Logger,
 				node.Storage.Headers,
 				final,
-				finalizationDistributor,
+				followerDistributor,
 				node.RootBlock.Header,
 				node.RootQC,
 				finalized,
@@ -376,7 +366,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Logger,
 				node.Metrics.Mempool,
 				heroCacheCollector,
-				finalizationDistributor,
+				followerDistributor,
 				followerState,
 				followerCore,
 				validator,
@@ -393,7 +383,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
-				finalizedHeader.Get(),
+				node.FinalizedHeader,
 				core,
 				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
@@ -409,10 +399,10 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
+				node.State,
 				node.Storage.Blocks,
 				followerEng,
 				syncCore,
-				finalizedHeader,
 				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {

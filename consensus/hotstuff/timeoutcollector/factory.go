@@ -11,10 +11,9 @@ import (
 // TimeoutCollectorFactory implements hotstuff.TimeoutCollectorFactory, it is responsible for creating timeout collector
 // for given view.
 type TimeoutCollectorFactory struct {
-	log               zerolog.Logger
-	notifier          hotstuff.Consumer
-	collectorNotifier hotstuff.TimeoutCollectorConsumer
-	processorFactory  hotstuff.TimeoutProcessorFactory
+	log              zerolog.Logger
+	notifier         hotstuff.TimeoutAggregationConsumer
+	processorFactory hotstuff.TimeoutProcessorFactory
 }
 
 var _ hotstuff.TimeoutCollectorFactory = (*TimeoutCollectorFactory)(nil)
@@ -22,15 +21,13 @@ var _ hotstuff.TimeoutCollectorFactory = (*TimeoutCollectorFactory)(nil)
 // NewTimeoutCollectorFactory creates new instance of TimeoutCollectorFactory.
 // No error returns are expected during normal operations.
 func NewTimeoutCollectorFactory(log zerolog.Logger,
-	notifier hotstuff.Consumer,
-	collectorNotifier hotstuff.TimeoutCollectorConsumer,
+	notifier hotstuff.TimeoutAggregationConsumer,
 	createProcessor hotstuff.TimeoutProcessorFactory,
 ) *TimeoutCollectorFactory {
 	return &TimeoutCollectorFactory{
-		log:               log,
-		notifier:          notifier,
-		collectorNotifier: collectorNotifier,
-		processorFactory:  createProcessor,
+		log:              log,
+		notifier:         notifier,
+		processorFactory: createProcessor,
 	}
 }
 
@@ -44,7 +41,7 @@ func (f *TimeoutCollectorFactory) Create(view uint64) (hotstuff.TimeoutCollector
 	if err != nil {
 		return nil, fmt.Errorf("could not create TimeoutProcessor at view %d: %w", view, err)
 	}
-	return NewTimeoutCollector(f.log, view, f.notifier, f.collectorNotifier, processor), nil
+	return NewTimeoutCollector(f.log, view, f.notifier, processor), nil
 }
 
 // TimeoutProcessorFactory implements hotstuff.TimeoutProcessorFactory, it is responsible for creating timeout processor
