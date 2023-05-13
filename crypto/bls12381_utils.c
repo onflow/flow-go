@@ -783,11 +783,10 @@ BLST_ERROR E1_read_bytes(E1* a, const byte *bin, const int len) {
     }
 
     // set a.z to 1
-    Fp* a_z = &(a->z); 
-    Fp_set_limb(a_z, 1);
+    Fp_copy(&a->z, &BLS12_381_pR);
 
     if (G1_SERIALIZATION == UNCOMPRESSED) {
-        ret = Fp_read_bytes(&(a->y), bin + Fp_BYTES, sizeof(a->y));
+        ret = Fp_read_bytes(&a->y, bin + Fp_BYTES, sizeof(a->y));
         if (ret != BLST_SUCCESS){ 
             return ret;
         }
@@ -799,19 +798,16 @@ BLST_ERROR E1_read_bytes(E1* a, const byte *bin, const int len) {
     }
     
     // compute the possible square root
-    Fp* a_x = &(a->x);
-    Fp_to_montg(a_x, a_x);
-
-    Fp* a_y = &(a->y);
-    Fp_squ_montg(a_y, a_x);
-    Fp_mul_montg(a_y, a_y, a_x);
-    Fp_add(a_y, a_y, &B_E1);          // B_E1 is already in Montg form             
-    if (!Fp_sqrt_montg(a_y, a_y))           // check whether x^3+b is a quadratic residue
+    Fp_to_montg(&a->x, &a->x);
+    Fp_squ_montg(&a->y, &a->x);
+    Fp_mul_montg(&a->y, &a->y, &a->x);    // x^3
+    Fp_add(&a->y, &a->y, &B_E1);          // B_E1 is already in Montg form             
+    if (!Fp_sqrt_montg(&a->y, &a->y))     // check whether x^3+b is a quadratic residue
         return BLST_POINT_NOT_ON_CURVE; 
 
     // resulting (x,y) is guaranteed to be on curve (y is already in Montg form)
-    if (Fp_get_sign(a_y) != y_sign) {
-        Fp_neg(a_y, a_y); // flip y sign if needed
+    if (Fp_get_sign(&a->y) != y_sign) {
+        Fp_neg(&a->y, &a->y); // flip y sign if needed
     }
     return BLST_SUCCESS;
 }
@@ -828,20 +824,18 @@ void E1_write_bytes(byte *bin, const E1* a) {
             return;
     }
     E1 tmp;
-    E1_to_affine(&tmp, a); // TODO: implement
+    E1_to_affine(&tmp, a);
 
-    Fp* t_x = &(tmp.x);
-    Fp_from_montg(t_x, t_x);
-    Fp_write_bytes(bin, t_x);
+    Fp_from_montg(&tmp.x, &tmp.x);
+    Fp_write_bytes(bin, &tmp.x);
 
-    Fp* t_y = &(tmp.y);
     if (G1_SERIALIZATION == COMPRESSED) {
-        bin[0] |= (Fp_get_sign(t_y) << 5);
+        bin[0] |= (Fp_get_sign(&tmp.y) << 5);
     } else {
-        Fp_from_montg(t_y, t_y);
-        Fp_write_bytes(bin + Fp_BYTES, t_y);
+        Fp_from_montg(&tmp.y, &tmp.y);
+        Fp_write_bytes(bin + Fp_BYTES, &tmp.y);
     }
-
+    // compression bit
     bin[0] |= (G1_SERIALIZATION << 7);
 }
 
@@ -1424,10 +1418,12 @@ void xmd_sha256(byte *hash, int len_hash, byte *msg, int len_msg, byte *dst, int
 
 
 // DEBUG printing functions 
+#define DEBUG 1
+#if DEBUG==1
 void bytes_print_(char* s, byte* data, int len) {
     printf("[%s]:\n", s);
     for (int i=0; i<len; i++) 
-        printf("%02x,", data[i]);
+        printf("%02X,", data[i]);
     printf("\n");
 }
 
@@ -1435,15 +1431,17 @@ void Fr_print_(char* s, Fr* a) {
     printf("[%s]:\n", s);
     limb_t* p = (limb_t*)(a) + Fr_LIMBS;
     for (int i=0; i<Fr_LIMBS; i++) 
-        printf("%16llx", *(--p));
+        printf("%016llX", *(--p));
     printf("\n");
 }
 
-void Fp_print_(char* s, Fp* a) {
+void Fp_print_(char* s, const Fp* a) {
+    Fp tmp;
+    Fp_from_montg(&tmp, a);
     printf("[%s]:\n", s);
-    limb_t* p = (limb_t*)(a) + Fp_LIMBS;
+    limb_t* p = (limb_t*)(&tmp) + Fp_LIMBS;
     for (int i=0; i<Fp_LIMBS; i++) 
-        printf("%16llx", *(--p));
+        printf("%016llX ", *(--p));
     printf("\n");
 }
 
@@ -1453,20 +1451,31 @@ void Fp2_print_(char* s, const Fp2* a) {
     Fp_from_montg(&tmp, &real(a));
     limb_t* p = (limb_t*)(&tmp) + Fp_LIMBS;
     for (int i=0; i<Fp_LIMBS; i++) 
-        printf("%16llx", *(--p));
+        printf("%016llX", *(--p));
     printf("\n");
     Fp_from_montg(&tmp, &imag(a));
     p = (limb_t*)(&tmp) + Fp_LIMBS;
     for (int i=0; i<Fp_LIMBS; i++) 
-        printf("%16llx", *(--p));
+        printf("%016llX", *(--p));
     printf("\n");
 }
 
-void E2_print_(char* s, const E2* a) {
-      printf("[%s]:\n", s);
-      Fp2_print_(".x", &(a->x));
-      Fp2_print_(".y", &(a->y));
-      Fp2_print_(".z", &(a->z));
+void E1_print_(char* s, const E1* p, const int jacob) {
+    E1 a; E1_copy(&a, p);
+    if (!jacob) E1_to_affine(&a, &a);
+    printf("[%s]:\n", s);
+    Fp_print_(".x", &(a.x));
+    Fp_print_(".y", &(a.y));
+    if (jacob) Fp_print_(".z", &(a.z));
+}
+
+void E2_print_(char* s, const E2* p, const int jacob) {
+    E2 a; E2_copy(&a, p);
+    if (!jacob) E2_to_affine(&a, &a);
+    printf("[%s]:\n", s);
+    Fp2_print_(".x", &(a.x));
+    Fp2_print_(".y", &(a.y));
+    if (jacob) Fp2_print_(".z", &(a.z));
 }
  
 
@@ -1493,3 +1502,4 @@ void ep2_print_(char* s, ep2_st* p) {
     printf("[%s]:\n", s);
     g2_print(p);
 }
+#endif

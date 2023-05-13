@@ -145,9 +145,10 @@ void xmd_sha256(byte *, int, byte *, int, byte *, int);
 // Debugging related functions
 void     bytes_print_(char*, byte*, int);
 void     Fr_print_(char*, Fr*);
-void     Fp_print_(char*, Fp*);
+void     Fp_print_(char*, const Fp*);
 void     Fp2_print_(char*, const Fp2*);
-void     E2_print_(char*, const E2*);
+void     E1_print_(char*, const E1*, const int);
+void     E2_print_(char*, const E2*, const int);
 void     fp_print_(char*, fp_t);
 void     bn_print_(char*, bn_st*);
 void     ep_print_(char*, ep_st*);

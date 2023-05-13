@@ -21,7 +21,7 @@ int get_sk_len() {
 
 // Computes a BLS signature from a G1 point and writes it in `out`.
 // `out` must be allocated properly with `G1_SER_BYTES` bytes.
-static void bls_sign_ep(byte* out, const Fr* sk, const E1* h) {
+static void bls_sign_E1(byte* out, const Fr* sk, const E1* h) {
     // s = h^s
     E1 s;
     E1_mult(&s, h, sk);
@@ -29,16 +29,16 @@ static void bls_sign_ep(byte* out, const Fr* sk, const E1* h) {
 }
 
 // Computes a BLS signature from a hash and writes it in `out`.
-// `hash` represents the hashed message with length `len` equal to `MAP_TO_G1_INPUT_LEN`. 
+// `hash` represents the hashed message with length `hash_len` equal to `MAP_TO_G1_INPUT_LEN`. 
 // `out` must be allocated properly with `G1_SER_BYTES` bytes.
-int bls_sign(byte* out, const Fr* sk, const byte* hash, const int len) {
+int bls_sign(byte* out, const Fr* sk, const byte* hash, const int hash_len) {
     // hash to G1
     E1 h;
-    if (map_to_G1(&h, hash, len) != VALID) {
+    if (map_to_G1(&h, hash, hash_len) != VALID) {
         return INVALID;
     }
     // s = h^sk
-    bls_sign_ep(out, sk, &h);
+    bls_sign_E1(out, sk, &h);
     return VALID;
 }
 
@@ -46,7 +46,7 @@ int bls_sign(byte* out, const Fr* sk, const byte* hash, const int len) {
 // and a message hash `h` (G1 point).
 // Hash, signature and public key are assumed to be in G1, G1 and G2 respectively. This 
 // function only checks the pairing equality. 
-static int bls_verify_ep(const E2* pk, const E1* s, const E1* h) {    
+static int bls_verify_E1(const E2* pk, const E1* s, const E1* h) {    
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
 
@@ -324,10 +324,9 @@ outG1:
 // membership check of the signature in G1 is verified.
 // membership check of pk in G2 is not verified in this function.
 // the membership check in G2 is separated to optimize multiple verifications using the same key.
-// `hash` represents the hashed message with length `len` equal to `MAP_TO_G1_INPUT_LEN`. 
-int bls_verify(const E2* pk, const byte* sig, const byte* hash, const int len) {  
+// `hash` represents the hashed message with length `hash_len` equal to `MAP_TO_G1_INPUT_LEN`. 
+int bls_verify(const E2* pk, const byte* sig, const byte* hash, const int hash_len) {  
     E1 s, h;
-    
     // deserialize the signature into a curve point
     if (E1_read_bytes(&s, sig, SIGNATURE_LEN) != BLST_SUCCESS) {
         return INVALID;
@@ -338,11 +337,11 @@ int bls_verify(const E2* pk, const byte* sig, const byte* hash, const int len) {
         return INVALID;
     }
 
-    if (map_to_G1(&h, hash, len) != VALID) {
+    if (map_to_G1(&h, hash, hash_len) != VALID) {
         return INVALID;
     }
     
-    return bls_verify_ep(pk, &s, &h);
+    return bls_verify_E1(pk, &s, &h);
 }
 
 
@@ -428,7 +427,7 @@ error:
 // verify the binary tree and fill the results using recursive batch verifications.
 static void bls_batch_verify_tree(const node* root, const int len, byte* results, const E1* h) {
     // verify the aggregated signature against the aggregated public key.
-    int res =  bls_verify_ep(root->pk, root->sig, h);
+    int res =  bls_verify_E1(root->pk, root->sig, h);
 
     // if the result is valid, all the subtree signatures are valid.
     if (res == VALID) {
