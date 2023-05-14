@@ -107,6 +107,8 @@ func (segment *SealingSegment) Validate() error {
 	// populate lookup of seals and results in the segment to satisfy builder
 	seals := make(map[Identifier]*Seal)
 	results := segment.ExecutionResults.Lookup()
+	resultsString := ""
+	sealsString := ""
 
 	if segment.FirstSeal != nil {
 		seals[segment.FirstSeal.ID()] = segment.FirstSeal
@@ -114,16 +116,18 @@ func (segment *SealingSegment) Validate() error {
 	for _, block := range segment.Blocks {
 		for _, result := range block.Payload.Results {
 			results[result.ID()] = result
+			resultsString += ", " + result.ID().String()
 		}
 		for _, seal := range block.Payload.Seals {
 			seals[seal.ID()] = seal
+			sealsString += ", " + seal.ID().String()
 		}
 	}
 
 	getResult := func(resultID Identifier) (*ExecutionResult, error) {
 		result, ok := results[resultID]
 		if !ok {
-			return nil, fmt.Errorf("result (id=%x) not found in segment", resultID)
+			return nil, fmt.Errorf("result (id=%x) not found in segment, results found: %s", resultID, resultsString)
 		}
 		return result, nil
 	}
@@ -134,7 +138,7 @@ func (segment *SealingSegment) Validate() error {
 		}
 		seal, ok := seals[sealID]
 		if !ok {
-			return nil, fmt.Errorf("seal (id=%x) not found in segment at block %x", sealID, blockID)
+			return nil, fmt.Errorf("seal (id=%x) not found in segment at block %x, seal found: %s", sealID, blockID, sealsString)
 		}
 		return seal, nil
 	}
