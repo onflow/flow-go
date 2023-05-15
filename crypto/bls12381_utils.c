@@ -52,35 +52,8 @@ ctx_t* relic_init_BLS12_381() {
     ep_param_set(B12_P381);
     ep2_curve_set_twist(EP_MTYPE);  // Multiplicative twist 
     #endif 
-
     if (ret != RLC_OK) return NULL;
     return core_get();
-}
-
-// global variable of the pre-computed data
-prec_st bls_prec_st;
-prec_st* bls_prec = NULL;
-
-// sets the global variable to input
-void precomputed_data_set(const prec_st* p) {
-    bls_prec = (prec_st*)p;
-}
-
-// Reads a prime field element from a digit vector in big endian format.
-// There is no conversion to Montgomery domain in this function.
-#define fp_read_raw(a, data_pointer) dv_copy((a), (data_pointer), Fp_LIMBS)
-
-// pre-compute some data required for curve BLS12-381
-prec_st* init_precomputed_data_BLS12_381() {
-    bls_prec = &bls_prec_st;
-    ctx_t* ctx = core_get();
-
-    // (p-1)/2
-    bn_div_dig(&bls_prec->p_1div2, &ctx->prime, 2);
-
-    // Montgomery constant R
-    fp_set_dig(bls_prec->r, 1);
-    return bls_prec;
 }
 
 // ------------------- Fr utilities
@@ -91,27 +64,6 @@ const Fr BLS12_381_rR = {{  \
     TO_LIMB_T(0x1824b159acc5056f), TO_LIMB_T(0x998c4fefecbc4ff5), \
     TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe), \
     }};
-
-// TODO: temp utility function to delete
-bn_st* Fr_blst_to_relic(const Fr* x) {
-    bn_st* out = (bn_st*)malloc(sizeof(bn_st)); 
-    byte* data = (byte*)malloc(Fr_BYTES);
-    be_bytes_from_limbs(data, (limb_t*)x, Fr_BYTES);
-    out->alloc = RLC_DV_DIGS;
-    bn_read_bin(out, data, Fr_BYTES);
-    free(data);
-    return out;
-}
-
-// TODO: temp utility function to delete
-Fr* Fr_relic_to_blst(const bn_st* x){
-    Fr* out = (Fr*)malloc(sizeof(Fr)); 
-    byte* data = (byte*)malloc(Fr_BYTES);
-    bn_write_bin(data, Fr_BYTES, x);   
-    Fr_read_bytes(out, data, Fr_BYTES);
-    free(data);
-    return out;
-}
 
 // returns true if a == 0 and false otherwise
 bool_t Fr_is_zero(const Fr* a) {
@@ -566,18 +518,8 @@ void Fp2_write_bytes(byte *bin, const Fp2* a) {
 
 // ------------------- E1 utilities
 
-// TODO: temp utility function to delete
-ep_st* E1_blst_to_relic(const E1* x) {
-    ep_st* out = (ep_st*)malloc(sizeof(ep_st)); 
-    byte* data = (byte*)malloc(G1_SER_BYTES);
-    E1_write_bytes(data, x);
-    ep_read_bin_compact(out, data, G1_SER_BYTES);
-    free(data);
-    return out;
-}
-
 // TODO: to delete, only used by temporary E2_blst_to_relic
-int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
+static int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     // check the length
     const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
     if (len!=G1_size) {
@@ -641,50 +583,15 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     return RLC_ERR;
 }
 
-
-// TODO: delete aftet deleting ep_write_bin_compact
-static int fp_get_sign(const fp_t y) {
-    bn_t bn_y;
-    bn_new(bn_y);
-    fp_prime_back(bn_y, y);
-    return bn_cmp(bn_y, &bls_prec->p_1div2) == RLC_GT;		
+// TODO: temp utility function to delete
+ep_st* E1_blst_to_relic(const E1* x) {
+    ep_st* out = (ep_st*)malloc(sizeof(ep_st)); 
+    byte* data = (byte*)malloc(G1_SER_BYTES);
+    E1_write_bytes(data, x);
+    ep_read_bin_compact(out, data, G1_SER_BYTES);
+    free(data);
+    return out;
 }
-
-// TODO: to delete, only used by temporary E2_blst_to_relic
-void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
-    const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
-
-    if (len!=G1_size) {
-        RLC_THROW(ERR_NO_BUFFER);
-        return;
-    }
- 
-    if (ep_is_infty(a)) {
-            // set the infinity bit
-            bin[0] = (G1_SERIALIZATION << 7) | (1<<6);
-            memset(bin+1, 0, G1_size-1);
-            return;
-    }
-
-    RLC_TRY {
-        ep_t t;
-        ep_null(t);
-        ep_new(t); 
-        ep_norm(t, a);
-        fp_write_bin(bin, Fp_BYTES, t->x);
-
-        if (G1_SERIALIZATION == COMPRESSED) {
-            bin[0] |= (fp_get_sign(t->y) << 5);
-        } else {
-            fp_write_bin(bin + Fp_BYTES, Fp_BYTES, t->y);
-        }
-        ep_free(t);
-    } RLC_CATCH_ANY {
-        RLC_THROW(ERR_CAUGHT);
-    }
-
-    bin[0] |= (G1_SERIALIZATION << 7);
- }
 
 void E1_copy(E1* res, const E1* p) {
     vec_copy(res, p, sizeof(E1));

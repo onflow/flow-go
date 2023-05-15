@@ -54,7 +54,6 @@ var frBytesLen = int(C.get_Fr_BYTES())
 // context required for the BLS set-up
 type ctx struct {
 	relicCtx *C.ctx_t
-	precCtx  *C.prec_st
 }
 
 // get some constants from the C layer
@@ -88,7 +87,6 @@ func (ct *ctx) initContext() error {
 		return errors.New("Relic core init failed")
 	}
 	ct.relicCtx = c
-	ct.precCtx = C.init_precomputed_data_BLS12_381()
 	return nil
 }
 

@@ -42,17 +42,9 @@
 #define G2_SER_BYTES        (G2_BYTES/(G2_SERIALIZATION+1))
 
 
-// Structure of precomputed data
-typedef struct prec_ {
-    // other field-related constants
-    bn_st p_1div2;
-    fp_t r;   // Montgomery multiplication constant
-} prec_st;
-
 // TODO: to delete when Relic is removed
-bn_st* Fr_blst_to_relic(const Fr* x);
-Fr*  Fr_relic_to_blst(const bn_st* x);
-ep2_st* E2_blst_to_relic(const E2* x);
+ep2_st*     E2_blst_to_relic(const E2* x);
+ep_st*      E1_blst_to_relic(const E1* x);
 
 int      get_valid();
 int      get_invalid();
@@ -107,10 +99,6 @@ int         E1_sum_vector_byte(byte*, const byte*, const int);
 void        G1_mult_gen(E1*, const Fr*);
 BLST_ERROR  E1_read_bytes(E1*, const byte *,  const int); 
 void        E1_write_bytes(byte *, const E1*);
-
-ep_st*      E1_blst_to_relic(const E1* x);
-int         ep_read_bin_compact(ep_t, const byte *, const int);
-void        ep_write_bin_compact(byte *, const ep_t,  const int);
 void        unsecure_map_bytes_to_G1(E1*, const byte*, int);
 BLST_ERROR  unsecure_map_bytes_to_G1complement(E1*, const byte*, int);
 
@@ -135,8 +123,6 @@ BLST_ERROR  unsecure_map_bytes_to_G2complement(E2*, const byte*, int);
 
 // Utility functions
 ctx_t*   relic_init_BLS12_381();
-prec_st* init_precomputed_data_BLS12_381();
-void     precomputed_data_set(const prec_st* p);
 
 // utility testing function
 void xmd_sha256(byte *, int, byte *, int, byte *, int);
