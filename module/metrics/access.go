@@ -67,7 +67,7 @@ func NewAccessCollector() *AccessCollector {
 			Help:      "counter for the number of times a cached connection is evicted from the connection pool",
 		}),
 	}
-	ac.RestMetrics = NewRecorderCollector(metricsProm.Config{Prefix: "access_rest_api"})
+	ac.RestMetrics = NewRestCollector(metricsProm.Config{Prefix: "access_rest_api"})
 
 	return ac
 }

@@ -12,18 +12,18 @@ import (
 	metricsProm "github.com/slok/go-http-metrics/metrics/prometheus"
 )
 
-type RecorderCollector struct {
+type RestCollector struct {
 	httpRequestDurHistogram   *prometheus.HistogramVec
 	httpResponseSizeHistogram *prometheus.HistogramVec
 	httpRequestsInflight      *prometheus.GaugeVec
 	httpRequestsTotal         *prometheus.GaugeVec
 }
 
-var _ module.RestMetrics = (*RecorderCollector)(nil)
+var _ module.RestMetrics = (*RestCollector)(nil)
 
-// NewRestCollector returns a new metrics RecorderCollector that implements the RecorderCollector
+// NewRestCollector returns a new metrics RestCollector that implements the RestCollector
 // using Prometheus as the backend.
-func NewRecorderCollector(cfg metricsProm.Config) module.RestMetrics {
+func NewRestCollector(cfg metricsProm.Config) module.RestMetrics {
 	if len(cfg.DurationBuckets) == 0 {
 		cfg.DurationBuckets = prometheus.DefBuckets
 	}
@@ -52,7 +52,7 @@ func NewRecorderCollector(cfg metricsProm.Config) module.RestMetrics {
 		cfg.ServiceLabel = "service"
 	}
 
-	r := &RecorderCollector{
+	r := &RestCollector{
 		httpRequestDurHistogram: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: cfg.Prefix,
 			Subsystem: "http",
@@ -95,19 +95,19 @@ func NewRecorderCollector(cfg metricsProm.Config) module.RestMetrics {
 }
 
 // These methods are called automatically by go-http-metrics/middleware
-func (r *RecorderCollector) ObserveHTTPRequestDuration(_ context.Context, p httpmetrics.HTTPReqProperties, duration time.Duration) {
+func (r *RestCollector) ObserveHTTPRequestDuration(_ context.Context, p httpmetrics.HTTPReqProperties, duration time.Duration) {
 	r.httpRequestDurHistogram.WithLabelValues(p.Service, p.ID, p.Method, p.Code).Observe(duration.Seconds())
 }
 
-func (r *RecorderCollector) ObserveHTTPResponseSize(_ context.Context, p httpmetrics.HTTPReqProperties, sizeBytes int64) {
+func (r *RestCollector) ObserveHTTPResponseSize(_ context.Context, p httpmetrics.HTTPReqProperties, sizeBytes int64) {
 	r.httpResponseSizeHistogram.WithLabelValues(p.Service, p.ID, p.Method, p.Code).Observe(float64(sizeBytes))
 }
 
-func (r *RecorderCollector) AddInflightRequests(_ context.Context, p httpmetrics.HTTPProperties, quantity int) {
+func (r *RestCollector) AddInflightRequests(_ context.Context, p httpmetrics.HTTPProperties, quantity int) {
 	r.httpRequestsInflight.WithLabelValues(p.Service, p.ID).Add(float64(quantity))
 }
 
 // New custom method to track all requests made for every REST API request
-func (r *RecorderCollector) AddTotalRequests(_ context.Context, method string, id string) {
+func (r *RestCollector) AddTotalRequests(_ context.Context, method string, id string) {
 	r.httpRequestsTotal.WithLabelValues(method, id).Inc()
 }
