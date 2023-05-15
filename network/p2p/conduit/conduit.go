@@ -16,7 +16,7 @@ import (
 // It directly passes the incoming messages to the corresponding methods of the
 // network Adapter.
 type DefaultConduitFactory struct {
-	*component.ComponentManager
+	component.Component
 	adapter            network.Adapter
 	misbehaviorManager network.MisbehaviorReportManager
 }
@@ -68,7 +68,7 @@ func NewDefaultConduitFactory(alspCfg *alspmgr.MisbehaviorReportManagerConfig, o
 			<-d.misbehaviorManager.Done()
 		}).Build()
 
-	d.ComponentManager = cm
+	d.Component = cm
 
 	return d, nil
 }
