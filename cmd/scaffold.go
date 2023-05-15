@@ -415,7 +415,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			SpamRecordsCacheSize: fnb.AlspConfig.SpamRecordCacheSize,
 			DisablePenalty:       fnb.AlspConfig.DisablePenalty,
 			AlspMetrics:          fnb.Metrics.Network,
-			CacheMetrics:         metrics.ApplicationLayerSpamRecordCacheMetricFactory(fnb.HeroCacheMetricsFactory()),
+			CacheMetrics:         metrics.ApplicationLayerSpamRecordCacheMetricFactory(fnb.HeroCacheMetricsFactory(), p2p.PrivateNetwork),
 		})
 		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
 		return fnb.InitFlowNetworkWithConduitFactory(node, cf, unicastRateLimiters, peerManagerFilters)

@@ -95,8 +95,13 @@ func DisallowListNotificationQueueMetricFactory(registrar prometheus.Registerer)
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDisallowListNotificationQueue, registrar)
 }
 
-func ApplicationLayerSpamRecordCacheMetricFactory(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
-	return f(namespaceNetwork, ResourceNetworkingApplicationLayerSpamRecordCache)
+func ApplicationLayerSpamRecordCacheMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+	r := ResourceNetworkingApplicationLayerSpamRecordCache
+	if publicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+
+	return f(namespaceNetwork, r)
 }
 
 func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {

@@ -642,7 +642,7 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 			SpamRecordsCacheSize: builder.AlspConfig.SpamRecordCacheSize,
 			DisablePenalty:       builder.AlspConfig.DisablePenalty,
 			AlspMetrics:          builder.Metrics.Network,
-			CacheMetrics:         metrics.ApplicationLayerSpamRecordCacheMetricFactory(builder.HeroCacheMetricsFactory()),
+			CacheMetrics:         metrics.ApplicationLayerSpamRecordCacheMetricFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork),
 		}),
 	})
 	if err != nil {
