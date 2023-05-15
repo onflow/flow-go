@@ -23,8 +23,8 @@ import (
 const (
 	// defaultMisbehaviorReportManagerWorkers is the default number of workers in the worker pool.
 	defaultMisbehaviorReportManagerWorkers = 2
-	FatalMsgNegativePositivePenalty = "penalty value is positive, expected negative %f"
-	FatalMsgFailedToApplyPenalty    = "failed to apply penalty to the spam record"
+	FatalMsgNegativePositivePenalty        = "penalty value is positive, expected negative %f"
+	FatalMsgFailedToApplyPenalty           = "failed to apply penalty to the spam record"
 )
 
 var (
@@ -42,6 +42,7 @@ var (
 //
 //	and report the node to be disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
 type MisbehaviorReportManager struct {
+	component.Component
 	logger  zerolog.Logger
 	metrics module.AlspMetrics
 	cache   alsp.SpamRecordCache
@@ -247,14 +248,14 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 	// a spam record for the peer first and then applies the penalty. In other words, Adjust uses an optimistic update by
 	// first assuming that the spam record exists and then initializing it if it does not exist. In this way, we avoid
 	// acquiring the lock twice per misbehavior report, reducing the contention on the lock and improving the performance.
-	updatedPenalty, err := m.cache.Adjust(report.OriginId(), func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
-		if report.Penalty() > 0 {
+	updatedPenalty, err := m.cache.Adjust(report.OriginId, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+		if report.Penalty > 0 {
 			// this should never happen, unless there is a bug in the misbehavior report handling logic.
 			// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
 			// we return the error as it is considered as a fatal error.
-			return record, fmt.Errorf(FatalMsgNegativePositivePenalty, report.Penalty())
+			return record, fmt.Errorf(FatalMsgNegativePositivePenalty, report.Penalty)
 		}
-		record.Penalty += report.Penalty() // penalty value is negative. We add it to the current penalty.
+		record.Penalty += report.Penalty // penalty value is negative. We add it to the current penalty.
 		return record, nil
 	})
 	if err != nil {
