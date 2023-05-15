@@ -90,7 +90,10 @@ type GossipSubRPCInspector interface {
 	Inspect(peer.ID, *pubsub.RPC) error
 }
 
-// GossipSubMsgValidationRpcInspector app specific RPC inspector used to inspect and validate incoming RPC messages before they are processed by libp2p.
+// GossipSubMsgValidationRpcInspector abstracts the general behavior of an app specific RPC inspector specifically
+// used to inspect and validate incoming. It is used to implement custom message validation logic. It is injected into
+// the GossipSubRouter and run on every incoming RPC message before the message is processed by libp2p. If the message
+// is invalid the RPC message will be dropped.
 // Implementations must:
 //   - be concurrency safe
 //   - be non-blocking
