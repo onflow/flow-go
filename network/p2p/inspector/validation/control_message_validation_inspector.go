@@ -113,17 +113,20 @@ func NewControlMsgValidationInspector(logger zerolog.Logger, sporkID flow.Identi
 	return c, nil
 }
 
-// Inspect inspects the rpc received and returns an error if any validation rule is broken.
-// For each control message type an initial inspection is done synchronously to check the amount
-// of messages in the control message. Further inspection is done asynchronously to check rate limits
-// and validate topic IDS each control message if initial validation is passed.
-// All errors returned from this function can be considered benign.
-// errors returned:
-//
-//	ErrDiscardThreshold - if the message count for the control message type exceeds the discard threshold.
-//
-// This func returns an exception in case of unexpected bug or state corruption the violation distributor
-// fails to distribute invalid control message notification or a new inspect message request can't be created.
+// Inspect is called by gossipsub upon reception of an rpc from a remote node.
+// It examines the provided message to ensure it adheres to the expected
+// format and conventions. If the message passes validation, the method returns
+// a nil error. If an issue is found, the method returns an error detailing
+// the specific issue encountered.
+// The returned error can be of two types:
+// 1. Expected errors: These are issues that are expected to occur during normal
+//    operation, such as invalid messages or messages that don't follow the
+//    conventions. These errors should be handled gracefully by the caller.
+// 2. Exceptions: These are unexpected issues, such as internal system errors
+//    or misconfigurations, that may require immediate attention or a change in
+//    the system's behavior. The caller should log and handle these errors
+//    accordingly.
+// The returned error is returned to the gossipsub node which causes the rejection of rpc (for non-nil errors).
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	control := rpc.GetControl()
 	for _, ctrlMsgType := range p2p.ControlMessageTypes() {
