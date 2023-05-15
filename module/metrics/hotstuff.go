@@ -44,6 +44,7 @@ type HotstuffCollector struct {
 	validatorComputationsDuration prometheus.Histogram
 	payloadProductionDuration     prometheus.Histogram
 	timeoutCollectorsRange        *prometheus.GaugeVec
+	numberOfActiveCollectors      prometheus.Gauge
 }
 
 var _ module.HotstuffMetrics = (*HotstuffCollector)(nil)
@@ -186,6 +187,20 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
+		timeoutCollectorsRange: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name:        "timeout_collectors_range",
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
+			Help:        "active range of TimeoutCollectors, lowest and highest views that we are collecting timeouts for",
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
+		}, []string{"lowest_retained_view", "newest_view_of_created_collector"}),
+		numberOfActiveCollectors: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:        "active_collectors",
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
+			Help:        "number of active collectors stored in TimeoutCollectors",
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
+		}),
 	}
 
 	return hc
@@ -284,5 +299,5 @@ func (hc *HotstuffCollector) PayloadProductionDuration(duration time.Duration) {
 func (hc *HotstuffCollector) TimeoutCollectorsRange(lowestRetainedView uint64, newestViewCreatedCollector uint64, activeCollectors int) {
 	hc.timeoutCollectorsRange.WithLabelValues("lowest_retained_view").Set(float64(lowestRetainedView))
 	hc.timeoutCollectorsRange.WithLabelValues("newest_view_of_created_collector").Set(float64(newestViewCreatedCollector))
-	hc.timeoutCollectorsRange.WithLabelValues("active_collectors").Set(float64(activeCollectors))
+	hc.numberOfActiveCollectors.Set(float64(activeCollectors))
 }
