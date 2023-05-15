@@ -1,6 +1,8 @@
 package alspmgr
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
@@ -13,7 +15,7 @@ import (
 )
 
 const (
-	FatalMsgNegativePositivePenalty = "penalty value is positive, expected negative"
+	FatalMsgNegativePositivePenalty = "penalty value is positive, expected negative %f"
 	FatalMsgFailedToApplyPenalty    = "failed to apply penalty to the spam record"
 )
 
@@ -133,8 +135,8 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 		if report.Penalty() > 0 {
 			// this should never happen, unless there is a bug in the misbehavior report handling logic.
 			// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
-			// TODO: refactor to throwing error to the irrecoverable context.
-			lg.Fatal().Float64("penalty", report.Penalty()).Msg(FatalMsgNegativePositivePenalty)
+			// we return the error as it is considered as a fatal error.
+			return record, fmt.Errorf(FatalMsgNegativePositivePenalty, report.Penalty())
 		}
 		record.Penalty += report.Penalty() // penalty value is negative. We add it to the current penalty.
 		return record, nil
