@@ -16,7 +16,7 @@ import (
 // finalized by a valid block.
 // This assumes state is bootstrapped with a root block, as it does NOT produce
 // results for final block of the state
-// Root <- A <- B(result(A(VB))) <- C(seal(B)) <- D
+// Root <- A <- B(result(A(VB))) <- C(seal(B))
 func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.FollowerState) {
 
 	final, err := state.Final().Head()
@@ -46,9 +46,6 @@ func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.F
 		Seals: sealsForB,
 	})
 	addToState(t, state, C, true)
-
-	D := BlockWithParentFixture(C.Header)
-	addToState(t, state, D, false)
 }
 
 func addToState(t *testing.T, state protocol.FollowerState, block *flow.Block, finalize bool) {

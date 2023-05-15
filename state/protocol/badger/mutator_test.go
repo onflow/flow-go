@@ -284,7 +284,7 @@ func TestVersionBeaconIndex(t *testing.T) {
 		// G <- B1 <- B2 (resultB1(vb1)) <- B3 <- B4 (resultB2(vb2), resultB3(vb3)) <- B5 (sealB1) <- B6 (sealB2, sealB3)
 		// up until and including finalization of B5 there should be no VBs indexed
 		//    when B5 is finalized, index VB1
-		//    when B6 is finalized, we can index VB2 and VB3, but the last one should be indexed for a height
+		//    when B6 is finalized, we can index VB2 and VB3, but (only) the last one should be indexed by seal height
 
 		// block 1
 		b1 := unittest.BlockWithParentFixture(rootHeader)
@@ -410,7 +410,7 @@ func TestVersionBeaconIndex(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, vb)
 
-		//  once B6 is finalized, events sealed by B5 are considered in effect, hence index should now find it
+		// once B5 is finalized, B1 and VB1 are sealed, hence index should now find it
 		err = state.Finalize(context.Background(), b5.ID())
 		require.NoError(t, err)
 

@@ -216,7 +216,7 @@ func TestValidateVersionBeacon(t *testing.T) {
 				VersionBoundaries: []flow.VersionBoundary{
 					{
 						BlockHeight: 0,
-						Version:     "asdf",
+						Version:     "asdf", // invalid semver - hence will be considered invalid
 					},
 				},
 				Sequence: 50,
