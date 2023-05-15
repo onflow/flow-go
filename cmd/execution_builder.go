@@ -314,7 +314,7 @@ func (exeNode *ExecutionNode) LoadBlobService(
 		blob.WithBitswapOptions(
 			// Only allow block requests from staked ENs and ANs on the allowedANs list (if set)
 			bitswap.WithPeerBlockRequestFilter(
-				blob.AuthorizedRequester(allowedANs, exeNode.builder.IdentityProvider, exeNode.builder.Logger),
+				blob.AuthorizedRequester(exeNode.builder.Logger, allowedANs, exeNode.builder.IdentityProvider),
 			),
 			bitswap.WithTracer(
 				blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()),

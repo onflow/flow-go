@@ -107,28 +107,30 @@ import (
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type AccessNodeConfig struct {
-	supportsObserver             bool // True if this is an Access node that supports observers and consensus follower engines
-	collectionGRPCPort           uint
-	executionGRPCPort            uint
-	pingEnabled                  bool
-	nodeInfoFile                 string
-	apiRatelimits                map[string]int
-	apiBurstlimits               map[string]int
-	rpcConf                      rpc.Config
-	stateStreamConf              state_stream.Config
-	stateStreamFilterConf        map[string]int
-	ExecutionNodeAddress         string // deprecated
-	HistoricalAccessRPCs         []access.AccessAPIClient
-	logTxTimeToFinalized         bool
-	logTxTimeToExecuted          bool
-	logTxTimeToFinalizedExecuted bool
-	retryEnabled                 bool
-	rpcMetricsEnabled            bool
-	executionDataSyncEnabled     bool
-	executionDataDir             string
-	executionDataStartHeight     uint64
-	executionDataConfig          edrequester.ExecutionDataConfig
-	PublicNetworkConfig          PublicNetworkConfig
+	supportsObserver               bool // True if this is an Access node that supports observers and consensus follower engines
+	collectionGRPCPort             uint
+	executionGRPCPort              uint
+	pingEnabled                    bool
+	nodeInfoFile                   string
+	apiRatelimits                  map[string]int
+	apiBurstlimits                 map[string]int
+	rpcConf                        rpc.Config
+	stateStreamConf                state_stream.Config
+	stateStreamFilterConf          map[string]int
+	ExecutionNodeAddress           string // deprecated
+	HistoricalAccessRPCs           []access.AccessAPIClient
+	logTxTimeToFinalized           bool
+	logTxTimeToExecuted            bool
+	logTxTimeToFinalizedExecuted   bool
+	retryEnabled                   bool
+	rpcMetricsEnabled              bool
+	executionDataSyncEnabled       bool
+	executionDataDir               string
+	executionDataStartHeight       uint64
+	executionDataConfig            edrequester.ExecutionDataConfig
+	PublicNetworkConfig            PublicNetworkConfig
+	execSyncRequestRateLimit       float64
+	execSyncRequestLockoutDuration time.Duration
 }
 
 type PublicNetworkConfig struct {
@@ -196,6 +198,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
+		execSyncRequestRateLimit:       5.0,
+		execSyncRequestLockoutDuration: 60 * time.Second,
 	}
 }
 
@@ -227,6 +231,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataDownloader    execution_data.Downloader
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
 	ExecutionDataStore         execution_data.ExecutionDataStore
+	PublicNetworkBlobservice   network.BlobService
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -475,7 +480,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				blob.WithBitswapOptions(
 					// Only allow block requests from staked ENs and ANs
 					bitswap.WithPeerBlockRequestFilter(
-						blob.AuthorizedRequester(nil, builder.IdentityProvider, builder.Logger),
+						blob.AuthorizedRequester(builder.Logger, nil, builder.IdentityProvider),
 					),
 					bitswap.WithTracer(
 						blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()),
@@ -549,6 +554,41 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 
 			return builder.ExecutionDataRequester, nil
 		})
+
+	if builder.supportsObserver {
+		builder.Component("public network execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+
+			opts := []network.BlobServiceOption{
+				blob.WithBitswapOptions(
+					// Rate limit blob requests by peer
+					bitswap.WithPeerBlockRequestFilter(
+						blob.RateLimitingFilter(
+							builder.Logger,
+							builder.execSyncRequestRateLimit,
+							builder.execSyncRequestLockoutDuration,
+						),
+					),
+					bitswap.WithTracer(
+						blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()),
+					),
+				),
+			}
+
+			net := builder.AccessNodeConfig.PublicNetworkConfig.Network
+
+			var err error
+			bs, err = net.RegisterBlobService(channels.PublicExecutionDataService, ds, opts...)
+			if err != nil {
+				return nil, fmt.Errorf("could not register blob service: %w", err)
+			}
+
+			builder.PublicNetworkBlobservice = bs
+
+			// TODO: do I need to add a dependable?
+
+			return builder.PublicNetworkBlobservice, nil
+		})
+	}
 
 	if builder.stateStreamConf.ListenAddr != "" {
 		builder.Component("exec state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -664,10 +704,14 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize, "execution-data-cache-size", defaultConfig.stateStreamConf.ExecutionDataCacheSize, "block execution data cache size")
 		flags.Uint32Var(&builder.stateStreamConf.MaxGlobalStreams, "state-stream-global-max-streams", defaultConfig.stateStreamConf.MaxGlobalStreams, "global maximum number of concurrent streams")
 		flags.UintVar(&builder.stateStreamConf.MaxExecutionDataMsgSize, "state-stream-max-message-size", defaultConfig.stateStreamConf.MaxExecutionDataMsgSize, "maximum size for a gRPC message containing block execution data")
-		flags.StringToIntVar(&builder.stateStreamFilterConf, "state-stream-event-filter-limits", defaultConfig.stateStreamFilterConf, "event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
 		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout, "state-stream-send-timeout", defaultConfig.stateStreamConf.ClientSendTimeout, "maximum wait before timing out while sending a response to a streaming client e.g. 30s")
 		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
 		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
+		flags.StringToIntVar(&builder.stateStreamFilterConf, "state-stream-event-filter-limits", defaultConfig.stateStreamFilterConf, "event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
+
+		// Public Execution Sync config
+		flags.Float64Var(&builder.execSyncRequestRateLimit, "public-network-exec-sync-rate-limit", defaultConfig.execSyncRequestRateLimit, "maximum number of execution data blobs that a peer can request per second")
+		flags.DurationVar(&builder.execSyncRequestLockoutDuration, "public-network-exec-sync-lockout-duration", defaultConfig.execSyncRequestLockoutDuration, "the number of seconds a peer will be forced to wait before being allowed to request additional blobs after being rate limited")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")

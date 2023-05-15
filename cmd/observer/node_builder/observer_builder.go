@@ -104,22 +104,24 @@ import (
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type ObserverServiceConfig struct {
-	bootstrapNodeAddresses    []string
-	bootstrapNodePublicKeys   []string
-	observerNetworkingKeyPath string
-	bootstrapIdentities       flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
-	apiRatelimits             map[string]int
-	apiBurstlimits            map[string]int
-	rpcConf                   rpc.Config
-	rpcMetricsEnabled         bool
-	executionDataSyncEnabled  bool
-	executionDataDir          string
-	executionDataStartHeight  uint64
-	executionDataConfig       edrequester.ExecutionDataConfig
-	apiTimeout                time.Duration
-	upstreamNodeAddresses     []string
-	upstreamNodePublicKeys    []string
-	upstreamIdentities        flow.IdentityList // the identity list of upstream peers the node uses to forward API requests to
+	bootstrapNodeAddresses         []string
+	bootstrapNodePublicKeys        []string
+	observerNetworkingKeyPath      string
+	bootstrapIdentities            flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
+	apiRatelimits                  map[string]int
+	apiBurstlimits                 map[string]int
+	rpcConf                        rpc.Config
+	rpcMetricsEnabled              bool
+	executionDataSyncEnabled       bool
+	executionDataDir               string
+	executionDataStartHeight       uint64
+	executionDataConfig            edrequester.ExecutionDataConfig
+	apiTimeout                     time.Duration
+	upstreamNodeAddresses          []string
+	upstreamNodePublicKeys         []string
+	upstreamIdentities             flow.IdentityList // the identity list of upstream peers the node uses to forward API requests to
+	execSyncRequestRateLimit       float64
+	execSyncRequestLockoutDuration time.Duration
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -157,9 +159,11 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
-		apiTimeout:             3 * time.Second,
-		upstreamNodeAddresses:  []string{},
-		upstreamNodePublicKeys: []string{},
+		apiTimeout:                     3 * time.Second,
+		upstreamNodeAddresses:          []string{},
+		upstreamNodePublicKeys:         []string{},
+		execSyncRequestRateLimit:       5.0,
+		execSyncRequestLockoutDuration: 60 * time.Second,
 	}
 }
 
@@ -475,10 +479,18 @@ func (builder *ObserverServiceBuilder) BuildExecutionDataRequester() *ObserverSe
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
-			bs, err = node.Network.RegisterBlobService(channels.ExecutionDataService, ds,
+			bs, err = node.Network.RegisterBlobService(channels.PublicExecutionDataService, ds,
 				blob.WithBitswapOptions(
+					// Rate limit blob requests by peer
+					bitswap.WithPeerBlockRequestFilter(
+						blob.RateLimitingFilter(
+							builder.Logger,
+							builder.execSyncRequestRateLimit,
+							builder.execSyncRequestLockoutDuration,
+						),
+					),
 					bitswap.WithTracer(
-						blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()),
+						blob.NewTracer(node.Logger.With().Str("blob_service", channels.PublicExecutionDataService.String()).Logger()),
 					),
 				),
 			)
@@ -598,6 +610,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.DurationVar(&builder.executionDataConfig.FetchTimeout, "execution-data-fetch-timeout", defaultConfig.executionDataConfig.FetchTimeout, "timeout to use when fetching execution data from the network e.g. 300s")
 		flags.DurationVar(&builder.executionDataConfig.RetryDelay, "execution-data-retry-delay", defaultConfig.executionDataConfig.RetryDelay, "initial delay for exponential backoff when fetching execution data fails e.g. 10s")
 		flags.DurationVar(&builder.executionDataConfig.MaxRetryDelay, "execution-data-max-retry-delay", defaultConfig.executionDataConfig.MaxRetryDelay, "maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
+
+		// Public Execution Sync config
+		flags.Float64Var(&builder.execSyncRequestRateLimit, "public-network-exec-sync-rate-limit", defaultConfig.execSyncRequestRateLimit, "maximum number of execution data blobs that a peer can request per second")
+		flags.DurationVar(&builder.execSyncRequestLockoutDuration, "public-network-exec-sync-lockout-duration", defaultConfig.execSyncRequestLockoutDuration, "the number of seconds a peer will be forced to wait before being allowed to request additional blobs after being rate limited")
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {

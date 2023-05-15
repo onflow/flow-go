@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
 	"github.com/onflow/flow-go/utils/logging"
 
 	ipld "github.com/ipfs/go-ipld-format"
@@ -248,16 +249,17 @@ func (r *rateLimitedBlockStore) Get(ctx context.Context, c cid.Cid) (blocks.Bloc
 	return r.Blockstore.Get(ctx, c)
 }
 
-// AuthorizedRequester returns a callback function used by bitswap to authorize block requests
+// AuthorizedRequester returns a PeerBlockRequestFilter function used by bitswap filter blob requests.
+// The callback returns true if the peer is authorized to request the blobs.
 // A request is authorized if the peer is
 // * known by the identity provider
 // * not ejected
 // * an Access node
 // * in the allowedNodes list (if non-empty)
 func AuthorizedRequester(
+	logger zerolog.Logger,
 	allowedNodes map[flow.Identifier]bool,
 	identityProvider module.IdentityProvider,
-	logger zerolog.Logger,
 ) func(peer.ID, cid.Cid) bool {
 	return func(peerID peer.ID, _ cid.Cid) bool {
 		lg := logger.With().
@@ -292,6 +294,45 @@ func AuthorizedRequester(
 			// honest peers not on the allowed list have no way to know and will continue to request
 			// blobs. therefore, these requests do not indicate suspicious behavior
 			lg.Debug().Msg("rejecting request from peer: not in allowed list")
+			return false
+		}
+
+		lg.Debug().Msg("accepting request from peer")
+		return true
+	}
+}
+
+// RateLimitingFilter returns a PeerBlockRequestFilter function used by bitswap filter blob requests.
+// The callback returns true if the peer is NOT rate limited.
+func RateLimitingFilter(
+	logger zerolog.Logger,
+	limit float64,
+	lockout time.Duration,
+) func(peer.ID, cid.Cid) bool {
+
+	// rate limiter to use for all incoming blob requests.
+	// Note: burst is hardcoded to 1 since this callback handles a single CID at a time.
+	limiter := ratelimiter.NewRateLimiter(rate.Limit(limit), 1, lockout)
+
+	return func(peerID peer.ID, _ cid.Cid) bool {
+		lg := logger.With().
+			Str("component", "blob_service").
+			Str("peer_id", peerID.String()).
+			Logger()
+
+		// enforce lockout
+		if limiter.IsRateLimited(peerID) {
+			lg.Warn().
+				Bool(logging.KeySuspicious, true).
+				Msg("rejecting request from rate limited peer")
+			return false
+		}
+
+		// check limits
+		if !limiter.Allow(peerID, 1) {
+			lg.Warn().
+				Bool(logging.KeySuspicious, true).
+				Msg("rejecting request from newly rate limited peer")
 			return false
 		}
 
