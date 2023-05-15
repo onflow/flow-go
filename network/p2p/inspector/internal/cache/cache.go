@@ -67,12 +67,12 @@ func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityF
 		decayFunc:           defaultDecayFunction(config.recordDecay),
 		c:                   stdmap.NewBackend(stdmap.WithBackData(backData)),
 	}
-	b := make([]byte, 100)
-	_, err := rand.Read(b)
+
+	var err error
+	recordCache.activeClusterIdsCacheId, err = activeClusterIdsKey()
 	if err != nil {
 		return nil, err
 	}
-	recordCache.activeClusterIdsCacheId = flow.HashToID(b)
 	recordCache.initActiveClusterIds()
 	return recordCache, nil
 }
@@ -106,15 +106,25 @@ func (r *RecordCache) Init(originId flow.Identifier) bool {
 // Note if Adjust is called under the assumption that the record exists, the ErrRecordNotFound should be treated
 // as an irrecoverable error and indicates a bug.
 func (r *RecordCache) Update(originId flow.Identifier) (float64, error) {
-	r.Init(originId)
-	_, adjusted := r.c.Adjust(originId, r.decayAdjustment)
-	if !adjusted {
-		return 0, ErrRecordNotFound
+	optimisticAdjustFunc := func() (flow.Entity, bool) {
+		return r.c.Adjust(originId, func(entity flow.Entity) flow.Entity {
+			r.decayAdjustment(entity)            // first decay the record
+			return r.incrementAdjustment(entity) // then increment the record
+		})
 	}
-	adjustedEntity, adjusted := r.c.Adjust(originId, r.incrementAdjustment)
-	if !adjusted {
-		return 0, ErrRecordNotFound
+
+	// optimisticAdjustFunc is called assuming the record exists; if the record does not exist,
+	// it means the record was not initialized. In this case, initialize the record and call optimisticAdjustFunc again.
+	// If the record was initialized, optimisticAdjustFunc will be called only once.
+	adjustedEntity, ok := optimisticAdjustFunc()
+	if !ok {
+		r.Init(originId)
+		adjustedEntity, ok = optimisticAdjustFunc()
+		if !ok {
+			return 0, fmt.Errorf("record not found for origin id %s, even after an init attempt", originId)
+		}
 	}
+
 	return adjustedEntity.(RecordEntity).Counter.Load(), nil
 }
 
@@ -252,4 +262,21 @@ func defaultDecayFunction(decay float64) preProcessingFunc {
 		recordEntity.Counter.Store(decayedVal)
 		return recordEntity, nil
 	}
+}
+
+// activeClusterIdsKey returns the key used to store the active cluster ids in the cache.
+// The key is a random string that is generated once and stored in the cache.
+// The key is used to retrieve the active cluster ids from the cache.
+// Args:
+// none
+// Returns:
+// - the key used to store the active cluster ids in the cache.
+// - an error if the key could not be generated (irrecoverable).
+func activeClusterIdsKey() (flow.Identifier, error) {
+	salt := make([]byte, 100)
+	_, err := rand.Read(salt)
+	if err != nil {
+		return flow.Identifier{}, err
+	}
+	return flow.MakeID(fmt.Sprintf("active-cluster-ids-%x", salt)), nil
 }
