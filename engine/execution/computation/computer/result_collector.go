@@ -41,7 +41,7 @@ type ViewCommitter interface {
 }
 
 type transactionResult struct {
-	transaction
+	transactionRequest
 	*snapshot.ExecutionSnapshot
 	fvm.ProcedureOutput
 }
@@ -215,7 +215,7 @@ func (collector *resultCollector) commitCollection(
 }
 
 func (collector *resultCollector) processTransactionResult(
-	txn transaction,
+	txn transactionRequest,
 	txnExecutionSnapshot *snapshot.ExecutionSnapshot,
 	output fvm.ProcedureOutput,
 ) error {
@@ -258,14 +258,14 @@ func (collector *resultCollector) processTransactionResult(
 }
 
 func (collector *resultCollector) AddTransactionResult(
-	txn transaction,
+	txn transactionRequest,
 	snapshot *snapshot.ExecutionSnapshot,
 	output fvm.ProcedureOutput,
 ) {
 	result := transactionResult{
-		transaction:       txn,
-		ExecutionSnapshot: snapshot,
-		ProcedureOutput:   output,
+		transactionRequest: txn,
+		ExecutionSnapshot:  snapshot,
+		ProcedureOutput:    output,
 	}
 
 	select {
@@ -281,7 +281,7 @@ func (collector *resultCollector) runResultProcessor() {
 
 	for result := range collector.processorInputChan {
 		err := collector.processTransactionResult(
-			result.transaction,
+			result.transactionRequest,
 			result.ExecutionSnapshot,
 			result.ProcedureOutput)
 		if err != nil {

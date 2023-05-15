@@ -80,20 +80,6 @@ func (_m *SpamRecordCache) Identities() []flow.Identifier {
 	return r0
 }
 
-// Init provides a mock function with given fields: originId
-func (_m *SpamRecordCache) Init(originId flow.Identifier) bool {
-	ret := _m.Called(originId)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
-		r0 = rf(originId)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
 // Remove provides a mock function with given fields: originId
 func (_m *SpamRecordCache) Remove(originId flow.Identifier) bool {
 	ret := _m.Called(originId)

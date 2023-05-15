@@ -22,10 +22,6 @@ const (
 // SpamRecordCache is a cache of spam records for the ALSP module.
 // It is used to keep track of the spam records of the nodes that have been reported for spamming.
 type SpamRecordCache interface {
-	// Init initializes the spam record cache for the given origin id if it does not exist.
-	// Returns true if the record is initialized, false otherwise (i.e., the record already exists).
-	Init(originId flow.Identifier) bool
-
 	// Adjust applies the given adjust function to the spam record of the given origin id.
 	// Returns the Penalty value of the record after the adjustment.
 	// It returns an error if the adjustFunc returns an error or if the record does not exist.

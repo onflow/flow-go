@@ -14,6 +14,26 @@ type GossipSubMetrics struct {
 	mock.Mock
 }
 
+// AsyncProcessingFinished provides a mock function with given fields: msgType, duration
+func (_m *GossipSubMetrics) AsyncProcessingFinished(msgType string, duration time.Duration) {
+	_m.Called(msgType, duration)
+}
+
+// AsyncProcessingStarted provides a mock function with given fields: msgType
+func (_m *GossipSubMetrics) AsyncProcessingStarted(msgType string) {
+	_m.Called(msgType)
+}
+
+// BlockingPreProcessingFinished provides a mock function with given fields: msgType, sampleSize, duration
+func (_m *GossipSubMetrics) BlockingPreProcessingFinished(msgType string, sampleSize uint, duration time.Duration) {
+	_m.Called(msgType, sampleSize, duration)
+}
+
+// BlockingPreProcessingStarted provides a mock function with given fields: msgType, sampleSize
+func (_m *GossipSubMetrics) BlockingPreProcessingStarted(msgType string, sampleSize uint) {
+	_m.Called(msgType, sampleSize)
+}
+
 // OnAppSpecificScoreUpdated provides a mock function with given fields: _a0
 func (_m *GossipSubMetrics) OnAppSpecificScoreUpdated(_a0 float64) {
 	_m.Called(_a0)
