@@ -40,6 +40,16 @@ import (
 // without any duplicate reports and within a specified time.
 func TestHandleReportedMisbehavior(t *testing.T) {
 	misbehaviorReportManger := mocknetwork.NewMisbehaviorReportManager(t)
+	misbehaviorReportManger.On("Start", mock.Anything).Return().Once()
+
+	readyDoneChan := func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()
+
+	misbehaviorReportManger.On("Ready").Return(readyDoneChan).Once()
+	misbehaviorReportManger.On("Done").Return(readyDoneChan).Once()
 	conduitFactory, err := conduit.NewDefaultConduitFactory(
 		&alspmgr.MisbehaviorReportManagerConfig{
 			SpamReportQueueSize:     uint32(100),
