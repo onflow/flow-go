@@ -56,10 +56,10 @@ type Engine struct {
 	epochs map[uint64]*RunningEpochComponents // epoch-scoped components per epoch
 
 	// internal event notifications
-	epochTransitionEvents        chan *flow.Header                // sends first block of new epoch
-	epochSetupPhaseStartedEvents chan *flow.Header                // sends first block of EpochSetup phase
-	epochStopEvents              chan uint64                      // sends counter of epoch to stop
-	clusterIDUpdateDistributor   protocol.ClusterIDUpdateConsumer // sends cluster ID updates to consumers
+	epochTransitionEvents        chan *flow.Header              // sends first block of new epoch
+	epochSetupPhaseStartedEvents chan *flow.Header              // sends first block of EpochSetup phase
+	epochStopEvents              chan uint64                    // sends counter of epoch to stop
+	clusterIDUpdateDistributor   protocol.ClusterIDUpdateEvents // sends cluster ID updates to consumers
 	cm                           *component.ComponentManager
 	component.Component
 }
@@ -75,7 +75,7 @@ func New(
 	voter module.ClusterRootQCVoter,
 	factory EpochComponentsFactory,
 	heightEvents events.Heights,
-	clusterIDUpdateDistributor protocol.ClusterIDUpdateConsumer,
+	clusterIDUpdateDistributor protocol.ClusterIDUpdateEvents,
 ) (*Engine, error) {
 	e := &Engine{
 		log:                          log.With().Str("engine", "epochmgr").Logger(),
