@@ -125,29 +125,20 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 		return
 	}
 
-	applyPenalty := func() (float64, error) {
-		return m.cache.Adjust(report.OriginId(), func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
-			if report.Penalty() > 0 {
-				// this should never happen, unless there is a bug in the misbehavior report handling logic.
-				// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
-				// TODO: refactor to throwing error to the irrecoverable context.
-				lg.Fatal().Float64("penalty", report.Penalty()).Msg(FatalMsgNegativePositivePenalty)
-			}
-			record.Penalty += report.Penalty() // penalty value is negative. We add it to the current penalty.
-			return record, nil
-		})
-	}
-
-	init := func() {
-		initialized := m.cache.Init(report.OriginId())
-		lg.Trace().Bool("initialized", initialized).Msg("initialized spam record")
-	}
-
-	// we first try to apply the penalty to the spam record, if it does not exist, cache returns ErrSpamRecordNotFound.
-	// in this case, we initialize the spam record and try to apply the penalty again. We use an optimistic update by
+	// Adjust will first try to apply the penalty to the spam record, if it does not exist, the Adjust method will initialize
+	// a spam record for the peer first and then applies the penalty. In other words, Adjust uses an optimistic update by
 	// first assuming that the spam record exists and then initializing it if it does not exist. In this way, we avoid
 	// acquiring the lock twice per misbehavior report, reducing the contention on the lock and improving the performance.
-	updatedPenalty, err := internal.TryWithRecoveryIfHitError(internal.ErrSpamRecordNotFound, applyPenalty, init)
+	updatedPenalty, err := m.cache.Adjust(report.OriginId(), func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+		if report.Penalty() > 0 {
+			// this should never happen, unless there is a bug in the misbehavior report handling logic.
+			// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
+			// TODO: refactor to throwing error to the irrecoverable context.
+			lg.Fatal().Float64("penalty", report.Penalty()).Msg(FatalMsgNegativePositivePenalty)
+		}
+		record.Penalty += report.Penalty() // penalty value is negative. We add it to the current penalty.
+		return record, nil
+	})
 	if err != nil {
 		// this should never happen, unless there is a bug in the spam record cache implementation.
 		// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
