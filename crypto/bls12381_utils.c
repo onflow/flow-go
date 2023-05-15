@@ -1214,40 +1214,52 @@ void E2_sum_vector(E2* sum, const E2* y, const int len){
 // Membership check in G2 of both keys is not verified in this function.
 // the membership check in G2 is separated to allow optimizing multiple verifications 
 // using the same public keys.
-/*int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte* sig2) {  
+int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte* sig2) {  
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
+    ep_new(elemsG1[0]);
+    ep_new(elemsG1[1]);
+    ep2_new(elemsG2[1]);
+    ep2_new(elemsG2[0]);
+    int ret;
 
     // elemsG1[0] = s1
-    ep_new(elemsG1[0]);
-    int read_ret = ep_read_bin_compact(elemsG1[0], sig1, SIGNATURE_LEN);
-    if (read_ret != RLC_OK) 
-        return read_ret;
-
+    E1 s;
+    if (E1_read_bytes(&s, sig1, SIGNATURE_LEN) != BLST_SUCCESS) {
+        ret = INVALID;
+        goto out;
+    };
     // check s1 is in G1
-    if (E1_in_G1(elemsG1[0]) != VALID) 
-        return INVALID;
+    if (E1_in_G1(&s) != VALID)  {
+        ret = INVALID;
+        goto out;
+    }
+    ep_st* s_tmp = E1_blst_to_relic(&s);
+    ep_copy(elemsG1[0], s_tmp);
 
     // elemsG1[1] = s2
-    ep_new(elemsG1[1]);
-    read_ret = ep_read_bin_compact(elemsG1[1], sig2, SIGNATURE_LEN);
-    if (read_ret != RLC_OK) 
-        return read_ret;
-
-    // check s2 in G1
-    if (E1_in_G1(elemsG1[1]) != VALID) 
-        return INVALID; 
+    E1 s;
+    if (E1_read_bytes(&s, sig2, SIGNATURE_LEN) != BLST_SUCCESS) {
+        ret = INVALID;
+        goto out;
+    };
+    // check s2 is in G1
+    if (E1_in_G1(&s) != VALID)  {
+        ret = INVALID;
+        goto out;
+    }
+    s_tmp = E1_blst_to_relic(&s);
+    ep_copy(elemsG1[1], s_tmp); 
 
     // elemsG2[1] = pk1
-    ep2_new(elemsG2[1]);
-    ep2_st* tmp = E2_blst_to_relic(pk1);
-    ep2_copy(elemsG2[1], tmp);
+    ep2_st* pk_tmp = E2_blst_to_relic(pk1);
+    ep2_copy(elemsG2[1], pk_tmp);
 
     // elemsG2[0] = pk2
-    ep2_new(elemsG2[0]);
-    tmp = E2_blst_to_relic(pk2);
-    ep2_copy(elemsG2[0], tmp);
-    free(tmp);
+    pk_tmp = E2_blst_to_relic(pk2);
+    ep2_copy(elemsG2[0], pk_tmp);
+    free(pk_tmp);
+    free(s_tmp);
 
 #if DOUBLE_PAIRING  
     // elemsG2[0] = -pk2
@@ -1260,6 +1272,7 @@ void E2_sum_vector(E2* sum, const E2* y, const int len){
 
     // compare the result to 1
     int res = fp12_cmp_dig(pair, 1);
+    fp12_free(pair);
 
 #elif SINGLE_PAIRING   
     fp12_t pair1, pair2;
@@ -1268,19 +1281,27 @@ void E2_sum_vector(E2* sum, const E2* y, const int len){
     pp_map_oatep_k12(pair2, elemsG1[1], elemsG2[1]);
 
     int res = fp12_cmp(pair1, pair2);
+    fp12_free(pair1); fp12_free(pair2);
 #endif
-    fp12_free(&one);
+
+    if (core_get()->code == RLC_OK) {
+        if (res == RLC_EQ) { 
+            ret = VALID; 
+        }
+        else { 
+            ret = INVALID; 
+        }
+        goto out; 
+    }
+    ret = UNDEFINED;
+
+out:
     ep_free(elemsG1[0]);
     ep_free(elemsG1[1]);
     ep2_free(elemsG2[0]);
     ep2_free(elemsG2[1]);
-    
-    if (core_get()->code == RLC_OK) {
-        if (res == RLC_EQ) return VALID;
-        return INVALID;
-    }
-    return UNDEFINED;
-}*/
+    return ret;
+}
 
 // Subtracts all G2 array elements `y` from an element `x` and writes the 
 // result in res
