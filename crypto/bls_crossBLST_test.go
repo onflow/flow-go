@@ -160,7 +160,6 @@ func testEncodeDecodeG1CrossBLST(t *rapid.T) {
 		sigFlowOutBytes := make([]byte, signatureLengthBLSBLS12381)
 		writePointE1(sigFlowOutBytes, &pointFlow)
 		sigBLSTOutBytes := pointBLST.Compress()
-
 		assert.Equal(t, sigFlowOutBytes, sigBLSTOutBytes)
 	}
 }
@@ -217,6 +216,6 @@ func TestCrossBLST(t *testing.T) {
 	rapid.Check(t, testKeyGenCrossBLST)
 	rapid.Check(t, testEncodeDecodePrivateKeyCrossBLST)
 	rapid.Check(t, testEncodeDecodePublicKeyCrossBLST)
-	rapid.Check(t, testEncodeDecodeG1CrossBLST) // commented till G1 check is implemented
+	rapid.Check(t, testEncodeDecodeG1CrossBLST)
 	rapid.Check(t, testSignHashCrossBLST)
 }

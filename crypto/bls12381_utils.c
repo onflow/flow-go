@@ -597,6 +597,12 @@ void E1_copy(E1* res, const E1* p) {
     vec_copy(res, p, sizeof(E1));
 }
 
+// checks p1 == p2
+bool_t E1_is_equal(const E1* p1, const E1* p2) {
+    // `POINTonE1_is_equal` includes the infinity case
+    return POINTonE1_is_equal((const POINTonE1*)p1, (const POINTonE1*)p2);
+}
+
 // compare p to infinity
 bool_t E1_is_infty(const E1* p) {
     // BLST infinity points are defined by Z=0
@@ -1258,7 +1264,7 @@ void E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len){
 // `len` should be at least Fr_BYTES.
 // this is a testing file only, should not be used in any protocol!
 void unsecure_map_bytes_to_G1(E1* p, const byte* bytes, int len) {
-    assert(len > Fr_BYTES);
+    assert(len >= Fr_BYTES);
     // map to Fr
     Fr log;
     map_bytes_to_Fr(&log, bytes, len);
@@ -1296,7 +1302,7 @@ BLST_ERROR unsecure_map_bytes_to_G1complement(E1* p, const byte* bytes, int len)
 // `len` should be at least Fr_BYTES.
 // this is a testing tool only, it should not be used in any protocol!
 void unsecure_map_bytes_to_G2(E2* p, const byte* bytes, int len) {
-    assert(len > Fr_BYTES);
+    assert(len >= Fr_BYTES);
     // map to Fr
     Fr log;
     map_bytes_to_Fr(&log, bytes, len);

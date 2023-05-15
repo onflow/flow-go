@@ -111,7 +111,12 @@ func (x *scalar) equals(other *scalar) bool {
 	return C.Fr_is_equal((*C.Fr)(x), (*C.Fr)(other)) != 0
 }
 
-// comparison in G2
+// comparison in E1
+func (p *pointE1) equals(other *pointE1) bool {
+	return C.E1_is_equal((*C.E1)(p), (*C.E1)(other)) != 0
+}
+
+// comparison in E2
 func (p *pointE2) equals(other *pointE2) bool {
 	return C.E2_is_equal((*C.E2)(p), (*C.E2)(other)) != 0
 }

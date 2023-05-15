@@ -87,6 +87,7 @@ void        Fp_squ_montg(Fp *, const Fp *);
 
 // E1 and G1 utilities
 void        E1_copy(E1*, const E1*);
+bool_t      E1_is_equal(const E1*, const E1*);
 void        E1_set_infty(E1*);
 bool_t      E1_is_infty(const E1*);
 void        E1_to_affine(E1*, const E1*);
@@ -106,7 +107,7 @@ BLST_ERROR  unsecure_map_bytes_to_G1complement(E1*, const byte*, int);
 void        E2_set_infty(E2* p);
 bool_t      E2_is_infty(const E2*);
 bool_t      E2_affine_on_curve(const E2*);
-bool_t      E2_is_equal(const E2* p1, const E2* p2);
+bool_t      E2_is_equal(const E2*, const E2*);
 void        E2_copy(E2*, const E2*);
 void        E2_to_affine(E2*, const E2*);
 BLST_ERROR  E2_read_bytes(E2*, const byte *,  const int); 

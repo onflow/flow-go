@@ -157,6 +157,42 @@ func BenchmarkSubgroupCheck(b *testing.B) {
 	})
 }
 
+// specific test of G1 points Encode and decode (BLS signature since the library is set for min_sig).
+// G2 points read and write are implicitly tested by public keys Encode/Decode.
+func TestReadWriteG1(t *testing.T) {
+	prg := getPRG(t)
+	seed := make([]byte, frBytesLen)
+	bytes := make([]byte, SignatureLenBLSBLS12381)
+	// generate a random G1 point, encode it, decode it,
+	// and compare it the original point
+	iterations := 50
+	t.Run("random points", func(t *testing.T) {
+		for i := 0; i < iterations; i++ {
+			var p, q pointE1
+			_, err := prg.Read(seed)
+			unsecureMapToG1(&p, seed)
+			require.NoError(t, err)
+			writePointE1(bytes, &p)
+			err = readPointE1(&q, bytes)
+			require.NoError(t, err)
+			assert.True(t, p.equals(&q))
+		}
+	})
+
+	t.Run("infinity", func(t *testing.T) {
+		for i := 0; i < iterations; i++ {
+			var p, q pointE1
+			seed := make([]byte, frBytesLen)
+			unsecureMapToG1(&p, seed) // this results in the infinity point
+			writePointE1(bytes, &p)
+			require.True(t, IsBLSSignatureIdentity(bytes)) // sanity check
+			err := readPointE1(&q, bytes)
+			require.NoError(t, err)
+			assert.True(t, p.equals(&q))
+		}
+	})
+}
+
 // test some edge cases of MapToFr to validate modular reduction and endianness:
 //   - inputs `0` and curve order `r`
 //   - inputs `1` and `r+1`
