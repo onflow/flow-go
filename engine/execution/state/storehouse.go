@@ -28,6 +28,7 @@ type StoreHouse interface {
 	// in-memory storage.
 	// If the block has been finalized, the updated registers will be stored in a non-forkaware
 	// disk storage
+	// The caller must ensure the parent block has been called with StoreBlock earlier
 	StoreBlock(header *flow.Header, update map[flow.RegisterID]flow.RegisterValue) error
 
 	// BlockFinalized notify the StoreHouse about block finalization, so that StoreHouse can
@@ -45,7 +46,7 @@ type StoreHouseReader interface {
 // Once one fork is finalized, then register updates for blocks on the finalized fork
 // can be moved to NonForkAwareStorage, and other conflicting forks can be pruned.
 type ForkAwareStore interface {
-	// GetRegsiter returns the latest register value for a given block,
+	// GetRegsiter returns the latest register value for a given block's view,
 	// it will traverses along the fork of blocks until finding the latest updated value.
 	// for instance, there are two forks of blocks as below:
 	// A <- B <- C <- D
@@ -60,18 +61,19 @@ type ForkAwareStore interface {
 	// the fork (A<-B<-C<-D)
 	// GetRegsiter(10, E, key1) will return 2, because A has the latest value of key1 on
 	// the fork (A<-B<-E<-F)
-	// GetRegsiter(10, F, key3) will return NotFound, because the register value is not updated
-	// on the fork (A<-B<-E<-F). When register value is not found, the call needs to query it from
-	// NonForkAwareStorage
-	// It returns empty value (length = 0) if register is not found.
-	GetRegsiter(view uint64, blockID flow.Identifier, id flow.RegisterID) (flow.RegisterValue, error)
+	// GetRegsiter(10, F, key3) will return empty value (length = 0), because the register value
+	// is not updated on the fork (A<-B<-E<-F).
+	// When register value is not found, it means the register is either not exist or not updated
+	// between the pruned view to the given view.
+	GetRegsiter(view uint64, id flow.RegisterID) (flow.RegisterValue, error)
 
 	// AddForBlock add the register updates of a given block to ForkAwareStore
 	AddForBlock(header *flow.Header, update map[flow.RegisterID]flow.RegisterValue) error
 
 	// GetUpdatesByBlock returns all the register updates updated at the given block.
 	// Useful for moving them into NonForkAwareStorage when the given block becomes finalized.
-	GetUpdatesByBlock(blockID flow.Identifier) (map[flow.RegisterID]flow.RegisterValue, error)
+	// If the given block has not been executed, it returns nil, NotFoundError
+	GetUpdatesByBlock(blockID flow.Identifier) (map[flow.RegisterID]flow.RegisterValue, bool)
 
 	// PruneByFinalized remove the register updates for all the blocks below the finalized height
 	// as well as the blocks that are conflicting with the finalized block
@@ -83,16 +85,20 @@ type ForkAwareStore interface {
 	// if C is finalized, then PruneByFinalized(C) will prune [A, B, E, F],
 	// [A,B] are pruned because they are below finalized view,
 	// [E,F] are pruned because they are conflicting with finalized block C.
-	PruneByFinalized(finalized *flow.Header) error
+	PruneByFinalized(finalized *flow.Header)
 }
 
 // NonForkAwareStorage stores register updates for finalized blocks into database
 type NonForkAwareStorage interface {
 	// GetRegsiter returns the latest register value for a given block
 	// It returns empty value (length = 0) if register is not found.
-	GetRegsiter(view uint64, blockID flow.Identifier, id flow.RegisterID) (flow.RegisterValue, error)
+	GetRegsiter(view uint64, id flow.RegisterID) (flow.RegisterValue, error)
 
 	// CommitBlock stores the updated registers to disk and index them by the finalized view.
 	// The given block header must be finalized.
 	CommitBlock(finalized *flow.Header, update map[flow.RegisterID]flow.RegisterValue) error
+
+	// LastCommitBlock returns the last committed block to the storage.
+	// It must be a finalized and executed block
+	LastCommitBlock() (*flow.Header, error)
 }
