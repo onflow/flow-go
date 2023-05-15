@@ -103,17 +103,16 @@ bool_t      E1_in_G1(const E1*);
 void        E1_mult(E1*, const E1*, const Fr*);
 void        E1_add(E1*, const E1*, const E1*);
 void        E1_sum_vector(E1*, const E1*, const int);
+int         E1_sum_vector_byte(byte*, const byte*, const int);
 void        G1_mult_gen(E1*, const Fr*);
 BLST_ERROR  E1_read_bytes(E1*, const byte *,  const int); 
 void        E1_write_bytes(byte *, const E1*);
 
 ep_st*      E1_blst_to_relic(const E1* x);
-int      ep_read_bin_compact(ep_t, const byte *, const int);
-void     ep_write_bin_compact(byte *, const ep_t,  const int);
-void     ep_sum_vector(ep_t, ep_st*, const int);
-int      ep_sum_vector_byte(byte*, const byte*, const int);
-void     map_bytes_to_G1(E1*, const byte*, int);
-void     map_bytes_to_G1complement(E1*, const byte*, int);
+int         ep_read_bin_compact(ep_t, const byte *, const int);
+void        ep_write_bin_compact(byte *, const ep_t,  const int);
+void        map_bytes_to_G1(E1*, const byte*, int);
+void        map_bytes_to_G1complement(E1*, const byte*, int);
 
 // E2 and G2 utilities
 void        E2_set_infty(E2* p);

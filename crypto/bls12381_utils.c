@@ -860,6 +860,43 @@ void E1_sum_vector(E1* sum, const E1* y, const int len){
     }
 }
 
+// Computes the sum of input signatures (E1 elements) flattened in a single byte array
+// `sigs_bytes` of `sigs_len` bytes.
+// and writes the sum (E1 element) as bytes in `dest`.
+// The function does not check membership of E1 inputs in G1 subgroup.
+// The header is using byte pointers to minimize Cgo calls from the Go layer.
+int E1_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int sigs_len) {
+    int error = UNDEFINED;
+    // sanity check that `len` is multiple of `G1_SER_BYTES`
+    if (sigs_len % G1_SER_BYTES) {
+        error =  INVALID; 
+        goto mem_error;
+    }
+    int n = sigs_len/G1_SER_BYTES; // number of signatures
+    
+    E1* sigs = (E1*) malloc(n * sizeof(E1));
+    if (!sigs) goto mem_error;
+
+    // import the points from the array
+    for (int i=0; i < n; i++) {
+        // deserialize each point from the input array
+        if  (E1_read_bytes(&sigs[i], &sigs_bytes[G1_SER_BYTES*i], G1_SER_BYTES) != BLST_SUCCESS) {
+            error = INVALID; 
+            goto out;
+        }
+    }
+    // sum the points
+    E1 acc;        
+    E1_sum_vector(&acc, sigs, n);
+    // export the result
+    E1_write_bytes(dest, &acc);
+    error = VALID;
+out:
+    free(sigs);
+mem_error:
+    return error;
+}
+
 // Exponentiation of generator g1 of G1, res = expo.g1
 void G1_mult_gen(E1* res, const Fr* expo) {
     pow256 tmp;
@@ -1307,51 +1344,6 @@ void E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len){
     E2_sum_vector(res, y, len);
     E2_neg(res);
     E2_add(res, x, res);
-}
-
-// computes the sum of the G1 array elements y and writes the sum in jointy
-void ep_sum_vector(ep_t jointx, ep_st* x, const int len) {
-    ep_set_infty(jointx);
-    for (int i=0; i<len; i++){
-        ep_add_jacob(jointx, jointx, &x[i]);
-    }
-}
-
-// Computes the sum of the signatures (G1 elements) flattened in a single sigs array
-// and writes the sum (G1 element) as bytes in dest.
-// The function assumes sigs is correctly allocated with regards to len.
-int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
-    int error = UNDEFINED;
-
-    // temp variables
-    ep_t acc;        
-    ep_new(acc);
-    ep_set_infty(acc);
-    ep_st* sigs = (ep_st*) malloc(len * sizeof(ep_st));
-    if (!sigs) goto mem_error;
-    for (int i=0; i < len; i++) ep_new(sigs[i]);
-
-    // import the points from the array
-    for (int i=0; i < len; i++) {
-        // deserialize each point from the input array
-        error = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
-        if (error != RLC_OK) {
-            goto out;
-        }
-    }
-    // sum the points
-    ep_sum_vector(acc, sigs, len);
-    // export the result
-    ep_write_bin_compact(dest, acc, SIGNATURE_LEN);
-
-    error = VALID;
-out:
-    // free the temp memory
-    ep_free(acc);
-    for (int i=0; i < len; i++) ep_free(sigs[i]);
-    free(sigs);
-mem_error:
-    return error;
 }
 
 /*
