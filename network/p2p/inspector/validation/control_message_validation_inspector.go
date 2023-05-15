@@ -36,10 +36,14 @@ type ControlMsgValidationInspector struct {
 	distributor p2p.GossipSubInspectorNotifDistributor
 	// workerPool queue that stores *InspectMsgRequest that will be processed by component workers.
 	workerPool *worker.Pool[*InspectMsgRequest]
-	// clusterPrefixTopicsReceivedCache keeps track of the amount of cluster prefixed topics received. The counter is incremented in the following scenarios.
-	// - The cluster prefix topic was received while the inspector waits for the cluster IDs provider to be set.
-	// - The node sends cluster prefix topic where the cluster prefix does not match any of the active cluster IDs,
-	// the inspector will allow a configured number of these messages from
+    // clusterPrefixTopicsReceivedTracker is a map that associates the hash of a peer's ID with the
+    // number of cluster-prefix topic control messages received from that peer. It helps in tracking
+    // and managing the rate of incoming control messages from each peer, ensuring that the system
+    // stays performant and resilient against potential spam or abuse.
+    // The counter is incremented in the following scenarios:
+    // 1. The cluster prefix topic is received while the inspector waits for the cluster IDs provider to be set (this can happen during the startup or epoch transitions). 
+    // 2. The node sends a cluster prefix topic where the cluster prefix does not match any of the active cluster IDs.
+    // In such cases, the inspector will allow a configured number of these messages from the corresponding peer.
 	clusterPrefixTopicsReceivedTracker *cache.ClusterPrefixTopicsReceivedTracker
 }
 
