@@ -78,8 +78,8 @@ func main() {
 		rpcConf                 rpc.Config
 		clusterComplianceConfig modulecompliance.Config
 
-		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
-		finalizationDistributor *pubsub.FinalizationDistributor
+		pools               *epochpool.TransactionPools // epoch-scoped transaction pools
+		followerDistributor *pubsub.FollowerDistributor
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
@@ -173,9 +173,9 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
-		Module("finalization distributor", func(node *cmd.NodeConfig) error {
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
-			finalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
+		Module("follower distributor", func(node *cmd.NodeConfig) error {
+			followerDistributor = pubsub.NewFollowerDistributor()
+			followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
 			return nil
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
@@ -281,7 +281,7 @@ func main() {
 				node.Logger,
 				node.Storage.Headers,
 				finalizer,
-				finalizationDistributor,
+				followerDistributor,
 				node.RootBlock.Header,
 				node.RootQC,
 				finalized,
@@ -308,7 +308,7 @@ func main() {
 				node.Logger,
 				node.Metrics.Mempool,
 				heroCacheCollector,
-				finalizationDistributor,
+				followerDistributor,
 				followerState,
 				followerCore,
 				validator,
@@ -439,6 +439,7 @@ func main() {
 
 			builderFactory, err := factories.NewBuilderFactory(
 				node.DB,
+				node.State,
 				node.Storage.Headers,
 				node.Tracer,
 				colMetrics,
