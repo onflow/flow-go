@@ -127,7 +127,8 @@ func (programs *Programs) getOrLoadAddressProgram(
 		loader,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error getting program: %w", err)
+		return nil, err
+		//		return nil, fmt.Errorf("error getting program: %w", err)
 	}
 
 	// Add dependencies to the stack.
@@ -248,7 +249,8 @@ func (loader *programLoader) Compute(
 	interpreterProgram, dependencies, err :=
 		loader.loadWithDependencyTracking(location, loader.loadFunc)
 	if err != nil {
-		return nil, fmt.Errorf("load program failed: %w", err)
+		return nil, err
+		//		return nil, fmt.Errorf("load program failed: %w", err)
 	}
 
 	return &derived.Program{

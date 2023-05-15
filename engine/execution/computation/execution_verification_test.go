@@ -322,190 +322,194 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		checkResult   func(t *testing.T, cr *execution.ComputationResult)
 	}
 
-	txFees := uint64(1_000)
+	//txFees := uint64(1_000)
 	fundingAmount := uint64(100_000_000)
-	transferAmount := uint64(123_456)
+	//transferAmount := uint64(123_456)
 
 	testCases := []testCase{
-		{
-			name:          "Transaction fee deduction emits events",
-			fundWith:      fundingAmount,
-			tryToTransfer: 0,
-			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				txResults := cr.AllTransactionResults()
+		/*
+			{
+				name:          "Transaction fee deduction emits events",
+				fundWith:      fundingAmount,
+				tryToTransfer: 0,
+				checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+					txResults := cr.AllTransactionResults()
 
-				require.Empty(t, txResults[0].ErrorMessage)
-				require.Empty(t, txResults[1].ErrorMessage)
-				require.Empty(t, txResults[2].ErrorMessage)
+					require.Empty(t, txResults[0].ErrorMessage)
+					require.Empty(t, txResults[1].ErrorMessage)
+					require.Empty(t, txResults[2].ErrorMessage)
 
-				var deposits []flow.Event
-				var withdraws []flow.Event
+					var deposits []flow.Event
+					var withdraws []flow.Event
 
-				// events of the first collection
-				events := cr.CollectionExecutionResultAt(2).Events()
-				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
-						deposits = append(deposits, e)
+					// events of the first collection
+					events := cr.CollectionExecutionResultAt(2).Events()
+					for _, e := range events {
+						if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+							deposits = append(deposits, e)
+						}
+						if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+							withdraws = append(withdraws, e)
+						}
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
-						withdraws = append(withdraws, e)
-					}
-				}
 
-				require.Len(t, deposits, 2)
-				require.Len(t, withdraws, 2)
+					require.Len(t, deposits, 2)
+					require.Len(t, withdraws, 2)
+				},
 			},
-		},
-		{
-			name:          "If just enough balance, fees are still deducted",
-			fundWith:      txFees + transferAmount,
-			tryToTransfer: transferAmount,
-			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				txResults := cr.AllTransactionResults()
+			{
+				name:          "If just enough balance, fees are still deducted",
+				fundWith:      txFees + transferAmount,
+				tryToTransfer: transferAmount,
+				checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+					txResults := cr.AllTransactionResults()
 
-				require.Empty(t, txResults[0].ErrorMessage)
-				require.Empty(t, txResults[1].ErrorMessage)
-				require.Empty(t, txResults[2].ErrorMessage)
+					require.Empty(t, txResults[0].ErrorMessage)
+					require.Empty(t, txResults[1].ErrorMessage)
+					require.Empty(t, txResults[2].ErrorMessage)
 
-				var deposits []flow.Event
-				var withdraws []flow.Event
+					var deposits []flow.Event
+					var withdraws []flow.Event
 
-				// events of the last collection
-				events := cr.CollectionExecutionResultAt(2).Events()
-				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
-						deposits = append(deposits, e)
+					// events of the last collection
+					events := cr.CollectionExecutionResultAt(2).Events()
+					for _, e := range events {
+						if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+							deposits = append(deposits, e)
+						}
+						if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+							withdraws = append(withdraws, e)
+						}
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
-						withdraws = append(withdraws, e)
-					}
-				}
 
-				require.Len(t, deposits, 2)
-				require.Len(t, withdraws, 2)
+					require.Len(t, deposits, 2)
+					require.Len(t, withdraws, 2)
+				},
 			},
-		},
-		{
-			// this is an edge case that is not applicable to any network.
-			// If storage limits were on this would fail due to storage limits
-			name:          "If not enough balance, transaction succeeds and fees are deducted to 0",
-			fundWith:      txFees,
-			tryToTransfer: 1,
-			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				txResults := cr.AllTransactionResults()
+			{
+				// this is an edge case that is not applicable to any network.
+				// If storage limits were on this would fail due to storage limits
+				name:          "If not enough balance, transaction succeeds and fees are deducted to 0",
+				fundWith:      txFees,
+				tryToTransfer: 1,
+				checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+					txResults := cr.AllTransactionResults()
 
-				require.Empty(t, txResults[0].ErrorMessage)
-				require.Empty(t, txResults[1].ErrorMessage)
-				require.Empty(t, txResults[2].ErrorMessage)
+					require.Empty(t, txResults[0].ErrorMessage)
+					require.Empty(t, txResults[1].ErrorMessage)
+					require.Empty(t, txResults[2].ErrorMessage)
 
-				var deposits []flow.Event
-				var withdraws []flow.Event
+					var deposits []flow.Event
+					var withdraws []flow.Event
 
-				// events of the last collection
-				events := cr.CollectionExecutionResultAt(2).Events()
-				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
-						deposits = append(deposits, e)
+					// events of the last collection
+					events := cr.CollectionExecutionResultAt(2).Events()
+					for _, e := range events {
+						if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+							deposits = append(deposits, e)
+						}
+						if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+							withdraws = append(withdraws, e)
+						}
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
-						withdraws = append(withdraws, e)
-					}
-				}
 
-				require.Len(t, deposits, 2)
-				require.Len(t, withdraws, 2)
+					require.Len(t, deposits, 2)
+					require.Len(t, withdraws, 2)
+				},
 			},
-		},
-		{
-			name:          "If tx fails, fees are deducted",
-			fundWith:      fundingAmount,
-			tryToTransfer: 2 * fundingAmount,
-			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				txResults := cr.AllTransactionResults()
+			{
+				name:          "If tx fails, fees are deducted",
+				fundWith:      fundingAmount,
+				tryToTransfer: 2 * fundingAmount,
+				checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+					txResults := cr.AllTransactionResults()
 
-				require.Empty(t, txResults[0].ErrorMessage)
-				require.Empty(t, txResults[1].ErrorMessage)
-				require.Contains(t, txResults[2].ErrorMessage, "Error Code: 1101")
+					require.Empty(t, txResults[0].ErrorMessage)
+					require.Empty(t, txResults[1].ErrorMessage)
+					require.Contains(t, txResults[2].ErrorMessage, "Error Code: 1101")
 
-				var deposits []flow.Event
-				var withdraws []flow.Event
+					var deposits []flow.Event
+					var withdraws []flow.Event
 
-				// events of the last collection
-				events := cr.CollectionExecutionResultAt(2).Events()
-				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
-						deposits = append(deposits, e)
+					// events of the last collection
+					events := cr.CollectionExecutionResultAt(2).Events()
+					for _, e := range events {
+						if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+							deposits = append(deposits, e)
+						}
+						if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+							withdraws = append(withdraws, e)
+						}
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
-						withdraws = append(withdraws, e)
-					}
-				}
 
-				require.Len(t, deposits, 1)
-				require.Len(t, withdraws, 1)
+					require.Len(t, deposits, 1)
+					require.Len(t, withdraws, 1)
+				},
 			},
-		},
+		*/
 	}
 
 	testCasesWithStorageEnabled := []testCase{
-		{
-			name:          "Transaction fee deduction emits events",
-			fundWith:      fundingAmount,
-			tryToTransfer: 0,
-			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				txResults := cr.AllTransactionResults()
+		/*
+			{
+				name:          "Transaction fee deduction emits events",
+				fundWith:      fundingAmount,
+				tryToTransfer: 0,
+				checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+					txResults := cr.AllTransactionResults()
 
-				require.Empty(t, txResults[0].ErrorMessage)
-				require.Empty(t, txResults[1].ErrorMessage)
-				require.Empty(t, txResults[2].ErrorMessage)
+					require.Empty(t, txResults[0].ErrorMessage)
+					require.Empty(t, txResults[1].ErrorMessage)
+					require.Empty(t, txResults[2].ErrorMessage)
 
-				var deposits []flow.Event
-				var withdraws []flow.Event
+					var deposits []flow.Event
+					var withdraws []flow.Event
 
-				// events of the last collection
-				events := cr.CollectionExecutionResultAt(2).Events()
-				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
-						deposits = append(deposits, e)
+					// events of the last collection
+					events := cr.CollectionExecutionResultAt(2).Events()
+					for _, e := range events {
+						if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+							deposits = append(deposits, e)
+						}
+						if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+							withdraws = append(withdraws, e)
+						}
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
-						withdraws = append(withdraws, e)
-					}
-				}
 
-				require.Len(t, deposits, 2)
-				require.Len(t, withdraws, 2)
+					require.Len(t, deposits, 2)
+					require.Len(t, withdraws, 2)
+				},
 			},
-		},
-		{
-			name:          "If just enough balance, fees are deducted",
-			fundWith:      txFees + transferAmount,
-			tryToTransfer: transferAmount,
-			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				txResults := cr.AllTransactionResults()
+			{
+				name:          "If just enough balance, fees are deducted",
+				fundWith:      txFees + transferAmount,
+				tryToTransfer: transferAmount,
+				checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+					txResults := cr.AllTransactionResults()
 
-				require.Empty(t, txResults[0].ErrorMessage)
-				require.Empty(t, txResults[1].ErrorMessage)
-				require.Empty(t, txResults[2].ErrorMessage)
+					require.Empty(t, txResults[0].ErrorMessage)
+					require.Empty(t, txResults[1].ErrorMessage)
+					require.Empty(t, txResults[2].ErrorMessage)
 
-				var deposits []flow.Event
-				var withdraws []flow.Event
+					var deposits []flow.Event
+					var withdraws []flow.Event
 
-				// events of the last collection
-				events := cr.CollectionExecutionResultAt(2).Events()
-				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
-						deposits = append(deposits, e)
+					// events of the last collection
+					events := cr.CollectionExecutionResultAt(2).Events()
+					for _, e := range events {
+						if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+							deposits = append(deposits, e)
+						}
+						if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+							withdraws = append(withdraws, e)
+						}
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
-						withdraws = append(withdraws, e)
-					}
-				}
 
-				require.Len(t, deposits, 2)
-				require.Len(t, withdraws, 2)
+					require.Len(t, deposits, 2)
+					require.Len(t, withdraws, 2)
+				},
 			},
-		},
+		*/
 		{
 			name:          "If tx fails, fees are still deducted and fee deduction events are emitted",
 			fundWith:      fundingAmount,
@@ -535,35 +539,37 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				require.Len(t, withdraws, 1)
 			},
 		},
-		{
-			name:          "If balance at minimum, transaction fails, fees are deducted and fee deduction events are emitted",
-			fundWith:      0,
-			tryToTransfer: 0,
-			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				txResults := cr.AllTransactionResults()
+		/*
+			{
+				name:          "If balance at minimum, transaction fails, fees are deducted and fee deduction events are emitted",
+				fundWith:      0,
+				tryToTransfer: 0,
+				checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+					txResults := cr.AllTransactionResults()
 
-				require.Empty(t, txResults[0].ErrorMessage)
-				require.Empty(t, txResults[1].ErrorMessage)
-				require.Contains(t, txResults[2].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
+					require.Empty(t, txResults[0].ErrorMessage)
+					require.Empty(t, txResults[1].ErrorMessage)
+					require.Contains(t, txResults[2].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 
-				var deposits []flow.Event
-				var withdraws []flow.Event
+					var deposits []flow.Event
+					var withdraws []flow.Event
 
-				// events of the last collection
-				events := cr.CollectionExecutionResultAt(2).Events()
-				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
-						deposits = append(deposits, e)
+					// events of the last collection
+					events := cr.CollectionExecutionResultAt(2).Events()
+					for _, e := range events {
+						if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+							deposits = append(deposits, e)
+						}
+						if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+							withdraws = append(withdraws, e)
+						}
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
-						withdraws = append(withdraws, e)
-					}
-				}
 
-				require.Len(t, deposits, 1)
-				require.Len(t, withdraws, 1)
+					require.Len(t, deposits, 1)
+					require.Len(t, withdraws, 1)
+				},
 			},
-		},
+		*/
 	}
 
 	transferTokensTx := func(chain flow.Chain) *flow.TransactionBody {
@@ -658,19 +664,24 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			cr := executeBlockAndVerifyWithParameters(t, [][]*flow.TransactionBody{
-				{
-					createAccountTx,
-				},
-				{
-					transferTx,
-				},
-				{
-					transferTx2,
-				},
-			}, opts, bootstrapOpts)
+			fmt.Println("SERVICE ACCOUNT:", chain.ServiceAddress())
+			//cr := executeBlockAndVerifyWithParameters(t,
+			_ = executeBlockAndVerifyWithParameters(t,
+				[][]*flow.TransactionBody{
+					{
+						createAccountTx,
+					},
+					{
+						transferTx,
+					},
+					{
+						transferTx2,
+					},
+				}, opts, bootstrapOpts)
 
-			tc.checkResult(t, cr)
+			//			tc.checkResult(t, cr)
+
+			require.True(t, false)
 		}
 	}
 

@@ -2,6 +2,7 @@ package derived
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/hashicorp/go-multierror"
@@ -261,6 +262,26 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 		return nil
 	}
 
+	fmt.Println("DERIVED TXN: ", txn.executionTime)
+	sorted := []string{}
+	for key := range txn.readSet {
+		sorted = append(sorted, fmt.Sprintf("DERIVED READ: %v", key))
+	}
+	sort.Strings(sorted)
+	for _, key := range sorted {
+		fmt.Println(key)
+	}
+
+	sorted = []string{}
+	for key := range txn.writeSet {
+		_, ok := table.items[key]
+		sorted = append(sorted, fmt.Sprintf("DERIVED WRITE: %v %v", key, ok))
+	}
+
+	sort.Strings(sorted)
+	for _, key := range sorted {
+		fmt.Println(key)
+	}
 	for key, entry := range txn.writeSet {
 		_, ok := table.items[key]
 		if ok {
@@ -449,7 +470,8 @@ func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
 	}
 
 	if err != nil {
-		return defaultVal, fmt.Errorf("failed to derive value: %w", err)
+		return defaultVal, err
+		//		return defaultVal, fmt.Errorf("failed to derive value: %w", err)
 	}
 
 	txn.set(key, val, committedState)

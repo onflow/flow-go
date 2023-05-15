@@ -3,6 +3,8 @@ package computer
 import (
 	"context"
 	"fmt"
+	"hash/crc32"
+	"sort"
 	"sync"
 	"time"
 
@@ -221,6 +223,38 @@ func (collector *resultCollector) processTransactionResult(
 	output fvm.ProcedureOutput,
 	timeSpent time.Duration,
 ) error {
+	fmt.Println("TXN", txn.txnIndex, txn.isSystemTransaction, txn.collectionIndex)
+	fmt.Println("OUTPUT", output)
+
+	reads := []string{}
+	for key := range txnExecutionSnapshot.ReadSet {
+		if key.Key[0] != '$' {
+			reads = append(reads, key.String()+" "+key.Key)
+		} else {
+			reads = append(reads, key.String())
+		}
+	}
+
+	sort.Strings(reads)
+	for _, key := range reads {
+		fmt.Println("READ ", key)
+	}
+
+	writes := []string{}
+	for key, value := range txnExecutionSnapshot.WriteSet {
+		valueHash := fmt.Sprintf("%d", crc32.ChecksumIEEE(value))
+		if key.Key[0] != '$' {
+			writes = append(writes, key.String()+" "+key.Key+" : "+valueHash)
+		} else {
+			writes = append(writes, key.String()+" : "+valueHash)
+		}
+	}
+
+	sort.Strings(writes)
+	for _, key := range writes {
+		fmt.Println("WRITE ", key)
+	}
+
 	logger := txn.ctx.Logger.With().
 		Uint64("computation_used", output.ComputationUsed).
 		Uint64("memory_used", output.MemoryEstimate).
@@ -347,6 +381,8 @@ func (collector *resultCollector) Finalize(
 	collector.Stop()
 
 	<-collector.processorDoneChan
+
+	fmt.Println("FINALIZE")
 
 	if collector.processorError != nil {
 		return nil, collector.processorError
