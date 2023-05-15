@@ -217,6 +217,6 @@ func TestCrossBLST(t *testing.T) {
 	rapid.Check(t, testKeyGenCrossBLST)
 	rapid.Check(t, testEncodeDecodePrivateKeyCrossBLST)
 	rapid.Check(t, testEncodeDecodePublicKeyCrossBLST)
-	//rapid.Check(t, testEncodeDecodeG1CrossBLST)   // commented till G1 check is implemented
+	rapid.Check(t, testEncodeDecodeG1CrossBLST) // commented till G1 check is implemented
 	rapid.Check(t, testSignHashCrossBLST)
 }
