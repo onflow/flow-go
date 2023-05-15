@@ -37,7 +37,7 @@ import (
 // It prepares a set of misbehavior reports and reports them to the conduit on the test channel.
 // The test ensures that the MisbehaviorReportManager receives and handles all reported misbehavior
 // without any duplicate reports and within a specified time.
-func TestHandleReportedMisbehavior(t *testing.T) {
+func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 	misbehaviorReportManger := mocknetwork.NewMisbehaviorReportManager(t)
 	conduitFactory := conduit.NewDefaultConduitFactory(
 		&alspmgr.MisbehaviorReportManagerConfig{
