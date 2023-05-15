@@ -321,7 +321,13 @@ func (el *EventLoop) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
 	el.onTrustedTC(tc)
 }
 
-// OnQcConstructedFromVotes implements hotstuff.QCCreatedConsumer and pushes received qc into processing pipeline.
+// OnQcConstructedFromVotes implements hotstuff.VoteCollectorConsumer and pushes received qc into processing pipeline.
 func (el *EventLoop) OnQcConstructedFromVotes(qc *flow.QuorumCertificate) {
 	el.onTrustedQC(qc)
 }
+
+// OnTimeoutProcessed implements hotstuff.TimeoutCollectorConsumer and is no-op
+func (el *EventLoop) OnTimeoutProcessed(timeout *model.TimeoutObject) {}
+
+// OnVoteProcessed implements hotstuff.VoteCollectorConsumer and is no-op
+func (el *EventLoop) OnVoteProcessed(vote *model.Vote) {}

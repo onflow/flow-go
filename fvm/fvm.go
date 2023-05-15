@@ -10,7 +10,6 @@ import (
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -100,13 +99,16 @@ type Procedure interface {
 	// For transactions, the execution time is TxIndex.  For scripts, the
 	// execution time is EndOfBlockExecutionTime.
 	ExecutionTime() logical.Time
-
-	// TODO(patrick): deprecated this.
-	SetOutput(output ProcedureOutput)
 }
 
 // VM runs procedures
 type VM interface {
+	NewExecutor(
+		Context,
+		Procedure,
+		storage.TransactionPreparer,
+	) ProcedureExecutor
+
 	Run(
 		Context,
 		Procedure,
@@ -130,17 +132,12 @@ func NewVirtualMachine() *VirtualMachine {
 	return &VirtualMachine{}
 }
 
-// TODO(patrick): rm after updating emulator
-func (vm *VirtualMachine) RunV2(
+func (vm *VirtualMachine) NewExecutor(
 	ctx Context,
 	proc Procedure,
-	storageSnapshot snapshot.StorageSnapshot,
-) (
-	*snapshot.ExecutionSnapshot,
-	ProcedureOutput,
-	error,
-) {
-	return vm.Run(ctx, proc, storageSnapshot)
+	txn storage.TransactionPreparer,
+) ProcedureExecutor {
+	return proc.NewExecutor(ctx, txn)
 }
 
 // Run runs a procedure against a ledger in the given context.
@@ -153,21 +150,22 @@ func (vm *VirtualMachine) Run(
 	ProcedureOutput,
 	error,
 ) {
-	derivedBlockData := ctx.DerivedBlockData
-	if derivedBlockData == nil {
-		derivedBlockData = derived.NewEmptyDerivedBlockData(
-			proc.ExecutionTime())
-	}
+	blockDatabase := storage.NewBlockDatabase(
+		storageSnapshot,
+		proc.ExecutionTime(),
+		ctx.DerivedBlockData)
 
-	var derivedTxnData *derived.DerivedTransactionData
+	stateParameters := ProcedureStateParameters(ctx, proc)
+
+	var storageTxn storage.Transaction
 	var err error
 	switch proc.Type() {
 	case ScriptProcedureType:
-		derivedTxnData = derivedBlockData.NewSnapshotReadDerivedTransactionData()
+		storageTxn = blockDatabase.NewSnapshotReadTransaction(stateParameters)
 	case TransactionProcedureType, BootstrapProcedureType:
-		derivedTxnData, err = derivedBlockData.NewDerivedTransactionData(
+		storageTxn, err = blockDatabase.NewTransaction(
 			proc.ExecutionTime(),
-			proc.ExecutionTime())
+			stateParameters)
 	default:
 		return nil, ProcedureOutput{}, fmt.Errorf(
 			"invalid proc type: %v",
@@ -180,32 +178,18 @@ func (vm *VirtualMachine) Run(
 			err)
 	}
 
-	nestedTxn := state.NewTransactionState(
-		storageSnapshot,
-		state.DefaultParameters().
-			WithMeterParameters(getBasicMeterParameters(ctx, proc)).
-			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-			WithMaxValueSizeAllowed(ctx.MaxStateValueSize))
-
-	txnState := &storage.SerialTransaction{
-		NestedTransactionPreparer: nestedTxn,
-		DerivedTransactionData:    derivedTxnData,
-	}
-
-	executor := proc.NewExecutor(ctx, txnState)
+	executor := proc.NewExecutor(ctx, storageTxn)
 	err = Run(executor)
 	if err != nil {
 		return nil, ProcedureOutput{}, err
 	}
 
-	// NOTE: It is not safe to ignore derivedTxnData' commit error for
-	// transactions that trigger derived data invalidation.
-	err = derivedTxnData.Commit()
+	err = storageTxn.Finalize()
 	if err != nil {
 		return nil, ProcedureOutput{}, err
 	}
 
-	executionSnapshot, err := txnState.FinalizeMainTransaction()
+	executionSnapshot, err := storageTxn.Commit()
 	if err != nil {
 		return nil, ProcedureOutput{}, err
 	}
@@ -222,8 +206,12 @@ func (vm *VirtualMachine) GetAccount(
 	*flow.Account,
 	error,
 ) {
-	nestedTxn := state.NewTransactionState(
+	blockDatabase := storage.NewBlockDatabase(
 		storageSnapshot,
+		0,
+		ctx.DerivedBlockData)
+
+	storageTxn := blockDatabase.NewSnapshotReadTransaction(
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
@@ -231,23 +219,11 @@ func (vm *VirtualMachine) GetAccount(
 				meter.DefaultParameters().
 					WithStorageInteractionLimit(ctx.MaxStateInteractionSize)))
 
-	derivedBlockData := ctx.DerivedBlockData
-	if derivedBlockData == nil {
-		derivedBlockData = derived.NewEmptyDerivedBlockData(0)
-	}
-
-	derivedTxnData := derivedBlockData.NewSnapshotReadDerivedTransactionData()
-
-	txnState := &storage.SerialTransaction{
-		NestedTransactionPreparer: nestedTxn,
-		DerivedTransactionData:    derivedTxnData,
-	}
-
 	env := environment.NewScriptEnv(
 		context.Background(),
 		ctx.TracerSpan,
 		ctx.EnvironmentParams,
-		txnState)
+		storageTxn)
 	account, err := env.GetAccount(address)
 	if err != nil {
 		if errors.IsLedgerFailure(err) {

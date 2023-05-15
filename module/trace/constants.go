@@ -63,7 +63,7 @@ const (
 
 	// Builder
 	COLBuildOn                  SpanName = "col.builder"
-	COLBuildOnSetup             SpanName = "col.builder.setup"
+	COLBuildOnGetBuildCtx       SpanName = "col.builder.getBuildCtx"
 	COLBuildOnUnfinalizedLookup SpanName = "col.builder.unfinalizedLookup"
 	COLBuildOnFinalizedLookup   SpanName = "col.builder.finalizedLookup"
 	COLBuildOnCreatePayload     SpanName = "col.builder.createPayload"
@@ -92,9 +92,8 @@ const (
 
 	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
 
-	EXEComputeBlock           SpanName = "exe.computer.computeBlock"
-	EXEComputeTransaction     SpanName = "exe.computer.computeTransaction"
-	EXEPostProcessTransaction SpanName = "exe.computer.postProcessTransaction"
+	EXEComputeBlock       SpanName = "exe.computer.computeBlock"
+	EXEComputeTransaction SpanName = "exe.computer.computeTransaction"
 
 	EXEStateSaveExecutionResults          SpanName = "exe.state.saveExecutionResults"
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"

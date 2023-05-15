@@ -10,8 +10,6 @@ import (
 	"github.com/onflow/flow-go/module/forest"
 )
 
-// TODO: rename file to forks.go (in subsequent PR to minimize changes, i.e. simplify review)
-
 // Forks enforces structural validity of the consensus state and implements
 // finalization rules as defined in Jolteon consensus https://arxiv.org/abs/2106.10362
 // The same approach has later been adopted by the Diem team resulting in DiemBFT v4:
@@ -19,7 +17,7 @@ import (
 // Forks is NOT safe for concurrent use by multiple goroutines.
 type Forks struct {
 	finalizationCallback module.Finalizer
-	notifier             hotstuff.FinalizationConsumer
+	notifier             hotstuff.FollowerConsumer
 	forest               forest.LevelledForest
 	trustedRoot          *model.CertifiedBlock
 
@@ -30,7 +28,7 @@ type Forks struct {
 
 var _ hotstuff.Forks = (*Forks)(nil)
 
-func New(trustedRoot *model.CertifiedBlock, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Forks, error) {
+func New(trustedRoot *model.CertifiedBlock, finalizationCallback module.Finalizer, notifier hotstuff.FollowerConsumer) (*Forks, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.CertifyingQC.BlockID) || (trustedRoot.Block.View != trustedRoot.CertifyingQC.View) {
 		return nil, model.NewConfigurationErrorf("invalid root: root QC is not pointing to root block")
 	}
@@ -83,7 +81,7 @@ func (f *Forks) GetBlock(blockID flow.Identifier) (*model.Block, bool) {
 	if !hasBlock {
 		return nil, false
 	}
-	return blockContainer.(*BlockContainer2).Block(), true
+	return blockContainer.(*BlockContainer).Block(), true
 }
 
 // GetBlocksForView returns all known blocks for the given view
@@ -92,7 +90,7 @@ func (f *Forks) GetBlocksForView(view uint64) []*model.Block {
 	blocks := make([]*model.Block, 0, 1) // in the vast majority of cases, there will only be one proposal for a particular view
 	for vertexIterator.HasNext() {
 		v := vertexIterator.NextVertex()
-		blocks = append(blocks, v.(*BlockContainer2).Block())
+		blocks = append(blocks, v.(*BlockContainer).Block())
 	}
 	return blocks
 }
@@ -155,7 +153,7 @@ func (f *Forks) EnsureBlockIsValidExtension(block *model.Block) error {
 	err := f.forest.VerifyVertex(blockContainer)
 	if err != nil {
 		if forest.IsInvalidVertexError(err) {
-			return model.NewInvalidBlockError(block.BlockID, block.View, fmt.Errorf("not a valid vertex for block tree: %w", err))
+			return model.NewInvalidBlockErrorf(block, "not a valid vertex for block tree: %w", err)
 		}
 		return fmt.Errorf("block tree generated unexpected error validating vertex: %w", err)
 	}
@@ -334,7 +332,7 @@ func (f *Forks) checkForConflictingQCs(qc *flow.QuorumCertificate) error {
 			// => conflicting qc
 			otherChildren := f.forest.GetChildren(otherBlock.VertexID())
 			if otherChildren.HasNext() {
-				otherChild := otherChildren.NextVertex().(*BlockContainer2).Block()
+				otherChild := otherChildren.NextVertex().(*BlockContainer).Block()
 				conflictingQC := otherChild.QC
 				return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
 					"conflicting QCs at view %d: %v and %v",
@@ -353,7 +351,7 @@ func (f *Forks) checkForDoubleProposal(block *model.Block) {
 	it := f.forest.GetVerticesAtLevel(block.View)
 	for it.HasNext() {
 		otherVertex := it.NextVertex() // by construction, must have same view as block
-		otherBlock := otherVertex.(*BlockContainer2).Block()
+		otherBlock := otherVertex.(*BlockContainer).Block()
 		if block.BlockID != otherBlock.BlockID {
 			f.notifier.OnDoubleProposeDetected(block, otherBlock)
 		}
@@ -400,7 +398,7 @@ func (f *Forks) checkForAdvancingFinalization(certifiedBlock *model.CertifiedBlo
 	if !parentBlockKnown {
 		return model.MissingBlockError{View: qcForParent.View, BlockID: qcForParent.BlockID}
 	}
-	parentBlock := parentVertex.(*BlockContainer2).Block()
+	parentBlock := parentVertex.(*BlockContainer).Block()
 
 	// Note: we assume that all stored blocks pass Forks.EnsureBlockIsValidExtension(block);
 	//       specifically, that Proposal's ViewNumber is strictly monotonically

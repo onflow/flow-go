@@ -118,7 +118,6 @@ func (id RegisterID) IsSlabIndex() bool {
 	return len(id.Key) == 9 && id.Key[0] == '$'
 }
 
-// TODO(patrick): pretty print flow internal register ids.
 // String returns formatted string representation of the RegisterID.
 func (id RegisterID) String() string {
 	formattedKey := ""

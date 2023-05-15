@@ -7,14 +7,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	httpmetrics "github.com/slok/go-http-metrics/metrics"
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/channels"
-
-	httpmetrics "github.com/slok/go-http-metrics/metrics"
 )
 
 type NoopCollector struct{}
@@ -163,7 +162,7 @@ func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.E
 }
 func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
 func (nc *NoopCollector) ExecutionBlockCachedPrograms(programs int)                     {}
-func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _, _ uint64, _, _ int, _ bool) {
+func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _ uint64, _, _ int, _ bool) {
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                         {}
 func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, _, _ uint64) {}
@@ -291,4 +290,10 @@ func (nc *NoopCollector) OnBehaviourPenaltyUpdated(f float64)                   
 func (nc *NoopCollector) OnIPColocationFactorUpdated(f float64)                            {}
 func (nc *NoopCollector) OnAppSpecificScoreUpdated(f float64)                              {}
 func (nc *NoopCollector) OnOverallPeerScoreUpdated(f float64)                              {}
-func (nc *NoopCollector) OnMisbehaviorReported(string, string)                             {}
+
+func (nc *NoopCollector) BlockingPreProcessingStarted(string, uint)                 {}
+func (nc *NoopCollector) BlockingPreProcessingFinished(string, uint, time.Duration) {}
+func (nc *NoopCollector) AsyncProcessingStarted(string)                             {}
+func (nc *NoopCollector) AsyncProcessingFinished(string, time.Duration)             {}
+
+func (nc *NoopCollector) OnMisbehaviorReported(string, string) {}

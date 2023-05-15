@@ -482,7 +482,8 @@ func createNode(
 	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector, rootHeader.ChainID)
 	require.NoError(t, err)
 
-	qcDistributor := pubsub.NewQCCreatedDistributor()
+	voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
+	voteAggregationDistributor.AddVoteAggregationConsumer(logConsumer)
 
 	forks, err := consensus.NewForks(rootHeader, headersDB, final, notifier, rootHeader, rootQC)
 	require.NoError(t, err)
@@ -516,9 +517,9 @@ func createNode(
 	livenessData, err := persist.GetLivenessData()
 	require.NoError(t, err)
 
-	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
+	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, voteAggregationDistributor.OnQcConstructedFromVotes)
 
-	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
+	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, voteAggregationDistributor, voteProcessorFactory.Create)
 	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
 	voteAggregator, err := voteaggregator.NewVoteAggregator(
@@ -526,26 +527,25 @@ func createNode(
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		notifier,
+		voteAggregationDistributor,
 		livenessData.CurrentView,
 		voteCollectors,
 	)
 	require.NoError(t, err)
 
-	timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
-	timeoutCollectorDistributor.AddConsumer(logConsumer)
+	timeoutAggregationDistributor := pubsub.NewTimeoutAggregationDistributor()
+	timeoutAggregationDistributor.AddTimeoutCollectorConsumer(logConsumer)
 
 	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(
 		log,
-		timeoutCollectorDistributor,
+		timeoutAggregationDistributor,
 		committee,
 		validator,
 		msig.ConsensusTimeoutTag,
 	)
 	timeoutCollectorsFactory := timeoutcollector.NewTimeoutCollectorFactory(
 		log,
-		notifier,
-		timeoutCollectorDistributor,
+		timeoutAggregationDistributor,
 		timeoutProcessorFactory,
 	)
 	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(
@@ -560,7 +560,6 @@ func createNode(
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		notifier,
 		livenessData.CurrentView,
 		timeoutCollectors,
 	)
@@ -573,8 +572,8 @@ func createNode(
 		Committee:                   committee,
 		Signer:                      signer,
 		Persist:                     persist,
-		QCCreatedDistributor:        qcDistributor,
-		TimeoutCollectorDistributor: timeoutCollectorDistributor,
+		VoteCollectorDistributor:    voteAggregationDistributor.VoteCollectorDistributor,
+		TimeoutCollectorDistributor: timeoutAggregationDistributor.TimeoutCollectorDistributor,
 		VoteAggregator:              voteAggregator,
 		TimeoutAggregator:           timeoutAggregator,
 	}
@@ -602,6 +601,7 @@ func createNode(
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
+		notifier,
 		tracer,
 		headersDB,
 		payloadsDB,
@@ -618,9 +618,6 @@ func createNode(
 	comp, err := compliance.NewEngine(log, me, compCore)
 	require.NoError(t, err)
 
-	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
-	require.NoError(t, err)
-
 	identities, err := state.Final().Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(me.NodeID())),
@@ -634,10 +631,10 @@ func createNode(
 		metricsCollector,
 		net,
 		me,
+		state,
 		blocksDB,
 		comp,
 		syncCore,
-		finalizedHeader,
 		idProvider,
 		func(cfg *synceng.Config) {
 			// use a small pool and scan interval for sync engine
