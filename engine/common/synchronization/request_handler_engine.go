@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -57,9 +58,9 @@ func NewRequestHandlerEngine(
 	metrics module.EngineMetrics,
 	net network.Network,
 	me module.Local,
+	state protocol.State,
 	blocks storage.Blocks,
 	core module.SyncCore,
-	finalizedHeader *FinalizedHeaderCache,
 ) (*RequestHandlerEngine, error) {
 	e := &RequestHandlerEngine{}
 
@@ -73,9 +74,9 @@ func NewRequestHandlerEngine(
 		metrics,
 		NewResponseSender(con),
 		me,
+		state,
 		blocks,
 		core,
-		finalizedHeader,
 		false,
 	)
 

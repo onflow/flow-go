@@ -23,9 +23,9 @@ func NewVoteAggregator(
 	engineMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
 	lowestRetainedView uint64,
-	notifier hotstuff.Consumer,
+	notifier hotstuff.VoteAggregationConsumer,
 	voteProcessorFactory hotstuff.VoteProcessorFactory,
-	distributor *pubsub.FinalizationDistributor,
+	distributor *pubsub.FollowerDistributor,
 ) (hotstuff.VoteAggregator, error) {
 
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
@@ -57,11 +57,11 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	mempoolMetrics module.MempoolMetrics,
 	notifier *pubsub.Distributor,
 	timeoutProcessorFactory hotstuff.TimeoutProcessorFactory,
-	distributor *pubsub.TimeoutCollectorDistributor,
+	distributor *pubsub.TimeoutAggregationDistributor,
 	lowestRetainedView uint64,
 ) (hotstuff.TimeoutAggregator, error) {
 
-	timeoutCollectorFactory := timeoutcollector.NewTimeoutCollectorFactory(log, notifier, distributor, timeoutProcessorFactory)
+	timeoutCollectorFactory := timeoutcollector.NewTimeoutCollectorFactory(log, distributor, timeoutProcessorFactory)
 	collectors := timeoutaggregator.NewTimeoutCollectors(log, lowestRetainedView, timeoutCollectorFactory)
 
 	// initialize the timeout aggregator
@@ -70,7 +70,6 @@ func NewTimeoutAggregator(log zerolog.Logger,
 		hotstuffMetrics,
 		engineMetrics,
 		mempoolMetrics,
-		notifier,
 		lowestRetainedView,
 		collectors,
 	)

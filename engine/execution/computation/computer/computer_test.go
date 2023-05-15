@@ -32,6 +32,7 @@ import (
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -95,9 +96,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("single collection", func(t *testing.T) {
 
-		execCtx := fvm.NewContext(
-			fvm.WithDerivedBlockData(derived.NewEmptyDerivedBlockData(0)),
-		)
+		execCtx := fvm.NewContext()
 
 		vm := &testVM{
 			t:                    t,
@@ -125,7 +124,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			mock.Anything, // duration
 			mock.Anything, // computation used
 			mock.Anything, // memory used
-			mock.Anything, // actual memory used
 			mock.Anything, // number of events
 			mock.Anything, // size of events
 			false).        // no failure
@@ -306,6 +304,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(0, 0, rag)
 		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
+		// TODO(patrick): switch to NewExecutor.
+		// vm.On("NewExecutor", mock.Anything, mock.Anything, mock.Anything).
+		//	Return(noOpExecutor{}).
+		//	Once() // just system chunk
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(
 				&snapshot.ExecutionSnapshot{},
@@ -1129,7 +1131,6 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		mock.Anything, // duration
 		mock.Anything, // computation used
 		mock.Anything, // memory used
-		mock.Anything, // actual memory used
 		expectedNumberOfEvents,
 		expectedEventSize,
 		false).
@@ -1275,12 +1276,73 @@ func generateCollection(
 	}
 }
 
+type noOpExecutor struct{}
+
+func (noOpExecutor) Cleanup() {}
+
+func (noOpExecutor) Preprocess() error {
+	return nil
+}
+
+func (noOpExecutor) Execute() error {
+	return nil
+}
+
+func (noOpExecutor) Output() fvm.ProcedureOutput {
+	return fvm.ProcedureOutput{}
+}
+
 type testVM struct {
 	t                    *testing.T
 	eventsPerTransaction int
 
 	callCount int
 	err       fvmErrors.CodedError
+}
+
+type testExecutor struct {
+	*testVM
+
+	ctx      fvm.Context
+	proc     fvm.Procedure
+	txnState storage.TransactionPreparer
+}
+
+func (testExecutor) Cleanup() {
+}
+
+func (testExecutor) Preprocess() error {
+	return nil
+}
+
+func (executor *testExecutor) Execute() error {
+	executor.callCount += 1
+
+	getSetAProgram(executor.t, executor.txnState)
+
+	return nil
+}
+
+func (executor *testExecutor) Output() fvm.ProcedureOutput {
+	txn := executor.proc.(*fvm.TransactionProcedure)
+
+	return fvm.ProcedureOutput{
+		Events: generateEvents(executor.eventsPerTransaction, txn.TxIndex),
+		Err:    executor.err,
+	}
+}
+
+func (vm *testVM) NewExecutor(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	txnState storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	return &testExecutor{
+		testVM:   vm,
+		proc:     proc,
+		ctx:      ctx,
+		txnState: txnState,
+	}
 }
 
 func (vm *testVM) Run(
@@ -1292,24 +1354,27 @@ func (vm *testVM) Run(
 	fvm.ProcedureOutput,
 	error,
 ) {
-	vm.callCount += 1
+	database := storage.NewBlockDatabase(
+		storageSnapshot,
+		proc.ExecutionTime(),
+		ctx.DerivedBlockData)
 
-	txn := proc.(*fvm.TransactionProcedure)
-
-	derivedTxnData, err := ctx.DerivedBlockData.NewDerivedTransactionData(
-		txn.ExecutionTime(),
-		txn.ExecutionTime())
+	txn, err := database.NewTransaction(
+		proc.ExecutionTime(),
+		state.DefaultParameters())
 	require.NoError(vm.t, err)
 
-	getSetAProgram(vm.t, storageSnapshot, derivedTxnData)
+	executor := vm.NewExecutor(ctx, proc, txn)
+	err = fvm.Run(executor)
+	require.NoError(vm.t, err)
 
-	snapshot := &snapshot.ExecutionSnapshot{}
-	output := fvm.ProcedureOutput{
-		Events: generateEvents(vm.eventsPerTransaction, txn.TxIndex),
-		Err:    vm.err,
-	}
+	err = txn.Finalize()
+	require.NoError(vm.t, err)
 
-	return snapshot, output, nil
+	executionSnapshot, err := txn.Commit()
+	require.NoError(vm.t, err)
+
+	return executionSnapshot, executor.Output(), nil
 }
 
 func (testVM) GetAccount(
@@ -1339,19 +1404,13 @@ func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 
 func getSetAProgram(
 	t *testing.T,
-	storageSnapshot snapshot.StorageSnapshot,
-	derivedTxnData *derived.DerivedTransactionData,
+	txnState storage.TransactionPreparer,
 ) {
-
-	txnState := state.NewTransactionState(
-		storageSnapshot,
-		state.DefaultParameters())
-
 	loc := common.AddressLocation{
 		Name:    "SomeContract",
 		Address: common.MustBytesToAddress([]byte{0x1}),
 	}
-	_, err := derivedTxnData.GetOrComputeProgram(
+	_, err := txnState.GetOrComputeProgram(
 		txnState,
 		loc,
 		&programLoader{
@@ -1360,9 +1419,6 @@ func getSetAProgram(
 			},
 		},
 	)
-	require.NoError(t, err)
-
-	err = derivedTxnData.Commit()
 	require.NoError(t, err)
 }
 
