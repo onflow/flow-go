@@ -172,13 +172,16 @@ func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.Gos
 			queue.WithHeroStoreSizeLimit(b.inspectorsConfig.GossipSubRPCInspectorNotificationCacheSize),
 			queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.publicNetwork))}...)
 	clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(b.metricsCfg.HeroCacheFactory, b.publicNetwork)
-	rpcValidationInspector := validation.NewControlMsgValidationInspector(
+	rpcValidationInspector, err := validation.NewControlMsgValidationInspector(
 		b.logger,
 		b.sporkID,
 		controlMsgRPCInspectorCfg,
 		notificationDistributor,
 		clusterPrefixedCacheCollector,
 	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
+	}
 	return rpcValidationInspector, notificationDistributor, nil
 }
 

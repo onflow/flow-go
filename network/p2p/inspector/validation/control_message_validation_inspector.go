@@ -48,12 +48,22 @@ var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
 var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
-func NewControlMsgValidationInspector(logger zerolog.Logger, sporkID flow.Identifier, config *ControlMsgValidationInspectorConfig, distributor p2p.GossipSubInspectorNotifDistributor, clusterPrefixedCacheCollector module.HeroCacheMetrics) *ControlMsgValidationInspector {
+// Args:
+//   - logger: the logger used by the inspector.
+//   - sporkID: the current spork ID.
+//   - config: inspector configuration.
+//   - distributor: gossipsub inspector notification distributor.
+//   - clusterPrefixedCacheCollector: metrics collector for the underlying cluster prefix received tracker cache.
+//
+// Returns:
+//   - *ControlMsgValidationInspector: a new control message validation inspector.
+//   - error: an error if there is any error while creating the inspector. All errors are irrecoverable and unexpected.
+func NewControlMsgValidationInspector(logger zerolog.Logger, sporkID flow.Identifier, config *ControlMsgValidationInspectorConfig, distributor p2p.GossipSubInspectorNotifDistributor, clusterPrefixedCacheCollector module.HeroCacheMetrics) (*ControlMsgValidationInspector, error) {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 
 	tracker, err := cache.NewClusterPrefixTopicsReceivedTracker(logger, config.ClusterPrefixedTopicsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedTopicsReceivedCacheDecay)
 	if err != nil {
-		lg.Fatal().Err(err).Msg("failed to create cluster prefix topics received tracker")
+		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
 	}
 
 	c := &ControlMsgValidationInspector{
@@ -100,7 +110,7 @@ func NewControlMsgValidationInspector(logger zerolog.Logger, sporkID flow.Identi
 		builder.AddWorker(pool.WorkerLogic())
 	}
 	c.Component = builder.Build()
-	return c
+	return c, nil
 }
 
 // Inspect inspects the rpc received and returns an error if any validation rule is broken.

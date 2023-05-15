@@ -618,7 +618,8 @@ func setupTest(t *testing.T, logger zerolog.Logger, role flow.Role, inspectorCon
 		mockDistributorOpt(distributor, spammer)
 	}
 
-	validationInspector := validation.NewControlMsgValidationInspector(logger, sporkID, inspectorConfig, distributor, metrics.NewNoopCollector())
+	validationInspector, err := validation.NewControlMsgValidationInspector(logger, sporkID, inspectorConfig, distributor, metrics.NewNoopCollector())
+	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, _ := p2ptest.NodeFixture(
 		t,
