@@ -251,7 +251,12 @@ func (c *Core) processBlockAndDescendants(proposal *cluster.Block) error {
 		if checkForAndLogOutdatedInputError(err, log) || checkForAndLogUnverifiableInputError(err, log) {
 			return nil
 		}
-		if checkForAndLogInvalidInputError(err, log) {
+		if invalidBlockErr, ok := model.AsInvalidProposalError(err); ok {
+			log.Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+
+			// notify consumers about invalid block
+			c.proposalViolationNotifier.OnInvalidBlockDetected(*invalidBlockErr)
+
 			// notify VoteAggregator about the invalid block
 			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header))
 			if err != nil {
@@ -292,7 +297,7 @@ func (c *Core) processBlockAndDescendants(proposal *cluster.Block) error {
 // the finalized state.
 // Expected errors during normal operations:
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
-//   - engine.InvalidInputError if the block proposal is invalid
+//   - model.InvalidProposalError if the block proposal is invalid
 //   - engine.UnverifiableInputError if the proposal cannot be validated
 func (c *Core) processBlockProposal(proposal *cluster.Block) error {
 	header := proposal.Header
@@ -313,9 +318,8 @@ func (c *Core) processBlockProposal(proposal *cluster.Block) error {
 	hotstuffProposal := model.ProposalFromFlow(header)
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
-		if invalidBlockErr, ok := model.AsInvalidProposalError(err); ok {
-			c.proposalViolationNotifier.OnInvalidBlockDetected(*invalidBlockErr)
-			return engine.NewInvalidInputErrorf("invalid block proposal: %w", err)
+		if model.IsInvalidProposalError(err) {
+			return err
 		}
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
 			// The cluster committee never returns ErrViewForUnknownEpoch, therefore this case
@@ -330,8 +334,7 @@ func (c *Core) processBlockProposal(proposal *cluster.Block) error {
 	if err != nil {
 		if state.IsInvalidExtensionError(err) {
 			// if the block proposes an invalid extension of the cluster state, then the block is invalid
-			// TODO: we should slash the block proposer
-			return engine.NewInvalidInputErrorf("invalid extension of cluster state (block: %x, height: %d): %w", blockID, header.Height, err)
+			return model.NewInvalidProposalErrorf(hotstuffProposal, "invalid extension of cluster state (block: %x, height: %d): %w", blockID, header.Height, err)
 		} else if state.IsOutdatedExtensionError(err) {
 			// cluster state aborted processing of block as it is on an abandoned fork: block is outdated
 			return engine.NewOutdatedInputErrorf("outdated extension of cluster state: %w", err)
@@ -377,19 +380,6 @@ func checkForAndLogOutdatedInputError(err error, log zerolog.Logger) bool {
 		// child is outdated by the time we started processing it
 		// => node was probably behind and is catching up. Log as warning
 		log.Info().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
-		return true
-	}
-	return false
-}
-
-// checkForAndLogInvalidInputError checks whether error is an `engine.InvalidInputError`.
-// If this is the case, we emit a log message and return true.
-// For any error other than `engine.InvalidInputError`, this function is a no-op
-// and returns false.
-func checkForAndLogInvalidInputError(err error, log zerolog.Logger) bool {
-	if engine.IsInvalidInputError(err) {
-		// the block is invalid; log as error as we desire honest participation
-		log.Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
 		return true
 	}
 	return false

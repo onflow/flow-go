@@ -359,7 +359,13 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		// make sure we fail to extend the state
 		*cs.state = clusterstate.MutableState{}
 		cs.state.On("Final").Return(func() clusterint.Snapshot { return cs.snapshot })
-		cs.state.On("Extend", mock.Anything).Return(state.NewInvalidExtensionError(""))
+		sentinelErr := state.NewInvalidExtensionError("")
+		cs.state.On("Extend", mock.Anything).Return(sentinelErr)
+		cs.proposalViolationNotifier.On("OnInvalidBlockDetected", mock.Anything).Run(func(args mock.Arguments) {
+			err := args.Get(0).(model.InvalidProposalError)
+			require.ErrorIs(cs.T(), err, sentinelErr)
+			require.Equal(cs.T(), err.InvalidProposal, hotstuffProposal)
+		}).Return().Once()
 		// we should notify VoteAggregator about the invalid block
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
