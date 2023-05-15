@@ -1,11 +1,16 @@
 package metrics
 
 import (
+	"github.com/onflow/flow-go/module"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	metricsProm "github.com/slok/go-http-metrics/metrics/prometheus"
 )
 
 type AccessCollector struct {
+	module.RestMetrics
 	connectionReused      prometheus.Counter
 	connectionsInPool     *prometheus.GaugeVec
 	connectionAdded       prometheus.Counter
@@ -14,6 +19,8 @@ type AccessCollector struct {
 	connectionUpdated     prometheus.Counter
 	connectionEvicted     prometheus.Counter
 }
+
+var _ module.AccessMetrics = (*AccessCollector)(nil)
 
 func NewAccessCollector() *AccessCollector {
 	ac := &AccessCollector{
@@ -60,6 +67,7 @@ func NewAccessCollector() *AccessCollector {
 			Help:      "counter for the number of times a cached connection is evicted from the connection pool",
 		}),
 	}
+	ac.RestMetrics = NewRecorderCollector(metricsProm.Config{Prefix: "access_rest_api"})
 
 	return ac
 }

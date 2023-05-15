@@ -61,6 +61,7 @@ type Engine struct {
 	finalizedHeaderCache      *events.FinalizedHeaderCache
 
 	log                zerolog.Logger
+	restCollector      module.RestMetrics
 	backend            *backend.Backend // the gRPC service implementation
 	unsecureGrpcServer *grpc.Server     // the unsecure gRPC server
 	secureGrpcServer   *grpc.Server     // the secure gRPC server
@@ -209,6 +210,7 @@ func NewBuilder(log zerolog.Logger,
 		httpServer:                httpServer,
 		config:                    config,
 		chain:                     chainID.Chain(),
+		restCollector:             accessMetrics,
 	}
 	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.notifyBackendOnBlockFinalized)
 	eng.backendNotifierActor = backendNotifierActor
@@ -383,7 +385,7 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 
 	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
 
-	r, err := rest.NewServer(e.backend, e.config.RESTListenAddr, e.log, e.chain)
+	r, err := rest.NewServer(e.backend, e.config.RESTListenAddr, e.log, e.chain, e.restCollector)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
 		ctx.Throw(err)
