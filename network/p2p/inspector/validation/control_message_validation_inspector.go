@@ -259,25 +259,46 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 //   - channels.ErrInvalidTopic: if topic is invalid.
 //   - ErrDuplicateTopic: if a duplicate topic ID is encountered.
 func (c *ControlMsgValidationInspector) validateTopics(from peer.ID, ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
-	seen := make(map[channels.Topic]struct{})
 	activeClusterIDS := c.clusterPrefixTopicsReceivedTracker.GetActiveClusterIds()
-	validateTopic := c.validateTopicInlineFunc(from, ctrlMsgType, seen, activeClusterIDS)
+	validateTopic := c.validateTopicInlineFunc(from, ctrlMsgType, activeClusterIDS)
 	switch ctrlMsgType {
 	case p2p.CtrlMsgGraft:
-		for _, graft := range ctrlMsg.GetGraft() {
-			topic := channels.Topic(graft.GetTopicID())
-			err := validateTopic(topic)
-			if err != nil {
-				return err
-			}
-		}
+		return c.validateGrafts(ctrlMsg, validateTopic)
 	case p2p.CtrlMsgPrune:
-		for _, prune := range ctrlMsg.GetPrune() {
-			topic := channels.Topic(prune.GetTopicID())
-			err := validateTopic(topic)
-			if err != nil {
-				return err
-			}
+		return c.validatePrunes(ctrlMsg, validateTopic)
+	}
+	return nil
+}
+
+// validateGrafts performs topic validation on all grafts in the control message using the provided validateTopic func while tracking duplicates.
+func (c *ControlMsgValidationInspector) validateGrafts(ctrlMsg *pubsub_pb.ControlMessage, validateTopic func(topic channels.Topic) error) error {
+	tracker := make(duplicateTopicTracker)
+	for _, graft := range ctrlMsg.GetGraft() {
+		topic := channels.Topic(graft.GetTopicID())
+		if tracker.isDuplicate(topic) {
+			return NewDuplicateTopicErr(topic)
+		}
+		tracker.set(topic)
+		err := validateTopic(topic)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validatePrunes performs topic validation on all prunes in the control message using the provided validateTopic func while tracking duplicates.
+func (c *ControlMsgValidationInspector) validatePrunes(ctrlMsg *pubsub_pb.ControlMessage, validateTopic func(topic channels.Topic) error) error {
+	tracker := make(duplicateTopicTracker)
+	for _, prune := range ctrlMsg.GetPrune() {
+		topic := channels.Topic(prune.GetTopicID())
+		if tracker.isDuplicate(topic) {
+			return NewDuplicateTopicErr(topic)
+		}
+		tracker.set(topic)
+		err := validateTopic(topic)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -342,16 +363,12 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 }
 
 // validateTopicInlineFunc returns a callback func that validates topics and keeps track of duplicates.
-func (c *ControlMsgValidationInspector) validateTopicInlineFunc(from peer.ID, ctrlMsgType p2p.ControlMessageType, seen map[channels.Topic]struct{}, activeClusterIDS flow.ChainIDList) func(topic channels.Topic) error {
+func (c *ControlMsgValidationInspector) validateTopicInlineFunc(from peer.ID, ctrlMsgType p2p.ControlMessageType, activeClusterIDS flow.ChainIDList) func(topic channels.Topic) error {
 	lg := c.logger.With().
 		Str("from", from.String()).
 		Str("ctrl_msg_type", string(ctrlMsgType)).
 		Logger()
 	return func(topic channels.Topic) error {
-		if _, ok := seen[topic]; ok {
-			return NewDuplicateTopicErr(topic)
-		}
-		seen[topic] = struct{}{}
 		err := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
 			switch {
