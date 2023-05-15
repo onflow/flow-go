@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sync/atomic"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -267,7 +268,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NotNil(t, chunkExecutionData2.TrieUpdate)
 		assert.Equal(t, byte(2), chunkExecutionData2.TrieUpdate.RootHash[0])
 
-		assert.Equal(t, 3, vm.callCount)
+		assert.Equal(t, 3, vm.CallCount())
 	})
 
 	t.Run("empty block still computes system chunk", func(t *testing.T) {
@@ -525,7 +526,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		assertEventHashesMatch(t, collectionCount+1, result)
 
-		assert.Equal(t, totalTransactionCount, vm.callCount)
+		assert.Equal(t, totalTransactionCount, vm.CallCount())
 	})
 
 	t.Run(
@@ -1296,7 +1297,7 @@ type testVM struct {
 	t                    *testing.T
 	eventsPerTransaction int
 
-	callCount int
+	callCount int32 // atomic variable
 	err       fvmErrors.CodedError
 }
 
@@ -1316,7 +1317,7 @@ func (testExecutor) Preprocess() error {
 }
 
 func (executor *testExecutor) Execute() error {
-	executor.callCount += 1
+	atomic.AddInt32(&executor.callCount, 1)
 
 	getSetAProgram(executor.t, executor.txnState)
 
@@ -1343,6 +1344,10 @@ func (vm *testVM) NewExecutor(
 		ctx:      ctx,
 		txnState: txnState,
 	}
+}
+
+func (vm *testVM) CallCount() int {
+	return int(atomic.LoadInt32(&vm.callCount))
 }
 
 func (vm *testVM) Run(
