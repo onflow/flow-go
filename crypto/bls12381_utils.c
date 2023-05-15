@@ -1221,7 +1221,7 @@ int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte*
     ep_new(elemsG1[1]);
     ep2_new(elemsG2[1]);
     ep2_new(elemsG2[0]);
-    int ret;
+    int ret = UNDEFINED;
 
     // elemsG1[0] = s1
     E1 s;
@@ -1230,7 +1230,7 @@ int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte*
         goto out;
     };
     // check s1 is in G1
-    if (E1_in_G1(&s) != VALID)  {
+    if (!E1_in_G1(&s))  {
         ret = INVALID;
         goto out;
     }
@@ -1238,13 +1238,12 @@ int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte*
     ep_copy(elemsG1[0], s_tmp);
 
     // elemsG1[1] = s2
-    E1 s;
     if (E1_read_bytes(&s, sig2, SIGNATURE_LEN) != BLST_SUCCESS) {
         ret = INVALID;
         goto out;
     };
     // check s2 is in G1
-    if (E1_in_G1(&s) != VALID)  {
+    if (!E1_in_G1(&s))  {
         ret = INVALID;
         goto out;
     }
@@ -1293,7 +1292,6 @@ int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte*
         }
         goto out; 
     }
-    ret = UNDEFINED;
 
 out:
     ep_free(elemsG1[0]);
