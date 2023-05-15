@@ -604,12 +604,13 @@ func TestSpamRecordCache_ConcurrentInitRemoveAdjust(t *testing.T) {
 
 	// Initialize spam records concurrently
 	for _, originID := range originIDsToAdd {
-		go func(id flow.Identifier) {
+		originID := originID // capture range variable
+		go func() {
 			defer wg.Done()
 			penalty, err := cache.Adjust(originID, adjustFnNoOp)
 			require.NoError(t, err)
 			require.Equal(t, float64(0), penalty)
-		}(originID)
+		}()
 	}
 
 	// Remove spam records concurrently
