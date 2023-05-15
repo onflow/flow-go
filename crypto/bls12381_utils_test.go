@@ -101,26 +101,30 @@ func TestSubgroupCheck(t *testing.T) {
 	_, err := prg.Read(seed)
 	require.NoError(t, err)
 
-	/*t.Run("G1", func(t *testing.T) {
+	t.Run("G1", func(t *testing.T) {
 		var p pointE1
-		randPointG1(&p) // point in G1
-		res := checkMembershipG1(&p)
-		assert.Equal(t, res, int(valid))
-		randPointG1Complement(&p) // point in E1\G1
-		res = checkMembershipG1(&p)
-		assert.Equal(t, res, int(invalid))
-	})*/
+		unsecureMapToG1(&p, seed) // point in G1
+		assert.True(t, checkMembershipG1(&p))
+
+		inG1 := false
+		for !inG1 {
+			_, err := prg.Read(seed)
+			require.NoError(t, err)
+			inG1 = unsecureMapToG1Complement(&p, seed) // point in E2\G2
+		}
+		assert.False(t, checkMembershipG1(&p))
+	})
 
 	t.Run("G2", func(t *testing.T) {
 		var p pointE2
-		mapToG2(&p, seed) // point in G2
+		unsecureMapToG2(&p, seed) // point in G2
 		assert.True(t, checkMembershipG2(&p))
 
 		inG2 := false
 		for !inG2 {
-			_, err := mrand.Read(seed)
+			_, err := prg.Read(seed)
 			require.NoError(t, err)
-			inG2 = mapToG2Complement(&p, seed) // point in E2\G2
+			inG2 = unsecureMapToG2Complement(&p, seed) // point in E2\G2
 		}
 		assert.False(t, checkMembershipG2(&p))
 	})
@@ -128,24 +132,23 @@ func TestSubgroupCheck(t *testing.T) {
 
 // subgroup membership check bench
 func BenchmarkSubgroupCheck(b *testing.B) {
+	seed := make([]byte, PubKeyLenBLSBLS12381)
+	_, err := mrand.Read(seed)
+	require.NoError(b, err)
 
-	/*b.Run("G1", func(b *testing.B) {
+	b.Run("G1", func(b *testing.B) {
 		var p pointE1
-		randPointG1(&p)
+		unsecureMapToG1(&p, seed) // point in G1
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_ = checkMembershipG1(&p) // G1
 		}
 		b.StopTimer()
-	})*/
+	})
 
 	b.Run("G2", func(b *testing.B) {
 		var p pointE2
-		seed := make([]byte, PubKeyLenBLSBLS12381)
-		_, err := mrand.Read(seed)
-		require.NoError(b, err)
-		mapToG2(&p, seed) // point in G2
-
+		unsecureMapToG2(&p, seed) // point in G2
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_ = checkMembershipG2(&p) // G2

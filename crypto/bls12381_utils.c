@@ -1346,44 +1346,49 @@ void E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len){
     E2_add(res, x, res);
 }
 
-/*
-// maps the bytes to a point in G1
+
+// maps the bytes to a point in G1.
+// `len` should be at least Fr_BYTES.
 // this is a testing file only, should not be used in any protocol!
-void map_bytes_to_G1(ep_t p, const byte* bytes, int len) {
+void unsecure_map_bytes_to_G1(E1* p, const byte* bytes, int len) {
+    assert(len > Fr_BYTES);
     // map to Fr
     Fr log;
     map_bytes_to_Fr(&log, bytes, len);
     // multiplies G1 generator by a random scalar
-
-    
+    G1_mult_gen(p, &log);
 }
 
 // generates a point in E1\G1 and stores it in p
 // this is a testing file only, should not be used in any protocol!
-void map_bytes_to_G1complement(ep_t p, const byte* bytes, int len) {
-    // generate a random point in E1
-    p->coord = BASIC;
-    fp_set_dig(p->z, 1);
-    do {
-        fp_rand(p->x); // set x to a random field element
-        byte r;
-        rand_bytes(&r, 1);
-        fp_zero(p->y);
-        fp_set_bit(p->y, 0, r&1); // set y randomly to 0 or 1
+BLST_ERROR unsecure_map_bytes_to_G1complement(E1* p, const byte* bytes, int len) {
+    assert(G1_SERIALIZATION == COMPRESSED);
+    assert(len >= G1_SER_BYTES);
+
+    // attempt to deserilize a compressed E1 point from input bytes
+    // after fixing the header 2 bits
+    byte copy[G1_SER_BYTES];
+    memcpy(copy, bytes, sizeof(copy));
+    copy[0] |= 1<<7;        // set compression bit
+    copy[0] &= ~(1<<6);     // clear infinity bit - point is not infinity
+
+    BLST_ERROR ser = E1_read_bytes(p, copy, G1_SER_BYTES);
+    if (ser != BLST_SUCCESS) {
+        return ser;
     }
-    while (ep_upk(p, p) == 0); // make sure p is in E1
 
-    // map the point to E1\G1 by clearing G1 order
-    ep_mul_basic(p, p, &core_get()->ep_r);
+    // map the point to E2\G2 by clearing G2 order
+    E1_mult(p, p, (const Fr*)BLS12_381_r);
+    E1_to_affine(p, p);
 
-    assert(ep_on_curve(p));  // sanity check to make sure p is in E1
+    assert(E1_affine_on_curve(p));  // sanity check to make sure p is in E2
+    return BLST_SUCCESS;
 }
-*/
 
 // maps the bytes to a point in G2.
 // `len` should be at least Fr_BYTES.
 // this is a testing tool only, it should not be used in any protocol!
-void map_bytes_to_G2(E2* p, const byte* bytes, int len) {
+void unsecure_map_bytes_to_G2(E2* p, const byte* bytes, int len) {
     assert(len > Fr_BYTES);
     // map to Fr
     Fr log;
@@ -1397,7 +1402,7 @@ void map_bytes_to_G2(E2* p, const byte* bytes, int len) {
 // succeeds.
 // For now, function only works when E2 serialization is compressed.
 // this is a testing tool only, it should not be used in any protocol!
-BLST_ERROR map_bytes_to_G2complement(E2* p, const byte* bytes, int len) {
+BLST_ERROR unsecure_map_bytes_to_G2complement(E2* p, const byte* bytes, int len) {
     assert(G2_SERIALIZATION == COMPRESSED);
     assert(len >= G2_SER_BYTES);
 

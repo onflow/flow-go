@@ -549,17 +549,6 @@ func (a *blsBLS12381Algo) init() error {
 	return nil
 }
 
-// This is only a TEST/DEBUG/BENCH function.
-// It returns the hash-to-G1 point from a slice of 128 bytes
-func mapToG1(data []byte) *pointE1 {
-	l := len(data)
-	var h pointE1
-	if C.map_to_G1((*C.E1)(&h), (*C.uchar)(&data[0]), (C.int)(l)) != valid {
-		return nil
-	}
-	return &h
-}
-
 // This is only a TEST function.
 // signWithXMDSHA256 signs a message using XMD_SHA256 as a hash to field.
 //

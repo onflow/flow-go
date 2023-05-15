@@ -111,8 +111,8 @@ void        E1_write_bytes(byte *, const E1*);
 ep_st*      E1_blst_to_relic(const E1* x);
 int         ep_read_bin_compact(ep_t, const byte *, const int);
 void        ep_write_bin_compact(byte *, const ep_t,  const int);
-void        map_bytes_to_G1(E1*, const byte*, int);
-void        map_bytes_to_G1complement(E1*, const byte*, int);
+void        unsecure_map_bytes_to_G1(E1*, const byte*, int);
+BLST_ERROR  unsecure_map_bytes_to_G1complement(E1*, const byte*, int);
 
 // E2 and G2 utilities
 void        E2_set_infty(E2* p);
@@ -130,8 +130,8 @@ void        E2_add(E2* res, const E2* a, const E2* b);
 void        E2_sum_vector(E2*, const E2*, const int);
 void        E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len);
 bool_t      E2_in_G2(const E2*);
-void        map_bytes_to_G2(E2*, const byte*, int);
-BLST_ERROR  map_bytes_to_G2complement(E2*, const byte*, int);
+void        unsecure_map_bytes_to_G2(E2*, const byte*, int);
+BLST_ERROR  unsecure_map_bytes_to_G2complement(E2*, const byte*, int);
 
 // Utility functions
 ctx_t*   relic_init_BLS12_381();
