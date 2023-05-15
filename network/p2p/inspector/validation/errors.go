@@ -8,28 +8,28 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-// ErrDiscardThreshold indicates that the amount of RPC messages received exceeds discard threshold.
-type ErrDiscardThreshold struct {
+// ErrHardThreshold indicates that the amount of RPC messages received exceeds hard threshold.
+type ErrHardThreshold struct {
 	// controlMsg the control message type.
 	controlMsg p2p.ControlMessageType
 	// amount the amount of control messages.
 	amount uint64
-	// discardThreshold configured discard threshold.
-	discardThreshold uint64
+	// hardThreshold configured hard threshold.
+	hardThreshold uint64
 }
 
-func (e ErrDiscardThreshold) Error() string {
-	return fmt.Sprintf("number of %s messges received exceeds the configured discard threshold: received %d discard threshold %d", e.controlMsg, e.amount, e.discardThreshold)
+func (e ErrHardThreshold) Error() string {
+	return fmt.Sprintf("number of %s messges received exceeds the configured hard threshold: received %d hard threshold %d", e.controlMsg, e.amount, e.hardThreshold)
 }
 
-// NewDiscardThresholdErr returns a new ErrDiscardThreshold.
-func NewDiscardThresholdErr(controlMsg p2p.ControlMessageType, amount, discardThreshold uint64) ErrDiscardThreshold {
-	return ErrDiscardThreshold{controlMsg: controlMsg, amount: amount, discardThreshold: discardThreshold}
+// NewHardThresholdErr returns a new ErrHardThreshold.
+func NewHardThresholdErr(controlMsg p2p.ControlMessageType, amount, hardThreshold uint64) ErrHardThreshold {
+	return ErrHardThreshold{controlMsg: controlMsg, amount: amount, hardThreshold: hardThreshold}
 }
 
-// IsErrDiscardThreshold returns true if an error is ErrDiscardThreshold
-func IsErrDiscardThreshold(err error) bool {
-	var e ErrDiscardThreshold
+// IsErrHardThreshold returns true if an error is ErrHardThreshold
+func IsErrHardThreshold(err error) bool {
+	var e ErrHardThreshold
 	return errors.As(err, &e)
 }
 
@@ -80,17 +80,24 @@ func IsErrRateLimitedControlMsg(err error) bool {
 
 // ErrInvalidTopic error wrapper that indicates an error when checking if a Topic is a valid Flow Topic.
 type ErrInvalidTopic struct {
+	// topic the invalid topic.
 	topic channels.Topic
-	err   error
+	// sampleSize the total amount of topics to be inspected before error is encountered.
+	sampleSize uint
+	// err the validation error
+	err error
 }
 
 func (e ErrInvalidTopic) Error() string {
+	if e.sampleSize > 0 {
+		return fmt.Errorf("invalid topic %s out of %d total topics sampled: %w", e.topic, e.sampleSize, e.err).Error()
+	}
 	return fmt.Errorf("invalid topic %s: %w", e.topic, e.err).Error()
 }
 
 // NewInvalidTopicErr returns a new ErrMalformedTopic
-func NewInvalidTopicErr(topic channels.Topic, err error) ErrInvalidTopic {
-	return ErrInvalidTopic{topic: topic, err: err}
+func NewInvalidTopicErr(topic channels.Topic, sampleSize uint, err error) ErrInvalidTopic {
+	return ErrInvalidTopic{topic: topic, sampleSize: sampleSize, err: err}
 }
 
 // IsErrInvalidTopic returns true if an error is ErrInvalidTopic
