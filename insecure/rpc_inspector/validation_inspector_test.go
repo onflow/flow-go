@@ -125,6 +125,8 @@ func TestValidationInspector_DiscardThreshold_Detection(t *testing.T) {
 				invGraftNotifCount.Inc()
 			case p2p.CtrlMsgPrune:
 				invPruneNotifCount.Inc()
+			default:
+				require.Fail(t, "unexpected control message type")
 			}
 			if count.Load() == 2 {
 				close(done)
@@ -187,6 +189,8 @@ func TestValidationInspector_RateLimitedPeer_Detection(t *testing.T) {
 				invGraftNotifCount.Inc()
 			case p2p.CtrlMsgPrune:
 				invPruneNotifCount.Inc()
+			default:
+				require.Fail(t, "unexpected control message type")
 			}
 			if count.Load() == 4 {
 				close(done)
@@ -271,6 +275,8 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 				invGraftNotifCount.Inc()
 			case p2p.CtrlMsgPrune:
 				invPruneNotifCount.Inc()
+			default:
+				require.Fail(t, "unexpected control message type")
 			}
 			if count.Load() == uint64(expectedNumOfTotalNotif) {
 				close(done)
@@ -358,6 +364,8 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 				invGraftNotifCount.Inc()
 			case p2p.CtrlMsgPrune:
 				invPruneNotifCount.Inc()
+			default:
+				require.Fail(t, "unexpected control message type")
 			}
 			if count.Load() == int64(expectedNumOfTotalNotif) {
 				close(done)
@@ -430,6 +438,8 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 				invGraftNotifCount.Inc()
 			case p2p.CtrlMsgPrune:
 				invPruneNotifCount.Inc()
+			default:
+				require.Fail(t, "unexpected control message type")
 			}
 			if count.Load() == int64(expectedNumOfTotalNotif) {
 				close(done)
@@ -492,6 +502,8 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 			switch notification.MsgType {
 			case p2p.CtrlMsgGraft:
 				invGraftNotifCount.Inc()
+			default:
+				require.Fail(t, "unexpected control message type")
 			}
 			require.Equal(t, uint64(1), notification.Count)
 			if count.Load() == int64(expectedNumOfTotalNotif) {
@@ -550,6 +562,8 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 			switch notification.MsgType {
 			case p2p.CtrlMsgPrune:
 				invPruneNotifCount.Inc()
+			default:
+				require.Fail(t, "unexpected control message type")
 			}
 			require.Equal(t, uint64(1), notification.Count)
 			if count.Load() == int64(expectedNumOfTotalNotif) {
