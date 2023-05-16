@@ -561,14 +561,16 @@ func createNode(
 	require.NoError(t, err)
 
 	hotstuffModules := &consensus.HotstuffModules{
-		Forks:             forks,
-		Validator:         validator,
-		Notifier:          hotstuffDistributor,
-		Committee:         committee,
-		Signer:            signer,
-		Persist:           persist,
-		VoteAggregator:    voteAggregator,
-		TimeoutAggregator: timeoutAggregator,
+		Forks:                       forks,
+		Validator:                   validator,
+		Notifier:                    hotstuffDistributor,
+		Committee:                   committee,
+		Signer:                      signer,
+		Persist:                     persist,
+		VoteCollectorDistributor:    voteAggregationDistributor.VoteCollectorDistributor,
+		TimeoutCollectorDistributor: timeoutAggregationDistributor.TimeoutCollectorDistributor,
+		VoteAggregator:              voteAggregator,
+		TimeoutAggregator:           timeoutAggregator,
 	}
 
 	// initialize hotstuff
