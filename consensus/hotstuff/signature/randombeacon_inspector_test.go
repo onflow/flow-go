@@ -40,7 +40,6 @@ func (rs *randomBeaconSuite) SetupTest() {
 
 	// generate threshold keys
 	rs.rng = unittest.GetPRG(rs.T())
-
 	seed := make([]byte, crypto.SeedMinLenDKG)
 	_, err := rs.rng.Read(seed)
 	require.NoError(rs.T(), err)

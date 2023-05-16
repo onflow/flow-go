@@ -22,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/testutils"
@@ -334,8 +334,8 @@ func WithoutGuarantee(payload *flow.Payload) {
 	payload.Guarantees = nil
 }
 
-func StateInteractionsFixture() *state.ExecutionSnapshot {
-	return &state.ExecutionSnapshot{}
+func StateInteractionsFixture() *snapshot.ExecutionSnapshot {
+	return &snapshot.ExecutionSnapshot{}
 }
 
 func BlockWithParentAndProposerFixture(
@@ -1982,14 +1982,31 @@ func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 	return commit
 }
 
-func VersionBeaconFixture() *flow.VersionBeacon {
+func WithBoundaries(boundaries ...flow.VersionBoundary) func(*flow.VersionBeacon) {
+	return func(b *flow.VersionBeacon) {
+		b.VersionBoundaries = append(b.VersionBoundaries, boundaries...)
+	}
+}
+
+func VersionBeaconFixture(options ...func(*flow.VersionBeacon)) *flow.VersionBeacon {
+
 	versionTable := &flow.VersionBeacon{
-		VersionBoundaries: []flow.VersionBoundary{
-			{
-				Version: "0.0.0",
-			},
-		},
-		Sequence: uint64(0),
+		VersionBoundaries: []flow.VersionBoundary{},
+		Sequence:          uint64(0),
+	}
+	opts := options
+
+	if len(opts) == 0 {
+		opts = []func(*flow.VersionBeacon){
+			WithBoundaries(flow.VersionBoundary{
+				Version:     "0.0.0",
+				BlockHeight: 0,
+			}),
+		}
+	}
+
+	for _, apply := range opts {
+		apply(versionTable)
 	}
 
 	return versionTable

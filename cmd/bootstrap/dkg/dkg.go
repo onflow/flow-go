@@ -14,7 +14,7 @@ func RandomBeaconKG(n int, seed []byte) (model.DKGData, error) {
 	if n == 1 {
 		sk, pk, pkGroup, err := thresholdSignKeyGenOneNode(seed)
 		if err != nil {
-			return model.DKGData{}, fmt.Errorf("fast KeyGen failed: %w", err)
+			return model.DKGData{}, fmt.Errorf("Beacon KeyGen failed: %w", err)
 		}
 
 		dkgData := model.DKGData{
@@ -28,7 +28,7 @@ func RandomBeaconKG(n int, seed []byte) (model.DKGData, error) {
 	skShares, pkShares, pkGroup, err := crypto.BLSThresholdKeyGen(int(n),
 		signature.RandomBeaconThreshold(int(n)), seed)
 	if err != nil {
-		return model.DKGData{}, fmt.Errorf("fast KeyGen failed: %w", err)
+		return model.DKGData{}, fmt.Errorf("Beacon KeyGen failed: %w", err)
 	}
 
 	dkgData := model.DKGData{
@@ -40,7 +40,7 @@ func RandomBeaconKG(n int, seed []byte) (model.DKGData, error) {
 	return dkgData, nil
 }
 
-// simulates DKG with one single node
+// Beacon KG with one node
 func thresholdSignKeyGenOneNode(seed []byte) ([]crypto.PrivateKey, []crypto.PublicKey, crypto.PublicKey, error) {
 	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	if err != nil {

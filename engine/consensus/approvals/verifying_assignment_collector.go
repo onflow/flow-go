@@ -362,8 +362,7 @@ func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(observation cons
 
 			nonce, err := rand.Uint64()
 			if err != nil {
-				log.Error().Err(err).
-					Msgf("nonce generation falied")
+				return 0, fmt.Errorf("nonce generation failed during request missing approvals: %w", err)
 			}
 
 			// prepare the request

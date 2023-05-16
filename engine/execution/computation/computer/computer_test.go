@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sync/atomic"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -34,6 +35,7 @@ import (
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
@@ -61,7 +63,7 @@ type fakeCommitter struct {
 }
 
 func (committer *fakeCommitter) CommitView(
-	view *state.ExecutionSnapshot,
+	view *snapshot.ExecutionSnapshot,
 	startState flow.StateCommitment,
 ) (
 	flow.StateCommitment,
@@ -95,9 +97,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("single collection", func(t *testing.T) {
 
-		execCtx := fvm.NewContext(
-			fvm.WithDerivedBlockData(derived.NewEmptyDerivedBlockData()),
-		)
+		execCtx := fvm.NewContext()
 
 		vm := &testVM{
 			t:                    t,
@@ -125,7 +125,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			mock.Anything, // duration
 			mock.Anything, // computation used
 			mock.Anything, // memory used
-			mock.Anything, // actual memory used
 			mock.Anything, // number of events
 			mock.Anything, // size of events
 			false).        // no failure
@@ -178,7 +177,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			parentBlockExecutionResultID,
 			block,
 			nil,
-			derived.NewEmptyDerivedBlockData())
+			derived.NewEmptyDerivedBlockData(0))
 		assert.NoError(t, err)
 		assert.Len(t, result.AllExecutionSnapshots(), 1+1) // +1 system chunk
 
@@ -269,7 +268,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NotNil(t, chunkExecutionData2.TrieUpdate)
 		assert.Equal(t, byte(2), chunkExecutionData2.TrieUpdate.RootHash[0])
 
-		assert.Equal(t, 3, vm.callCount)
+		assert.Equal(t, 3, vm.CallCount())
 	})
 
 	t.Run("empty block still computes system chunk", func(t *testing.T) {
@@ -304,11 +303,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create an empty block
 		block := generateBlock(0, 0, rag)
-		derivedBlockData := derived.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
+		// TODO(patrick): switch to NewExecutor.
+		// vm.On("NewExecutor", mock.Anything, mock.Anything, mock.Anything).
+		//	Return(noOpExecutor{}).
+		//	Once() // just system chunk
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(
-				&state.ExecutionSnapshot{},
+				&snapshot.ExecutionSnapshot{},
 				fvm.ProcedureOutput{},
 				nil).
 			Once() // just system chunk
@@ -354,7 +357,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		chain := flow.Localnet.Chain()
 		vm := fvm.NewVirtualMachine()
-		derivedBlockData := derived.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
 			fvm.WithDerivedBlockData(derivedBlockData),
@@ -362,7 +365,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		opts := append(baseOpts, contextOptions...)
 		ctx := fvm.NewContext(opts...)
-		snapshotTree := storage.NewSnapshotTree(nil)
+		snapshotTree := snapshot.NewSnapshotTree(nil)
 
 		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
@@ -467,7 +470,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
-		derivedBlockData := derived.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
 			Return(nil, nil, nil, nil).
@@ -523,147 +526,177 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		assertEventHashesMatch(t, collectionCount+1, result)
 
-		assert.Equal(t, totalTransactionCount, vm.callCount)
+		assert.Equal(t, totalTransactionCount, vm.CallCount())
 	})
 
-	t.Run("service events are emitted", func(t *testing.T) {
-		execCtx := fvm.NewContext(
-			fvm.WithServiceEventCollectionEnabled(),
-			fvm.WithAuthorizationChecksEnabled(false),
-			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-		)
+	t.Run(
+		"service events are emitted", func(t *testing.T) {
+			execCtx := fvm.NewContext(
+				fvm.WithServiceEventCollectionEnabled(),
+				fvm.WithAuthorizationChecksEnabled(false),
+				fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			)
 
-		collectionCount := 2
-		transactionsPerCollection := 2
+			collectionCount := 2
+			transactionsPerCollection := 2
 
-		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 // +1 for system chunk
+			totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 // +1 for system chunk
 
-		// create a block with 2 collections with 2 transactions each
-		block := generateBlock(collectionCount, transactionsPerCollection, rag)
+			// create a block with 2 collections with 2 transactions each
+			block := generateBlock(collectionCount, transactionsPerCollection, rag)
 
-		ordinaryEvent := cadence.Event{
-			EventType: &cadence.EventType{
-				Location:            stdlib.FlowLocation{},
-				QualifiedIdentifier: "what.ever",
-			},
-		}
+			ordinaryEvent := cadence.Event{
+				EventType: &cadence.EventType{
+					Location:            stdlib.FlowLocation{},
+					QualifiedIdentifier: "what.ever",
+				},
+			}
 
-		serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
-		require.NoError(t, err)
+			serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
+			require.NoError(t, err)
 
-		payload, err := json.Decode(nil, []byte(unittest.EpochSetupFixtureJSON))
-		require.NoError(t, err)
+			payload, err := json.Decode(nil, []byte(unittest.EpochSetupFixtureJSON))
+			require.NoError(t, err)
 
-		serviceEventA, ok := payload.(cadence.Event)
-		require.True(t, ok)
+			serviceEventA, ok := payload.(cadence.Event)
+			require.True(t, ok)
 
-		serviceEventA.EventType.Location = common.AddressLocation{
-			Address: common.Address(serviceEvents.EpochSetup.Address),
-		}
-		serviceEventA.EventType.QualifiedIdentifier = serviceEvents.EpochSetup.QualifiedIdentifier()
+			serviceEventA.EventType.Location = common.AddressLocation{
+				Address: common.Address(serviceEvents.EpochSetup.Address),
+			}
+			serviceEventA.EventType.QualifiedIdentifier = serviceEvents.EpochSetup.QualifiedIdentifier()
 
-		payload, err = json.Decode(nil, []byte(unittest.EpochCommitFixtureJSON))
-		require.NoError(t, err)
+			payload, err = json.Decode(nil, []byte(unittest.EpochCommitFixtureJSON))
+			require.NoError(t, err)
 
-		serviceEventB, ok := payload.(cadence.Event)
-		require.True(t, ok)
+			serviceEventB, ok := payload.(cadence.Event)
+			require.True(t, ok)
 
-		serviceEventB.EventType.Location = common.AddressLocation{
-			Address: common.Address(serviceEvents.EpochCommit.Address),
-		}
-		serviceEventB.EventType.QualifiedIdentifier = serviceEvents.EpochCommit.QualifiedIdentifier()
+			serviceEventB.EventType.Location = common.AddressLocation{
+				Address: common.Address(serviceEvents.EpochCommit.Address),
+			}
+			serviceEventB.EventType.QualifiedIdentifier = serviceEvents.EpochCommit.QualifiedIdentifier()
 
-		// events to emit for each iteration/transaction
-		events := make([][]cadence.Event, totalTransactionCount)
-		events[0] = nil
-		events[1] = []cadence.Event{serviceEventA, ordinaryEvent}
-		events[2] = []cadence.Event{ordinaryEvent}
-		events[3] = nil
-		events[4] = []cadence.Event{serviceEventB}
+			payload, err = json.Decode(nil, []byte(unittest.VersionBeaconFixtureJSON))
+			require.NoError(t, err)
 
-		emittingRuntime := &testRuntime{
-			executeTransaction: func(
-				script runtime.Script,
-				context runtime.Context,
-			) error {
-				for _, e := range events[0] {
-					err := context.Interface.EmitEvent(e)
-					if err != nil {
-						return err
+			serviceEventC, ok := payload.(cadence.Event)
+			require.True(t, ok)
+
+			serviceEventC.EventType.Location = common.AddressLocation{
+				Address: common.Address(serviceEvents.VersionBeacon.Address),
+			}
+			serviceEventC.EventType.QualifiedIdentifier = serviceEvents.VersionBeacon.QualifiedIdentifier()
+
+			// events to emit for each iteration/transaction
+			events := make([][]cadence.Event, totalTransactionCount)
+			events[0] = nil
+			events[1] = []cadence.Event{serviceEventA, ordinaryEvent}
+			events[2] = []cadence.Event{ordinaryEvent}
+			events[3] = nil
+			events[4] = []cadence.Event{serviceEventB, serviceEventC}
+
+			emittingRuntime := &testRuntime{
+				executeTransaction: func(
+					script runtime.Script,
+					context runtime.Context,
+				) error {
+					for _, e := range events[0] {
+						err := context.Interface.EmitEvent(e)
+						if err != nil {
+							return err
+						}
 					}
-				}
-				events = events[1:]
-				return nil
-			},
-			readStored: func(
-				address common.Address,
-				path cadence.Path,
-				r runtime.Context,
-			) (cadence.Value, error) {
-				return nil, nil
-			},
-		}
+					events = events[1:]
+					return nil
+				},
+				readStored: func(
+					address common.Address,
+					path cadence.Path,
+					r runtime.Context,
+				) (cadence.Value, error) {
+					return nil, nil
+				},
+			}
 
-		execCtx = fvm.NewContextFromParent(
-			execCtx,
-			fvm.WithReusableCadenceRuntimePool(
-				reusableRuntime.NewCustomReusableCadenceRuntimePool(
-					0,
-					runtime.Config{},
-					func(_ runtime.Config) runtime.Runtime {
-						return emittingRuntime
-					})))
+			execCtx = fvm.NewContextFromParent(
+				execCtx,
+				fvm.WithReusableCadenceRuntimePool(
+					reusableRuntime.NewCustomReusableCadenceRuntimePool(
+						0,
+						runtime.Config{},
+						func(_ runtime.Config) runtime.Runtime {
+							return emittingRuntime
+						},
+					),
+				),
+			)
 
-		vm := fvm.NewVirtualMachine()
+			vm := fvm.NewVirtualMachine()
 
-		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+			bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+			trackerStorage := mocktracker.NewMockStorage()
 
-		prov := provider.NewProvider(
-			zerolog.Nop(),
-			metrics.NewNoopCollector(),
-			execution_data.DefaultSerializer,
-			bservice,
-			trackerStorage,
-		)
+			prov := provider.NewProvider(
+				zerolog.Nop(),
+				metrics.NewNoopCollector(),
+				execution_data.DefaultSerializer,
+				bservice,
+				trackerStorage,
+			)
 
-		exe, err := computer.NewBlockComputer(
-			vm,
-			execCtx,
-			metrics.NewNoopCollector(),
-			trace.NewNoopTracer(),
-			zerolog.Nop(),
-			committer.NewNoopViewCommitter(),
-			me,
-			prov,
-			nil)
-		require.NoError(t, err)
+			exe, err := computer.NewBlockComputer(
+				vm,
+				execCtx,
+				metrics.NewNoopCollector(),
+				trace.NewNoopTracer(),
+				zerolog.Nop(),
+				committer.NewNoopViewCommitter(),
+				me,
+				prov,
+				nil,
+			)
+			require.NoError(t, err)
 
-		result, err := exe.ExecuteBlock(
-			context.Background(),
-			unittest.IdentifierFixture(),
-			block,
-			nil,
-			derived.NewEmptyDerivedBlockData())
-		require.NoError(t, err)
+			result, err := exe.ExecuteBlock(
+				context.Background(),
+				unittest.IdentifierFixture(),
+				block,
+				nil,
+				derived.NewEmptyDerivedBlockData(0),
+			)
+			require.NoError(t, err)
 
-		// make sure event index sequence are valid
-		for i := 0; i < result.BlockExecutionResult.Size(); i++ {
-			collectionResult := result.CollectionExecutionResultAt(i)
-			unittest.EnsureEventsIndexSeq(t, collectionResult.Events(), execCtx.Chain.ChainID())
-		}
+			// make sure event index sequence are valid
+			for i := 0; i < result.BlockExecutionResult.Size(); i++ {
+				collectionResult := result.CollectionExecutionResultAt(i)
+				unittest.EnsureEventsIndexSeq(t, collectionResult.Events(), execCtx.Chain.ChainID())
+			}
 
-		sEvents := result.AllServiceEvents()
-		// all events should have been collected
-		require.Len(t, sEvents, 2)
+			sEvents := result.AllServiceEvents() // all events should have been collected
+			require.Len(t, sEvents, 3)
 
-		// events are ordered
+			// events are ordered
+			require.Equal(
+				t,
+				serviceEventA.EventType.ID(),
+				string(sEvents[0].Type),
+			)
+			require.Equal(
+				t,
+				serviceEventB.EventType.ID(),
+				string(sEvents[1].Type),
+			)
 
-		require.Equal(t, serviceEventA.EventType.ID(), string(sEvents[0].Type))
-		require.Equal(t, serviceEventB.EventType.ID(), string(sEvents[1].Type))
+			require.Equal(
+				t,
+				serviceEventC.EventType.ID(),
+				string(sEvents[2].Type),
+			)
 
-		assertEventHashesMatch(t, collectionCount+1, result)
-	})
+			assertEventHashesMatch(t, collectionCount+1, result)
+		},
+	)
 
 	t.Run("succeeding transactions store programs", func(t *testing.T) {
 
@@ -746,8 +779,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			context.Background(),
 			unittest.IdentifierFixture(),
 			block,
-			state.MapStorageSnapshot{key: value},
-			derived.NewEmptyDerivedBlockData())
+			snapshot.MapStorageSnapshot{key: value},
+			derived.NewEmptyDerivedBlockData(0))
 		assert.NoError(t, err)
 		assert.Len(t, result.AllExecutionSnapshots(), collectionCount+1) // +1 system chunk
 	})
@@ -848,8 +881,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			context.Background(),
 			unittest.IdentifierFixture(),
 			block,
-			state.MapStorageSnapshot{key: value},
-			derived.NewEmptyDerivedBlockData())
+			snapshot.MapStorageSnapshot{key: value},
+			derived.NewEmptyDerivedBlockData(0))
 		require.NoError(t, err)
 		assert.Len(t, result.AllExecutionSnapshots(), collectionCount+1) // +1 system chunk
 	})
@@ -1099,7 +1132,6 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		mock.Anything, // duration
 		mock.Anything, // computation used
 		mock.Anything, // memory used
-		mock.Anything, // actual memory used
 		expectedNumberOfEvents,
 		expectedEventSize,
 		false).
@@ -1118,6 +1150,12 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		expectedCachedPrograms).
 		Return(nil).
 		Times(1) // block
+
+	metrics.On(
+		"ExecutionBlockExecutionEffortVectorComponent",
+		mock.Anything,
+		mock.Anything).
+		Return(nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()
@@ -1156,7 +1194,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		unittest.IdentifierFixture(),
 		block,
 		ledger,
-		derived.NewEmptyDerivedBlockData())
+		derived.NewEmptyDerivedBlockData(0))
 	assert.NoError(t, err)
 	assert.Len(t, result.AllExecutionSnapshots(), 1) // +1 system chunk
 	assert.Len(t, result.AllTransactionResults(), 1)
@@ -1239,47 +1277,115 @@ func generateCollection(
 	}
 }
 
+type noOpExecutor struct{}
+
+func (noOpExecutor) Cleanup() {}
+
+func (noOpExecutor) Preprocess() error {
+	return nil
+}
+
+func (noOpExecutor) Execute() error {
+	return nil
+}
+
+func (noOpExecutor) Output() fvm.ProcedureOutput {
+	return fvm.ProcedureOutput{}
+}
+
 type testVM struct {
 	t                    *testing.T
 	eventsPerTransaction int
 
-	callCount int
+	callCount int32 // atomic variable
 	err       fvmErrors.CodedError
+}
+
+type testExecutor struct {
+	*testVM
+
+	ctx      fvm.Context
+	proc     fvm.Procedure
+	txnState storage.TransactionPreparer
+}
+
+func (testExecutor) Cleanup() {
+}
+
+func (testExecutor) Preprocess() error {
+	return nil
+}
+
+func (executor *testExecutor) Execute() error {
+	atomic.AddInt32(&executor.callCount, 1)
+
+	getSetAProgram(executor.t, executor.txnState)
+
+	return nil
+}
+
+func (executor *testExecutor) Output() fvm.ProcedureOutput {
+	txn := executor.proc.(*fvm.TransactionProcedure)
+
+	return fvm.ProcedureOutput{
+		Events: generateEvents(executor.eventsPerTransaction, txn.TxIndex),
+		Err:    executor.err,
+	}
+}
+
+func (vm *testVM) NewExecutor(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	txnState storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	return &testExecutor{
+		testVM:   vm,
+		proc:     proc,
+		ctx:      ctx,
+		txnState: txnState,
+	}
+}
+
+func (vm *testVM) CallCount() int {
+	return int(atomic.LoadInt32(&vm.callCount))
 }
 
 func (vm *testVM) Run(
 	ctx fvm.Context,
 	proc fvm.Procedure,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
-	vm.callCount += 1
+	database := storage.NewBlockDatabase(
+		storageSnapshot,
+		proc.ExecutionTime(),
+		ctx.DerivedBlockData)
 
-	txn := proc.(*fvm.TransactionProcedure)
-
-	derivedTxnData, err := ctx.DerivedBlockData.NewDerivedTransactionData(
-		txn.ExecutionTime(),
-		txn.ExecutionTime())
+	txn, err := database.NewTransaction(
+		proc.ExecutionTime(),
+		state.DefaultParameters())
 	require.NoError(vm.t, err)
 
-	getSetAProgram(vm.t, storageSnapshot, derivedTxnData)
+	executor := vm.NewExecutor(ctx, proc, txn)
+	err = fvm.Run(executor)
+	require.NoError(vm.t, err)
 
-	snapshot := &state.ExecutionSnapshot{}
-	output := fvm.ProcedureOutput{
-		Events: generateEvents(vm.eventsPerTransaction, txn.TxIndex),
-		Err:    vm.err,
-	}
+	err = txn.Finalize()
+	require.NoError(vm.t, err)
 
-	return snapshot, output, nil
+	executionSnapshot, err := txn.Commit()
+	require.NoError(vm.t, err)
+
+	return executionSnapshot, executor.Output(), nil
 }
 
 func (testVM) GetAccount(
 	_ fvm.Context,
 	_ flow.Address,
-	_ state.StorageSnapshot,
+	_ snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -1303,19 +1409,13 @@ func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 
 func getSetAProgram(
 	t *testing.T,
-	storageSnapshot state.StorageSnapshot,
-	derivedTxnData derived.DerivedTransactionCommitter,
+	txnState storage.TransactionPreparer,
 ) {
-
-	txnState := state.NewTransactionState(
-		storageSnapshot,
-		state.DefaultParameters())
-
 	loc := common.AddressLocation{
 		Name:    "SomeContract",
 		Address: common.MustBytesToAddress([]byte{0x1}),
 	}
-	_, err := derivedTxnData.GetOrComputeProgram(
+	_, err := txnState.GetOrComputeProgram(
 		txnState,
 		loc,
 		&programLoader{
@@ -1325,9 +1425,6 @@ func getSetAProgram(
 		},
 	)
 	require.NoError(t, err)
-
-	err = derivedTxnData.Commit()
-	require.NoError(t, err)
 }
 
 type programLoader struct {
@@ -1335,7 +1432,7 @@ type programLoader struct {
 }
 
 func (p *programLoader) Compute(
-	_ state.NestedTransaction,
+	_ state.NestedTransactionPreparer,
 	_ common.AddressLocation,
 ) (
 	*derived.Program,

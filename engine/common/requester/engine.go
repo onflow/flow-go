@@ -405,7 +405,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 
 	nonce, err := rand.Uint64()
 	if err != nil {
-		return false, fmt.Errorf("nonce generation failed %w", err)
+		return false, fmt.Errorf("nonce generation failed: %w", err)
 	}
 
 	// create a batch request, send it and store it for reference
