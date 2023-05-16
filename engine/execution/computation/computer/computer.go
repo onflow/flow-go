@@ -15,7 +15,9 @@ import (
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -188,18 +190,15 @@ func (e *blockComputer) queueTransactionRequests(
 	blockId flow.Identifier,
 	blockIdStr string,
 	blockHeader *flow.Header,
-	derivedBlockData *derived.DerivedBlockData,
 	rawCollections []*entity.CompleteCollection,
 	systemTxnBody *flow.TransactionBody,
 	requestQueue chan transactionRequest,
 ) {
 	txnIndex := uint32(0)
 
-	// TODO(patrick): remove derivedBlockData from context
 	collectionCtx := fvm.NewContextFromParent(
 		e.vmCtx,
-		fvm.WithBlockHeader(blockHeader),
-		fvm.WithDerivedBlockData(derivedBlockData))
+		fvm.WithBlockHeader(blockHeader))
 
 	for idx, collection := range rawCollections {
 		collectionLogger := collectionCtx.Logger.With().
@@ -230,11 +229,9 @@ func (e *blockComputer) queueTransactionRequests(
 
 	}
 
-	// TODO(patrick): remove derivedBlockData from context
 	systemCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
-		fvm.WithBlockHeader(blockHeader),
-		fvm.WithDerivedBlockData(derivedBlockData))
+		fvm.WithBlockHeader(blockHeader))
 	systemCollectionLogger := systemCtx.Logger.With().
 		Str("block_id", blockIdStr).
 		Uint64("height", blockHeader.Height).
@@ -326,33 +323,23 @@ func (e *blockComputer) executeBlock(
 		blockId,
 		blockIdStr,
 		block.Block.Header,
-		derivedBlockData,
 		rawCollections,
 		systemTxn,
 		requestQueue)
 	close(requestQueue)
 
-	snapshotTree := snapshot.NewSnapshotTree(baseSnapshot)
+	database := storage.NewBlockDatabase(baseSnapshot, 0, derivedBlockData)
+
 	for request := range requestQueue {
-		txnExecutionSnapshot, output, err := e.executeTransaction(
+		request.ctx.Logger.Info().Msg("executing transaction")
+		err := e.executeTransaction(
 			blockSpan,
-			request,
-			snapshotTree)
+			database,
+			collector,
+			request)
 		if err != nil {
-			prefix := ""
-			if request.isSystemTransaction {
-				prefix = "system "
-			}
-
-			return nil, fmt.Errorf(
-				"failed to execute %stransaction at txnIndex %v: %w",
-				prefix,
-				request.txnIndex,
-				err)
+			return nil, err
 		}
-
-		collector.AddTransactionResult(request, txnExecutionSnapshot, output)
-		snapshotTree = snapshotTree.Append(txnExecutionSnapshot)
 	}
 
 	res, err := collector.Finalize(ctx)
@@ -371,11 +358,48 @@ func (e *blockComputer) executeBlock(
 
 func (e *blockComputer) executeTransaction(
 	parentSpan otelTrace.Span,
+	database *storage.BlockDatabase,
+	collector *resultCollector,
 	request transactionRequest,
-	storageSnapshot snapshot.StorageSnapshot,
+) error {
+	txn, err := e.executeTransactionInternal(
+		parentSpan,
+		database,
+		collector,
+		request)
+	if err != nil {
+		prefix := ""
+		if request.isSystemTransaction {
+			prefix = "system "
+		}
+
+		snapshotTime := logical.Time(0)
+		if txn != nil {
+			snapshotTime = txn.SnapshotTime()
+		}
+
+		return fmt.Errorf(
+			"failed to execute %stransaction %v (%d@%d) for block %s "+
+				"at height %v: %w",
+			prefix,
+			request.txnIdStr,
+			request.txnIndex,
+			snapshotTime,
+			request.blockIdStr,
+			request.ctx.BlockHeader.Height,
+			err)
+	}
+
+	return nil
+}
+
+func (e *blockComputer) executeTransactionInternal(
+	parentSpan otelTrace.Span,
+	database *storage.BlockDatabase,
+	collector *resultCollector,
+	request transactionRequest,
 ) (
-	*snapshot.ExecutionSnapshot,
-	fvm.ProcedureOutput,
+	storage.Transaction,
 	error,
 ) {
 	startedAt := time.Now()
@@ -391,32 +415,42 @@ func (e *blockComputer) executeTransaction(
 	)
 	defer txSpan.End()
 
-	logger := e.log.With().
-		Str("tx_id", request.txnIdStr).
-		Uint32("tx_index", request.txnIndex).
-		Str("block_id", request.blockIdStr).
-		Uint64("height", request.ctx.BlockHeader.Height).
-		Bool("system_chunk", request.isSystemTransaction).
-		Bool("system_transaction", request.isSystemTransaction).
-		Logger()
-	logger.Info().Msg("executing transaction in fvm")
-
 	request.ctx = fvm.NewContextFromParent(request.ctx, fvm.WithSpan(txSpan))
 
-	executionSnapshot, output, err := e.vm.Run(
-		request.ctx,
-		request.TransactionProcedure,
-		storageSnapshot)
+	txn, err := database.NewTransaction(
+		request.ExecutionTime(),
+		fvm.ProcedureStateParameters(request.ctx, request))
 	if err != nil {
-		return nil, fvm.ProcedureOutput{}, fmt.Errorf(
-			"failed to execute transaction %v for block %s at height %v: %w",
-			request.txnIdStr,
-			request.blockIdStr,
-			request.ctx.BlockHeader.Height,
-			err)
+		return nil, err
 	}
 
-	logger = logger.With().
+	executor := e.vm.NewExecutor(request.ctx, request.TransactionProcedure, txn)
+	defer executor.Cleanup()
+
+	err = executor.Preprocess()
+	if err != nil {
+		return txn, err
+	}
+
+	err = executor.Execute()
+	if err != nil {
+		return txn, err
+	}
+
+	err = txn.Finalize()
+	if err != nil {
+		return txn, err
+	}
+
+	executionSnapshot, err := txn.Commit()
+	if err != nil {
+		return txn, err
+	}
+
+	output := executor.Output()
+	collector.AddTransactionResult(request, executionSnapshot, output)
+
+	logger := request.ctx.Logger.With().
 		Uint64("computation_used", output.ComputationUsed).
 		Uint64("memory_used", output.MemoryEstimate).
 		Int64("time_spent_in_ms", time.Since(startedAt).Milliseconds()).
@@ -452,5 +486,5 @@ func (e *blockComputer) executeTransaction(
 		flow.EventsList(output.Events).ByteSize(),
 		output.Err != nil,
 	)
-	return executionSnapshot, output, nil
+	return txn, nil
 }
