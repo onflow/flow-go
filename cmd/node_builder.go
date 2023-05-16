@@ -257,13 +257,8 @@ type NodeConfig struct {
 
 	// root state information
 	RootSnapshot protocol.Snapshot
-	// cached properties of RootSnapshot for convenience
-	RootBlock   *flow.Block
-	RootQC      *flow.QuorumCertificate
-	RootResult  *flow.ExecutionResult
-	RootSeal    *flow.Seal
-	RootChainID flow.ChainID
-	SporkID     flow.Identifier
+	// excerpt of root snapshot and latest finalized snapshot, when we boot up
+	StateExcerptAtBoot
 
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool
@@ -272,6 +267,19 @@ type NodeConfig struct {
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
 	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
+}
+
+// StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.
+type StateExcerptAtBoot struct {
+	// properties of RootSnapshot for convenience
+	RootBlock   *flow.Block
+	RootQC      *flow.QuorumCertificate
+	RootResult  *flow.ExecutionResult
+	RootSeal    *flow.Seal
+	RootChainID flow.ChainID
+	SporkID     flow.Identifier
+	// finalized block for use in bootstrapping
+	FinalizedHeader *flow.Header
 }
 
 func DefaultBaseConfig() *BaseConfig {

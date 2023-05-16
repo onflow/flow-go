@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestStartStop tests that the component can be started and stopped gracefully.
 func TestStartStop(t *testing.T) {
 	state := mockprotocol.NewState(t)
 	ctl, err := NewBlockRateController(unittest.Logger(), DefaultConfig(), state)
@@ -19,7 +20,7 @@ func TestStartStop(t *testing.T) {
 
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
 	ctl.Start(ctx)
-	unittest.AssertClosesBefore(t, ctl.Ready(), time.Second)
+	unittest.RequireCloseBefore(t, ctl.Ready(), time.Second, "component did not start")
 	cancel()
-	unittest.AssertClosesBefore(t, ctl.Done(), time.Second)
+	unittest.RequireCloseBefore(t, ctl.Done(), time.Second, "component did not stop")
 }

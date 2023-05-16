@@ -1,6 +1,7 @@
 package cruisectl
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -22,12 +23,15 @@ func TestParseTransition_Valid(t *testing.T) {
 	}, {
 		transition: EpochTransitionTime{time.Monday, 23, 59},
 		str:        "monday@23:59",
+	}, {
+		transition: EpochTransitionTime{time.Friday, 12, 21},
+		str:        "FrIdAy@12:21",
 	}}
 
 	for _, c := range cases {
 		t.Run(c.str, func(t *testing.T) {
 			// 1 - the computed string representation should match the string fixture
-			assert.Equal(t, c.str, c.transition.String())
+			assert.Equal(t, strings.ToLower(c.str), c.transition.String())
 			// 2 - the parsed transition should match the transition fixture
 			parsed, err := ParseTransition(c.str)
 			assert.NoError(t, err)
@@ -43,7 +47,6 @@ func TestParseTransition_Invalid(t *testing.T) {
 		// invalid WD part
 		"sundy@12:00",
 		"tue@12:00",
-		"Monday@12:00",
 		"@12:00",
 		// invalid HH part
 		"wednesday@24:00",

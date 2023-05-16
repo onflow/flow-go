@@ -56,7 +56,7 @@ type BlockRateController struct {
 	lastMeasurement *measurement // the most recently taken measurement
 	*epochInfo                   // scheduled transition view for current/next epoch
 
-	blockRateDelay         *atomic.Float64 // the block rate delay value to use when proposing a block
+	proposalDelay          *atomic.Float64
 	epochFallbackTriggered *atomic.Bool
 
 	viewChanges chan uint64       // OnViewChange events           (view entered)
@@ -65,17 +65,16 @@ type BlockRateController struct {
 
 // NewBlockRateController returns a new BlockRateController.
 func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.State) (*BlockRateController, error) {
-
 	ctl := &BlockRateController{
 		config:      config,
 		log:         log.With().Str("component", "cruise_ctl").Logger(),
 		state:       state,
-		viewChanges: make(chan uint64, 1),
-		epochSetups: make(chan *flow.Header, 1),
+		viewChanges: make(chan uint64, 10),
+		epochSetups: make(chan *flow.Header, 5),
 	}
 
 	ctl.Component = component.NewComponentManagerBuilder().
-		AddWorker(ctl.processEventsWorker).
+		AddWorker(ctl.processEventsWorkerLogic).
 		Build()
 
 	// TODO initialize last measurement
@@ -85,19 +84,39 @@ func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.S
 	return ctl, nil
 }
 
-// BlockRateDelay returns the current block rate delay value to use when proposing, in milliseconds.
-// This function reflects the most recently computed output of the PID controller
-func (ctl *BlockRateController) BlockRateDelay() float64 {
-	return ctl.blockRateDelay.Load()
+// ProposalDelay returns the current proposal delay value to use when proposing, in milliseconds.
+// This function reflects the most recently computed output of the PID controller.
+// The proposal delay is the delay introduced when this node produces a block proposal,
+// and is the variable adjusted by the BlockRateController to achieve a target view rate.
+//
+// For a given proposal, suppose the time to produce the proposal is P:
+//   - if P < ProposalDelay to produce, then we wait ProposalDelay-P before broadcasting the proposal (total proposal time of ProposalDelay)
+//   - if P >= ProposalDelay to produce, then we immediately broadcast the proposal (total proposal time of P)
+func (ctl *BlockRateController) ProposalDelay() float64 {
+	return ctl.proposalDelay.Load()
 }
 
-// processEventsWorker is a worker routine which processes events received from other components.
-func (ctl *BlockRateController) processEventsWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// processEventsWorkerLogic is the logic for processing events received from other components.
+// This method should be executed by a dedicated worker routine (not concurrency safe).
+func (ctl *BlockRateController) processEventsWorkerLogic(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	done := ctx.Done()
 
 	for {
+
+		// Prioritize EpochSetup events
+		select {
+		case block := <-ctl.epochSetups:
+			snapshot := ctl.state.AtHeight(block.Height)
+			err := ctl.processEpochSetupPhaseStarted(snapshot)
+			if err != nil {
+				ctl.log.Err(err).Msgf("fatal error handling EpochSetupPhaseStarted event")
+				ctx.Throw(err)
+			}
+		default:
+		}
+
 		select {
 		case <-done:
 			return
