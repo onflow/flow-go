@@ -437,6 +437,61 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
 }
 
+// TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently tests the handling of duplicate misbehavior reports for a single peer.
+// Reports are coming in concurrently.
+// The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the peer in the cache, in
+// other words, the duplicate reports are not ignored. This is important because the misbehavior reports are assumed each uniquely reporting
+// a different misbehavior even though they are coming with the same description. This is similar to the traffic tickets, where each ticket
+// is uniquely identifying a traffic violation, even though the description of the violation is the same.
+func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *testing.T) {
+	alspMetrics := metrics.NewNoopCollector()
+	cacheMetrics := metrics.NewNoopCollector()
+	cacheSize := uint32(100)
+
+	cfg := &alspmgr.MisbehaviorReportManagerConfig{
+		Logger:               unittest.Logger(),
+		SpamRecordsCacheSize: cacheSize,
+		AlspMetrics:          alspMetrics,
+		CacheMetrics:         cacheMetrics,
+	}
+
+	cache := internal.NewSpamRecordCache(cfg.SpamRecordsCacheSize, cfg.Logger, cfg.CacheMetrics, model.SpamRecordFactory())
+
+	// create a new MisbehaviorReportManager
+	m := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+
+	// creates a single misbehavior report
+	originId := unittest.IdentifierFixture()
+	report := createMisbehaviorReportForOriginId(t, originId)
+
+	channel := channels.Channel("test-channel")
+
+	times := 100 // number of times the duplicate misbehavior report is reported concurrently
+	wg := sync.WaitGroup{}
+	wg.Add(times)
+
+	// concurrently reports the same misbehavior report twice
+	for i := 0; i < times; i++ {
+		go func() {
+			defer wg.Done()
+
+			m.HandleMisbehaviorReport(channel, report)
+		}()
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
+
+	// check if the misbehavior reports have been processed by verifying that the Adjust method was called on the cache
+	record, ok := cache.Get(originId)
+	require.True(t, ok)
+	require.NotNil(t, record)
+
+	require.Equal(t, report.Penalty()*float64(times), record.Penalty)
+	// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
+	require.Equal(t, uint64(0), record.CutoffCounter)
+	// the decay should be the default decay value.
+	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+}
+
 // TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequentially tests the handling of single misbehavior reports for multiple peers.
 // Reports are coming in sequentially.
 // The test ensures that each misbehavior report is handled correctly and the penalties are applied to the corresponding peers in the cache.
