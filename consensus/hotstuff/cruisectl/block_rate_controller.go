@@ -72,7 +72,7 @@ func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.S
 	}
 
 	ctl.Component = component.NewComponentManagerBuilder().
-		AddWorker(ctl.processEventsWorker).
+		AddWorker(ctl.processEventsWorkerLogic).
 		Build()
 
 	// TODO initialize last measurement
@@ -91,8 +91,9 @@ func (ctl *BlockRateController) BlockRateDelay() float64 {
 	return ctl.blockRateDelay.Load()
 }
 
-// processEventsWorker is a worker routine which processes events received from other components.
-func (ctl *BlockRateController) processEventsWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// processEventsWorkerLogic is the logic for processing events received from other components.
+// This method should be executed by a dedicated worker routine (not concurrency safe).
+func (ctl *BlockRateController) processEventsWorkerLogic(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	done := ctx.Done()
