@@ -67,8 +67,8 @@ func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.S
 		config:      config,
 		log:         log,
 		state:       state,
-		viewChanges: make(chan uint64, 1),
-		epochSetups: make(chan *flow.Header, 1),
+		viewChanges: make(chan uint64, 10),
+		epochSetups: make(chan *flow.Header, 5),
 	}
 
 	ctl.Component = component.NewComponentManagerBuilder().
