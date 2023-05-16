@@ -313,6 +313,32 @@ func (_m *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	return r0, r1
 }
 
+// VersionBeacon provides a mock function with given fields:
+func (_m *Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
+	ret := _m.Called()
+
+	var r0 *flow.SealedVersionBeacon
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (*flow.SealedVersionBeacon, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() *flow.SealedVersionBeacon); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.SealedVersionBeacon)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 type mockConstructorTestingTNewSnapshot interface {
 	mock.TestingT
 	Cleanup(func())
