@@ -84,7 +84,12 @@ func (s *SpamRecordCache) Adjust(originId flow.Identifier, adjustFunc model.Reco
 
 	case err == ErrSpamRecordNotFound:
 		// if the record does not exist, we initialize the record and try to adjust it again.
-		s.init(originId)
+		// Note: there is an edge case where the record is initialized by another goroutine between the two calls.
+		// In this case, the init function is invoked twice, but it is not a problem because the underlying
+		// cache is thread-safe. Hence, we do not need to synchronize the two calls. In such cases, one of the
+		// two calls returns false, and the other call returns true. We do not care which call returns false, hence,
+		// we ignore the return value of the init function.
+		_ = s.init(originId)
 		// as the record is initialized, the adjust function should not return an error, and any returned error
 		// is an irrecoverable error and indicates a bug.
 		return s.adjust(originId, adjustFunc)
