@@ -323,6 +323,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 
 	builderFactory, err := factories.NewBuilderFactory(
 		node.PublicDB,
+		node.State,
 		node.Headers,
 		node.Tracer,
 		node.Metrics,
@@ -662,7 +663,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig(), metrics.NewChainSyncCollector(genesisHead.ChainID), genesisHead.ChainID)
 	require.NoError(t, err)
 
-	finalizationDistributor := pubsub.NewFinalizationDistributor()
+	followerDistributor := pubsub.NewFollowerDistributor()
 
 	latestExecutedHeight, _, err := execState.GetHighestExecutedBlockID(context.TODO())
 	require.NoError(t, err)
@@ -698,19 +699,16 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node.ProtocolEvents.AddConsumer(ingestionEngine)
 
-	followerCore, finalizer := createFollowerCore(t, &node, followerState, finalizationDistributor, rootHead, rootQC)
+	followerCore, finalizer := createFollowerCore(t, &node, followerState, followerDistributor, rootHead, rootQC)
 	// mock out hotstuff validator
 	validator := new(mockhotstuff.Validator)
 	validator.On("ValidateProposal", mock.Anything).Return(nil)
-
-	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
-	require.NoError(t, err)
 
 	core, err := follower.NewComplianceCore(
 		node.Log,
 		node.Metrics,
 		node.Metrics,
-		finalizationDistributor,
+		followerDistributor,
 		followerState,
 		followerCore,
 		validator,
@@ -718,13 +716,16 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Tracer,
 	)
 	require.NoError(t, err)
+
+	finalizedHeader, err := protoState.Final().Head()
+	require.NoError(t, err)
 	followerEng, err := follower.NewComplianceLayer(
 		node.Log,
 		node.Net,
 		node.Me,
 		node.Metrics,
 		node.Headers,
-		finalizedHeader.Get(),
+		finalizedHeader,
 		core,
 	)
 	require.NoError(t, err)
@@ -736,10 +737,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Metrics,
 		node.Net,
 		node.Me,
+		node.State,
 		node.Blocks,
 		followerEng,
 		syncCore,
-		finalizedHeader,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
@@ -851,7 +852,7 @@ func createFollowerCore(
 	t *testing.T,
 	node *testmock.GenericNode,
 	followerState *badgerstate.FollowerState,
-	notifier hotstuff.FinalizationConsumer,
+	notifier hotstuff.FollowerConsumer,
 	rootHead *flow.Header,
 	rootQC *flow.QuorumCertificate,
 ) (module.HotStuffFollower, *confinalizer.Finalizer) {

@@ -440,7 +440,12 @@ func (h *MessageHub) Process(channel channels.Channel, originID flow.Identifier,
 		}
 		h.forwardToOwnTimeoutAggregator(t)
 	default:
-		h.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, message, channel)
+		h.log.Warn().
+			Bool(logging.KeySuspicious, true).
+			Hex("origin_id", logging.ID(originID)).
+			Str("message_type", fmt.Sprintf("%T", message)).
+			Str("channel", channel.String()).
+			Msgf("delivered unsupported message type")
 	}
 	return nil
 }

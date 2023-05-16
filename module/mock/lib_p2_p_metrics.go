@@ -50,6 +50,16 @@ func (_m *LibP2PMetrics) AllowStream(p peer.ID, dir network.Direction) {
 	_m.Called(p, dir)
 }
 
+// AsyncProcessingFinished provides a mock function with given fields: msgType, duration
+func (_m *LibP2PMetrics) AsyncProcessingFinished(msgType string, duration time.Duration) {
+	_m.Called(msgType, duration)
+}
+
+// AsyncProcessingStarted provides a mock function with given fields: msgType
+func (_m *LibP2PMetrics) AsyncProcessingStarted(msgType string) {
+	_m.Called(msgType)
+}
+
 // BlockConn provides a mock function with given fields: dir, usefd
 func (_m *LibP2PMetrics) BlockConn(dir network.Direction, usefd bool) {
 	_m.Called(dir, usefd)
@@ -88,6 +98,16 @@ func (_m *LibP2PMetrics) BlockServicePeer(svc string, p peer.ID) {
 // BlockStream provides a mock function with given fields: p, dir
 func (_m *LibP2PMetrics) BlockStream(p peer.ID, dir network.Direction) {
 	_m.Called(p, dir)
+}
+
+// BlockingPreProcessingFinished provides a mock function with given fields: msgType, sampleSize, duration
+func (_m *LibP2PMetrics) BlockingPreProcessingFinished(msgType string, sampleSize uint, duration time.Duration) {
+	_m.Called(msgType, sampleSize, duration)
+}
+
+// BlockingPreProcessingStarted provides a mock function with given fields: msgType, sampleSize
+func (_m *LibP2PMetrics) BlockingPreProcessingStarted(msgType string, sampleSize uint) {
+	_m.Called(msgType, sampleSize)
 }
 
 // DNSLookupDuration provides a mock function with given fields: duration

@@ -257,18 +257,14 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		snapshotTree)
 	require.NoError(t, err)
 
-	nestedTxn := state.NewTransactionState(
+	blockDatabase := storage.NewBlockDatabase(
 		snapshotTree.Append(executionSnapshot),
-		state.DefaultParameters())
+		0,
+		nil)
 
-	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
-	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
+	txnState, err := blockDatabase.NewTransaction(0, state.DefaultParameters())
 	require.NoError(t, err)
 
-	txnState := storage.SerialTransaction{
-		NestedTransactionPreparer: nestedTxn,
-		DerivedTransactionData:    derivedTxnData,
-	}
 	computer := fvm.NewMeterParamOverridesComputer(ctx, txnState)
 
 	overrides, err := computer.Compute(txnState, struct{}{})
