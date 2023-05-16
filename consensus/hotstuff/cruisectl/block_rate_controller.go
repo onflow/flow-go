@@ -43,7 +43,7 @@ type epochInfo struct {
 	nextEpochFinalView    *uint64
 }
 
-// BlockRateController dynamically adjusts the block rate delay of this node,
+// BlockRateController dynamically adjusts the proposal delay of this node,
 // based on the measured block rate of the consensus committee as a whole, in
 // order to achieve a target overall block rate.
 type BlockRateController struct {
@@ -53,18 +53,18 @@ type BlockRateController struct {
 	state  protocol.State
 	log    zerolog.Logger
 
-	lastMeasurement *measurement // the most recently taken measurement
-	*epochInfo                   // scheduled transition view for current/next epoch
+	lastMeasurement measurement // the most recently taken measurement
+	epochInfo                   // scheduled transition view for current/next epoch
 
-	proposalDelay          *atomic.Float64
-	epochFallbackTriggered *atomic.Bool
+	proposalDelay          atomic.Float64
+	epochFallbackTriggered atomic.Bool
 
 	viewChanges chan uint64       // OnViewChange events           (view entered)
 	epochSetups chan *flow.Header // EpochSetupPhaseStarted events (block header within setup phase)
 }
 
 // NewBlockRateController returns a new BlockRateController.
-func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.State) (*BlockRateController, error) {
+func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.State, curView uint64) (*BlockRateController, error) {
 	ctl := &BlockRateController{
 		config:      config,
 		log:         log.With().Str("component", "cruise_ctl").Logger(),
@@ -77,11 +77,66 @@ func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.S
 		AddWorker(ctl.processEventsWorkerLogic).
 		Build()
 
-	// TODO initialize last measurement
-	// TODO initialize epochInfo info
-	_ = ctl.lastMeasurement
+	err := ctl.initEpochInfo(curView)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize epoch info: %w", err)
+	}
+	ctl.initLastMeasurement(curView, time.Now())
 
 	return ctl, nil
+}
+
+// initLastMeasurement initializes the lastMeasurement field.
+// We set the view rate to the computed target view rate and the error to 0.
+func (ctl *BlockRateController) initLastMeasurement(curView uint64, now time.Time) {
+	viewsRemaining := float64(ctl.curEpochFinalView - curView)                                   // views remaining in current epoch
+	timeRemaining := float64(ctl.epochInfo.curEpochTargetEndTime.Sub(now).Milliseconds()) * 1000 // time remaining until target epoch end
+	targetViewRate := viewsRemaining / timeRemaining
+	ctl.lastMeasurement = measurement{
+		view:            curView,
+		time:            now,
+		viewRate:        targetViewRate,
+		aveViewRate:     targetViewRate,
+		targetViewRate:  targetViewRate,
+		proportionalErr: 0,
+		integralErr:     0,
+		derivativeErr:   0,
+	}
+}
+
+// initEpochInfo initializes the epochInfo state upon component startup.
+// No errors are expected during normal operation.
+func (ctl *BlockRateController) initEpochInfo(curView uint64) error {
+	finalSnapshot := ctl.state.Final()
+	curEpoch := finalSnapshot.Epochs().Current()
+
+	curEpochFirstView, err := curEpoch.FirstView()
+	if err != nil {
+		return fmt.Errorf("could not initialize current epoch first view: %w", err)
+	}
+	ctl.curEpochFirstView = curEpochFirstView
+
+	curEpochFinalView, err := curEpoch.FinalView()
+	if err != nil {
+		return fmt.Errorf("could not initialize current epoch final view: %w", err)
+	}
+	ctl.curEpochFirstView = curEpochFinalView
+
+	phase, err := finalSnapshot.Phase()
+	if err != nil {
+		return fmt.Errorf("could not check snapshot phase: %w", err)
+	}
+	if phase > flow.EpochPhaseStaking {
+		nextEpochFinalView, err := finalSnapshot.Epochs().Next().FinalView()
+		if err != nil {
+			return fmt.Errorf("could not initialize next epoch final view: %w", err)
+		}
+		ctl.epochInfo.nextEpochFinalView = &nextEpochFinalView
+	}
+
+	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(curView, time.Now(), ctl.epochInfo)
+
+	return nil
 }
 
 // ProposalDelay returns the current proposal delay value to use when proposing, in milliseconds.
@@ -102,7 +157,6 @@ func (ctl *BlockRateController) processEventsWorkerLogic(ctx irrecoverable.Signa
 	ready()
 
 	done := ctx.Done()
-
 	for {
 
 		// Prioritize EpochSetup events
@@ -146,25 +200,27 @@ func (ctl *BlockRateController) processEventsWorkerLogic(ctx irrecoverable.Signa
 //
 // No errors are expected during normal operation.
 func (ctl *BlockRateController) processOnViewChange(view uint64) error {
-	err := ctl.checkForEpochTransition(view)
+	now := time.Now()
+	err := ctl.checkForEpochTransition(view, now)
 	if err != nil {
 		return fmt.Errorf("could not check for epoch transition: %w", err)
 	}
-	err = ctl.measureViewRate(view)
+	err = ctl.measureViewRate(view, now)
 	if err != nil {
 		return fmt.Errorf("could not measure view rate: %w", err)
 	}
-
 	return nil
 }
 
 // checkForEpochTransition updates the epochInfo to reflect an epoch transition if curView
 // being entered causes a transition to the next epoch. Otherwise, this is a no-op.
 // No errors are expected during normal operation.
-func (ctl *BlockRateController) checkForEpochTransition(curView uint64) error {
+func (ctl *BlockRateController) checkForEpochTransition(curView uint64, now time.Time) error {
 	if curView > ctl.curEpochFinalView {
+		// typical case - no epoch transition
 		return nil
 	}
+
 	if ctl.nextEpochFinalView == nil {
 		return fmt.Errorf("cannot transition without nextEpochFinalView set")
 	}
@@ -175,14 +231,14 @@ func (ctl *BlockRateController) checkForEpochTransition(curView uint64) error {
 	}
 	ctl.curEpochFinalView = *ctl.nextEpochFinalView
 	ctl.nextEpochFinalView = nil
-	// TODO update target end time
+	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(curView, now, ctl.epochInfo)
 	return nil
 }
 
-// measureViewRate computes a new measurement for the newly entered view.
+// measureViewRate computes a new measurement of view rate and error for the newly entered view.
+// It updates the proposal delay based on the new error.
 // No errors are expected during normal operation.
-func (ctl *BlockRateController) measureViewRate(view uint64) error {
-	now := time.Now()
+func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) error {
 	lastMeasurement := ctl.lastMeasurement
 	// handle repeated events - they are a no-op
 	if view == lastMeasurement.view {
@@ -193,31 +249,30 @@ func (ctl *BlockRateController) measureViewRate(view uint64) error {
 	}
 
 	alpha := ctl.config.alpha()
-	nextMeasurement := new(measurement)
+	viewDiff := float64(view - lastMeasurement.view)                                             // views between current and last measurement
+	timeDiff := float64(lastMeasurement.time.Sub(now).Milliseconds()) * 1000                     // time between current and last measurement
+	viewsRemaining := float64(ctl.curEpochFinalView - view)                                      // views remaining in current epoch
+	timeRemaining := float64(ctl.epochInfo.curEpochTargetEndTime.Sub(now).Milliseconds()) * 1000 // time remaining until target epoch end
+
+	// compute and store the rate and error for the current view
+	var nextMeasurement measurement
 	nextMeasurement.view = view
 	nextMeasurement.time = now
-	nextMeasurement.viewRate = ctl.computeInstantaneousViewRate(lastMeasurement.view, view, lastMeasurement.time, now)
+	nextMeasurement.viewRate = viewDiff / timeDiff
 	nextMeasurement.aveViewRate = (alpha * nextMeasurement.viewRate) + ((1.0 - alpha) * lastMeasurement.aveViewRate)
-	// TODO
+	nextMeasurement.targetViewRate = viewsRemaining / timeRemaining
+	nextMeasurement.proportionalErr = nextMeasurement.targetViewRate - nextMeasurement.aveViewRate
+	nextMeasurement.integralErr = lastMeasurement.integralErr + nextMeasurement.proportionalErr
+	nextMeasurement.derivativeErr = (nextMeasurement.proportionalErr - lastMeasurement.proportionalErr) / viewDiff
+	ctl.lastMeasurement = nextMeasurement
 
+	// compute and store the new proposal delay value
+	delay := float64(ctl.config.DefaultProposalDelay.Milliseconds()) +
+		ctl.lastMeasurement.proportionalErr*ctl.config.KP +
+		ctl.lastMeasurement.integralErr*ctl.config.KI +
+		ctl.lastMeasurement.derivativeErr*ctl.config.KD
+	ctl.proposalDelay.Store(delay)
 	return nil
-}
-
-// computeInstantaneousViewRate computes the view rate between two view measurements
-// in views/second with millisecond precision.
-func (ctl *BlockRateController) computeInstantaneousViewRate(v1, v2 uint64, t1, t2 time.Time) float64 {
-	viewDiff := float64(v2 - v1)
-	timeDiff := float64(t2.Sub(t1).Milliseconds()) * 1000
-	return viewDiff / timeDiff
-}
-
-// computeTargetViewRate computes the target view rate, the set-point for the PID controller,
-// in views/second with millisecond precision. The target view rate is the rate so that the
-// next epoch transition will occur at the target time.
-func (ctl *BlockRateController) computeTargetViewRate(curView uint64) float64 {
-	viewsRemaining := float64(ctl.curEpochFinalView - curView)
-	timeRemaining := float64(ctl.epochInfo.curEpochTargetEndTime.Sub(time.Now().UTC()).Milliseconds()) * 1000
-	return viewsRemaining / timeRemaining
 }
 
 // processEpochSetupPhaseStarted processes EpochSetupPhaseStarted events from the protocol state.

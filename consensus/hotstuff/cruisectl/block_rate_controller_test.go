@@ -24,3 +24,16 @@ func TestStartStop(t *testing.T) {
 	cancel()
 	unittest.RequireCloseBefore(t, ctl.Done(), time.Second, "component did not stop")
 }
+
+// test - epoch fallback triggered
+//  - twice
+//  - revert to default block rate
+
+// test - new view
+//  - epoch transition
+//  - measurement is updated
+//  - duplicate events are handled
+
+// test - epochsetup
+//  - epoch info is updated
+//  - duplicate events are handled

@@ -17,6 +17,9 @@ var weekdays = map[string]time.Weekday{
 	strings.ToLower(time.Saturday.String()):  time.Saturday,
 }
 
+// epochLength is the length of an epoch (7 days, or 1 week).
+const epochLength = time.Hour * 24 * 7
+
 var transitionFmt = "%s@%02d:%02d" // example: wednesday@08:00
 
 // EpochTransitionTime represents the target epochInfo transition time.
@@ -118,14 +121,14 @@ func ParseTransition(s string) (*EpochTransitionTime, error) {
 // NOTE 2: In the long run, the target end time should be specified by the smart contract
 // and stored along with the other protocol.Epoch information. This would remove the
 // need for this imperfect inference logic.
-func (tt *EpochTransitionTime) inferTargetEndTime(curView uint64, curTime time.Time, epoch *epochInfo) time.Time {
+func (tt *EpochTransitionTime) inferTargetEndTime(curView uint64, curTime time.Time, epoch epochInfo) time.Time {
 	now := curTime
 	// find the nearest target end time, plus the targets one week before and after
 	nearestTargetDate := tt.findNearestTargetTime(now)
 	earlierTargetDate := nearestTargetDate.AddDate(0, 0, -7)
 	laterTargetDate := nearestTargetDate.AddDate(0, 0, 7)
 
-	estimatedTimeRemainingInEpoch := time.Duration(float64(epoch.curEpochFinalView-curView) / float64(epoch.curEpochFinalView-epoch.curEpochFinalView) * float64(time.Hour*24*7))
+	estimatedTimeRemainingInEpoch := time.Duration(float64(epoch.curEpochFinalView-curView) / float64(epoch.curEpochFinalView-epoch.curEpochFirstView) * float64(epochLength))
 	estimatedEpochEndTime := now.Add(estimatedTimeRemainingInEpoch)
 
 	minDiff := estimatedEpochEndTime.Sub(nearestTargetDate).Abs()
@@ -145,7 +148,6 @@ func (tt *EpochTransitionTime) inferTargetEndTime(curView uint64, curTime time.T
 // findNearestTargetTime interprets ref as a date (ignores time-of-day portion)
 // and finds the nearest date, either before or after ref, which has the given weekday.
 // We then return a time.Time with this date and the hour/minute specified by the EpochTransitionTime.
-// For example, inputs ref="Wed Jul 2", weekday=Sunday would yield "Sun June 29". todo needed??
 func (tt *EpochTransitionTime) findNearestTargetTime(ref time.Time) time.Time {
 	hour := int(tt.hour)
 	minute := int(tt.minute)

@@ -53,6 +53,12 @@ type Config struct {
 }
 
 // alpha returns the sample inclusion proportion used when calculating the exponentially moving average.
-func (c Config) alpha() float64 {
+func (c *Config) alpha() float64 {
 	return 2.0 / float64(c.N+1)
+}
+
+// defaultBlockRate returns 1/Config.DefaultProposalDelay.
+// This is used as the initial block rate "measurement", before any measurements are taken.
+func (c *Config) defaultBlockRate() float64 {
+	return 1.0 / float64(c.DefaultProposalDelay.Milliseconds()*1000)
 }
