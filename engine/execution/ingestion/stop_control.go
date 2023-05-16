@@ -30,8 +30,12 @@ type StopControl struct {
 	log   zerolog.Logger
 	state StopControlState
 
-	// used to prevent setting stopHeight to block which has already been executed
-	highestExecutingHeight uint64
+	// used to prevent setting stopHeight to block which has already been
+	// executed.  Note that highestExecutingHeight uses a separate mutex to
+	// prevent executingBlockHeight and blockFinalized (in particular,
+	// its state.IsBlockExecuted call) from deadlocking.
+	highestExecutingHeightMutex sync.Mutex
+	highestExecutingHeight      uint64
 }
 
 type StopControlState byte
@@ -124,6 +128,9 @@ func (s *StopControl) SetStopHeight(
 			fmt.Errorf("cannot update stopHeight, already paused")
 	}
 
+	s.highestExecutingHeightMutex.Lock()
+	defer s.highestExecutingHeightMutex.Unlock()
+
 	// cannot set stopHeight to block which is already executing
 	// so the lowest possible stopHeight is highestExecutingHeight+1
 	if height <= s.highestExecutingHeight {
@@ -207,7 +214,6 @@ func (s *StopControl) blockFinalized(
 	execState state.ReadOnlyExecutionState,
 	h *flow.Header,
 ) {
-
 	s.Lock()
 	defer s.Unlock()
 
@@ -221,7 +227,6 @@ func (s *StopControl) blockFinalized(
 	// However, it is possible that EN block computation progress can fall behind. In this case,
 	// we want to crash only after the execution reached the stopHeight.
 	if h.Height == s.stopHeight {
-
 		executed, err := state.IsBlockExecuted(ctx, execState, h.ParentID)
 		if err != nil {
 			// any error here would indicate unexpected storage error, so we crash the node
@@ -306,14 +311,11 @@ func (s *StopControl) stopExecution() {
 // executingBlockHeight should be called while execution of height starts,
 // used for internal tracking of the minimum possible value of stopHeight
 func (s *StopControl) executingBlockHeight(height uint64) {
-	// TODO: should we lock here?
+	s.highestExecutingHeightMutex.Lock()
+	defer s.highestExecutingHeightMutex.Unlock()
 
-	if s.state == StopControlPaused {
-		return
-	}
-
-	// updating the highest executing height, which will be used to reject setting
-	// stopHeight that is too low.
+	// updating the highest executing height, which will be used to reject
+	// setting stopHeight that is too low.
 	if height > s.highestExecutingHeight {
 		s.highestExecutingHeight = height
 	}
