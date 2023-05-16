@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/network/alsp/internal"
 	"github.com/onflow/flow-go/network/alsp/model"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -76,6 +77,9 @@ type MisbehaviorReportManagerConfig struct {
 	// This is useful for managing production incidents.
 	// Note: under normal circumstances, the ALSP module should not be disabled.
 	DisablePenalty bool
+	// NetworkType is the type of the network it is used to determine whether the ALSP module is utilized in the
+	// public (unstaked) or private (staked) network.
+	NetworkType p2p.NetworkType
 }
 
 // validate validates the MisbehaviorReportManagerConfig instance. It returns an error if the config is invalid.
@@ -144,7 +148,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 	m.cache = internal.NewSpamRecordCache(
 		cfg.SpamRecordCacheSize,
 		lg.With().Str("component", "spam_record_cache").Logger(),
-		metrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory),
+		metrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory, cfg.NetworkType),
 		model.SpamRecordFactory())
 
 	store := queue.NewHeroStore(

@@ -440,7 +440,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 	cache := internal.NewSpamRecordCache(
 		cfg.SpamRecordCacheSize,
 		cfg.Logger,
-		metrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory),
+		metrics.NewNoopCollector(),
 		model.SpamRecordFactory())
 
 	// create a new MisbehaviorReportManager
@@ -559,7 +559,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentiall
 	cache := internal.NewSpamRecordCache(
 		cfg.SpamRecordCacheSize,
 		cfg.Logger,
-		metrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory),
+		metrics.NewNoopCollector(),
 		model.SpamRecordFactory())
 
 	// create a new MisbehaviorReportManager

@@ -418,6 +418,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			DisablePenalty:          fnb.AlspConfig.DisablePenalty,
 			AlspMetrics:             fnb.Metrics.Network,
 			HeroCacheMetricsFactory: fnb.HeroCacheMetricsFactory(),
+			NetworkType:             p2p.PrivateNetwork,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create default conduit factory: %w", err)

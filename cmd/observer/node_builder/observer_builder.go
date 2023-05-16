@@ -633,6 +633,7 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 		DisablePenalty:          builder.AlspConfig.DisablePenalty,
 		AlspMetrics:             builder.Metrics.Network,
 		HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
+		NetworkType:             p2p.PublicNetwork,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize conduit factory: %w", err)
@@ -872,7 +873,7 @@ func (builder *ObserverServiceBuilder) initPublicLibP2PFactory(networkKey crypto
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
 		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector).
-			SetPublicNetwork(p2p.PublicNetwork).
+			SetNetworkType(p2p.PublicNetwork).
 			SetMetrics(&p2pconfig.MetricsConfig{
 				HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 				Metrics:          builder.Metrics.Network,

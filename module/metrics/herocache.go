@@ -6,6 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 const subsystemHeroCache = "hero_cache"
@@ -63,7 +64,7 @@ func NewNoopHeroCacheMetricsFactory() HeroCacheMetricsFactory {
 	}
 }
 
-func NetworkReceiveCacheMetricsFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+func NetworkReceiveCacheMetricsFactory(f HeroCacheMetricsFactory, publicNetwork p2p.NetworkType) module.HeroCacheMetrics {
 	r := ResourceNetworkingReceiveCache
 	if publicNetwork {
 		r = PrependPublicPrefix(r)
@@ -95,9 +96,9 @@ func DisallowListNotificationQueueMetricFactory(registrar prometheus.Registerer)
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDisallowListNotificationQueue, registrar)
 }
 
-func ApplicationLayerSpamRecordCacheMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+func ApplicationLayerSpamRecordCacheMetricFactory(f HeroCacheMetricsFactory, networkType p2p.NetworkType) module.HeroCacheMetrics {
 	r := ResourceNetworkingApplicationLayerSpamRecordCache
-	if publicNetwork {
+	if networkType == p2p.PublicNetwork {
 		r = PrependPublicPrefix(r)
 	}
 
@@ -108,27 +109,27 @@ func ApplicationLayerSpamRecordQueueMetricsFactory(f HeroCacheMetricsFactory) mo
 	return f(namespaceNetwork, ResourceNetworkingApplicationLayerSpamRecordQueue)
 }
 
-func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(f HeroCacheMetricsFactory, networkType p2p.NetworkType) module.HeroCacheMetrics {
 	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
 	r := ResourceNetworkingRpcMetricsObserverInspectorQueue
-	if publicNetwork {
+	if networkType == p2p.PublicNetwork {
 		r = ResourceNetworkingPublicRpcMetricsObserverInspectorQueue
 	}
 	return f(namespaceNetwork, r)
 }
 
-func GossipSubRPCInspectorQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+func GossipSubRPCInspectorQueueMetricFactory(f HeroCacheMetricsFactory, networkType p2p.NetworkType) module.HeroCacheMetrics {
 	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
 	r := ResourceNetworkingRpcValidationInspectorQueue
-	if publicNetwork {
+	if networkType == p2p.PublicNetwork {
 		r = ResourceNetworkingPublicRpcValidationInspectorQueue
 	}
 	return f(namespaceNetwork, r)
 }
 
-func RpcInspectorNotificationQueueMetricFactory(f HeroCacheMetricsFactory, publicNetwork bool) module.HeroCacheMetrics {
+func RpcInspectorNotificationQueueMetricFactory(f HeroCacheMetricsFactory, networkType p2p.NetworkType) module.HeroCacheMetrics {
 	r := ResourceNetworkingRpcInspectorNotificationQueue
-	if publicNetwork {
+	if networkType == p2p.PublicNetwork {
 		r = PrependPublicPrefix(r)
 	}
 	return f(namespaceNetwork, r)
