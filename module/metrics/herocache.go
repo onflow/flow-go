@@ -106,7 +106,7 @@ func ApplicationLayerSpamRecordCacheMetricFactory(f HeroCacheMetricsFactory, net
 }
 
 func ApplicationLayerSpamRecordQueueMetricsFactory(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
-	return f(namespaceNetwork, ResourceNetworkingApplicationLayerSpamRecordQueue)
+	return f(namespaceNetwork, ResourceNetworkingApplicationLayerSpamReportQueue)
 }
 
 func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(f HeroCacheMetricsFactory, networkType p2p.NetworkType) module.HeroCacheMetrics {
