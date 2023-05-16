@@ -783,7 +783,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
-			finalizationDistributor.AddConsumer(sync)
+			followerDistributor.AddFinalizationConsumer(sync)
 
 			return sync, nil
 		}).
