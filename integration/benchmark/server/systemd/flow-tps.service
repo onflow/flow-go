@@ -1,11 +1,13 @@
 [Unit]
 Description=Flow TPS tests - generate list of merge commit hashes and run TPS tests against each one
+After=network.target
 
 [Service]
-Type=oneshot
-ExecStart=/var/flow/flow-go/integration/benchmark/server/runs.sh
-ExecStart=/var/flow/flow-go/integration/benchmark/server/control.sh
-ExecStart=/var/flow/flow-go/integration/benchmark/server/bench.sh
+Type=simple
+ExecStart=/var/flow/flow-go/integration/benchmark/server/tps.sh
 WorkingDirectory=/var/flow/flow-go/integration/benchmark/server
 Environment="GOPATH=/var/flow/go" "GOCACHE=/var/flow/gocache"
-RemainAfterExit=no
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
