@@ -532,7 +532,7 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
 
 	// wait for two GossipSub heartbeat intervals to ensure that the victim node has penalized the spammer node.
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// now we expect the detection and mitigation to kick in and the victim node to disconnect from the spammer node.
 	// so the spammer and victim nodes should not be able to exchange messages on the topic.
