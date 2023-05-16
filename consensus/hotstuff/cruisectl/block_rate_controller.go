@@ -99,6 +99,19 @@ func (ctl *BlockRateController) processEventsWorkerLogic(ctx irrecoverable.Signa
 	done := ctx.Done()
 
 	for {
+
+		// Prioritize EpochSetup events
+		select {
+		case block := <-ctl.epochSetups:
+			snapshot := ctl.state.AtHeight(block.Height)
+			err := ctl.processEpochSetupPhaseStarted(snapshot)
+			if err != nil {
+				ctl.log.Err(err).Msgf("fatal error handling EpochSetupPhaseStarted event")
+				ctx.Throw(err)
+			}
+		default:
+		}
+
 		select {
 		case <-done:
 			return
