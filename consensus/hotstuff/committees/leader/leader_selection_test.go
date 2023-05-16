@@ -203,7 +203,7 @@ func TestViewOutOfRange(t *testing.T) {
 		_, err = leaders.LeaderForView(before)
 		assert.Error(t, err)
 
-		before = rand.Uint64() % firstView // random view before first view
+		before = uint64(rand.Intn(int(firstView))) // random view before first view
 		_, err = leaders.LeaderForView(before)
 		assert.Error(t, err)
 	})
