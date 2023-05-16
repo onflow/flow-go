@@ -86,7 +86,7 @@ func ParseTransition(s string) (*EpochTransitionTime, error) {
 		return nil, newInvalidTransitionStrError(s, "error scanning minute part: %w", err)
 	}
 
-	day, ok := weekdays[dayStr]
+	day, ok := weekdays[strings.ToLower(dayStr)]
 	if !ok {
 		return nil, newInvalidTransitionStrError(s, "invalid weekday part %s", dayStr)
 	}
