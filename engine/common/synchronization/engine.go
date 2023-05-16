@@ -306,18 +306,17 @@ func (e *Engine) checkLoop(ctx irrecoverable.SignalerContext, ready component.Re
 	defer scan.Stop()
 
 	done := ctx.Done()
-CheckLoop:
 	for {
 		// give the quit channel a priority to be selected
 		select {
 		case <-done:
-			break CheckLoop
+			return
 		default:
 		}
 
 		select {
 		case <-done:
-			break CheckLoop
+			return
 		case <-pollChan:
 			e.pollHeight()
 		case <-scan.C:
@@ -353,7 +352,7 @@ func (e *Engine) pollHeight() {
 		Uint64("height", req.Height).
 		Uint64("range_nonce", req.Nonce).
 		Msg("sending sync request")
-	err := e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
+	err = e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
 	if err != nil {
 		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
 		return
