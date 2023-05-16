@@ -273,28 +273,28 @@ func mapToG1(data []byte) *pointE1 {
 // mapToG1 is a test function, it wraps a call to C since cgo can't be used in go test files.
 // It maps input bytes to a point in G2 and stores it in input point.
 // THIS IS NOT the kind of mapping function that is used in BLS signature.
-func unsecureMapToG1(pt *pointE1, seed []byte) {
-	C.unsecure_map_bytes_to_G1((*C.E1)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
+func unsafeMapToG1(pt *pointE1, seed []byte) {
+	C.unsafe_map_bytes_to_G1((*C.E1)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
 }
 
-// unsecureMapToG1Complement is a test function, it wraps a call to C since cgo can't be used in go test files.
+// unsafeMapToG1Complement is a test function, it wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in E2\G2 and stores it in input point.
-func unsecureMapToG1Complement(pt *pointE1, seed []byte) bool {
-	res := C.unsecure_map_bytes_to_G1complement((*C.E1)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
+func unsafeMapToG1Complement(pt *pointE1, seed []byte) bool {
+	res := C.unsafe_map_bytes_to_G1complement((*C.E1)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
 	return int(res) == blst_valid
 }
 
-// unsecureMapToG2 is a test function, it wraps a call to C since cgo can't be used in go test files.
+// unsafeMapToG2 is a test function, it wraps a call to C since cgo can't be used in go test files.
 // It maps input bytes to a point in G2 and stores it in input point.
 // THIS IS NOT the kind of mapping function that is used in BLS signature.
-func unsecureMapToG2(pt *pointE2, seed []byte) {
-	C.unsecure_map_bytes_to_G2((*C.E2)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
+func unsafeMapToG2(pt *pointE2, seed []byte) {
+	C.unsafe_map_bytes_to_G2((*C.E2)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
 }
 
-// unsecureMapToG2Complement is a test function, it wraps a call to C since cgo can't be used in go test files.
+// unsafeMapToG2Complement is a test function, it wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in E2\G2 and stores it in input point.
-func unsecureMapToG2Complement(pt *pointE2, seed []byte) bool {
-	res := C.unsecure_map_bytes_to_G2complement((*C.E2)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
+func unsafeMapToG2Complement(pt *pointE2, seed []byte) bool {
+	res := C.unsafe_map_bytes_to_G2complement((*C.E2)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
 	return int(res) == blst_valid
 }
 

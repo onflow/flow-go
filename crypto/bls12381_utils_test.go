@@ -103,28 +103,28 @@ func TestSubgroupCheck(t *testing.T) {
 
 	t.Run("G1", func(t *testing.T) {
 		var p pointE1
-		unsecureMapToG1(&p, seed) // point in G1
+		unsafeMapToG1(&p, seed) // point in G1
 		assert.True(t, checkMembershipG1(&p))
 
 		inG1 := false
 		for !inG1 {
 			_, err := prg.Read(seed)
 			require.NoError(t, err)
-			inG1 = unsecureMapToG1Complement(&p, seed) // point in E2\G2
+			inG1 = unsafeMapToG1Complement(&p, seed) // point in E2\G2
 		}
 		assert.False(t, checkMembershipG1(&p))
 	})
 
 	t.Run("G2", func(t *testing.T) {
 		var p pointE2
-		unsecureMapToG2(&p, seed) // point in G2
+		unsafeMapToG2(&p, seed) // point in G2
 		assert.True(t, checkMembershipG2(&p))
 
 		inG2 := false
 		for !inG2 {
 			_, err := prg.Read(seed)
 			require.NoError(t, err)
-			inG2 = unsecureMapToG2Complement(&p, seed) // point in E2\G2
+			inG2 = unsafeMapToG2Complement(&p, seed) // point in E2\G2
 		}
 		assert.False(t, checkMembershipG2(&p))
 	})
@@ -138,7 +138,7 @@ func BenchmarkSubgroupCheck(b *testing.B) {
 
 	b.Run("G1", func(b *testing.B) {
 		var p pointE1
-		unsecureMapToG1(&p, seed) // point in G1
+		unsafeMapToG1(&p, seed) // point in G1
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_ = checkMembershipG1(&p) // G1
@@ -148,7 +148,7 @@ func BenchmarkSubgroupCheck(b *testing.B) {
 
 	b.Run("G2", func(b *testing.B) {
 		var p pointE2
-		unsecureMapToG2(&p, seed) // point in G2
+		unsafeMapToG2(&p, seed) // point in G2
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_ = checkMembershipG2(&p) // G2
@@ -170,7 +170,7 @@ func TestReadWriteG1(t *testing.T) {
 		for i := 0; i < iterations; i++ {
 			var p, q pointE1
 			_, err := prg.Read(seed)
-			unsecureMapToG1(&p, seed)
+			unsafeMapToG1(&p, seed)
 			require.NoError(t, err)
 			writePointE1(bytes, &p)
 			err = readPointE1(&q, bytes)
@@ -183,7 +183,7 @@ func TestReadWriteG1(t *testing.T) {
 		for i := 0; i < iterations; i++ {
 			var p, q pointE1
 			seed := make([]byte, frBytesLen)
-			unsecureMapToG1(&p, seed) // this results in the infinity point
+			unsafeMapToG1(&p, seed) // this results in the infinity point
 			writePointE1(bytes, &p)
 			require.True(t, IsBLSSignatureIdentity(bytes)) // sanity check
 			err := readPointE1(&q, bytes)

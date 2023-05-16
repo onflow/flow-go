@@ -1263,7 +1263,7 @@ void E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len){
 // maps the bytes to a point in G1.
 // `len` should be at least Fr_BYTES.
 // this is a testing file only, should not be used in any protocol!
-void unsecure_map_bytes_to_G1(E1* p, const byte* bytes, int len) {
+void unsafe_map_bytes_to_G1(E1* p, const byte* bytes, int len) {
     assert(len >= Fr_BYTES);
     // map to Fr
     Fr log;
@@ -1274,7 +1274,7 @@ void unsecure_map_bytes_to_G1(E1* p, const byte* bytes, int len) {
 
 // generates a point in E1\G1 and stores it in p
 // this is a testing file only, should not be used in any protocol!
-BLST_ERROR unsecure_map_bytes_to_G1complement(E1* p, const byte* bytes, int len) {
+BLST_ERROR unsafe_map_bytes_to_G1complement(E1* p, const byte* bytes, int len) {
     assert(G1_SERIALIZATION == COMPRESSED);
     assert(len >= G1_SER_BYTES);
 
@@ -1301,7 +1301,7 @@ BLST_ERROR unsecure_map_bytes_to_G1complement(E1* p, const byte* bytes, int len)
 // maps the bytes to a point in G2.
 // `len` should be at least Fr_BYTES.
 // this is a testing tool only, it should not be used in any protocol!
-void unsecure_map_bytes_to_G2(E2* p, const byte* bytes, int len) {
+void unsafe_map_bytes_to_G2(E2* p, const byte* bytes, int len) {
     assert(len >= Fr_BYTES);
     // map to Fr
     Fr log;
@@ -1315,7 +1315,7 @@ void unsecure_map_bytes_to_G2(E2* p, const byte* bytes, int len) {
 // succeeds.
 // For now, function only works when E2 serialization is compressed.
 // this is a testing tool only, it should not be used in any protocol!
-BLST_ERROR unsecure_map_bytes_to_G2complement(E2* p, const byte* bytes, int len) {
+BLST_ERROR unsafe_map_bytes_to_G2complement(E2* p, const byte* bytes, int len) {
     assert(G2_SERIALIZATION == COMPRESSED);
     assert(len >= G2_SER_BYTES);
 
