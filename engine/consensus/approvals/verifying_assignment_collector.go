@@ -2,7 +2,6 @@ package approvals
 
 import (
 	"fmt"
-	"math/rand"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 // **Emergency-sealing parameters**
@@ -360,9 +360,14 @@ func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(observation cons
 				)
 			}
 
+			nonce, err := rand.Uint64()
+			if err != nil {
+				return 0, fmt.Errorf("nonce generation failed during request missing approvals: %w", err)
+			}
+
 			// prepare the request
 			req := &messages.ApprovalRequest{
-				Nonce:      rand.Uint64(),
+				Nonce:      nonce,
 				ResultID:   ac.ResultID(),
 				ChunkIndex: chunkIndex,
 			}
