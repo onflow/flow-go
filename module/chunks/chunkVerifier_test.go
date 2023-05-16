@@ -15,6 +15,7 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
@@ -354,6 +355,14 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 
 type vmMock struct{}
 
+func (vm *vmMock) NewExecutor(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	panic("not implemented")
+}
+
 func (vm *vmMock) Run(
 	ctx fvm.Context,
 	proc fvm.Procedure,
@@ -422,6 +431,14 @@ func (vmMock) GetAccount(
 
 type vmSystemOkMock struct{}
 
+func (vm *vmSystemOkMock) NewExecutor(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	panic("not implemented")
+}
+
 func (vm *vmSystemOkMock) Run(
 	ctx fvm.Context,
 	proc fvm.Procedure,
@@ -470,6 +487,14 @@ func (vmSystemOkMock) GetAccount(
 }
 
 type vmSystemBadMock struct{}
+
+func (vm *vmSystemBadMock) NewExecutor(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	panic("not implemented")
+}
 
 func (vm *vmSystemBadMock) Run(
 	ctx fvm.Context,

@@ -58,6 +58,16 @@ func (_m *EventLoop) OnTcConstructedFromTimeouts(certificate *flow.TimeoutCertif
 	_m.Called(certificate)
 }
 
+// OnTimeoutProcessed provides a mock function with given fields: timeout
+func (_m *EventLoop) OnTimeoutProcessed(timeout *model.TimeoutObject) {
+	_m.Called(timeout)
+}
+
+// OnVoteProcessed provides a mock function with given fields: vote
+func (_m *EventLoop) OnVoteProcessed(vote *model.Vote) {
+	_m.Called(vote)
+}
+
 // Ready provides a mock function with given fields:
 func (_m *EventLoop) Ready() <-chan struct{} {
 	ret := _m.Called()

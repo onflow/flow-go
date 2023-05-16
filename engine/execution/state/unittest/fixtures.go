@@ -46,11 +46,21 @@ func ComputationResultForBlockFixture(
 
 	}
 
+	_, serviceEventEpochCommitProtocol := unittest.EpochCommitFixtureByChainID(flow.Localnet)
+	_, serviceEventEpochSetupProtocol := unittest.EpochSetupFixtureByChainID(flow.Localnet)
+	_, serviceEventVersionBeaconProtocol := unittest.VersionBeaconFixtureByChainID(flow.Localnet)
+
+	convertedServiceEvents := flow.ServiceEventList{
+		serviceEventEpochCommitProtocol.ServiceEvent(),
+		serviceEventEpochSetupProtocol.ServiceEvent(),
+		serviceEventVersionBeaconProtocol.ServiceEvent(),
+	}
+
 	executionResult := flow.NewExecutionResult(
 		parentBlockExecutionResultID,
 		completeBlock.ID(),
 		computationResult.AllChunks(),
-		nil,
+		convertedServiceEvents,
 		flow.ZeroID)
 
 	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{

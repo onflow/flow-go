@@ -5,7 +5,6 @@ package synchronization
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -28,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 // defaultSyncResponseQueueCapacity maximum capacity of sync responses queue
@@ -334,9 +334,19 @@ func (e *Engine) pollHeight() {
 	final := e.finalizedHeaderCache.Get()
 	participants := e.participantsProvider.Identifiers()
 
+	nonce, err := rand.Uint64()
+	if err != nil {
+		// TODO: this error should be returned by pollHeight()
+		// it is logged for now since the only error possible is related to a failure
+		// of the system entropy generation. Such error is going to cause failures in other
+		// components where it's handled properly and will lead to crashing the module.
+		e.log.Warn().Err(err).Msg("nonce generation failed during pollHeight")
+		return
+	}
+
 	// send the request for synchronization
 	req := &messages.SyncRequest{
-		Nonce:  rand.Uint64(),
+		Nonce:  nonce,
 		Height: final.Height,
 	}
 	e.log.Debug().
@@ -356,12 +366,21 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 	var errs *multierror.Error
 
 	for _, ran := range ranges {
+		nonce, err := rand.Uint64()
+		if err != nil {
+			// TODO: this error should be returned by sendRequests
+			// it is logged for now since the only error possible is related to a failure
+			// of the system entropy generation. Such error is going to cause failures in other
+			// components where it's handled properly and will lead to crashing the module.
+			e.log.Error().Err(err).Msg("nonce generation failed during range request")
+			return
+		}
 		req := &messages.RangeRequest{
-			Nonce:      rand.Uint64(),
+			Nonce:      nonce,
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
-		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants...)
+		err = e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
 			continue
@@ -376,11 +395,20 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 	}
 
 	for _, batch := range batches {
+		nonce, err := rand.Uint64()
+		if err != nil {
+			// TODO: this error should be returned by sendRequests
+			// it is logged for now since the only error possible is related to a failure
+			// of the system entropy generation. Such error is going to cause failures in other
+			// components where it's handled properly and will lead to crashing the module.
+			e.log.Error().Err(err).Msg("nonce generation failed during batch request")
+			return
+		}
 		req := &messages.BatchRequest{
-			Nonce:    rand.Uint64(),
+			Nonce:    nonce,
 			BlockIDs: batch.BlockIDs,
 		}
-		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants...)
+		err = e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
 			continue

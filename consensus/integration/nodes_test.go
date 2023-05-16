@@ -437,8 +437,6 @@ func createNode(
 	hotstuffDistributor := pubsub.NewDistributor()
 	hotstuffDistributor.AddConsumer(counterConsumer)
 	hotstuffDistributor.AddConsumer(logConsumer)
-	finalizationDistributor := pubsub.NewFinalizationDistributor()
-	hotstuffDistributor.AddConsumer(finalizationDistributor)
 
 	require.Equal(t, participant.nodeInfo.NodeID, localID)
 	privateKeys, err := participant.nodeInfo.PrivateKeys()
@@ -484,7 +482,8 @@ func createNode(
 	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector, rootHeader.ChainID)
 	require.NoError(t, err)
 
-	qcDistributor := pubsub.NewQCCreatedDistributor()
+	voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
+	voteAggregationDistributor.AddVoteAggregationConsumer(logConsumer)
 
 	forks, err := consensus.NewForks(rootHeader, headersDB, final, hotstuffDistributor, rootHeader, rootQC)
 	require.NoError(t, err)
@@ -518,9 +517,9 @@ func createNode(
 	livenessData, err := persist.GetLivenessData()
 	require.NoError(t, err)
 
-	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
+	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, voteAggregationDistributor.OnQcConstructedFromVotes)
 
-	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, hotstuffDistributor, voteProcessorFactory.Create)
+	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, voteAggregationDistributor, voteProcessorFactory.Create)
 	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
 	voteAggregator, err := voteaggregator.NewVoteAggregator(
@@ -528,26 +527,25 @@ func createNode(
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		hotstuffDistributor,
+		voteAggregationDistributor,
 		livenessData.CurrentView,
 		voteCollectors,
 	)
 	require.NoError(t, err)
 
-	timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
-	timeoutCollectorDistributor.AddConsumer(logConsumer)
+	timeoutAggregationDistributor := pubsub.NewTimeoutAggregationDistributor()
+	timeoutAggregationDistributor.AddTimeoutCollectorConsumer(logConsumer)
 
 	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(
 		log,
-		timeoutCollectorDistributor,
+		timeoutAggregationDistributor,
 		committee,
 		validator,
 		msig.ConsensusTimeoutTag,
 	)
 	timeoutCollectorsFactory := timeoutcollector.NewTimeoutCollectorFactory(
 		log,
-		hotstuffDistributor,
-		timeoutCollectorDistributor,
+		timeoutAggregationDistributor,
 		timeoutProcessorFactory,
 	)
 	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorsFactory)
@@ -557,24 +555,20 @@ func createNode(
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		hotstuffDistributor,
 		livenessData.CurrentView,
 		timeoutCollectors,
 	)
 	require.NoError(t, err)
 
 	hotstuffModules := &consensus.HotstuffModules{
-		Forks:                       forks,
-		Validator:                   validator,
-		Notifier:                    hotstuffDistributor,
-		Committee:                   committee,
-		Signer:                      signer,
-		Persist:                     persist,
-		QCCreatedDistributor:        qcDistributor,
-		FinalizationDistributor:     finalizationDistributor,
-		TimeoutCollectorDistributor: timeoutCollectorDistributor,
-		VoteAggregator:              voteAggregator,
-		TimeoutAggregator:           timeoutAggregator,
+		Forks:             forks,
+		Validator:         validator,
+		Notifier:          hotstuffDistributor,
+		Committee:         committee,
+		Signer:            signer,
+		Persist:           persist,
+		VoteAggregator:    voteAggregator,
+		TimeoutAggregator: timeoutAggregator,
 	}
 
 	// initialize hotstuff
@@ -599,6 +593,7 @@ func createNode(
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
+		hotstuffDistributor,
 		tracer,
 		headersDB,
 		payloadsDB,

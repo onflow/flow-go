@@ -3,9 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -57,7 +55,6 @@ func TestHandler(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-	rand.Seed(time.Now().UnixNano())
 	suite.log = zerolog.New(zerolog.NewConsoleWriter())
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)

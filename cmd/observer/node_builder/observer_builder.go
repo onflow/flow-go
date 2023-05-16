@@ -172,7 +172,7 @@ type ObserverServiceBuilder struct {
 	FollowerState           stateprotocol.FollowerState
 	SyncCore                *chainsync.Core
 	RpcEng                  *rpc.Engine
-	FinalizationDistributor *pubsub.FinalizationDistributor
+	FollowerDistributor     *pubsub.FollowerDistributor
 	Committee               hotstuff.DynamicCommittee
 	Finalized               *flow.Header
 	Pending                 []*flow.Header
@@ -333,7 +333,7 @@ func (builder *ObserverServiceBuilder) buildFollowerCore() *ObserverServiceBuild
 			node.Logger,
 			node.Storage.Headers,
 			final,
-			builder.FinalizationDistributor,
+			builder.FollowerDistributor,
 			node.RootBlock.Header,
 			node.RootQC,
 			builder.Finalized,
@@ -364,7 +364,7 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 			node.Logger,
 			node.Metrics.Mempool,
 			heroCacheCollector,
-			builder.FinalizationDistributor,
+			builder.FollowerDistributor,
 			builder.FollowerState,
 			builder.FollowerCore,
 			val,
@@ -532,7 +532,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionDataRequester() *ObserverSe
 				builder.executionDataConfig,
 			)
 
-			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
 			return builder.ExecutionDataRequester, nil
 		})
@@ -548,11 +548,11 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 		opt(config)
 	}
 	anb := &ObserverServiceBuilder{
-		ObserverServiceConfig:   config,
-		FlowNodeBuilder:         cmd.FlowNode("observer"),
-		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
+		ObserverServiceConfig: config,
+		FlowNodeBuilder:       cmd.FlowNode("observer"),
+		FollowerDistributor:   pubsub.NewFollowerDistributor(),
 	}
-	anb.FinalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
+	anb.FollowerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	anb.FlowNodeBuilder.SkipNwAddressBasedValidations = true
@@ -1049,7 +1049,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, err
 		}
-		builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
+		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 		return builder.RpcEng, nil
 	})
 }

@@ -567,14 +567,6 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 	}
 }
 
-// OnBlockIncorporated is a noop for this engine since access node is only dealing with finalized blocks
-func (e *Engine) OnBlockIncorporated(*model.Block) {
-}
-
-// OnDoubleProposeDetected is a noop for this engine since access node is only dealing with finalized blocks
-func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {
-}
-
 // requestMissingCollections requests missing collections for all blocks in the local db storage once at startup
 func (e *Engine) requestMissingCollections(ctx context.Context) error {
 
