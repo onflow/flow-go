@@ -66,8 +66,6 @@ const (
 	PubKeyLenBLSBLS12381 = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
 
 	// Hash to curve params
-	// expandMsgOutput is the output length of the expand_message step as required by the hash_to_curve algorithm
-	expandMsgOutput = 2 * (fieldSize + (securityBits / 8))
 	// hash to curve suite ID of the form : CurveID_ || HashID_ || MapID_ || encodingVariant_
 	h2cSuiteID = "BLS12381G1_XOF:KMAC128_SSWU_RO_"
 	// scheme implemented as a countermasure for rogue attacks of the form : SchemeTag_
@@ -78,6 +76,12 @@ const (
 	// The PoP cipher suite is guaranteed to be different than all signature ciphersuites
 	blsPOPCipherSuite = "BLS_POP_" + h2cSuiteID + schemeTag
 )
+
+// expandMsgOutput is the output length of the expand_message step as required by the
+// hash_to_curve algorithm (and the map to G1 step)
+//
+// (Cgo does not export C macros)
+var expandMsgOutput = int(C.get_mapToG1_input_len())
 
 // blsBLS12381Algo, embeds SignAlgo
 type blsBLS12381Algo struct {
@@ -316,7 +320,7 @@ const invalidBLSSignatureHeader = byte(0xE0)
 // makes the verification fail early. The verification would return (false, nil).
 func BLSInvalidSignature() Signature {
 	signature := make([]byte, SignatureLenBLSBLS12381)
-	signature[0] = invalidBLSSignatureHeader // invalid header as per C.ep_read_bin_compact
+	signature[0] = invalidBLSSignatureHeader // invalid header as per the Zcash serialization
 	return signature
 }
 
@@ -500,7 +504,7 @@ func (a *pubKeyBLSBLS12381) EncodeCompressed() []byte {
 		panic("library is not configured to use compressed public key serialization")
 	}
 	dest := make([]byte, pubKeyLengthBLSBLS12381)
-	writePointG2(dest, &a.point)
+	writePointE2(dest, &a.point)
 	return dest
 }
 
@@ -543,15 +547,6 @@ func (a *blsBLS12381Algo) init() error {
 		return errors.New("BLS-12381 length settings in Go and C are not consistent, check hardcoded lengths and compressions")
 	}
 	return nil
-}
-
-// This is only a TEST/DEBUG/BENCH function.
-// It returns the hash to G1 point from a slice of 128 bytes
-func mapToG1(data []byte) *pointE1 {
-	l := len(data)
-	var h pointE1
-	C.map_to_G1((*C.ep_st)(&h), (*C.uchar)(&data[0]), (C.int)(l))
-	return &h
 }
 
 // This is only a TEST function.

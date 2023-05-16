@@ -61,6 +61,19 @@ type Identity struct {
 	NetworkPubKey crypto.PublicKey
 }
 
+func (id *Identity) Equals(other *Identity) bool {
+	if other == nil {
+		return false
+	}
+	return id.NodeID == other.NodeID &&
+		id.Address == other.Address &&
+		id.Role == other.Role &&
+		id.Weight == other.Weight &&
+		id.Ejected == other.Ejected &&
+		id.StakingPubKey.Equals(other.StakingPubKey) &&
+		id.NetworkPubKey.Equals(other.NetworkPubKey)
+}
+
 // ParseIdentity parses a string representation of an identity.
 func ParseIdentity(identity string) (*Identity, error) {
 

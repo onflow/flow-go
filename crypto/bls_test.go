@@ -30,6 +30,7 @@ func TestBLSMainMethods(t *testing.T) {
 	// This test checks that:
 	//  - signature decoding handles input x-coordinates larger than p (doesn't result in an exception)
 	//  - signature decoding only accepts reduced x-coordinates to avoid signature malleability
+
 	t.Run("invalid x coordinate larger than p", func(t *testing.T) {
 		msg, err := hex.DecodeString("7f26ba692dc2da7ff828ef4675ff1cd6ab855fca0637b6dab295f1df8e51bc8bb1b8f0c6610aabd486cf1f098f2ddbc6691d94e10f928816f890a3d366ce46249836a595c7ea1828af52e899ba2ab627ab667113bb563918c5d5a787c414399487b4e3a7")
 		require.NoError(t, err)

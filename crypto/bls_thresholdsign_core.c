@@ -65,28 +65,21 @@ static void Fr_lagrange_coeff_at_zero(Fr* res, const int i, const uint8_t indice
 // Computes the Langrange interpolation at zero P(0) = LI(0) with regards to the indices [indices(0)..indices(t)] 
 // and their G1 images [shares(0)..shares(t)], and stores the resulting G1 point in `dest`.
 // `len` is equal to `t+1` where `t` is the polynomial degree.
-static void E1_lagrange_interpolate_at_zero(ep_st* dest, const ep_st shares[], const uint8_t indices[], const int len) {
+static void E1_lagrange_interpolate_at_zero(E1* out, const E1 shares[], const uint8_t indices[], const int len) {
     // Purpose is to compute Q(0) where Q(x) = A_0 + A_1*x + ... +  A_t*x^t in G1 
     // where A_i = g1 ^ a_i
 
     // Q(0) = share_i0 ^ L_i0(0) + share_i1 ^ L_i1(0) + .. + share_it ^ L_it(0)
     // where L is the Lagrange coefficient
     
-    // temp variables
-    ep_t mult;
-    ep_new(mult);         
-    ep_set_infty(dest);
-
+    E1_set_infty(out);
     Fr fr_lagr_coef;
-    for (int i=0; i < len; i++) {
-        Fr_lagrange_coeff_at_zero(&fr_lagr_coef, i, indices, len);
-        bn_st* bn_lagr_coef = Fr_blst_to_relic(&fr_lagr_coef);
-        ep_mul_lwnaf(mult, &shares[i], bn_lagr_coef);
-        free(bn_lagr_coef);
-        ep_add_jacob(dest, dest, mult);
+    E1 mult; 
+    for (int i=0; i < len; i++) { 
+        Fr_lagrange_coeff_at_zero(&fr_lagr_coef, i, indices, len); 
+        E1_mult(&mult, &shares[i], &fr_lagr_coef);
+        E1_add(out, out, &mult);
     }
-    // free the temp memory
-    ep_free(mult);
 }
 
 // Computes the Langrange interpolation at zero LI(0) with regards to the indices [indices(0)..indices(t)] 
@@ -94,33 +87,25 @@ static void E1_lagrange_interpolate_at_zero(ep_st* dest, const ep_st shares[], c
 // `len` is equal to `t+1` where `t` is the polynomial degree.
 int E1_lagrange_interpolate_at_zero_write(byte* dest, const byte* shares, const uint8_t indices[], const int len) {
     int read_ret;
-    // temp variables
-    ep_t res;
-    ep_new(res);
-    ep_st* ep_shares = malloc(sizeof(ep_t) * len);
-
+    E1* E1_shares = malloc(sizeof(E1) * len);
     for (int i=0; i < len; i++) {
-        ep_new(ep_shares[i]);
-        read_ret = ep_read_bin_compact(&ep_shares[i], &shares[SIGNATURE_LEN*i], SIGNATURE_LEN);
-        if (read_ret != RLC_OK) goto out;
-            
+        read_ret = E1_read_bytes(&E1_shares[i], &shares[G1_SER_BYTES * i], G1_SER_BYTES);
+        if (read_ret != BLST_SUCCESS) {
+            goto out;
+        }
     }
+
     // G1 interpolation at 0
     // computes Q(x) = A_0 + A_1*x + ... +  A_t*x^t  in G1,
     // where A_i = g1 ^ a_i
-    E1_lagrange_interpolate_at_zero(res, ep_shares, indices, len);
-
+    E1 res;
+    E1_lagrange_interpolate_at_zero(&res, E1_shares, indices, len);
     // export the result
-    ep_write_bin_compact(dest, res, SIGNATURE_LEN);
+    E1_write_bytes(dest, &res);
     read_ret = VALID;
-
 out:
     // free the temp memory
-    ep_free(res);
-    for (int i=0; i < len; i++) {
-        ep_free(ep_shares[i]);
-    } 
-    free(ep_shares); 
+    free(E1_shares); 
     return read_ret;
 }
 
