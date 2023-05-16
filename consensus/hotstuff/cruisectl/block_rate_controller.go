@@ -62,7 +62,6 @@ type BlockRateController struct {
 
 // NewBlockRateController returns a new BlockRateController.
 func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.State) (*BlockRateController, error) {
-
 	ctl := &BlockRateController{
 		config:      config,
 		log:         log,

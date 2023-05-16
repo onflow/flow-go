@@ -47,11 +47,12 @@ type Config struct {
 	// When disabled, the DefaultBlockRateDelay is used.
 	Enabled bool
 
-	// N is the number of views over which the view rate average is measured.
+	// N is the number of views over which the view rate average is measured. 
+	// Per convention, this must be a _positive_ integer. 	
 	N uint
 	// KP, KI, KD, are the coefficients to the PID controller and define its response.
-	// KP adjusts the proportional term (responds to the magnitude of instantaneous error).
-	// KI adjusts the integral term (responds to the magnitude and duration of error over time).
-	// KD adjusts the derivative term (responds to the instantaneous rate of change of the error).
+	// KP adjusts the proportional term (responds to the magnitude of error).
+	// KI adjusts the integral term (responds to the error sum over a recent time interval).
+	// KD adjusts the derivative term (responds to the rate of change, i.e. time derivative, of the error).
 	KP, KI, KD float64
 }
