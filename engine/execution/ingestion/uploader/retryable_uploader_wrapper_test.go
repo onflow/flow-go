@@ -31,8 +31,8 @@ func Test_Upload_invoke(t *testing.T) {
 
 	dummyUploader := &DummyUploader{
 		f: func() error {
-			wg.Done()
 			uploaderCalled = true
+			wg.Done()
 			return nil
 		},
 	}
@@ -63,8 +63,8 @@ func Test_RetryUpload(t *testing.T) {
 	uploaderCalled := false
 	dummyUploader := &DummyUploader{
 		f: func() error {
-			wg.Done()
 			uploaderCalled = true
+			wg.Done()
 			return nil
 		},
 	}
