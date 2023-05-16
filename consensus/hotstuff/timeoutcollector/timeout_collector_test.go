@@ -172,7 +172,6 @@ func (s *TimeoutCollectorTestSuite) TestAddTimeout_TONotifications() {
 	expectedHighestQC := timeouts[len(timeouts)-1].NewestQC
 
 	// shuffle timeouts in random order
-	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(timeouts), func(i, j int) {
 		timeouts[i], timeouts[j] = timeouts[j], timeouts[i]
 	})
