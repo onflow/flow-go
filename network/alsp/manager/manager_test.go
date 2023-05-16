@@ -999,6 +999,78 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurre
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 }
 
+// TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently tests the handling of duplicate misbehavior reports for a single peer.
+// Reports are coming in concurrently.
+// The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the peer in the cache, in
+// other words, the duplicate reports are not ignored. This is important because the misbehavior reports are assumed each uniquely reporting
+// a different misbehavior even though they are coming with the same description. This is similar to the traffic tickets, where each ticket
+// is uniquely identifying a traffic violation, even though the description of the violation is the same.
+func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *testing.T) {
+	cfg := &alspmgr.MisbehaviorReportManagerConfig{
+		Logger:                  unittest.Logger(),
+		SpamRecordCacheSize:     uint32(100),
+		SpamReportQueueSize:     uint32(100),
+		AlspMetrics:             metrics.NewNoopCollector(),
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+	}
+
+	cache := internal.NewSpamRecordCache(cfg.SpamRecordCacheSize, cfg.Logger, metrics.NewNoopCollector(), model.SpamRecordFactory())
+
+	// create a new MisbehaviorReportManager
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	require.NoError(t, err)
+
+	// start the ALSP manager
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
+	}()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	m.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
+
+	// creates a single misbehavior report
+	originId := unittest.IdentifierFixture()
+	report := createMisbehaviorReportForOriginId(t, originId)
+
+	channel := channels.Channel("test-channel")
+
+	times := 100 // number of times the duplicate misbehavior report is reported concurrently
+	wg := sync.WaitGroup{}
+	wg.Add(times)
+
+	// concurrently reports the same misbehavior report twice
+	for i := 0; i < times; i++ {
+		go func() {
+			defer wg.Done()
+
+			m.HandleMisbehaviorReport(channel, report)
+		}()
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
+
+	require.Eventually(t, func() bool {
+		// check if the misbehavior reports have been processed by verifying that the Adjust method was called on the cache
+		record, ok := cache.Get(originId)
+		if !ok {
+			return false
+		}
+		require.NotNil(t, record)
+
+		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports.
+		if record.Penalty != report.Penalty()*float64(times) {
+			return false
+		}
+		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
+		require.Equal(t, uint64(0), record.CutoffCounter)
+		// the decay should be the default decay value.
+		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+
+		return true
+	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
+}
+
 // createMisbehaviorReportForOriginId creates a mock misbehavior report for a single origin id.
 // Args:
 // - t: the testing.T instance
