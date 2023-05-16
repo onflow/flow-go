@@ -398,12 +398,6 @@ func (e *Engine) pollHeight() {
 func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsync.Range, batches []chainsync.Batch) {
 	var errs *multierror.Error
 
-	nonce, err := rand.Uint64()
-	if err != nil {
-		e.log.Error().Err(err).Msg("nonce generation failed")
-		return
-	}
-
 	for _, ran := range ranges {
 		nonce, err := rand.Uint64()
 		if err != nil {
