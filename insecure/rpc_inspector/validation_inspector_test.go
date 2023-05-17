@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -469,14 +468,26 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	)
 
 	ids := flow.IdentityList{&victimId, &spammer.SpammerId}
-	provider := id.NewFixedIdentityProvider(ids)
 	idProvider.On("ByPeerID", mockery.Anything).Return(
 		func(peerId peer.ID) *flow.Identity {
-			identity, _ := provider.ByPeerID(peerId)
-			return identity
+			switch peerId {
+			case victimNode.Host().ID():
+				return &victimId
+			case spammer.SpammerNode.Host().ID():
+				return &spammer.SpammerId
+			default:
+				return nil
+			}
+
 		}, func(peerId peer.ID) bool {
-			_, ok := provider.ByPeerID(peerId)
-			return ok
+			switch peerId {
+			case victimNode.Host().ID():
+				fallthrough
+			case spammer.SpammerNode.Host().ID():
+				return true
+			default:
+				return false
+			}
 		})
 
 	spamRpcCount := 10            // total number of individual rpc messages to send
@@ -531,8 +542,8 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsInvalidSporkIDTopic)
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
 
-	// wait for two GossipSub heartbeat intervals to ensure that the victim node has penalized the spammer node.
-	time.Sleep(2 * time.Second)
+	// wait for three GossipSub heartbeat intervals to ensure that the victim node has penalized the spammer node.
+	time.Sleep(3 * time.Second)
 
 	// now we expect the detection and mitigation to kick in and the victim node to disconnect from the spammer node.
 	// so the spammer and victim nodes should not be able to exchange messages on the topic.
