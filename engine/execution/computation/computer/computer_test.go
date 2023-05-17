@@ -35,6 +35,7 @@ import (
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -904,6 +905,53 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, result.AllExecutionSnapshots(), collectionCount+1) // +1 system chunk
 	})
+
+	t.Run("internal error", func(t *testing.T) {
+		execCtx := fvm.NewContext()
+
+		committer := new(computermock.ViewCommitter)
+
+		bservice := requesterunit.MockBlobService(
+			blockstore.NewBlockstore(
+				dssync.MutexWrap(datastore.NewMapDatastore())))
+		trackerStorage := mocktracker.NewMockStorage()
+
+		prov := provider.NewProvider(
+			zerolog.Nop(),
+			metrics.NewNoopCollector(),
+			execution_data.DefaultSerializer,
+			bservice,
+			trackerStorage)
+
+		exe, err := computer.NewBlockComputer(
+			errorVM{errorAt: 5},
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer,
+			me,
+			prov,
+			nil)
+		require.NoError(t, err)
+
+		collectionCount := 5
+		transactionsPerCollection := 3
+		block := generateBlock(collectionCount, transactionsPerCollection, rag)
+
+		committer.On("CommitView", mock.Anything, mock.Anything).
+			Return(nil, nil, nil, nil).
+			Times(collectionCount + 1)
+
+		_, err = exe.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			block,
+			nil,
+			derived.NewEmptyDerivedBlockData(0))
+		assert.ErrorContains(t, err, "boom - internal error")
+	})
+
 }
 
 func assertEventHashesMatch(
@@ -1423,6 +1471,68 @@ func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 		events[i] = event
 	}
 	return events
+}
+
+type errorVM struct {
+	errorAt logical.Time
+}
+
+type errorExecutor struct {
+	err error
+}
+
+func (errorExecutor) Cleanup() {}
+
+func (errorExecutor) Preprocess() error {
+	return nil
+}
+
+func (e errorExecutor) Execute() error {
+	return e.err
+}
+
+func (errorExecutor) Output() fvm.ProcedureOutput {
+	return fvm.ProcedureOutput{}
+}
+
+func (vm errorVM) NewExecutor(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	var err error
+	if proc.ExecutionTime() == vm.errorAt {
+		err = fmt.Errorf("boom - internal error")
+	}
+
+	return errorExecutor{err: err}
+}
+
+func (vm errorVM) Run(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	*snapshot.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
+	var err error
+	if proc.ExecutionTime() == vm.errorAt {
+		err = fmt.Errorf("boom - internal error")
+	}
+	return &snapshot.ExecutionSnapshot{}, fvm.ProcedureOutput{}, err
+}
+
+func (errorVM) GetAccount(
+	ctx fvm.Context,
+	addr flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
+	panic("not implemented")
 }
 
 func getSetAProgram(
