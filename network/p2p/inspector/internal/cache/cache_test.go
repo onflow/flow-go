@@ -192,7 +192,7 @@ func TestRecordCache_Decay(t *testing.T) {
 	require.True(t, cache.Init(originID1))
 	count, err := cache.Update(originID1)
 	require.Equal(t, float64(1), count)
-
+	require.NoError(t, err)
 	count, ok, err := cache.Get(originID1)
 	require.True(t, ok)
 	require.NoError(t, err)
