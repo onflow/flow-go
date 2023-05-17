@@ -62,3 +62,7 @@ func (c *Config) alpha() float64 {
 func (c *Config) defaultBlockRate() float64 {
 	return 1.0 / float64(c.DefaultProposalDelay.Milliseconds()*1000)
 }
+
+func (c *Config) DefaultProposalDelayMs() float64 {
+	return float64(c.DefaultProposalDelay.Milliseconds())
+}

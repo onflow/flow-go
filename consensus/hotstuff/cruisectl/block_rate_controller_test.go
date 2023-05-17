@@ -16,15 +16,18 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
+// BlockRateControllerSuite encapsulates tests for the BlockRateController.
 type BlockRateControllerSuite struct {
 	suite.Suite
 
-	initialView       uint64
-	epochCounter      uint64
-	curEpochFirstView uint64
-	curEpochFinalView uint64
+	initialView            uint64
+	epochCounter           uint64
+	curEpochFirstView      uint64
+	curEpochFinalView      uint64
+	epochFallbackTriggered bool
 
 	state    *mockprotocol.State
+	params   *mockprotocol.Params
 	snapshot *mockprotocol.Snapshot
 	epochs   *mocks.EpochQuery
 	curEpoch *mockprotocol.Epoch
@@ -47,11 +50,16 @@ func (bs *BlockRateControllerSuite) SetupTest() {
 	bs.curEpochFinalView = uint64(100_000)
 
 	bs.state = mockprotocol.NewState(bs.T())
+	bs.params = mockprotocol.NewParams(bs.T())
 	bs.snapshot = mockprotocol.NewSnapshot(bs.T())
 	bs.epochs = mocks.NewEpochQuery(bs.T(), bs.epochCounter)
 	bs.curEpoch = mockprotocol.NewEpoch(bs.T())
 
 	bs.state.On("Final").Return(bs.snapshot)
+	bs.state.On("Params").Return(bs.params)
+	bs.params.On("EpochFallbackTriggered").Return(
+		func() bool { return bs.epochFallbackTriggered },
+		func() error { return nil })
 	bs.snapshot.On("Phase").Return(
 		func() flow.EpochPhase { return bs.epochs.Phase() },
 		func() error { return nil })
@@ -77,7 +85,16 @@ func (bs *BlockRateControllerSuite) StopController() {
 	unittest.RequireCloseBefore(bs.T(), bs.ctl.Done(), time.Second, "component did not stop")
 }
 
+// AssertCorrectInitialization checks that the controller is configured as expected after construction.
 func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
+	// proposal delay should be initialized to default value
+	assert.Equal(bs.T(), bs.config.DefaultProposalDelayMs(), bs.ctl.ProposalDelay())
+
+	// if epoch fallback is triggered, we don't care about anything else
+	if bs.ctl.epochFallbackTriggered.Load() {
+		return
+	}
+
 	// should initialize epoch info
 	epoch := bs.ctl.epochInfo
 	expectedEndTime := bs.config.TargetTransition.inferTargetEndTime(bs.initialView, time.Now(), epoch)
@@ -103,6 +120,7 @@ func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
 	assert.Equal(bs.T(), lastMeasurement.targetViewRate, lastMeasurement.aveViewRate)
 	// errors should be initialized to zero
 	assert.Equal(bs.T(), float64(0), lastMeasurement.proportionalErr+lastMeasurement.integralErr+lastMeasurement.derivativeErr)
+
 }
 
 // TestStartStop tests that the component can be started and stopped gracefully.
@@ -111,12 +129,16 @@ func (bs *BlockRateControllerSuite) TestStartStop() {
 	bs.StopController()
 }
 
+// TestInit_EpochStakingPhase tests initializing the component in the EpochStaking phase.
+// Measurement and epoch info should be initialized, next epoch final view should be nil.
 func (bs *BlockRateControllerSuite) TestInit_EpochStakingPhase() {
 	bs.CreateAndStartController()
 	defer bs.StopController()
 	bs.AssertCorrectInitialization()
 }
 
+// TestInit_EpochStakingPhase tests initializing the component in the EpochSetup phase.
+// Measurement and epoch info should be initialized, next epoch final view should be set.
 func (bs *BlockRateControllerSuite) TestInit_EpochSetupPhase() {
 	nextEpoch := mockprotocol.NewEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
@@ -128,7 +150,42 @@ func (bs *BlockRateControllerSuite) TestInit_EpochSetupPhase() {
 	bs.AssertCorrectInitialization()
 }
 
-//func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {}
+// TestInit_EpochFallbackTriggered tests initializing the component when epoch fallback is triggered.
+// Default proposal delay should be set.
+func (bs *BlockRateControllerSuite) TestInit_EpochFallbackTriggered() {
+	bs.epochFallbackTriggered = true
+	bs.CreateAndStartController()
+	defer bs.StopController()
+	bs.AssertCorrectInitialization()
+}
+
+// TestEpochFallbackTriggered tests epoch fallback:
+//   - the proposal delay should revert to default
+//   - duplicate events should be no-ops
+func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
+	bs.CreateAndStartController()
+	defer bs.StopController()
+
+	// update error so that proposal delay is non-default
+	bs.ctl.lastMeasurement.aveViewRate *= 1.1
+	err := bs.ctl.measureViewRate(bs.initialView+1, time.Now())
+	require.NoError(bs.T(), err)
+	assert.NotEqual(bs.T(), bs.config.DefaultProposalDelayMs(), bs.ctl.ProposalDelay())
+
+	// send the event
+	bs.ctl.EpochEmergencyFallbackTriggered()
+	// async: should revert to default proposal delay
+	require.Eventually(bs.T(), func() bool {
+		return bs.config.DefaultProposalDelayMs() == bs.ctl.ProposalDelay()
+	}, time.Second, time.Millisecond)
+
+	// additional events should be no-ops
+	// (send capacity+1 events to guarantee one is processed)
+	for i := 0; i <= cap(bs.ctl.epochFallbacks); i++ {
+		bs.ctl.EpochEmergencyFallbackTriggered()
+	}
+	assert.Equal(bs.T(), bs.config.DefaultProposalDelayMs(), bs.ctl.ProposalDelay())
+}
 
 // test - epoch fallback triggered
 //  - twice

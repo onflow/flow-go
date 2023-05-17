@@ -59,18 +59,20 @@ type BlockRateController struct {
 	proposalDelay          atomic.Float64
 	epochFallbackTriggered atomic.Bool
 
-	viewChanges chan uint64       // OnViewChange events           (view entered)
-	epochSetups chan *flow.Header // EpochSetupPhaseStarted events (block header within setup phase)
+	viewChanges    chan uint64       // OnViewChange events           (view entered)
+	epochSetups    chan *flow.Header // EpochSetupPhaseStarted events (block header within setup phase)
+	epochFallbacks chan struct{}     // EpochFallbackTriggered events
 }
 
 // NewBlockRateController returns a new BlockRateController.
 func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.State, curView uint64) (*BlockRateController, error) {
 	ctl := &BlockRateController{
-		config:      config,
-		log:         log.With().Str("component", "cruise_ctl").Logger(),
-		state:       state,
-		viewChanges: make(chan uint64, 10),
-		epochSetups: make(chan *flow.Header, 5),
+		config:         config,
+		log:            log.With().Str("component", "cruise_ctl").Logger(),
+		state:          state,
+		viewChanges:    make(chan uint64, 10),
+		epochSetups:    make(chan *flow.Header, 5),
+		epochFallbacks: make(chan struct{}, 5),
 	}
 
 	ctl.Component = component.NewComponentManagerBuilder().
@@ -87,7 +89,7 @@ func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.S
 }
 
 // initLastMeasurement initializes the lastMeasurement field.
-// We set the view rate to the computed target view rate and the error to 0.
+// We set the measured view rate to the computed target view rate and the error to 0.
 func (ctl *BlockRateController) initLastMeasurement(curView uint64, now time.Time) {
 	viewsRemaining := float64(ctl.curEpochFinalView - curView)                                   // views remaining in current epoch
 	timeRemaining := float64(ctl.epochInfo.curEpochTargetEndTime.Sub(now).Milliseconds()) / 1000 // time remaining (s) until target epoch end
@@ -102,6 +104,7 @@ func (ctl *BlockRateController) initLastMeasurement(curView uint64, now time.Tim
 		integralErr:     0,
 		derivativeErr:   0,
 	}
+	ctl.proposalDelay.Store(float64(ctl.config.DefaultProposalDelay.Milliseconds()))
 }
 
 // initEpochInfo initializes the epochInfo state upon component startup.
@@ -136,6 +139,12 @@ func (ctl *BlockRateController) initEpochInfo(curView uint64) error {
 
 	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(curView, time.Now(), ctl.epochInfo)
 
+	epochFallbackTriggered, err := ctl.state.Params().EpochFallbackTriggered()
+	if err != nil {
+		return fmt.Errorf("could not check epoch fallback: %w", err)
+	}
+	ctl.epochFallbackTriggered.Store(epochFallbackTriggered)
+
 	return nil
 }
 
@@ -159,7 +168,7 @@ func (ctl *BlockRateController) processEventsWorkerLogic(ctx irrecoverable.Signa
 	done := ctx.Done()
 	for {
 
-		// Prioritize EpochSetup events
+		// Priority 1: EpochSetup
 		select {
 		case block := <-ctl.epochSetups:
 			snapshot := ctl.state.AtHeight(block.Height)
@@ -171,6 +180,14 @@ func (ctl *BlockRateController) processEventsWorkerLogic(ctx irrecoverable.Signa
 		default:
 		}
 
+		// Priority 2: EpochFallbackTriggered
+		select {
+		case <-ctl.epochFallbacks:
+			ctl.processEpochFallbackTriggered()
+		default:
+		}
+
+		// Priority 3: OnViewChange
 		select {
 		case <-done:
 			return
@@ -187,6 +204,8 @@ func (ctl *BlockRateController) processEventsWorkerLogic(ctx irrecoverable.Signa
 				ctl.log.Err(err).Msgf("fatal error handling EpochSetupPhaseStarted event")
 				ctx.Throw(err)
 			}
+		case <-ctl.epochFallbacks:
+			ctl.processEpochFallbackTriggered()
 		}
 	}
 }
@@ -290,6 +309,15 @@ func (ctl *BlockRateController) processEpochSetupPhaseStarted(snapshot protocol.
 	return nil
 }
 
+// processEpochFallbackTriggered processes EpochFallbackTriggered events from the protocol state.
+// When epoch fallback mode is triggered, we:
+//   - set proposal delay to the default value
+//   - set epoch fallback triggered, to disable the controller
+func (ctl *BlockRateController) processEpochFallbackTriggered() {
+	ctl.proposalDelay.Store(ctl.config.DefaultProposalDelayMs())
+	ctl.epochFallbackTriggered.Store(true)
+}
+
 // OnViewChange responds to a view-change notification from HotStuff.
 // The event is queued for async processing by the worker. If the channel is full,
 // the event is discarded - since we are taking an average it doesn't matter if
@@ -309,5 +337,5 @@ func (ctl *BlockRateController) EpochSetupPhaseStarted(_ uint64, first *flow.Hea
 
 // EpochEmergencyFallbackTriggered responds to epoch fallback mode being triggered.
 func (ctl *BlockRateController) EpochEmergencyFallbackTriggered() {
-	ctl.epochFallbackTriggered.Store(true)
+	ctl.epochFallbacks <- struct{}{}
 }
