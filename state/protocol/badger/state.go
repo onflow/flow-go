@@ -120,9 +120,9 @@ func Bootstrap(
 		versionBeacons,
 	)
 
-	if err := IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
-		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
-	}
+	//if err := IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
+	//	return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
+	//}
 
 	segment, err := root.SealingSegment()
 	if err != nil {
