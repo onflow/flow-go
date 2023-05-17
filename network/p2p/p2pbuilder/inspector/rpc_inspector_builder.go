@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
@@ -90,11 +91,12 @@ type GossipSubInspectorBuilder struct {
 	sporkID          flow.Identifier
 	inspectorsConfig *GossipSubRPCInspectorsConfig
 	metricsCfg       *p2pconfig.MetricsConfig
+	idProvider       module.IdentityProvider
 	publicNetwork    bool
 }
 
 // NewGossipSubInspectorBuilder returns new *GossipSubInspectorBuilder.
-func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier, inspectorsConfig *GossipSubRPCInspectorsConfig) *GossipSubInspectorBuilder {
+func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier, inspectorsConfig *GossipSubRPCInspectorsConfig, provider module.IdentityProvider) *GossipSubInspectorBuilder {
 	return &GossipSubInspectorBuilder{
 		logger:           logger,
 		sporkID:          sporkID,
@@ -103,6 +105,7 @@ func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier
 			Metrics:          metrics.NewNoopCollector(),
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		},
+		idProvider:    provider,
 		publicNetwork: p2p.PublicNetwork,
 	}
 }
@@ -178,6 +181,7 @@ func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.Gos
 		controlMsgRPCInspectorCfg,
 		notificationDistributor,
 		clusterPrefixedCacheCollector,
+		b.idProvider,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)

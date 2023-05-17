@@ -53,15 +53,13 @@ func NodeFixture(
 	t *testing.T,
 	sporkID flow.Identifier,
 	dhtPrefix string,
+	idProvider module.IdentityProvider,
 	opts ...NodeFixtureParameterOption,
 ) (p2p.LibP2PNode, flow.Identity) {
 
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
 
-	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(
-		logger,
-		sporkID,
-		inspectorbuilder.DefaultGossipSubRPCInspectorsConfig()).
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), idProvider).
 		Build()
 	require.NoError(t, err)
 
@@ -306,7 +304,7 @@ func WithDefaultResourceManager() NodeFixtureParameterOption {
 
 // NodesFixture is a test fixture that creates a number of libp2p nodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func NodesFixture(t *testing.T, sporkID flow.Identifier, dhtPrefix string, count int, opts ...NodeFixtureParameterOption) ([]p2p.LibP2PNode,
+func NodesFixture(t *testing.T, sporkID flow.Identifier, dhtPrefix string, count int, idProvider module.IdentityProvider, opts ...NodeFixtureParameterOption) ([]p2p.LibP2PNode,
 	flow.IdentityList) {
 	var nodes []p2p.LibP2PNode
 
@@ -314,7 +312,7 @@ func NodesFixture(t *testing.T, sporkID flow.Identifier, dhtPrefix string, count
 	var identities flow.IdentityList
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
-		node, identity := NodeFixture(t, sporkID, dhtPrefix, opts...)
+		node, identity := NodeFixture(t, sporkID, dhtPrefix, idProvider, opts...)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}

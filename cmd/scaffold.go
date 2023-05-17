@@ -386,7 +386,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
 		}
 
-		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.GossipSubConfig.RpcInspector).
+		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.GossipSubConfig.RpcInspector, fnb.IdentityProvider).
 			SetPublicNetwork(p2p.PrivateNetwork).
 			SetMetrics(metricsCfg).
 			Build()

@@ -49,7 +49,7 @@ func NewCorruptLibP2PNodeFactory(
 			Metrics:          metricsCfg,
 		}
 
-		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, gossipSubCfg.RpcInspector).
+		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, gossipSubCfg.RpcInspector, idProvider).
 			SetPublicNetwork(p2p.PrivateNetwork).
 			SetMetrics(metCfg).
 			Build()

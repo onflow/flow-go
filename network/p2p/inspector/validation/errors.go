@@ -117,3 +117,23 @@ func IsErrActiveClusterIDsNotSet(err error) bool {
 	var e ErrActiveClusterIdsNotSet
 	return errors.As(err, &e)
 }
+
+// ErrUnstakedPeer error that indicates a cluster prefixed control message has been from an unstaked peer.
+type ErrUnstakedPeer struct {
+	err error
+}
+
+func (e ErrUnstakedPeer) Error() string {
+	return e.err.Error()
+}
+
+// NewUnstakedPeerErr returns a new ErrUnstakedPeer
+func NewUnstakedPeerErr(err error) ErrUnstakedPeer {
+	return ErrUnstakedPeer{err: err}
+}
+
+// IsErrUnstakedPeer returns true if an error is ErrUnstakedPeer
+func IsErrUnstakedPeer(err error) bool {
+	var e ErrUnstakedPeer
+	return errors.As(err, &e)
+}

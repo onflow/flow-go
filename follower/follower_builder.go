@@ -603,7 +603,7 @@ func (builder *FollowerServiceBuilder) initPublicLibP2PFactory(networkKey crypto
 			builder.IdentityProvider,
 			builder.GossipSubConfig.LocalMeshLogInterval)
 
-		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector).
+		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector, builder.IdentityProvider).
 			SetPublicNetwork(p2p.PublicNetwork).
 			SetMetrics(&p2pconfig.MetricsConfig{
 				HeroCacheFactory: builder.HeroCacheMetricsFactory(),
