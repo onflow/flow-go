@@ -223,7 +223,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(block)
+	err = c.processBlockAndDescendants(originID, block)
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -236,7 +236,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 // its pending descendants. By induction, any child block of a
 // valid proposal is itself connected to the finalized state and can be
 // processed as well.
-func (c *Core) processBlockAndDescendants(proposal *cluster.Block) error {
+func (c *Core) processBlockAndDescendants(originID flow.Identifier, proposal *cluster.Block) error {
 	blockID := proposal.ID()
 	log := c.log.With().
 		Str("block_id", blockID.String()).
@@ -255,7 +255,10 @@ func (c *Core) processBlockAndDescendants(proposal *cluster.Block) error {
 			log.Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
 
 			// notify consumers about invalid block
-			c.proposalViolationNotifier.OnInvalidBlockDetected(*invalidBlockErr)
+			c.proposalViolationNotifier.OnInvalidBlockDetected(flow.Slashable[model.InvalidProposalError]{
+				OriginID: originID,
+				Message:  *invalidBlockErr,
+			})
 
 			// notify VoteAggregator about the invalid block
 			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header))
@@ -280,7 +283,7 @@ func (c *Core) processBlockAndDescendants(proposal *cluster.Block) error {
 		return nil
 	}
 	for _, child := range children {
-		cpr := c.processBlockAndDescendants(child.Message)
+		cpr := c.processBlockAndDescendants(originID, child.Message)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr

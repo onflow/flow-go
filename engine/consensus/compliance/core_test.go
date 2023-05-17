@@ -369,7 +369,10 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 		*cs.validator = *hotstuff.NewValidator(cs.T())
 		sentinelError := model.NewInvalidProposalErrorf(hotstuffProposal, "")
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(sentinelError)
-		cs.proposalViolationNotifier.On("OnInvalidBlockDetected", sentinelError).Return().Once()
+		cs.proposalViolationNotifier.On("OnInvalidBlockDetected", flow.Slashable[model.InvalidProposalError]{
+			OriginID: originID,
+			Message:  sentinelError.(model.InvalidProposalError),
+		}).Return().Once()
 		// we should notify VoteAggregator about the invalid block
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
@@ -444,9 +447,10 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsProtocolStateValidation() {
 		sentinelErr := state.NewInvalidExtensionError("")
 		cs.state.On("Extend", mock.Anything, mock.Anything).Return(sentinelErr)
 		cs.proposalViolationNotifier.On("OnInvalidBlockDetected", mock.Anything).Run(func(args mock.Arguments) {
-			err := args.Get(0).(model.InvalidProposalError)
-			require.ErrorIs(cs.T(), err, sentinelErr)
-			require.Equal(cs.T(), err.InvalidProposal, hotstuffProposal)
+			err := args.Get(0).(flow.Slashable[model.InvalidProposalError])
+			require.ErrorIs(cs.T(), err.Message, sentinelErr)
+			require.Equal(cs.T(), err.Message.InvalidProposal, hotstuffProposal)
+			require.Equal(cs.T(), err.OriginID, originID)
 		}).Return().Once()
 		// we should notify VoteAggregator about the invalid block
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
@@ -531,7 +535,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	}
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(parent)
+	err := cs.core.processBlockAndDescendants(unittest.IdentifierFixture(), parent)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// make sure we drop the cache after trying to process

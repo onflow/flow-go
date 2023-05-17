@@ -232,7 +232,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(block)
+	err = c.processBlockAndDescendants(originID, block)
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -247,7 +247,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 // processed as well.
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
-func (c *Core) processBlockAndDescendants(proposal *flow.Block) error {
+func (c *Core) processBlockAndDescendants(originID flow.Identifier, proposal *flow.Block) error {
 	blockID := proposal.Header.ID()
 
 	log := c.log.With().
@@ -267,7 +267,10 @@ func (c *Core) processBlockAndDescendants(proposal *flow.Block) error {
 			log.Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
 
 			// notify consumers about invalid block
-			c.proposalViolationNotifier.OnInvalidBlockDetected(*invalidBlockErr)
+			c.proposalViolationNotifier.OnInvalidBlockDetected(flow.Slashable[model.InvalidProposalError]{
+				OriginID: originID,
+				Message:  *invalidBlockErr,
+			})
 
 			// notify VoteAggregator about the invalid block
 			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header))
@@ -292,7 +295,7 @@ func (c *Core) processBlockAndDescendants(proposal *flow.Block) error {
 		return nil
 	}
 	for _, child := range children {
-		cpr := c.processBlockAndDescendants(child.Message)
+		cpr := c.processBlockAndDescendants(originID, child.Message)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr

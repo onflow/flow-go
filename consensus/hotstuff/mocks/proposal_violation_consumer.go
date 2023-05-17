@@ -4,6 +4,7 @@ package mocks
 
 import (
 	model "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -18,7 +19,7 @@ func (_m *ProposalViolationConsumer) OnDoubleProposeDetected(_a0 *model.Block, _
 }
 
 // OnInvalidBlockDetected provides a mock function with given fields: err
-func (_m *ProposalViolationConsumer) OnInvalidBlockDetected(err model.InvalidProposalError) {
+func (_m *ProposalViolationConsumer) OnInvalidBlockDetected(err flow.Slashable[model.InvalidProposalError]) {
 	_m.Called(err)
 }
 
