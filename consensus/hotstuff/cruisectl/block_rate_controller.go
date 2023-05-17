@@ -219,6 +219,15 @@ func (ctl *BlockRateController) processEventsWorkerLogic(ctx irrecoverable.Signa
 //
 // No errors are expected during normal operation.
 func (ctl *BlockRateController) processOnViewChange(view uint64) error {
+	// if epoch fallback is triggered, we always use default proposal delay
+	if ctl.epochFallbackTriggered.Load() {
+		return nil
+	}
+	// duplicate events are no-ops
+	if ctl.lastMeasurement.view == view {
+		return nil
+	}
+
 	now := time.Now()
 	err := ctl.checkForEpochTransition(view, now)
 	if err != nil {
@@ -235,7 +244,8 @@ func (ctl *BlockRateController) processOnViewChange(view uint64) error {
 // being entered causes a transition to the next epoch. Otherwise, this is a no-op.
 // No errors are expected during normal operation.
 func (ctl *BlockRateController) checkForEpochTransition(curView uint64, now time.Time) error {
-	if curView > ctl.curEpochFinalView {
+	fmt.Println("checking epoch transition", curView, now)
+	if curView <= ctl.curEpochFinalView {
 		// typical case - no epoch transition
 		return nil
 	}
@@ -248,6 +258,7 @@ func (ctl *BlockRateController) checkForEpochTransition(curView uint64, now time
 		return fmt.Errorf("sanity check failed: curView is beyond both current and next epoch (%d > %d; %d > %d)",
 			curView, ctl.curEpochFinalView, curView, *ctl.nextEpochFinalView)
 	}
+	ctl.curEpochFirstView = ctl.curEpochFinalView + 1
 	ctl.curEpochFinalView = *ctl.nextEpochFinalView
 	ctl.nextEpochFinalView = nil
 	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(curView, now, ctl.epochInfo)
@@ -259,10 +270,6 @@ func (ctl *BlockRateController) checkForEpochTransition(curView uint64, now time
 // No errors are expected during normal operation.
 func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) error {
 	lastMeasurement := ctl.lastMeasurement
-	// handle repeated events - they are a no-op
-	if view == lastMeasurement.view {
-		return nil
-	}
 	if view < lastMeasurement.view {
 		return fmt.Errorf("got invalid OnViewChange event, transition from view %d to %d", lastMeasurement.view, view)
 	}
@@ -300,6 +307,9 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 //
 // No errors are expected during normal operation.
 func (ctl *BlockRateController) processEpochSetupPhaseStarted(snapshot protocol.Snapshot) error {
+	if ctl.epochFallbackTriggered.Load() {
+		return nil
+	}
 	nextEpoch := snapshot.Epochs().Next()
 	finalView, err := nextEpoch.FinalView()
 	if err != nil {
@@ -314,8 +324,8 @@ func (ctl *BlockRateController) processEpochSetupPhaseStarted(snapshot protocol.
 //   - set proposal delay to the default value
 //   - set epoch fallback triggered, to disable the controller
 func (ctl *BlockRateController) processEpochFallbackTriggered() {
-	ctl.proposalDelay.Store(ctl.config.DefaultProposalDelayMs())
 	ctl.epochFallbackTriggered.Store(true)
+	ctl.proposalDelay.Store(ctl.config.DefaultProposalDelayMs())
 }
 
 // OnViewChange responds to a view-change notification from HotStuff.

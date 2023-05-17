@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -44,10 +45,14 @@ func TestBlockRateController(t *testing.T) {
 
 func (bs *BlockRateControllerSuite) SetupTest() {
 	bs.config = DefaultConfig()
+	bs.config.KP = 1.0
+	bs.config.KI = 1.0
+	bs.config.KD = 1.0
 	bs.initialView = 0
 	bs.epochCounter = uint64(0)
 	bs.curEpochFirstView = uint64(0)
 	bs.curEpochFinalView = uint64(100_000)
+	bs.epochFallbackTriggered = false
 
 	bs.state = mockprotocol.NewState(bs.T())
 	bs.params = mockprotocol.NewParams(bs.T())
@@ -56,6 +61,7 @@ func (bs *BlockRateControllerSuite) SetupTest() {
 	bs.curEpoch = mockprotocol.NewEpoch(bs.T())
 
 	bs.state.On("Final").Return(bs.snapshot)
+	bs.state.On("AtHeight", mock.Anything).Return(bs.snapshot).Maybe()
 	bs.state.On("Params").Return(bs.params)
 	bs.params.On("EpochFallbackTriggered").Return(
 		func() bool { return bs.epochFallbackTriggered },
@@ -120,7 +126,20 @@ func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
 	assert.Equal(bs.T(), lastMeasurement.targetViewRate, lastMeasurement.aveViewRate)
 	// errors should be initialized to zero
 	assert.Equal(bs.T(), float64(0), lastMeasurement.proportionalErr+lastMeasurement.integralErr+lastMeasurement.derivativeErr)
+}
 
+// SanityCheckSubsequentMeasurements checks that two consecutive measurements are different and broadly reasonable.
+// It does not assert exact values, because part of the measurements depend on timing in the worker.
+func (bs *BlockRateControllerSuite) SanityCheckSubsequentMeasurements(m1, m2 measurement) {
+	// later measurements should have later times
+	assert.True(bs.T(), m1.time.Before(m2.time))
+	// new measurement should have different error
+	assert.NotEqual(bs.T(), m1.proportionalErr, m2.proportionalErr)
+	assert.NotEqual(bs.T(), m1.integralErr, m2.integralErr)
+	assert.NotEqual(bs.T(), m1.derivativeErr, m2.derivativeErr)
+	// new measurement should observe a different view rate
+	assert.NotEqual(bs.T(), m1.viewRate, m2.viewRate)
+	assert.NotEqual(bs.T(), m1.aveViewRate, m2.aveViewRate)
 }
 
 // TestStartStop tests that the component can be started and stopped gracefully.
@@ -187,19 +206,84 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	assert.Equal(bs.T(), bs.config.DefaultProposalDelayMs(), bs.ctl.ProposalDelay())
 }
 
-// test - epoch fallback triggered
-//  - twice
-//  - revert to default block rate
+// TestOnViewChange_UpdateProposalDelay tests that a new measurement is taken and
+// proposal delay updated upon receiving an OnViewChange event.
+func (bs *BlockRateControllerSuite) TestOnViewChange_UpdateProposalDelay() {
+	bs.CreateAndStartController()
+	defer bs.StopController()
 
-//func (bs *BlockRateControllerSuite) TestOnViewChange() {}
+	initialMeasurement := bs.ctl.lastMeasurement
+	initialProposalDelay := bs.ctl.ProposalDelay()
+	bs.ctl.OnViewChange(0, bs.initialView+1)
+	require.Eventually(bs.T(), func() bool {
+		return bs.ctl.lastMeasurement.view > bs.initialView
+	}, time.Second, time.Millisecond)
+	nextMeasurement := bs.ctl.lastMeasurement
+	nextProposalDelay := bs.ctl.ProposalDelay()
 
-// test - new view
-//  - epoch transition
-//  - measurement is updated
-//  - duplicate events are handled
+	bs.SanityCheckSubsequentMeasurements(initialMeasurement, nextMeasurement)
+	// new measurement should update proposal delay
+	assert.NotEqual(bs.T(), initialProposalDelay, nextProposalDelay)
 
-//func (bs *BlockRateControllerSuite) TestOnEpochSetupPhaseStarted() {}
+	// duplicate events should be no-ops
+	for i := 0; i <= cap(bs.ctl.viewChanges); i++ {
+		bs.ctl.OnViewChange(0, bs.initialView+1)
+	}
+	require.Eventually(bs.T(), func() bool {
+		return len(bs.ctl.viewChanges) == 0
+	}, time.Second, time.Millisecond)
 
-// test - epochsetup
-//  - epoch info is updated
-//  - duplicate events are handled
+	// state should be unchanged
+	assert.Equal(bs.T(), nextMeasurement, bs.ctl.lastMeasurement)
+	assert.Equal(bs.T(), nextProposalDelay, bs.ctl.ProposalDelay())
+}
+
+// TestOnViewChange_EpochTransition tests that a view change into the next epoch
+// updates the local state to reflect the new epoch.
+func (bs *BlockRateControllerSuite) TestOnViewChange_EpochTransition() {
+	nextEpoch := mockprotocol.NewEpoch(bs.T())
+	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
+	nextEpoch.On("FinalView").Return(bs.curEpochFinalView+100_000, nil)
+	bs.epochs.Add(nextEpoch)
+	bs.CreateAndStartController()
+	defer bs.StopController()
+
+	initialMeasurement := bs.ctl.lastMeasurement
+	bs.epochs.Transition()
+	bs.ctl.OnViewChange(0, bs.curEpochFinalView+1)
+	require.Eventually(bs.T(), func() bool {
+		return bs.ctl.lastMeasurement.view > bs.initialView
+	}, time.Second, time.Millisecond)
+	nextMeasurement := bs.ctl.lastMeasurement
+
+	bs.SanityCheckSubsequentMeasurements(initialMeasurement, nextMeasurement)
+	// epoch boundaries should be updated
+	assert.Equal(bs.T(), bs.curEpochFinalView+1, bs.ctl.epochInfo.curEpochFirstView)
+	assert.Equal(bs.T(), bs.ctl.epochInfo.curEpochFinalView, bs.curEpochFinalView+100_000)
+	assert.Nil(bs.T(), bs.ctl.nextEpochFinalView)
+}
+
+// TestOnEpochSetupPhaseStarted ensures that the epoch info is updated when the next epoch is setup.
+func (bs *BlockRateControllerSuite) TestOnEpochSetupPhaseStarted() {
+	nextEpoch := mockprotocol.NewEpoch(bs.T())
+	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
+	nextEpoch.On("FinalView").Return(bs.curEpochFinalView+100_000, nil)
+	bs.epochs.Add(nextEpoch)
+	bs.CreateAndStartController()
+	defer bs.StopController()
+
+	header := unittest.BlockHeaderFixture()
+	bs.ctl.EpochSetupPhaseStarted(bs.epochCounter, header)
+	require.Eventually(bs.T(), func() bool {
+		return bs.ctl.nextEpochFinalView != nil
+	}, time.Second, time.Millisecond)
+
+	assert.Equal(bs.T(), bs.curEpochFinalView+100_000, *bs.ctl.nextEpochFinalView)
+
+	// duplicate events should be no-ops
+	for i := 0; i <= cap(bs.ctl.epochSetups); i++ {
+		bs.ctl.EpochSetupPhaseStarted(bs.epochCounter, header)
+	}
+
+	assert.Equal(bs.T(), bs.curEpochFinalView+100_000, *bs.ctl.nextEpochFinalView)
+}
