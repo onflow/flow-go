@@ -41,9 +41,10 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 	misbehaviorReportManger := mocknetwork.NewMisbehaviorReportManager(t)
 	conduitFactory := conduit.NewDefaultConduitFactory(
 		&alspmgr.MisbehaviorReportManagerConfig{
-			Logger:       unittest.Logger(),
-			AlspMetrics:  metrics.NewNoopCollector(),
-			CacheMetrics: metrics.NewNoopCollector(),
+			Logger:               unittest.Logger(),
+			AlspMetrics:          metrics.NewNoopCollector(),
+			CacheMetrics:         metrics.NewNoopCollector(),
+			SpamRecordsCacheSize: 100,
 		},
 		conduit.WithMisbehaviorManager(misbehaviorReportManger))
 

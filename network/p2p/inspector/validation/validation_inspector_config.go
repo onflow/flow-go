@@ -28,6 +28,8 @@ type ControlMsgValidationInspectorConfig struct {
 	GraftValidationCfg *CtrlMsgValidationConfig
 	// PruneValidationCfg validation configuration for PRUNE control messages.
 	PruneValidationCfg *CtrlMsgValidationConfig
+	// IHaveValidationCfg validation configuration for IHAVE control messages.
+	IHaveValidationCfg *CtrlMsgValidationConfig
 	// ClusterPrefixHardThreshold the upper bound on the amount of cluster prefixed control messages that will be processed
 	// before a node starts to get penalized. This allows LN nodes to process some cluster prefixed control messages during startup
 	// when the cluster ID's provider is set asynchronously. It also allows processing of some stale messages that may be sent by nodes
@@ -47,6 +49,8 @@ func (conf *ControlMsgValidationInspectorConfig) getCtrlMsgValidationConfig(cont
 		return conf.GraftValidationCfg, true
 	case p2p.CtrlMsgPrune:
 		return conf.PruneValidationCfg, true
+	case p2p.CtrlMsgIHave:
+		return conf.IHaveValidationCfg, true
 	default:
 		return nil, false
 	}
@@ -54,5 +58,5 @@ func (conf *ControlMsgValidationInspectorConfig) getCtrlMsgValidationConfig(cont
 
 // allCtrlMsgValidationConfig returns all control message validation configs in a list.
 func (conf *ControlMsgValidationInspectorConfig) allCtrlMsgValidationConfig() CtrlMsgValidationConfigs {
-	return CtrlMsgValidationConfigs{conf.GraftValidationCfg, conf.PruneValidationCfg}
+	return CtrlMsgValidationConfigs{conf.GraftValidationCfg, conf.PruneValidationCfg, conf.IHaveValidationCfg}
 }

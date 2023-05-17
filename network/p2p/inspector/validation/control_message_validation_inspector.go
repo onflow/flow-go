@@ -2,6 +2,7 @@ package validation
 
 import (
 	"fmt"
+	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
@@ -15,12 +16,14 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/cache"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
+	flowrand "github.com/onflow/flow-go/utils/rand"
 )
 
 // ControlMsgValidationInspector RPC message inspector that inspects control messages and performs some validation on them,
@@ -30,6 +33,7 @@ type ControlMsgValidationInspector struct {
 	events.Noop
 	logger  zerolog.Logger
 	sporkID flow.Identifier
+	metrics module.GossipSubRpcValidationInspectorMetrics
 	// config control message validation configurations.
 	config *ControlMsgValidationInspectorConfig
 	// distributor used to disseminate invalid RPC message notifications.
@@ -64,7 +68,14 @@ var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 // Returns:
 //   - *ControlMsgValidationInspector: a new control message validation inspector.
 //   - error: an error if there is any error while creating the inspector. All errors are irrecoverable and unexpected.
-func NewControlMsgValidationInspector(logger zerolog.Logger, sporkID flow.Identifier, config *ControlMsgValidationInspectorConfig, distributor p2p.GossipSubInspectorNotifDistributor, clusterPrefixedCacheCollector module.HeroCacheMetrics, idProvider module.IdentityProvider) (*ControlMsgValidationInspector, error) {
+func NewControlMsgValidationInspector(
+	logger zerolog.Logger,
+	sporkID flow.Identifier,
+	config *ControlMsgValidationInspectorConfig,
+	distributor p2p.GossipSubInspectorNotifDistributor,
+	clusterPrefixedCacheCollector module.HeroCacheMetrics,
+	idProvider module.IdentityProvider,
+	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics) (*ControlMsgValidationInspector, error) {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 
 	tracker, err := cache.NewClusterPrefixTopicsReceivedTracker(logger, config.ClusterPrefixedTopicsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedTopicsReceivedCacheDecay)
@@ -79,6 +90,7 @@ func NewControlMsgValidationInspector(logger zerolog.Logger, sporkID flow.Identi
 		distributor:                        distributor,
 		clusterPrefixTopicsReceivedTracker: tracker,
 		idProvider:                         idProvider,
+		metrics:                            inspectorMetrics,
 	}
 
 	cfg := &queue.HeroStoreConfig{
@@ -147,15 +159,26 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 			continue
 		}
 
-		// mandatory blocking pre-processing of RPC to check discard threshold.
-		err := c.blockingPreprocessingRpc(from, validationConfig, control)
-		if err != nil {
-			lg.Error().
-				Err(err).
-				Str("peer_id", from.String()).
-				Str("ctrl_msg_type", string(ctrlMsgType)).
-				Msg("could not pre-process rpc, aborting")
-			return fmt.Errorf("could not pre-process rpc, aborting: %w", err)
+		switch ctrlMsgType {
+		case p2p.CtrlMsgGraft, p2p.CtrlMsgPrune:
+			// normal pre-processing
+			err := c.blockingPreprocessingRpc(from, validationConfig, control)
+			if err != nil {
+				lg.Error().
+					Err(err).
+					Msg("could not pre-process rpc, aborting")
+				return fmt.Errorf("could not pre-process rpc, aborting: %w", err)
+			}
+		case p2p.CtrlMsgIHave:
+			// iHave specific pre-processing
+			sampleSize := util.SampleN(len(control.GetIhave()), validationConfig.IHaveInspectionMaxSampleSize, validationConfig.IHaveSyncInspectSampleSizePercentage)
+			err := c.blockingIHaveSamplePreprocessing(from, validationConfig, control, sampleSize)
+			if err != nil {
+				lg.Error().
+					Err(err).
+					Msg("could not pre-process rpc, aborting")
+				return fmt.Errorf("could not pre-process rpc, aborting: %w", err)
+			}
 		}
 
 		// queue further async inspection
@@ -187,22 +210,33 @@ func (c *ControlMsgValidationInspector) ClusterIdsUpdated(clusterIDList flow.Cha
 // blockingPreprocessingRpc ensures the RPC control message count does not exceed the configured discard threshold.
 // Expected error returns during normal operations:
 //   - ErrDiscardThreshold: if control message count exceeds the configured discard threshold.
+//
+// blockingPreprocessingRpc generic pre-processing validation func that ensures the RPC control message count does not exceed the configured hard threshold.
 func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
+	if validationConfig.ControlMsg != p2p.CtrlMsgGraft && validationConfig.ControlMsg != p2p.CtrlMsgPrune {
+		return fmt.Errorf("unexpected control message type %s encountered during blocking pre-processing rpc, expected %s or %s", validationConfig.ControlMsg, p2p.CtrlMsgGraft, p2p.CtrlMsgPrune)
+	}
+	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
+		Uint64("ctrl_msg_count", count).
 		Str("peer_id", from.String()).
 		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
 
-	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
-	// if Count greater than discard threshold drop message and penalize
-	if count > validationConfig.DiscardThreshold {
-		discardThresholdErr := NewDiscardThresholdErr(validationConfig.ControlMsg, count, validationConfig.DiscardThreshold)
+	c.metrics.BlockingPreProcessingStarted(validationConfig.ControlMsg.String(), uint(count))
+	start := time.Now()
+	defer func() {
+		c.metrics.BlockingPreProcessingFinished(validationConfig.ControlMsg.String(), uint(count), time.Since(start))
+	}()
+
+	// if Count greater than hard threshold drop message and penalize
+	if count > validationConfig.HardThreshold {
+		hardThresholdErr := NewHardThresholdErr(validationConfig.ControlMsg, count, validationConfig.HardThreshold)
 		lg.Warn().
-			Err(discardThresholdErr).
-			Uint64("ctrl_msg_count", count).
-			Uint64("upper_threshold", discardThresholdErr.discardThreshold).
+			Err(hardThresholdErr).
+			Uint64("upper_threshold", hardThresholdErr.hardThreshold).
 			Bool(logging.KeySuspicious, true).
 			Msg("rejecting rpc control message")
-		err := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, discardThresholdErr))
+		err := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, hardThresholdErr))
 		if err != nil {
 			lg.Error().
 				Err(err).
@@ -210,15 +244,102 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 				Msg("failed to distribute invalid control message notification")
 			return err
 		}
-		return discardThresholdErr
+		return hardThresholdErr
 	}
 
+	return nil
+}
+
+// blockingPreprocessingSampleRpc blocking pre-processing of a sample of iHave control messages.
+func (c *ControlMsgValidationInspector) blockingIHaveSamplePreprocessing(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
+	c.metrics.BlockingPreProcessingStarted(p2p.CtrlMsgIHave.String(), sampleSize)
+	start := time.Now()
+	defer func() {
+		c.metrics.BlockingPreProcessingFinished(p2p.CtrlMsgIHave.String(), sampleSize, time.Since(start))
+	}()
+	err := c.blockingPreprocessingSampleRpc(from, validationConfig, controlMessage, sampleSize)
+	if err != nil {
+		return fmt.Errorf("failed to pre-process a sample of iHave messages: %w", err)
+	}
+	return nil
+}
+
+// blockingPreprocessingSampleRpc blocking pre-processing validation func that performs some pre-validation of RPC control messages.
+// If the RPC control message count exceeds the configured hard threshold we perform synchronous topic validation on a subset
+// of the control messages. This is used for control message types that do not have an upper bound on the amount of messages a node can send.
+func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
+	if validationConfig.ControlMsg != p2p.CtrlMsgIHave && validationConfig.ControlMsg != p2p.CtrlMsgIWant {
+		return fmt.Errorf("unexpected control message type %s encountered during blocking pre-processing sample rpc, expected %s or %s", validationConfig.ControlMsg, p2p.CtrlMsgIHave, p2p.CtrlMsgIWant)
+	}
+	activeClusterIDS := c.clusterPrefixTopicsReceivedTracker.GetActiveClusterIds()
+	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
+	lg := c.logger.With().
+		Uint64("ctrl_msg_count", count).
+		Str("peer_id", from.String()).
+		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
+	// if count greater than hard threshold perform synchronous topic validation on random subset of the iHave messages
+	if count > validationConfig.HardThreshold {
+		// for iHave control message topic validation we only validate a random subset of the messages
+		// shuffle the ihave messages to perform random validation on a subset of size sampleSize
+		err := c.sampleCtrlMessages(p2p.CtrlMsgIHave, controlMessage, sampleSize)
+		if err != nil {
+			return fmt.Errorf("failed to sample ihave messages: %w", err)
+		}
+		err = c.validateTopicsSample(from, validationConfig, controlMessage, activeClusterIDS, sampleSize)
+		if err != nil {
+			lg.Warn().
+				Err(err).
+				Bool(logging.KeySuspicious, true).
+				Msg("topic validation pre-processing failed rejecting rpc control message")
+			disErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, err))
+			if disErr != nil {
+				lg.Error().
+					Err(disErr).
+					Bool(logging.KeySuspicious, true).
+					Msg("failed to distribute invalid control message notification")
+				return disErr
+			}
+			return err
+		}
+	}
+
+	// pre-processing validation passed, perform ihave sampling again
+	// to randomize async validation to avoid data race that can occur when
+	// performing the sampling asynchronously.
+	// for iHave control message topic validation we only validate a random subset of the messages
+	err := c.sampleCtrlMessages(p2p.CtrlMsgIHave, controlMessage, sampleSize)
+	if err != nil {
+		return fmt.Errorf("failed to sample ihave messages: %w", err)
+	}
+	return nil
+}
+
+// sampleCtrlMessages performs sampling on the specified control message that will randomize
+// the items in the control message slice up to index sampleSize-1.
+func (c *ControlMsgValidationInspector) sampleCtrlMessages(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage, sampleSize uint) error {
+	switch ctrlMsgType {
+	case p2p.CtrlMsgIHave:
+		iHaves := ctrlMsg.GetIhave()
+		swap := func(i, j uint) {
+			iHaves[i], iHaves[j] = iHaves[j], iHaves[i]
+		}
+		err := flowrand.Samples(uint(len(iHaves)), sampleSize, swap)
+		if err != nil {
+			return fmt.Errorf("failed to get random sample of ihave control messages: %w", err)
+		}
+	}
 	return nil
 }
 
 // processInspectMsgReq func used by component workers to perform further inspection of control messages that will check if the messages are rate limited
 // and ensure all topic IDS are valid when the amount of messages is above the configured safety threshold.
 func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequest) error {
+	c.metrics.AsyncProcessingStarted(req.validationConfig.ControlMsg.String())
+	start := time.Now()
+	defer func() {
+		c.metrics.AsyncProcessingFinished(req.validationConfig.ControlMsg.String(), time.Since(start))
+	}()
+
 	count := c.getCtrlMsgCount(req.validationConfig.ControlMsg, req.ctrlMsg)
 	lg := c.logger.With().
 		Str("peer_id", req.Peer.String()).
@@ -228,11 +349,12 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 	switch {
 	case !req.validationConfig.RateLimiter.Allow(req.Peer, int(count)): // check if Peer RPC messages are rate limited
 		validationErr = NewRateLimitedControlMsgErr(req.validationConfig.ControlMsg)
-	case count > req.validationConfig.SafetyThreshold: // check if Peer RPC messages Count greater than safety threshold further inspect each message individually
-		validationErr = c.validateTopics(req.Peer, req.validationConfig.ControlMsg, req.ctrlMsg)
+	case count > req.validationConfig.SafetyThreshold:
+		// check if Peer RPC messages Count greater than safety threshold further inspect each message individually
+		validationErr = c.validateTopics(req.Peer, req.validationConfig, req.ctrlMsg)
 	default:
 		lg.Trace().
-			Uint64("upper_threshold", req.validationConfig.DiscardThreshold).
+			Uint64("hard_threshold", req.validationConfig.HardThreshold).
 			Uint64("safety_threshold", req.validationConfig.SafetyThreshold).
 			Msg(fmt.Sprintf("control message %s inspection passed %d is below configured safety threshold", req.validationConfig.ControlMsg, count))
 		return nil
@@ -260,6 +382,8 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 		return uint64(len(ctrlMsg.GetGraft()))
 	case p2p.CtrlMsgPrune:
 		return uint64(len(ctrlMsg.GetPrune()))
+	case p2p.CtrlMsgIHave:
+		return uint64(len(ctrlMsg.GetIhave()))
 	default:
 		return 0
 	}
@@ -269,13 +393,20 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 // Expected error returns during normal operations:
 //   - channels.ErrInvalidTopic: if topic is invalid.
 //   - ErrDuplicateTopic: if a duplicate topic ID is encountered.
-func (c *ControlMsgValidationInspector) validateTopics(from peer.ID, ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) error {
+func (c *ControlMsgValidationInspector) validateTopics(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) error {
 	activeClusterIDS := c.clusterPrefixTopicsReceivedTracker.GetActiveClusterIds()
-	switch ctrlMsgType {
+	switch validationConfig.ControlMsg {
 	case p2p.CtrlMsgGraft:
 		return c.validateGrafts(from, ctrlMsg, activeClusterIDS)
 	case p2p.CtrlMsgPrune:
 		return c.validatePrunes(from, ctrlMsg, activeClusterIDS)
+	case p2p.CtrlMsgIHave:
+		return c.validateIhaves(from, validationConfig, ctrlMsg, activeClusterIDS)
+	default:
+		// sanity check
+		// This should never happen validateTopics is only used to validate GRAFT and PRUNE control message types
+		// if any other control message type is encountered here this indicates invalid state irrecoverable error.
+		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics expected %s, %s or %s got %s", p2p.CtrlMsgGraft, p2p.CtrlMsgPrune, p2p.CtrlMsgIHave, validationConfig.ControlMsg))
 	}
 	return nil
 }
@@ -310,6 +441,39 @@ func (c *ControlMsgValidationInspector) validatePrunes(from peer.ID, ctrlMsg *pu
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// validateIhaves performs topic validation on all ihaves in the control message using the provided validateTopic func while tracking duplicates.
+func (c *ControlMsgValidationInspector) validateIhaves(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage, activeClusterIDS flow.ChainIDList) error {
+	sampleSize := util.SampleN(len(ctrlMsg.GetIhave()), validationConfig.IHaveInspectionMaxSampleSize, validationConfig.IHaveAsyncInspectSampleSizePercentage)
+	return c.validateTopicsSample(from, validationConfig, ctrlMsg, activeClusterIDS, sampleSize)
+}
+
+// validateTopicsSample samples a subset of topics from the specified control message and ensures the sample contains only valid flow topic/channel and no duplicate topics exist.
+// Sample size ensures liveness of the network when validating messages with no upper bound on the amount of messages that may be received.
+// All errors returned from this function can be considered benign.
+func (c *ControlMsgValidationInspector) validateTopicsSample(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage, activeClusterIDS flow.ChainIDList, sampleSize uint) error {
+	tracker := make(duplicateTopicTracker)
+	switch validationConfig.ControlMsg {
+	case p2p.CtrlMsgIHave:
+		for i := uint(0); i < sampleSize; i++ {
+			topic := channels.Topic(ctrlMsg.Ihave[i].GetTopicID())
+			if tracker.isDuplicate(topic) {
+				return NewDuplicateTopicErr(topic)
+			}
+			tracker.set(topic)
+			err := c.validateTopic(from, topic, activeClusterIDS)
+			if err != nil {
+				return err
+			}
+		}
+	default:
+		// sanity check
+		// This should never happen validateTopicsSample is only used to validate IHAVE control message types
+		// if any other control message type is encountered here this indicates invalid state irrecoverable error.
+		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics sample expected %s got %s", p2p.CtrlMsgIHave, validationConfig.ControlMsg))
 	}
 	return nil
 }

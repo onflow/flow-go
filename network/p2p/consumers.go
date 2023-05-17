@@ -69,7 +69,7 @@ type DisallowListNotificationDistributor interface {
 // The implementation should guarantee that all registered consumers are called upon distribution of a new event.
 type GossipSubInspectorNotifDistributor interface {
 	component.Component
-	// DistributeInvalidControlMessageNotification distributes the event to all the consumers.
+	// Distribute distributes the event to all the consumers.
 	// Any error returned by the distributor is non-recoverable and will cause the node to crash.
 	// Implementation must be concurrency safe, and non-blocking.
 	Distribute(notification *InvCtrlMsgNotif) error

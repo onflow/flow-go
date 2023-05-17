@@ -27,29 +27,29 @@ func TestErrActiveClusterIDsNotSetRoundTrip(t *testing.T) {
 	assert.False(t, IsErrActiveClusterIDsNotSet(dummyErr), "IsErrActiveClusterIDsNotSet should return false for non-ErrActiveClusterIdsNotSet error")
 }
 
-// TestErrDiscardThresholdRoundTrip ensures correct error formatting for ErrDiscardThreshold.
-func TestErrDiscardThresholdRoundTrip(t *testing.T) {
+// TestErrHardThresholdRoundTrip ensures correct error formatting for ErrHardThreshold.
+func TestErrHardThresholdRoundTrip(t *testing.T) {
 	controlMsg := p2p.CtrlMsgGraft
 	amount := uint64(100)
-	discardThreshold := uint64(500)
-	err := NewDiscardThresholdErr(controlMsg, amount, discardThreshold)
+	hardThreshold := uint64(500)
+	err := NewHardThresholdErr(controlMsg, amount, hardThreshold)
 
 	// tests the error message formatting.
-	expectedErrMsg := fmt.Sprintf("number of %s messges received exceeds the configured discard threshold: received %d discard threshold %d", controlMsg, amount, discardThreshold)
+	expectedErrMsg := fmt.Sprintf("number of %s messges received exceeds the configured hard threshold: received %d hard threshold %d", controlMsg, amount, hardThreshold)
 	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
 
-	// tests the IsErrDiscardThreshold function.
-	assert.True(t, IsErrDiscardThreshold(err), "IsErrDiscardThreshold should return true for ErrDiscardThreshold error")
+	// tests the IsErrHardThreshold function.
+	assert.True(t, IsErrHardThreshold(err), "IsErrHardThreshold should return true for ErrHardThreshold error")
 
-	// test IsErrDiscardThreshold with a different error type.
+	// test IsErrHardThreshold with a different error type.
 	dummyErr := fmt.Errorf("dummy error")
-	assert.False(t, IsErrDiscardThreshold(dummyErr), "IsErrDiscardThreshold should return false for non-ErrDiscardThreshold error")
+	assert.False(t, IsErrHardThreshold(dummyErr), "IsErrHardThreshold should return false for non-ErrHardThreshold error")
 }
 
 // TestErrInvalidLimitConfigRoundTrip ensures correct error formatting for ErrInvalidLimitConfig.
 func TestErrInvalidLimitConfigRoundTrip(t *testing.T) {
 	controlMsg := p2p.CtrlMsgGraft
-	limitStr := DiscardThresholdMapKey
+	limitStr := HardThresholdMapKey
 	limit := uint64(500)
 	err := NewInvalidLimitConfigErr(controlMsg, limitStr, limit)
 

@@ -29,10 +29,13 @@ func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation
 		validation.RateLimitMapKey:       validation.DefaultIHaveRateLimit,
 	}, iHaveOpts...)
 	return &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:     validation.DefaultNumberOfWorkers,
-		InspectMsgStoreOpts: opts,
-		GraftValidationCfg:  graftCfg,
-		PruneValidationCfg:  pruneCfg,
-		IHaveValidationCfg:  iHaveCfg,
+		NumberOfWorkers:                         validation.DefaultNumberOfWorkers,
+		InspectMsgStoreOpts:                     opts,
+		GraftValidationCfg:                      graftCfg,
+		PruneValidationCfg:                      pruneCfg,
+		IHaveValidationCfg:                      iHaveCfg,
+		ClusterPrefixHardThreshold:              validation.DefaultClusterPrefixDiscardThreshold,
+		ClusterPrefixedTopicsReceivedCacheDecay: validation.DefaultClusterPrefixedTopicsReceivedCacheDecay,
+		ClusterPrefixedTopicsReceivedCacheSize:  validation.DefaultClusterPrefixedTopicsReceivedCacheSize,
 	}
 }

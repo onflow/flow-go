@@ -59,7 +59,7 @@ func NodeFixture(
 
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
 
-	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), idProvider).
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), idProvider, metrics.NewNoopCollector()).
 		Build()
 	require.NoError(t, err)
 

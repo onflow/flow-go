@@ -28,7 +28,7 @@ func NewCorruptLibP2PNodeFactory(
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metricsCfg module.LibP2PMetrics,
+	metricsCfg module.NetworkMetrics,
 	resolver madns.BasicResolver,
 	role string,
 	connGaterCfg *p2pconfig.ConnectionGaterConfig,
@@ -49,7 +49,7 @@ func NewCorruptLibP2PNodeFactory(
 			Metrics:          metricsCfg,
 		}
 
-		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, gossipSubCfg.RpcInspector, idProvider).
+		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, gossipSubCfg.RpcInspector, idProvider, metricsCfg).
 			SetPublicNetwork(p2p.PrivateNetwork).
 			SetMetrics(metCfg).
 			Build()
