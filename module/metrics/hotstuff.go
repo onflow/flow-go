@@ -193,7 +193,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Subsystem:   subsystemHotstuff,
 			Help:        "active range of TimeoutCollectors, lowest and highest views that we are collecting timeouts for",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
-		}, []string{"lowest_retained_view", "newest_view_of_created_collector"}),
+		}, []string{"prefix"}),
 		numberOfActiveCollectors: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:        "active_collectors",
 			Namespace:   namespaceConsensus,
