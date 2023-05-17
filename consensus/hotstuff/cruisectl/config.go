@@ -24,7 +24,7 @@ func DefaultConfig() *Config {
 // Config defines configuration for the BlockRateController.
 type Config struct {
 	// TargetTransition defines the target time to transition epochs each week.
-	TargetTransition *EpochTransitionTime
+	TargetTransition EpochTransitionTime
 	// DefaultProposalDelay is the baseline ProposalDelay value. It is used:
 	//  - when Enabled is false
 	//  - when epoch fallback has been triggered

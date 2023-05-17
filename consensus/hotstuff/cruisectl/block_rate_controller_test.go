@@ -43,6 +43,7 @@ func TestBlockRateController(t *testing.T) {
 	suite.Run(t, new(BlockRateControllerSuite))
 }
 
+// SetupTest initializes mocks and default values.
 func (bs *BlockRateControllerSuite) SetupTest() {
 	bs.config = DefaultConfig()
 	bs.config.KP = 1.0
@@ -78,6 +79,8 @@ func (bs *BlockRateControllerSuite) SetupTest() {
 	bs.ctx, bs.cancel = irrecoverable.NewMockSignalerContextWithCancel(bs.T(), context.Background())
 }
 
+// CreateAndStartController creates and starts the BlockRateController.
+// Should be called only once per test case.
 func (bs *BlockRateControllerSuite) CreateAndStartController() {
 	ctl, err := NewBlockRateController(unittest.Logger(), bs.config, bs.state, bs.initialView)
 	require.NoError(bs.T(), err)
@@ -86,6 +89,7 @@ func (bs *BlockRateControllerSuite) CreateAndStartController() {
 	unittest.RequireCloseBefore(bs.T(), bs.ctl.Ready(), time.Second, "component did not start")
 }
 
+// StopController stops the BlockRateController.
 func (bs *BlockRateControllerSuite) StopController() {
 	bs.cancel()
 	unittest.RequireCloseBefore(bs.T(), bs.ctl.Done(), time.Second, "component did not stop")
@@ -284,6 +288,5 @@ func (bs *BlockRateControllerSuite) TestOnEpochSetupPhaseStarted() {
 	for i := 0; i <= cap(bs.ctl.epochSetups); i++ {
 		bs.ctl.EpochSetupPhaseStarted(bs.epochCounter, header)
 	}
-
 	assert.Equal(bs.T(), bs.curEpochFinalView+100_000, *bs.ctl.nextEpochFinalView)
 }

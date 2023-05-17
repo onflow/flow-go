@@ -35,8 +35,8 @@ type EpochTransitionTime struct {
 // DefaultEpochTransitionTime is the default epochInfo transition target.
 // The target switchover is Wednesday 12:00 PDT, which is 19:00 UTC.
 // The string representation is `wednesday@19:00`.
-func DefaultEpochTransitionTime() *EpochTransitionTime {
-	return &EpochTransitionTime{
+func DefaultEpochTransitionTime() EpochTransitionTime {
+	return EpochTransitionTime{
 		day:    time.Wednesday,
 		hour:   19,
 		minute: 0,
