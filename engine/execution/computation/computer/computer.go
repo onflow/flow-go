@@ -3,7 +3,6 @@ package computer
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
@@ -15,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -319,6 +317,13 @@ func (e *blockComputer) executeBlock(
 	defer collector.Stop()
 
 	requestQueue := make(chan transactionRequest, numTxns)
+
+	database := newTransactionCoordinator(
+		e.vm,
+		baseSnapshot,
+		derivedBlockData,
+		collector)
+
 	e.queueTransactionRequests(
 		blockId,
 		blockIdStr,
@@ -328,14 +333,11 @@ func (e *blockComputer) executeBlock(
 		requestQueue)
 	close(requestQueue)
 
-	database := storage.NewBlockDatabase(baseSnapshot, 0, derivedBlockData)
-
 	for request := range requestQueue {
 		request.ctx.Logger.Info().Msg("executing transaction")
 		err := e.executeTransaction(
 			blockSpan,
 			database,
-			collector,
 			request)
 		if err != nil {
 			return nil, err
@@ -357,15 +359,13 @@ func (e *blockComputer) executeBlock(
 }
 
 func (e *blockComputer) executeTransaction(
-	parentSpan otelTrace.Span,
-	database *storage.BlockDatabase,
-	collector *resultCollector,
+	blockSpan otelTrace.Span,
+	database *transactionCoordinator,
 	request transactionRequest,
 ) error {
 	txn, err := e.executeTransactionInternal(
-		parentSpan,
+		blockSpan,
 		database,
-		collector,
 		request)
 	if err != nil {
 		prefix := ""
@@ -394,18 +394,15 @@ func (e *blockComputer) executeTransaction(
 }
 
 func (e *blockComputer) executeTransactionInternal(
-	parentSpan otelTrace.Span,
-	database *storage.BlockDatabase,
-	collector *resultCollector,
+	blockSpan otelTrace.Span,
+	database *transactionCoordinator,
 	request transactionRequest,
 ) (
-	storage.Transaction,
+	*transaction,
 	error,
 ) {
-	startedAt := time.Now()
-
 	txSpan := e.tracer.StartSampledSpanFromParent(
-		parentSpan,
+		blockSpan,
 		request.txnId,
 		trace.EXEComputeTransaction)
 	txSpan.SetAttributes(
@@ -417,22 +414,18 @@ func (e *blockComputer) executeTransactionInternal(
 
 	request.ctx = fvm.NewContextFromParent(request.ctx, fvm.WithSpan(txSpan))
 
-	txn, err := database.NewTransaction(
-		request.ExecutionTime(),
-		fvm.ProcedureStateParameters(request.ctx, request))
+	txn, err := database.NewTransaction(request)
 	if err != nil {
 		return nil, err
 	}
+	defer txn.Cleanup()
 
-	executor := e.vm.NewExecutor(request.ctx, request.TransactionProcedure, txn)
-	defer executor.Cleanup()
-
-	err = executor.Preprocess()
+	err = txn.Preprocess()
 	if err != nil {
 		return txn, err
 	}
 
-	err = executor.Execute()
+	err = txn.Execute()
 	if err != nil {
 		return txn, err
 	}
@@ -442,17 +435,5 @@ func (e *blockComputer) executeTransactionInternal(
 		return txn, err
 	}
 
-	executionSnapshot, err := txn.Commit()
-	if err != nil {
-		return txn, err
-	}
-
-	output := executor.Output()
-	collector.AddTransactionResult(
-		request,
-		executionSnapshot,
-		output,
-		time.Since(startedAt))
-
-	return txn, nil
+	return txn, txn.Commit()
 }
