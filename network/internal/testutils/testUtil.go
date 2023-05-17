@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
@@ -247,8 +248,9 @@ func GenerateNetworks(t *testing.T,
 		receiveCache := netcache.NewHeroReceiveCache(p2p.DefaultReceiveCacheSize, log, metrics.NewNoopCollector())
 		cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  unittest.Logger(),
-			SpamRecordCacheSize:     uint32(1000),
-			SpamReportQueueSize:     uint32(1000),
+			SpamRecordCacheSize:     alsp.DefaultSpamRecordCacheSize,
+			SpamReportQueueSize:     alsp.DefaultSpamReportQueueSize,
+			HeartBeatInterval:       alsp.DefaultHeartBeatInterval,
 			AlspMetrics:             metrics.NewNoopCollector(),
 			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		})

@@ -36,6 +36,8 @@ var (
 	// ErrSpamReportQueueSizeNotSet is returned when the spam report queue size is not set, it is a fatal irrecoverable error,
 	// and the ALSP module cannot be initialized.
 	ErrSpamReportQueueSizeNotSet = errors.New("spam report queue size is not set")
+	// ErrHeartBeatIntervalNotSet is returned when the heartbeat interval is not set, it is a fatal irrecoverable error,
+	ErrHeartBeatIntervalNotSet = errors.New("heartbeat interval is not set")
 )
 
 // MisbehaviorReportManager is responsible for handling misbehavior reports.
@@ -81,6 +83,9 @@ type MisbehaviorReportManagerConfig struct {
 	// NetworkType is the type of the network it is used to determine whether the ALSP module is utilized in the
 	// public (unstaked) or private (staked) network.
 	NetworkType network.NetworkingType
+	// HeartBeatInterval is the interval between the heartbeats. Heartbeat is a recurring event that is used to
+	// apply recurring actions, e.g., decay the penalty of the misbehaving nodes.
+	HeartBeatInterval time.Duration
 }
 
 // validate validates the MisbehaviorReportManagerConfig instance. It returns an error if the config is invalid.
@@ -99,6 +104,9 @@ func (c MisbehaviorReportManagerConfig) validate() error {
 	}
 	if c.SpamReportQueueSize == 0 {
 		return ErrSpamReportQueueSizeNotSet
+	}
+	if c.HeartBeatInterval == 0 {
+		return ErrHeartBeatIntervalNotSet
 	}
 	return nil
 }
@@ -167,6 +175,10 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 	}
 
 	builder := component.NewComponentManagerBuilder()
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		ready()
+		m.startHeartbeatTicks(ctx, cfg.HeartBeatInterval) // blocking call
+	})
 	for i := 0; i < defaultMisbehaviorReportManagerWorkers; i++ {
 		builder.AddWorker(m.workerPool.WorkerLogic())
 	}
@@ -224,14 +236,19 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 }
 
 // startHeartbeatTicks starts the heartbeat ticks ticker to tick at the given intervals. It is a blocking function, and
-// should be called in a separate goroutine. It returns when the context is canceled.
+// should be called in a separate goroutine. It returns when the context is canceled. Hearbeats are recurring events that
+// are used to perform periodic tasks.
 // Args:
-// 	ctx: the context.
-// 	interval: the interval between two ticks.
+//
+//	ctx: the context.
+//	interval: the interval between two ticks.
+//
 // Returns:
-// 	none.
+//
+//	none.
 func (m *MisbehaviorReportManager) startHeartbeatTicks(ctx irrecoverable.SignalerContext, interval time.Duration) {
 	ticker := time.NewTicker(interval)
+	m.logger.Info().Dur("interval", interval).Msg("starting heartbeat ticks")
 	defer ticker.Stop()
 	for {
 		select {
@@ -245,11 +262,15 @@ func (m *MisbehaviorReportManager) startHeartbeatTicks(ctx irrecoverable.Signale
 	}
 }
 
-// onHeartbeat is called upon a startHeartbeatTicks. It decays the penalty of all spam records based on their individual decay speed.
+// onHeartbeat is called upon a startHeartbeatTicks. It encapsulates the recurring tasks that should be performed
+// during a heartbeat, which currently includes decay of the spam records.
 // Args:
-// 	ctx: the context.
+//
+//	ctx: the context.
+//
 // Returns:
-// 	none.
+//
+//	none.
 func (m *MisbehaviorReportManager) onHeartbeat(ctx irrecoverable.SignalerContext) {
 	allIds := m.cache.Identities()
 

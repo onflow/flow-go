@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -49,8 +50,9 @@ func WithConduitFactory(factory network.ConduitFactory) func(*Network) {
 // in order for a mock hub to find each other.
 func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Network)) *Network {
 	cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-		SpamRecordCacheSize:     uint32(1000),
-		SpamReportQueueSize:     uint32(1000),
+		SpamRecordCacheSize:     alsp.DefaultSpamRecordCacheSize,
+		SpamReportQueueSize:     alsp.DefaultSpamReportQueueSize,
+		HeartBeatInterval:       alsp.DefaultHeartBeatInterval,
 		Logger:                  unittest.Logger(),
 		AlspMetrics:             metrics.NewNoopCollector(),
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
