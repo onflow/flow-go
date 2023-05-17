@@ -2,7 +2,6 @@ package upgrades
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
 	"math"
 	"testing"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/coreos/go-semver/semver"
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/model/flow"
@@ -22,69 +22,41 @@ type TestServiceEventVersionControl struct {
 }
 
 func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent() {
+	// This should not be too short, otherwise we might execute to many blocks
+	// before the version beacon takes effect.
+	// If the test is flaky try increasing this value.
+	// If the test is too slow try decreasing this value.
+	freezePeriodForTheseTests := uint64(300)
 
 	ctx := context.Background()
 
-	serviceAddress := s.net.Root().Header.ChainID.Chain().ServiceAddress()
+	serviceAddress := sdk.Address(s.net.Root().Header.ChainID.Chain().ServiceAddress())
 	env := templates.Environment{
 		NodeVersionBeaconAddress: serviceAddress.String(),
 	}
 
 	freezePeriod := s.getFreezePeriod(ctx, env)
-
-	s.Run("should fail adding version boundary inside the freeze period", func() {
-		latestFinalized, err := s.AccessClient().GetLatestFinalizedBlockHeader(ctx)
-		require.NoError(s.T(), err)
-
-		height := latestFinalized.Height + freezePeriod - 5
-		major := uint8(0)
-		minor := uint8(0)
-		patch := uint8(1)
-		preRelease := ""
-
-		txResult := s.sendSetVersionBoundaryTransaction(
-			ctx,
-			env,
-			versionBoundary{
-				Major:       major,
-				Minor:       minor,
-				Patch:       patch,
-				PreRelease:  preRelease,
-				BlockHeight: height,
-			})
-		s.Require().Error(txResult.Error)
-
-		sealed := s.ReceiptState.WaitForReceiptFromAny(
-			s.T(),
-			flow.Identifier(txResult.BlockID))
-		s.Require().Len(sealed.ExecutionResult.ServiceEvents, 0)
-	})
-
 	s.Run("set freeze period script should work", func() {
 		// we also want to do this for the next test to conclude faster
-		// this should not be too short, otherwise we might execute to many blocks
-		// before the version beacon takes effect
-		// if the test is flaky increase this value
-		// if the test is too slow decrease this value
-		newFreezePeriod := uint64(300)
+		newFreezePeriod := freezePeriodForTheseTests
 
-		s.Require().NotEqual(newFreezePeriod, freezePeriod,
+		s.Require().NotEqual(
+			newFreezePeriod,
+			freezePeriod,
 			"the test is pointless, "+
 				"please change the freeze period in the test")
 
 		setFreezePeriodScript := templates.GenerateChangeVersionFreezePeriodScript(env)
-		sdkServiceAddress := sdk.Address(serviceAddress)
-
 		latestBlockID, err := s.AccessClient().GetLatestBlockID(ctx)
 		require.NoError(s.T(), err)
 
 		tx := sdk.NewTransaction().
 			SetScript(setFreezePeriodScript).
 			SetReferenceBlockID(sdk.Identifier(latestBlockID)).
-			SetProposalKey(sdkServiceAddress,
+			SetProposalKey(serviceAddress,
 				0, s.AccessClient().GetSeqNumber()). // todo track sequence number
-			AddAuthorizer(sdkServiceAddress).
-			SetPayer(sdkServiceAddress)
+			AddAuthorizer(serviceAddress).
+			SetPayer(serviceAddress)
 
 		err = tx.AddArgument(cadence.NewUInt64(newFreezePeriod))
 		s.Require().NoError(err)
@@ -97,10 +69,35 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 
 		s.Require().NoError(result.Error)
 
-		// This changes the freeze  period to something shorter,
-		// so we can test the next step
 		freezePeriod = s.getFreezePeriod(ctx, env)
 		s.Require().Equal(newFreezePeriod, freezePeriod)
+	})
+
+	s.Run("should fail adding version boundary inside the freeze period", func() {
+		latestFinalized, err := s.AccessClient().GetLatestFinalizedBlockHeader(ctx)
+		require.NoError(s.T(), err)
+
+		height := latestFinalized.Height + freezePeriod - 5
+		major := uint8(0)
+		minor := uint8(0)
+		patch := uint8(1)
+
+		txResult := s.sendSetVersionBoundaryTransaction(
+			ctx,
+			env,
+			versionBoundary{
+				Major:       major,
+				Minor:       minor,
+				Patch:       patch,
+				PreRelease:  "",
+				BlockHeight: height,
+			})
+		s.Require().Error(txResult.Error)
+
+		sealed := s.ReceiptState.WaitForReceiptFromAny(
+			s.T(),
+			flow.Identifier(txResult.BlockID))
+		s.Require().Len(sealed.ExecutionResult.ServiceEvents, 0)
 	})
 
 	s.Run("should add version boundary after the freeze period", func() {
@@ -117,7 +114,6 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 		major := uint8(0)
 		minor := uint8(0)
 		patch := uint8(1)
-		preRelease := ""
 
 		txResult := s.sendSetVersionBoundaryTransaction(
 			ctx,
@@ -126,7 +122,7 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 				Major:       major,
 				Minor:       minor,
 				Patch:       patch,
-				PreRelease:  preRelease,
+				PreRelease:  "",
 				BlockHeight: height,
 			})
 		s.Require().NoError(txResult.Error)
@@ -173,12 +169,10 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 		// the current height + the freeze period
 		height := latestFinalized.Height + freezePeriod + 100
 
-		// version 0.0.1
-		// max version to be sure that the node version is lower
+		// max version to be sure that the node version is lower so we force a stop
 		major := uint8(math.MaxUint8)
 		minor := uint8(math.MaxUint8)
 		patch := uint8(math.MaxUint8)
-		preRelease := ""
 
 		txResult := s.sendSetVersionBoundaryTransaction(
 			ctx,
@@ -187,7 +181,7 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 				Major:       major,
 				Minor:       minor,
 				Patch:       patch,
-				PreRelease:  preRelease,
+				PreRelease:  "",
 				BlockHeight: height,
 			})
 		s.Require().NoError(txResult.Error)
@@ -273,27 +267,14 @@ func (s *TestServiceEventVersionControl) sendSetVersionBoundaryTransaction(
 		SetPayer(sdk.Address(serviceAddress)).
 		AddAuthorizer(sdk.Address(serviceAddress))
 
-	// args
-	// newMajor: UInt8,
-	// newMinor: UInt8,
-	// newPatch: UInt8,
-	// newPreRelease: String?,
-	// targetBlockHeight: UInt64
-
 	err = tx.AddArgument(cadence.NewUInt8(boundary.Major))
 	s.Require().NoError(err)
-
 	err = tx.AddArgument(cadence.NewUInt8(boundary.Minor))
 	s.Require().NoError(err)
-
 	err = tx.AddArgument(cadence.NewUInt8(boundary.Patch))
 	s.Require().NoError(err)
-
-	preReleaseCadenceString, err := cadence.NewString(boundary.PreRelease)
+	err = tx.AddArgument(cadence.String(boundary.PreRelease))
 	s.Require().NoError(err)
-	err = tx.AddArgument(preReleaseCadenceString)
-	s.Require().NoError(err)
-
 	err = tx.AddArgument(cadence.NewUInt64(boundary.BlockHeight))
 	s.Require().NoError(err)
 

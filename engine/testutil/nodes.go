@@ -4,11 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/coreos/go-semver/semver"
-	"github.com/onflow/flow-go/cmd/build"
 	"math"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -686,32 +683,16 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	// disabled by default
 	uploader := uploader.NewManager(node.Tracer)
 
-	// TODO: package into a function
 	opts := []ingestion.StopControlOption{
 		ingestion.StopControlWithLogger(node.Log),
 	}
-	sem := build.Semver()
-	if build.IsDefined(sem) {
-		// for now our versions have a "v" prefix, but semver doesn't like that
-		// so we strip it out
-		sem = strings.TrimPrefix(sem, "v")
-
-		ver, err := semver.NewVersion(sem)
-		require.NoError(t, err, "node semver should be valid if set")
-
-		opts = append(opts, ingestion.StopControlWithVersionControl(
-			ver,
-			versionBeacons,
-			true,
-		))
-	}
-
-	stopControl := ingestion.NewStopControl(
+	stopControl, err := ingestion.NewStopControlWithVersionControl(
 		node.Headers,
+		versionBeacons,
+		true,
 		opts...,
 	)
-
-	node.Log.Info().Msg("stop control initialized")
+	require.NoError(t, err, "stop control should be initialized")
 
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(

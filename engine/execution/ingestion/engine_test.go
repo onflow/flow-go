@@ -1153,7 +1153,7 @@ func TestStopAtHeight(t *testing.T) {
 // TestStopAtHeightRaceFinalization test a possible race condition which happens
 // when block at stop height N is finalized while N-1 is being executed.
 // If execution finishes exactly between finalization checking execution state and
-// setting block ID to shouldCrash, it's possible to miss and never actually stop the EN
+// setting block ID to crash, it's possible to miss and never actually stop the EN
 func TestStopAtHeightRaceFinalization(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 

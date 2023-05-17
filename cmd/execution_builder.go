@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/coreos/go-semver/semver"
-	"github.com/onflow/flow-go/cmd/build"
 	"os"
 	"path"
 	"path/filepath"
@@ -652,11 +650,6 @@ func (exeNode *ExecutionNode) LoadStopControl(
 	module.ReadyDoneAware,
 	error,
 ) {
-
-	// node.RootSnapshot.VersionBeacon()
-	// node.Storage.VersionBeacons.Highest()
-	//
-
 	opts := []ingestion.StopControlOption{
 		ingestion.StopControlWithLogger(exeNode.builder.Logger),
 	}
@@ -664,32 +657,16 @@ func (exeNode *ExecutionNode) LoadStopControl(
 		opts = append(opts, ingestion.StopControlWithStopped())
 	}
 
-	sem := build.Semver()
-	if build.IsDefined(sem) {
-		// for now our versions have a "v" prefix, but semver doesn't like that
-		// so we strip it out
-		sem = strings.TrimPrefix(sem, "v")
-
-		ver, err := semver.NewVersion(sem)
-		if err != nil {
-			exeNode.builder.Logger.
-				Err(err).
-				Str("semver", sem).
-				Msg("failed to parse semver")
-
-			return nil, fmt.Errorf("failed to parse semver: %w", err)
-		}
-
-		opts = append(opts, ingestion.StopControlWithVersionControl(
-			ver,
-			node.Storage.VersionBeacons,
-			true,
-		))
+	stopControl, err := ingestion.NewStopControlWithVersionControl(
+		node.Storage.Headers,
+		node.Storage.VersionBeacons,
+		true,
+		opts...)
+	if err != nil {
+		return nil, fmt.Errorf("error starting stop control: %w", err)
 	}
 
-	exeNode.stopControl = ingestion.NewStopControl(node.Storage.Headers, opts...)
-
-	exeNode.builder.Logger.Info().Msg("stop control initialized")
+	exeNode.stopControl = stopControl
 
 	return &module.NoopReadyDoneAware{}, nil
 }

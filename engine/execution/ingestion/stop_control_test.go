@@ -3,16 +3,16 @@ package ingestion
 import (
 	"context"
 	"fmt"
-	"github.com/coreos/go-semver/semver"
-	"github.com/onflow/flow-go/model/flow"
-	storageMock "github.com/onflow/flow-go/storage/mock"
 	"testing"
 
+	"github.com/coreos/go-semver/semver"
 	testifyMock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/state/mock"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	storageMock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
