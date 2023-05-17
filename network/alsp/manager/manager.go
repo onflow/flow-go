@@ -25,7 +25,6 @@ const (
 	// defaultMisbehaviorReportManagerWorkers is the default number of workers in the worker pool.
 	defaultMisbehaviorReportManagerWorkers = 2
 	FatalMsgNegativePositivePenalty        = "penalty value is positive, expected negative %f"
-	FatalMsgFailedToApplyPenalty           = "failed to apply penalty to the spam record"
 )
 
 var (
