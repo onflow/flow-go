@@ -90,7 +90,7 @@ func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.S
 // We set the view rate to the computed target view rate and the error to 0.
 func (ctl *BlockRateController) initLastMeasurement(curView uint64, now time.Time) {
 	viewsRemaining := float64(ctl.curEpochFinalView - curView)                                   // views remaining in current epoch
-	timeRemaining := float64(ctl.epochInfo.curEpochTargetEndTime.Sub(now).Milliseconds()) * 1000 // time remaining until target epoch end
+	timeRemaining := float64(ctl.epochInfo.curEpochTargetEndTime.Sub(now).Milliseconds()) / 1000 // time remaining (s) until target epoch end
 	targetViewRate := viewsRemaining / timeRemaining
 	ctl.lastMeasurement = measurement{
 		view:            curView,
@@ -120,7 +120,7 @@ func (ctl *BlockRateController) initEpochInfo(curView uint64) error {
 	if err != nil {
 		return fmt.Errorf("could not initialize current epoch final view: %w", err)
 	}
-	ctl.curEpochFirstView = curEpochFinalView
+	ctl.curEpochFinalView = curEpochFinalView
 
 	phase, err := finalSnapshot.Phase()
 	if err != nil {
@@ -250,9 +250,9 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 
 	alpha := ctl.config.alpha()
 	viewDiff := float64(view - lastMeasurement.view)                                             // views between current and last measurement
-	timeDiff := float64(lastMeasurement.time.Sub(now).Milliseconds()) * 1000                     // time between current and last measurement
+	timeDiff := float64(lastMeasurement.time.Sub(now).Milliseconds()) / 1000                     // time between current and last measurement
 	viewsRemaining := float64(ctl.curEpochFinalView - view)                                      // views remaining in current epoch
-	timeRemaining := float64(ctl.epochInfo.curEpochTargetEndTime.Sub(now).Milliseconds()) * 1000 // time remaining until target epoch end
+	timeRemaining := float64(ctl.epochInfo.curEpochTargetEndTime.Sub(now).Milliseconds()) / 1000 // time remaining until target epoch end
 
 	// compute and store the rate and error for the current view
 	var nextMeasurement measurement
