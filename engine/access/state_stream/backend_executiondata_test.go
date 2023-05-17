@@ -150,9 +150,6 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
 	s.snapshot.On("Head").Return(s.blocks[0].Header, nil).Maybe()
 
-	s.state.On("Params").Return(s.params, nil).Maybe()
-	s.params.On("SporkRootBlockHeight").Return(rootBlock.Header.Height, nil).Maybe()
-
 	s.seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
 		func(blockID flow.Identifier) *flow.Seal {
 			if seal, ok := s.sealMap[blockID]; ok {
@@ -242,6 +239,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.eds,
 		s.execDataCache,
 		s.broadcaster,
+		rootBlock.Header.Height,
 	)
 	require.NoError(s.T(), err)
 }

@@ -78,6 +78,7 @@ func NewEng(
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	chainID flow.ChainID,
+	initialBlockHeight uint64,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, GetExecutionDataByBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, GetExecutionDataByBlockID->10
 	heroCacheMetrics module.HeroCacheMetrics,
@@ -116,7 +117,7 @@ func NewEng(
 
 	broadcaster := engine.NewBroadcaster()
 
-	backend, err := New(logger, config, state, headers, seals, results, execDataStore, execDataCache, broadcaster)
+	backend, err := New(logger, config, state, headers, seals, results, execDataStore, execDataCache, broadcaster, initialBlockHeight)
 	if err != nil {
 		return nil, fmt.Errorf("could not create state stream backend: %w", err)
 	}

@@ -66,18 +66,14 @@ func New(
 	execDataStore execution_data.ExecutionDataStore,
 	execDataCache *herocache.BlockExecutionData,
 	broadcaster *engine.Broadcaster,
+	rootHeight uint64,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
 	// cache the root block height and ID for runtime lookups.
-	rootHeight, err := state.Params().SporkRootBlockHeight()
-	if err != nil {
-		return nil, fmt.Errorf("could not get spork root block height: %w", err)
-	}
-
 	rootBlockID, err := headers.BlockIDByHeight(rootHeight)
 	if err != nil {
-		return nil, fmt.Errorf("could not get spork root block ID: %w", err)
+		return nil, fmt.Errorf("could not get root block ID: %w", err)
 	}
 
 	b := &StateStreamBackend{
@@ -159,7 +155,7 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
 	}
 
-	// if the start block is the spork root block, there will not be an execution data. skip it and
+	// if the start block is the root block, there will not be an execution data. skip it and
 	// begin from the next block.
 	// Note: we can skip the block lookup since it was already done in the constructor
 	if startBlockID == b.rootBlockID || startHeight == b.rootBlockHeight {
@@ -178,7 +174,7 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 	// heights that have not been indexed yet will result in an error
 	if startHeight > 0 {
 		if startHeight < b.rootBlockHeight {
-			return 0, status.Errorf(codes.InvalidArgument, "start height must be greater than or equal to the spork root height %d", b.rootBlockHeight)
+			return 0, status.Errorf(codes.InvalidArgument, "start height must be greater than or equal to the root height %d", b.rootBlockHeight)
 		}
 
 		header, err := b.headers.ByHeight(startHeight)

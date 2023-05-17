@@ -591,6 +591,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				node.Storage.Seals,
 				node.Storage.Results,
 				node.RootChainID,
+				builder.executionDataConfig.InitialBlockHeight,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
 				heroCacheCollector,
