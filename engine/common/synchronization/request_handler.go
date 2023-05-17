@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -38,10 +39,10 @@ type RequestHandler struct {
 	log     zerolog.Logger
 	metrics module.EngineMetrics
 
-	blocks          storage.Blocks
-	core            module.SyncCore
-	finalizedHeader *FinalizedHeaderCache
-	responseSender  ResponseSender
+	blocks         storage.Blocks
+	state          protocol.State
+	core           module.SyncCore
+	responseSender ResponseSender
 
 	pendingSyncRequests   engine.MessageStore    // message store for *message.SyncRequest
 	pendingBatchRequests  engine.MessageStore    // message store for *message.BatchRequest
@@ -56,9 +57,9 @@ func NewRequestHandler(
 	metrics module.EngineMetrics,
 	responseSender ResponseSender,
 	me module.Local,
+	state protocol.State,
 	blocks storage.Blocks,
 	core module.SyncCore,
-	finalizedHeader *FinalizedHeaderCache,
 	queueMissingHeights bool,
 ) *RequestHandler {
 	r := &RequestHandler{
@@ -67,9 +68,9 @@ func NewRequestHandler(
 		me:                  me,
 		log:                 log.With().Str("engine", "synchronization").Logger(),
 		metrics:             metrics,
+		state:               state,
 		blocks:              blocks,
 		core:                core,
-		finalizedHeader:     finalizedHeader,
 		responseSender:      responseSender,
 		queueMissingHeights: queueMissingHeights,
 	}
@@ -148,8 +149,12 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 // onSyncRequest processes an outgoing handshake; if we have a higher height, we
 // inform the other node of it, so they can organize their block downloads. If
 // we have a lower height, we add the difference to our own download queue.
+// No errors are expected during normal operation.
 func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
-	final := r.finalizedHeader.Get()
+	final, err := r.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not get finalized header: %w", err)
+	}
 
 	logger := r.log.With().Str("origin_id", originID.String()).Logger()
 	logger.Debug().
@@ -173,7 +178,7 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.S
 		Height: final.Height,
 		Nonce:  req.Nonce,
 	}
-	err := r.responseSender.SendResponse(res, originID)
+	err = r.responseSender.SendResponse(res, originID)
 	if err != nil {
 		logger.Warn().Err(err).Msg("sending sync response failed")
 		return nil
@@ -184,12 +189,16 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.S
 }
 
 // onRangeRequest processes a request for a range of blocks by height.
+// No errors are expected during normal operation.
 func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
 	logger := r.log.With().Str("origin_id", originID.String()).Logger()
 	logger.Debug().Msg("received new range request")
 
 	// get the latest final state to know if we can fulfill the request
-	head := r.finalizedHeader.Get()
+	head, err := r.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not get finalized header: %w", err)
+	}
 
 	// if we don't have anything to send, we can bail right away
 	if head.Height < req.FromHeight || req.FromHeight > req.ToHeight {
@@ -217,7 +226,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 		req.ToHeight = maxHeight
 	}
 
-	// get all of the blocks, one by one
+	// get all the blocks, one by one
 	blocks := make([]messages.UntrustedBlock, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		block, err := r.blocks.ByHeight(height)
@@ -242,7 +251,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
-	err := r.responseSender.SendResponse(res, originID)
+	err = r.responseSender.SendResponse(res, originID)
 	if err != nil {
 		logger.Warn().Err(err).Msg("sending range response failed")
 		return nil
@@ -385,7 +394,6 @@ func (r *RequestHandler) requestProcessingLoop() {
 // Ready returns a ready channel that is closed once the engine has fully started.
 func (r *RequestHandler) Ready() <-chan struct{} {
 	r.lm.OnStart(func() {
-		<-r.finalizedHeader.Ready()
 		for i := 0; i < defaultEngineRequestsWorkers; i++ {
 			r.unit.Launch(r.requestProcessingLoop)
 		}
@@ -398,7 +406,6 @@ func (r *RequestHandler) Done() <-chan struct{} {
 	r.lm.OnStop(func() {
 		// wait for all request processing workers to exit
 		<-r.unit.Done()
-		<-r.finalizedHeader.Done()
 	})
 	return r.lm.Stopped()
 }

@@ -77,7 +77,7 @@ func TestMetricsInspector_ObserveRPC(t *testing.T) {
 	ctlMsgs := spammer.GenerateCtlMessages(controlMessageCount,
 		corruptlibp2p.WithGraft(messageCount, channels.PushBlocks.String()),
 		corruptlibp2p.WithPrune(messageCount, channels.PushBlocks.String()),
-		corruptlibp2p.WithIHave(messageCount, 1000))
+		corruptlibp2p.WithIHave(messageCount, 1000, channels.PushBlocks.String()))
 
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, ctlMsgs)

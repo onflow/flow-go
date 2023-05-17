@@ -8,28 +8,28 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-// ErrDiscardThreshold indicates that the amount of RPC messages received exceeds discard threshold.
-type ErrDiscardThreshold struct {
+// ErrHardThreshold indicates that the amount of RPC messages received exceeds hard threshold.
+type ErrHardThreshold struct {
 	// controlMsg the control message type.
 	controlMsg p2p.ControlMessageType
 	// amount the amount of control messages.
 	amount uint64
-	// discardThreshold configured discard threshold.
-	discardThreshold uint64
+	// hardThreshold configured hard threshold.
+	hardThreshold uint64
 }
 
-func (e ErrDiscardThreshold) Error() string {
-	return fmt.Sprintf("number of %s messges received exceeds the configured discard threshold: received %d discard threshold %d", e.controlMsg, e.amount, e.discardThreshold)
+func (e ErrHardThreshold) Error() string {
+	return fmt.Sprintf("number of %s messges received exceeds the configured hard threshold: received %d hard threshold %d", e.controlMsg, e.amount, e.hardThreshold)
 }
 
-// NewDiscardThresholdErr returns a new ErrDiscardThreshold.
-func NewDiscardThresholdErr(controlMsg p2p.ControlMessageType, amount, discardThreshold uint64) ErrDiscardThreshold {
-	return ErrDiscardThreshold{controlMsg: controlMsg, amount: amount, discardThreshold: discardThreshold}
+// NewHardThresholdErr returns a new ErrHardThreshold.
+func NewHardThresholdErr(controlMsg p2p.ControlMessageType, amount, hardThreshold uint64) ErrHardThreshold {
+	return ErrHardThreshold{controlMsg: controlMsg, amount: amount, hardThreshold: hardThreshold}
 }
 
-// IsErrDiscardThreshold returns true if an error is ErrDiscardThreshold
-func IsErrDiscardThreshold(err error) bool {
-	var e ErrDiscardThreshold
+// IsErrHardThreshold returns true if an error is ErrHardThreshold
+func IsErrHardThreshold(err error) bool {
+	var e ErrHardThreshold
 	return errors.As(err, &e)
 }
 
@@ -52,7 +52,7 @@ func NewInvalidLimitConfigErr(controlMsg p2p.ControlMessageType, limitStr string
 	return ErrInvalidLimitConfig{controlMsg: controlMsg, limit: limit, limitStr: limitStr}
 }
 
-// IsErrInvalidLimitConfig returns whether an error is ErrInvalidLimitConfig
+// IsErrInvalidLimitConfig returns whether an error is ErrInvalidLimitConfig.
 func IsErrInvalidLimitConfig(err error) bool {
 	var e ErrInvalidLimitConfig
 	return errors.As(err, &e)
@@ -72,7 +72,7 @@ func NewRateLimitedControlMsgErr(controlMsg p2p.ControlMessageType) ErrRateLimit
 	return ErrRateLimitedControlMsg{controlMsg: controlMsg}
 }
 
-// IsErrRateLimitedControlMsg returns whether an error is ErrRateLimitedControlMsg
+// IsErrRateLimitedControlMsg returns whether an error is ErrRateLimitedControlMsg.
 func IsErrRateLimitedControlMsg(err error) bool {
 	var e ErrRateLimitedControlMsg
 	return errors.As(err, &e)
@@ -87,12 +87,12 @@ func (e ErrDuplicateTopic) Error() string {
 	return fmt.Errorf("duplicate topic %s", e.topic).Error()
 }
 
-// NewDuplicateTopicErr returns a new ErrDuplicateTopic
+// NewDuplicateTopicErr returns a new ErrDuplicateTopic.
 func NewDuplicateTopicErr(topic channels.Topic) ErrDuplicateTopic {
 	return ErrDuplicateTopic{topic: topic}
 }
 
-// IsErrDuplicateTopic returns true if an error is ErrDuplicateTopic
+// IsErrDuplicateTopic returns true if an error is ErrDuplicateTopic.
 func IsErrDuplicateTopic(err error) bool {
 	var e ErrDuplicateTopic
 	return errors.As(err, &e)
@@ -107,12 +107,12 @@ func (e ErrActiveClusterIdsNotSet) Error() string {
 	return fmt.Errorf("failed to validate cluster prefixed topic %s no active cluster IDs set", e.topic).Error()
 }
 
-// NewActiveClusterIdsNotSetErr returns a new ErrActiveClusterIdsNotSet
+// NewActiveClusterIdsNotSetErr returns a new ErrActiveClusterIdsNotSet.
 func NewActiveClusterIdsNotSetErr(topic channels.Topic) ErrActiveClusterIdsNotSet {
 	return ErrActiveClusterIdsNotSet{topic: topic}
 }
 
-// IsErrActiveClusterIDsNotSet returns true if an error is ErrActiveClusterIdsNotSet
+// IsErrActiveClusterIDsNotSet returns true if an error is ErrActiveClusterIdsNotSet.
 func IsErrActiveClusterIDsNotSet(err error) bool {
 	var e ErrActiveClusterIdsNotSet
 	return errors.As(err, &e)
@@ -127,12 +127,12 @@ func (e ErrUnstakedPeer) Error() string {
 	return e.err.Error()
 }
 
-// NewUnstakedPeerErr returns a new ErrUnstakedPeer
+// NewUnstakedPeerErr returns a new ErrUnstakedPeer.
 func NewUnstakedPeerErr(err error) ErrUnstakedPeer {
 	return ErrUnstakedPeer{err: err}
 }
 
-// IsErrUnstakedPeer returns true if an error is ErrUnstakedPeer
+// IsErrUnstakedPeer returns true if an error is ErrUnstakedPeer.
 func IsErrUnstakedPeer(err error) bool {
 	var e ErrUnstakedPeer
 	return errors.As(err, &e)

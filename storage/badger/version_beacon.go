@@ -1,6 +1,8 @@
 package badger
 
 import (
+	"errors"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -28,11 +30,14 @@ func (r *VersionBeacons) Highest(
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()
 
-	var beacon *flow.SealedVersionBeacon
+	var beacon flow.SealedVersionBeacon
 
-	err := operation.LookupLastVersionBeaconByHeight(belowOrEqualTo, beacon)(tx)
+	err := operation.LookupLastVersionBeaconByHeight(belowOrEqualTo, &beacon)(tx)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
-	return beacon, nil
+	return &beacon, nil
 }

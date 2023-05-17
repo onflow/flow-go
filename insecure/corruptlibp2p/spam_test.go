@@ -2,6 +2,7 @@ package corruptlibp2p_test
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -77,7 +78,7 @@ func TestSpam_IHave(t *testing.T) {
 	})
 
 	// prepare to spam - generate iHAVE control messages
-	iHaveSentCtlMsgs := gsrSpammer.GenerateCtlMessages(messagesToSpam, corruptlibp2p.WithIHave(messagesToSpam, 5))
+	iHaveSentCtlMsgs := gsrSpammer.GenerateCtlMessages(messagesToSpam, corruptlibp2p.WithIHave(messagesToSpam, 5, fmt.Sprintf("%s/%s", channels.PushBlocks, sporkId)))
 
 	// start spamming the victim peer
 	gsrSpammer.SpamControlMessage(t, victimNode, iHaveSentCtlMsgs)

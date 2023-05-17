@@ -18,6 +18,7 @@ const (
 	LabelConnectionDirection = "direction"
 	LabelConnectionUseFD     = "usefd" // whether the connection is using a file descriptor
 	LabelSuccess             = "success"
+	LabelCtrlMsgType         = "control_message"
 	LabelMisbehavior         = "misbehavior"
 )
 
@@ -84,9 +85,10 @@ const (
 	ResourceNetworkingDnsIpCache                       = "networking_dns_ip_cache"     // networking layer
 	ResourceNetworkingDnsTxtCache                      = "networking_dns_txt_cache"    // networking layer
 	ResourceNetworkingDisallowListNotificationQueue    = "networking_disallow_list_notification_queue"
-	ResourceNetworkingRpcValidationInspectorQueue      = "networking_rpc_validation_inspector_queue"
 	ResourceNetworkingRpcInspectorNotificationQueue    = "networking_rpc_inspector_notification_queue"
+	ResourceNetworkingRpcValidationInspectorQueue      = "networking_rpc_validation_inspector_queue"
 	ResourceNetworkingRpcMetricsObserverInspectorQueue = "networking_rpc_metrics_observer_inspector_queue"
+	ResourceNetworkingApplicationLayerSpamRecordCache  = "application_layer_spam_record_cache"
 	ResourceNetworkingRpcClusterPrefixReceivedCache    = "networking_rpc_cluster_prefixed_received_cache"
 
 	ResourceFollowerPendingBlocksCache = "follower_pending_block_cache"      // follower engine

@@ -79,9 +79,8 @@ func main() {
 		rpcConf                 rpc.Config
 		clusterComplianceConfig modulecompliance.Config
 
-		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
-		finalizationDistributor *pubsub.FinalizationDistributor
-		finalizedHeader         *consync.FinalizedHeaderCache
+		pools               *epochpool.TransactionPools // epoch-scoped transaction pools
+		followerDistributor *pubsub.FollowerDistributor
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
@@ -175,9 +174,9 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
-		Module("finalization distributor", func(node *cmd.NodeConfig) error {
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
-			finalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
+		Module("follower distributor", func(node *cmd.NodeConfig) error {
+			followerDistributor = pubsub.NewFollowerDistributor()
+			followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
 			return nil
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
@@ -262,14 +261,6 @@ func main() {
 
 			return validator, err
 		}).
-		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			finalizedHeader, err = consync.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
-			if err != nil {
-				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-			}
-
-			return finalizedHeader, nil
-		}).
 		Component("consensus committee", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
@@ -291,7 +282,7 @@ func main() {
 				node.Logger,
 				node.Storage.Headers,
 				finalizer,
-				finalizationDistributor,
+				followerDistributor,
 				node.RootBlock.Header,
 				node.RootQC,
 				finalized,
@@ -318,7 +309,7 @@ func main() {
 				node.Logger,
 				node.Metrics.Mempool,
 				heroCacheCollector,
-				finalizationDistributor,
+				followerDistributor,
 				followerState,
 				followerCore,
 				validator,
@@ -335,7 +326,7 @@ func main() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
-				finalizedHeader.Get(),
+				node.FinalizedHeader,
 				core,
 				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
@@ -353,10 +344,10 @@ func main() {
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
+				node.State,
 				node.Storage.Blocks,
 				followerEng,
 				mainChainSyncCore,
-				finalizedHeader,
 				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {
@@ -449,6 +440,7 @@ func main() {
 
 			builderFactory, err := factories.NewBuilderFactory(
 				node.DB,
+				node.State,
 				node.Storage.Headers,
 				node.Tracer,
 				colMetrics,

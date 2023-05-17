@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -58,9 +57,6 @@ type SyncSuite struct {
 }
 
 func (ss *SyncSuite) SetupTest() {
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
-
 	// generate own ID
 	ss.participants = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
 	keys := unittest.NetworkingKeys(len(ss.participants))
@@ -168,12 +164,9 @@ func (ss *SyncSuite) SetupTest() {
 	log := zerolog.New(io.Discard)
 	metrics := metrics.NewNoopCollector()
 
-	finalizedHeader, err := NewFinalizedHeaderCache(log, ss.state, pubsub.NewFinalizationDistributor())
-	require.NoError(ss.T(), err, "could not create finalized snapshot cache")
-
 	idCache, err := cache.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())
 	require.NoError(ss.T(), err, "could not create protocol state identity cache")
-	e, err := New(log, metrics, ss.net, ss.me, ss.blocks, ss.comp, ss.core, finalizedHeader,
+	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
@@ -554,20 +547,6 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 	time.Sleep(time.Millisecond * 100)
 
 	ss.core.AssertExpectations(ss.T())
-}
-
-// TestOnFinalizedBlock tests that when new finalized block is discovered engine updates cached variables
-// to latest state
-func (ss *SyncSuite) TestOnFinalizedBlock() {
-	finalizedBlock := unittest.BlockHeaderWithParentFixture(ss.head)
-	// change head
-	ss.head = finalizedBlock
-
-	err := ss.e.finalizedHeader.updateHeader()
-	require.NoError(ss.T(), err)
-	actualHeader := ss.e.finalizedHeader.Get()
-	require.ElementsMatch(ss.T(), ss.e.participantsProvider.Identifiers(), ss.participants[1:].NodeIDs())
-	require.Equal(ss.T(), actualHeader, finalizedBlock)
 }
 
 // TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type

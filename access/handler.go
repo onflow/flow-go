@@ -16,15 +16,11 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-type FinalizedHeaderCache interface {
-	Get() *flow.Header
-}
-
 type Handler struct {
 	api                  API
 	chain                flow.Chain
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
-	finalizedHeaderCache FinalizedHeaderCache
+	finalizedHeaderCache module.FinalizedHeaderCache
 	me                   module.Local
 }
 
@@ -33,7 +29,7 @@ type HandlerOption func(*Handler)
 
 var _ access.AccessAPIServer = (*Handler)(nil)
 
-func NewHandler(api API, chain flow.Chain, finalizedHeader FinalizedHeaderCache, me module.Local, options ...HandlerOption) *Handler {
+func NewHandler(api API, chain flow.Chain, finalizedHeader module.FinalizedHeaderCache, me module.Local, options ...HandlerOption) *Handler {
 	h := &Handler{
 		api:                  api,
 		chain:                chain,

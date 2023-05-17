@@ -31,10 +31,12 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/middleware"
@@ -230,6 +232,7 @@ func GenerateNetworks(t *testing.T,
 	mws []network.Middleware,
 	sms []network.SubscriptionManager,
 	opts ...p2p.NetworkOptFunction) []network.Network {
+
 	count := len(ids)
 	nets := make([]network.Network, 0)
 
@@ -254,7 +257,13 @@ func GenerateNetworks(t *testing.T,
 			Metrics:             metrics.NewNoopCollector(),
 			IdentityProvider:    id.NewFixedIdentityProvider(ids),
 			ReceiveCache:        receiveCache,
-			Options:             opts,
+			ConduitFactory: conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
+				Logger:               unittest.Logger(),
+				SpamRecordsCacheSize: uint32(1000),
+				AlspMetrics:          metrics.NewNoopCollector(),
+				CacheMetrics:         metrics.NewNoopCollector(),
+			}),
+			Options: opts,
 		})
 		require.NoError(t, err)
 
