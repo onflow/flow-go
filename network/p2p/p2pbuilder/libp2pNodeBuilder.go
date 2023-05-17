@@ -21,6 +21,7 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
@@ -557,7 +558,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
 	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, gossipCfg.RpcInspector).
-		SetNetworkType(p2p.PrivateNetwork).
+		SetNetworkType(flownet.PrivateNetwork).
 		SetMetrics(metricsCfg).
 		Build()
 	if err != nil {

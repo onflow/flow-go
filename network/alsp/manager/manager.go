@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/network/alsp/internal"
 	"github.com/onflow/flow-go/network/alsp/model"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -78,7 +77,7 @@ type MisbehaviorReportManagerConfig struct {
 	DisablePenalty bool
 	// NetworkType is the type of the network it is used to determine whether the ALSP module is utilized in the
 	// public (unstaked) or private (staked) network.
-	NetworkType p2p.NetworkType
+	NetworkType network.NetworkType
 }
 
 // validate validates the MisbehaviorReportManagerConfig instance. It returns an error if the config is invalid.

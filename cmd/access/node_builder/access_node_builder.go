@@ -726,7 +726,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
 		DisablePenalty:          builder.AlspConfig.DisablePenalty,
 		AlspMetrics:             builder.Metrics.Network,
-		NetworkType:             p2p.PublicNetwork,
+		NetworkType:             network.PublicNetwork,
 		HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
 	})
 	if err != nil {
@@ -1110,7 +1110,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 			top := topology.EmptyTopology{}
 			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 				builder.Logger,
-				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork))
+				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork))
 
 			err := node.Metrics.Mempool.Register(metrics.PrependPublicPrefix(metrics.ResourceNetworkingReceiveCache), receiveCache.Size)
 			if err != nil {
@@ -1156,7 +1156,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibP2PFactory(networkKey crypto.
 		// setup RPC inspectors
 		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector)
 		rpcInspectorSuite, err := rpcInspectorBuilder.
-			SetNetworkType(p2p.PublicNetwork).
+			SetNetworkType(network.PublicNetwork).
 			SetMetrics(&p2pconfig.MetricsConfig{
 				HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 				Metrics:          builder.Metrics.Network,

@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector"
@@ -26,7 +27,7 @@ type GossipSubInspectorBuilder struct {
 	sporkID          flow.Identifier
 	inspectorsConfig *GossipSubRPCInspectorsConfig
 	metricsCfg       *p2pconfig.MetricsConfig
-	networkType      p2p.NetworkType
+	networkType      network.NetworkType
 }
 
 // NewGossipSubInspectorBuilder returns new *GossipSubInspectorBuilder.
@@ -39,7 +40,7 @@ func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier
 			Metrics:          metrics.NewNoopCollector(),
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		},
-		networkType: p2p.PublicNetwork,
+		networkType: network.PublicNetwork,
 	}
 }
 
@@ -55,7 +56,7 @@ func (b *GossipSubInspectorBuilder) SetMetrics(metricsCfg *p2pconfig.MetricsConf
 // - networkType: the network type.
 // Returns:
 // - *GossipSubInspectorBuilder: the builder.
-func (b *GossipSubInspectorBuilder) SetNetworkType(networkType p2p.NetworkType) *GossipSubInspectorBuilder {
+func (b *GossipSubInspectorBuilder) SetNetworkType(networkType network.NetworkType) *GossipSubInspectorBuilder {
 	b.networkType = networkType
 	return b
 }
