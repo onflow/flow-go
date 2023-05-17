@@ -1,10 +1,12 @@
 package module
 
 import (
+	"context"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	httpmetrics "github.com/slok/go-http-metrics/metrics"
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
@@ -588,7 +590,15 @@ type ExecutionDataPrunerMetrics interface {
 	Pruned(height uint64, duration time.Duration)
 }
 
+// Example recorder taken from:
+// https://github.com/slok/go-http-metrics/blob/master/metrics/prometheus/prometheus.go
+type RestMetrics interface {
+	httpmetrics.Recorder
+	AddTotalRequests(ctx context.Context, service string, id string)
+}
+
 type AccessMetrics interface {
+	RestMetrics
 	// TotalConnectionsInPool updates the number connections to collection/execution nodes stored in the pool, and the size of the pool
 	TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint)
 

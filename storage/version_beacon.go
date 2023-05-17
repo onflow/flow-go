@@ -7,7 +7,7 @@ type VersionBeacons interface {
 
 	// Highest finds the highest flow.SealedVersionBeacon but no higher than
 	// belowOrEqualTo
-	// Returns storage.ErrNotFound if no version beacon exists at or below the
-	// given height.
+	// Returns nil if no version beacon has been sealed below or equal to the
+	// input height.
 	Highest(belowOrEqualTo uint64) (*flow.SealedVersionBeacon, error)
 }
