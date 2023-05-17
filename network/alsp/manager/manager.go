@@ -4,12 +4,15 @@ import (
 	crand "crypto/rand"
 	"errors"
 	"fmt"
+	"math"
+	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -218,6 +221,68 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 	}
 
 	lg.Debug().Msg("misbehavior report submitted")
+}
+
+// startHeartbeatTicks starts the heartbeat ticks ticker to tick at the given intervals. It is a blocking function, and
+// should be called in a separate goroutine. It returns when the context is canceled.
+// Args:
+// 	ctx: the context.
+// 	interval: the interval between two ticks.
+// Returns:
+// 	none.
+func (m *MisbehaviorReportManager) startHeartbeatTicks(ctx irrecoverable.SignalerContext, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			m.logger.Debug().Msg("heartbeat ticks stopped")
+			return
+		case <-ticker.C:
+			m.logger.Trace().Msg("new heartbeat ticked")
+			m.onHeartbeat(ctx)
+		}
+	}
+}
+
+// onHeartbeat is called upon a startHeartbeatTicks. It decays the penalty of all spam records based on their individual decay speed.
+// Args:
+// 	ctx: the context.
+// Returns:
+// 	none.
+func (m *MisbehaviorReportManager) onHeartbeat(ctx irrecoverable.SignalerContext) {
+	allIds := m.cache.Identities()
+
+	for _, id := range allIds {
+		penalty, err := m.cache.Adjust(id, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+			if record.Penalty > 0 {
+				// sanity check; this should never happen.
+				return record, fmt.Errorf("illegal state: spam record %x has positive penalty %f", id, record.Penalty)
+			}
+			if record.Decay <= 0 {
+				// sanity check; this should never happen.
+				return record, fmt.Errorf("illegal state: spam record %x has non-positive decay %f", id, record.Decay)
+			}
+
+			// each time we decay the penalty by the decay speed, the penalty is a negative number, and the decay speed
+			// is a positive number. So the penalty is getting closer to zero.
+			// We use math.Min() to make sure the penalty is never positive.
+			record.Penalty = math.Min(record.Penalty+record.Decay, 0)
+			return record, nil
+		})
+
+		// any error here is fatal because it indicates a bug in the cache. All ids being iterated over are in the cache,
+		// and adjust function above should not return an error unless there is a bug.
+		if err != nil {
+			ctx.Throw(fmt.Errorf("failed to decay spam record %x: %w", id, err))
+			return // should be no-op because Throw() is fatal. But just in case to avoid continuing on an invalid state.
+		}
+
+		m.logger.Trace().
+			Hex("identifier", logging.ID(id)).
+			Float64("updated_penalty", penalty).
+			Msg("spam record decayed")
+	}
 }
 
 // processMisbehaviorReport is the worker function that processes the misbehavior reports.
