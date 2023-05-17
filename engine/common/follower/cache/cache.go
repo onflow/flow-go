@@ -49,7 +49,7 @@ type Cache struct {
 	byView   map[uint64]BlocksByID          // lookup of blocks by their respective view; used to detect equivocation
 	byParent map[flow.Identifier]BlocksByID // lookup of blocks by their parentID, for finding a block's known children
 
-	consumer   hotstuff.ProposalViolationConsumer // equivocation will be reported using this consumer
+	notifier   hotstuff.ProposalViolationConsumer // equivocation will be reported using this notifier
 	lowestView counters.StrictMonotonousCounter   // lowest view that the cache accepts blocks for
 }
 
@@ -66,7 +66,7 @@ func (c *Cache) Peek(blockID flow.Identifier) *flow.Block {
 }
 
 // NewCache creates new instance of Cache
-func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetrics, consumer hotstuff.ProposalViolationConsumer) *Cache {
+func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetrics, notifier hotstuff.ProposalViolationConsumer) *Cache {
 	// We consume ejection event from HeroCache to here to drop ejected blocks from our secondary indices.
 	distributor := NewDistributor()
 	cache := &Cache{
@@ -80,7 +80,7 @@ func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetric
 		),
 		byView:   make(map[uint64]BlocksByID),
 		byParent: make(map[flow.Identifier]BlocksByID),
-		consumer: consumer,
+		notifier: notifier,
 	}
 	distributor.AddConsumer(cache.handleEjectedEntity)
 	return cache
@@ -183,7 +183,7 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 
 	// report equivocations
 	for _, pair := range bc.equivocatingBlocks {
-		c.consumer.OnDoubleProposeDetected(model.BlockFromFlow(pair[0].Header), model.BlockFromFlow(pair[1].Header))
+		c.notifier.OnDoubleProposeDetected(model.BlockFromFlow(pair[0].Header), model.BlockFromFlow(pair[1].Header))
 	}
 
 	if len(certifiedBatch) < 1 {
