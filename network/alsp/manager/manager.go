@@ -77,7 +77,7 @@ type MisbehaviorReportManagerConfig struct {
 	DisablePenalty bool
 	// NetworkType is the type of the network it is used to determine whether the ALSP module is utilized in the
 	// public (unstaked) or private (staked) network.
-	NetworkType network.NetworkType
+	NetworkType network.NetworkingType
 }
 
 // validate validates the MisbehaviorReportManagerConfig instance. It returns an error if the config is invalid.

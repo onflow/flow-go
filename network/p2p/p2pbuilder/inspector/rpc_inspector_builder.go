@@ -27,7 +27,7 @@ type GossipSubInspectorBuilder struct {
 	sporkID          flow.Identifier
 	inspectorsConfig *GossipSubRPCInspectorsConfig
 	metricsCfg       *p2pconfig.MetricsConfig
-	networkType      network.NetworkType
+	networkType      network.NetworkingType
 }
 
 // NewGossipSubInspectorBuilder returns new *GossipSubInspectorBuilder.
@@ -56,7 +56,7 @@ func (b *GossipSubInspectorBuilder) SetMetrics(metricsCfg *p2pconfig.MetricsConf
 // - networkType: the network type.
 // Returns:
 // - *GossipSubInspectorBuilder: the builder.
-func (b *GossipSubInspectorBuilder) SetNetworkType(networkType network.NetworkType) *GossipSubInspectorBuilder {
+func (b *GossipSubInspectorBuilder) SetNetworkType(networkType network.NetworkingType) *GossipSubInspectorBuilder {
 	b.networkType = networkType
 	return b
 }
