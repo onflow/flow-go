@@ -1009,7 +1009,7 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 
 	// phase-2: wait enough for at least one heartbeat to be processed.
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	// phase-3: check if the penalty was decayed for at least one heartbeat.
 	record, ok := cache.Get(originId)
@@ -1017,10 +1017,9 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 	require.NotNil(t, record)
 
 	// with at least a single heartbeat, the penalty should be greater than the penalty before the decay.
-	fmt.Println(penaltyBeforeDecay)
 	require.Greater(t, record.Penalty, penaltyBeforeDecay)
-	// we waited for at most 2 heartbeats, so the decayed penalty should be still less than the value after 3 decays.
-	require.Less(t, record.Penalty, penaltyBeforeDecay+3*record.Decay)
+	// we waited for at most one heartbeat, so the decayed penalty should be still less than the value after 2 heartbeats.
+	require.Less(t, record.Penalty, penaltyBeforeDecay+2*record.Decay)
 	// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
 	require.Equal(t, uint64(0), record.CutoffCounter)
 	// the decay should be the default decay value.
