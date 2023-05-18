@@ -394,6 +394,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
 		builder.SyncEng = sync
+		builder.FollowerDistributor.AddFinalizationConsumer(sync)
 
 		return builder.SyncEng, nil
 	})
@@ -1040,10 +1041,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Blocks,
 				builder.SyncCore,
 			)
-
 			if err != nil {
 				return nil, fmt.Errorf("could not create public sync request handler: %w", err)
 			}
+			builder.FollowerDistributor.AddFinalizationConsumer(syncRequestHandler)
 
 			return syncRequestHandler, nil
 		})
