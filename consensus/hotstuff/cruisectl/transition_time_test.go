@@ -78,6 +78,7 @@ func TestParseTransition_Invalid(t *testing.T) {
 	}
 }
 
+// drawTransitionTime draws a random EpochTransitionTime.
 func drawTransitionTime(t *rapid.T) EpochTransitionTime {
 	day := time.Weekday(rapid.IntRange(0, 6).Draw(t, "wd").(int))
 	hour := rapid.Uint8Range(0, 23).Draw(t, "h").(uint8)
@@ -85,10 +86,22 @@ func drawTransitionTime(t *rapid.T) EpochTransitionTime {
 	return EpochTransitionTime{day, hour, minute}
 }
 
+// TestInferTargetEndTime tests that we can infer "the most reasonable" target time.
 func TestInferTargetEndTime(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		//ett := drawTransitionTime(t)
+		ett := drawTransitionTime(t)
+		curTime := time.Unix(rapid.Int64().Draw(t, "ref_unix").(int64), 0).UTC()
+		epochPctComplete := rapid.Float64Range(0, 1).Draw(t, "pct_complete").(float64)
 
+		target := ett.inferTargetEndTime(curTime, epochPctComplete)
+		computedEndTime := curTime.Add(time.Duration(float64(epochLength) * epochPctComplete))
+		// selected target must be the nearest to the computed end time
+		delta := computedEndTime.Sub(target).Abs()
+		assert.LessOrEqual(t, delta.Hours(), float64(24*7)/2)
+		// nearest date must be a target time
+		assert.Equal(t, ett.day, target.Weekday())
+		assert.Equal(t, int(ett.hour), target.Hour())
+		assert.Equal(t, int(ett.minute), target.Minute())
 	})
 }
 
@@ -96,13 +109,12 @@ func TestInferTargetEndTime(t *testing.T) {
 func TestFindNearestTargetTime(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		ett := drawTransitionTime(t)
-		ref := time.Unix(rapid.Int64().Draw(t, "ref_unix").(int64), 0)
+		ref := time.Unix(rapid.Int64().Draw(t, "ref_unix").(int64), 0).UTC()
 
 		nearest := ett.findNearestTargetTime(ref)
-		distance := nearest.Sub(ref)
-		// nearest date must be at most 4 days away
-		// since distance is determined in terms of date, distance may be up to 4 days in time terms
-		assert.Less(t, distance.Abs().Hours(), float64(24*4))
+		distance := nearest.Sub(ref).Abs()
+		// nearest date must be at most 1/2 a week away
+		assert.LessOrEqual(t, distance.Hours(), float64(24*7)/2)
 		// nearest date must be a target time
 		assert.Equal(t, ett.day, nearest.Weekday())
 		assert.Equal(t, int(ett.hour), nearest.Hour())

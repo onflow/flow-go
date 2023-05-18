@@ -121,14 +121,14 @@ func ParseTransition(s string) (*EpochTransitionTime, error) {
 // NOTE 2: In the long run, the target end time should be specified by the smart contract
 // and stored along with the other protocol.Epoch information. This would remove the
 // need for this imperfect inference logic.
-func (tt *EpochTransitionTime) inferTargetEndTime(curView uint64, curTime time.Time, epoch epochInfo) time.Time {
-	now := curTime
+func (tt *EpochTransitionTime) inferTargetEndTime(curTime time.Time, epochPctComplete float64) time.Time {
+	now := curTime.UTC()
 	// find the nearest target end time, plus the targets one week before and after
 	nearestTargetDate := tt.findNearestTargetTime(now)
 	earlierTargetDate := nearestTargetDate.AddDate(0, 0, -7)
 	laterTargetDate := nearestTargetDate.AddDate(0, 0, 7)
 
-	estimatedTimeRemainingInEpoch := time.Duration(float64(epoch.curEpochFinalView-curView) / float64(epoch.curEpochFinalView-epoch.curEpochFirstView) * float64(epochLength))
+	estimatedTimeRemainingInEpoch := time.Duration(epochPctComplete * float64(epochLength))
 	estimatedEpochEndTime := now.Add(estimatedTimeRemainingInEpoch)
 
 	minDiff := estimatedEpochEndTime.Sub(nearestTargetDate).Abs()
@@ -153,13 +153,19 @@ func (tt *EpochTransitionTime) findNearestTargetTime(ref time.Time) time.Time {
 	hour := int(tt.hour)
 	minute := int(tt.minute)
 	date := time.Date(ref.Year(), ref.Month(), ref.Day(), hour, minute, 0, 0, time.UTC)
-	walk := 0 // how many days we should walk each loop
-	for date.Weekday() != tt.day {
+
+	// walk back and forth by date around the reference until we find the closest matching weekday
+	walk := 0
+	for date.Weekday() != tt.day || date.Sub(ref).Abs().Hours() > float64(24*7/2) {
 		walk++
 		if walk%2 == 0 {
 			date = date.AddDate(0, 0, walk)
 		} else {
 			date = date.AddDate(0, 0, -walk)
+		}
+		// sanity check to avoid an infinite loop: should be impossible
+		if walk > 14 {
+			panic(fmt.Sprintf("unexpected failure to find nearest target time with ref=%s, transition=%s", ref.String(), tt.String()))
 		}
 	}
 	return date

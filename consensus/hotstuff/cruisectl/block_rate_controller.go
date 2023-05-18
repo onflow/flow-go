@@ -43,6 +43,13 @@ type epochInfo struct {
 	nextEpochFinalView    *uint64
 }
 
+// pctComplete returns the percentage of views completed of the epoch for the given curView.
+// curView must be within the range [curEpochFirstView, curEpochFinalView]
+// Returns the completion percentage as a float between [0, 1]
+func (epoch *epochInfo) pctComplete(curView uint64) float64 {
+	return float64(curView-epoch.curEpochFirstView) / float64(epoch.curEpochFinalView-epoch.curEpochFirstView)
+}
+
 // BlockRateController dynamically adjusts the proposal delay of this node,
 // based on the measured block rate of the consensus committee as a whole, in
 // order to achieve a target overall block rate.
@@ -137,7 +144,7 @@ func (ctl *BlockRateController) initEpochInfo(curView uint64) error {
 		ctl.epochInfo.nextEpochFinalView = &nextEpochFinalView
 	}
 
-	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(curView, time.Now(), ctl.epochInfo)
+	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(time.Now(), ctl.epochInfo.pctComplete(curView))
 
 	epochFallbackTriggered, err := ctl.state.Params().EpochFallbackTriggered()
 	if err != nil {
@@ -261,7 +268,7 @@ func (ctl *BlockRateController) checkForEpochTransition(curView uint64, now time
 	ctl.curEpochFirstView = ctl.curEpochFinalView + 1
 	ctl.curEpochFinalView = *ctl.nextEpochFinalView
 	ctl.nextEpochFinalView = nil
-	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(curView, now, ctl.epochInfo)
+	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(now, ctl.epochInfo.pctComplete(curView))
 	return nil
 }
 
