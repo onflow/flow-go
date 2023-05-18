@@ -23,7 +23,6 @@ import (
 const (
 	// defaultMisbehaviorReportManagerWorkers is the default number of workers in the worker pool.
 	defaultMisbehaviorReportManagerWorkers = 2
-	FatalMsgNegativePositivePenalty        = "penalty value is positive, expected negative %f"
 )
 
 var (
@@ -255,7 +254,7 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 			// this should never happen, unless there is a bug in the misbehavior report handling logic.
 			// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
 			// we return the error as it is considered as a fatal error.
-			return record, fmt.Errorf(FatalMsgNegativePositivePenalty, report.Penalty)
+			return record, fmt.Errorf("penalty value is positive, expected negative %f", report.Penalty)
 		}
 		record.Penalty += report.Penalty // penalty value is negative. We add it to the current penalty.
 		return record, nil
