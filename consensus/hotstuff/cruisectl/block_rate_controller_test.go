@@ -2,6 +2,7 @@ package cruisectl
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -289,4 +291,40 @@ func (bs *BlockRateControllerSuite) TestOnEpochSetupPhaseStarted() {
 		bs.ctl.EpochSetupPhaseStarted(bs.epochCounter, header)
 	}
 	assert.Equal(bs.T(), bs.curEpochFinalView+100_000, *bs.ctl.nextEpochFinalView)
+}
+
+// TestMeasurementsPrecisely bypasses the worker thread and directly instigates a new measurement.
+// Since here we can precisely control the "view-entered" time, we precisely
+// validate the resulting measurement and proposal delay.
+func (bs *BlockRateControllerSuite) TestMeasurementsPrecisely() {
+	bs.CreateAndStartController()
+	defer bs.StopController()
+
+	rapid.Check(bs.T(), func(t *rapid.T) {
+		lastMeasurement := bs.ctl.lastMeasurement
+		curView := lastMeasurement.view
+		nextViewDiff := rapid.Uint64Range(1, 10).Draw(t, "view_diff").(uint64)
+		msPerView := rapid.Float64Range(250, 750).Draw(t, "ms_pr_view").(float64)
+		timeDiff := time.Duration(msPerView*float64(nextViewDiff)) * time.Millisecond
+		nextView := curView + nextViewDiff
+		fmt.Println("rapid: ", nextView, timeDiff.String(), msPerView, nextViewDiff)
+		nextViewEnteredAt := lastMeasurement.time.Add(timeDiff)
+		alpha := bs.ctl.config.alpha()
+
+		err := bs.ctl.measureViewRate(nextView, nextViewEnteredAt)
+		require.NoError(bs.T(), err)
+		nextMeasurement := bs.ctl.lastMeasurement
+
+		// assert view/time are updated
+		assert.Equal(bs.T(), nextView, nextMeasurement.view)
+		assert.Equal(bs.T(), nextViewEnteredAt, nextMeasurement.time)
+		// assert view rate is calculated correctly
+		expectedViewRate := float64(nextViewDiff) / (float64(timeDiff.Milliseconds()) / 1000)
+		fmt.Println("rapid: ", expectedViewRate, lastMeasurement.aveViewRate, float64(nextViewDiff), timeDiff.Milliseconds(), float64(timeDiff.Milliseconds())/1000.0)
+		require.Equal(bs.T(), expectedViewRate, nextMeasurement.viewRate)
+		expectedAveViewRate := (alpha * expectedViewRate) + ((1.0 - alpha) * lastMeasurement.aveViewRate)
+		require.Equal(bs.T(), expectedAveViewRate, nextMeasurement.aveViewRate)
+
+		// TODO validate other fields
+	})
 }

@@ -275,8 +275,9 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 	}
 
 	alpha := ctl.config.alpha()
-	viewDiff := float64(view - lastMeasurement.view)                                             // views between current and last measurement
-	timeDiff := float64(lastMeasurement.time.Sub(now).Milliseconds()) / 1000                     // time between current and last measurement
+	viewDiff := float64(view - lastMeasurement.view)                         // views between current and last measurement
+	timeDiff := float64(now.Sub(lastMeasurement.time).Milliseconds()) / 1000 // time between current and last measurement
+	fmt.Println(view, timeDiff, lastMeasurement.time.Sub(now).String())
 	viewsRemaining := float64(ctl.curEpochFinalView - view)                                      // views remaining in current epoch
 	timeRemaining := float64(ctl.epochInfo.curEpochTargetEndTime.Sub(now).Milliseconds()) / 1000 // time remaining until target epoch end
 
@@ -285,6 +286,7 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 	nextMeasurement.view = view
 	nextMeasurement.time = now
 	nextMeasurement.viewRate = viewDiff / timeDiff
+	fmt.Println(nextMeasurement.viewRate, lastMeasurement.aveViewRate)
 	nextMeasurement.aveViewRate = (alpha * nextMeasurement.viewRate) + ((1.0 - alpha) * lastMeasurement.aveViewRate)
 	nextMeasurement.targetViewRate = viewsRemaining / timeRemaining
 	nextMeasurement.proportionalErr = nextMeasurement.targetViewRate - nextMeasurement.aveViewRate
