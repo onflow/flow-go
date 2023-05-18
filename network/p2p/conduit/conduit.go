@@ -58,10 +58,10 @@ func NewDefaultConduitFactory(alspCfg *alspmgr.MisbehaviorReportManagerConfig, o
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			d.misbehaviorManager.Start(ctx)
 			select {
-			case <-ctx.Done():
-				return
 			case <-d.misbehaviorManager.Ready():
 				ready()
+			case <-ctx.Done():
+				// jumps out of select statement to let a graceful shutdown.
 			}
 
 			<-ctx.Done()
