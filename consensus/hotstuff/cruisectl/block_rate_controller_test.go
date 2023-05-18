@@ -99,7 +99,7 @@ func (bs *BlockRateControllerSuite) StopController() {
 // AssertCorrectInitialization checks that the controller is configured as expected after construction.
 func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
 	// proposal delay should be initialized to default value
-	assert.Equal(bs.T(), bs.config.DefaultProposalDelayMs(), bs.ctl.ProposalDelay())
+	assert.Equal(bs.T(), bs.config.DefaultProposalDelay, bs.ctl.ProposalDelay())
 
 	// if epoch fallback is triggered, we don't care about anything else
 	if bs.ctl.epochFallbackTriggered {
@@ -201,7 +201,7 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	bs.ctl.EpochEmergencyFallbackTriggered()
 	// async: should revert to default proposal delay
 	require.Eventually(bs.T(), func() bool {
-		return bs.config.DefaultProposalDelayMs() == bs.ctl.ProposalDelay()
+		return bs.config.DefaultProposalDelay == bs.ctl.ProposalDelay()
 	}, time.Second, time.Millisecond)
 
 	// additional events should be no-ops
@@ -209,7 +209,7 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	for i := 0; i <= cap(bs.ctl.epochFallbacks); i++ {
 		bs.ctl.EpochEmergencyFallbackTriggered()
 	}
-	assert.Equal(bs.T(), bs.config.DefaultProposalDelayMs(), bs.ctl.ProposalDelay())
+	assert.Equal(bs.T(), bs.config.DefaultProposalDelay, bs.ctl.ProposalDelay())
 }
 
 // TestOnViewChange_UpdateProposalDelay tests that a new measurement is taken and
@@ -346,11 +346,11 @@ func (bs *BlockRateControllerSuite) TestMeasurementsPrecisely() {
 			expectedIntegralErr*bs.config.KI +
 			expectedDerivativeErr*bs.config.KD
 		if expectedDelayMS > bs.config.MaxProposalDelayMs() {
-			assert.Equal(bs.T(), bs.config.MaxProposalDelayMs(), bs.ctl.ProposalDelay())
+			assert.Equal(bs.T(), bs.config.MaxProposalDelay, bs.ctl.ProposalDelay())
 		} else if expectedDelayMS < bs.config.MinProposalDelayMs() {
-			assert.Equal(bs.T(), bs.config.MinProposalDelayMs(), bs.ctl.ProposalDelay())
+			assert.Equal(bs.T(), bs.config.MinProposalDelay, bs.ctl.ProposalDelay())
 		} else {
-			assert.InDelta(bs.T(), expectedDelayMS, bs.ctl.ProposalDelay(), 0.001)
+			assert.InDelta(bs.T(), expectedDelayMS, bs.ctl.ProposalDelay().Milliseconds(), 1)
 		}
 	})
 }

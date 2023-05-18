@@ -63,7 +63,7 @@ type BlockRateController struct {
 	lastMeasurement measurement // the most recently taken measurement
 	epochInfo                   // scheduled transition view for current/next epoch
 
-	proposalDelayMS        atomic.Float64
+	proposalDelayDur       atomic.Int64 // PID output, stored as ns so it is convertible to time.Duration
 	epochFallbackTriggered bool
 
 	viewChanges    chan uint64       // OnViewChange events           (view entered)
@@ -98,8 +98,8 @@ func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.S
 // initLastMeasurement initializes the lastMeasurement field.
 // We set the measured view rate to the computed target view rate and the error to 0.
 func (ctl *BlockRateController) initLastMeasurement(curView uint64, now time.Time) {
-	viewsRemaining := float64(ctl.curEpochFinalView - curView)                                   // views remaining in current epoch
-	timeRemaining := float64(ctl.epochInfo.curEpochTargetEndTime.Sub(now).Milliseconds()) / 1000 // time remaining (s) until target epoch end
+	viewsRemaining := float64(ctl.curEpochFinalView - curView)              // views remaining in current epoch
+	timeRemaining := ctl.epochInfo.curEpochTargetEndTime.Sub(now).Seconds() // time remaining (s) until target epoch end
 	targetViewRate := viewsRemaining / timeRemaining
 	ctl.lastMeasurement = measurement{
 		view:            curView,
@@ -111,7 +111,7 @@ func (ctl *BlockRateController) initLastMeasurement(curView uint64, now time.Tim
 		integralErr:     0,
 		derivativeErr:   0,
 	}
-	ctl.proposalDelayMS.Store(float64(ctl.config.DefaultProposalDelay.Milliseconds()))
+	ctl.proposalDelayDur.Store(ctl.config.DefaultProposalDelay.Nanoseconds())
 }
 
 // initEpochInfo initializes the epochInfo state upon component startup.
@@ -155,7 +155,7 @@ func (ctl *BlockRateController) initEpochInfo(curView uint64) error {
 	return nil
 }
 
-// ProposalDelay returns the current proposal delay value to use when proposing, in milliseconds.
+// ProposalDelay returns the current proposal delay value to use when proposing.
 // This function reflects the most recently computed output of the PID controller.
 // The proposal delay is the delay introduced when this node produces a block proposal,
 // and is the variable adjusted by the BlockRateController to achieve a target view rate.
@@ -163,8 +163,8 @@ func (ctl *BlockRateController) initEpochInfo(curView uint64) error {
 // For a given proposal, suppose the time to produce the proposal is P:
 //   - if P < ProposalDelay to produce, then we wait ProposalDelay-P before broadcasting the proposal (total proposal time of ProposalDelay)
 //   - if P >= ProposalDelay to produce, then we immediately broadcast the proposal (total proposal time of P)
-func (ctl *BlockRateController) ProposalDelay() float64 {
-	return ctl.proposalDelayMS.Load()
+func (ctl *BlockRateController) ProposalDelay() time.Duration {
+	return time.Duration(ctl.proposalDelayDur.Load())
 }
 
 // processEventsWorkerLogic is the logic for processing events received from other components.
@@ -282,10 +282,10 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 	}
 
 	alpha := ctl.config.alpha()
-	viewDiff := float64(view - lastMeasurement.view)                                             // views between current and last measurement
-	timeDiff := float64(now.Sub(lastMeasurement.time).Milliseconds()) / 1000                     // time between current and last measurement
-	viewsRemaining := float64(ctl.curEpochFinalView - view)                                      // views remaining in current epoch
-	timeRemaining := float64(ctl.epochInfo.curEpochTargetEndTime.Sub(now).Milliseconds()) / 1000 // time remaining until target epoch end
+	viewDiff := float64(view - lastMeasurement.view)                        // views between current and last measurement
+	timeDiff := now.Sub(lastMeasurement.time).Seconds()                     // time between current and last measurement
+	viewsRemaining := float64(ctl.curEpochFinalView - view)                 // views remaining in current epoch
+	timeRemaining := ctl.epochInfo.curEpochTargetEndTime.Sub(now).Seconds() // time remaining until target epoch end
 
 	// compute and store the rate and error for the current view
 	var nextMeasurement measurement
@@ -304,15 +304,16 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 		nextMeasurement.proportionalErr*ctl.config.KP +
 		nextMeasurement.integralErr*ctl.config.KI +
 		nextMeasurement.derivativeErr*ctl.config.KD
-	if delayMS < ctl.config.MinProposalDelayMs() {
-		ctl.proposalDelayMS.Store(ctl.config.MinProposalDelayMs())
+	delay := time.Duration(delayMS) * time.Millisecond
+	if delay < ctl.config.MinProposalDelay {
+		ctl.proposalDelayDur.Store(ctl.config.MinProposalDelay.Nanoseconds())
 		return nil
 	}
-	if delayMS > ctl.config.MaxProposalDelayMs() {
-		ctl.proposalDelayMS.Store(ctl.config.MaxProposalDelayMs())
+	if delay > ctl.config.MaxProposalDelay {
+		ctl.proposalDelayDur.Store(ctl.config.MaxProposalDelay.Nanoseconds())
 		return nil
 	}
-	ctl.proposalDelayMS.Store(delayMS)
+	ctl.proposalDelayDur.Store(delay.Nanoseconds())
 	return nil
 }
 
@@ -341,7 +342,7 @@ func (ctl *BlockRateController) processEpochSetupPhaseStarted(snapshot protocol.
 //   - set epoch fallback triggered, to disable the controller
 func (ctl *BlockRateController) processEpochFallbackTriggered() {
 	ctl.epochFallbackTriggered = true
-	ctl.proposalDelayMS.Store(ctl.config.DefaultProposalDelayMs())
+	ctl.proposalDelayDur.Store(ctl.config.DefaultProposalDelay.Nanoseconds())
 }
 
 // OnViewChange responds to a view-change notification from HotStuff.
