@@ -139,7 +139,6 @@ func (bs *BlockRateControllerSuite) SanityCheckSubsequentMeasurements(m1, m2 mea
 	// later measurements should have later times
 	assert.True(bs.T(), m1.time.Before(m2.time))
 	// new measurement should have different error
-	// TODO better sanity checks
 	assert.NotEqual(bs.T(), m1.proportionalErr, m2.proportionalErr)
 	assert.NotEqual(bs.T(), m1.integralErr, m2.integralErr)
 	assert.NotEqual(bs.T(), m1.derivativeErr, m2.derivativeErr)
@@ -294,6 +293,36 @@ func (bs *BlockRateControllerSuite) TestOnEpochSetupPhaseStarted() {
 	assert.Equal(bs.T(), bs.curEpochFinalView+100_000, *bs.ctl.nextEpochFinalView)
 }
 
+// TestProposalDelay_AfterTargetTransitionTime tests the behaviour of the controller
+// when we have passed the target end time for the current epoch.
+// We should approach the min proposal delay (increase view rate as much as possible)
+func (bs *BlockRateControllerSuite) TestProposalDelay_AfterTargetTransitionTime() {
+	// we are near the end of the epoch in view terms
+	bs.initialView = uint64(float64(bs.curEpochFinalView) * .95)
+	bs.CreateAndStartController()
+	defer bs.StopController()
+
+	lastProposalDelay := bs.ctl.ProposalDelay()
+	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
+		// we have passed the target end time of the epoch
+		enteredViewAt := bs.ctl.curEpochTargetEndTime.Add(time.Duration(view) * time.Second)
+		err := bs.ctl.measureViewRate(bs.initialView+1, enteredViewAt)
+		require.NoError(bs.T(), err)
+
+		assert.LessOrEqual(bs.T(), bs.ctl.ProposalDelay(), lastProposalDelay)
+		lastProposalDelay = bs.ctl.ProposalDelay()
+
+		// transition views until the end of the epoch, or 100 views
+		if view-bs.initialView >= 100 {
+			break
+		}
+	}
+}
+
+// TODO - once we have some basic parameters, can broadly test behaviour under conditions like:
+//func (bs *BlockRateControllerSuite) TestProposalDelay_BehindSchedule() {}
+//func (bs *BlockRateControllerSuite) TestProposalDelay_AheadOfSchedule() {}
+
 // TestMeasurementsPrecisely bypasses the worker thread and directly instigates a new measurement.
 // Since we control the "view-entered" time, we precisely validate the resulting measurements.
 // For each measurement, we select a number of views to skip (0-99) and a view time (10ms-10s)
@@ -354,5 +383,3 @@ func (bs *BlockRateControllerSuite) TestMeasurementsPrecisely() {
 		}
 	})
 }
-
-// TODO we have passed the target time
