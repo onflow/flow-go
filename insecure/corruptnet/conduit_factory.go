@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 
 	"github.com/rs/zerolog"
@@ -34,6 +35,13 @@ func NewCorruptConduitFactory(logger zerolog.Logger, chainId flow.ChainID) *Cond
 	factory := &ConduitFactory{
 		logger: logger.With().Str("module", "corrupt-conduit-factory").Logger(),
 	}
+
+	builder := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			<-ctx.Done()
+		})
+	factory.Component = builder.Build()
 
 	return factory
 }
