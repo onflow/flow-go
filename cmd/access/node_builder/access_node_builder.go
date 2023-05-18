@@ -1133,8 +1133,10 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 //   - The passed in private key as the libp2p key
 //   - No connection gater
 //   - Default Flow libp2p pubsub options
+//
 // Args:
-//  - networkKey: The private key to use for the libp2p node
+//   - networkKey: The private key to use for the libp2p node
+//
 // - bindAddress: The address to bind the libp2p node to.
 // - networkMetrics: The metrics collector for the network
 // Returns:
