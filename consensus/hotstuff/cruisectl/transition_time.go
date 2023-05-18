@@ -149,6 +149,7 @@ func (tt *EpochTransitionTime) inferTargetEndTime(curView uint64, curTime time.T
 // and finds the nearest date, either before or after ref, which has the given weekday.
 // We then return a time.Time with this date and the hour/minute specified by the EpochTransitionTime.
 func (tt *EpochTransitionTime) findNearestTargetTime(ref time.Time) time.Time {
+	ref = ref.UTC()
 	hour := int(tt.hour)
 	minute := int(tt.minute)
 	date := time.Date(ref.Year(), ref.Month(), ref.Day(), hour, minute, 0, 0, time.UTC)

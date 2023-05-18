@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"pgregory.net/rapid"
 )
 
 // TestParseTransition_Valid tests that valid transition configurations have
@@ -75,4 +76,36 @@ func TestParseTransition_Invalid(t *testing.T) {
 			assert.Error(t, err)
 		})
 	}
+}
+
+func drawTransitionTime(t *rapid.T) EpochTransitionTime {
+	day := time.Weekday(rapid.IntRange(0, 6).Draw(t, "wd").(int))
+	hour := rapid.Uint8Range(0, 23).Draw(t, "h").(uint8)
+	minute := rapid.Uint8Range(0, 59).Draw(t, "m").(uint8)
+	return EpochTransitionTime{day, hour, minute}
+}
+
+func TestInferTargetEndTime(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		//ett := drawTransitionTime(t)
+
+	})
+}
+
+// TestFindNearestTargetTime tests finding the nearest target time to a reference time.
+func TestFindNearestTargetTime(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		ett := drawTransitionTime(t)
+		ref := time.Unix(rapid.Int64().Draw(t, "ref_unix").(int64), 0)
+
+		nearest := ett.findNearestTargetTime(ref)
+		distance := nearest.Sub(ref)
+		// nearest date must be at most 4 days away
+		// since distance is determined in terms of date, distance may be up to 4 days in time terms
+		assert.Less(t, distance.Abs().Hours(), float64(24*4))
+		// nearest date must be a target time
+		assert.Equal(t, ett.day, nearest.Weekday())
+		assert.Equal(t, int(ett.hour), nearest.Hour())
+		assert.Equal(t, int(ett.minute), nearest.Minute())
+	})
 }
