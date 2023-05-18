@@ -31,14 +31,14 @@ func (_m *MisbehaviorReport) OriginId() flow.Identifier {
 }
 
 // Penalty provides a mock function with given fields:
-func (_m *MisbehaviorReport) Penalty() int {
+func (_m *MisbehaviorReport) Penalty() float64 {
 	ret := _m.Called()
 
-	var r0 int
-	if rf, ok := ret.Get(0).(func() int); ok {
+	var r0 float64
+	if rf, ok := ret.Get(0).(func() float64); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(int)
+		r0 = ret.Get(0).(float64)
 	}
 
 	return r0
