@@ -64,9 +64,9 @@ func NewNoopHeroCacheMetricsFactory() HeroCacheMetricsFactory {
 	}
 }
 
-func NetworkReceiveCacheMetricsFactory(f HeroCacheMetricsFactory, publicNetwork network.NetworkingType) module.HeroCacheMetrics {
+func NetworkReceiveCacheMetricsFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
 	r := ResourceNetworkingReceiveCache
-	if publicNetwork {
+	if networkType == network.PublicNetwork {
 		r = PrependPublicPrefix(r)
 	}
 	return f(namespaceNetwork, r)
