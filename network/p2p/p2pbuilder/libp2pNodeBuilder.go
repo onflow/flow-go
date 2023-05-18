@@ -81,53 +81,12 @@ func DefaultGossipSubConfig() *GossipSubConfig {
 	}
 }
 
-// LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
-type LibP2PFactoryFunc func() (p2p.LibP2PNode, error)
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error)
 type CreateNodeFunc func(logger zerolog.Logger,
 	host host.Host,
 	pCache *p2pnode.ProtocolPeerCache,
 	peerManager *connection.PeerManager) p2p.LibP2PNode
 type GossipSubAdapterConfigFunc func(*p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig
-
-// DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
-// default options for the host, the pubsub and the ping service.
-func DefaultLibP2PNodeFactory(log zerolog.Logger,
-	address string,
-	flowKey fcrypto.PrivateKey,
-	sporkId flow.Identifier,
-	idProvider module.IdentityProvider,
-	metricsCfg *p2pconfig.MetricsConfig,
-	resolver madns.BasicResolver,
-	role string,
-	connGaterCfg *p2pconfig.ConnectionGaterConfig,
-	peerManagerCfg *p2pconfig.PeerManagerConfig,
-	gossipCfg *GossipSubConfig,
-	rCfg *ResourceManagerConfig,
-	uniCfg *p2pconfig.UnicastConfig,
-) p2p.LibP2PFactoryFunc {
-	return func() (p2p.LibP2PNode, error) {
-		builder, err := DefaultNodeBuilder(log,
-			address,
-			flowKey,
-			sporkId,
-			idProvider,
-			metricsCfg,
-			resolver,
-			role,
-			connGaterCfg,
-			peerManagerCfg,
-			gossipCfg,
-			rCfg,
-			uniCfg)
-
-		if err != nil {
-			return nil, fmt.Errorf("could not create node builder: %w", err)
-		}
-
-		return builder.Build()
-	}
-}
 
 // ResourceManagerConfig returns the resource manager configuration for the libp2p node.
 // The resource manager is used to limit the number of open connections and streams (as well as any other resources
