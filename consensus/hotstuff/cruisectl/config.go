@@ -14,10 +14,10 @@ func DefaultConfig() *Config {
 		MaxProposalDelay:     1000 * time.Millisecond,
 		MinProposalDelay:     250 * time.Millisecond,
 		Enabled:              true,
-		N:                    600, // 10 minutes @ 1 view/second
-		KP:                   math.NaN(),
-		KI:                   math.NaN(),
-		KD:                   math.NaN(),
+		N:                    600,        // 10 minutes @ 1 view/second
+		KP:                   math.NaN(), // TODO
+		KI:                   math.NaN(), // TODO
+		KD:                   math.NaN(), // TODO
 	}
 }
 
@@ -53,6 +53,7 @@ type Config struct {
 }
 
 // alpha returns the sample inclusion proportion used when calculating the exponentially moving average.
+// We use 2/(N+1) to incorporate the most recent N samples into the average.
 func (c *Config) alpha() float64 {
 	return 2.0 / float64(c.N+1)
 }

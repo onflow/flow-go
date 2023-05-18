@@ -57,7 +57,7 @@ type BlockRateController struct {
 	epochInfo                   // scheduled transition view for current/next epoch
 
 	proposalDelayMS        atomic.Float64
-	epochFallbackTriggered atomic.Bool
+	epochFallbackTriggered bool
 
 	viewChanges    chan uint64       // OnViewChange events           (view entered)
 	epochSetups    chan *flow.Header // EpochSetupPhaseStarted events (block header within setup phase)
@@ -143,7 +143,7 @@ func (ctl *BlockRateController) initEpochInfo(curView uint64) error {
 	if err != nil {
 		return fmt.Errorf("could not check epoch fallback: %w", err)
 	}
-	ctl.epochFallbackTriggered.Store(epochFallbackTriggered)
+	ctl.epochFallbackTriggered = epochFallbackTriggered
 
 	return nil
 }
@@ -220,7 +220,7 @@ func (ctl *BlockRateController) processEventsWorkerLogic(ctx irrecoverable.Signa
 // No errors are expected during normal operation.
 func (ctl *BlockRateController) processOnViewChange(view uint64) error {
 	// if epoch fallback is triggered, we always use default proposal delay
-	if ctl.epochFallbackTriggered.Load() {
+	if ctl.epochFallbackTriggered {
 		return nil
 	}
 	// duplicate events are no-ops
@@ -244,7 +244,6 @@ func (ctl *BlockRateController) processOnViewChange(view uint64) error {
 // being entered causes a transition to the next epoch. Otherwise, this is a no-op.
 // No errors are expected during normal operation.
 func (ctl *BlockRateController) checkForEpochTransition(curView uint64, now time.Time) error {
-	fmt.Println("checking epoch transition", curView, now)
 	if curView <= ctl.curEpochFinalView {
 		// typical case - no epoch transition
 		return nil
@@ -258,6 +257,7 @@ func (ctl *BlockRateController) checkForEpochTransition(curView uint64, now time
 		return fmt.Errorf("sanity check failed: curView is beyond both current and next epoch (%d > %d; %d > %d)",
 			curView, ctl.curEpochFinalView, curView, *ctl.nextEpochFinalView)
 	}
+
 	ctl.curEpochFirstView = ctl.curEpochFinalView + 1
 	ctl.curEpochFinalView = *ctl.nextEpochFinalView
 	ctl.nextEpochFinalView = nil
@@ -275,9 +275,8 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 	}
 
 	alpha := ctl.config.alpha()
-	viewDiff := float64(view - lastMeasurement.view)                         // views between current and last measurement
-	timeDiff := float64(now.Sub(lastMeasurement.time).Milliseconds()) / 1000 // time between current and last measurement
-	fmt.Println(view, timeDiff, lastMeasurement.time.Sub(now).String())
+	viewDiff := float64(view - lastMeasurement.view)                                             // views between current and last measurement
+	timeDiff := float64(now.Sub(lastMeasurement.time).Milliseconds()) / 1000                     // time between current and last measurement
 	viewsRemaining := float64(ctl.curEpochFinalView - view)                                      // views remaining in current epoch
 	timeRemaining := float64(ctl.epochInfo.curEpochTargetEndTime.Sub(now).Milliseconds()) / 1000 // time remaining until target epoch end
 
@@ -286,7 +285,6 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 	nextMeasurement.view = view
 	nextMeasurement.time = now
 	nextMeasurement.viewRate = viewDiff / timeDiff
-	fmt.Println(nextMeasurement.viewRate, lastMeasurement.aveViewRate)
 	nextMeasurement.aveViewRate = (alpha * nextMeasurement.viewRate) + ((1.0 - alpha) * lastMeasurement.aveViewRate)
 	nextMeasurement.targetViewRate = viewsRemaining / timeRemaining
 	nextMeasurement.proportionalErr = nextMeasurement.targetViewRate - nextMeasurement.aveViewRate
@@ -317,9 +315,10 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 //
 // No errors are expected during normal operation.
 func (ctl *BlockRateController) processEpochSetupPhaseStarted(snapshot protocol.Snapshot) error {
-	if ctl.epochFallbackTriggered.Load() {
+	if ctl.epochFallbackTriggered {
 		return nil
 	}
+
 	nextEpoch := snapshot.Epochs().Next()
 	finalView, err := nextEpoch.FinalView()
 	if err != nil {
@@ -334,7 +333,7 @@ func (ctl *BlockRateController) processEpochSetupPhaseStarted(snapshot protocol.
 //   - set proposal delay to the default value
 //   - set epoch fallback triggered, to disable the controller
 func (ctl *BlockRateController) processEpochFallbackTriggered() {
-	ctl.epochFallbackTriggered.Store(true)
+	ctl.epochFallbackTriggered = true
 	ctl.proposalDelayMS.Store(ctl.config.DefaultProposalDelayMs())
 }
 

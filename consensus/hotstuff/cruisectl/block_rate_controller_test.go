@@ -102,7 +102,7 @@ func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
 	assert.Equal(bs.T(), bs.config.DefaultProposalDelayMs(), bs.ctl.ProposalDelay())
 
 	// if epoch fallback is triggered, we don't care about anything else
-	if bs.ctl.epochFallbackTriggered.Load() {
+	if bs.ctl.epochFallbackTriggered {
 		return
 	}
 
