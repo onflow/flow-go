@@ -14,7 +14,7 @@ import (
 var SnapshotCmd = &cobra.Command{
 	Use:   "snapshot",
 	Short: "Read snapshot from protocol state",
-	Run:   run,
+	Run:   runSnapshot,
 }
 
 func init() {
@@ -43,17 +43,17 @@ func runSnapshot(*cobra.Command, []string) {
 	var snapshot protocol.Snapshot
 
 	if flagHeight > 0 {
-		log.Info().Msgf("get block by height: %v", flagHeight)
+		log.Info().Msgf("get snapshot by height: %v", flagHeight)
 		snapshot = state.AtHeight(flagHeight)
 	}
 
 	if flagFinal {
-		log.Info().Msgf("get last finalized block")
+		log.Info().Msgf("get last finalized snapshot")
 		snapshot = state.Final()
 	}
 
 	if flagSealed {
-		log.Info().Msgf("get last sealed block")
+		log.Info().Msgf("get last sealed snapshot")
 		snapshot = state.Sealed()
 	}
 
@@ -62,5 +62,6 @@ func runSnapshot(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("failed to convert snapshot to bytes: %v")
 	}
 
+	log.Info().Msgf("snapshot created")
 	fmt.Println(data)
 }
