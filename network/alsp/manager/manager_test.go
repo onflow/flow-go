@@ -1026,6 +1026,169 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
 }
 
+// TestDecayMisbehaviorPenalty_MultipleHeartbeat tests the decay of the misbehavior penalty under multiple heartbeats.
+// The test ensures that the misbehavior penalty is decayed with a linear progression within multiple heartbeats.
+func TestDecayMisbehaviorPenalty_MultipleHeartbeats(t *testing.T) {
+	cfg := managerCfgFixture()
+
+	cache := internal.NewSpamRecordCache(cfg.SpamRecordCacheSize, cfg.Logger, metrics.NewNoopCollector(), model.SpamRecordFactory())
+
+	// create a new MisbehaviorReportManager
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	require.NoError(t, err)
+
+	// start the ALSP manager
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
+	}()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	m.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
+
+	// creates a single misbehavior report
+	originId := unittest.IdentifierFixture()
+	report := misbehaviorReportFixtureWithDefaultPenalty(t, originId)
+	require.Less(t, report.Penalty(), float64(0)) // ensure the penalty is negative
+
+	channel := channels.Channel("test-channel")
+
+	// number of times the duplicate misbehavior report is reported concurrently
+	times := 10
+	wg := sync.WaitGroup{}
+	wg.Add(times)
+
+	// concurrently reports the same misbehavior report twice
+	for i := 0; i < times; i++ {
+		go func() {
+			defer wg.Done()
+
+			m.HandleMisbehaviorReport(channel, report)
+		}()
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
+
+	// phase-1: eventually all the misbehavior reports should be processed.
+	penaltyBeforeDecay := float64(0)
+	require.Eventually(t, func() bool {
+		// check if the misbehavior reports have been processed by verifying that the Adjust method was called on the cache
+		record, ok := cache.Get(originId)
+		if !ok {
+			return false
+		}
+		require.NotNil(t, record)
+
+		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports.
+		if record.Penalty != report.Penalty()*float64(times) {
+			return false
+		}
+		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
+		require.Equal(t, uint64(0), record.CutoffCounter)
+		// the decay should be the default decay value.
+		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+
+		penaltyBeforeDecay = record.Penalty
+		return true
+	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
+
+	// phase-2: wait for 3 heartbeats to be processed.
+	time.Sleep(3 * time.Second)
+
+	// phase-3: check if the penalty was decayed in a linear progression.
+	record, ok := cache.Get(originId)
+	require.True(t, ok) // the record should be in the cache
+	require.NotNil(t, record)
+
+	// with 3 heartbeats processed, the penalty should be greater than the penalty before the decay.
+	require.Greater(t, record.Penalty, penaltyBeforeDecay)
+	// with 3 heartbeats processed, the decayed penalty should be less than the value after 4 heartbeats.
+	require.Less(t, record.Penalty, penaltyBeforeDecay+4*record.Decay)
+	// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
+	require.Equal(t, uint64(0), record.CutoffCounter)
+	// the decay should be the default decay value.
+	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+}
+
+// TestDecayMisbehaviorPenalty_MultipleHeartbeat tests the decay of the misbehavior penalty under multiple heartbeats.
+// The test ensures that the misbehavior penalty is decayed with a linear progression within multiple heartbeats.
+func TestDecayMisbehaviorPenalty_DecayToZero(t *testing.T) {
+	cfg := managerCfgFixture()
+
+	cache := internal.NewSpamRecordCache(cfg.SpamRecordCacheSize, cfg.Logger, metrics.NewNoopCollector(), model.SpamRecordFactory())
+
+	// create a new MisbehaviorReportManager
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	require.NoError(t, err)
+
+	// start the ALSP manager
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
+	}()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	m.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
+
+	// creates a single misbehavior report
+	originId := unittest.IdentifierFixture()
+	report := misbehaviorReportFixture(t, originId) // penalties are between -1 and -10
+	require.Less(t, report.Penalty(), float64(0))   // ensure the penalty is negative
+
+	channel := channels.Channel("test-channel")
+
+	// number of times the duplicate misbehavior report is reported concurrently
+	times := 10
+	wg := sync.WaitGroup{}
+	wg.Add(times)
+
+	// concurrently reports the same misbehavior report twice
+	for i := 0; i < times; i++ {
+		go func() {
+			defer wg.Done()
+
+			m.HandleMisbehaviorReport(channel, report)
+		}()
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
+
+	// phase-1: eventually all the misbehavior reports should be processed.
+	require.Eventually(t, func() bool {
+		// check if the misbehavior reports have been processed by verifying that the Adjust method was called on the cache
+		record, ok := cache.Get(originId)
+		if !ok {
+			return false
+		}
+		require.NotNil(t, record)
+
+		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports.
+		if record.Penalty != report.Penalty()*float64(times) {
+			return false
+		}
+		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
+		require.Equal(t, uint64(0), record.CutoffCounter)
+		// the decay should be the default decay value.
+		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+		
+		return true
+	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
+
+	// phase-2: default decay speed is 1000 and with 10 penalties in range of [-1, -10], the penalty should be decayed to zero in
+	// a single heartbeat.
+	time.Sleep(1 * time.Second)
+
+	// phase-3: check if the penalty was decayed to zero.
+	record, ok := cache.Get(originId)
+	require.True(t, ok) // the record should be in the cache
+	require.NotNil(t, record)
+
+	// with a single heartbeat and decay speed of 1000, the penalty should be decayed to zero.
+	require.Equal(t, float64(0), record.Penalty)
+	// the decay should be the default decay value.
+	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+}
+
 // misbehaviorReportFixture creates a mock misbehavior report for a single origin id.
 // Args:
 // - t: the testing.T instance
