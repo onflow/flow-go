@@ -22,7 +22,7 @@ const epochLength = time.Hour * 24 * 7
 
 var transitionFmt = "%s@%02d:%02d" // example: wednesday@08:00
 
-// EpochTransitionTime represents the target epochInfo transition time.
+// EpochTransitionTime represents the target epoch transition time.
 // Epochs last one week, so the transition is defined in terms of a day-of-week and time-of-day.
 // The target time is always in UTC to avoid confusion resulting from different
 // representations of the same transition time and around daylight savings time.
@@ -32,7 +32,7 @@ type EpochTransitionTime struct {
 	minute uint8        // minute of the hour to target epoch transition
 }
 
-// DefaultEpochTransitionTime is the default epochInfo transition target.
+// DefaultEpochTransitionTime is the default epoch transition target.
 // The target switchover is Wednesday 12:00 PDT, which is 19:00 UTC.
 // The string representation is `wednesday@19:00`.
 func DefaultEpochTransitionTime() EpochTransitionTime {
