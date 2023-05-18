@@ -941,6 +941,91 @@ func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *t
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 }
 
+// TestDecayMisbehaviorPenalty_SingleHeartbeat tests the decay of the misbehavior penalty. The test ensures that the misbehavior penalty
+// is decayed after a single heartbeat. The test guarantees waiting for at least one heartbeat by waiting for the first decay to happen.
+func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
+	cfg := managerCfgFixture()
+
+	cache := internal.NewSpamRecordCache(cfg.SpamRecordCacheSize, cfg.Logger, metrics.NewNoopCollector(), model.SpamRecordFactory())
+
+	// create a new MisbehaviorReportManager
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	require.NoError(t, err)
+
+	// start the ALSP manager
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
+	}()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	m.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
+
+	// creates a single misbehavior report
+	originId := unittest.IdentifierFixture()
+	report := createMisbehaviorReportForOriginId(t, originId)
+	require.Less(t, report.Penalty(), float64(0)) // ensure the penalty is negative
+
+	channel := channels.Channel("test-channel")
+
+	// number of times the duplicate misbehavior report is reported concurrently
+	times := 10
+	wg := sync.WaitGroup{}
+	wg.Add(times)
+
+	// concurrently reports the same misbehavior report twice
+	for i := 0; i < times; i++ {
+		go func() {
+			defer wg.Done()
+
+			m.HandleMisbehaviorReport(channel, report)
+		}()
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
+
+	// phase-1: eventually all the misbehavior reports should be processed.
+	penaltyBeforeDecay := float64(0)
+	require.Eventually(t, func() bool {
+		// check if the misbehavior reports have been processed by verifying that the Adjust method was called on the cache
+		record, ok := cache.Get(originId)
+		if !ok {
+			return false
+		}
+		require.NotNil(t, record)
+
+		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports.
+		if record.Penalty != report.Penalty()*float64(times) {
+			return false
+		}
+		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
+		require.Equal(t, uint64(0), record.CutoffCounter)
+		// the decay should be the default decay value.
+		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+
+		penaltyBeforeDecay = record.Penalty
+		return true
+	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
+
+	// phase-2: wait enough for at least one heartbeat to be processed.
+	time.Sleep(2 * time.Second)
+
+	// phase-3: check if the penalty was decayed for at least one heartbeat.
+	record, ok := cache.Get(originId)
+	require.True(t, ok) // the record should be in the cache
+	require.NotNil(t, record)
+
+	// with at least a single heartbeat, the penalty should be greater than the penalty before the decay.
+	fmt.Println(penaltyBeforeDecay)
+	require.Greater(t, record.Penalty, penaltyBeforeDecay)
+	// we waited for at most 2 heartbeats, so the decayed penalty should be still less than the value after 3 decays.
+	require.Less(t, record.Penalty, penaltyBeforeDecay+3*record.Decay)
+	// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
+	require.Equal(t, uint64(0), record.CutoffCounter)
+	// the decay should be the default decay value.
+	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+}
+
 // createMisbehaviorReportForOriginId creates a mock misbehavior report for a single origin id.
 // Args:
 // - t: the testing.T instance
@@ -952,7 +1037,7 @@ func createMisbehaviorReportForOriginId(t *testing.T, originID flow.Identifier) 
 	report := mocknetwork.NewMisbehaviorReport(t)
 	report.On("OriginId").Return(originID)
 	report.On("Reason").Return(alsp.AllMisbehaviorTypes()[rand.Intn(len(alsp.AllMisbehaviorTypes()))])
-	report.On("Penalty").Return(float64(-1 * rand.Intn(10))) // random penalty between -1 and -10
+	report.On("Penalty").Return(model.DefaultPenaltyValue) // random penalty between -1 and -10
 
 	return report
 }
