@@ -16,10 +16,10 @@ type NetworkingType uint8
 const (
 	// PublicNetwork indicates that the unstaked public-side of the Flow blockchain that nodes can join and leave at will
 	// with no staking requirement.
-	PublicNetwork NetworkingType = true
+	PublicNetwork NetworkingType = iota
 	// PrivateNetwork indicates that the staked private-side of the Flow blockchain that nodes can only join and leave
 	// with a staking requirement.
-	PrivateNetwork NetworkingType = false
+	PrivateNetwork
 )
 
 // Network represents the network layer of the node. It allows processes that
