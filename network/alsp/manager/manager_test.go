@@ -3,6 +3,7 @@ package alspmgr_test
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/rand"
 	"sync"
 	"testing"
@@ -902,7 +903,7 @@ func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *t
 
 	// creates a single misbehavior report
 	originId := unittest.IdentifierFixture()
-	report := createMisbehaviorReportForOriginId(t, originId)
+	report := misbehaviorReportFixture(t, originId)
 
 	channel := channels.Channel("test-channel")
 
@@ -964,7 +965,7 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 
 	// creates a single misbehavior report
 	originId := unittest.IdentifierFixture()
-	report := createMisbehaviorReportForOriginId(t, originId)
+	report := misbehaviorReportFixtureWithDefaultPenalty(t, originId)
 	require.Less(t, report.Penalty(), float64(0)) // ensure the penalty is negative
 
 	channel := channels.Channel("test-channel")
@@ -1026,18 +1027,26 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
 }
 
-// createMisbehaviorReportForOriginId creates a mock misbehavior report for a single origin id.
+// misbehaviorReportFixture creates a mock misbehavior report for a single origin id.
 // Args:
 // - t: the testing.T instance
 // - originID: the origin id of the misbehavior report
 // Returns:
 // - network.MisbehaviorReport: the misbehavior report
 // Note: the penalty of the misbehavior report is randomly chosen between -1 and -10.
-func createMisbehaviorReportForOriginId(t *testing.T, originID flow.Identifier) network.MisbehaviorReport {
+func misbehaviorReportFixture(t *testing.T, originID flow.Identifier) network.MisbehaviorReport {
+	return misbehaviorReportFixtureWithPenalty(t, originID, math.Min(-1, float64(-1-rand.Intn(10))))
+}
+
+func misbehaviorReportFixtureWithDefaultPenalty(t *testing.T, originID flow.Identifier) network.MisbehaviorReport {
+	return misbehaviorReportFixtureWithPenalty(t, originID, model.DefaultPenaltyValue)
+}
+
+func misbehaviorReportFixtureWithPenalty(t *testing.T, originID flow.Identifier, penalty float64) network.MisbehaviorReport {
 	report := mocknetwork.NewMisbehaviorReport(t)
 	report.On("OriginId").Return(originID)
 	report.On("Reason").Return(alsp.AllMisbehaviorTypes()[rand.Intn(len(alsp.AllMisbehaviorTypes()))])
-	report.On("Penalty").Return(model.DefaultPenaltyValue) // random penalty between -1 and -10
+	report.On("Penalty").Return(penalty)
 
 	return report
 }
@@ -1054,7 +1063,7 @@ func createRandomMisbehaviorReportsForOriginId(t *testing.T, originID flow.Ident
 	reports := make([]network.MisbehaviorReport, numReports)
 
 	for i := 0; i < numReports; i++ {
-		reports[i] = createMisbehaviorReportForOriginId(t, originID)
+		reports[i] = misbehaviorReportFixture(t, originID)
 	}
 
 	return reports
@@ -1071,7 +1080,7 @@ func createRandomMisbehaviorReports(t *testing.T, numReports int) []network.Misb
 	reports := make([]network.MisbehaviorReport, numReports)
 
 	for i := 0; i < numReports; i++ {
-		reports[i] = createMisbehaviorReportForOriginId(t, unittest.IdentifierFixture())
+		reports[i] = misbehaviorReportFixture(t, unittest.IdentifierFixture())
 	}
 
 	return reports
