@@ -11,7 +11,7 @@ import (
 
 // NetworkingType is the type of the Flow networking layer. It is used to differentiate between the public (i.e., unstaked)
 // and private (i.e., staked) networks.
-type NetworkingType bool
+type NetworkingType uint8
 
 const (
 	// PublicNetwork indicates that the unstaked public-side of the Flow blockchain that nodes can join and leave at will
