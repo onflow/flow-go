@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -686,13 +687,21 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	opts := []ingestion.StopControlOption{
 		ingestion.StopControlWithLogger(node.Log),
 	}
-	stopControl, err := ingestion.NewStopControlWithVersionControl(
+
+	ver, err := build.SemverV2()
+	require.NoError(t, err, "failed to parse semver version from build info")
+
+	opts = append(opts,
+		ingestion.StopControlWithVersionControl(
+			ver,
+			versionBeacons,
+			true,
+		))
+
+	stopControl := ingestion.NewStopControl(
 		node.Headers,
-		versionBeacons,
-		true,
 		opts...,
 	)
-	require.NoError(t, err, "stop control should be initialized")
 
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(

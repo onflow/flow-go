@@ -28,6 +28,7 @@ import (
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -657,15 +658,24 @@ func (exeNode *ExecutionNode) LoadStopControl(
 		opts = append(opts, ingestion.StopControlWithStopped())
 	}
 
-	stopControl, err := ingestion.NewStopControlWithVersionControl(
-		node.Storage.Headers,
-		node.Storage.VersionBeacons,
-		true,
-		opts...)
-	if err != nil {
-		return nil, fmt.Errorf("error starting stop control: %w", err)
+	ver, err := build.SemverV2()
+	if err == nil {
+		opts = append(opts,
+			ingestion.StopControlWithVersionControl(
+				ver,
+				node.Storage.VersionBeacons,
+				true,
+			))
+	} else {
+		// In the future we might want to error here, but for now we just log a warning
+		exeNode.builder.Logger.Warn().
+			Err(err).
+			Msg("could not set semver version for stop control")
 	}
 
+	stopControl := ingestion.NewStopControl(
+		node.Storage.Headers,
+		opts...)
 	exeNode.stopControl = stopControl
 
 	return &module.NoopReadyDoneAware{}, nil

@@ -10,7 +10,6 @@ import (
 	"github.com/coreos/go-semver/semver"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -134,39 +133,6 @@ func StopControlWithVersionControl(
 // Its jut a small subset of storage.Headers for comments see storage.Headers
 type StopControlHeaders interface {
 	ByHeight(height uint64) (*flow.Header, error)
-}
-
-// NewStopControlWithVersionControl is just a wrapper around NewStopControl
-// and StopControlWithVersionControl with some boilerplate
-func NewStopControlWithVersionControl(
-	headers StopControlHeaders,
-	versionBeacons storage.VersionBeacons,
-	crashOnVersionBoundaryReached bool,
-	options ...StopControlOption,
-) (
-	*StopControl,
-	error,
-) {
-	sem := build.Semver()
-	if build.IsDefined(sem) {
-		// for now our versions have a "v" prefix, but semver doesn't like that,
-		// so we strip it out
-		sem = strings.TrimPrefix(sem, "v")
-
-		ver, err := semver.NewVersion(sem)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse semver: %w", err)
-		}
-
-		options = append(options,
-			StopControlWithVersionControl(
-				ver,
-				versionBeacons,
-				crashOnVersionBoundaryReached,
-			))
-	}
-
-	return NewStopControl(headers, options...), nil
 }
 
 // NewStopControl creates new empty NewStopControl
