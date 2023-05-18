@@ -566,7 +566,7 @@ func (builder *FollowerServiceBuilder) validateParams() error {
 	return nil
 }
 
-// initPublicLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the observer.
+// initPublicLibp2pNode creates a libp2p node for the follower service in public (unstaked) network.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
 // The LibP2P host is created with the following options:
 //   - DHT as client and seeded with the given bootstrap peers
@@ -576,70 +576,73 @@ func (builder *FollowerServiceBuilder) validateParams() error {
 //   - No connection manager
 //   - No peer manager
 //   - Default libp2p pubsub options
-func (builder *FollowerServiceBuilder) initPublicLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
-	return func() (p2p.LibP2PNode, error) {
-		var pis []peer.AddrInfo
+// Args:
+//  - networkKey: the private key to use for the libp2p node
+// Returns:
+// - p2p.LibP2PNode: the libp2p node
+// - error: if any error occurs. Any error returned from this function is irrecoverable.
+func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.PrivateKey) (p2p.LibP2PNode, error) {
+	var pis []peer.AddrInfo
 
-		for _, b := range builder.bootstrapIdentities {
-			pi, err := utils.PeerAddressInfo(*b)
-
-			if err != nil {
-				return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
-			}
-
-			pis = append(pis, pi)
-		}
-
-		meshTracer := tracer.NewGossipSubMeshTracer(
-			builder.Logger,
-			builder.Metrics.Network,
-			builder.IdentityProvider,
-			builder.GossipSubConfig.LocalMeshLogInterval)
-
-		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector).
-			SetPublicNetwork(p2p.PublicNetwork).
-			SetMetrics(&p2pconfig.MetricsConfig{
-				HeroCacheFactory: builder.HeroCacheMetricsFactory(),
-				Metrics:          builder.Metrics.Network,
-			}).Build()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for public libp2p node: %w", err)
-		}
-
-		node, err := p2pbuilder.NewNodeBuilder(
-			builder.Logger,
-			builder.Metrics.Network,
-			builder.BaseConfig.BindAddr,
-			networkKey,
-			builder.SporkID,
-			builder.LibP2PResourceManagerConfig).
-			SetSubscriptionFilter(
-				subscription.NewRoleBasedFilter(
-					subscription.UnstakedRole, builder.IdentityProvider,
-				),
-			).
-			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return p2pdht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID),
-					builder.Logger,
-					builder.Metrics.Network,
-					p2pdht.AsClient(),
-					dht.BootstrapPeers(pis...),
-				)
-			}).
-			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
-			SetGossipSubTracer(meshTracer).
-			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
-			SetGossipSubRpcInspectorSuite(rpcInspectorSuite).
-			Build()
+	for _, b := range builder.bootstrapIdentities {
+		pi, err := utils.PeerAddressInfo(*b)
 
 		if err != nil {
-			return nil, fmt.Errorf("could not build public libp2p node: %w", err)
+			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
 		}
 
-		builder.LibP2PNode = node
-
-		return builder.LibP2PNode, nil
+		pis = append(pis, pi)
 	}
+
+	meshTracer := tracer.NewGossipSubMeshTracer(
+		builder.Logger,
+		builder.Metrics.Network,
+		builder.IdentityProvider,
+		builder.GossipSubConfig.LocalMeshLogInterval)
+
+	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector).
+		SetPublicNetwork(p2p.PublicNetwork).
+		SetMetrics(&p2pconfig.MetricsConfig{
+			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+			Metrics:          builder.Metrics.Network,
+		}).Build()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for public libp2p node: %w", err)
+	}
+
+	node, err := p2pbuilder.NewNodeBuilder(
+		builder.Logger,
+		builder.Metrics.Network,
+		builder.BaseConfig.BindAddr,
+		networkKey,
+		builder.SporkID,
+		builder.LibP2PResourceManagerConfig).
+		SetSubscriptionFilter(
+			subscription.NewRoleBasedFilter(
+				subscription.UnstakedRole, builder.IdentityProvider,
+			),
+		).
+		SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
+			return p2pdht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID),
+				builder.Logger,
+				builder.Metrics.Network,
+				p2pdht.AsClient(),
+				dht.BootstrapPeers(pis...),
+			)
+		}).
+		SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
+		SetGossipSubTracer(meshTracer).
+		SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
+		SetGossipSubRpcInspectorSuite(rpcInspectorSuite).
+		Build()
+
+	if err != nil {
+		return nil, fmt.Errorf("could not build public libp2p node: %w", err)
+	}
+
+	builder.LibP2PNode = node
+
+	return builder.LibP2PNode, nil
 }
 
 // initObserverLocal initializes the observer's ID, network key and network address
@@ -677,7 +680,7 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 	var libp2pNode p2p.LibP2PNode
 	builder.
 		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			libP2PFactory := builder.initPublicLibP2PFactory(node.NetworkKey)
+			libP2PFactory := builder.initPublicLibp2pNode(node.NetworkKey)
 
 			var err error
 			libp2pNode, err = libP2PFactory()
