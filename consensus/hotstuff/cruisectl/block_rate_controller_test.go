@@ -2,7 +2,6 @@ package cruisectl
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -140,6 +139,7 @@ func (bs *BlockRateControllerSuite) SanityCheckSubsequentMeasurements(m1, m2 mea
 	// later measurements should have later times
 	assert.True(bs.T(), m1.time.Before(m2.time))
 	// new measurement should have different error
+	// TODO better sanity checks
 	assert.NotEqual(bs.T(), m1.proportionalErr, m2.proportionalErr)
 	assert.NotEqual(bs.T(), m1.integralErr, m2.integralErr)
 	assert.NotEqual(bs.T(), m1.derivativeErr, m2.derivativeErr)
@@ -235,6 +235,7 @@ func (bs *BlockRateControllerSuite) TestOnViewChange_UpdateProposalDelay() {
 	for i := 0; i <= cap(bs.ctl.viewChanges); i++ {
 		bs.ctl.OnViewChange(0, bs.initialView+1)
 	}
+	// wait for the channel to drain, since OnViewChange doesn't block on sending
 	require.Eventually(bs.T(), func() bool {
 		return len(bs.ctl.viewChanges) == 0
 	}, time.Second, time.Millisecond)
@@ -294,8 +295,9 @@ func (bs *BlockRateControllerSuite) TestOnEpochSetupPhaseStarted() {
 }
 
 // TestMeasurementsPrecisely bypasses the worker thread and directly instigates a new measurement.
-// Since here we can precisely control the "view-entered" time, we precisely
-// validate the resulting measurement and proposal delay.
+// Since we control the "view-entered" time, we precisely validate the resulting measurements.
+// For each measurement, we select a number of views to skip (0-99) and a view time (10ms-10s)
+// then assert that the measurements match expectations, which are computed differently where reasonable.
 func (bs *BlockRateControllerSuite) TestMeasurementsPrecisely() {
 	bs.CreateAndStartController()
 	defer bs.StopController()
@@ -303,14 +305,19 @@ func (bs *BlockRateControllerSuite) TestMeasurementsPrecisely() {
 	rapid.Check(bs.T(), func(t *rapid.T) {
 		lastMeasurement := bs.ctl.lastMeasurement
 		curView := lastMeasurement.view
-		nextViewDiff := rapid.Uint64Range(1, 10).Draw(t, "view_diff").(uint64)
-		msPerView := rapid.Float64Range(250, 750).Draw(t, "ms_pr_view").(float64)
-		timeDiff := time.Duration(msPerView*float64(nextViewDiff)) * time.Millisecond
-		nextView := curView + nextViewDiff
-		fmt.Println("rapid: ", nextView, timeDiff.String(), msPerView, nextViewDiff)
+
+		// draw a random view distance and average view time over that distance
+		viewDiff := rapid.Uint64Range(1, 100).Draw(t, "view_diff").(uint64)
+		msPerView := rapid.Float64Range(10, 10_000).Draw(t, "ms_pr_view").(float64)
+
+		timeDiff := time.Duration(msPerView*float64(viewDiff)) * time.Millisecond
+		nextView := curView + viewDiff
 		nextViewEnteredAt := lastMeasurement.time.Add(timeDiff)
+		viewsRemainingInEpoch := float64(bs.ctl.curEpochFinalView - nextView)
+		timeRemainingInEpoch := float64(bs.ctl.curEpochTargetEndTime.Sub(nextViewEnteredAt).Milliseconds() / 1000)
 		alpha := bs.ctl.config.alpha()
 
+		// perform a measurement
 		err := bs.ctl.measureViewRate(nextView, nextViewEnteredAt)
 		require.NoError(bs.T(), err)
 		nextMeasurement := bs.ctl.lastMeasurement
@@ -319,12 +326,31 @@ func (bs *BlockRateControllerSuite) TestMeasurementsPrecisely() {
 		assert.Equal(bs.T(), nextView, nextMeasurement.view)
 		assert.Equal(bs.T(), nextViewEnteredAt, nextMeasurement.time)
 		// assert view rate is calculated correctly
-		expectedViewRate := float64(nextViewDiff) / (float64(timeDiff.Milliseconds()) / 1000)
-		fmt.Println("rapid: ", expectedViewRate, lastMeasurement.aveViewRate, float64(nextViewDiff), timeDiff.Milliseconds(), float64(timeDiff.Milliseconds())/1000.0)
-		require.Equal(bs.T(), expectedViewRate, nextMeasurement.viewRate)
+		expectedViewRate := float64(viewDiff) / (float64(timeDiff.Milliseconds()) / 1000)
+		assert.InDelta(bs.T(), expectedViewRate, nextMeasurement.viewRate, 0.001)
 		expectedAveViewRate := (alpha * expectedViewRate) + ((1.0 - alpha) * lastMeasurement.aveViewRate)
-		require.Equal(bs.T(), expectedAveViewRate, nextMeasurement.aveViewRate)
+		assert.InDelta(bs.T(), expectedAveViewRate, nextMeasurement.aveViewRate, 0.001)
+		expectedTargetViewRate := viewsRemainingInEpoch / timeRemainingInEpoch
+		assert.InDelta(bs.T(), expectedTargetViewRate, nextMeasurement.targetViewRate, 0.001)
+		// assert error is calculated correctly
+		expectedProportionalErr := expectedTargetViewRate - expectedAveViewRate
+		assert.InDelta(bs.T(), expectedProportionalErr, nextMeasurement.proportionalErr, 0.001)
+		expectedIntegralErr := lastMeasurement.integralErr + expectedProportionalErr
+		assert.InDelta(bs.T(), expectedIntegralErr, nextMeasurement.integralErr, 0.001)
+		expectedDerivativeErr := (expectedProportionalErr - lastMeasurement.proportionalErr) / float64(viewDiff)
+		assert.InDelta(bs.T(), expectedDerivativeErr, nextMeasurement.derivativeErr, 0.001)
 
-		// TODO validate other fields
+		// assert delay is calculated correctly
+		expectedDelayMS := bs.config.DefaultProposalDelayMs() +
+			expectedProportionalErr*bs.config.KP +
+			expectedIntegralErr*bs.config.KI +
+			expectedDerivativeErr*bs.config.KD
+		if expectedDelayMS > bs.config.MaxProposalDelayMs() {
+			assert.Equal(bs.T(), bs.config.MaxProposalDelayMs(), bs.ctl.ProposalDelay())
+		} else if expectedDelayMS < bs.config.MinProposalDelayMs() {
+			assert.Equal(bs.T(), bs.config.MinProposalDelayMs(), bs.ctl.ProposalDelay())
+		} else {
+			assert.InDelta(bs.T(), expectedDelayMS, bs.ctl.ProposalDelay(), 0.001)
+		}
 	})
 }

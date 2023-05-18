@@ -56,7 +56,7 @@ type BlockRateController struct {
 	lastMeasurement measurement // the most recently taken measurement
 	epochInfo                   // scheduled transition view for current/next epoch
 
-	proposalDelay          atomic.Float64
+	proposalDelayMS        atomic.Float64
 	epochFallbackTriggered atomic.Bool
 
 	viewChanges    chan uint64       // OnViewChange events           (view entered)
@@ -104,7 +104,7 @@ func (ctl *BlockRateController) initLastMeasurement(curView uint64, now time.Tim
 		integralErr:     0,
 		derivativeErr:   0,
 	}
-	ctl.proposalDelay.Store(float64(ctl.config.DefaultProposalDelay.Milliseconds()))
+	ctl.proposalDelayMS.Store(float64(ctl.config.DefaultProposalDelay.Milliseconds()))
 }
 
 // initEpochInfo initializes the epochInfo state upon component startup.
@@ -157,7 +157,7 @@ func (ctl *BlockRateController) initEpochInfo(curView uint64) error {
 //   - if P < ProposalDelay to produce, then we wait ProposalDelay-P before broadcasting the proposal (total proposal time of ProposalDelay)
 //   - if P >= ProposalDelay to produce, then we immediately broadcast the proposal (total proposal time of P)
 func (ctl *BlockRateController) ProposalDelay() float64 {
-	return ctl.proposalDelay.Load()
+	return ctl.proposalDelayMS.Load()
 }
 
 // processEventsWorkerLogic is the logic for processing events received from other components.
@@ -295,11 +295,19 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 	ctl.lastMeasurement = nextMeasurement
 
 	// compute and store the new proposal delay value
-	delay := float64(ctl.config.DefaultProposalDelay.Milliseconds()) +
-		ctl.lastMeasurement.proportionalErr*ctl.config.KP +
-		ctl.lastMeasurement.integralErr*ctl.config.KI +
-		ctl.lastMeasurement.derivativeErr*ctl.config.KD
-	ctl.proposalDelay.Store(delay)
+	delayMS := ctl.config.DefaultProposalDelayMs() +
+		nextMeasurement.proportionalErr*ctl.config.KP +
+		nextMeasurement.integralErr*ctl.config.KI +
+		nextMeasurement.derivativeErr*ctl.config.KD
+	if delayMS < ctl.config.MinProposalDelayMs() {
+		ctl.proposalDelayMS.Store(ctl.config.MinProposalDelayMs())
+		return nil
+	}
+	if delayMS > ctl.config.MaxProposalDelayMs() {
+		ctl.proposalDelayMS.Store(ctl.config.MaxProposalDelayMs())
+		return nil
+	}
+	ctl.proposalDelayMS.Store(delayMS)
 	return nil
 }
 
@@ -327,7 +335,7 @@ func (ctl *BlockRateController) processEpochSetupPhaseStarted(snapshot protocol.
 //   - set epoch fallback triggered, to disable the controller
 func (ctl *BlockRateController) processEpochFallbackTriggered() {
 	ctl.epochFallbackTriggered.Store(true)
-	ctl.proposalDelay.Store(ctl.config.DefaultProposalDelayMs())
+	ctl.proposalDelayMS.Store(ctl.config.DefaultProposalDelayMs())
 }
 
 // OnViewChange responds to a view-change notification from HotStuff.
