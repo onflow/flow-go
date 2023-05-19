@@ -97,7 +97,6 @@ func (r *RecordCache) Init(originId flow.Identifier) bool {
 // Assuming that adjust is always called when the record exists, the error is irrecoverable and indicates a bug.
 // Args:
 // - originId: the origin id the sender of the control message.
-// - adjustFunc: the function that adjusts the record.
 // Returns:
 //   - The number of cluster prefix topics received after the adjustment.
 //   - error if the adjustFunc returns an error or if the record does not exist (ErrRecordNotFound).
