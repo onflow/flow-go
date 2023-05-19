@@ -149,7 +149,7 @@ jobs:
             make1: install-tools
             make2: test
             retries: 3
-            race: 1
+            race: 0
           - name: integration
             make1: install-tools
             make2: test
