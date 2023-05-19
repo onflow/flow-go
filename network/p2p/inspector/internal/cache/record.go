@@ -3,8 +3,6 @@ package cache
 import (
 	"time"
 
-	"go.uber.org/atomic"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -15,14 +13,14 @@ type ClusterPrefixedMessagesReceivedRecord struct {
 	NodeID flow.Identifier
 	// Gauge represents the approximate amount of cluster prefixed messages received by a peer, this
 	// value is decayed back to 0 after some time.
-	Gauge       *atomic.Float64
+	Gauge       float64
 	lastUpdated time.Time
 }
 
 func NewClusterPrefixedMessagesReceivedRecord(nodeID flow.Identifier) ClusterPrefixedMessagesReceivedRecord {
 	return ClusterPrefixedMessagesReceivedRecord{
 		NodeID:      nodeID,
-		Gauge:       atomic.NewFloat64(0),
+		Gauge:       0.0,
 		lastUpdated: time.Now(),
 	}
 }

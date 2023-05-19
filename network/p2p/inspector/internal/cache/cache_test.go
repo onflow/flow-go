@@ -529,7 +529,7 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 // Returns:
 // - RecordEntity: the created record entity.
 func recordEntityFixture(id flow.Identifier) ClusterPrefixedMessagesReceivedRecord {
-	return ClusterPrefixedMessagesReceivedRecord{NodeID: id, Gauge: atomic.NewFloat64(0), lastUpdated: time.Now()}
+	return ClusterPrefixedMessagesReceivedRecord{NodeID: id, Gauge: 0.0, lastUpdated: time.Now()}
 }
 
 // cacheFixture returns a new *RecordCache.

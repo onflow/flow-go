@@ -119,7 +119,7 @@ func (r *RecordCache) Update(nodeID flow.Identifier) (float64, error) {
 		}
 	}
 
-	return adjustedEntity.(ClusterPrefixedMessagesReceivedRecord).Gauge.Load(), nil
+	return adjustedEntity.(ClusterPrefixedMessagesReceivedRecord).Gauge, nil
 }
 
 // Get returns the current number of cluster prefixed control messages received from a peer.
@@ -156,7 +156,7 @@ func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
 	}
 
 	// perform decay on Gauge
-	return record.Gauge.Load(), true, nil
+	return record.Gauge, true, nil
 }
 
 // NodeIDs returns the list of identities of the nodes that have a spam record in the cache.
@@ -186,7 +186,7 @@ func (r *RecordCache) incrementAdjustment(entity flow.Entity) flow.Entity {
 		// This should never happen, because the cache only contains ClusterPrefixedMessagesReceivedRecord entities.
 		panic(fmt.Sprintf("invalid entity type, expected ClusterPrefixedMessagesReceivedRecord type, got: %T", entity))
 	}
-	record.Gauge.Add(1)
+	record.Gauge++
 	record.lastUpdated = time.Now()
 	// Return the adjusted record.
 	return record
@@ -217,7 +217,7 @@ type decayFunc func(recordEntity ClusterPrefixedMessagesReceivedRecord) (Cluster
 // All errors returned are unexpected and irrecoverable.
 func defaultDecayFunction(decay float64) decayFunc {
 	return func(recordEntity ClusterPrefixedMessagesReceivedRecord) (ClusterPrefixedMessagesReceivedRecord, error) {
-		received := recordEntity.Gauge.Load()
+		received := recordEntity.Gauge
 		if received == 0 {
 			return recordEntity, nil
 		}
@@ -226,7 +226,7 @@ func defaultDecayFunction(decay float64) decayFunc {
 		if err != nil {
 			return recordEntity, fmt.Errorf("could not decay cluster prefixed control messages received gauge: %w", err)
 		}
-		recordEntity.Gauge.Store(decayedVal)
+		recordEntity.Gauge = decayedVal
 		return recordEntity, nil
 	}
 }
