@@ -160,6 +160,32 @@ func (_m *Params) Seal() (*flow.Seal, error) {
 	return r0, r1
 }
 
+// SealedRoot provides a mock function with given fields:
+func (_m *Params) SealedRoot() (*flow.Header, error) {
+	ret := _m.Called()
+
+	var r0 *flow.Header
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (*flow.Header, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Header)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // SporkID provides a mock function with given fields:
 func (_m *Params) SporkID() (flow.Identifier, error) {
 	ret := _m.Called()
