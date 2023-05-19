@@ -13,8 +13,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestClusterPrefixTopicsReceivedTracker_Inc ensures cluster prefixed received tracker increments a counter correctly.
-func TestClusterPrefixTopicsReceivedTracker_Inc(t *testing.T) {
+// TestClusterPrefixedMessagesReceivedTracker_Inc ensures cluster prefixed received tracker increments a counter correctly.
+func TestClusterPrefixedMessagesReceivedTracker_Inc(t *testing.T) {
 	tracker := mockTracker(t)
 	id := unittest.IdentifierFixture()
 	n := float64(5)
@@ -25,8 +25,8 @@ func TestClusterPrefixTopicsReceivedTracker_Inc(t *testing.T) {
 	}
 }
 
-// TestClusterPrefixTopicsReceivedTracker_IncConcurrent ensures cluster prefixed received tracker increments a counter correctly concurrently.
-func TestClusterPrefixTopicsReceivedTracker_IncConcurrent(t *testing.T) {
+// TestClusterPrefixedMessagesReceivedTracker_IncConcurrent ensures cluster prefixed received tracker increments a counter correctly concurrently.
+func TestClusterPrefixedMessagesReceivedTracker_IncConcurrent(t *testing.T) {
 	tracker := mockTracker(t)
 	n := float64(5)
 	id := unittest.IdentifierFixture()
@@ -43,8 +43,8 @@ func TestClusterPrefixTopicsReceivedTracker_IncConcurrent(t *testing.T) {
 	require.Equal(t, n, tracker.Load(id))
 }
 
-// TestClusterPrefixTopicsReceivedTracker_ConcurrentIncAndLoad ensures cluster prefixed received tracker increments/loads a counter correctly concurrently.
-func TestClusterPrefixTopicsReceivedTracker_ConcurrentIncAndLoad(t *testing.T) {
+// TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad ensures cluster prefixed received tracker increments/loads a counter correctly concurrently.
+func TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad(t *testing.T) {
 	tracker := mockTracker(t)
 	n := float64(5)
 	id := unittest.IdentifierFixture()
@@ -72,7 +72,7 @@ func TestClusterPrefixTopicsReceivedTracker_ConcurrentIncAndLoad(t *testing.T) {
 	require.Equal(t, float64(5), tracker.Load(id))
 }
 
-func TestClusterPrefixTopicsReceivedTracker_StoreAndGetActiveClusterIds(t *testing.T) {
+func TestClusterPrefixedMessagesReceivedTracker_StoreAndGetActiveClusterIds(t *testing.T) {
 	tracker := mockTracker(t)
 	activeClusterIds := []flow.ChainIDList{chainIDListFixture(), chainIDListFixture(), chainIDListFixture()}
 	for _, chainIDList := range activeClusterIds {
@@ -82,7 +82,7 @@ func TestClusterPrefixTopicsReceivedTracker_StoreAndGetActiveClusterIds(t *testi
 	}
 }
 
-func TestClusterPrefixTopicsReceivedTracker_StoreAndGetActiveClusterIdsConcurrent(t *testing.T) {
+func TestClusterPrefixedMessagesReceivedTracker_StoreAndGetActiveClusterIdsConcurrent(t *testing.T) {
 	tracker := mockTracker(t)
 	activeClusterIds := []flow.ChainIDList{chainIDListFixture(), chainIDListFixture(), chainIDListFixture()}
 	expectedLen := len(activeClusterIds[0])
@@ -105,12 +105,12 @@ func TestClusterPrefixTopicsReceivedTracker_StoreAndGetActiveClusterIdsConcurren
 	require.Equal(t, expectedLen, len(actualChainIdList)) // each fixture is of the same len
 }
 
-func mockTracker(t *testing.T) *ClusterPrefixTopicsReceivedTracker {
+func mockTracker(t *testing.T) *ClusterPrefixedMessagesReceivedTracker {
 	logger := zerolog.Nop()
 	sizeLimit := uint32(100)
 	collector := metrics.NewNoopCollector()
 	decay := float64(0)
-	tracker, err := NewClusterPrefixTopicsReceivedTracker(logger, sizeLimit, collector, decay)
+	tracker, err := NewClusterPrefixedMessagesReceivedTracker(logger, sizeLimit, collector, decay)
 	require.NoError(t, err)
 	return tracker
 }

@@ -27,7 +27,7 @@ type RecordCacheConfig struct {
 	recordDecay float64
 }
 
-// RecordCache is a cache that stores *ClusterPrefixTopicsReceivedRecord used by the control message validation inspector
+// RecordCache is a cache that stores *ClusterPrefixedMessagesReceivedRecord used by the control message validation inspector
 // to keep track of the amount of cluster prefixed control messages received by a peer.
 type RecordCache struct {
 	// recordEntityFactory is a factory function that creates a new *RecordEntity.
@@ -48,19 +48,19 @@ type RecordCache struct {
 // - recordEntityFactory: a factory function that creates a new spam record.
 // Returns:
 // - *RecordCache, the created cache.
-// Note that this cache is supposed to keep the cluster prefix topics received record for the authorized (staked) nodes. Since the number of such nodes is
+// Note that this cache is supposed to keep the cluster prefix control messages received record for the authorized (staked) nodes. Since the number of such nodes is
 // expected to be small, we do not eject any records from the cache. The cache size must be large enough to hold all
 // the records of the authorized nodes. Also, this cache is keeping at most one record per peer id, so the
 // size of the cache must be at least the number of authorized nodes.
 func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityFactory) (*RecordCache, error) {
 	backData := herocache.NewCache(config.sizeLimit,
 		herocache.DefaultOversizeFactor,
-		// this cache is supposed to keep the cluster prefix topics received record for the authorized (staked) nodes. Since the number of such nodes is
+		// this cache is supposed to keep the cluster prefix control messages received record for the authorized (staked) nodes. Since the number of such nodes is
 		// expected to be small, we do not eject any records from the cache. The cache size must be large enough to hold all
 		// the records of the authorized nodes. Also, this cache is keeping at most one record per peer id, so the
 		// size of the cache must be at least the number of authorized nodes.
 		heropool.NoEjection,
-		config.logger.With().Str("mempool", "gossipsub=cluster-prefix-topics-received-records").Logger(),
+		config.logger.With().Str("mempool", "gossipsub=cluster-prefix-control-messages-received-records").Logger(),
 		config.collector)
 	recordCache := &RecordCache{
 		recordEntityFactory: recordEntityFactory,
@@ -90,8 +90,8 @@ func (r *RecordCache) Init(nodeID flow.Identifier) bool {
 	return r.c.Add(entity)
 }
 
-// Update applies an adjustment that increments the number of cluster prefixed topics received by a peer.
-// Returns number of cluster prefix topics received after the adjustment. The record is initialized before
+// Update applies an adjustment that increments the number of cluster prefixed control messages received by a peer.
+// Returns number of cluster prefix control messages received after the adjustment. The record is initialized before
 // the adjustment func is applied that will increment the Counter.
 // It returns an error if the adjustFunc returns an error or if the record does not exist.
 // Assuming that adjust is always called when the record exists, the error is irrecoverable and indicates a bug.
@@ -99,7 +99,7 @@ func (r *RecordCache) Init(nodeID flow.Identifier) bool {
 // - nodeID: the node ID of the sender of the control message.
 // - adjustFunc: the function that adjusts the record.
 // Returns:
-//   - The number of cluster prefix topics received after the adjustment.
+//   - The number of cluster prefix control messages received after the adjustment.
 //   - error if the adjustFunc returns an error or if the record does not exist (ErrRecordNotFound).
 //     All errors should be treated as an irrecoverable error and indicates a bug.
 //
@@ -128,14 +128,14 @@ func (r *RecordCache) Update(nodeID flow.Identifier) (float64, error) {
 	return adjustedEntity.(RecordEntity).Counter.Load(), nil
 }
 
-// Get returns the current number of cluster prefixed topcis received from a peer.
+// Get returns the current number of cluster prefixed control messages received from a peer.
 // The record is initialized before the count is returned.
 // Before the count is returned it is decayed using the configured decay function.
 // Returns the record and true if the record exists, nil and false otherwise.
 // Args:
 // - nodeID: the node ID of the sender of the control message.
 // Returns:
-// - The number of cluster prefix topics received after the decay and true if the record exists, 0 and false otherwise.
+// - The number of cluster prefixed control messages received after the decay and true if the record exists, 0 and false otherwise.
 func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
 	if r.Init(nodeID) {
 		return 0, true, nil
@@ -248,7 +248,7 @@ func (r *RecordCache) getActiveClusterIdsCacheId() flow.Identifier {
 
 type preProcessingFunc func(recordEntity RecordEntity) (RecordEntity, error)
 
-// defaultDecayFunction is the default decay function that is used to decay the cluster prefixed topic received counter of a peer.
+// defaultDecayFunction is the default decay function that is used to decay the cluster prefixed control message received counter of a peer.
 func defaultDecayFunction(decay float64) preProcessingFunc {
 	return func(recordEntity RecordEntity) (RecordEntity, error) {
 		if recordEntity.Counter.Load() == 0 {
@@ -257,7 +257,7 @@ func defaultDecayFunction(decay float64) preProcessingFunc {
 
 		decayedVal, err := scoring.GeometricDecay(recordEntity.Counter.Load(), decay, recordEntity.lastUpdated)
 		if err != nil {
-			return recordEntity, fmt.Errorf("could not decay cluster prefixed topic received counter: %w", err)
+			return recordEntity, fmt.Errorf("could not decay cluster prefixed control messages received counter: %w", err)
 		}
 		recordEntity.Counter.Store(decayedVal)
 		return recordEntity, nil

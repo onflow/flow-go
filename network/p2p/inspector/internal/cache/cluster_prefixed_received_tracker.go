@@ -9,13 +9,13 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// ClusterPrefixTopicsReceivedTracker struct that keeps track of the amount of cluster prefixed control messages received by a peer.
-type ClusterPrefixTopicsReceivedTracker struct {
+// ClusterPrefixedMessagesReceivedTracker struct that keeps track of the amount of cluster prefixed control messages received by a peer.
+type ClusterPrefixedMessagesReceivedTracker struct {
 	cache *RecordCache
 }
 
-// NewClusterPrefixTopicsReceivedTracker returns a new *ClusterPrefixTopicsReceivedTracker.
-func NewClusterPrefixTopicsReceivedTracker(logger zerolog.Logger, sizeLimit uint32, clusterPrefixedCacheCollector module.HeroCacheMetrics, decay float64) (*ClusterPrefixTopicsReceivedTracker, error) {
+// NewClusterPrefixedMessagesReceivedTracker returns a new *ClusterPrefixedMessagesReceivedTracker.
+func NewClusterPrefixedMessagesReceivedTracker(logger zerolog.Logger, sizeLimit uint32, clusterPrefixedCacheCollector module.HeroCacheMetrics, decay float64) (*ClusterPrefixedMessagesReceivedTracker, error) {
 	config := &RecordCacheConfig{
 		sizeLimit:   sizeLimit,
 		logger:      logger,
@@ -26,11 +26,11 @@ func NewClusterPrefixTopicsReceivedTracker(logger zerolog.Logger, sizeLimit uint
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new record cahe: %w", err)
 	}
-	return &ClusterPrefixTopicsReceivedTracker{cache: recordCache}, nil
+	return &ClusterPrefixedMessagesReceivedTracker{cache: recordCache}, nil
 }
 
-// Inc increments the cluster prefixed topics received Counter for the peer.
-func (c *ClusterPrefixTopicsReceivedTracker) Inc(nodeID flow.Identifier) (float64, error) {
+// Inc increments the cluster prefixed control messages received Counter for the peer.
+func (c *ClusterPrefixedMessagesReceivedTracker) Inc(nodeID flow.Identifier) (float64, error) {
 	count, err := c.cache.Update(nodeID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to increment cluster prefixed received tracker Counter for peer %s: %w", nodeID, err)
@@ -38,18 +38,18 @@ func (c *ClusterPrefixTopicsReceivedTracker) Inc(nodeID flow.Identifier) (float6
 	return count, nil
 }
 
-// Load loads the current number of cluster prefixed topics received by a peer.
-func (c *ClusterPrefixTopicsReceivedTracker) Load(nodeID flow.Identifier) float64 {
+// Load loads the current number of cluster prefixed control messages received by a peer.
+func (c *ClusterPrefixedMessagesReceivedTracker) Load(nodeID flow.Identifier) float64 {
 	count, _, _ := c.cache.Get(nodeID)
 	return count
 }
 
 // StoreActiveClusterIds stores the active cluster Ids in the underlying record cache.
-func (c *ClusterPrefixTopicsReceivedTracker) StoreActiveClusterIds(clusterIdList flow.ChainIDList) {
+func (c *ClusterPrefixedMessagesReceivedTracker) StoreActiveClusterIds(clusterIdList flow.ChainIDList) {
 	c.cache.storeActiveClusterIds(clusterIdList)
 }
 
 // GetActiveClusterIds gets the active cluster Ids from the underlying record cache.
-func (c *ClusterPrefixTopicsReceivedTracker) GetActiveClusterIds() flow.ChainIDList {
+func (c *ClusterPrefixedMessagesReceivedTracker) GetActiveClusterIds() flow.ChainIDList {
 	return c.cache.getActiveClusterIds()
 }

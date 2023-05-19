@@ -7,11 +7,11 @@ import (
 )
 
 // RecordEntity is an entity that represents a tracking record that keeps track
-// of the amount of cluster prefixed topics received from a peer. This struct
+// of the amount of cluster prefixed control messages received from a peer. This struct
 // implements the flow.Entity interface and uses a flow.Identifier created from
 // the records peer field for deduplication.
 type RecordEntity struct {
-	ClusterPrefixTopicsReceivedRecord
+	ClusterPrefixedMessagesReceivedRecord
 	lastUpdated time.Time
 }
 
@@ -20,8 +20,8 @@ var _ flow.Entity = (*RecordEntity)(nil)
 // NewRecordEntity returns a new RecordEntity.
 func NewRecordEntity(nodeID flow.Identifier) RecordEntity {
 	return RecordEntity{
-		ClusterPrefixTopicsReceivedRecord: NewClusterPrefixTopicsReceivedRecord(nodeID),
-		lastUpdated:                       time.Now(),
+		ClusterPrefixedMessagesReceivedRecord: NewClusterPrefixedMessagesReceivedRecord(nodeID),
+		lastUpdated:                           time.Now(),
 	}
 }
 
