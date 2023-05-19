@@ -1,10 +1,12 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -98,6 +100,12 @@ func (p Params) SealedRoot() (*flow.Header, error) {
 	// look up root block ID
 	var rootID flow.Identifier
 	err := p.state.db.View(operation.LookupBlockHeight(p.state.sealedRootHeight, &rootID))
+	// TODO(leo): old execution node that starts since beginning of a spork (instead of dynamic bootstrapped)
+	// might not have this key. In that case, fallback to Root()
+	if errors.Is(err, storage.ErrNotFound) {
+		return p.Root()
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("could not look up root header: %w", err)
 	}

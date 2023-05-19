@@ -133,6 +133,11 @@ func Bootstrap(
 		return nil, fmt.Errorf("could not get sealing segment: %w", err)
 	}
 
+	rootResult, _, err := root.SealedResult()
+	if err != nil {
+		return nil, fmt.Errorf("could not get sealed result for sealing segment: %w", err)
+	}
+
 	err = operation.RetryOnConflictTx(db, transaction.Update, func(tx *transaction.Tx) error {
 		// sealing segment is in ascending height order, so the tail is the
 		// oldest ancestor and head is the newest child in the segment
@@ -141,7 +146,7 @@ func Bootstrap(
 		lowest := segment.Sealed()   // last sealed block
 
 		// 1) bootstrap the sealing segment
-		err = state.bootstrapSealingSegment(segment, highest)(tx)
+		err = state.bootstrapSealingSegment(segment, highest, rootResult)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
 		}
@@ -209,7 +214,7 @@ func Bootstrap(
 
 // bootstrapSealingSegment inserts all blocks and associated metadata for the
 // protocol state root snapshot to disk.
-func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block) func(tx *transaction.Tx) error {
+func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block, rootResult *flow.ExecutionResult) func(tx *transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 
 		for _, result := range segment.ExecutionResults {
@@ -232,7 +237,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 
 			// first seal contains the result ID for the sealed root block, indexing it allows dynamically bootstrapped EN to execute
 			// the next block
-			err = transaction.WithTx(operation.IndexExecutionResult(segment.FirstSeal.BlockID, segment.FirstSeal.ResultID))(tx)
+			err = transaction.WithTx(operation.IndexExecutionResult(rootResult.BlockID, rootResult.ID()))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index root result: %w", err)
 			}
