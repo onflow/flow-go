@@ -33,18 +33,23 @@ func NewClusterPrefixedMessagesReceivedTracker(logger zerolog.Logger, sizeLimit 
 }
 
 // Inc increments the cluster prefixed control messages received Gauge for the peer.
+// All errors returned from this callback are unexpected and irrecoverable.
 func (c *ClusterPrefixedMessagesReceivedTracker) Inc(nodeID flow.Identifier) (float64, error) {
 	count, err := c.cache.Update(nodeID)
 	if err != nil {
-		return 0, fmt.Errorf("failed to increment cluster prefixed received tracker Gauge for peer %s: %w", nodeID, err)
+		return 0, fmt.Errorf("failed to increment cluster prefixed received tracker gauge value for peer %s: %w", nodeID, err)
 	}
 	return count, nil
 }
 
 // Load loads the current number of cluster prefixed control messages received by a peer.
-func (c *ClusterPrefixedMessagesReceivedTracker) Load(nodeID flow.Identifier) float64 {
-	count, _, _ := c.cache.Get(nodeID)
-	return count
+// All errors returned from this callback are unexpected and irrecoverable.
+func (c *ClusterPrefixedMessagesReceivedTracker) Load(nodeID flow.Identifier) (float64, error) {
+	count, _, err := c.cache.Get(nodeID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get cluster prefixed received tracker gauge value for peer %s: %w", nodeID, err)
+	}
+	return count, nil
 }
 
 // StoreActiveClusterIds stores the active cluster Ids in the underlying record cache.

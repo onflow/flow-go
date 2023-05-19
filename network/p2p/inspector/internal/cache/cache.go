@@ -35,7 +35,7 @@ type RecordCache struct {
 	// c is the underlying cache.
 	c *stdmap.Backend
 	// decayFunc decay func used by the cache to perform decay on gauges.
-	decayFunc preProcessingFunc
+	decayFunc decayFunc
 }
 
 // NewRecordCache creates a new *RecordCache.
@@ -96,9 +96,13 @@ func (r *RecordCache) Init(nodeID flow.Identifier) bool {
 // Note if Adjust is called under the assumption that the record exists, the ErrRecordNotFound should be treated
 // as an irrecoverable error and indicates a bug.
 func (r *RecordCache) Update(nodeID flow.Identifier) (float64, error) {
+	var err error
 	optimisticAdjustFunc := func() (flow.Entity, bool) {
 		return r.c.Adjust(nodeID, func(entity flow.Entity) flow.Entity {
-			r.decayAdjustment(entity)            // first decay the record
+			entity, err = r.decayAdjustment(entity) // first decay the record
+			if err != nil {
+				return entity
+			}
 			return r.incrementAdjustment(entity) // then increment the record
 		})
 	}
@@ -107,7 +111,10 @@ func (r *RecordCache) Update(nodeID flow.Identifier) (float64, error) {
 	// it means the record was not initialized. In this case, initialize the record and call optimisticAdjustFunc again.
 	// If the record was initialized, optimisticAdjustFunc will be called only once.
 	adjustedEntity, adjusted := optimisticAdjustFunc()
-	if !adjusted {
+	switch {
+	case err != nil:
+		return 0, fmt.Errorf("unexpected error while applying decay adjustment for node %s: %w", nodeID, err)
+	case !adjusted:
 		r.Init(nodeID)
 		adjustedEntity, adjusted = optimisticAdjustFunc()
 		if !adjusted {
@@ -131,9 +138,16 @@ func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
 		return 0, true, nil
 	}
 
-	adjustedEntity, adjusted := r.c.Adjust(nodeID, r.decayAdjustment)
-	if !adjusted {
-		return 0, false, fmt.Errorf("unexpected record not found for node ID %s, even after an init attempt", nodeID)
+	var err error
+	adjustedEntity, adjusted := r.c.Adjust(nodeID, func(entity flow.Entity) flow.Entity {
+		entity, err = r.decayAdjustment(entity)
+		return entity
+	})
+	switch {
+	case err != nil:
+		return 0, false, fmt.Errorf("unexpected error while applying decay adjustment for node %s: %w", nodeID, err)
+	case !adjusted:
+		return 0, false, fmt.Errorf("unexpected error record not found for node ID %s, even after an init attempt", nodeID)
 	}
 
 	record, ok := adjustedEntity.(ClusterPrefixedMessagesReceivedRecord)
@@ -147,8 +161,8 @@ func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
 	return record.Gauge.Load(), true, nil
 }
 
-// Identities returns the list of identities of the nodes that have a spam record in the cache.
-func (r *RecordCache) Identities() []flow.Identifier {
+// NodeIDs returns the list of identities of the nodes that have a spam record in the cache.
+func (r *RecordCache) NodeIDs() []flow.Identifier {
 	return flow.GetIDs(r.c.All())
 }
 
@@ -180,7 +194,7 @@ func (r *RecordCache) incrementAdjustment(entity flow.Entity) flow.Entity {
 	return record
 }
 
-func (r *RecordCache) decayAdjustment(entity flow.Entity) flow.Entity {
+func (r *RecordCache) decayAdjustment(entity flow.Entity) (flow.Entity, error) {
 	record, ok := entity.(ClusterPrefixedMessagesReceivedRecord)
 	if !ok {
 		// sanity check
@@ -190,17 +204,20 @@ func (r *RecordCache) decayAdjustment(entity flow.Entity) flow.Entity {
 	var err error
 	record, err = r.decayFunc(record)
 	if err != nil {
-		return record
+		return record, err
 	}
 	record.lastUpdated = time.Now()
 	// Return the adjusted record.
-	return record
+	return record, nil
 }
 
-type preProcessingFunc func(recordEntity ClusterPrefixedMessagesReceivedRecord) (ClusterPrefixedMessagesReceivedRecord, error)
+// decayFunc the callback used to apply a decay method to the record.
+// All errors returned from this callback are unexpected and irrecoverable.
+type decayFunc func(recordEntity ClusterPrefixedMessagesReceivedRecord) (ClusterPrefixedMessagesReceivedRecord, error)
 
 // defaultDecayFunction is the default decay function that is used to decay the cluster prefixed control message received gauge of a peer.
-func defaultDecayFunction(decay float64) preProcessingFunc {
+// All errors returned are unexpected and irrecoverable.
+func defaultDecayFunction(decay float64) decayFunc {
 	return func(recordEntity ClusterPrefixedMessagesReceivedRecord) (ClusterPrefixedMessagesReceivedRecord, error) {
 		received := recordEntity.Gauge.Load()
 		if received == 0 {

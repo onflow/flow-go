@@ -18,10 +18,15 @@ func TestClusterPrefixedMessagesReceivedTracker_Inc(t *testing.T) {
 	tracker := mockTracker(t)
 	id := unittest.IdentifierFixture()
 	n := float64(5)
+	prevGuage := 0.0
 	for i := float64(1); i <= n; i++ {
-		j, err := tracker.Inc(id)
+		guage, err := tracker.Inc(id)
 		require.NoError(t, err)
-		require.Equal(t, i, j)
+		// on each increment the current gauge value should
+		// always be greater than the previous gauge value but
+		// slightly less than i due to the decay.
+		require.LessOrEqual(t, guage, i)
+		require.Greater(t, guage, prevGuage)
 	}
 }
 
@@ -40,7 +45,10 @@ func TestClusterPrefixedMessagesReceivedTracker_IncConcurrent(t *testing.T) {
 		}()
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
-	require.Equal(t, n, tracker.Load(id))
+	// after each decay is applied the gauge value result should be slightly less than n
+	gaugeVal, err := tracker.Load(id)
+	require.NoError(t, err)
+	require.True(t, n-gaugeVal < .2)
 }
 
 // TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad ensures cluster prefixed received tracker increments/loads the cluster prefixed control messages received gauge value correctly concurrently.
@@ -63,13 +71,17 @@ func TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad(t *testing.
 		for i := float64(0); i < n; i++ {
 			go func() {
 				defer wg.Done()
-				j := tracker.Load(id)
-				require.NotNil(t, j)
+				gaugeVal, err := tracker.Load(id)
+				require.NoError(t, err)
+				require.NotNil(t, gaugeVal)
 			}()
 		}
 	}()
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
-	require.Equal(t, float64(5), tracker.Load(id))
+	gaugeVal, err := tracker.Load(id)
+	require.NoError(t, err)
+	// after each decay is applied the gauge value result should be slightly less than n
+	require.True(t, n-gaugeVal < .2)
 }
 
 func TestClusterPrefixedMessagesReceivedTracker_StoreAndGetActiveClusterIds(t *testing.T) {
@@ -109,7 +121,7 @@ func mockTracker(t *testing.T) *ClusterPrefixedMessagesReceivedTracker {
 	logger := zerolog.Nop()
 	sizeLimit := uint32(100)
 	collector := metrics.NewNoopCollector()
-	decay := float64(0)
+	decay := defaultDecay
 	tracker, err := NewClusterPrefixedMessagesReceivedTracker(logger, sizeLimit, collector, decay)
 	require.NoError(t, err)
 	return tracker
