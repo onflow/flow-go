@@ -407,6 +407,8 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
+			followerDistributor.AddFinalizationConsumer(sync)
+
 			return sync, nil
 		})
 }
