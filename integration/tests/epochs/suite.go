@@ -184,7 +184,6 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 
 	_, stakeAmount, err := s.client.TokenAmountByRole(role)
 	require.NoError(s.T(), err)
-
 	containerName := s.getTestContainerName(role)
 
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
@@ -266,22 +265,6 @@ func (s *Suite) generateAccountKeys(role flow.Role) (
 	}
 
 	return
-}
-
-// createAccount creates a new flow account, can be used to test staking
-func (s *Suite) createAccount(ctx context.Context,
-	accountKey *sdk.AccountKey,
-	payerAccount *sdk.Account,
-	payer sdk.Address,
-) (sdk.Address, error) {
-	latestBlockID, err := s.client.GetLatestBlockID(ctx)
-	require.NoError(s.T(), err)
-
-	addr, err := s.client.CreateAccount(ctx, accountKey, payerAccount, payer, sdk.Identifier(latestBlockID))
-	require.NoError(s.T(), err)
-
-	payerAccount.Keys[0].SequenceNumber++
-	return addr, nil
 }
 
 // removeNodeFromProtocol removes the given node from the protocol.
@@ -553,18 +536,7 @@ func (s *Suite) getLatestFinalizedHeader(ctx context.Context) *flow.Header {
 // submitSmokeTestTransaction will submit a create account transaction to smoke test network
 // This ensures a single transaction can be sealed by the network.
 func (s *Suite) submitSmokeTestTransaction(ctx context.Context) {
-	fullAccountKey := sdk.NewAccountKey().
-		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen).PublicKey()).
-		SetHashAlgo(sdkcrypto.SHA2_256).
-		SetWeight(sdk.AccountKeyWeightThreshold)
-
-	// createAccount will submit a create account transaction and wait for it to be sealed
-	_, err := s.createAccount(
-		ctx,
-		fullAccountKey,
-		s.client.Account(),
-		s.client.SDKServiceAddress(),
-	)
+	_, err := utils.CreateFlowAccount(ctx, s.client)
 	require.NoError(s.T(), err)
 }
 

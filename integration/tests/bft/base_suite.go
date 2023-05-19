@@ -102,7 +102,9 @@ func (b *BaseSuite) SetupSuite() {
 func (b *BaseSuite) TearDownSuite() {
 	b.Net.Remove()
 	b.Cancel()
-	unittest.RequireCloseBefore(b.T(), b.OrchestratorNetwork.Done(), 1*time.Second, "could not stop orchestrator network on time")
+	if b.OrchestratorNetwork != nil {
+		unittest.RequireCloseBefore(b.T(), b.OrchestratorNetwork.Done(), 1*time.Second, "could not stop orchestrator network on time")
+	}
 }
 
 // StartCorruptedNetwork starts the corrupted network with the configured node configs, this func should be used after test suite is setup.
