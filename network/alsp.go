@@ -35,7 +35,7 @@ type MisbehaviorReport interface {
 	Reason() Misbehavior
 
 	// Penalty returns the penalty value of the misbehavior.
-	Penalty() int
+	Penalty() float64
 }
 
 // MisbehaviorReportManager abstracts the semantics of handling misbehavior reports.

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 )
@@ -13,6 +14,9 @@ type TransactionPreparer interface {
 
 type Transaction interface {
 	TransactionPreparer
+
+	// SnapshotTime returns the transaction's current snapshot time.
+	SnapshotTime() logical.Time
 
 	// Finalize convert transaction preparer's intermediate state into
 	// committable state.
