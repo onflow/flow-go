@@ -26,8 +26,11 @@ type RecordCacheConfig struct {
 	recordDecay float64
 }
 
-// RecordCache is a cache that stores *ClusterPrefixedMessagesReceivedRecord used by the control message validation inspector
-// to keep track of the amount of cluster prefixed control messages received by a peer.
+// RecordCache is a cache that stores *ClusterPrefixedMessagesReceivedRecord by peer node ID. Each record
+// contains a counter that indicates the current number cluster prefixed control messages that were allowed to bypass
+// validation due to the active cluster ids not being set or an unknown cluster ID error is encountered during validation.
+// Each record contains a float64 Gauge field that is decayed overtime back to 0. This ensures that nodes that fall
+// behind in the protocol can catch up.
 type RecordCache struct {
 	// recordEntityFactory is a factory function that creates a new *ClusterPrefixedMessagesReceivedRecord.
 	recordEntityFactory recordEntityFactory
