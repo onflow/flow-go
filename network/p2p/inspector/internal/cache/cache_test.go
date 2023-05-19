@@ -43,29 +43,29 @@ func TestRecordCache_Init(t *testing.T) {
 	// test initializing a record for an node ID that doesn't exist in the cache
 	initialized := cache.Init(nodeID1)
 	require.True(t, initialized, "expected record to be initialized")
-	counter, ok, err := cache.Get(nodeID1)
+	gauge, ok, err := cache.Get(nodeID1)
 	require.NoError(t, err)
 	require.True(t, ok, "expected record to exist")
-	require.Zerof(t, counter, "expected counter to be 0")
+	require.Zerof(t, gauge, "expected gauge to be 0")
 	require.Equal(t, uint(1), cache.Size(), "expected cache to have one additional record")
 
 	// test initializing a record for an node ID that already exists in the cache
 	initialized = cache.Init(nodeID1)
 	require.False(t, initialized, "expected record not to be initialized")
-	counterAgain, ok, err := cache.Get(nodeID1)
+	gaugeAgain, ok, err := cache.Get(nodeID1)
 	require.NoError(t, err)
 	require.True(t, ok, "expected record to still exist")
-	require.Zerof(t, counterAgain, "expected same counter to be 0")
-	require.Equal(t, counter, counterAgain, "expected records to be the same")
+	require.Zerof(t, gaugeAgain, "expected same gauge to be 0")
+	require.Equal(t, gauge, gaugeAgain, "expected records to be the same")
 	require.Equal(t, uint(1), cache.Size(), "expected cache to still have one additional record")
 
 	// test initializing a record for another node ID
 	initialized = cache.Init(nodeID2)
 	require.True(t, initialized, "expected record to be initialized")
-	counter2, ok, err := cache.Get(nodeID2)
+	gauge2, ok, err := cache.Get(nodeID2)
 	require.NoError(t, err)
 	require.True(t, ok, "expected record to exist")
-	require.Zerof(t, counter2, "expected second counter to be 0")
+	require.Zerof(t, gauge2, "expected second gauge to be 0")
 	require.Equal(t, uint(2), cache.Size(), "expected cache to have two additional records")
 }
 
@@ -97,7 +97,7 @@ func TestRecordCache_ConcurrentInit(t *testing.T) {
 	for _, nodeID := range nodeIDs {
 		count, found, _ := cache.Get(nodeID)
 		require.True(t, found)
-		require.Zerof(t, count, "expected all counters to be initialized to 0")
+		require.Zerof(t, count, "expected all gauge values to be initialized to 0")
 	}
 }
 
@@ -143,8 +143,8 @@ func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
 
 // TestRecordCache_Update tests the Update method of the RecordCache.
 // The test covers the following scenarios:
-// 1. Updating a record counter for an existing node ID.
-// 2. Attempting to update a record counter  for a non-existing node ID should not result in error. Update should always attempt to initialize the counter.
+// 1. Updating a record gauge for an existing node ID.
+// 2. Attempting to update a record gauge  for a non-existing node ID should not result in error. Update should always attempt to initialize the gauge.
 // 3. Multiple updates on the same record only initialize the record once.
 func TestRecordCache_Update(t *testing.T) {
 	cache := cacheFixture(t, 100, 0, zerolog.Nop(), metrics.NewNoopCollector())
@@ -179,7 +179,7 @@ func TestRecordCache_Update(t *testing.T) {
 	require.Equal(t, float64(2), count2)
 }
 
-// TestRecordCache_UpdateDecay ensures that a counter in the record cache is eventually decayed back to 0 after some time.
+// TestRecordCache_UpdateDecay ensures that a gauge in the record cache is eventually decayed back to 0 after some time.
 func TestRecordCache_Decay(t *testing.T) {
 	cache := cacheFixture(t, 100, 0.09, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
@@ -521,7 +521,7 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 // Returns:
 // - RecordEntity: the created record entity.
 func recordEntityFixture(id flow.Identifier) ClusterPrefixedMessagesReceivedRecord {
-	return ClusterPrefixedMessagesReceivedRecord{NodeID: id, Counter: atomic.NewFloat64(0), lastUpdated: time.Now()}
+	return ClusterPrefixedMessagesReceivedRecord{NodeID: id, Gauge: atomic.NewFloat64(0), lastUpdated: time.Now()}
 }
 
 // cacheFixture returns a new *RecordCache.

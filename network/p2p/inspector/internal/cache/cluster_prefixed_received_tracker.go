@@ -32,11 +32,11 @@ func NewClusterPrefixedMessagesReceivedTracker(logger zerolog.Logger, sizeLimit 
 	return &ClusterPrefixedMessagesReceivedTracker{cache: recordCache, activeClusterIds: atomic.NewPointer[flow.ChainIDList](&flow.ChainIDList{})}, nil
 }
 
-// Inc increments the cluster prefixed control messages received Counter for the peer.
+// Inc increments the cluster prefixed control messages received Gauge for the peer.
 func (c *ClusterPrefixedMessagesReceivedTracker) Inc(nodeID flow.Identifier) (float64, error) {
 	count, err := c.cache.Update(nodeID)
 	if err != nil {
-		return 0, fmt.Errorf("failed to increment cluster prefixed received tracker Counter for peer %s: %w", nodeID, err)
+		return 0, fmt.Errorf("failed to increment cluster prefixed received tracker Gauge for peer %s: %w", nodeID, err)
 	}
 	return count, nil
 }

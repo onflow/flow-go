@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestClusterPrefixedMessagesReceivedTracker_Inc ensures cluster prefixed received tracker increments a counter correctly.
+// TestClusterPrefixedMessagesReceivedTracker_Inc ensures cluster prefixed received tracker increments a cluster prefixed control messages received gauge value correctly.
 func TestClusterPrefixedMessagesReceivedTracker_Inc(t *testing.T) {
 	tracker := mockTracker(t)
 	id := unittest.IdentifierFixture()
@@ -25,7 +25,7 @@ func TestClusterPrefixedMessagesReceivedTracker_Inc(t *testing.T) {
 	}
 }
 
-// TestClusterPrefixedMessagesReceivedTracker_IncConcurrent ensures cluster prefixed received tracker increments a counter correctly concurrently.
+// TestClusterPrefixedMessagesReceivedTracker_IncConcurrent ensures cluster prefixed received tracker increments a cluster prefixed control messages received gauge value correctly concurrently.
 func TestClusterPrefixedMessagesReceivedTracker_IncConcurrent(t *testing.T) {
 	tracker := mockTracker(t)
 	n := float64(5)
@@ -43,7 +43,7 @@ func TestClusterPrefixedMessagesReceivedTracker_IncConcurrent(t *testing.T) {
 	require.Equal(t, n, tracker.Load(id))
 }
 
-// TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad ensures cluster prefixed received tracker increments/loads a counter correctly concurrently.
+// TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad ensures cluster prefixed received tracker increments/loads the cluster prefixed control messages received gauge value correctly concurrently.
 func TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad(t *testing.T) {
 	tracker := mockTracker(t)
 	n := float64(5)

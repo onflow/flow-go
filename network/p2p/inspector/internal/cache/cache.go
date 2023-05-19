@@ -22,12 +22,12 @@ type RecordCacheConfig struct {
 	sizeLimit uint32
 	logger    zerolog.Logger
 	collector module.HeroCacheMetrics
-	// recordDecay decay factor used by the cache to perform geometric decay on counters.
+	// recordDecay decay factor used by the cache to perform geometric decay on gauge values.
 	recordDecay float64
 }
 
 // RecordCache is a cache that stores *ClusterPrefixedMessagesReceivedRecord by peer node ID. Each record
-// contains a counter that indicates the current number cluster prefixed control messages that were allowed to bypass
+// contains a float64 Gauge field that indicates the current number cluster prefixed control messages that were allowed to bypass
 // validation due to the active cluster ids not being set or an unknown cluster ID error is encountered during validation.
 // Each record contains a float64 Gauge field that is decayed overtime back to 0. This ensures that nodes that fall
 // behind in the protocol can catch up.
@@ -36,7 +36,7 @@ type RecordCache struct {
 	recordEntityFactory recordEntityFactory
 	// c is the underlying cache.
 	c *stdmap.Backend
-	// decayFunc decay func used by the cache to perform decay on counters.
+	// decayFunc decay func used by the cache to perform decay on gauges.
 	decayFunc preProcessingFunc
 }
 
@@ -84,7 +84,7 @@ func (r *RecordCache) Init(nodeID flow.Identifier) bool {
 
 // Update applies an adjustment that increments the number of cluster prefixed control messages received by a peer.
 // Returns number of cluster prefix control messages received after the adjustment. The record is initialized before
-// the adjustment func is applied that will increment the Counter.
+// the adjustment func is applied that will increment the Gauge.
 // It returns an error if the adjustFunc returns an error or if the record does not exist.
 // Assuming that adjust is always called when the record exists, the error is irrecoverable and indicates a bug.
 // Args:
@@ -117,7 +117,7 @@ func (r *RecordCache) Update(nodeID flow.Identifier) (float64, error) {
 		}
 	}
 
-	return adjustedEntity.(ClusterPrefixedMessagesReceivedRecord).Counter.Load(), nil
+	return adjustedEntity.(ClusterPrefixedMessagesReceivedRecord).Gauge.Load(), nil
 }
 
 // Get returns the current number of cluster prefixed control messages received from a peer.
@@ -145,8 +145,8 @@ func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
 		panic(fmt.Sprintf("invalid entity type, expected ClusterPrefixedMessagesReceivedRecord type, got: %T", adjustedEntity))
 	}
 
-	// perform decay on Counter
-	return record.Counter.Load(), true, nil
+	// perform decay on Gauge
+	return record.Gauge.Load(), true, nil
 }
 
 // Identities returns the list of identities of the nodes that have a spam record in the cache.
@@ -176,7 +176,7 @@ func (r *RecordCache) incrementAdjustment(entity flow.Entity) flow.Entity {
 		// This should never happen, because the cache only contains ClusterPrefixedMessagesReceivedRecord entities.
 		panic(fmt.Sprintf("invalid entity type, expected ClusterPrefixedMessagesReceivedRecord type, got: %T", entity))
 	}
-	record.Counter.Add(1)
+	record.Gauge.Add(1)
 	record.lastUpdated = time.Now()
 	// Return the adjusted record.
 	return record
@@ -201,19 +201,19 @@ func (r *RecordCache) decayAdjustment(entity flow.Entity) flow.Entity {
 
 type preProcessingFunc func(recordEntity ClusterPrefixedMessagesReceivedRecord) (ClusterPrefixedMessagesReceivedRecord, error)
 
-// defaultDecayFunction is the default decay function that is used to decay the cluster prefixed control message received counter of a peer.
+// defaultDecayFunction is the default decay function that is used to decay the cluster prefixed control message received gauge of a peer.
 func defaultDecayFunction(decay float64) preProcessingFunc {
 	return func(recordEntity ClusterPrefixedMessagesReceivedRecord) (ClusterPrefixedMessagesReceivedRecord, error) {
-		counter := recordEntity.Counter.Load()
-		if counter == 0 {
+		received := recordEntity.Gauge.Load()
+		if received == 0 {
 			return recordEntity, nil
 		}
 
-		decayedVal, err := scoring.GeometricDecay(counter, decay, recordEntity.lastUpdated)
+		decayedVal, err := scoring.GeometricDecay(received, decay, recordEntity.lastUpdated)
 		if err != nil {
-			return recordEntity, fmt.Errorf("could not decay cluster prefixed control messages received counter: %w", err)
+			return recordEntity, fmt.Errorf("could not decay cluster prefixed control messages received gauge: %w", err)
 		}
-		recordEntity.Counter.Store(decayedVal)
+		recordEntity.Gauge.Store(decayedVal)
 		return recordEntity, nil
 	}
 }
