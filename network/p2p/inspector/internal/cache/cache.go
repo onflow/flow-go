@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"crypto/rand"
 	"fmt"
 	"time"
 
@@ -36,8 +35,6 @@ type RecordCache struct {
 	c *stdmap.Backend
 	// decayFunc decay func used by the cache to perform decay on counters.
 	decayFunc preProcessingFunc
-	// activeClusterIdsCacheId identifier used to store the active cluster Ids.
-	activeClusterIdsCacheId flow.Identifier
 }
 
 // NewRecordCache creates a new *RecordCache.
@@ -62,19 +59,11 @@ func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityF
 		heropool.NoEjection,
 		config.logger.With().Str("mempool", "gossipsub=cluster-prefix-control-messages-received-records").Logger(),
 		config.collector)
-	recordCache := &RecordCache{
+	return &RecordCache{
 		recordEntityFactory: recordEntityFactory,
 		decayFunc:           defaultDecayFunction(config.recordDecay),
 		c:                   stdmap.NewBackend(stdmap.WithBackData(backData)),
-	}
-
-	var err error
-	recordCache.activeClusterIdsCacheId, err = activeClusterIdsKey()
-	if err != nil {
-		return nil, err
-	}
-	recordCache.initActiveClusterIds()
-	return recordCache, nil
+	}, nil
 }
 
 // Init initializes the record cache for the given peer id if it does not exist.
@@ -157,41 +146,6 @@ func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
 	return record.Counter.Load(), true, nil
 }
 
-func (r *RecordCache) storeActiveClusterIds(clusterIDList flow.ChainIDList) flow.ChainIDList {
-	adjustedEntity, _ := r.c.Adjust(r.activeClusterIdsCacheId, func(entity flow.Entity) flow.Entity {
-		record, ok := entity.(ActiveClusterIdsEntity)
-		if !ok {
-			// sanity check
-			// This should never happen, because cache should always contain a ActiveClusterIdsEntity
-			// stored at the flow.ZeroID
-			panic(fmt.Sprintf("invalid entity type, expected ActiveClusterIdsEntity type, got: %T", entity))
-		}
-		record.ActiveClusterIds = clusterIDList
-		// Return the adjusted record.
-		return record
-	})
-	return adjustedEntity.(ActiveClusterIdsEntity).ActiveClusterIds
-}
-
-func (r *RecordCache) getActiveClusterIds() flow.ChainIDList {
-	adjustedEntity, ok := r.c.ByID(r.activeClusterIdsCacheId)
-	if !ok {
-		// sanity check
-		// This should never happen, because cache should always contain a ActiveClusterIdsEntity
-		// stored at the flow.ZeroID
-		panic(fmt.Sprintf("invalid entity type, expected ActiveClusterIdsEntity type, got: %T", adjustedEntity))
-	}
-	return adjustedEntity.(ActiveClusterIdsEntity).ActiveClusterIds
-}
-
-func (r *RecordCache) initActiveClusterIds() {
-	activeClusterIdsEntity := NewActiveClusterIdsEntity(r.activeClusterIdsCacheId, make(flow.ChainIDList, 0))
-	stored := r.c.Add(activeClusterIdsEntity)
-	if !stored {
-		panic("failed to initialize active cluster Ids in RecordCache")
-	}
-}
-
 // Identities returns the list of identities of the nodes that have a spam record in the cache.
 func (r *RecordCache) Identities() []flow.Identifier {
 	return flow.GetIDs(r.c.All())
@@ -242,10 +196,6 @@ func (r *RecordCache) decayAdjustment(entity flow.Entity) flow.Entity {
 	return record
 }
 
-func (r *RecordCache) getActiveClusterIdsCacheId() flow.Identifier {
-	return r.activeClusterIdsCacheId
-}
-
 type preProcessingFunc func(recordEntity RecordEntity) (RecordEntity, error)
 
 // defaultDecayFunction is the default decay function that is used to decay the cluster prefixed control message received counter of a peer.
@@ -262,21 +212,4 @@ func defaultDecayFunction(decay float64) preProcessingFunc {
 		recordEntity.Counter.Store(decayedVal)
 		return recordEntity, nil
 	}
-}
-
-// activeClusterIdsKey returns the key used to store the active cluster ids in the cache.
-// The key is a random string that is generated once and stored in the cache.
-// The key is used to retrieve the active cluster ids from the cache.
-// Args:
-// none
-// Returns:
-// - the key used to store the active cluster ids in the cache.
-// - an error if the key could not be generated (irrecoverable).
-func activeClusterIdsKey() (flow.Identifier, error) {
-	salt := make([]byte, 100)
-	_, err := rand.Read(salt)
-	if err != nil {
-		return flow.Identifier{}, err
-	}
-	return flow.MakeID(fmt.Sprintf("active-cluster-ids-%x", salt)), nil
 }

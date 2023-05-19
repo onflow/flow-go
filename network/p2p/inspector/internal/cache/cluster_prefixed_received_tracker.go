@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -12,6 +13,8 @@ import (
 // ClusterPrefixedMessagesReceivedTracker struct that keeps track of the amount of cluster prefixed control messages received by a peer.
 type ClusterPrefixedMessagesReceivedTracker struct {
 	cache *RecordCache
+	// activeClusterIds atomic pointer that stores the current active cluster IDs. This ensures safe concurrent access to the activeClusterIds internal flow.ChainIDList.
+	activeClusterIds *atomic.Pointer[flow.ChainIDList]
 }
 
 // NewClusterPrefixedMessagesReceivedTracker returns a new *ClusterPrefixedMessagesReceivedTracker.
@@ -26,7 +29,7 @@ func NewClusterPrefixedMessagesReceivedTracker(logger zerolog.Logger, sizeLimit 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new record cahe: %w", err)
 	}
-	return &ClusterPrefixedMessagesReceivedTracker{cache: recordCache}, nil
+	return &ClusterPrefixedMessagesReceivedTracker{cache: recordCache, activeClusterIds: atomic.NewPointer[flow.ChainIDList](&flow.ChainIDList{})}, nil
 }
 
 // Inc increments the cluster prefixed control messages received Counter for the peer.
@@ -46,10 +49,10 @@ func (c *ClusterPrefixedMessagesReceivedTracker) Load(nodeID flow.Identifier) fl
 
 // StoreActiveClusterIds stores the active cluster Ids in the underlying record cache.
 func (c *ClusterPrefixedMessagesReceivedTracker) StoreActiveClusterIds(clusterIdList flow.ChainIDList) {
-	c.cache.storeActiveClusterIds(clusterIdList)
+	c.activeClusterIds.Store(&clusterIdList)
 }
 
 // GetActiveClusterIds gets the active cluster Ids from the underlying record cache.
 func (c *ClusterPrefixedMessagesReceivedTracker) GetActiveClusterIds() flow.ChainIDList {
-	return c.cache.getActiveClusterIds()
+	return *c.activeClusterIds.Load()
 }

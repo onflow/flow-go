@@ -25,7 +25,7 @@ func TestNewRecordCache(t *testing.T) {
 	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
-	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
+	require.Equalf(t, uint(0), cache.Size(), "cache size must be 1")
 }
 
 // TestRecordCache_Init tests the Init method of the RecordCache.
@@ -35,7 +35,7 @@ func TestRecordCache_Init(t *testing.T) {
 	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
-	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
+	require.Equalf(t, uint(0), cache.Size(), "cache size must be 1")
 
 	nodeID1 := unittest.IdentifierFixture()
 	nodeID2 := unittest.IdentifierFixture()
@@ -47,7 +47,7 @@ func TestRecordCache_Init(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok, "expected record to exist")
 	require.Zerof(t, counter, "expected counter to be 0")
-	require.Equal(t, cache.Size(), uint(2), "expected cache to have one additional record")
+	require.Equal(t, uint(1), cache.Size(), "expected cache to have one additional record")
 
 	// test initializing a record for an node ID that already exists in the cache
 	initialized = cache.Init(nodeID1)
@@ -57,7 +57,7 @@ func TestRecordCache_Init(t *testing.T) {
 	require.True(t, ok, "expected record to still exist")
 	require.Zerof(t, counterAgain, "expected same counter to be 0")
 	require.Equal(t, counter, counterAgain, "expected records to be the same")
-	require.Equal(t, cache.Size(), uint(2), "expected cache to still have one additional record")
+	require.Equal(t, uint(1), cache.Size(), "expected cache to still have one additional record")
 
 	// test initializing a record for another node ID
 	initialized = cache.Init(nodeID2)
@@ -66,7 +66,7 @@ func TestRecordCache_Init(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok, "expected record to exist")
 	require.Zerof(t, counter2, "expected second counter to be 0")
-	require.Equal(t, cache.Size(), uint(3), "expected cache to have two additional records")
+	require.Equal(t, uint(2), cache.Size(), "expected cache to have two additional records")
 }
 
 // TestRecordCache_ConcurrentInit tests the concurrent initialization of records.
@@ -77,7 +77,7 @@ func TestRecordCache_ConcurrentInit(t *testing.T) {
 	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
-	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
+	require.Equalf(t, uint(0), cache.Size(), "cache size must be 1")
 
 	nodeIDs := unittest.IdentifierListFixture(10)
 
@@ -110,7 +110,7 @@ func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
 	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
-	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
+	require.Equalf(t, uint(0), cache.Size(), "cache size must be 1")
 
 	nodeID := unittest.IdentifierFixture()
 	const concurrentAttempts = 10
@@ -150,7 +150,7 @@ func TestRecordCache_Update(t *testing.T) {
 	cache := cacheFixture(t, 100, 0, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
-	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
+	require.Equalf(t, uint(0), cache.Size(), "cache size must be 1")
 
 	nodeID1 := unittest.IdentifierFixture()
 	nodeID2 := unittest.IdentifierFixture()
@@ -184,7 +184,7 @@ func TestRecordCache_Decay(t *testing.T) {
 	cache := cacheFixture(t, 100, 0.09, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
-	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
+	require.Equalf(t, uint(0), cache.Size(), "cache size must be 1")
 
 	nodeID1 := unittest.IdentifierFixture()
 
@@ -216,7 +216,7 @@ func TestRecordCache_Identities(t *testing.T) {
 	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
-	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
+	require.Equalf(t, uint(0), cache.Size(), "cache size must be 1")
 
 	// initialize spam records for a few node IDs
 	nodeID1 := unittest.IdentifierFixture()
@@ -229,7 +229,7 @@ func TestRecordCache_Identities(t *testing.T) {
 
 	// check if the Identities method returns the correct set of node IDs
 	identities := cache.Identities()
-	require.Equal(t, 4, len(identities))
+	require.Equal(t, 3, len(identities))
 
 	identityMap := make(map[flow.Identifier]struct{})
 	for _, id := range identities {
@@ -251,7 +251,7 @@ func TestRecordCache_Remove(t *testing.T) {
 	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
-	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
+	require.Equalf(t, uint(0), cache.Size(), "cache size must be 1")
 
 	// initialize spam records for a few node IDs
 	nodeID1 := unittest.IdentifierFixture()
@@ -263,7 +263,7 @@ func TestRecordCache_Remove(t *testing.T) {
 	require.True(t, cache.Init(nodeID3))
 
 	numOfIds := uint(3)
-	require.Equal(t, numOfIds+1, cache.Size(), fmt.Sprintf("expected size of the cache to be %d", numOfIds+1))
+	require.Equal(t, numOfIds, cache.Size(), fmt.Sprintf("expected size of the cache to be %d", numOfIds+1))
 	// remove nodeID1 and check if the record is removed
 	require.True(t, cache.Remove(nodeID1))
 	require.NotContains(t, nodeID1, cache.Identities())
@@ -287,7 +287,7 @@ func TestRecordCache_ConcurrentRemove(t *testing.T) {
 	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
-	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
+	require.Equalf(t, uint(0), cache.Size(), "cache size must be 1")
 
 	nodeIDs := unittest.IdentifierListFixture(10)
 	for _, nodeID := range nodeIDs {
@@ -309,7 +309,7 @@ func TestRecordCache_ConcurrentRemove(t *testing.T) {
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
 
 	// ensure cache only has default active cluster Ids stored
-	require.Equal(t, uint(1), cache.Size())
+	require.Equal(t, uint(0), cache.Size())
 }
 
 // TestRecordCache_ConcurrentUpdatesAndReads tests the concurrent adjustments and reads of records for different
@@ -321,7 +321,7 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 	cache := cacheFixture(t, 100, 0, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
-	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
+	require.Equalf(t, uint(0), cache.Size(), "cache size must be 1")
 
 	nodeIDs := unittest.IdentifierListFixture(10)
 	for _, nodeID := range nodeIDs {
@@ -368,7 +368,7 @@ func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
-	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
+	require.Equalf(t, uint(0), cache.Size(), "cache size must be 1")
 
 	nodeIDs := unittest.IdentifierListFixture(20)
 	nodeIDsToAdd := nodeIDs[:10]
@@ -402,7 +402,7 @@ func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 
 	// ensure that the initialized records are correctly added to the cache
 	// and removed records are correctly removed from the cache
-	require.Equal(t, uint(nodeIDsToAdd.Len()+1), cache.Size())
+	require.Equal(t, uint(nodeIDsToAdd.Len()), cache.Size())
 }
 
 // TestRecordCache_ConcurrentInitRemoveUpdate tests the concurrent initialization, removal, and adjustment of
@@ -414,7 +414,7 @@ func TestRecordCache_ConcurrentInitRemoveUpdate(t *testing.T) {
 	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
-	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
+	require.Equalf(t, uint(0), cache.Size(), "cache size must be 1")
 
 	nodeIDs := unittest.IdentifierListFixture(30)
 	nodeIDsToAdd := nodeIDs[:10]
@@ -465,7 +465,7 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	require.NotNil(t, cache)
 	// expect cache to be initialized with a empty active cluster IDs list
-	require.Equalf(t, uint(1), cache.Size(), "cache size must be 1")
+	require.Equalf(t, uint(0), cache.Size(), "cache size must be 1")
 
 	nodeIDs := unittest.IdentifierListFixture(20)
 	nodeIDsToAdd := nodeIDs[:10]
@@ -508,9 +508,6 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 			require.True(t, len(ids) <= len(nodeIDs))
 			// the returned IDs should be a subset of the node IDs
 			for _, id := range ids {
-				if id == cache.getActiveClusterIdsCacheId() {
-					continue
-				}
 				require.Contains(t, nodeIDs, id)
 			}
 		}()
