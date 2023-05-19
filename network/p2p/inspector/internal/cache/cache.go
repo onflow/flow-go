@@ -88,8 +88,7 @@ func (r *RecordCache) Init(nodeID flow.Identifier) bool {
 // - adjustFunc: the function that adjusts the record.
 // Returns:
 //   - The cluster prefix control messages received gauge value after the adjustment.
-//   - error if the adjustFunc returns an error or if the record does not exist, or the decay func returned an unexpected error.
-//     All errors should be treated as an irrecoverable error and indicates a bug.
+//   - exception only in cases of internal data inconsistency or bugs. No errors are expected.
 //
 // Note if Adjust is called under the assumption that the record exists, the ErrRecordNotFound should be treated
 // as an irrecoverable error and indicates a bug.
@@ -125,12 +124,12 @@ func (r *RecordCache) Update(nodeID flow.Identifier) (float64, error) {
 
 // Get returns the current number of cluster prefixed control messages received from a peer.
 // The record is initialized before the count is returned.
-// Before the count is returned it is decayed using the configured decay function.
+// Before the control messages received gauge value is returned it is decayed using the configured decay function.
 // Returns the record and true if the record exists, nil and false otherwise.
 // Args:
 // - nodeID: the node ID of the sender of the control message.
 // Returns:
-// - The number of cluster prefixed control messages received after the decay and true if the record exists, 0 and false otherwise.
+// - The cluster prefixed control messages received gauge value after the decay and true if the record exists, 0 and false otherwise.
 func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
 	if r.Init(nodeID) {
 		return 0, true, nil
