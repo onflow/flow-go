@@ -340,6 +340,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Metrics, node.Metrics, node.Metrics,
 		node.State,
 		transactions,
+		compliance.DefaultConfig(),
 	)
 	require.NoError(t, err)
 

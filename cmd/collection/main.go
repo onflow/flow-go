@@ -466,7 +466,7 @@ func main() {
 				node.Metrics.Mempool,
 				node.State,
 				node.Storage.Transactions,
-				modulecompliance.WithSkipNewProposalsThreshold(clusterComplianceConfig.SkipNewProposalsThreshold),
+				clusterComplianceConfig,
 			)
 			if err != nil {
 				return nil, err

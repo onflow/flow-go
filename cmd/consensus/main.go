@@ -48,7 +48,6 @@ import (
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	"github.com/onflow/flow-go/module/chainsync"
 	chmodule "github.com/onflow/flow-go/module/chunks"
-	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -730,7 +729,7 @@ func main() {
 				hot,
 				hotstuffModules.VoteAggregator,
 				hotstuffModules.TimeoutAggregator,
-				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+				node.ComplianceConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance core: %w", err)

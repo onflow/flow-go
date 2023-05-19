@@ -338,9 +338,10 @@ func (e *ComplianceEngine) submitConnectedBatch(log zerolog.Logger, latestFinali
 		log.Debug().Msgf("dropping range [%d, %d] below finalized view %d", blocks[0].Header.View, lastBlock.View, latestFinalizedView)
 		return
 	}
-	if lastBlock.View > latestFinalizedView+e.config.SkipNewProposalsThreshold {
+	skipNewProposalsThreshold := e.config.GetSkipNewProposalsThreshold()
+	if lastBlock.View > latestFinalizedView+skipNewProposalsThreshold {
 		log.Debug().
-			Uint64("skip_new_proposals_threshold", e.config.SkipNewProposalsThreshold).
+			Uint64("skip_new_proposals_threshold", skipNewProposalsThreshold).
 			Msgf("dropping range [%d, %d] too far ahead of locally finalized view %d",
 				blocks[0].Header.View, lastBlock.View, latestFinalizedView)
 		return
