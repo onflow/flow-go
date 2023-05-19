@@ -98,6 +98,7 @@ func NewComplianceLayer(
 	headers storage.Headers,
 	finalized *flow.Header,
 	core complianceCore,
+	config compliance.Config,
 	opts ...EngineOption,
 ) (*ComplianceEngine, error) {
 	// FIFO queue for inbound block proposals
@@ -115,7 +116,7 @@ func NewComplianceLayer(
 		log:                        log.With().Str("engine", "follower").Logger(),
 		me:                         me,
 		engMetrics:                 engMetrics,
-		config:                     compliance.DefaultConfig(),
+		config:                     config,
 		channel:                    channels.ReceiveBlocks,
 		pendingProposals:           pendingBlocks,
 		syncedBlocks:               syncedBlocks,

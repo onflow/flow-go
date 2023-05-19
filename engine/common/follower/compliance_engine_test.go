@@ -2,6 +2,7 @@ package follower
 
 import (
 	"context"
+	"github.com/onflow/flow-go/module/compliance"
 	"sync"
 	"testing"
 	"time"
@@ -70,7 +71,8 @@ func (s *EngineSuite) SetupTest() {
 		metrics,
 		s.headers,
 		s.finalized,
-		s.core)
+		s.core,
+		compliance.DefaultConfig())
 	require.Nil(s.T(), err)
 
 	s.engine = eng
