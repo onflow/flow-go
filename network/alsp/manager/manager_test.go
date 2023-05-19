@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -123,14 +125,13 @@ func TestHandleReportedMisbehavior_Integration(t *testing.T) {
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(
-		cfg.SpamRecordCacheSize,
-		cfg.Logger,
-		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory),
-		model.SpamRecordFactory())
-
 	// create a new MisbehaviorReportManager
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	var cache alsp.SpamRecordCache
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg,
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return cache
+		}))
 	require.NoError(t, err)
 
 	conduitFactory, err := conduit.NewDefaultConduitFactory(
@@ -327,7 +328,6 @@ func TestReportCreation(t *testing.T) {
 func TestNewMisbehaviorReportManager(t *testing.T) {
 	logger := unittest.Logger()
 	alspMetrics := metrics.NewNoopCollector()
-	cacheMetrics := metrics.NewNoopCollector()
 
 	t.Run("with default values", func(t *testing.T) {
 		cfg := &alspmgr.MisbehaviorReportManagerConfig{
@@ -344,8 +344,6 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 	})
 
 	t.Run("with a custom spam record cache", func(t *testing.T) {
-		customCache := internal.NewSpamRecordCache(100, logger, cacheMetrics, model.SpamRecordFactory())
-
 		cfg := &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  logger,
 			SpamRecordCacheSize:     uint32(100),
@@ -354,7 +352,10 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		}
 
-		m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(customCache))
+		m, err := alspmgr.NewMisbehaviorReportManager(cfg,
+			alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+				return internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			}))
 		require.NoError(t, err)
 		assert.NotNil(t, m)
 	})
@@ -437,14 +438,13 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(
-		cfg.SpamRecordCacheSize,
-		cfg.Logger,
-		metrics.NewNoopCollector(),
-		model.SpamRecordFactory())
-
 	// create a new MisbehaviorReportManager
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	var cache alsp.SpamRecordCache
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg,
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return cache
+		}))
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -498,11 +498,14 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport_PenaltyDisable(t *testing.T
 		DisablePenalty:          true, // disable penalty for misbehavior reports
 	}
 
-	// we use a mock cache but we do not expect any calls to the cache, since the penalty is disabled.
-	cache := mockalsp.NewSpamRecordCache(t)
-
 	// create a new MisbehaviorReportManager
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	// we use a mock cache but we do not expect any calls to the cache, since the penalty is disabled.
+	var cache *mockalsp.SpamRecordCache
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg,
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			cache = mockalsp.NewSpamRecordCache(t)
+			return cache
+		}))
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -556,14 +559,13 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentiall
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(
-		cfg.SpamRecordCacheSize,
-		cfg.Logger,
-		metrics.NewNoopCollector(),
-		model.SpamRecordFactory())
-
 	// create a new MisbehaviorReportManager
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	var cache alsp.SpamRecordCache
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg,
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return cache
+		}))
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -624,14 +626,13 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(
-		cfg.SpamRecordCacheSize,
-		cfg.Logger,
-		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory),
-		model.SpamRecordFactory())
-
 	// create a new MisbehaviorReportManager
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	var cache alsp.SpamRecordCache
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg,
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return cache
+		}))
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -701,14 +702,13 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequential
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(
-		cfg.SpamRecordCacheSize,
-		cfg.Logger,
-		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory),
-		model.SpamRecordFactory())
-
 	// create a new MisbehaviorReportManager
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	var cache alsp.SpamRecordCache
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg,
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return cache
+		}))
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -768,14 +768,13 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(
-		cfg.SpamRecordCacheSize,
-		cfg.Logger,
-		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory),
-		model.SpamRecordFactory())
-
 	// create a new MisbehaviorReportManager
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	var cache alsp.SpamRecordCache
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg,
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return cache
+		}))
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -845,14 +844,13 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(
-		cfg.SpamRecordCacheSize,
-		cfg.Logger,
-		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory),
-		model.SpamRecordFactory())
-
 	// create a new MisbehaviorReportManager
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	var cache alsp.SpamRecordCache
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg,
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return cache
+		}))
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -934,14 +932,13 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurre
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(
-		cfg.SpamRecordCacheSize,
-		cfg.Logger,
-		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory),
-		model.SpamRecordFactory())
-
 	// create a new MisbehaviorReportManager
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	var cache alsp.SpamRecordCache
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg,
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return cache
+		}))
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -1014,10 +1011,13 @@ func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *t
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
 
-	cache := internal.NewSpamRecordCache(cfg.SpamRecordCacheSize, cfg.Logger, metrics.NewNoopCollector(), model.SpamRecordFactory())
-
 	// create a new MisbehaviorReportManager
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
+	var cache alsp.SpamRecordCache
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg,
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return cache
+		}))
 	require.NoError(t, err)
 
 	// start the ALSP manager
