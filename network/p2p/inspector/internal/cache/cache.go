@@ -89,9 +89,6 @@ func (r *RecordCache) Init(nodeID flow.Identifier) bool {
 // Returns:
 //   - The cluster prefix control messages received gauge value after the adjustment.
 //   - exception only in cases of internal data inconsistency or bugs. No errors are expected.
-//
-// Note if Adjust is called under the assumption that the record exists, the ErrRecordNotFound should be treated
-// as an irrecoverable error and indicates a bug.
 func (r *RecordCache) Update(nodeID flow.Identifier) (float64, error) {
 	var err error
 	optimisticAdjustFunc := func() (flow.Entity, bool) {
