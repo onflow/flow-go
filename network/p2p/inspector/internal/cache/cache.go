@@ -24,13 +24,13 @@ type RecordCacheConfig struct {
 	recordDecay float64
 }
 
-// RecordCache is a cache that stores *ClusterPrefixedMessagesReceivedRecord by peer node ID. Each record
-// contains a float64 Gauge field that indicates the current number cluster prefixed control messages that were allowed to bypass
-// validation due to the active cluster ids not being set or an unknown cluster ID error is encountered during validation.
+// RecordCache is a cache that stores ClusterPrefixedMessagesReceivedRecord by peer node ID. Each record
+// contains a float64 Gauge field that indicates the current approximate number cluster prefixed control messages that were allowed to bypass
+// validation due to some error that will prevent the message from being validated.
 // Each record contains a float64 Gauge field that is decayed overtime back to 0. This ensures that nodes that fall
 // behind in the protocol can catch up.
 type RecordCache struct {
-	// recordEntityFactory is a factory function that creates a new *ClusterPrefixedMessagesReceivedRecord.
+	// recordEntityFactory is a factory function that creates a new ClusterPrefixedMessagesReceivedRecord.
 	recordEntityFactory recordEntityFactory
 	// c is the underlying cache.
 	c *stdmap.Backend
