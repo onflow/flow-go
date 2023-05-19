@@ -130,6 +130,7 @@ func (r *RecordCache) Update(nodeID flow.Identifier) (float64, error) {
 // - nodeID: the node ID of the sender of the control message.
 // Returns:
 // - The cluster prefixed control messages received gauge value after the decay and true if the record exists, 0 and false otherwise.
+// No errors are expected during normal operation.
 func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
 	if r.Init(nodeID) {
 		return 0, true, nil
