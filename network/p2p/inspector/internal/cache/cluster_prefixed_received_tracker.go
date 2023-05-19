@@ -25,7 +25,7 @@ func NewClusterPrefixedMessagesReceivedTracker(logger zerolog.Logger, sizeLimit 
 		collector:   clusterPrefixedCacheCollector,
 		recordDecay: decay,
 	}
-	recordCache, err := NewRecordCache(config, NewRecordEntity)
+	recordCache, err := NewRecordCache(config, NewClusterPrefixedMessagesReceivedRecord)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new record cahe: %w", err)
 	}

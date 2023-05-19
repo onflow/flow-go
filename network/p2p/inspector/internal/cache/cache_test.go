@@ -520,16 +520,13 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 // - id: the node id of the record.
 // Returns:
 // - RecordEntity: the created record entity.
-func recordEntityFixture(id flow.Identifier) RecordEntity {
-	return RecordEntity{
-		ClusterPrefixedMessagesReceivedRecord: ClusterPrefixedMessagesReceivedRecord{NodeID: id, Counter: atomic.NewFloat64(0)},
-		lastUpdated:                           time.Now(),
-	}
+func recordEntityFixture(id flow.Identifier) ClusterPrefixedMessagesReceivedRecord {
+	return ClusterPrefixedMessagesReceivedRecord{NodeID: id, Counter: atomic.NewFloat64(0), lastUpdated: time.Now()}
 }
 
 // cacheFixture returns a new *RecordCache.
 func cacheFixture(t *testing.T, sizeLimit uint32, recordDecay float64, logger zerolog.Logger, collector module.HeroCacheMetrics) *RecordCache {
-	recordFactory := func(id flow.Identifier) RecordEntity {
+	recordFactory := func(id flow.Identifier) ClusterPrefixedMessagesReceivedRecord {
 		return recordEntityFixture(id)
 	}
 	config := &RecordCacheConfig{

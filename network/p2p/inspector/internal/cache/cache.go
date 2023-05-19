@@ -16,7 +16,7 @@ import (
 
 var ErrRecordNotFound = fmt.Errorf("record not found")
 
-type recordEntityFactory func(identifier flow.Identifier) RecordEntity
+type recordEntityFactory func(identifier flow.Identifier) ClusterPrefixedMessagesReceivedRecord
 
 type RecordCacheConfig struct {
 	sizeLimit uint32
@@ -29,7 +29,7 @@ type RecordCacheConfig struct {
 // RecordCache is a cache that stores *ClusterPrefixedMessagesReceivedRecord used by the control message validation inspector
 // to keep track of the amount of cluster prefixed control messages received by a peer.
 type RecordCache struct {
-	// recordEntityFactory is a factory function that creates a new *RecordEntity.
+	// recordEntityFactory is a factory function that creates a new *ClusterPrefixedMessagesReceivedRecord.
 	recordEntityFactory recordEntityFactory
 	// c is the underlying cache.
 	c *stdmap.Backend
@@ -114,7 +114,7 @@ func (r *RecordCache) Update(nodeID flow.Identifier) (float64, error) {
 		}
 	}
 
-	return adjustedEntity.(RecordEntity).Counter.Load(), nil
+	return adjustedEntity.(ClusterPrefixedMessagesReceivedRecord).Counter.Load(), nil
 }
 
 // Get returns the current number of cluster prefixed control messages received from a peer.
@@ -135,11 +135,11 @@ func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
 		return 0, false, ErrRecordNotFound
 	}
 
-	record, ok := adjustedEntity.(RecordEntity)
+	record, ok := adjustedEntity.(ClusterPrefixedMessagesReceivedRecord)
 	if !ok {
 		// sanity check
-		// This should never happen, because the cache only contains RecordEntity entities.
-		panic(fmt.Sprintf("invalid entity type, expected RecordEntity type, got: %T", adjustedEntity))
+		// This should never happen, because the cache only contains ClusterPrefixedMessagesReceivedRecord entities.
+		panic(fmt.Sprintf("invalid entity type, expected ClusterPrefixedMessagesReceivedRecord type, got: %T", adjustedEntity))
 	}
 
 	// perform decay on Counter
@@ -167,11 +167,11 @@ func (r *RecordCache) Size() uint {
 }
 
 func (r *RecordCache) incrementAdjustment(entity flow.Entity) flow.Entity {
-	record, ok := entity.(RecordEntity)
+	record, ok := entity.(ClusterPrefixedMessagesReceivedRecord)
 	if !ok {
 		// sanity check
-		// This should never happen, because the cache only contains RecordEntity entities.
-		panic(fmt.Sprintf("invalid entity type, expected RecordEntity type, got: %T", entity))
+		// This should never happen, because the cache only contains ClusterPrefixedMessagesReceivedRecord entities.
+		panic(fmt.Sprintf("invalid entity type, expected ClusterPrefixedMessagesReceivedRecord type, got: %T", entity))
 	}
 	record.Counter.Add(1)
 	record.lastUpdated = time.Now()
@@ -180,11 +180,11 @@ func (r *RecordCache) incrementAdjustment(entity flow.Entity) flow.Entity {
 }
 
 func (r *RecordCache) decayAdjustment(entity flow.Entity) flow.Entity {
-	record, ok := entity.(RecordEntity)
+	record, ok := entity.(ClusterPrefixedMessagesReceivedRecord)
 	if !ok {
 		// sanity check
-		// This should never happen, because the cache only contains RecordEntity entities.
-		panic(fmt.Sprintf("invalid entity type, expected RecordEntity type, got: %T", entity))
+		// This should never happen, because the cache only contains ClusterPrefixedMessagesReceivedRecord entities.
+		panic(fmt.Sprintf("invalid entity type, expected ClusterPrefixedMessagesReceivedRecord type, got: %T", entity))
 	}
 	var err error
 	record, err = r.decayFunc(record)
@@ -196,11 +196,11 @@ func (r *RecordCache) decayAdjustment(entity flow.Entity) flow.Entity {
 	return record
 }
 
-type preProcessingFunc func(recordEntity RecordEntity) (RecordEntity, error)
+type preProcessingFunc func(recordEntity ClusterPrefixedMessagesReceivedRecord) (ClusterPrefixedMessagesReceivedRecord, error)
 
 // defaultDecayFunction is the default decay function that is used to decay the cluster prefixed control message received counter of a peer.
 func defaultDecayFunction(decay float64) preProcessingFunc {
-	return func(recordEntity RecordEntity) (RecordEntity, error) {
+	return func(recordEntity ClusterPrefixedMessagesReceivedRecord) (ClusterPrefixedMessagesReceivedRecord, error) {
 		counter := recordEntity.Counter.Load()
 		if counter == 0 {
 			return recordEntity, nil
