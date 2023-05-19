@@ -62,6 +62,7 @@ func init() {
 type testingContext struct {
 	t                   *testing.T
 	engine              *Engine
+	headers             *storage.MockHeaders
 	blocks              *storage.MockBlocks
 	collections         *storage.MockCollections
 	state               *protocol.State
@@ -102,6 +103,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	myIdentity.StakingPubKey = sk.PublicKey()
 	me := mocklocal.NewMockLocal(sk, myIdentity.ID(), t)
 
+	headers := storage.NewMockHeaders(ctrl)
 	blocks := storage.NewMockBlocks(ctrl)
 	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
@@ -167,6 +169,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		me,
 		request,
 		protocolState,
+		headers,
 		blocks,
 		collections,
 		events,
@@ -192,6 +195,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	f(testingContext{
 		t:                   t,
 		engine:              engine,
+		headers:             headers,
 		blocks:              blocks,
 		collections:         collections,
 		state:               protocolState,
@@ -1386,6 +1390,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	myIdentity.StakingPubKey = sk.PublicKey()
 	me := mocklocal.NewMockLocal(sk, myIdentity.ID(), t)
 
+	headers := storage.NewMockHeaders(ctrl)
 	blocks := storage.NewMockBlocks(ctrl)
 	collections := storage.NewMockCollections(ctrl)
 	events := storage.NewMockEvents(ctrl)
@@ -1408,6 +1413,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		me,
 		request,
 		ps,
+		headers,
 		blocks,
 		collections,
 		events,

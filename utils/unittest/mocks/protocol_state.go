@@ -70,6 +70,10 @@ func (p *Params) Root() (*flow.Header, error) {
 	return p.state.root.Header, nil
 }
 
+func (p *Params) SealedRoot() (*flow.Header, error) {
+	return p.Root()
+}
+
 func (p *Params) Seal() (*flow.Seal, error) {
 	return nil, fmt.Errorf("not implemented")
 }
