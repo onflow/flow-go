@@ -54,7 +54,7 @@ func (s *Suite) SetupSuite() {
 // submitSmokeTestTransaction will submit a create account transaction to smoke test network
 // This ensures a single transaction can be sealed by the network.
 func (s *Suite) submitSmokeTestTransaction(ctx context.Context) {
-	addr, err := utils.CreateFlowAccount(ctx, s.client)
+	_, err := utils.CreateFlowAccount(ctx, s.client)
 	require.NoError(s.T(), err)
 }
 
