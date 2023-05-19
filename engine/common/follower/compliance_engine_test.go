@@ -2,7 +2,6 @@ package follower
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/compliance"
 	"sync"
 	"testing"
 	"time"
@@ -16,6 +15,7 @@ import (
 	followermock "github.com/onflow/flow-go/engine/common/follower/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"

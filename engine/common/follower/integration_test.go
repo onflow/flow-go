@@ -2,7 +2,6 @@ package follower
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/compliance"
 	"sync"
 	"testing"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/compliance"
 	moduleconsensus "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
