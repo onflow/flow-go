@@ -83,7 +83,6 @@ func (r *RecordCache) Init(nodeID flow.Identifier) bool {
 // Update applies an adjustment that increments the number of cluster prefixed control messages received by a peer.
 // Returns number of cluster prefix control messages received after the adjustment. The record is initialized before
 // the adjustment func is applied that will increment the Gauge.
-// Assuming that adjust is always called when the record exists, the error is irrecoverable and indicates a bug.
 // Args:
 // - nodeID: the node ID of the sender of the control message.
 // - adjustFunc: the function that adjusts the record.
