@@ -201,11 +201,12 @@ type preProcessingFunc func(recordEntity RecordEntity) (RecordEntity, error)
 // defaultDecayFunction is the default decay function that is used to decay the cluster prefixed control message received counter of a peer.
 func defaultDecayFunction(decay float64) preProcessingFunc {
 	return func(recordEntity RecordEntity) (RecordEntity, error) {
-		if recordEntity.Counter.Load() == 0 {
+		counter := recordEntity.Counter.Load()
+		if counter == 0 {
 			return recordEntity, nil
 		}
 
-		decayedVal, err := scoring.GeometricDecay(recordEntity.Counter.Load(), decay, recordEntity.lastUpdated)
+		decayedVal, err := scoring.GeometricDecay(counter, decay, recordEntity.lastUpdated)
 		if err != nil {
 			return recordEntity, fmt.Errorf("could not decay cluster prefixed control messages received counter: %w", err)
 		}
