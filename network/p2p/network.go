@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
@@ -65,6 +66,7 @@ type Network struct {
 	topology                    network.Topology
 	registerEngineRequests      chan *registerEngineRequest
 	registerBlobServiceRequests chan *registerBlobServiceRequest
+	misbehaviorReportManager    network.MisbehaviorReportManager
 }
 
 var _ network.Network = &Network{}
@@ -106,6 +108,7 @@ type NetworkParameters struct {
 	IdentityProvider    module.IdentityProvider
 	ReceiveCache        *netcache.ReceiveCache
 	ConduitFactory      network.ConduitFactory
+	AlspCfg             *alspmgr.MisbehaviorReportManagerConfig
 	Options             []NetworkOptFunction
 }
 
@@ -121,6 +124,10 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not create middleware: %w", err)
 	}
+	misbehaviorMngr, err := alspmgr.NewMisbehaviorReportManager(param.AlspCfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not create misbehavior report manager: %w", err)
+	}
 
 	n := &Network{
 		logger:                      param.Logger.With().Str("component", "network").Logger(),
@@ -135,6 +142,7 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 		conduitFactory:              param.ConduitFactory,
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
+		misbehaviorReportManager:    misbehaviorMngr,
 	}
 
 	for _, opt := range param.Options {
@@ -149,21 +157,21 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 
 	n.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			n.logger.Debug().Msg("starting conduit factory")
-			n.conduitFactory.Start(ctx)
+			n.logger.Debug().Msg("starting misbehavior manager")
+			n.misbehaviorReportManager.Start(ctx)
 
 			select {
-			case <-n.conduitFactory.Ready():
-				n.logger.Debug().Msg("conduit factory is ready")
+			case <-n.misbehaviorReportManager.Ready():
+				n.logger.Debug().Msg("misbehavior manager is ready")
 				ready()
 			case <-ctx.Done():
 				// jumps to the end of the select statement to let a graceful shutdown.
 			}
 
 			<-ctx.Done()
-			n.logger.Debug().Msg("stopping conduit factory")
-			<-n.conduitFactory.Done()
-			n.logger.Debug().Msg("conduit factory stopped")
+			n.logger.Debug().Msg("stopping misbehavior manager")
+			<-n.misbehaviorReportManager.Done()
+			n.logger.Debug().Msg("misbehavior manager stopped")
 		}).
 		AddWorker(n.runMiddleware).
 		AddWorker(n.processRegisterEngineRequests).
@@ -523,4 +531,16 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 
 func (n *Network) Topology() flow.IdentityList {
 	return n.topology.Fanout(n.Identities())
+}
+
+// ReportMisbehaviorOnChannel reports the misbehavior of a node on sending a message to the current node that appears
+// valid based on the networking layer but is considered invalid by the current node based on the Flow protocol.
+// The misbehavior report is sent to the current node's networking layer on the given channel to be processed.
+// Args:
+// - channel: The channel on which the misbehavior report is sent.
+// - report: The misbehavior report to be sent.
+// Returns:
+// none
+func (n *Network) ReportMisbehaviorOnChannel(channel channels.Channel, report network.MisbehaviorReport) {
+
 }

@@ -362,19 +362,7 @@ func (builder *FollowerServiceBuilder) initNetwork(nodeID module.Local,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
 
-	cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-		Logger:                  builder.Logger,
-		SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
-		SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
-		DisablePenalty:          builder.AlspConfig.DisablePenalty,
-		AlspMetrics:             builder.Metrics.Network,
-		HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
-		NetworkType:             network.PublicNetwork,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not create conduit factory: %w", err)
-	}
-
+	cf := conduit.NewDefaultConduitFactory()
 	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
 		Logger:              builder.Logger,
 		Codec:               cborcodec.NewCodec(),
@@ -386,6 +374,15 @@ func (builder *FollowerServiceBuilder) initNetwork(nodeID module.Local,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
 		ConduitFactory:      cf,
+		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  builder.Logger,
+			SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
+			SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
+			DisablePenalty:          builder.AlspConfig.DisablePenalty,
+			AlspMetrics:             builder.Metrics.Network,
+			HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
+			NetworkType:             network.PublicNetwork,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
