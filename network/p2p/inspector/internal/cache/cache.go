@@ -14,8 +14,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
-var ErrRecordNotFound = fmt.Errorf("record not found")
-
 type recordEntityFactory func(identifier flow.Identifier) ClusterPrefixedMessagesReceivedRecord
 
 type RecordCacheConfig struct {
@@ -108,12 +106,12 @@ func (r *RecordCache) Update(nodeID flow.Identifier) (float64, error) {
 	// optimisticAdjustFunc is called assuming the record exists; if the record does not exist,
 	// it means the record was not initialized. In this case, initialize the record and call optimisticAdjustFunc again.
 	// If the record was initialized, optimisticAdjustFunc will be called only once.
-	adjustedEntity, ok := optimisticAdjustFunc()
-	if !ok {
+	adjustedEntity, adjusted := optimisticAdjustFunc()
+	if !adjusted {
 		r.Init(nodeID)
-		adjustedEntity, ok = optimisticAdjustFunc()
-		if !ok {
-			return 0, fmt.Errorf("record not found for node ID %s, even after an init attempt", nodeID)
+		adjustedEntity, adjusted = optimisticAdjustFunc()
+		if !adjusted {
+			return 0, fmt.Errorf("unexpected record not found for node ID %s, even after an init attempt", nodeID)
 		}
 	}
 
@@ -135,7 +133,7 @@ func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
 
 	adjustedEntity, adjusted := r.c.Adjust(nodeID, r.decayAdjustment)
 	if !adjusted {
-		return 0, false, ErrRecordNotFound
+		return 0, false, fmt.Errorf("unexpected record not found for node ID %s, even after an init attempt", nodeID)
 	}
 
 	record, ok := adjustedEntity.(ClusterPrefixedMessagesReceivedRecord)
