@@ -23,9 +23,6 @@ func (_m *API) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Ident
 	ret := _m.Called(ctx, blockID)
 
 	var r0 *execution_data.BlockExecutionData
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (*execution_data.BlockExecutionData, error)); ok {
-		return rf(ctx, blockID)
-	}
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *execution_data.BlockExecutionData); ok {
 		r0 = rf(ctx, blockID)
 	} else {
