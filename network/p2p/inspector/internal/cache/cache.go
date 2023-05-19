@@ -135,6 +135,7 @@ func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
 
 	var err error
 	adjustedEntity, adjusted := r.c.Adjust(nodeID, func(entity flow.Entity) flow.Entity {
+		// perform decay on gauge value
 		entity, err = r.decayAdjustment(entity)
 		return entity
 	})
@@ -152,7 +153,6 @@ func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
 		panic(fmt.Sprintf("invalid entity type, expected ClusterPrefixedMessagesReceivedRecord type, got: %T", adjustedEntity))
 	}
 
-	// perform decay on Gauge
 	return record.Gauge, true, nil
 }
 
