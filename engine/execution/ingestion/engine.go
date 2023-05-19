@@ -43,6 +43,7 @@ type Engine struct {
 	me                     module.Local
 	request                module.Requester // used to request collections
 	state                  protocol.State
+	headers                storage.Headers
 	blocks                 storage.Blocks
 	collections            storage.Collections
 	events                 storage.Events
@@ -68,6 +69,7 @@ func New(
 	me module.Local,
 	request module.Requester,
 	state protocol.State,
+	headers storage.Headers,
 	blocks storage.Blocks,
 	collections storage.Collections,
 	events storage.Events,
@@ -94,6 +96,7 @@ func New(
 		me:                     me,
 		request:                request,
 		state:                  state,
+		headers:                headers,
 		blocks:                 blocks,
 		collections:            collections,
 		events:                 events,
@@ -204,13 +207,13 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) (
 	// blocks.
 	lastExecuted := final.Height
 
-	rootBlock, err := e.state.Params().Root()
+	rootBlock, err := e.state.Params().SealedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
 	}
 
 	for ; lastExecuted > rootBlock.Height; lastExecuted-- {
-		header, err := e.state.AtHeight(lastExecuted).Head()
+		header, err := e.getHeaderByHeight(lastExecuted)
 		if err != nil {
 			return nil, fmt.Errorf("could not get header at height: %v, %w", lastExecuted, err)
 		}
@@ -234,7 +237,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) (
 	// starting from the first unexecuted block, go through each unexecuted and finalized block
 	// reload its block to execution queues
 	for height := firstUnexecuted; height <= final.Height; height++ {
-		header, err := e.state.AtHeight(height).Head()
+		header, err := e.getHeaderByHeight(lastExecuted)
 		if err != nil {
 			return nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
 		}
@@ -321,13 +324,13 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 			return fmt.Errorf("could not get last executed: %w", err)
 		}
 
-		last, err := e.state.AtBlockID(lastExecutedID).Head()
+		last, err := e.headers.ByBlockID(lastExecutedID)
 		if err != nil {
 			return fmt.Errorf("could not get last executed final by ID: %w", err)
 		}
 
 		// don't reload root block
-		rootBlock, err := e.state.Params().Root()
+		rootBlock, err := e.state.Params().SealedRoot()
 		if err != nil {
 			return fmt.Errorf("failed to retrieve root block: %w", err)
 		}
@@ -1300,4 +1303,10 @@ func (e *Engine) fetchCollection(
 	))
 
 	return nil
+}
+
+func (e *Engine) getHeaderByHeight(height uint64) (*flow.Header, error) {
+	// we don't use protocol state because for dynamic boostrapped execution node
+	// the last executed and sealed block is below the root block
+	return e.headers.ByHeight(height)
 }

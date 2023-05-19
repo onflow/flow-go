@@ -23,6 +23,11 @@ type InstanceParams interface {
 	// No errors are expected during normal operation.
 	Root() (*flow.Header, error)
 
+	// SealedRoot returns the sealed root block. If it's different from Root() block,
+	// it means the node is bootstrapped from mid-spork.
+	// No errors are expected during normal operation.
+	SealedRoot() (*flow.Header, error)
+
 	// Seal returns the root block seal of the current protocol state. This will be
 	// the seal for the root block used to bootstrap this state and may differ from
 	// node to node for the same protocol state.

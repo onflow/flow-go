@@ -94,6 +94,23 @@ func (p Params) Root() (*flow.Header, error) {
 	return header, nil
 }
 
+func (p Params) SealedRoot() (*flow.Header, error) {
+	// look up root block ID
+	var rootID flow.Identifier
+	err := p.state.db.View(operation.LookupBlockHeight(p.state.sealedRootHeight, &rootID))
+	if err != nil {
+		return nil, fmt.Errorf("could not look up root header: %w", err)
+	}
+
+	// retrieve root header
+	header, err := p.state.headers.ByBlockID(rootID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve root header: %w", err)
+	}
+
+	return header, nil
+}
+
 func (p Params) Seal() (*flow.Seal, error) {
 
 	// look up root header

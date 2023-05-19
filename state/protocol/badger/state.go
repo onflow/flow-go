@@ -46,6 +46,10 @@ type State struct {
 	// larger than the height of the root block of the spork, (also cached below as
 	// `sporkRootBlockHeight`), for instance if the node joined in an epoch after the last spork.
 	rootHeight uint64
+	// sealedRootHeight returns the root block that is sealed.
+	// For non-execution node, sealedRootHeight == rootHeight == rootSnapshot.SealingSegment.Highest().Header.Height
+	// For execution node, sealedRootHeight == rootSnapshot.SealingSegment.Sealed().Header.Height < rootHeight == rootSnapshot.SealingSegment.Highest().Header.Height
+	sealedRootHeight uint64
 	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
 	// the state, because it cannot change over the lifecycle of a protocol state instance.
 	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
@@ -225,6 +229,13 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			if err != nil {
 				return fmt.Errorf("could not insert first seal: %w", err)
 			}
+
+			// first seal contains the result ID for the sealed root block, indexing it allows dynamically bootstrapped EN to execute
+			// the next block
+			err = transaction.WithTx(operation.IndexExecutionResult(segment.FirstSeal.BlockID, segment.FirstSeal.ResultID))(tx)
+			if err != nil {
+				return fmt.Errorf("could not index root result: %w", err)
+			}
 		}
 
 		for _, block := range segment.ExtraBlocks {
@@ -355,6 +366,11 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 
 		// insert height pointers
 		err = operation.InsertRootHeight(highest.Header.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert root height: %w", err)
+		}
+		// the sealed root height is the lowest block in sealing segment
+		err = operation.InsertSealedRootHeight(lowest.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root height: %w", err)
 		}
@@ -837,6 +853,11 @@ func (state *State) populateCache() error {
 	err := state.db.View(func(tx *badger.Txn) error {
 		// root height
 		err := state.db.View(operation.RetrieveRootHeight(&state.rootHeight))
+		if err != nil {
+			return fmt.Errorf("could not read root block to populate cache: %w", err)
+		}
+		// sealed root height
+		err = state.db.View(operation.RetrieveSealedRootHeight(&state.sealedRootHeight))
 		if err != nil {
 			return fmt.Errorf("could not read root block to populate cache: %w", err)
 		}
