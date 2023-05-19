@@ -134,17 +134,6 @@ func TestHandleReportedMisbehavior_Integration(t *testing.T) {
 		}))
 	require.NoError(t, err)
 
-	conduitFactory, err := conduit.NewDefaultConduitFactory(
-		&alspmgr.MisbehaviorReportManagerConfig{
-			SpamReportQueueSize:     uint32(100),
-			SpamRecordCacheSize:     uint32(100),
-			Logger:                  unittest.Logger(),
-			AlspMetrics:             metrics.NewNoopCollector(),
-			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
-		},
-		conduit.WithMisbehaviorManager(m))
-	require.NoError(t, err)
-
 	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
 		t,
 		1,
@@ -157,8 +146,7 @@ func TestHandleReportedMisbehavior_Integration(t *testing.T) {
 		unittest.Logger(),
 		ids,
 		mws,
-		sms,
-		p2p.WithConduitFactory(conduitFactory))
+		sms)
 
 	ctx, cancel := context.WithCancel(context.Background())
 

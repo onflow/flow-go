@@ -40,14 +40,6 @@ const (
 // be included in network communication. We omit any nodes that have been ejected.
 var NotEjectedFilter = filter.Not(filter.Ejected)
 
-type NetworkOptFunction func(*Network)
-
-func WithConduitFactory(f network.ConduitFactory) NetworkOptFunction {
-	return func(n *Network) {
-		n.conduitFactory = f
-	}
-}
-
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
@@ -109,7 +101,6 @@ type NetworkParameters struct {
 	ReceiveCache        *netcache.ReceiveCache
 	ConduitFactory      network.ConduitFactory
 	AlspCfg             *alspmgr.MisbehaviorReportManagerConfig
-	Options             []NetworkOptFunction
 }
 
 var _ network.Network = (*Network)(nil)
@@ -119,7 +110,6 @@ var _ network.Network = (*Network)(nil)
 // using the given state & cache interfaces to track volatile information.
 // csize determines the size of the cache dedicated to keep track of received messages
 func NewNetwork(param *NetworkParameters) (*Network, error) {
-
 	mw, err := param.MiddlewareFactory()
 	if err != nil {
 		return nil, fmt.Errorf("could not create middleware: %w", err)
@@ -143,10 +133,6 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
 		misbehaviorReportManager:    misbehaviorMngr,
-	}
-
-	for _, opt := range param.Options {
-		opt(n)
 	}
 
 	n.mw.SetOverlay(n)

@@ -230,15 +230,12 @@ func GenerateNetworks(t *testing.T,
 	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
-	sms []network.SubscriptionManager,
-	opts ...p2p.NetworkOptFunction) []network.Network {
+	sms []network.SubscriptionManager) []network.Network {
 
 	count := len(ids)
 	nets := make([]network.Network, 0)
 
 	for i := 0; i < count; i++ {
-
-		// creates and mocks me
 		me := &mock.Local{}
 		me.On("NodeID").Return(ids[i].NodeID)
 		me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID(me.NodeID())))
@@ -257,7 +254,6 @@ func GenerateNetworks(t *testing.T,
 			IdentityProvider:    id.NewFixedIdentityProvider(ids),
 			ReceiveCache:        receiveCache,
 			ConduitFactory:      cf,
-			Options:             opts,
 			AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 				Logger:                  unittest.Logger(),
 				SpamRecordCacheSize:     uint32(1000),
