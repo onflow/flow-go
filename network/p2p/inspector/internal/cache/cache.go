@@ -87,7 +87,7 @@ func (r *RecordCache) Init(nodeID flow.Identifier) bool {
 // - nodeID: the node ID of the sender of the control message.
 // - adjustFunc: the function that adjusts the record.
 // Returns:
-//   - The number of cluster prefix control messages received after the adjustment.
+//   - The cluster prefix control messages received gauge value after the adjustment.
 //   - error if the adjustFunc returns an error or if the record does not exist, or the decay func returned an unexpected error.
 //     All errors should be treated as an irrecoverable error and indicates a bug.
 //
