@@ -94,13 +94,23 @@ func (b *Bootstrapper) IsBootstrapped(db *badger.DB) (flow.StateCommitment, bool
 	return commit, true, nil
 }
 
-func (b *Bootstrapper) BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, genesis *flow.Header) error {
+func (b *Bootstrapper) BootstrapExecutionDatabase(
+	db *badger.DB,
+	rootResult *flow.ExecutionResult,
+	commit flow.StateCommitment,
+	genesis *flow.Header,
+) error {
 
 	err := operation.RetryOnConflict(db.Update, func(txn *badger.Txn) error {
 
 		err := operation.InsertExecutedBlock(genesis.ID())(txn)
 		if err != nil {
 			return fmt.Errorf("could not index initial genesis execution block: %w", err)
+		}
+
+		err = operation.IndexExecutionResult(rootResult.BlockID, rootResult.ID())(txn)
+		if err != nil {
+			return fmt.Errorf("could not index result for root result: %w", err)
 		}
 
 		err = operation.IndexStateCommitment(flow.ZeroID, commit)(txn)

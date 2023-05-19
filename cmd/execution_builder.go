@@ -1062,7 +1062,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 		// TODO: check that the checkpoint file contains the root block's statecommit hash
 
-		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.SealedRootBlock.Header)
+		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootResult, node.RootSeal.FinalState, node.SealedRootBlock.Header)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution database: %w", err)
 		}
