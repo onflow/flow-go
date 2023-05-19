@@ -794,6 +794,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		node.Me,
 		exeNode.collectionRequester,
 		node.State,
+		node.Storage.Headers,
 		node.Storage.Blocks,
 		node.Storage.Collections,
 		exeNode.events,
