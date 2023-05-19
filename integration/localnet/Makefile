@@ -95,27 +95,27 @@ start-cached: start-metrics start-flow-cached
 # Starts metrics services
 .PHONY: start-metrics
 start-metrics:
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.metrics.yml up -d
 
 # Starts a version of localnet with just flow nodes and without metrics services.
 # This prevents port collision and consumption when these services are not needed.
 # All images are re-built prior to being started.
 .PHONY: start-flow
 start-flow:
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d --build
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml up -d --build
 
 # Same as start-flow, but most recently built images are used.
 .PHONY: start-flow-cached
 start-flow-cached:
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up -d
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml up -d
 
 .PHONY: build-flow
 build-flow:
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml build
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.nodes.yml build
 
 .PHONY: stop
 stop:
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml down -v --remove-orphans
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml down -v --remove-orphans
 
 .PHONY: load
 load:
@@ -143,7 +143,7 @@ clean-data:
 	rm -f ./docker-compose.nodes.yml
 
 # deletes the stopped environment-clean container(s) - running this command inside another target doesn't delete the containers so it's isolated to run in a separate target
-# Note: running this target shows an error on the command line "make: *** [clean-data2] Error 1" but the container is still deletes
+# Note: running this target shows an error on the command line "make: *** [clean-data2] Error 1" but the container is still deleted
 .PHONY: clean-data2
 clean-data2:
 	docker rm $(shell docker ps -aq --filter ancestor=environment-clean)
