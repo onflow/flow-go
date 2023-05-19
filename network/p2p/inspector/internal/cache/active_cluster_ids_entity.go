@@ -14,7 +14,7 @@ type ActiveClusterIdsEntity struct {
 
 var _ flow.Entity = (*ActiveClusterIdsEntity)(nil)
 
-// NewActiveClusterIdsEntity returns a new ActiveClusterIdsEntity. The flow zero Identifier will be used to store this special
+// NewActiveClusterIdsEntity returns a new ActiveClusterIdsEntity. The flow zero NodeID will be used to store this special
 // purpose entity.
 func NewActiveClusterIdsEntity(identifier flow.Identifier, clusterIDList flow.ChainIDList) ActiveClusterIdsEntity {
 	return ActiveClusterIdsEntity{

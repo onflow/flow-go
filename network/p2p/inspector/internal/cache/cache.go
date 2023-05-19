@@ -80,13 +80,13 @@ func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityF
 // Init initializes the record cache for the given peer id if it does not exist.
 // Returns true if the record is initialized, false otherwise (i.e.: the record already exists).
 // Args:
-// - originId: the origin id the sender of the control message.
+// - nodeID: the node ID of the sender of the control message.
 // Returns:
 // - true if the record is initialized, false otherwise (i.e.: the record already exists).
 // Note that if Init is called multiple times for the same peer id, the record is initialized only once, and the
 // subsequent calls return false and do not change the record (i.e.: the record is not re-initialized).
-func (r *RecordCache) Init(originId flow.Identifier) bool {
-	entity := r.recordEntityFactory(originId)
+func (r *RecordCache) Init(nodeID flow.Identifier) bool {
+	entity := r.recordEntityFactory(nodeID)
 	return r.c.Add(entity)
 }
 
@@ -96,7 +96,7 @@ func (r *RecordCache) Init(originId flow.Identifier) bool {
 // It returns an error if the adjustFunc returns an error or if the record does not exist.
 // Assuming that adjust is always called when the record exists, the error is irrecoverable and indicates a bug.
 // Args:
-// - originId: the origin id the sender of the control message.
+// - nodeID: the node ID of the sender of the control message.
 // - adjustFunc: the function that adjusts the record.
 // Returns:
 //   - The number of cluster prefix topics received after the adjustment.
@@ -105,9 +105,9 @@ func (r *RecordCache) Init(originId flow.Identifier) bool {
 //
 // Note if Adjust is called under the assumption that the record exists, the ErrRecordNotFound should be treated
 // as an irrecoverable error and indicates a bug.
-func (r *RecordCache) Update(originId flow.Identifier) (float64, error) {
+func (r *RecordCache) Update(nodeID flow.Identifier) (float64, error) {
 	optimisticAdjustFunc := func() (flow.Entity, bool) {
-		return r.c.Adjust(originId, func(entity flow.Entity) flow.Entity {
+		return r.c.Adjust(nodeID, func(entity flow.Entity) flow.Entity {
 			r.decayAdjustment(entity)            // first decay the record
 			return r.incrementAdjustment(entity) // then increment the record
 		})
@@ -118,10 +118,10 @@ func (r *RecordCache) Update(originId flow.Identifier) (float64, error) {
 	// If the record was initialized, optimisticAdjustFunc will be called only once.
 	adjustedEntity, ok := optimisticAdjustFunc()
 	if !ok {
-		r.Init(originId)
+		r.Init(nodeID)
 		adjustedEntity, ok = optimisticAdjustFunc()
 		if !ok {
-			return 0, fmt.Errorf("record not found for origin id %s, even after an init attempt", originId)
+			return 0, fmt.Errorf("record not found for node ID %s, even after an init attempt", nodeID)
 		}
 	}
 
@@ -133,15 +133,15 @@ func (r *RecordCache) Update(originId flow.Identifier) (float64, error) {
 // Before the count is returned it is decayed using the configured decay function.
 // Returns the record and true if the record exists, nil and false otherwise.
 // Args:
-// - originId: the origin id the sender of the control message.
+// - nodeID: the node ID of the sender of the control message.
 // Returns:
 // - The number of cluster prefix topics received after the decay and true if the record exists, 0 and false otherwise.
-func (r *RecordCache) Get(originId flow.Identifier) (float64, bool, error) {
-	if r.Init(originId) {
+func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
+	if r.Init(nodeID) {
 		return 0, true, nil
 	}
 
-	adjustedEntity, adjusted := r.c.Adjust(originId, r.decayAdjustment)
+	adjustedEntity, adjusted := r.c.Adjust(nodeID, r.decayAdjustment)
 	if !adjusted {
 		return 0, false, ErrRecordNotFound
 	}
@@ -200,11 +200,11 @@ func (r *RecordCache) Identities() []flow.Identifier {
 // Remove removes the record of the given peer id from the cache.
 // Returns true if the record is removed, false otherwise (i.e., the record does not exist).
 // Args:
-// - originId: the origin id the sender of the control message.
+// - nodeID: the node ID of the sender of the control message.
 // Returns:
 // - true if the record is removed, false otherwise (i.e., the record does not exist).
-func (r *RecordCache) Remove(originId flow.Identifier) bool {
-	return r.c.Remove(originId)
+func (r *RecordCache) Remove(nodeID flow.Identifier) bool {
+	return r.c.Remove(nodeID)
 }
 
 // Size returns the number of records in the cache.

@@ -17,23 +17,22 @@ type RecordEntity struct {
 
 var _ flow.Entity = (*RecordEntity)(nil)
 
-// NewRecordEntity returns a new RecordEntity creating the Identifier from the ClusterPrefixTopicsReceivedRecord
-// peer field.
-func NewRecordEntity(identifier flow.Identifier) RecordEntity {
+// NewRecordEntity returns a new RecordEntity.
+func NewRecordEntity(nodeID flow.Identifier) RecordEntity {
 	return RecordEntity{
-		ClusterPrefixTopicsReceivedRecord: NewClusterPrefixTopicsReceivedRecord(identifier),
+		ClusterPrefixTopicsReceivedRecord: NewClusterPrefixTopicsReceivedRecord(nodeID),
 		lastUpdated:                       time.Now(),
 	}
 }
 
-// ID returns the origin id of the spam record, which is used as the unique identifier of the entity for maintenance and
+// ID returns the node ID of the sender, which is used as the unique identifier of the entity for maintenance and
 // deduplication purposes in the cache.
 func (r RecordEntity) ID() flow.Identifier {
-	return r.Identifier
+	return r.NodeID
 }
 
-// Checksum returns the origin id of the spam record, it does not have any purpose in the cache.
+// Checksum returns the node ID of the sender, it does not have any purpose in the cache.
 // It is implemented to satisfy the flow.Entity interface.
 func (r RecordEntity) Checksum() flow.Identifier {
-	return r.Identifier
+	return r.NodeID
 }

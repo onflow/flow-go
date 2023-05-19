@@ -30,17 +30,17 @@ func NewClusterPrefixTopicsReceivedTracker(logger zerolog.Logger, sizeLimit uint
 }
 
 // Inc increments the cluster prefixed topics received Counter for the peer.
-func (c *ClusterPrefixTopicsReceivedTracker) Inc(id flow.Identifier) (float64, error) {
-	count, err := c.cache.Update(id)
+func (c *ClusterPrefixTopicsReceivedTracker) Inc(nodeID flow.Identifier) (float64, error) {
+	count, err := c.cache.Update(nodeID)
 	if err != nil {
-		return 0, fmt.Errorf("failed to increment cluster prefixed received tracker Counter for peer %s: %w", id, err)
+		return 0, fmt.Errorf("failed to increment cluster prefixed received tracker Counter for peer %s: %w", nodeID, err)
 	}
 	return count, nil
 }
 
 // Load loads the current number of cluster prefixed topics received by a peer.
-func (c *ClusterPrefixTopicsReceivedTracker) Load(id flow.Identifier) float64 {
-	count, _, _ := c.cache.Get(id)
+func (c *ClusterPrefixTopicsReceivedTracker) Load(nodeID flow.Identifier) float64 {
+	count, _, _ := c.cache.Get(nodeID)
 	return count
 }
 
