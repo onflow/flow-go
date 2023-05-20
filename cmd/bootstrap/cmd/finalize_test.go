@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	utils "github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -91,4 +93,25 @@ func TestFinalize_HappyPath(t *testing.T) {
 		snapshotPath := filepath.Join(bootDir, model.PathRootProtocolStateSnapshot)
 		assert.FileExists(t, snapshotPath)
 	})
+}
+
+func TestClusterAssignment(t *testing.T) {
+	flagCollectionClusters = 5
+	// Happy path (limit set-up, can't have one less internal node)
+	partnersLen := 7
+	internalLen := 22
+	partners := unittest.NodeInfosFixture(partnersLen, unittest.WithRole(flow.RoleCollection))
+	internals := unittest.NodeInfosFixture(internalLen, unittest.WithRole(flow.RoleCollection))
+
+	// should not error
+	_, clusters, err := constructClusterAssignment(partners, internals)
+	require.NoError(t, err)
+	// should not log
+	checkClusterConstraint(clusters, model.ToIdentityList(partners), model.ToIdentityList(internals))
+
+	// unhappy Path
+	internals = internals[:21] // reduce one internal node
+	// should error
+	_, _, err = constructClusterAssignment(partners, internals)
+	require.Error(t, err)
 }

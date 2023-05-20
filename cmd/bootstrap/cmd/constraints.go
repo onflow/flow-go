@@ -12,6 +12,9 @@ func ensureUniformNodeWeightsPerRole(allNodes flow.IdentityList) {
 	// ensure all nodes of the same role have equal weight
 	for _, role := range flow.Roles() {
 		withRole := allNodes.Filter(filter.HasRole(role))
+		if len(withRole) == 0 {
+			continue
+		}
 		expectedWeight := withRole[0].Weight
 		for _, node := range withRole {
 			if node.Weight != expectedWeight {
@@ -44,7 +47,12 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 	if err != nil {
 		log.Fatal().Msgf("can't bootstrap because the cluster assignment failed: %s", err)
 	}
+	checkClusterConstraint(clusters, partners, internals)
+}
 
+// Sanity check about the number of internal/partner nodes in each cluster. The identites
+// in each cluster do not matter for this sanity check.
+func checkClusterConstraint(clusters flow.ClusterList, partners flow.IdentityList, internals flow.IdentityList) {
 	for i, cluster := range clusters {
 		var clusterPartnerCount, clusterInternalCount int
 		for _, node := range cluster {
