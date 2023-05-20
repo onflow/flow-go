@@ -1067,8 +1067,8 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.Logger.Info().
 			Hex("root_result_id", logging.Entity(fnb.RootResult)).
 			Hex("root_state_commitment", fnb.RootSeal.FinalState[:]).
-			Hex("root_block_id", logging.Entity(fnb.RootBlock)).
-			Uint64("root_block_height", fnb.RootBlock.Header.Height).
+			Hex("root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
+			Uint64("root_block_height", fnb.FinalizedRootBlock.Header.Height).
 			Msg("protocol state bootstrapped")
 	}
 
@@ -1085,8 +1085,10 @@ func (fnb *FlowNodeBuilder) initState() error {
 	}
 
 	fnb.Logger.Info().
-		Hex("root_block_id", logging.Entity(fnb.RootBlock)).
-		Uint64("root_block_height", fnb.RootBlock.Header.Height).
+		Hex("root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
+		Uint64("root_block_height", fnb.FinalizedRootBlock.Header.Height).
+		Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
+		Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
 		Hex("finalized_block_id", logging.Entity(lastFinalized)).
 		Uint64("finalized_block_height", lastFinalized.Height).
 		Msg("successfully opened protocol state")
@@ -1124,13 +1126,14 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 		return fmt.Errorf("failed to read root sealing segment: %w", err)
 	}
 
-	fnb.RootBlock = sealingSegment.Highest()
+	fnb.FinalizedRootBlock = sealingSegment.Highest()
+	fnb.SealedRootBlock = sealingSegment.Sealed()
 	fnb.RootQC, err = fnb.RootSnapshot.QuorumCertificate()
 	if err != nil {
 		return fmt.Errorf("failed to read root QC: %w", err)
 	}
 
-	fnb.RootChainID = fnb.RootBlock.Header.ChainID
+	fnb.RootChainID = fnb.FinalizedRootBlock.Header.ChainID
 	fnb.SporkID, err = fnb.RootSnapshot.Params().SporkID()
 	if err != nil {
 		return fmt.Errorf("failed to read spork ID: %w", err)
