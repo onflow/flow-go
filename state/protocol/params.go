@@ -21,6 +21,7 @@ type InstanceParams interface {
 	// the head of the protocol state snapshot used to bootstrap this state and
 	// may differ from node to node for the same protocol state.
 	// No errors are expected during normal operation.
+	// TODO(leo): rename to FinalizedRoot
 	Root() (*flow.Header, error)
 
 	// Seal returns the root block seal of the current protocol state. This will be

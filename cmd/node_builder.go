@@ -279,6 +279,21 @@ type NodeConfig struct {
 	GossipSubInspectorNotifDistributor p2p.GossipSubInspectorNotificationDistributor
 }
 
+// StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.
+type StateExcerptAtBoot struct {
+	// properties of RootSnapshot for convenience
+	FinalizedRootBlock *flow.Block
+	SealedRootBlock    *flow.Block
+	RootQC             *flow.QuorumCertificate // QC for Finalized Root Block
+	RootResult         *flow.ExecutionResult   // Result for SealedRootBlock
+	RootSeal           *flow.Seal              //Seal for RootResult
+	RootChainID        flow.ChainID
+	SporkID            flow.Identifier
+	// finalized block for use in bootstrapping
+	// TODO:(leo) isn't it FinalizedRootBlock.Header?
+	FinalizedHeader *flow.Header
+}
+
 func DefaultBaseConfig() *BaseConfig {
 	homedir, _ := os.UserHomeDir()
 	datadir := filepath.Join(homedir, ".flow", "database")
