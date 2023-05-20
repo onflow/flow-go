@@ -96,6 +96,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 }
 
 func TestClusterAssignment(t *testing.T) {
+	tmp := flagCollectionClusters
 	flagCollectionClusters = 5
 	// Happy path (limit set-up, can't have one less internal node)
 	partnersLen := 7
@@ -114,4 +115,6 @@ func TestClusterAssignment(t *testing.T) {
 	// should error
 	_, _, err = constructClusterAssignment(partners, internals)
 	require.Error(t, err)
+	// revert the flag value
+	flagCollectionClusters = tmp
 }
