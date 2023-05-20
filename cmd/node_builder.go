@@ -294,13 +294,15 @@ type NodeConfig struct {
 // StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.
 type StateExcerptAtBoot struct {
 	// properties of RootSnapshot for convenience
-	RootBlock   *flow.Block
-	RootQC      *flow.QuorumCertificate
-	RootResult  *flow.ExecutionResult
-	RootSeal    *flow.Seal
-	RootChainID flow.ChainID
-	SporkID     flow.Identifier
+	FinalizedRootBlock *flow.Block
+	SealedRootBlock    *flow.Block
+	RootQC             *flow.QuorumCertificate // QC for Finalized Root Block
+	RootResult         *flow.ExecutionResult   // Result for SealedRootBlock
+	RootSeal           *flow.Seal              //Seal for RootResult
+	RootChainID        flow.ChainID
+	SporkID            flow.Identifier
 	// finalized block for use in bootstrapping
+	// TODO:(leo) isn't it FinalizedRootBlock.Header?
 	FinalizedHeader *flow.Header
 }
 
