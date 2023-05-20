@@ -35,14 +35,18 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 
 	ensureUniformNodeWeightsPerRole(all)
 
-	// check collection committee Byzantine threshold for each cluster
-	// for checking Byzantine constraints, the seed doesn't matter
-	_, clusters := constructClusterAssignment(partnerNodes, internalNodes)
-	partnerCOLCount := uint(0)
-	internalCOLCount := uint(0)
-	for _, cluster := range clusters {
-		clusterPartnerCount := uint(0)
-		clusterInternalCount := uint(0)
+	// check collection committee threshold of internal nodes in each cluster
+	// although the assignmment is non-deterministic, the number of internal/partner
+	// nodes in each cluster is deterministic. The following check is only a sanity
+	// check about the number of internal/partner nodes in each cluster. The identites
+	// in each cluster do not matter for this sanity check.
+	_, clusters, err := constructClusterAssignment(partnerNodes, internalNodes)
+	if err != nil {
+		log.Fatal().Msgf("can't bootstrap because the cluster assignment failed: %s", err)
+	}
+
+	for i, cluster := range clusters {
+		var clusterPartnerCount, clusterInternalCount int
 		for _, node := range cluster {
 			if _, exists := partners.ByNodeID(node.NodeID); exists {
 				clusterPartnerCount++
@@ -53,11 +57,9 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 		}
 		if clusterInternalCount <= clusterPartnerCount*2 {
 			log.Fatal().Msgf(
-				"will not bootstrap configuration without Byzantine majority within cluster: "+
+				"can't bootstrap because cluster %d doesn't have enough internal nodes: "+
 					"(partners=%d, internals=%d, min_internals=%d)",
-				clusterPartnerCount, clusterInternalCount, clusterPartnerCount*2+1)
+				i, clusterPartnerCount, clusterInternalCount, clusterPartnerCount*2+1)
 		}
-		partnerCOLCount += clusterPartnerCount
-		internalCOLCount += clusterInternalCount
 	}
 }
