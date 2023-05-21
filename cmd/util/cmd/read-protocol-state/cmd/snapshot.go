@@ -67,7 +67,16 @@ func runSnapshot(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("fail to serialize snapshot")
 	}
 
-	log.Info().Msgf("snapshot created")
+	sealingSegment, err := serializable.SealingSegment()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not get sealing segment")
+	}
+
+	log.Info().Msgf("snapshot created, sealed height %v, id %v",
+		sealingSegment.Sealed().Header.Height, sealingSegment.Sealed().Header.ID())
+
+	log.Info().Msgf("highest finalized height %v, id %v",
+		sealingSegment.Highest().Header.Height, sealingSegment.Highest().Header.ID())
 
 	encoded := serializable.Encodable()
 	common.PrettyPrint(encoded)
