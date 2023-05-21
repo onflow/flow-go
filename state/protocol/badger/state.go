@@ -709,8 +709,62 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 
 // populateCache is used after opening or bootstrapping the state to populate the cache.
 func (state *State) populateCache() error {
-	var rootHeight uint64
-	err := state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	// cache the initial value for finalized block
+	err := state.db.View(func(tx *badger.Txn) error {
+		// root height
+		err := state.db.View(operation.RetrieveRootHeight(&state.rootHeight))
+		if err != nil {
+			return fmt.Errorf("could not read root block to populate cache: %w", err)
+		}
+		// sealed root height
+		err = state.db.View(operation.RetrieveSealedRootHeight(&state.sealedRootHeight))
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				// to be backward compatible
+				state.sealedRootHeight = state.rootHeight
+			} else {
+				return fmt.Errorf("could not read sealed root block to populate cache: %w", err)
+			}
+		}
+		// spork root block height
+		err = state.db.View(operation.RetrieveSporkRootBlockHeight(&state.sporkRootBlockHeight))
+		if err != nil {
+			return fmt.Errorf("could not get spork root block height: %w", err)
+		}
+		// finalized header
+		var finalizedHeight uint64
+		err = operation.RetrieveFinalizedHeight(&finalizedHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup finalized height: %w", err)
+		}
+		var cachedFinalHeader cachedHeader
+		err = operation.LookupBlockHeight(finalizedHeight, &cachedFinalHeader.id)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup finalized id (height=%d): %w", finalizedHeight, err)
+		}
+		cachedFinalHeader.header, err = state.headers.ByBlockID(cachedFinalHeader.id)
+		if err != nil {
+			return fmt.Errorf("could not get finalized block (id=%x): %w", cachedFinalHeader.id, err)
+		}
+		state.cachedFinal.Store(&cachedFinalHeader)
+		// sealed header
+		var sealedHeight uint64
+		err = operation.RetrieveSealedHeight(&sealedHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup sealed height: %w", err)
+		}
+		var cachedSealedHeader cachedHeader
+		err = operation.LookupBlockHeight(finalizedHeight, &cachedSealedHeader.id)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup sealed id (height=%d): %w", finalizedHeight, err)
+		}
+		cachedSealedHeader.header, err = state.headers.ByBlockID(cachedSealedHeader.id)
+		if err != nil {
+			return fmt.Errorf("could not get sealed block (id=%x): %w", cachedFinalHeader.id, err)
+		}
+		state.cachedSealed.Store(&cachedSealedHeader)
+		return nil
+	})
 	if err != nil {
 		return fmt.Errorf("could not read root block to populate cache: %w", err)
 	}
