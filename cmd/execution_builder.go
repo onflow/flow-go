@@ -861,7 +861,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 		node.Storage.Headers,
 		final,
 		exeNode.followerDistributor,
-		node.RootBlock.Header,
+		node.FinalizedRootBlock.Header,
 		node.RootQC,
 		finalized,
 		pending,

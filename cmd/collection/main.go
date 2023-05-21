@@ -290,7 +290,7 @@ func main() {
 				node.Storage.Headers,
 				finalizer,
 				followerDistributor,
-				node.RootBlock.Header,
+				node.FinalizedRootBlock.Header,
 				node.RootQC,
 				finalized,
 				pending,
