@@ -73,7 +73,8 @@ func TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad(t *testing.
 				defer wg.Done()
 				gaugeVal, err := tracker.Load(id)
 				require.NoError(t, err)
-				require.NotNil(t, gaugeVal)
+				require.Greater(t, gaugeVal, float64(0))
+				require.LessOrEqual(t, gaugeVal, n)
 			}()
 		}
 	}()
