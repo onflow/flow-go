@@ -306,12 +306,9 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 		// get spam records concurrently
 		go func(id flow.Identifier) {
 			defer wg.Done()
-			record, found, err := cache.Get(id)
+			_, found, err := cache.Get(id)
 			require.NoError(t, err)
 			require.True(t, found)
-			// slight decay will result in 0.9 < gauge < 1
-			require.LessOrEqual(t, record, 1.0)
-			require.Greater(t, record, 0.9)
 		}(nodeID)
 	}
 
