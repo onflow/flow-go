@@ -85,7 +85,6 @@ func (r *RecordCache) Init(nodeID flow.Identifier) bool {
 // the adjustment func is applied that will increment the Gauge.
 // Args:
 // - nodeID: the node ID of the sender of the control message.
-// - adjustFunc: the function that adjusts the record.
 // Returns:
 //   - The cluster prefix control messages received gauge value after the adjustment.
 //   - exception only in cases of internal data inconsistency or bugs. No errors are expected.
