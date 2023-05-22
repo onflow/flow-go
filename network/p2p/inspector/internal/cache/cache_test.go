@@ -240,7 +240,7 @@ func TestRecordCache_Remove(t *testing.T) {
 	require.True(t, cache.Init(nodeID3))
 
 	numOfIds := uint(3)
-	require.Equal(t, numOfIds, cache.Size(), fmt.Sprintf("expected size of the cache to be %d", numOfIds+1))
+	require.Equal(t, numOfIds, cache.Size(), fmt.Sprintf("expected size of the cache to be %d", numOfIds))
 	// remove nodeID1 and check if the record is removed
 	require.True(t, cache.Remove(nodeID1))
 	require.NotContains(t, nodeID1, cache.NodeIDs())
@@ -284,7 +284,6 @@ func TestRecordCache_ConcurrentRemove(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
 
-	// ensure cache only has default active cluster Ids stored
 	require.Equal(t, uint(0), cache.Size())
 }
 
@@ -318,7 +317,9 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 			record, found, err := cache.Get(id)
 			require.NoError(t, err)
 			require.True(t, found)
-			require.NotNil(t, record)
+			// slight decay will result in 0.9 < gauge < 1
+			require.LessOrEqual(t, record, 1.0)
+			require.Greater(t, record, 0.9)
 		}(nodeID)
 	}
 
