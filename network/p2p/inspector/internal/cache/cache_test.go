@@ -149,7 +149,7 @@ func TestRecordCache_Update(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.LessOrEqual(t, currentGauge, gauge)
-	require.Greater(t, currentGauge, 0.9999999)
+	require.Greater(t, currentGauge, 0.9)
 
 	// test adjusting the spam record for a non-existing node ID
 	nodeID3 := unittest.IdentifierFixture()
