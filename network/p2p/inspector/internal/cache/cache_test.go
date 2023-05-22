@@ -402,7 +402,7 @@ func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 
 	// ensure that the initialized records are correctly added to the cache
 	// and removed records are correctly removed from the cache
-	require.Equal(t, uint(nodeIDsToAdd.Len()), cache.Size())
+	require.ElementsMatch(t, nodeIDsToAdd), cache.NodeIDs())
 }
 
 // TestRecordCache_ConcurrentInitRemoveUpdate tests the concurrent initialization, removal, and adjustment of
