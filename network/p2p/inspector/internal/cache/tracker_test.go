@@ -48,7 +48,7 @@ func TestClusterPrefixedMessagesReceivedTracker_IncConcurrent(t *testing.T) {
 	// after each decay is applied the gauge value result should be slightly less than n
 	gaugeVal, err := tracker.Load(id)
 	require.NoError(t, err)
-	require.True(t, n-gaugeVal < .2)
+	require.InDelta(t, n, gaugeVal, .2)
 }
 
 // TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad ensures cluster prefixed received tracker increments/loads the cluster prefixed control messages received gauge value correctly concurrently.
@@ -81,7 +81,7 @@ func TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad(t *testing.
 	gaugeVal, err := tracker.Load(id)
 	require.NoError(t, err)
 	// after each decay is applied the gauge value result should be slightly less than n
-	require.True(t, n-gaugeVal < .2)
+	require.InDelta(t, n, gaugeVal, .2)
 }
 
 func TestClusterPrefixedMessagesReceivedTracker_StoreAndGetActiveClusterIds(t *testing.T) {
