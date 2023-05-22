@@ -104,10 +104,10 @@ func (r *RecordCache) Update(nodeID flow.Identifier) (float64, error) {
 	// it means the record was not initialized. In this case, initialize the record and call optimisticAdjustFunc again.
 	// If the record was initialized, optimisticAdjustFunc will be called only once.
 	adjustedEntity, adjusted := optimisticAdjustFunc()
-	switch {
-	case err != nil:
+	if err != nil {
 		return 0, fmt.Errorf("unexpected error while applying decay adjustment for node %s: %w", nodeID, err)
-	case !adjusted:
+	}
+	if !adjusted {
 		r.Init(nodeID)
 		adjustedEntity, adjusted = optimisticAdjustFunc()
 		if !adjusted {
@@ -138,10 +138,10 @@ func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
 		entity, err = r.decayAdjustment(entity)
 		return entity
 	})
-	switch {
-	case err != nil:
+	if err != nil {
 		return 0, false, fmt.Errorf("unexpected error while applying decay adjustment for node %s: %w", nodeID, err)
-	case !adjusted:
+	}
+	if !adjusted {
 		return 0, false, fmt.Errorf("unexpected error record not found for node ID %s, even after an init attempt", nodeID)
 	}
 
