@@ -153,16 +153,16 @@ func TestRecordCache_Update(t *testing.T) {
 
 	// test adjusting the spam record for a non-existing node ID
 	nodeID3 := unittest.IdentifierFixture()
-	gauge2, err := cache.Update(nodeID3)
+	gauge3, err := cache.Update(nodeID3)
 	require.NoError(t, err)
-	require.Equal(t, float64(1), gauge2)
+	require.Equal(t, float64(1), gauge3)
 
 	// when updated the value should be incremented from 1 -> 2 and slightly decayed resulting
 	// in a gauge value less than 2 but greater than 1.9
-	gauge2, err = cache.Update(nodeID3)
+	gauge3, err = cache.Update(nodeID3)
 	require.NoError(t, err)
-	require.LessOrEqual(t, gauge2, 2.0)
-	require.Greater(t, gauge2, 1.9)
+	require.LessOrEqual(t, gauge3, 2.0)
+	require.Greater(t, gauge3, 1.9)
 }
 
 // TestRecordCache_UpdateDecay ensures that a gauge in the record cache is eventually decayed back to 0 after some time.
