@@ -79,7 +79,8 @@ func TestRecordCache_ConcurrentInit(t *testing.T) {
 
 	// ensure that all records are correctly initialized
 	for _, nodeID := range nodeIDs {
-		gauge, found, _ := cache.Get(nodeID)
+		gauge, found, err := cache.Get(nodeID)
+		require.NoError(t, err)
 		require.True(t, found)
 		require.Zerof(t, gauge, "expected all gauge values to be initialized to 0")
 	}
@@ -117,7 +118,8 @@ func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
 	require.Equal(t, int32(1), successGauge.Load())
 
 	// ensure that the record is correctly initialized in the cache
-	gauge, found, _ := cache.Get(nodeID)
+	gauge, found, err := cache.Get(nodeID)
+	require.NoError(t, err)
 	require.True(t, found)
 	require.Zero(t, gauge)
 }
@@ -244,9 +246,11 @@ func TestRecordCache_Remove(t *testing.T) {
 	require.NotContains(t, nodeID1, cache.NodeIDs())
 
 	// check if the other node IDs are still in the cache
-	_, exists, _ := cache.Get(nodeID2)
+	_, exists, err := cache.Get(nodeID2)
+	require.NoError(t, err)
 	require.True(t, exists)
-	_, exists, _ = cache.Get(nodeID3)
+	_, exists, err = cache.Get(nodeID3)
+	require.NoError(t, err)
 	require.True(t, exists)
 
 	// attempt to remove a non-existent node ID
@@ -311,7 +315,8 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 		// get spam records concurrently
 		go func(id flow.Identifier) {
 			defer wg.Done()
-			record, found, _ := cache.Get(id)
+			record, found, err := cache.Get(id)
+			require.NoError(t, err)
 			require.True(t, found)
 			require.NotNil(t, record)
 		}(nodeID)
@@ -321,7 +326,8 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 
 	// ensure that the records are correctly updated in the cache
 	for _, nodeID := range nodeIDs {
-		gauge, found, _ := cache.Get(nodeID)
+		gauge, found, err := cache.Get(nodeID)
+		require.NoError(t, err)
 		require.True(t, found)
 		// slight decay will result in 0.9 < gauge < 1
 		require.LessOrEqual(t, gauge, 1.0)
