@@ -415,6 +415,7 @@ func TestRecordCache_ConcurrentInitRemoveUpdate(t *testing.T) {
 	}
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+	require.ElementsMatch(t, append(nodeIDsToAdd, nodeIDsToAdjust...), cache.NodeIDs())
 }
 
 // TestRecordCache_EdgeCasesAndInvalidInputs tests the edge cases and invalid inputs for RecordCache methods.
