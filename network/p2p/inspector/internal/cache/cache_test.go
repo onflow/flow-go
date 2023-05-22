@@ -236,15 +236,7 @@ func TestRecordCache_Identities(t *testing.T) {
 	// check if the NodeIDs method returns the correct set of node IDs
 	identities := cache.NodeIDs()
 	require.Equal(t, 3, len(identities))
-
-	identityMap := make(map[flow.Identifier]struct{})
-	for _, id := range identities {
-		identityMap[id] = struct{}{}
-	}
-
-	require.Contains(t, identityMap, nodeID1)
-	require.Contains(t, identityMap, nodeID2)
-	require.Contains(t, identityMap, nodeID3)
+	require.ElementsMatch(t, identities, []flow.Identifier{nodeID1, nodeID2, nodeID3})
 }
 
 // TestRecordCache_Remove tests the Remove method of the RecordCache.
