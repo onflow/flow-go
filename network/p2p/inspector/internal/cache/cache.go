@@ -188,6 +188,7 @@ func (r *RecordCache) incrementAdjustment(entity flow.Entity) flow.Entity {
 	return record
 }
 
+// All errors returned from this function are unexpected and irrecoverable.
 func (r *RecordCache) decayAdjustment(entity flow.Entity) (flow.Entity, error) {
 	record, ok := entity.(ClusterPrefixedMessagesReceivedRecord)
 	if !ok {
