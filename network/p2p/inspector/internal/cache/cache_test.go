@@ -79,9 +79,9 @@ func TestRecordCache_ConcurrentInit(t *testing.T) {
 
 	// ensure that all records are correctly initialized
 	for _, nodeID := range nodeIDs {
-		guage, found, _ := cache.Get(nodeID)
+		gauge, found, _ := cache.Get(nodeID)
 		require.True(t, found)
-		require.Zerof(t, guage, "expected all gauge values to be initialized to 0")
+		require.Zerof(t, gauge, "expected all gauge values to be initialized to 0")
 	}
 }
 
@@ -117,9 +117,9 @@ func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
 	require.Equal(t, int32(1), successGauge.Load())
 
 	// ensure that the record is correctly initialized in the cache
-	guage, found, _ := cache.Get(nodeID)
+	gauge, found, _ := cache.Get(nodeID)
 	require.True(t, found)
-	require.Zero(t, guage)
+	require.Zero(t, gauge)
 }
 
 // TestRecordCache_Update tests the Update method of the RecordCache.
@@ -137,30 +137,30 @@ func TestRecordCache_Update(t *testing.T) {
 	require.True(t, cache.Init(nodeID1))
 	require.True(t, cache.Init(nodeID2))
 
-	guage, err := cache.Update(nodeID1)
+	gauge, err := cache.Update(nodeID1)
 	require.NoError(t, err)
-	require.Equal(t, float64(1), guage)
+	require.Equal(t, float64(1), gauge)
 
 	// get will apply a slightl decay resulting
-	// in a gauge value less than guage which is 1 but greater than 0.9
+	// in a gauge value less than gauge which is 1 but greater than 0.9
 	currentGauge, ok, err := cache.Get(nodeID1)
 	require.NoError(t, err)
 	require.True(t, ok)
-	require.LessOrEqual(t, currentGauge, guage)
+	require.LessOrEqual(t, currentGauge, gauge)
 	require.Greater(t, currentGauge, 0.9999999)
 
 	// test adjusting the spam record for a non-existing node ID
 	nodeID3 := unittest.IdentifierFixture()
-	guage2, err := cache.Update(nodeID3)
+	gauge2, err := cache.Update(nodeID3)
 	require.NoError(t, err)
-	require.Equal(t, float64(1), guage2)
+	require.Equal(t, float64(1), gauge2)
 
 	// when updated the value should be incremented from 1 -> 2 and slightly decayed resulting
 	// in a gauge value less than 2 but greater than 1.9
-	guage2, err = cache.Update(nodeID3)
+	gauge2, err = cache.Update(nodeID3)
 	require.NoError(t, err)
-	require.LessOrEqual(t, guage2, 2.0)
-	require.Greater(t, guage2, 1.9)
+	require.LessOrEqual(t, gauge2, 2.0)
+	require.Greater(t, gauge2, 1.9)
 }
 
 // TestRecordCache_UpdateDecay ensures that a gauge in the record cache is eventually decayed back to 0 after some time.
@@ -171,22 +171,22 @@ func TestRecordCache_Decay(t *testing.T) {
 
 	// initialize spam records for nodeID1 and nodeID2
 	require.True(t, cache.Init(nodeID1))
-	guage, err := cache.Update(nodeID1)
-	require.Equal(t, float64(1), guage)
+	gauge, err := cache.Update(nodeID1)
+	require.Equal(t, float64(1), gauge)
 	require.NoError(t, err)
-	guage, ok, err := cache.Get(nodeID1)
+	gauge, ok, err := cache.Get(nodeID1)
 	require.True(t, ok)
 	require.NoError(t, err)
-	// guage should have been delayed slightly
-	require.True(t, guage < float64(1))
+	// gauge should have been delayed slightly
+	require.True(t, gauge < float64(1))
 
 	time.Sleep(time.Second)
 
-	guage, ok, err = cache.Get(nodeID1)
+	gauge, ok, err = cache.Get(nodeID1)
 	require.True(t, ok)
 	require.NoError(t, err)
-	// guage should have been delayed slightly, but closer to 0
-	require.Less(t, guage, 0.1)
+	// gauge should have been delayed slightly, but closer to 0
+	require.Less(t, gauge, 0.1)
 }
 
 // TestRecordCache_Identities tests the NodeIDs method of the RecordCache.
@@ -321,11 +321,11 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 
 	// ensure that the records are correctly updated in the cache
 	for _, nodeID := range nodeIDs {
-		guage, found, _ := cache.Get(nodeID)
+		gauge, found, _ := cache.Get(nodeID)
 		require.True(t, found)
 		// slight decay will result in 0.9 < gauge < 1
-		require.LessOrEqual(t, guage, 1.0)
-		require.Greater(t, guage, 0.9)
+		require.LessOrEqual(t, gauge, 1.0)
+		require.Greater(t, gauge, 0.9)
 	}
 }
 
