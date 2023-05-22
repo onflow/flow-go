@@ -35,7 +35,7 @@ func NewClusterPrefixedMessagesReceivedTracker(logger zerolog.Logger, sizeLimit 
 // Inc increments the cluster prefixed control messages received Gauge for the peer.
 // All errors returned from this callback are unexpected and irrecoverable.
 func (c *ClusterPrefixedMessagesReceivedTracker) Inc(nodeID flow.Identifier) (float64, error) {
-	count, err := c.cache.Update(nodeID)
+	count, err := c.cache.ReceivedClusterPrefixedMessage(nodeID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to increment cluster prefixed received tracker gauge value for peer %s: %w", nodeID, err)
 	}

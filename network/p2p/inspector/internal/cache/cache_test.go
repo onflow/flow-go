@@ -124,12 +124,12 @@ func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
 	require.Zero(t, gauge)
 }
 
-// TestRecordCache_Update tests the Update method of the RecordCache.
+// TestRecordCache_ReceivedClusterPrefixedMessage tests the ReceivedClusterPrefixedMessage method of the RecordCache.
 // The test covers the following scenarios:
 // 1. Updating a record gauge for an existing node ID.
-// 2. Attempting to update a record gauge  for a non-existing node ID should not result in error. Update should always attempt to initialize the gauge.
+// 2. Attempting to update a record gauge  for a non-existing node ID should not result in error. ReceivedClusterPrefixedMessage should always attempt to initialize the gauge.
 // 3. Multiple updates on the same record only initialize the record once.
-func TestRecordCache_Update(t *testing.T) {
+func TestRecordCache_ReceivedClusterPrefixedMessage(t *testing.T) {
 	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 
 	nodeID1 := unittest.IdentifierFixture()
@@ -139,7 +139,7 @@ func TestRecordCache_Update(t *testing.T) {
 	require.True(t, cache.Init(nodeID1))
 	require.True(t, cache.Init(nodeID2))
 
-	gauge, err := cache.Update(nodeID1)
+	gauge, err := cache.ReceivedClusterPrefixedMessage(nodeID1)
 	require.NoError(t, err)
 	require.Equal(t, float64(1), gauge)
 
@@ -153,13 +153,13 @@ func TestRecordCache_Update(t *testing.T) {
 
 	// test adjusting the spam record for a non-existing node ID
 	nodeID3 := unittest.IdentifierFixture()
-	gauge3, err := cache.Update(nodeID3)
+	gauge3, err := cache.ReceivedClusterPrefixedMessage(nodeID3)
 	require.NoError(t, err)
 	require.Equal(t, float64(1), gauge3)
 
 	// when updated the value should be incremented from 1 -> 2 and slightly decayed resulting
 	// in a gauge value less than 2 but greater than 1.9
-	gauge3, err = cache.Update(nodeID3)
+	gauge3, err = cache.ReceivedClusterPrefixedMessage(nodeID3)
 	require.NoError(t, err)
 	require.LessOrEqual(t, gauge3, 2.0)
 	require.Greater(t, gauge3, 1.9)
@@ -173,7 +173,7 @@ func TestRecordCache_Decay(t *testing.T) {
 
 	// initialize spam records for nodeID1 and nodeID2
 	require.True(t, cache.Init(nodeID1))
-	gauge, err := cache.Update(nodeID1)
+	gauge, err := cache.ReceivedClusterPrefixedMessage(nodeID1)
 	require.Equal(t, float64(1), gauge)
 	require.NoError(t, err)
 	gauge, ok, err := cache.Get(nodeID1)
@@ -299,7 +299,7 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 		// adjust spam records concurrently
 		go func(id flow.Identifier) {
 			defer wg.Done()
-			_, err := cache.Update(id)
+			_, err := cache.ReceivedClusterPrefixedMessage(id)
 			require.NoError(t, err)
 		}(nodeID)
 
@@ -369,7 +369,7 @@ func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 
 	// ensure that the initialized records are correctly added to the cache
 	// and removed records are correctly removed from the cache
-	require.ElementsMatch(t, nodeIDsToAdd), cache.NodeIDs())
+	require.ElementsMatch(t, nodeIDsToAdd, cache.NodeIDs())
 }
 
 // TestRecordCache_ConcurrentInitRemoveUpdate tests the concurrent initialization, removal, and adjustment of
@@ -413,7 +413,7 @@ func TestRecordCache_ConcurrentInitRemoveUpdate(t *testing.T) {
 	for _, nodeID := range nodeIDsToAdjust {
 		go func(id flow.Identifier) {
 			defer wg.Done()
-			_, _ = cache.Update(id)
+			_, _ = cache.ReceivedClusterPrefixedMessage(id)
 		}(nodeID)
 	}
 

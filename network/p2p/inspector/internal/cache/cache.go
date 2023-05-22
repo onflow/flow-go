@@ -80,7 +80,7 @@ func (r *RecordCache) Init(nodeID flow.Identifier) bool {
 	return r.c.Add(entity)
 }
 
-// Update applies an adjustment that increments the number of cluster prefixed control messages received by a peer.
+// ReceivedClusterPrefixedMessage applies an adjustment that increments the number of cluster prefixed control messages received by a peer.
 // Returns number of cluster prefix control messages received after the adjustment. The record is initialized before
 // the adjustment func is applied that will increment the Gauge.
 // Args:
@@ -88,7 +88,7 @@ func (r *RecordCache) Init(nodeID flow.Identifier) bool {
 // Returns:
 //   - The cluster prefix control messages received gauge value after the adjustment.
 //   - exception only in cases of internal data inconsistency or bugs. No errors are expected.
-func (r *RecordCache) Update(nodeID flow.Identifier) (float64, error) {
+func (r *RecordCache) ReceivedClusterPrefixedMessage(nodeID flow.Identifier) (float64, error) {
 	var err error
 	optimisticAdjustFunc := func() (flow.Entity, bool) {
 		return r.c.Adjust(nodeID, func(entity flow.Entity) flow.Entity {
