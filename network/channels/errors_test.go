@@ -27,7 +27,7 @@ func TestErrInvalidTopicRoundTrip(t *testing.T) {
 	assert.False(t, IsInvalidTopicErr(dummyErr), "IsInvalidTopicErr should return false for non-IsInvalidTopicErr error")
 }
 
-// TestErrUnknownClusterIDRoundTrip ensures correct error formatting for ErrUnknownClusterID.
+// TestErrUnknownClusterIDRoundTrip ensures correct error formatting for UnknownClusterIDErr.
 func TestErrUnknownClusterIDRoundTrip(t *testing.T) {
 	clusterId := flow.ChainID("cluster-id")
 	activeClusterIds := flow.ChainIDList{"active", "cluster", "ids"}
@@ -38,9 +38,9 @@ func TestErrUnknownClusterIDRoundTrip(t *testing.T) {
 	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
 
 	// tests the IsErrActiveClusterIDsNotSet function.
-	assert.True(t, IsErrUnknownClusterID(err), "IsErrUnknownClusterID should return true for ErrUnknownClusterID error")
+	assert.True(t, IsUnknownClusterIDErr(err), "IsUnknownClusterIDErr should return true for UnknownClusterIDErr error")
 
 	// test IsErrActiveClusterIDsNotSet with a different error type.
 	dummyErr := fmt.Errorf("dummy error")
-	assert.False(t, IsErrUnknownClusterID(dummyErr), "IsErrUnknownClusterID should return false for non-ErrUnknownClusterID error")
+	assert.False(t, IsUnknownClusterIDErr(dummyErr), "IsUnknownClusterIDErr should return false for non-UnknownClusterIDErr error")
 }

@@ -482,7 +482,7 @@ func (c *ControlMsgValidationInspector) validateTopicsSample(from peer.ID, valid
 // Expected error returns during normal operations:
 //   - channels.InvalidTopicErr: if topic is invalid.
 //   - ErrActiveClusterIdsNotSet: if the cluster ID provider is not set.
-//   - channels.ErrUnknownClusterID: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
+//   - channels.UnknownClusterIDErr: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
 //
 // This func returns an exception in case of unexpected bug or state corruption if cluster prefixed topic validation
 // fails due to unexpected error returned when getting the active cluster IDS.
@@ -509,9 +509,9 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 // Expected error returns during normal operations:
 //   - ErrActiveClusterIdsNotSet: if the cluster ID provider is not set.
 //   - channels.InvalidTopicErr: if topic is invalid.
-//   - channels.ErrUnknownClusterID: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
+//   - channels.UnknownClusterIDErr: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
 //
-// In the case where an ErrActiveClusterIdsNotSet or ErrUnknownClusterID is encountered and the cluster prefixed topic received
+// In the case where an ErrActiveClusterIdsNotSet or UnknownClusterIDErr is encountered and the cluster prefixed topic received
 // tracker for the peer is less than or equal to the configured ClusterPrefixHardThreshold an error will only be logged and not returned.
 // At the point where the hard threshold is crossed the error will be returned and the sender will start to be penalized.
 // Any errors encountered while incrementing or loading the cluster prefixed control message gauge for a peer will result in a fatal log, these
@@ -547,7 +547,7 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 
 	err = channels.IsValidFlowClusterTopic(topic, activeClusterIds)
 	if err != nil {
-		if channels.IsErrUnknownClusterID(err) {
+		if channels.IsUnknownClusterIDErr(err) {
 			// unknown cluster ID error could indicate that a node has fallen
 			// behind and needs to catchup increment to topics received cache.
 			_, incErr := c.tracker.Inc(nodeID)

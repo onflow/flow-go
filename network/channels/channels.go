@@ -359,7 +359,7 @@ func IsValidNonClusterFlowTopic(topic Topic, expectedSporkID flow.Identifier) er
 // All errors returned from this function can be considered benign.
 // Expected errors:
 // - InvalidTopicErr if the topic is not a valid Flow topic or the cluster ID cannot be derived from the topic.
-// - ErrUnknownClusterID if the cluster ID from the topic is not in the activeClusterIDS list.
+// - UnknownClusterIDErr if the cluster ID from the topic is not in the activeClusterIDS list.
 func IsValidFlowClusterTopic(topic Topic, activeClusterIDS flow.ChainIDList) error {
 	err := isValidFlowTopic(topic)
 	if err != nil {

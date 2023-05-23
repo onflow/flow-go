@@ -519,7 +519,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			require.True(t, channels.IsErrUnknownClusterID(notification.Err))
+			require.True(t, channels.IsUnknownClusterIDErr(notification.Err))
 			require.Equal(t, messageCount, notification.Count)
 			switch notification.MsgType {
 			case p2p.CtrlMsgGraft:

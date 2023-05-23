@@ -28,23 +28,23 @@ func IsInvalidTopicErr(err error) bool {
 	return errors.As(err, &e)
 }
 
-// ErrUnknownClusterID error wrapper that indicates an invalid topic with an unknown cluster ID prefix.
-type ErrUnknownClusterID struct {
+// UnknownClusterIDErr error wrapper that indicates an invalid topic with an unknown cluster ID prefix.
+type UnknownClusterIDErr struct {
 	clusterId        flow.ChainID
 	activeClusterIds flow.ChainIDList
 }
 
-func (e ErrUnknownClusterID) Error() string {
+func (e UnknownClusterIDErr) Error() string {
 	return fmt.Errorf("cluster ID %s not found in active cluster IDs list %s", e.clusterId, e.activeClusterIds).Error()
 }
 
-// NewUnknownClusterIdErr returns a new ErrUnknownClusterID
-func NewUnknownClusterIdErr(clusterId flow.ChainID, activeClusterIds flow.ChainIDList) ErrUnknownClusterID {
-	return ErrUnknownClusterID{clusterId: clusterId, activeClusterIds: activeClusterIds}
+// NewUnknownClusterIdErr returns a new UnknownClusterIDErr
+func NewUnknownClusterIdErr(clusterId flow.ChainID, activeClusterIds flow.ChainIDList) UnknownClusterIDErr {
+	return UnknownClusterIDErr{clusterId: clusterId, activeClusterIds: activeClusterIds}
 }
 
-// IsErrUnknownClusterID returns true if an error is ErrUnknownClusterID
-func IsErrUnknownClusterID(err error) bool {
-	var e ErrUnknownClusterID
+// IsUnknownClusterIDErr returns true if an error is UnknownClusterIDErr
+func IsUnknownClusterIDErr(err error) bool {
+	var e UnknownClusterIDErr
 	return errors.As(err, &e)
 }
