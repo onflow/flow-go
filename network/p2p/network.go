@@ -103,13 +103,39 @@ type NetworkParameters struct {
 	AlspCfg             *alspmgr.MisbehaviorReportManagerConfig
 }
 
-var _ network.Network = (*Network)(nil)
+type NetworkParamOption func(*NetworkParameters)
+
+func WithAlspConfig(cfg *alspmgr.MisbehaviorReportManagerConfig) NetworkParamOption {
+	return func(params *NetworkParameters) {
+		params.AlspCfg = cfg
+	}
+}
+
+type NetworkOption func(*Network)
+
+// WithAlspManager sets the misbehavior report manager for the network. It overrides the default
+// misbehavior report manager that is created from the config.
+// Note that this option is mostly used for testing purposes, do not use it in production unless you
+// know what you are doing.
+//
+// Args:
+//
+//	mgr: misbehavior report manager
+//
+// Returns:
+//
+//	NetworkOption: network option
+func WithAlspManager(mgr network.MisbehaviorReportManager) NetworkOption {
+	return func(n *Network) {
+		n.misbehaviorReportManager = mgr
+	}
+}
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
 // using the given state & cache interfaces to track volatile information.
 // csize determines the size of the cache dedicated to keep track of received messages
-func NewNetwork(param *NetworkParameters) (*Network, error) {
+func NewNetwork(param *NetworkParameters, opts ...NetworkOption) (*Network, error) {
 	mw, err := param.MiddlewareFactory()
 	if err != nil {
 		return nil, fmt.Errorf("could not create middleware: %w", err)
@@ -133,6 +159,10 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
 		misbehaviorReportManager:    misbehaviorMngr,
+	}
+
+	for _, opt := range opts {
+		opt(n)
 	}
 
 	n.mw.SetOverlay(n)
@@ -528,5 +558,5 @@ func (n *Network) Topology() flow.IdentityList {
 // Returns:
 // none
 func (n *Network) ReportMisbehaviorOnChannel(channel channels.Channel, report network.MisbehaviorReport) {
-
+	n.misbehaviorReportManager.HandleMisbehaviorReport(channel, report)
 }
