@@ -904,10 +904,10 @@ func BenchmarkBatchVerify(b *testing.B) {
 func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 	rand := getPRG(t)
 	// number of signatures to aggregate
-	sigsNum := rand.Intn(20) + 1
+	sigsNum := rand.Intn(40) + 1
 	sigs := make([]Signature, 0, sigsNum)
 
-	// number of keys
+	// number of keys (less than the number of signatures)
 	keysNum := rand.Intn(sigsNum) + 1
 	sks := make([]PrivateKey, 0, keysNum)
 	// generate the keys
@@ -983,8 +983,7 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 		valid, err := VerifyBLSSignatureManyMessages(inputPks[:0], aggSig, inputMsgs, inputKmacs)
 		assert.Error(t, err)
 		assert.True(t, IsBLSAggregateEmptyListError(err))
-		assert.False(t, valid,
-			"verification should fail with an empty key list")
+		assert.False(t, valid, "verification should fail with an empty key list")
 	})
 
 	// test inconsistent input arrays
@@ -1018,6 +1017,45 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 		assert.True(t, IsNotBLSKeyError(err))
 		assert.False(t, valid, "verification should fail with nil hasher")
 		inputPks[0] = tmpPK
+	})
+
+	t.Run("variable number of distinct keys and messages", func(t *testing.T) {
+		// use a specific PRG for easier reproduction
+		prg := getPRG(t)
+		// number of signatures to aggregate
+		N := 100
+		sigs := make([]Signature, 0, N)
+		msgs := make([][]byte, 0, N)
+		pks := make([]PublicKey, 0, N)
+		kmacs := make([]hash.Hasher, 0, N)
+		kmac := NewExpandMsgXOFKMAC128("test tag")
+		for i := 0; i < N; i++ {
+			// distinct message
+			msg := make([]byte, 20)
+			msgs = append(msgs, msg)
+			_, err := prg.Read(msg)
+			require.NoError(t, err)
+			// distinct key
+			sk := randomSK(t, prg)
+			pks = append(pks, sk.PublicKey())
+			// generate a signature
+			s, err := sk.Sign(msg, kmac)
+			require.NoError(t, err)
+			sigs = append(sigs, s)
+			kmacs = append(kmacs, kmac)
+		}
+
+		// go through all numbers of couples (msg, key)
+		for i := 1; i < N; i++ {
+			// aggregate signatures
+			var err error
+			aggSig, err = AggregateBLSSignatures(sigs[:i])
+			require.NoError(t, err)
+			// Verify the aggregated signature
+			valid, err := VerifyBLSSignatureManyMessages(pks[:i], aggSig, msgs[:i], kmacs[:i])
+			require.NoError(t, err, "verification errored with %d couples (msg,key)", i)
+			assert.True(t, valid, "verification failed with %d couples (msg,key)", i)
+		}
 	})
 }
 

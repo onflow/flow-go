@@ -1445,19 +1445,6 @@ void multi_pairing(Fp12* res, const E1 *p, const E2 *q, const int len) {
     final_exp(res_vec, res_vec);
 }
 
-// TODO: remove
-void test_pairing(const E1* h, const E1* s, const E2* pk) {
-    Fp12 e1, e2, e3;
-    e(&e1, h, pk);
-    Fp12_print_("e1", &e1);
-    e(&e2, s, BLS12_381_minus_g2);
-    Fp12_print_("e2", &e2);
-    Fp12_mult(&e3, &e2, &e1);
-    Fp12_print_("e3", &e3);
-}
-
-
-
 // This is a testing function.
 // It wraps a call to a Relic macro since cgo can't call macros.
 void xmd_sha256(byte *hash, int len_hash, byte *msg, int len_msg, byte *dst, int len_dst){

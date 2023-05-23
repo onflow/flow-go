@@ -130,7 +130,6 @@ void        Fp12_set_one(Fp12*);
 void        Fp12_inv(Fp12*); // TODO: remove
 void        Fp12_mult(Fp12*, const Fp12*, const Fp12*); // TODO: remove
 void        multi_pairing(Fp12*, const E1*, const E2*, const int);
-void        test_pairing(const E1*, const E1*, const E2*); // TODO: remove
 
 // Utility functions
 ctx_t*   relic_init_BLS12_381();
