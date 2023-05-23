@@ -89,75 +89,53 @@ int bls_verifyPerDistinctMessage(const byte* sig,
 
     int ret = UNDEFINED; // return value
     
-    ep_t* elemsG1 = (ep_t*)malloc((nb_hashes + 1) * sizeof(ep_t));
+    E1* elemsG1 = (E1*)malloc((nb_hashes + 1) * sizeof(E1));
     if (!elemsG1) goto outG1;
-    ep2_t* elemsG2 = (ep2_t*)malloc((nb_hashes + 1) * sizeof(ep2_t));
+    E2* elemsG2 = (E2*)malloc((nb_hashes + 1) * sizeof(E2));
     if (!elemsG2) goto outG2;
 
-    for (int i=0; i < nb_hashes+1; i++) {
-        ep_new(elemsG1[i]);
-        ep2_new(elemsG2[i]);
-    }
-
     // elemsG1[0] = sig
-    E1 s;
-    if (E1_read_bytes(&s, sig, SIGNATURE_LEN) != BLST_SUCCESS) {
+    if (E1_read_bytes(&elemsG1[0], sig, SIGNATURE_LEN) != BLST_SUCCESS) {
         ret = INVALID;
         goto out;
     }
 
-    // check s is in G1
-    if (!E1_in_G1(&s)) goto out;
-    ep_st* s_tmp = E1_blst_to_relic(&s);
-    ep_copy(elemsG1[0], s_tmp);
+    // check signature is in G1
+    if (!E1_in_G1(&elemsG1[0])) {
+        ret = INVALID;
+        goto out;
+    }
 
     // elemsG2[0] = -g2
-    ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded 
+    E2_copy(&elemsG2[0], BLS12_381_minus_g2); 
 
     // map all hashes to G1
     int offset = 0;
     for (int i=1; i < nb_hashes+1; i++) {
         // elemsG1[i] = h
         // hash to G1 
-        E1 h;
-        map_to_G1(&h, &hashes[offset], len_hashes[i-1]);
-        ep_st* h_tmp = (ep_st*) E1_blst_to_relic(&h);
-        ep_copy(elemsG1[i], h_tmp); 
+        map_to_G1(&elemsG1[i], &hashes[offset], len_hashes[i-1]);
         offset += len_hashes[i-1];
     }
 
     // aggregate public keys mapping to the same hash
     offset = 0;
-    E2 tmp;
     for (int i=1; i < nb_hashes+1; i++) {
         // elemsG2[i] = agg_pk[i]
-        E2_sum_vector(&tmp, &pks[offset] , pks_per_hash[i-1]);
-        ep2_st* relic_tmp = E2_blst_to_relic(&tmp);
-        ep2_copy(elemsG2[i], relic_tmp);
-        free(relic_tmp);
+        E2_sum_vector(&elemsG2[i], &pks[offset] , pks_per_hash[i-1]);
         offset += pks_per_hash[i-1];
     }
 
-    fp12_t pair;
-    fp12_new(&pair);
-    // double pairing with Optimal Ate 
-    pp_map_sim_oatep_k12(pair, (ep_t*)(elemsG1) , (ep2_t*)(elemsG2), nb_hashes+1);
-
-    // compare the result to 1
-    int cmp_res = fp12_cmp_dig(pair, 1);
-    
-    if (core_get()->code == RLC_OK) {
-        if (cmp_res == RLC_EQ) ret = VALID;
-        else ret = INVALID;
+    // multi pairing
+    Fp12 e;
+    multi_pairing(&e, elemsG1 , elemsG2, nb_hashes+1);
+    if (Fp12_is_one(&e)) {
+        ret = VALID;
     } else {
-        ret = UNDEFINED;
+        ret = INVALID;
     }
 
 out:
-    for (int i=0; i < nb_hashes+1; i++) {
-        ep_free(elemsG1[i]);
-        ep2_free(elemsG2[i]);
-    }
     free(elemsG2);
 outG2:
     free(elemsG1);
@@ -185,38 +163,29 @@ int bls_verifyPerDistinctKey(const byte* sig,
 
     int ret = UNDEFINED; // return value
     
-    ep_t* elemsG1 = (ep_t*)malloc((nb_pks + 1) * sizeof(ep_t));
+    E1* elemsG1 = (E1*)malloc((nb_pks + 1) * sizeof(E1));
     if (!elemsG1) goto outG1;
-    ep2_t* elemsG2 = (ep2_t*)malloc((nb_pks + 1) * sizeof(ep2_t));
+    E2* elemsG2 = (E2*)malloc((nb_pks + 1) * sizeof(E2));
     if (!elemsG2) goto outG2;
-    for (int i=0; i < nb_pks+1; i++) {
-        ep_new(elemsG1[i]);
-        ep2_new(elemsG2[i]);
-    }
 
     // elemsG1[0] = s
-    E1 s;
-    if (E1_read_bytes(&s, sig, SIGNATURE_LEN) != BLST_SUCCESS) {
+    if (E1_read_bytes(&elemsG1[0], sig, SIGNATURE_LEN) != BLST_SUCCESS) {
         ret = INVALID;
         goto out;
     }
 
     // check s in G1
-    if (!E1_in_G1(&s)){
+    if (!E1_in_G1(&elemsG1[0])){
         ret = INVALID;
         goto out;
-    } 
-    ep_st* s_tmp = E1_blst_to_relic(&s);
-    ep_copy(elemsG1[0], s_tmp);
+    }
 
     // elemsG2[0] = -g2
-    ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded 
+    E2_copy(&elemsG2[0], BLS12_381_minus_g2);
 
     // set the public keys
     for (int i=1; i < nb_pks+1; i++) {
-        ep2_st* tmp = E2_blst_to_relic(&pks[i-1]);
-        ep2_copy(elemsG2[i], tmp);
-        free(tmp);
+        E2_copy(&elemsG2[i], &pks[i-1]);
     }
 
     // map all hashes to G1 and aggregate the ones with the same public key
@@ -246,34 +215,21 @@ int bls_verifyPerDistinctKey(const byte* sig,
             index_offset++; 
         }
         // aggregate all the points of the array 
-        E1 sum;
-        E1_sum_vector(&sum, tmp_hashes, hashes_per_pk[i-1]);
-        ep_st* sum_tmp = E1_blst_to_relic(&sum);
-        ep_copy(elemsG1[i], sum_tmp);
+        E1_sum_vector(&elemsG1[i], tmp_hashes, hashes_per_pk[i-1]);
     }
-    for (int i=0; i<tmp_hashes_size; i++) ep_free(&tmp_hashes[i]);
     free(tmp_hashes);
 
-    fp12_t pair;
-    fp12_new(&pair);
-    // double pairing with Optimal Ate 
-    pp_map_sim_oatep_k12(pair, (ep_t*)(elemsG1) , (ep2_t*)(elemsG2), nb_pks+1);
-
-    // compare the result to 1
-    int cmp_res = fp12_cmp_dig(pair, 1);
+    // multi pairing
+    Fp12 e;
+    multi_pairing(&e, elemsG1, elemsG2, nb_pks+1);
     
-    if (core_get()->code == RLC_OK) {
-        if (cmp_res == RLC_EQ) ret = VALID;
-        else ret = INVALID;
+    if (Fp12_is_one(&e)) {
+        ret = VALID;
     } else {
-        ret = UNDEFINED;
+        ret = INVALID;
     }
 
 out:
-    for (int i=0; i < nb_pks+1; i++) {
-        ep_free(elemsG1[i]);
-        ep2_free(elemsG2[i]);
-    }
     free(elemsG2);
 outG2:
     free(elemsG1);

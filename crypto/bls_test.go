@@ -900,7 +900,7 @@ func BenchmarkBatchVerify(b *testing.B) {
 //
 // Aggregate n signatures of distinct messages under different keys,
 // and verify the aggregated signature using the multi-signature verification with
-// many message.
+// many messages.
 func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 	rand := getPRG(t)
 	// number of signatures to aggregate
