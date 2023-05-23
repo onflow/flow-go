@@ -165,7 +165,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig) (*Misbehav
 	store := queue.NewHeroStore(
 		cfg.SpamReportQueueSize,
 		lg.With().Str("component", "spam_record_queue").Logger(),
-		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory))
+		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory, cfg.NetworkType))
 
 	m.workerPool = worker.NewWorkerPoolBuilder[internal.ReportedMisbehaviorWork](
 		cfg.Logger,

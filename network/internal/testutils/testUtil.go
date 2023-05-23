@@ -260,7 +260,6 @@ func NetworkConfigFixture(
 	me.On("Address").Return(myId.Address).Maybe()
 
 	receiveCache := netcache.NewHeroReceiveCache(p2p.DefaultReceiveCacheSize, logger, metrics.NewNoopCollector())
-	cf := conduit.NewDefaultConduitFactory()
 	params := &p2p.NetworkParameters{
 		Logger:              logger,
 		Codec:               cbor.NewCodec(),
@@ -271,7 +270,7 @@ func NetworkConfigFixture(
 		Metrics:             metrics.NewNoopCollector(),
 		IdentityProvider:    id.NewFixedIdentityProvider(allIds),
 		ReceiveCache:        receiveCache,
-		ConduitFactory:      cf,
+		ConduitFactory:      conduit.NewDefaultConduitFactory(),
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  unittest.Logger(),
 			SpamRecordCacheSize:     uint32(1000),
