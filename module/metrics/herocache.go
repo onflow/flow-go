@@ -105,8 +105,12 @@ func ApplicationLayerSpamRecordCacheMetricFactory(f HeroCacheMetricsFactory, net
 	return f(namespaceNetwork, r)
 }
 
-func ApplicationLayerSpamRecordQueueMetricsFactory(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
-	return f(namespaceNetwork, ResourceNetworkingApplicationLayerSpamReportQueue)
+func ApplicationLayerSpamRecordQueueMetricsFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingApplicationLayerSpamReportQueue
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
 }
 
 func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
