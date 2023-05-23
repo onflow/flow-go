@@ -31,11 +31,10 @@ const (
 	// DefaultPruneSafetyThreshold a lower bound for prune messages, if the amount of PRUNEs in an RPC control message is below this threshold those GRAFTs validation will be bypassed.
 	DefaultPruneSafetyThreshold = .5 * DefaultPruneHardThreshold
 
-	// DefaultClusterPrefixDiscardThreshold the upper bound limit on the amount of cluster prefixed control messages allowed
-	// to be processed when the cluster IDs provider has not been set or a node is behind in the protocol state. If the number
-	// of cluster prefixed control messages in an RPC exceeds this threshold the entire RPC will be dropped and the node should
-	// be penalized.
-	DefaultClusterPrefixDiscardThreshold = 100
+	// DefaultClusterPrefixedMsgDropThreshold is the maximum number of cluster-prefixed control messages allowed to be processed
+	// when the cluster IDs provider has not been set or a node is behind in the protocol state. If the number of cluster-prefixed
+	// control messages in an RPC exceeds this threshold, the entire RPC will be dropped and the node should be penalized.
+	DefaultClusterPrefixedMsgDropThreshold = 100
 	// DefaultPruneRateLimit the rate limit for prune control messages.
 	// Currently, the default rate limit is equal to the hard threshold amount.
 	// This will result in a rate limit of 30 prunes/sec.

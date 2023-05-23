@@ -103,7 +103,7 @@ type Consumer interface {
 // IDs are removed when the current set of epoch components are stopped. The implementation must be concurrency safe and  non-blocking.
 type ClusterIDUpdateEvents interface {
 	// ClusterIdsUpdated is called when a new cluster ID update event is distributed.
-	// Any error on consuming event must handle internally.
+	// Any error encountered on consuming event must handle internally by the implementation.
 	// The implementation must be concurrency safe, but can be blocking.
 	ClusterIdsUpdated(flow.ChainIDList)
 }

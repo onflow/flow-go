@@ -18,13 +18,13 @@ type GossipSubRPCValidationInspectorConfigs struct {
 	PruneLimits map[string]int
 	// IHaveLimitsConfig IHAVE control message validation limits configuration.
 	IHaveLimitsConfig *GossipSubCtrlMsgIhaveLimitsConfig
-	// ClusterPrefixedTopicsReceivedCacheSize size of the cache used to track the amount of cluster prefixed topics received by peers.
-	ClusterPrefixedTopicsReceivedCacheSize uint32
+	// ClusterPrefixedControlMsgsReceivedCacheSize size of the cache used to track the amount of cluster prefixed topics received by peers.
+	ClusterPrefixedControlMsgsReceivedCacheSize uint32
 	// ClusterPrefixHardThreshold the upper bound on the amount of cluster prefixed control messages that will be processed
 	// before a node starts to get penalized.
 	ClusterPrefixHardThreshold float64
-	// ClusterPrefixedTopicsReceivedCacheDecay decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers.
-	ClusterPrefixedTopicsReceivedCacheDecay float64
+	// ClusterPrefixedControlMsgsReceivedCacheDecay decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers.
+	ClusterPrefixedControlMsgsReceivedCacheDecay float64
 }
 
 // GossipSubRPCMetricsInspectorConfigs rpc metrics observer inspector configuration.
@@ -71,11 +71,11 @@ func DefaultGossipSubRPCInspectorsConfig() *GossipSubRPCInspectorsConfig {
 	return &GossipSubRPCInspectorsConfig{
 		GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
 		ValidationInspectorConfigs: &GossipSubRPCValidationInspectorConfigs{
-			NumberOfWorkers:                         validation.DefaultNumberOfWorkers,
-			CacheSize:                               validation.DefaultControlMsgValidationInspectorQueueCacheSize,
-			ClusterPrefixedTopicsReceivedCacheSize:  validation.DefaultClusterPrefixedTopicsReceivedCacheSize,
-			ClusterPrefixedTopicsReceivedCacheDecay: validation.DefaultClusterPrefixedTopicsReceivedCacheDecay,
-			ClusterPrefixHardThreshold:              validation.DefaultClusterPrefixDiscardThreshold,
+			NumberOfWorkers: validation.DefaultNumberOfWorkers,
+			CacheSize:       validation.DefaultControlMsgValidationInspectorQueueCacheSize,
+			ClusterPrefixedControlMsgsReceivedCacheSize:  validation.DefaultClusterPrefixedControlMsgsReceivedCacheSize,
+			ClusterPrefixedControlMsgsReceivedCacheDecay: validation.DefaultClusterPrefixedControlMsgsReceivedCacheDecay,
+			ClusterPrefixHardThreshold:                   validation.DefaultClusterPrefixedMsgDropThreshold,
 			GraftLimits: map[string]int{
 				validation.HardThresholdMapKey:   validation.DefaultGraftHardThreshold,
 				validation.SafetyThresholdMapKey: validation.DefaultGraftSafetyThreshold,
