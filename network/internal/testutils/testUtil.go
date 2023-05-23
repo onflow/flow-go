@@ -225,8 +225,8 @@ func GenerateMiddlewares(t *testing.T,
 	return mws, idProviders
 }
 
-// NetworkFixtures generates the network for the given middlewares
-func NetworkFixtures(t *testing.T,
+// NetworksFixture generates the network for the given middlewares
+func NetworksFixture(t *testing.T,
 	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
@@ -377,7 +377,7 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []network.Network, []observable.Observable) {
 	ids, libp2pNodes, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, consumer, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks := NetworkFixtures(t, log, ids, mws, sms)
+	networks := NetworksFixture(t, log, ids, mws, sms)
 
 	return ids, libp2pNodes, mws, networks, observables
 }

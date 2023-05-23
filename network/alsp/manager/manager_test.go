@@ -123,7 +123,7 @@ func TestHandleReportedMisbehavior_Integration(t *testing.T) {
 		unittest.NetworkCodec(),
 		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
 	sms := testutils.GenerateSubscriptionManagers(t, mws)
-	networks := testutils.NetworkFixtures(
+	networks := testutils.NetworksFixture(
 		t,
 		unittest.Logger(),
 		ids,
@@ -213,7 +213,7 @@ func TestMisbehaviorReportMetrics(t *testing.T) {
 		unittest.NetworkCodec(),
 		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
 	sms := testutils.GenerateSubscriptionManagers(t, mws)
-	networks := testutils.NetworkFixtures(
+	networks := testutils.NetworksFixture(
 		t,
 		unittest.Logger(),
 		ids,
