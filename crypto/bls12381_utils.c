@@ -1189,79 +1189,41 @@ void E2_sum_vector(E2* sum, const E2* y, const int len){
 // the membership check in G2 is separated to allow optimizing multiple verifications 
 // using the same public keys.
 int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte* sig2) {  
-    ep_t elemsG1[2];
-    ep2_t elemsG2[2];
-    ep_new(elemsG1[0]);
-    ep_new(elemsG1[1]);
-    ep2_new(elemsG2[1]);
-    ep2_new(elemsG2[0]);
-    int ret = UNDEFINED;
+    E1 elemsG1[2];
+    E2 elemsG2[2];
 
     // elemsG1[0] = s1
-    E1 s;
-    if (E1_read_bytes(&s, sig1, SIGNATURE_LEN) != BLST_SUCCESS) {
-        ret = INVALID;
-        goto out;
+    if (E1_read_bytes(&elemsG1[0], sig1, G1_SER_BYTES) != BLST_SUCCESS) {
+        return INVALID;
     };
     // check s1 is in G1
-    if (!E1_in_G1(&s))  {
-        ret = INVALID;
-        goto out;
+    if (!E1_in_G1(&elemsG1[0]))  {
+        return INVALID;
     }
-    ep_st* s_tmp = E1_blst_to_relic(&s);
-    ep_copy(elemsG1[0], s_tmp);
 
     // elemsG1[1] = s2
-    if (E1_read_bytes(&s, sig2, SIGNATURE_LEN) != BLST_SUCCESS) {
-        ret = INVALID;
-        goto out;
+    if (E1_read_bytes(&elemsG1[1], sig2, G1_SER_BYTES) != BLST_SUCCESS) {
+        return INVALID;
     };
     // check s2 is in G1
-    if (!E1_in_G1(&s))  {
-        ret = INVALID;
-        goto out;
+    if (!E1_in_G1(&elemsG1[1]))  {
+        return INVALID;
     }
-    s_tmp = E1_blst_to_relic(&s);
-    ep_copy(elemsG1[1], s_tmp); 
 
     // elemsG2[1] = pk1
-    ep2_st* pk_tmp = E2_blst_to_relic(pk1);
-    ep2_copy(elemsG2[1], pk_tmp);
-
-    // elemsG2[0] = pk2
-    pk_tmp = E2_blst_to_relic(pk2);
-    ep2_copy(elemsG2[0], pk_tmp);
-    free(pk_tmp);
-    free(s_tmp);
+    E2_copy(&elemsG2[1], pk1);
 
     // elemsG2[0] = -pk2
-    ep2_neg(elemsG2[0], elemsG2[0]);
+    E2_neg(&elemsG2[0], pk2);
 
-    fp12_t pair;
-    fp12_new(&pair);
-    // double pairing with Optimal Ate 
-    pp_map_sim_oatep_k12(pair, (ep_t*)(elemsG1) , (ep2_t*)(elemsG2), 2);
+    // double pairing
+    Fp12 e;
+    multi_pairing(&e, elemsG1 , elemsG2, 2);
 
-    // compare the result to 1
-    int res = fp12_cmp_dig(pair, 1);
-    fp12_free(pair);
-
-    if (core_get()->code == RLC_OK) {
-        if (res == RLC_EQ) { 
-            ret = VALID; 
-        }
-        else { 
-            ret = INVALID; 
-        }
-        goto out; 
-    }
-
-out:
-    ep_free(elemsG1[0]);
-    ep_free(elemsG1[1]);
-    ep2_free(elemsG2[0]);
-    ep2_free(elemsG2[1]);
-    return ret;
+    if (Fp12_is_one(&e)) {
+        return VALID; 
+    } 
+    return INVALID; 
 }
 
 // Subtracts all G2 array elements `y` from an element `x` and writes the 
