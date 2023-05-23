@@ -626,8 +626,6 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 	topology network.Topology,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
-
-	cf := conduit.NewDefaultConduitFactory()
 	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
 		Logger:              builder.Logger,
 		Codec:               cborcodec.NewCodec(),
@@ -638,7 +636,7 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 		Metrics:             networkMetrics,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
-		ConduitFactory:      cf,
+		ConduitFactory:      conduit.NewDefaultConduitFactory(),
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  builder.Logger,
 			SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
