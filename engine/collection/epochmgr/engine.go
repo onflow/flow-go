@@ -457,7 +457,7 @@ func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, c
 	select {
 	case <-components.Ready():
 		e.storeEpochComponents(counter, NewRunningEpochComponents(components, cancel))
-		activeClusterIDS, err := e.activeClusterIDS()
+		activeClusterIDS, err := e.activeClusterIDs()
 		if err != nil {
 			return fmt.Errorf("failed to get active cluster IDs: %w", err)
 		}
@@ -487,7 +487,7 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 	case <-components.Done():
 		e.removeEpoch(counter)
 		e.pools.ForEpoch(counter).Clear()
-		activeClusterIDS, err := e.activeClusterIDS()
+		activeClusterIDS, err := e.activeClusterIDs()
 		if err != nil {
 			return fmt.Errorf("failed to get active cluster IDs: %w", err)
 		}
@@ -524,9 +524,9 @@ func (e *Engine) removeEpoch(counter uint64) {
 	e.mu.Unlock()
 }
 
-// activeClusterIDS returns the active canonical cluster ID's for the assigned collection clusters.
+// activeClusterIDs returns the active canonical cluster ID's for the assigned collection clusters.
 // No errors are expected during normal operation.
-func (e *Engine) activeClusterIDS() (flow.ChainIDList, error) {
+func (e *Engine) activeClusterIDs() (flow.ChainIDList, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	clusterIDs := make(flow.ChainIDList, 0)
