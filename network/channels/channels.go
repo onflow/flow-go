@@ -381,7 +381,8 @@ func IsValidFlowClusterTopic(topic Topic, activeClusterIDS flow.ChainIDList) err
 // isValidFlowTopic ensures the topic is a valid Flow network topic.
 // A valid Topic has the following properties:
 // - A Channel can be derived from the Topic and that channel exists.
-// All errors returned from this function can be considered benign.
+// Expected errors:
+// - ErrInvalidTopic if the topic is not a valid Flow topic.
 func isValidFlowTopic(topic Topic) error {
 	channel, ok := ChannelFromTopic(topic)
 	if !ok {
