@@ -158,9 +158,8 @@ func testEncodeDecodeG1CrossBLST(t *rapid.T) {
 	// check both serializations of G1 points are equal
 	if flowPass && blstPass {
 		sigFlowOutBytes := make([]byte, signatureLengthBLSBLS12381)
-		writePointG1(sigFlowOutBytes, &pointFlow)
+		writePointE1(sigFlowOutBytes, &pointFlow)
 		sigBLSTOutBytes := pointBLST.Compress()
-
 		assert.Equal(t, sigFlowOutBytes, sigBLSTOutBytes)
 	}
 }
@@ -176,10 +175,10 @@ func testEncodeDecodeG1CrossBLST(t *rapid.T) {
 //
 // The test also assumes Flow signature serialization is identical to the one in BLST.
 func testSignHashCrossBLST(t *rapid.T) {
-	// generate two private keys from the same seed
+	// decode two private keys from the same bytes
 	skBytes := rapid.Custom(validPrivateKeyBytesFlow).Example().([]byte)
-
 	skFlow, err := DecodePrivateKey(BLSBLS12381, skBytes)
+
 	require.NoError(t, err)
 	var skBLST blst.Scalar
 	res := skBLST.Deserialize(skBytes)
@@ -194,7 +193,7 @@ func testSignHashCrossBLST(t *rapid.T) {
 	sigBytesBLST := sigBLST.Compress()
 
 	skFlowBLS, ok := skFlow.(*prKeyBLSBLS12381)
-	require.True(t, ok, "incoherent key type assertion")
+	require.True(t, ok)
 	sigFlow := skFlowBLS.signWithXMDSHA256(message)
 	sigBytesFlow := sigFlow.Bytes()
 
@@ -217,6 +216,6 @@ func TestCrossBLST(t *testing.T) {
 	rapid.Check(t, testKeyGenCrossBLST)
 	rapid.Check(t, testEncodeDecodePrivateKeyCrossBLST)
 	rapid.Check(t, testEncodeDecodePublicKeyCrossBLST)
-	//rapid.Check(t, testEncodeDecodeG1CrossBLST)   // commented till G1 check is implemented
+	rapid.Check(t, testEncodeDecodeG1CrossBLST)
 	rapid.Check(t, testSignHashCrossBLST)
 }

@@ -10,6 +10,7 @@
 #include "relic.h"
 #include "blst_include.h"
 
+#define SEC_BITS  128
 #define VALID     RLC_OK
 #define INVALID   RLC_ERR
 #define UNDEFINED (((VALID&1)^1) | ((INVALID&2)^2)) // different value than RLC_OK and RLC_ERR
@@ -21,7 +22,6 @@
 #define MIN(a,b) ((a)>(b)?(b):(a))
 
 // Fields and Group serialization lengths
-#define SEC_BITS  128
 #define Fp_BITS   381
 #define Fp2_BYTES (2*Fp_BYTES)
 #define Fp_LIMBS  BITS_TO_LIMBS(Fp_BITS)
@@ -41,59 +41,22 @@
 #define G1_SER_BYTES        (G1_BYTES/(G1_SERIALIZATION+1))
 #define G2_SER_BYTES        (G2_BYTES/(G2_SERIALIZATION+1))
 
-// Subgroup membership check method
-#define EXP_ORDER 0
-#define BOWE 1
-#define MEMBERSHIP_CHECK_G1 BOWE
-#define MEMBERSHIP_CHECK_G2 EXP_ORDER
-
-
-// constants used in the optimized SWU hash to curve
-#if (hashToPoint == LOCAL_SSWU)
-    #define ELLP_Nx_LEN 12
-    #define ELLP_Dx_LEN 10
-    #define ELLP_Ny_LEN 16
-    #define ELLP_Dy_LEN 15
-#endif
-
-
-// Structure of precomputed data
-typedef struct prec_ {
-    #if (hashToPoint == LOCAL_SSWU)
-    // constants needed in optimized SSWU
-    bn_st p_3div4;
-    fp_st sqrt_z;
-    // related hardcoded constants for faster access,
-    // where a1 is the coefficient of isogenous curve E1
-    fp_st minus_a1;
-    fp_st a1z;
-    // coefficients of the isogeny map
-    fp_st iso_Nx[ELLP_Nx_LEN];
-    fp_st iso_Ny[ELLP_Ny_LEN];
-    #endif
-    #if  (MEMBERSHIP_CHECK_G1 == BOWE)
-    bn_st beta;
-    bn_st z2_1_by3;
-    #endif
-    // other field-related constants
-    bn_st p_1div2;
-    fp_t r;   // Montgomery multiplication constant
-} prec_st;
 
 // TODO: to delete when Relic is removed
-bn_st* Fr_blst_to_relic(const Fr* x);
-Fr*  Fr_relic_to_blst(const bn_st* x);
-ep2_st* E2_blst_to_relic(const E2* x);
+ep2_st*     E2_blst_to_relic(const E2* x);
+ep_st*      E1_blst_to_relic(const E1* x);
 
 int      get_valid();
 int      get_invalid();
 int      get_Fr_BYTES();
+int      get_mapToG1_input_len();
 
 // BLS based SPoCK
 int bls_spock_verify(const E2*, const byte*, const E2*, const byte*);
 
 // hash to curve functions (functions in bls12381_hashtocurve.c)
-void     map_to_G1(ep_t, const byte*, const int);
+#define MAP_TO_G1_INPUT_LEN (2*(Fp_BYTES + SEC_BITS/8))
+int     map_to_G1(E1*, const byte*, const int);
 
 // Fr utilities
 extern const Fr BLS12_381_rR;
@@ -119,31 +82,33 @@ void        Fr_write_bytes(byte *bin, const Fr* a);
 bool_t      map_bytes_to_Fr(Fr*, const byte*, int);
 
 // Fp utilities
-void    Fp_mul_montg(Fp *, const Fp *, const Fp *);
-void    Fp_squ_montg(Fp *, const Fp *);
+void        Fp_mul_montg(Fp *, const Fp *, const Fp *);
+void        Fp_squ_montg(Fp *, const Fp *);
 
 // E1 and G1 utilities
-int      ep_read_bin_compact(ep_t, const byte *, const int);
-void     ep_write_bin_compact(byte *, const ep_t,  const int);
-void     ep_mult_gen_bench(ep_t, const Fr*);
-void     ep_mult_generic_bench(ep_t, const Fr*);
-void     ep_mult(ep_t, const ep_t, const Fr*);
-void     ep_sum_vector(ep_t, ep_st*, const int);
-int      ep_sum_vector_byte(byte*, const byte*, const int);
-int      E1_in_G1(const ep_t);
-bool_t   E1_is_infty(const E1*);
-int      G1_simple_subgroup_check(const ep_t);
-void     map_bytes_to_G1(E1*, const uint8_t*, int);
-void     map_bytes_to_G1complement(E1*, const uint8_t*, int);
-#if  (MEMBERSHIP_CHECK_G1 == BOWE)
-int      bowe_subgroup_check_G1(const ep_t);
-#endif
+void        E1_copy(E1*, const E1*);
+bool_t      E1_is_equal(const E1*, const E1*);
+void        E1_set_infty(E1*);
+bool_t      E1_is_infty(const E1*);
+void        E1_to_affine(E1*, const E1*);
+bool_t      E1_affine_on_curve(const E1*);
+bool_t      E1_in_G1(const E1*);
+void        E1_mult(E1*, const E1*, const Fr*);
+void        E1_add(E1*, const E1*, const E1*);
+void        E1_neg(E1*, const E1*);
+void        E1_sum_vector(E1*, const E1*, const int);
+int         E1_sum_vector_byte(byte*, const byte*, const int);
+void        G1_mult_gen(E1*, const Fr*);
+BLST_ERROR  E1_read_bytes(E1*, const byte *,  const int); 
+void        E1_write_bytes(byte *, const E1*);
+void        unsafe_map_bytes_to_G1(E1*, const byte*, int);
+BLST_ERROR  unsafe_map_bytes_to_G1complement(E1*, const byte*, int);
 
 // E2 and G2 utilities
 void        E2_set_infty(E2* p);
 bool_t      E2_is_infty(const E2*);
 bool_t      E2_affine_on_curve(const E2*);
-bool_t      E2_is_equal(const E2* p1, const E2* p2);
+bool_t      E2_is_equal(const E2*, const E2*);
 void        E2_copy(E2*, const E2*);
 void        E2_to_affine(E2*, const E2*);
 BLST_ERROR  E2_read_bytes(E2*, const byte *,  const int); 
@@ -152,20 +117,23 @@ void        G2_mult_gen(E2*, const Fr*);
 void        E2_mult(E2*, const E2*, const Fr*);
 void        E2_mult_small_expo(E2*, const E2*, const byte);
 void        E2_add(E2* res, const E2* a, const E2* b);
+void        E2_neg(E2*, const E2*);
 void        E2_sum_vector(E2*, const E2*, const int);
 void        E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len);
 bool_t      E2_in_G2(const E2*);
-void        map_bytes_to_G2(E2*, const uint8_t*, int);
-BLST_ERROR  map_bytes_to_G2complement(E2*, const uint8_t*, int);
+void        unsafe_map_bytes_to_G2(E2*, const byte*, int);
+BLST_ERROR  unsafe_map_bytes_to_G2complement(E2*, const byte*, int);
 
 // pairing and Fp12
 bool_t      Fp12_is_one(Fp12*);
+void        Fp12_set_one(Fp12*);
+void        Fp12_inv(Fp12*); // TODO: remove
+void        Fp12_mult(Fp12*, const Fp12*, const Fp12*); // TODO: remove
 void        multi_pairing(Fp12*, const E1*, const E2*, const int);
+void        test_pairing(const E1*, const E1*, const E2*); // TODO: remove
 
 // Utility functions
 ctx_t*   relic_init_BLS12_381();
-prec_st* init_precomputed_data_BLS12_381();
-void     precomputed_data_set(const prec_st* p);
 
 // utility testing function
 void xmd_sha256(byte *, int, byte *, int, byte *, int);
@@ -173,12 +141,15 @@ void xmd_sha256(byte *, int, byte *, int, byte *, int);
 // Debugging related functions
 void     bytes_print_(char*, byte*, int);
 void     Fr_print_(char*, Fr*);
-void     Fp_print_(char*, Fp*);
+void     Fp_print_(char*, const Fp*);
 void     Fp2_print_(char*, const Fp2*);
-void     E2_print_(char*, const E2*);
+void     Fp12_print_(char*, const Fp12*);
+void     E1_print_(char*, const E1*, const int);
+void     E2_print_(char*, const E2*, const int);
 void     fp_print_(char*, fp_t);
 void     bn_print_(char*, bn_st*);
 void     ep_print_(char*, ep_st*);
 void     ep2_print_(char*, ep2_st*);
+void     fp12_print_(char* s, fp12_t p);
 
 #endif

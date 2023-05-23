@@ -16,19 +16,12 @@
 #define SK_BITS             (Fr_BITS)
 #define SK_LEN              BITS_TO_BYTES(SK_BITS)    
 
-// algorithm choice for hashing to G1 
-// both methods are similar implementations of the same optimized SSWU 
-// but offer different timings.
-#define RELIC_SSWU 1  // relic library implementation
-#define LOCAL_SSWU 2       // local implementation 
-#define hashToPoint LOCAL_SSWU
-
 // bls core (functions in bls_core.c)
 int      get_signature_len();
 int      get_pk_len();
 int      get_sk_len();  
 
-void     bls_sign(byte*, const Fr*, const byte*, const int);
+int      bls_sign(byte*, const Fr*, const byte*, const int);
 int      bls_verify(const E2*, const byte*, const byte*, const int);
 int      bls_verifyPerDistinctMessage(const byte*, const int, const byte*, const uint32_t*,
                          const uint32_t*, const E2*);

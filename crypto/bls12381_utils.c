@@ -25,6 +25,10 @@ int get_Fr_BYTES() {
     return Fr_BYTES;
 }
 
+int get_mapToG1_input_len() {
+    return MAP_TO_G1_INPUT_LEN;
+}
+
 
 // Initializes Relic context with BLS12-381 parameters
 ctx_t* relic_init_BLS12_381() { 
@@ -48,98 +52,18 @@ ctx_t* relic_init_BLS12_381() {
     ep_param_set(B12_P381);
     ep2_curve_set_twist(EP_MTYPE);  // Multiplicative twist 
     #endif 
-
     if (ret != RLC_OK) return NULL;
     return core_get();
-}
-
-// global variable of the pre-computed data
-prec_st bls_prec_st;
-prec_st* bls_prec = NULL;
-
-// required constants for the optimized SWU hash to curve
-#if (hashToPoint == LOCAL_SSWU)
-extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_LIMBS];
-extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_LIMBS];
-#endif
-
-#if (MEMBERSHIP_CHECK_G1 == BOWE)
-extern const uint64_t beta_data[Fp_LIMBS];
-extern const uint64_t z2_1_by3_data[2];
-#endif
-
-// sets the global variable to input
-void precomputed_data_set(const prec_st* p) {
-    bls_prec = (prec_st*)p;
-}
-
-// Reads a prime field element from a digit vector in big endian format.
-// There is no conversion to Montgomery domain in this function.
-#define fp_read_raw(a, data_pointer) dv_copy((a), (data_pointer), Fp_LIMBS)
-
-// pre-compute some data required for curve BLS12-381
-prec_st* init_precomputed_data_BLS12_381() {
-
-    bls_prec = &bls_prec_st;
-    ctx_t* ctx = core_get();
-
-    // (p-1)/2
-    bn_div_dig(&bls_prec->p_1div2, &ctx->prime, 2);
-    #if (hashToPoint == LOCAL_SSWU)
-    // (p-3)/4
-    bn_div_dig(&bls_prec->p_3div4, &bls_prec->p_1div2, 2);
-    // sqrt(-z)
-    fp_neg(bls_prec->sqrt_z, ctx->ep_map_u);
-    fp_srt(bls_prec->sqrt_z, bls_prec->sqrt_z);
-    // -a1 and a1*z
-    fp_neg(bls_prec->minus_a1, ctx->ep_iso.a);
-    fp_mul(bls_prec->a1z, ctx->ep_iso.a, ctx->ep_map_u);
-    
-    for (int i=0; i<ELLP_Nx_LEN; i++)  
-        fp_read_raw(bls_prec->iso_Nx[i], iso_Nx_data[i]);
-    for (int i=0; i<ELLP_Ny_LEN; i++)  
-        fp_read_raw(bls_prec->iso_Ny[i], iso_Ny_data[i]);
-    #endif
-
-    #if (MEMBERSHIP_CHECK_G1 == BOWE)
-    bn_new(&bls_prec->beta);
-    bn_read_raw(&bls_prec->beta, beta_data, Fp_LIMBS);
-    bn_new(&bls_prec->z2_1_by3);
-    bn_read_raw(&bls_prec->z2_1_by3, z2_1_by3_data, 2);
-    #endif
-
-    // Montgomery constant R
-    fp_set_dig(bls_prec->r, 1);
-    return bls_prec;
 }
 
 // ------------------- Fr utilities
 
 // Montgomery constant R related to the curve order r
 // R mod r = (1<<256)%r 
-const Fr BLS12_381_rR = { TO_LIMB_T(0x1824b159acc5056f), TO_LIMB_T(0x998c4fefecbc4ff5), \
-                          TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe), };
-
-// TODO: temp utility function to delete
-bn_st* Fr_blst_to_relic(const Fr* x) {
-    bn_st* out = (bn_st*)malloc(sizeof(bn_st)); 
-    byte* data = (byte*)malloc(Fr_BYTES);
-    be_bytes_from_limbs(data, (limb_t*)x, Fr_BYTES);
-    out->alloc = RLC_DV_DIGS;
-    bn_read_bin(out, data, Fr_BYTES);
-    free(data);
-    return out;
-}
-
-// TODO: temp utility function to delete
-Fr* Fr_relic_to_blst(const bn_st* x){
-    Fr* out = (Fr*)malloc(sizeof(Fr)); 
-    byte* data = (byte*)malloc(Fr_BYTES);
-    bn_write_bin(data, Fr_BYTES, x);   
-    Fr_read_bytes(out, data, Fr_BYTES);
-    free(data);
-    return out;
-}
+const Fr BLS12_381_rR = {{  \
+    TO_LIMB_T(0x1824b159acc5056f), TO_LIMB_T(0x998c4fefecbc4ff5), \
+    TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe), \
+    }};
 
 // returns true if a == 0 and false otherwise
 bool_t Fr_is_zero(const Fr* a) {
@@ -218,6 +142,7 @@ void Fr_inv_montg_eucl(Fr *res, const Fr *a) {
 // if base = b*R, res = b^expo * R
 // In general, res = base^expo * R^(-expo+1)
 // `expo` is encoded as a little-endian limb_t table of length `expo_len`.
+// TODO: clean up?
 void Fr_exp_montg(Fr *res, const Fr* base, const limb_t* expo, const int expo_len) {
     // mask of the most significant bit
 	const limb_t msb_mask =  (limb_t)1<<((sizeof(limb_t)<<3)-1);
@@ -338,6 +263,7 @@ void Fr_write_bytes(byte *bin, const Fr* a) {
 
 // maps big-endian bytes into an Fr element using modular reduction
 // Input is byte-big-endian, output is Fr (internally vec256)
+// TODO: check redc_mont_256(vec256 ret, const vec512 a, const vec256 p, limb_t n0);
 static void Fr_from_be_bytes(Fr* out, const byte *bytes, size_t n)
 {
     Fr digit, radix;
@@ -367,7 +293,7 @@ static void Fr_from_be_bytes(Fr* out, const byte *bytes, size_t n)
 // Reads a scalar from an array and maps it to Fr using modular reduction.
 // Input is byte-big-endian as used by the external APIs.
 // It returns true if scalar is zero and false otherwise.
-bool_t map_bytes_to_Fr(Fr* a, const uint8_t* bin, int len) {
+bool_t map_bytes_to_Fr(Fr* a, const byte* bin, int len) {
     Fr_from_be_bytes(a, bin, len);
     return Fr_is_zero(a);
 }
@@ -378,12 +304,12 @@ bool_t map_bytes_to_Fr(Fr* a, const uint8_t* bin, int len) {
 const Fp BLS12_381_pR = { ONE_MONT_P };        /* R mod p = (1<<384)%p */
 
 // sets `a` to 0
-void Fp_set_zero(Fp* a){
+static void Fp_set_zero(Fp* a){
     vec_zero((byte*)a, sizeof(Fp));
 }
 
 // sets `a` to limb `l`
-void Fp_set_limb(Fp* a, const limb_t l){
+static void Fp_set_limb(Fp* a, const limb_t l){
     vec_zero((byte*)a + sizeof(limb_t), sizeof(Fp) - sizeof(limb_t));
     *((limb_t*)a) = l;
 }
@@ -399,15 +325,25 @@ static void Fp_add(Fp *res, const Fp *a, const Fp *b) {
     add_mod_384((limb_t*)res, (limb_t*)a, (limb_t*)b, BLS12_381_P);
 }
 
-void Fp_sub(Fp *res, const Fp *a, const Fp *b) {
+static void Fp_sub(Fp *res, const Fp *a, const Fp *b) {
     sub_mod_384((limb_t*)res, (limb_t*)a, (limb_t*)b, BLS12_381_P);
 }
 
-void Fp_neg(Fp *res, const Fp *a) {
+static void Fp_neg(Fp *res, const Fp *a) {
     cneg_mod_384((limb_t*)res, (limb_t*)a, 1, BLS12_381_P);
 }
 
-static bool check_Fp(const Fp* in) {
+// checks if `a` is a quadratic residue in Fp. If yes, it computes 
+// the square root in `res`.
+// 
+// The boolean output is valid whether `a` is in Montgomery form or not,
+// since montgomery constant `R` is a quadratic residue.
+// However, the square root is valid only if `a` is in montgomery form.
+static bool_t Fp_sqrt_montg(Fp *res, const Fp* a) {
+   return sqrt_fp((limb_t*)res, (limb_t*)a);
+}
+
+static bool Fp_check(const Fp* in) {
     // use same method as in BLST internal function
     // which seems the most efficient. The method uses the assembly-based 
     // modular addition instead of limbs comparison
@@ -449,7 +385,7 @@ BLST_ERROR Fp_read_bytes(Fp* a, const byte *bin, int len) {
     }
     limbs_from_be_bytes((limb_t*)a, bin, Fp_BYTES);
     // compare read scalar to p
-    if (!check_Fp(a)) {
+    if (!Fp_check(a)) {
         return BLST_BAD_ENCODING;
     }       
     return BLST_SUCCESS;
@@ -467,7 +403,7 @@ void Fp_write_bytes(byte *bin, const Fp* a) {
 // Unlike Relic's versions, the function does not reduce the read integer modulo p and does
 // not throw an exception for an integer larger than p. The function returns RLC_OK if the input
 // corresponds to a field element, and returns RLC_ERR otherwise. 
-static int fp_read_bin_safe(fp_t a, const uint8_t *bin, int len) {
+static int fp_read_bin_safe(fp_t a, const byte *bin, int len) {
     if (len != Fp_BYTES) {
         return RLC_ERR;
     }
@@ -503,37 +439,39 @@ out:
 // 1 if y > (p - 1)/2 and 0 otherwise.
 // y is in montgomery form
 static byte Fp_get_sign(const Fp* y) {
-    return sgn0_pty_mont_384((const limb_t*)y, BLS12_381_P, p0);
+    // BLST's sgn0_pty_mont_384 requires input to be in Montg form.
+    // The needed sign bit is on position 1 !
+    return (sgn0_pty_mont_384((const limb_t*)y, BLS12_381_P, p0)>>1) & 1;
 }
 
 // ------------------- Fp^2 utilities
 
 // sets `a` to limb `l`
-void Fp2_set_limb(Fp2* a, const limb_t l){
+static void Fp2_set_limb(Fp2* a, const limb_t l){
     Fp_set_limb(&real(a), l);  
     Fp_set_zero(&imag(a));
 }
 
-void Fp2_add(Fp2 *res, const Fp2 *a, const Fp2 *b) {
+static void Fp2_add(Fp2 *res, const Fp2 *a, const Fp2 *b) {
     add_mod_384x((vec384*)res, (vec384*)a, (vec384*)b, BLS12_381_P);
 }
 
-void Fp2_sub(Fp2 *res, const Fp2 *a, const Fp2 *b) {
+static void Fp2_sub(Fp2 *res, const Fp2 *a, const Fp2 *b) {
     sub_mod_384x((vec384*)res, (vec384*)a, (vec384*)b, BLS12_381_P);
 }
 
-void Fp2_neg(Fp2 *res, const Fp2 *a) {
+static void Fp2_neg(Fp2 *res, const Fp2 *a) {
     cneg_mod_384(real(res), real(a), 1, BLS12_381_P);
     cneg_mod_384(imag(res), imag(a), 1, BLS12_381_P);
 }
 
 // res = a*b in montgomery form
-void Fp2_mul_montg(Fp2 *res, const Fp2 *a, const Fp2 *b) {
+static void Fp2_mul_montg(Fp2 *res, const Fp2 *a, const Fp2 *b) {
     mul_mont_384x((vec384*)res, (vec384*)a, (vec384*)b, BLS12_381_P, p0); 
 }
 
 // res = a^2 in montgomery form
-void Fp2_squ_montg(Fp2 *res, const Fp2 *a) {
+static void Fp2_squ_montg(Fp2 *res, const Fp2 *a) {
     sqr_mont_384x((vec384*)res, (vec384*)a, BLS12_381_P, p0); 
 }
 
@@ -543,7 +481,7 @@ void Fp2_squ_montg(Fp2 *res, const Fp2 *a) {
 // The boolean output is valid whether `a` is in Montgomery form or not,
 // since montgomery constant `R` is a quadratic residue.
 // However, the square root is valid only if `a` is in montgomery form.
-static bool_t Fp2_sqrt(Fp2 *res, const Fp2* a) {
+static bool_t Fp2_sqrt_montg(Fp2 *res, const Fp2* a) {
    return sqrt_fp2((vec384*)res, (vec384*)a);
 }
 
@@ -551,6 +489,8 @@ static bool_t Fp2_sqrt(Fp2 *res, const Fp2* a) {
 // sign(y_0) if y_1 = 0, else sign(y_1)
 // y coordinates must be in montgomery form
 static byte Fp2_get_sign(Fp2* y) {
+    // BLST's sgn0_pty_mont_384x requires input to be in Montg form.
+    // The needed sign bit is on position 1 !
     return (sgn0_pty_mont_384x((vec384*)y, BLS12_381_P, p0)>>1) & 1;
 }
 
@@ -582,44 +522,10 @@ void Fp2_write_bytes(byte *bin, const Fp2* a) {
     Fp_write_bytes(bin + Fp_BYTES, &imag(a));
 }
 
-// ------------------- G1 utilities
+// ------------------- E1 utilities
 
-// res = p
-void  E1_copy(E1* res, const E1* p) {
-    if ((uptr_t)p==(uptr_t)res) {
-        return;
-    }
-    vec_copy(res, p, sizeof(E1));
-}
-
-// check if `p` is infinity
-bool_t E1_is_infty(const E1* p) {
-    // BLST infinity points are defined by Z=0
-    return vec_is_zero(p->z, sizeof(p->z));
-}
-
-// converts an E1 point from Jacobian into affine coordinates (z=1)
-void E1_to_affine(E1* res, const E1* p) {
-    // optimization in case coordinates are already affine
-    if (vec_is_equal(p->z, BLS12_381_pR, sizeof(p->z))) {
-        E1_copy(res, p);
-        return;
-    }
-    // convert from Jacobian
-    POINTonE1_from_Jacobian((POINTonE1*)res, (const POINTonE1*)p);   
-}
-
-// ep_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
-// len is the size of the input buffer.
-//
-// The resulting point is guaranteed to be on the curve E1.
-// The serialization follows:
-// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
-// The code is a modified version of Relic ep_read_bin
-//
-// It returns RLC_OK if the inputs are valid (input buffer lengths are valid and coordinates correspond
-// to a point on curve) and the execution completes, and RLC_ERR otherwise.
-int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
+// TODO: to delete, only used by temporary E2_blst_to_relic
+static int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     // check the length
     const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
     if (len!=G1_size) {
@@ -683,81 +589,291 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     return RLC_ERR;
 }
 
-
-// TODO: delete aftet deleting ep_write_bin_compact
-static int fp_get_sign(const fp_t y) {
-    bn_t bn_y;
-    bn_new(bn_y);
-    fp_prime_back(bn_y, y);
-    return bn_cmp(bn_y, &bls_prec->p_1div2) == RLC_GT;		
+// TODO: temp utility function to delete
+ep_st* E1_blst_to_relic(const E1* x) {
+    ep_st* out = (ep_st*)malloc(sizeof(ep_st)); 
+    byte* data = (byte*)malloc(G1_SER_BYTES);
+    E1_write_bytes(data, x);
+    ep_read_bin_compact(out, data, G1_SER_BYTES);
+    free(data);
+    return out;
 }
 
-// ep_write_bin_compact exports a point a in E(Fp) to a buffer bin in a compressed or uncompressed form.
-// len is the allocated size of the buffer bin.
-// The serialization is following:
-// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
-// The code is a modified version of Relic ep_write_bin
-void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
-    const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
-
-    if (len!=G1_size) {
-        RLC_THROW(ERR_NO_BUFFER);
+void E1_copy(E1* res, const E1* p) {
+    if ((uptr_t)p == (uptr_t)res) {
         return;
     }
- 
-    if (ep_is_infty(a)) {
+    vec_copy(res, p, sizeof(E1));
+}
+
+// checks p1 == p2
+bool_t E1_is_equal(const E1* p1, const E1* p2) {
+    // `POINTonE1_is_equal` includes the infinity case
+    return POINTonE1_is_equal((const POINTonE1*)p1, (const POINTonE1*)p2);
+}
+
+// compare p to infinity
+bool_t E1_is_infty(const E1* p) {
+    // BLST infinity points are defined by Z=0
+    return vec_is_zero(p->z, sizeof(p->z));  
+}
+
+// set p to infinity
+void E1_set_infty(E1* p) {
+    // BLST infinity points are defined by Z=0
+    vec_zero(p->z, sizeof(p->z));  
+}
+
+// converts an E1 point from Jacobian into affine coordinates (z=1)
+void E1_to_affine(E1* res, const E1* p) {
+    // optimize in case coordinates are already affine
+    if (vec_is_equal(p->z, BLS12_381_pR, Fp_BYTES)) {
+        E1_copy(res, p);
+        return;
+    }
+    // convert from Jacobian
+    POINTonE1_from_Jacobian((POINTonE1*)res, (const POINTonE1*)p);   
+}
+
+// checks affine point `p` is in E1
+bool_t E1_affine_on_curve(const E1* p) {
+    // BLST's `POINTonE1_affine_on_curve` does not include the inifity case!
+    return POINTonE1_affine_on_curve((POINTonE1_affine*)p) | E1_is_infty(p);
+}
+
+// checks if input E1 point is on the subgroup G1.
+// It assumes input `p` is on E1.
+bool_t E1_in_G1(const E1* p){
+    // currently uses Scott method
+    return POINTonE1_in_G1((const POINTonE1*)p);
+}
+
+// E1_read_bytes imports a E1(Fp) point from a buffer in a compressed or uncompressed form.
+// The resulting point is guaranteed to be on curve E1 (no G1 check is included).
+// Expected serialization follows:
+// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
+//
+// returns:
+//    - BLST_BAD_ENCODING if the length is invalid or serialization header bits are invalid
+//    - BLST_BAD_SCALAR if Fp coordinates couldn't deserialize
+//    - BLST_POINT_NOT_ON_CURVE if deserialized point isn't on E1
+//    - BLST_SUCCESS if deserialization is valid 
+
+// TODO: replace with POINTonE1_Deserialize_BE and POINTonE1_Uncompress_Z, 
+//       and update logic with G2 subgroup check?
+BLST_ERROR E1_read_bytes(E1* a, const byte *bin, const int len) {
+    // check the length
+    if (len != G1_SER_BYTES) {
+        return BLST_BAD_ENCODING;
+    }
+
+    // check the compression bit
+    int compressed = bin[0] >> 7;
+    if ((compressed == 1) != (G1_SERIALIZATION == COMPRESSED)) {
+        return BLST_BAD_ENCODING;
+    } 
+
+    // check if the point in infinity
+    int is_infinity = bin[0] & 0x40;
+    if (is_infinity) {
+        // the remaining bits need to be cleared
+        if (bin[0] & 0x3F) {
+            return BLST_BAD_ENCODING;
+        }
+        for (int i=1; i<G1_SER_BYTES-1; i++) {
+            if (bin[i]) {
+                return BLST_BAD_ENCODING;
+            } 
+        }
+		E1_set_infty(a);
+		return BLST_SUCCESS;
+	} 
+
+    // read the sign bit and check for consistency
+    int y_sign = (bin[0] >> 5) & 1;
+    if (y_sign && (!compressed)) {
+        return BLST_BAD_ENCODING;
+    } 
+    
+    // use a temporary buffer to mask the header bits and read a.x
+    byte temp[Fp_BYTES];
+    memcpy(temp, bin, Fp_BYTES);
+    temp[0] &= 0x1F;        // clear the header bits
+    BLST_ERROR ret = Fp_read_bytes(&a->x, temp, sizeof(temp));
+    if (ret != BLST_SUCCESS) {
+        return ret;
+    }
+
+    // set a.z to 1
+    Fp_copy(&a->z, &BLS12_381_pR);
+
+    if (G1_SERIALIZATION == UNCOMPRESSED) {
+        ret = Fp_read_bytes(&a->y, bin + Fp_BYTES, sizeof(a->y));
+        if (ret != BLST_SUCCESS){ 
+            return ret;
+        }
+        // check read point is on curve
+        if (!E1_affine_on_curve(a)) { 
+            return BLST_POINT_NOT_ON_CURVE;
+        }
+        return BLST_SUCCESS;
+    }
+    
+    // compute the possible square root
+    Fp_to_montg(&a->x, &a->x);
+    Fp_squ_montg(&a->y, &a->x);
+    Fp_mul_montg(&a->y, &a->y, &a->x);    // x^3
+    Fp_add(&a->y, &a->y, &B_E1);          // B_E1 is already in Montg form             
+    if (!Fp_sqrt_montg(&a->y, &a->y))     // check whether x^3+b is a quadratic residue
+        return BLST_POINT_NOT_ON_CURVE; 
+
+    // resulting (x,y) is guaranteed to be on curve (y is already in Montg form)
+    if (Fp_get_sign(&a->y) != y_sign) {
+        Fp_neg(&a->y, &a->y); // flip y sign if needed
+    }
+    return BLST_SUCCESS;
+}
+
+// E1_write_bytes exports a point in E1(Fp) to a buffer in a compressed or uncompressed form.
+// It assumes buffer is of length G1_SER_BYTES
+// The serialization follows:
+// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
+void E1_write_bytes(byte *bin, const E1* a) {
+    if (E1_is_infty(a)) {
             // set the infinity bit
-            bin[0] = (G1_SERIALIZATION << 7) | (1<<6);
-            memset(bin+1, 0, G1_size-1);
+            bin[0] = (G1_SERIALIZATION << 7) | (1 << 6);
+            memset(bin+1, 0, G1_SER_BYTES-1);
             return;
     }
+    E1 tmp;
+    E1_to_affine(&tmp, a);
 
-    RLC_TRY {
-        ep_t t;
-        ep_null(t);
-        ep_new(t); 
-        ep_norm(t, a);
-        fp_write_bin(bin, Fp_BYTES, t->x);
+    Fp_from_montg(&tmp.x, &tmp.x);
+    Fp_write_bytes(bin, &tmp.x);
 
-        if (G1_SERIALIZATION == COMPRESSED) {
-            bin[0] |= (fp_get_sign(t->y) << 5);
-        } else {
-            fp_write_bin(bin + Fp_BYTES, Fp_BYTES, t->y);
-        }
-        ep_free(t);
-    } RLC_CATCH_ANY {
-        RLC_THROW(ERR_CAUGHT);
+    if (G1_SERIALIZATION == COMPRESSED) {
+        bin[0] |= (Fp_get_sign(&tmp.y) << 5);
+    } else {
+        Fp_from_montg(&tmp.y, &tmp.y);
+        Fp_write_bytes(bin + Fp_BYTES, &tmp.y);
     }
-
+    // compression bit
     bin[0] |= (G1_SERIALIZATION << 7);
- }
-
-// Exponentiation of a generic point p in G1
-void ep_mult(ep_t res, const ep_t p, const Fr *expo) {
-    bn_st* tmp_expo = Fr_blst_to_relic(expo);
-    // Using window NAF of size 2 
-    ep_mul_lwnaf(res, p, tmp_expo);
-    free(tmp_expo);
 }
 
-// Exponentiation of generator g1 in G1
-// These two function are here for bench purposes only
-void ep_mult_gen_bench(ep_t res, const Fr* expo) {
-    bn_st* tmp_expo = Fr_blst_to_relic(expo);
-    // Using precomputed table of size 4
-    ep_mul_gen(res, tmp_expo);
-    free(tmp_expo);
+// generic point addition that must handle doubling and points at infinity
+void E1_add(E1* res, const E1* a, const E1* b) {
+    POINTonE1_dadd((POINTonE1*)res, (POINTonE1*)a, (POINTonE1*)b, NULL); 
 }
 
-void ep_mult_generic_bench(ep_t res, const Fr* expo) {
-    // generic point multiplication
-    ep_mult(res, &core_get()->ep_g, expo);
+// Point negation: res = -a
+void E1_neg(E1* res, const E1* a) {
+    // TODO: optimize
+    E1_copy(res, a);
+    POINTonE1_cneg((POINTonE1*)res, 1);
+}
+
+// Exponentiation of a generic point `a` in E1, res = expo.a
+void E1_mult(E1* res, const E1* p, const Fr* expo) {
+    pow256 tmp;
+    pow256_from_Fr(tmp, expo);
+    POINTonE1_mult_glv((POINTonE1*)res, (POINTonE1*)p, tmp);
+    vec_zero(&tmp, sizeof(tmp));
+}
+
+// computes the sum of the E1 array elements `y[i]` and writes it in `sum`.
+void E1_sum_vector(E1* sum, const E1* y, const int len){
+    E1_set_infty(sum);
+    for (int i=0; i<len; i++){
+        E1_add(sum, sum, &y[i]);
+    }
+}
+
+// Computes the sum of input signatures (E1 elements) flattened in a single byte array
+// `sigs_bytes` of `sigs_len` bytes.
+// and writes the sum (E1 element) as bytes in `dest`.
+// The function does not check membership of E1 inputs in G1 subgroup.
+// The header is using byte pointers to minimize Cgo calls from the Go layer.
+int E1_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int sigs_len) {
+    int error = UNDEFINED;
+    // sanity check that `len` is multiple of `G1_SER_BYTES`
+    if (sigs_len % G1_SER_BYTES) {
+        error =  INVALID; 
+        goto mem_error;
+    }
+    int n = sigs_len/G1_SER_BYTES; // number of signatures
+    
+    E1* sigs = (E1*) malloc(n * sizeof(E1));
+    if (!sigs) goto mem_error;
+
+    // import the points from the array
+    for (int i=0; i < n; i++) {
+        // deserialize each point from the input array
+        if  (E1_read_bytes(&sigs[i], &sigs_bytes[G1_SER_BYTES*i], G1_SER_BYTES) != BLST_SUCCESS) {
+            error = INVALID; 
+            goto out;
+        }
+    }
+    // sum the points
+    E1 acc;        
+    E1_sum_vector(&acc, sigs, n);
+    // export the result
+    E1_write_bytes(dest, &acc);
+    error = VALID;
+out:
+    free(sigs);
+mem_error:
+    return error;
+}
+
+// Exponentiation of generator g1 of G1, res = expo.g1
+void G1_mult_gen(E1* res, const Fr* expo) {
+    pow256 tmp;
+    pow256_from_Fr(tmp, expo);
+    POINTonE1_mult_glv((POINTonE1*)res, &BLS12_381_G1, tmp);
+    vec_zero(&tmp, sizeof(tmp));
+}
+
+ 
+// Reads a scalar bytes and maps it to Fp using modular reduction.
+// output is in Montgomery form. 
+// `len` must be less or equal to 96 bytes and must be a multiple of 8.
+// This function is only used by `map_to_G1` where input is 64 bytes.
+// input `len` is not checked to satisfy the conditions above.
+static void map_96_bytes_to_Fp(Fp* a, const byte* bin, int len) {
+    vec768 tmp ;
+    vec_zero(&tmp, sizeof(tmp));
+    limbs_from_be_bytes((limb_t*)tmp, bin, len);
+    redc_mont_384((limb_t*)a, tmp, BLS12_381_P, p0); // aR^(-2)
+    Fp_mul_montg(a, a, (Fp*)BLS12_381_RRRR); // aR
+}
+
+// maps bytes input `hash` to G1.
+// `hash` must be `MAP_TO_G1_INPUT_LEN` (128 bytes)
+// It uses construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
+int map_to_G1(E1* h, const byte* hash, const int len) {
+    // sanity check of length
+    if (len != MAP_TO_G1_INPUT_LEN) {
+        return INVALID;
+    }
+    // map to field elements
+    Fp u[2];
+    map_96_bytes_to_Fp(&u[0], hash, MAP_TO_G1_INPUT_LEN/2);
+    map_96_bytes_to_Fp(&u[1], hash + MAP_TO_G1_INPUT_LEN/2, MAP_TO_G1_INPUT_LEN/2);
+    // map field elements to G1
+    // inputs must be in Montgomery form
+    map_to_g1((POINTonE1 *)h, (limb_t *)&u[0], (limb_t *)&u[1]);
+    return VALID;
 }
 
 // ------------------- E2 utilities
 
+const E1* BLS12_381_g1 = (const E1*)&BLS12_381_G1; /// TODO:delete
+const E2* BLS12_381_g2 = (const E2*)&BLS12_381_G2;
+const E2* BLS12_381_minus_g2 = (const E2*)&BLS12_381_NEG_G2;
+
 // TODO: to delete
-static int fp2_read_bin_safe(fp2_t a, const uint8_t *bin, int len) {
+static int fp2_read_bin_safe(fp2_t a, const byte *bin, int len) {
     if (len != Fp2_BYTES) {
         return RLC_ERR;
     }
@@ -847,11 +963,9 @@ ep2_st* E2_blst_to_relic(const E2* x) {
     return out;
 }
 
-// E2_read_bytes imports a point from a buffer in a compressed or uncompressed form.
-// The resulting point is guaranteed to be on curve E2 (no G2 check is included)
+// E2_read_bytes imports a E2(Fp^2) point from a buffer in a compressed or uncompressed form.
+// The resulting point is guaranteed to be on curve E2 (no G2 check is included).
 //
-// reads a scalar in `a` and checks it is a valid Fp element (a < p).
-// input is bytes-big-endian.
 // returns:
 //    - BLST_BAD_ENCODING if the length is invalid or serialization header bits are invalid
 //    - BLST_BAD_SCALAR if Fp^2 coordinates couldn't deserialize
@@ -885,7 +999,7 @@ BLST_ERROR E2_read_bytes(E2* a, const byte *bin, const int len) {
             } 
         }
 		E2_set_infty(a);
-		return RLC_OK;
+		return BLST_SUCCESS;
 	} 
 
     // read the sign bit and check for consistency
@@ -929,7 +1043,7 @@ BLST_ERROR E2_read_bytes(E2* a, const byte *bin, const int len) {
     Fp2_squ_montg(a_y, a_x);
     Fp2_mul_montg(a_y, a_y, a_x);
     Fp2_add(a_y, a_y, &B_E2);          // B_E2 is already in Montg form             
-    if (!Fp2_sqrt(a_y, a_y))    // check whether x^3+b is a quadratic residue
+    if (!Fp2_sqrt_montg(a_y, a_y))    // check whether x^3+b is a quadratic residue
         return BLST_POINT_NOT_ON_CURVE; 
 
     // resulting (x,y) is guaranteed to be on curve (y is already in Montg form)
@@ -939,11 +1053,10 @@ BLST_ERROR E2_read_bytes(E2* a, const byte *bin, const int len) {
     return BLST_SUCCESS;
 }
 
-// E2_write_bytes exports a point in E(Fp^2) to a buffer in a compressed or uncompressed form.
+// E2_write_bytes exports a point in E2(Fp^2) to a buffer in a compressed or uncompressed form.
 // It assumes buffer is of length G2_SER_BYTES
 // The serialization follows:
-// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
-// The code is a modified version of Relic ep2_write_bin 
+// https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
 void E2_write_bytes(byte *bin, const E2* a) {
     if (E2_is_infty(a)) {
             // set the infinity bit
@@ -985,8 +1098,7 @@ bool_t E2_is_infty(const E2* p) {
 
 // checks affine point `p` is in E2
 bool_t E2_affine_on_curve(const E2* p) {
-    // BLST's `POINTonE2_affine_on_curve` does not include the inifity case, 
-    // unlike what the function name means.
+    // BLST's `POINTonE2_affine_on_curve` does not include the infinity case!
     return POINTonE2_affine_on_curve((POINTonE2_affine*)p) | E2_is_infty(p);
 }
 
@@ -1006,7 +1118,7 @@ void  E2_copy(E2* res, const E2* p) {
 
 // converts an E2 point from Jacobian into affine coordinates (z=1)
 void E2_to_affine(E2* res, const E2* p) {
-    // optimization in case coordinates are already affine
+    // optimize in case coordinates are already affine
     if (vec_is_equal(p->z, BLS12_381_Rx.p2, sizeof(p->z))) {
         E2_copy(res, p);
         return;
@@ -1020,17 +1132,19 @@ void E2_add(E2* res, const E2* a, const E2* b) {
     POINTonE2_dadd((POINTonE2*)res, (POINTonE2*)a, (POINTonE2*)b, NULL); 
 }
 
-// Point negation in place.
-// no need for an api of the form E2_neg(E2* res, const E2* a) for now
-static void E2_neg(E2* a) {
-    POINTonE2_cneg((POINTonE2*)a, 1);
+// Point negation: res = -a
+void E2_neg(E2* res, const E2* a) {
+    // TODO: optimize
+    E2_copy(res, a);
+    POINTonE2_cneg((POINTonE2*)res, 1);
 }
 
 // Exponentiation of a generic point `a` in E2, res = expo.a
 void E2_mult(E2* res, const E2* p, const Fr* expo) {
     pow256 tmp;
     pow256_from_Fr(tmp, expo);
-    POINTonE2_sign((POINTonE2*)res, (POINTonE2*)p, tmp);
+    POINTonE2_mult_gls((POINTonE2*)res, (POINTonE2*)p, tmp);
+    vec_zero(&tmp, sizeof(tmp)); 
 }
 
 // Exponentiation of a generic point `a` in E2 by a byte exponent.
@@ -1039,14 +1153,16 @@ void  E2_mult_small_expo(E2* res, const E2* p, const byte expo) {
     vec_zero(&pow_expo, sizeof(pow256)); 
     pow_expo[0] = expo; // `pow256` uses bytes little endian.
     // TODO: to bench against a specific version of mult with 8 bits expo
-    POINTonE2_sign((POINTonE2*)res, (POINTonE2*)p, pow_expo);
+    POINTonE2_mult_gls((POINTonE2*)res, (POINTonE2*)p, pow_expo);
+    pow_expo[0] = 0;
 }
 
 // Exponentiation of generator g2 of G2, res = expo.g2
 void G2_mult_gen(E2* res, const Fr* expo) {
     pow256 tmp;
     pow256_from_Fr(tmp, expo);
-    POINTonE2_sign((POINTonE2*)res, &BLS12_381_G2, tmp);
+    POINTonE2_mult_gls((POINTonE2*)res, (POINTonE2*)BLS12_381_g2, tmp);
+    vec_zero(&tmp, sizeof(tmp));
 }
 
 // checks if input E2 point is on the subgroup G2.
@@ -1056,11 +1172,11 @@ bool_t E2_in_G2(const E2* p){
     return POINTonE2_in_G2((const POINTonE2*)p);
 }
 
-// computes the sum of the G2 array elements y and writes the sum in jointy
-void E2_sum_vector(E2* jointy, const E2* y, const int len){
-    E2_set_infty(jointy);
+// computes the sum of the E2 array elements `y[i]` and writes it in `sum`
+void E2_sum_vector(E2* sum, const E2* y, const int len){
+    E2_set_infty(sum);
     for (int i=0; i<len; i++){
-        E2_add(jointy, jointy, &y[i]);
+        E2_add(sum, sum, &y[i]);
     }
 }
 
@@ -1075,37 +1191,48 @@ void E2_sum_vector(E2* jointy, const E2* y, const int len){
 int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte* sig2) {  
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
+    ep_new(elemsG1[0]);
+    ep_new(elemsG1[1]);
+    ep2_new(elemsG2[1]);
+    ep2_new(elemsG2[0]);
+    int ret = UNDEFINED;
 
     // elemsG1[0] = s1
-    ep_new(elemsG1[0]);
-    int read_ret = ep_read_bin_compact(elemsG1[0], sig1, SIGNATURE_LEN);
-    if (read_ret != RLC_OK) 
-        return read_ret;
-
+    E1 s;
+    if (E1_read_bytes(&s, sig1, SIGNATURE_LEN) != BLST_SUCCESS) {
+        ret = INVALID;
+        goto out;
+    };
     // check s1 is in G1
-    if (E1_in_G1(elemsG1[0]) != VALID) 
-        return INVALID;
+    if (!E1_in_G1(&s))  {
+        ret = INVALID;
+        goto out;
+    }
+    ep_st* s_tmp = E1_blst_to_relic(&s);
+    ep_copy(elemsG1[0], s_tmp);
 
     // elemsG1[1] = s2
-    ep_new(elemsG1[1]);
-    read_ret = ep_read_bin_compact(elemsG1[1], sig2, SIGNATURE_LEN);
-    if (read_ret != RLC_OK) 
-        return read_ret;
-
-    // check s2 in G1
-    if (E1_in_G1(elemsG1[1]) != VALID) 
-        return INVALID; 
+    if (E1_read_bytes(&s, sig2, SIGNATURE_LEN) != BLST_SUCCESS) {
+        ret = INVALID;
+        goto out;
+    };
+    // check s2 is in G1
+    if (!E1_in_G1(&s))  {
+        ret = INVALID;
+        goto out;
+    }
+    s_tmp = E1_blst_to_relic(&s);
+    ep_copy(elemsG1[1], s_tmp); 
 
     // elemsG2[1] = pk1
-    ep2_new(elemsG2[1]);
-    ep2_st* tmp = E2_blst_to_relic(pk1);
-    ep2_copy(elemsG2[1], tmp);
+    ep2_st* pk_tmp = E2_blst_to_relic(pk1);
+    ep2_copy(elemsG2[1], pk_tmp);
 
     // elemsG2[0] = pk2
-    ep2_new(elemsG2[0]);
-    tmp = E2_blst_to_relic(pk2);
-    ep2_copy(elemsG2[0], tmp);
-    free(tmp);
+    pk_tmp = E2_blst_to_relic(pk2);
+    ep2_copy(elemsG2[0], pk_tmp);
+    free(pk_tmp);
+    free(s_tmp);
 
     // elemsG2[0] = -pk2
     ep2_neg(elemsG2[0], elemsG2[0]);
@@ -1117,184 +1244,78 @@ int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte*
 
     // compare the result to 1
     int res = fp12_cmp_dig(pair, 1);
+    fp12_free(pair);
 
-    fp12_free(&one);
+    if (core_get()->code == RLC_OK) {
+        if (res == RLC_EQ) { 
+            ret = VALID; 
+        }
+        else { 
+            ret = INVALID; 
+        }
+        goto out; 
+    }
+
+out:
     ep_free(elemsG1[0]);
     ep_free(elemsG1[1]);
     ep2_free(elemsG2[0]);
     ep2_free(elemsG2[1]);
-    
-    if (core_get()->code == RLC_OK) {
-        if (res == RLC_EQ) return VALID;
-        return INVALID;
-    }
-    return UNDEFINED;
+    return ret;
 }
 
 // Subtracts all G2 array elements `y` from an element `x` and writes the 
 // result in res
 void E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len){
     E2_sum_vector(res, y, len);
-    E2_neg(res);
+    E2_neg(res, res);
     E2_add(res, x, res);
 }
 
-// computes the sum of the G1 array elements y and writes the sum in jointy
-void ep_sum_vector(ep_t jointx, ep_st* x, const int len) {
-    ep_set_infty(jointx);
-    for (int i=0; i<len; i++){
-        ep_add_jacob(jointx, jointx, &x[i]);
-    }
-}
 
-// Computes the sum of the signatures (G1 elements) flattened in a single sigs array
-// and writes the sum (G1 element) as bytes in dest.
-// The function assumes sigs is correctly allocated with regards to len.
-int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
-    int error = UNDEFINED;
-
-    // temp variables
-    ep_t acc;        
-    ep_new(acc);
-    ep_set_infty(acc);
-    ep_st* sigs = (ep_st*) malloc(len * sizeof(ep_st));
-    if (!sigs) goto mem_error;
-    for (int i=0; i < len; i++) ep_new(sigs[i]);
-
-    // import the points from the array
-    for (int i=0; i < len; i++) {
-        // deserialize each point from the input array
-        error = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
-        if (error != RLC_OK) {
-            goto out;
-        }
-    }
-    // sum the points
-    ep_sum_vector(acc, sigs, len);
-    // export the result
-    ep_write_bin_compact(dest, acc, SIGNATURE_LEN);
-
-    error = VALID;
-out:
-    // free the temp memory
-    ep_free(acc);
-    for (int i=0; i < len; i++) ep_free(sigs[i]);
-    free(sigs);
-mem_error:
-    return error;
-}
-
-// uses a simple scalar multiplication by G1's order
-// to check whether a point on the curve E1 is in G1.
-int G1_simple_subgroup_check(const ep_t p){
-    ep_t inf;
-    ep_new(inf);
-    // check p^order == infinity
-    // use basic double & add as lwnaf reduces the expo modulo r
-    ep_mul_basic(inf, p, &core_get()->ep_r);
-    if (!ep_is_infty(inf)){
-        ep_free(inf);
-        return INVALID;
-    }
-    ep_free(inf);
-    return VALID;
-}
-
-#if (MEMBERSHIP_CHECK_G1 == BOWE)
-// beta such that beta^3 == 1 mod p
-// beta is in the Montgomery form
-const uint64_t beta_data[Fp_LIMBS] = { 
-    0xcd03c9e48671f071, 0x5dab22461fcda5d2, 0x587042afd3851b95,
-    0x8eb60ebe01bacb9e, 0x03f97d6e83d050d2, 0x18f0206554638741,
-};
-
-
-// (z^2-1)/3 with z being the parameter of bls12-381
-const uint64_t z2_1_by3_data[2] = { 
-    0x0000000055555555, 0x396c8c005555e156  
-};
-
-// uses Bowe's check from section 3.2 from https://eprint.iacr.org/2019/814.pdf
-// to check whether a point on the curve E1 is in G1.
-int bowe_subgroup_check_G1(const ep_t p){
-    if (ep_is_infty(p) == 1) 
-        return VALID;
-    fp_t b;
-    dv_copy(b, beta_data, Fp_LIMBS); 
-    ep_t sigma, sigma2, p_inv;
-    ep_new(sigma);
-    ep_new(sigma2);
-    ep_new(p_inv);
-
-    // si(p) 
-    ep_copy(sigma, p);
-    fp_mul(sigma[0].x, sigma[0].x, b);
-    // -si^2(p)
-    ep_copy(sigma2, sigma);
-    fp_mul(sigma2[0].x, sigma2[0].x, b);
-    fp_neg(sigma2[0].y, sigma2[0].y);
-    ep_dbl(sigma, sigma);
-    // -p
-    ep_copy(p_inv, p);
-    fp_neg(p_inv[0].y, p_inv[0].y);
-    // (z^2-1)/3 (2*si(p) - p - si^2(p)) - si^2(p)
-    ep_add(sigma, sigma, p_inv);
-    ep_add(sigma, sigma, sigma2);
-    // TODO: multiplication using a chain?
-    ep_mul_lwnaf(sigma, sigma, &bls_prec->z2_1_by3);
-    ep_add(sigma, sigma, sigma2);
-    
-    ep_free(sigma2);
-    ep_free(p_inv);
-    // check result against infinity
-    if (!ep_is_infty(sigma)){
-        ep_free(sigma);
-        return INVALID;
-    }
-    ep_free(sigma);
-    return VALID;
-}
-#endif
-
-/*
-// maps the bytes to a point in G1
+// maps the bytes to a point in G1.
+// `len` should be at least Fr_BYTES.
 // this is a testing file only, should not be used in any protocol!
-void map_bytes_to_G1(ep_t p, const uint8_t* bytes, int len) {
+void unsafe_map_bytes_to_G1(E1* p, const byte* bytes, int len) {
+    assert(len >= Fr_BYTES);
     // map to Fr
     Fr log;
     map_bytes_to_Fr(&log, bytes, len);
     // multiplies G1 generator by a random scalar
-
-    
+    G1_mult_gen(p, &log);
 }
 
 // generates a point in E1\G1 and stores it in p
 // this is a testing file only, should not be used in any protocol!
-void map_bytes_to_G1complement(ep_t p, const uint8_t* bytes, int len) {
-    // generate a random point in E1
-    p->coord = BASIC;
-    fp_set_dig(p->z, 1);
-    do {
-        fp_rand(p->x); // set x to a random field element
-        byte r;
-        rand_bytes(&r, 1);
-        fp_zero(p->y);
-        fp_set_bit(p->y, 0, r&1); // set y randomly to 0 or 1
+BLST_ERROR unsafe_map_bytes_to_G1complement(E1* p, const byte* bytes, int len) {
+    assert(G1_SERIALIZATION == COMPRESSED);
+    assert(len >= G1_SER_BYTES);
+
+    // attempt to deserilize a compressed E1 point from input bytes
+    // after fixing the header 2 bits
+    byte copy[G1_SER_BYTES];
+    memcpy(copy, bytes, sizeof(copy));
+    copy[0] |= 1<<7;        // set compression bit
+    copy[0] &= ~(1<<6);     // clear infinity bit - point is not infinity
+
+    BLST_ERROR ser = E1_read_bytes(p, copy, G1_SER_BYTES);
+    if (ser != BLST_SUCCESS) {
+        return ser;
     }
-    while (ep_upk(p, p) == 0); // make sure p is in E1
 
-    // map the point to E1\G1 by clearing G1 order
-    ep_mul_basic(p, p, &core_get()->ep_r);
+    // map the point to E2\G2 by clearing G2 order
+    E1_mult(p, p, (const Fr*)BLS12_381_r);
+    E1_to_affine(p, p);
 
-    assert(ep_on_curve(p));  // sanity check to make sure p is in E1
+    assert(E1_affine_on_curve(p));  // sanity check to make sure p is in E2
+    return BLST_SUCCESS;
 }
-*/
 
 // maps the bytes to a point in G2.
 // `len` should be at least Fr_BYTES.
 // this is a testing tool only, it should not be used in any protocol!
-void map_bytes_to_G2(E2* p, const uint8_t* bytes, int len) {
-    assert(len > Fr_BYTES);
+void unsafe_map_bytes_to_G2(E2* p, const byte* bytes, int len) {
+    assert(len >= Fr_BYTES);
     // map to Fr
     Fr log;
     map_bytes_to_Fr(&log, bytes, len);
@@ -1307,7 +1328,7 @@ void map_bytes_to_G2(E2* p, const uint8_t* bytes, int len) {
 // succeeds.
 // For now, function only works when E2 serialization is compressed.
 // this is a testing tool only, it should not be used in any protocol!
-BLST_ERROR map_bytes_to_G2complement(E2* p, const uint8_t* bytes, int len) {
+BLST_ERROR unsafe_map_bytes_to_G2complement(E2* p, const byte* bytes, int len) {
     assert(G2_SERIALIZATION == COMPRESSED);
     assert(len >= G2_SER_BYTES);
 
@@ -1318,13 +1339,14 @@ BLST_ERROR map_bytes_to_G2complement(E2* p, const uint8_t* bytes, int len) {
     copy[0] |= 1<<7;        // set compression bit
     copy[0] &= ~(1<<6);     // clear infinity bit - point is not infinity
 
-    BLST_ERROR ser = E2_read_bytes(p, copy, len);
+    BLST_ERROR ser = E2_read_bytes(p, copy, G2_SER_BYTES);
     if (ser != BLST_SUCCESS) {
         return ser;
     }
 
     // map the point to E2\G2 by clearing G2 order
     E2_mult(p, p, (const Fr*)BLS12_381_r);
+    E2_to_affine(p, p);
 
     assert(E2_affine_on_curve(p));  // sanity check to make sure p is in E2
     return BLST_SUCCESS;
@@ -1333,13 +1355,32 @@ BLST_ERROR map_bytes_to_G2complement(E2* p, const uint8_t* bytes, int len) {
 // ------------------- Pairing utilities 
 
 bool_t Fp12_is_one(Fp12 *a) {
-    return vec_is_equal(a[0][0], BLS12_381_Rx.p2, sizeof(a[0][0])) &
-           vec_is_zero(a[0][1], sizeof(a) - sizeof(a[0][0]));
+    //return vec_is_equal(a[0][0], BLS12_381_Rx.p2, sizeof(a[0][0])) &
+    //       vec_is_zero(a[0][1], sizeof(a) - sizeof(a[0][0]));
+    return vec_is_equal(a, BLS12_381_Rx.p12, sizeof(Fp12));
 }
 
-static void Fp12_set_one(Fp12 *a) {
-    vec_copy(a[0][0], BLS12_381_Rx.p2, sizeof(a[0][0]));
-    vec_zero(a[0][1], sizeof(a) - sizeof(a[0][0]));
+void Fp12_set_one(Fp12 *a) {
+    vec_copy(a, BLS12_381_Rx.p12, sizeof(Fp12));
+    //vec_copy(a[0][0], BLS12_381_Rx.p2, sizeof(a[0][0]));
+    //vec_zero(a[0][1], sizeof(a) - sizeof(a[0][0]));
+}
+
+// TODO: remove
+void Fp12_inv(Fp12 *a) {
+    conjugate_fp12((vec384fp6*)a);
+}
+
+// TODO: remove
+void Fp12_mult(Fp12* ret, const Fp12* a, const Fp12* b){
+    mul_fp12((vec384fp6*)ret, (vec384fp6*)a, (vec384fp6*)b);
+}
+
+static void e(Fp12* res, const E1* p, const E2* q) {
+    E1 p_aff; E1_to_affine(&p_aff, p); 
+    E2 q_aff; E2_to_affine(&q_aff, q);
+    miller_loop_n((vec384fp6*)res, (POINTonE2_affine*)&q_aff, (POINTonE1_affine*)&p_aff, 1);
+    final_exp((vec384fp6*)res, (vec384fp6*)res);
 }
 
 // computes e(p[0], q[0]) * ... * e(q[len-1], q[len-1]) 
@@ -1348,34 +1389,37 @@ static void Fp12_set_one(Fp12 *a) {
 // It assumes `p` and `q` are correctly initialized and all 
 // p[i] and q[i] are respectively on G1 and G2 (it does not
 // check their memberships).
-void multi_pairing(Fp12 *res, const E1 *p, const E2 *q, const int len) {
+void multi_pairing(Fp12* res, const E1 *p, const E2 *q, const int len) {
+    // easier access pointer
+    vec384fp6* res_vec = (vec384fp6*)res;
     // N_MAX is defined within BLST. It should represent a good tradeoff of the max number
     // of miller loops to be batched in one call to `miller_loop_n`.
-    E1 p_[N_MAX];
-    E2 q_[N_MAX];
-    int n = 0; // the number of couples (p,q) held p_ and q_
+    // miller_loop_n expects an array of `POINTonEx_affine`.
+    POINTonE1_affine p_aff[N_MAX];
+    POINTonE2_affine q_aff[N_MAX];
+    int n = 0; // the number of couples (p,q) held in p_aff and q_aff
     int init_flag = 0;
-
-    // easier access pointers
-    vec384fp6* res_vec = (vec384fp6*)res;
-    POINTonE1_affine* p_POINT =  (POINTonE1_affine*)p_;
-    POINTonE2_affine* q_POINT =  (POINTonE2_affine*)q_;
-
 
     for (int i=0; i<len; i++) {
         if (E1_is_infty(p + i) || E2_is_infty(q + i)) {
             continue;
         }
-        // `miller_loop_n` expects affine coordinates
-        E1_to_affine(p_ + i, p + i); E2_to_affine(q_ + i, q + i);
+        // `miller_loop_n` expects affine coordinates in a `POINTonEx_affine` array.
+        // `POINTonEx_affine` has a different size than `POINTonEx` or `Ex` ! 
+        E1 tmp1; 
+        E1_to_affine(&tmp1, p + i); 
+        vec_copy(p_aff + n, &tmp1, sizeof(POINTonE1_affine));
+        E2 tmp2; 
+        E2_to_affine(&tmp2, q + i); 
+        vec_copy(q_aff + n, &tmp2, sizeof(POINTonE2_affine));
         n++;
-        if (n==N_MAX) {  // if p_ and q_ are filled batch `N_MAX` miller loops
+        if (n==N_MAX) {  // if p_ and q_ are filled, batch `N_MAX` miller loops
             if (!init_flag) {
-                miller_loop_n(res_vec, q_POINT, p_POINT, N_MAX); 
+                miller_loop_n(res_vec, q_aff, p_aff, N_MAX); 
                 init_flag = 1;
             } else {
                 vec384fp12 tmp;
-                miller_loop_n(tmp, q_POINT, p_POINT, N_MAX);
+                miller_loop_n(tmp, q_aff, p_aff, N_MAX);
                 mul_fp12(res_vec, res_vec, tmp);
             }
             n = 0;
@@ -1385,21 +1429,31 @@ void multi_pairing(Fp12 *res, const E1 *p, const E2 *q, const int len) {
     // remaining couples are also batched in `n` miller loops
     if (n > 0) {
         if (!init_flag) {
-            miller_loop_n(res_vec, q_POINT, p_POINT, n); 
+            miller_loop_n(res_vec, q_aff, p_aff, n);
             init_flag = 1;
         } else {
             vec384fp12 tmp;
-            miller_loop_n(tmp, q_POINT, p_POINT, n);
+            miller_loop_n(tmp, q_aff, p_aff, n);
             mul_fp12(res_vec, res_vec, tmp);
         } 
-    }
+    }   
 
     // check if no miller loop was computed
     if (!init_flag) {
         Fp12_set_one(res);
     }
-
     final_exp(res_vec, res_vec);
+}
+
+// TODO: remove
+void test_pairing(const E1* h, const E1* s, const E2* pk) {
+    Fp12 e1, e2, e3;
+    e(&e1, h, pk);
+    Fp12_print_("e1", &e1);
+    e(&e2, s, BLS12_381_minus_g2);
+    Fp12_print_("e2", &e2);
+    Fp12_mult(&e3, &e2, &e1);
+    Fp12_print_("e3", &e3);
 }
 
 
@@ -1412,49 +1466,66 @@ void xmd_sha256(byte *hash, int len_hash, byte *msg, int len_msg, byte *dst, int
 
 
 // DEBUG printing functions 
+#define DEBUG 1
+#if DEBUG==1
 void bytes_print_(char* s, byte* data, int len) {
-    printf("[%s]:\n", s);
+    if (strlen(s)) printf("[%s]:\n", s);
     for (int i=0; i<len; i++) 
-        printf("%02x,", data[i]);
+        printf("%02X,", data[i]);
     printf("\n");
 }
 
 void Fr_print_(char* s, Fr* a) {
-    printf("[%s]:\n", s);
+    if (strlen(s)) printf("[%s]:\n", s);
     limb_t* p = (limb_t*)(a) + Fr_LIMBS;
     for (int i=0; i<Fr_LIMBS; i++) 
-        printf("%16llx", *(--p));
+        printf("%016llX", *(--p));
     printf("\n");
 }
 
-void Fp_print_(char* s, Fp* a) {
-    printf("[%s]:\n", s);
-    limb_t* p = (limb_t*)(a) + Fp_LIMBS;
+void Fp_print_(char* s, const Fp* a) {
+    if (strlen(s)) printf("[%s]:\n", s);
+    Fp tmp;
+    Fp_from_montg(&tmp, a);
+    limb_t* p = (limb_t*)(&tmp) + Fp_LIMBS;
     for (int i=0; i<Fp_LIMBS; i++) 
-        printf("%16llx", *(--p));
+        printf("%016llX ", *(--p));
     printf("\n");
 }
 
 void Fp2_print_(char* s, const Fp2* a) {
-    printf("[%s]:\n", s);
-    Fp tmp;
-    Fp_from_montg(&tmp, &real(a));
-    limb_t* p = (limb_t*)(&tmp) + Fp_LIMBS;
-    for (int i=0; i<Fp_LIMBS; i++) 
-        printf("%16llx", *(--p));
-    printf("\n");
-    Fp_from_montg(&tmp, &imag(a));
-    p = (limb_t*)(&tmp) + Fp_LIMBS;
-    for (int i=0; i<Fp_LIMBS; i++) 
-        printf("%16llx", *(--p));
-    printf("\n");
+    if (strlen(s)) printf("[%s]:\n", s);
+    Fp_print_("", &real(a));
+    Fp_print_("", &imag(a));
 }
 
-void E2_print_(char* s, const E2* a) {
-      printf("[%s]:\n", s);
-      Fp2_print_(".x", &(a->x));
-      Fp2_print_(".y", &(a->y));
-      Fp2_print_(".z", &(a->z));
+void Fp12_print_(char* s, const Fp12* a) {
+    if (strlen(s)) printf("[%s]:\n", s);
+    for (int i=0; i<2; i++) {
+        vec384fp6* a_ = (vec384fp6*)a + i;
+        for (int j=0; j<3; j++) {
+            vec384fp2* a__ = (vec384fp2*)a_ + j;
+            Fp2_print_("", a__);
+        }
+    }
+}
+
+void E1_print_(char* s, const E1* p, const int jacob) {
+    E1 a; E1_copy(&a, p);
+    if (!jacob) E1_to_affine(&a, &a);
+    if (strlen(s))  printf("[%s]:\n", s);
+    Fp_print_(".x", &(a.x));
+    Fp_print_(".y", &(a.y));
+    if (jacob) Fp_print_(".z", &(a.z));
+}
+
+void E2_print_(char* s, const E2* p, const int jacob) {
+    E2 a; E2_copy(&a, p);
+    if (strlen(s)) if (!jacob) E2_to_affine(&a, &a);
+    printf("[%s]:\n", s);
+    Fp2_print_("", &(a.x));
+    Fp2_print_("", &(a.y));
+    if (jacob) Fp2_print_("", &(a.z));
 }
  
 
@@ -1463,6 +1534,11 @@ void fp_print_(char* s, fp_st a) {
     fp_write_str(str, 100, a, 16);
     printf("[%s]:\n%s\n", s, str);
     free(str);
+}
+
+void fp12_print_(char* s, fp12_t p) {
+    printf("[%s]:\n", s);
+    fp12_print(p);
 }
 
 void bn_print_(char* s, bn_st *a) {
@@ -1481,3 +1557,4 @@ void ep2_print_(char* s, ep2_st* p) {
     printf("[%s]:\n", s);
     g2_print(p);
 }
+#endif

@@ -115,10 +115,10 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 	aggregatedSig := make([]byte, signatureLengthBLSBLS12381)
 
 	// add the points in the C layer
-	result := C.ep_sum_vector_byte(
+	result := C.E1_sum_vector_byte(
 		(*C.uchar)(&aggregatedSig[0]),
 		(*C.uchar)(&flatSigs[0]),
-		(C.int)(len(sigs)))
+		(C.int)(len(flatSigs)))
 
 	switch result {
 	case valid:
