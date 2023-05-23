@@ -282,7 +282,8 @@ func ChannelFromTopic(topic Topic) (Channel, bool) {
 //
 //	channel/spork_id
 //
-// All errors returned from this function can be considered benign.
+// A generic error is returned if an error is encountered while converting the spork ID to flow Identifier or
+// the spork ID is missing.
 func sporkIdFromTopic(topic Topic) (flow.Identifier, error) {
 	if index := strings.LastIndex(topic.String(), "/"); index != -1 {
 		id, err := flow.HexStringToIdentifier(string(topic)[index+1:])
@@ -300,7 +301,7 @@ func sporkIdFromTopic(topic Topic) (flow.Identifier, error) {
 //
 //	channel/spork_id
 //
-// All errors returned from this function can be considered benign.
+// A generic error is returned if an error is encountered while deriving the spork ID from the topic
 func sporkIdStrFromTopic(topic Topic) (string, error) {
 	sporkId, err := sporkIdFromTopic(topic)
 	if err != nil {
@@ -314,7 +315,7 @@ func sporkIdStrFromTopic(topic Topic) (string, error) {
 //
 //	sync-cluster/some_cluster_id
 //
-// All errors returned from this function can be considered benign.
+// A generic error is returned if the topic is malformed.
 func clusterIDStrFromTopic(topic Topic) (flow.ChainID, error) {
 	for prefix := range clusterChannelPrefixRoleMap {
 		if strings.HasPrefix(topic.String(), prefix) {
@@ -338,7 +339,8 @@ func SyncCluster(clusterID flow.ChainID) Channel {
 
 // IsValidNonClusterFlowTopic ensures the topic is a valid Flow network topic and
 // ensures the sporkID part of the Topic is equal to the current network sporkID.
-// All errors returned from this function can be considered benign.
+// Expected errors:
+// - ErrInvalidTopic if the topic is not a if the topic is not a valid topic for the given spork.
 func IsValidNonClusterFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
 	sporkID, err := sporkIdStrFromTopic(topic)
 	if err != nil {
