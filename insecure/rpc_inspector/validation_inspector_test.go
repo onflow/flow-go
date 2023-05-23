@@ -97,7 +97,7 @@ func TestValidationInspector_HardThreshold_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
-	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
+	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	hardThreshold := uint64(10)
 	// create our RPC validation inspector
 	inspectorConfig := internal.DefaultRPCValidationConfig()
@@ -305,13 +305,13 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
-	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
+	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
 	inspectorConfig := internal.DefaultRPCValidationConfig()
 	// set safety thresholds to 0 to force inspector to validate all control messages
 	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
-	// set discard threshold to 0 so that in the case of invalid cluster ID
+	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
 	inspectorConfig.ClusterPrefixHardThreshold = 0
 	inspectorConfig.IHaveValidationCfg.SafetyThreshold = 0
@@ -417,18 +417,18 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
-	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
+	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
 	inspectorConfig := internal.DefaultRPCValidationConfig()
 	// set safety thresholds to 0 to force inspector to validate all control messages
 	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
-	// set discard threshold to 0 so that in the case of invalid cluster ID
+	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
 	inspectorConfig.ClusterPrefixHardThreshold = 0
 	inspectorConfig.NumberOfWorkers = 1
 
-	// SafetyThreshold < messageCount < DiscardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
+	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
 	messageCount := inspectorConfig.GraftValidationCfg.SafetyThreshold + 3
 	controlMessageCount := int64(1)
@@ -492,18 +492,18 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
-	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
+	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
 	inspectorConfig := internal.DefaultRPCValidationConfig()
 	// set safety thresholds to 0 to force inspector to validate all control messages
 	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
-	// set discard threshold to 0 so that in the case of invalid cluster ID
+	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
 	inspectorConfig.ClusterPrefixHardThreshold = 0
 	inspectorConfig.NumberOfWorkers = 1
 
-	// SafetyThreshold < messageCount < DiscardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
+	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
 	messageCount := inspectorConfig.GraftValidationCfg.SafetyThreshold + 1
 	controlMessageCount := int64(1)
@@ -564,13 +564,13 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 }
 
 // TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection ensures that an error is returned only after the cluster prefixed topics received for a peer exceed the configured
-// cluster prefix discard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error.
+// cluster prefix hard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error.
 // This test involves Graft control messages.
 func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
-	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
+	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
 	inspectorConfig := internal.DefaultRPCValidationConfig()
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
@@ -606,7 +606,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Times(int(controlMessageCount))
 
 	// we deliberately avoid setting the cluster IDs so that we eventually receive errors after we have exceeded the allowed cluster
-	// prefixed discard threshold
+	// prefixed hard threshold
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
@@ -626,13 +626,13 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 }
 
 // TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection ensures that an error is returned only after the cluster prefixed topics received for a peer exceed the configured
-// cluster prefix discard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error.
+// cluster prefix hard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error.
 // This test involves Prune control messages.
 func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
-	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
+	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
 	inspectorConfig := internal.DefaultRPCValidationConfig()
 	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
@@ -668,7 +668,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Times(int(controlMessageCount))
 
 	// we deliberately avoid setting the cluster IDs so that we eventually receive errors after we have exceeded the allowed cluster
-	// prefixed discard threshold
+	// prefixed hard threshold
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
@@ -693,18 +693,18 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
-	// if GRAFT/PRUNE message count is higher than discard threshold the RPC validation should fail and expected error should be returned
+	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
 	inspectorConfig := internal.DefaultRPCValidationConfig()
 	// set safety thresholds to 0 to force inspector to validate all control messages
 	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
 	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
-	// set discard threshold to 0 so that in the case of invalid cluster ID
+	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
 	inspectorConfig.ClusterPrefixHardThreshold = 0
 	inspectorConfig.NumberOfWorkers = 1
 
-	// SafetyThreshold < messageCount < DiscardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
+	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
 	messageCount := inspectorConfig.GraftValidationCfg.SafetyThreshold + 1
 	controlMessageCount := int64(1)
