@@ -627,6 +627,19 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
 
+	cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
+		Logger:                  builder.Logger,
+		SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
+		SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
+		DisablePenalty:          builder.AlspConfig.DisablePenalty,
+		AlspMetrics:             builder.Metrics.Network,
+		HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
+		NetworkType:             network.PublicNetwork,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize conduit factory: %w", err)
+	}
+
 	// creates network instance
 	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
 		Logger:              builder.Logger,
@@ -638,13 +651,7 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 		Metrics:             networkMetrics,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
-		ConduitFactory: conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-			Logger:               builder.Logger,
-			SpamRecordsCacheSize: builder.AlspConfig.SpamRecordCacheSize,
-			DisablePenalty:       builder.AlspConfig.DisablePenalty,
-			AlspMetrics:          builder.Metrics.Network,
-			CacheMetrics:         metrics.ApplicationLayerSpamRecordCacheMetricFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork),
-		}),
+		ConduitFactory:      cf,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -869,9 +876,8 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		builder.Metrics.Network,
 		builder.IdentityProvider,
 		builder.GossipSubConfig.LocalMeshLogInterval)
-
 	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector).
-		SetPublicNetwork(p2p.PublicNetwork).
+		SetNetworkType(network.PublicNetwork).
 		SetMetrics(&p2pconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 			Metrics:          builder.Metrics.Network,
@@ -964,7 +970,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 				builder.Logger,
-				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork))
+				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork))
 
 			err := node.Metrics.Mempool.Register(metrics.PrependPublicPrefix(metrics.ResourceNetworkingReceiveCache), receiveCache.Size)
 			if err != nil {

@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector"
@@ -26,7 +27,7 @@ type GossipSubInspectorBuilder struct {
 	sporkID          flow.Identifier
 	inspectorsConfig *GossipSubRPCInspectorsConfig
 	metricsCfg       *p2pconfig.MetricsConfig
-	publicNetwork    bool
+	networkType      network.NetworkingType
 }
 
 // NewGossipSubInspectorBuilder returns new *GossipSubInspectorBuilder.
@@ -39,7 +40,7 @@ func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier
 			Metrics:          metrics.NewNoopCollector(),
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		},
-		publicNetwork: p2p.PublicNetwork,
+		networkType: network.PublicNetwork,
 	}
 }
 
@@ -49,10 +50,14 @@ func (b *GossipSubInspectorBuilder) SetMetrics(metricsCfg *p2pconfig.MetricsConf
 	return b
 }
 
-// SetPublicNetwork used to differentiate between libp2p nodes used for public vs private networks.
-// Currently, there are different metrics collectors for public vs private networks.
-func (b *GossipSubInspectorBuilder) SetPublicNetwork(public bool) *GossipSubInspectorBuilder {
-	b.publicNetwork = public
+// SetNetworkType sets the network type for the inspector.
+// This is used to determine if the node is running on a public or private network.
+// Args:
+// - networkType: the network type.
+// Returns:
+// - *GossipSubInspectorBuilder: the builder.
+func (b *GossipSubInspectorBuilder) SetNetworkType(networkType network.NetworkingType) *GossipSubInspectorBuilder {
+	b.networkType = networkType
 	return b
 }
 
@@ -65,7 +70,7 @@ func (b *GossipSubInspectorBuilder) buildGossipSubMetricsInspector() p2p.GossipS
 		b.inspectorsConfig.MetricsInspectorConfigs.NumberOfWorkers,
 		[]queue.HeroStoreConfigOption{
 			queue.WithHeroStoreSizeLimit(b.inspectorsConfig.MetricsInspectorConfigs.CacheSize),
-			queue.WithHeroStoreCollector(metrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.publicNetwork)),
+			queue.WithHeroStoreCollector(metrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType)),
 		}...)
 	return metricsInspector
 }
@@ -90,7 +95,7 @@ func (b *GossipSubInspectorBuilder) validationInspectorConfig(validationConfigs 
 		NumberOfWorkers: validationConfigs.NumberOfWorkers,
 		InspectMsgStoreOpts: []queue.HeroStoreConfigOption{
 			queue.WithHeroStoreSizeLimit(validationConfigs.CacheSize),
-			queue.WithHeroStoreCollector(metrics.GossipSubRPCInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.publicNetwork))},
+			queue.WithHeroStoreCollector(metrics.GossipSubRPCInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType))},
 		GraftValidationCfg: graftValidationCfg,
 		PruneValidationCfg: pruneValidationCfg,
 		IHaveValidationCfg: iHaveValidationCfg,
@@ -109,7 +114,7 @@ func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.Gos
 		b.logger,
 		[]queue.HeroStoreConfigOption{
 			queue.WithHeroStoreSizeLimit(b.inspectorsConfig.GossipSubRPCInspectorNotificationCacheSize),
-			queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.publicNetwork))}...)
+			queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType))}...)
 
 	rpcValidationInspector := validation.NewControlMsgValidationInspector(
 		b.logger,

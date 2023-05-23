@@ -245,6 +245,14 @@ func GenerateNetworks(t *testing.T,
 		me.On("Address").Return(ids[i].Address)
 
 		receiveCache := netcache.NewHeroReceiveCache(p2p.DefaultReceiveCacheSize, log, metrics.NewNoopCollector())
+		cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  unittest.Logger(),
+			SpamRecordCacheSize:     uint32(1000),
+			SpamReportQueueSize:     uint32(1000),
+			AlspMetrics:             metrics.NewNoopCollector(),
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		})
+		require.NoError(t, err)
 
 		// create the network
 		net, err := p2p.NewNetwork(&p2p.NetworkParameters{
@@ -257,13 +265,8 @@ func GenerateNetworks(t *testing.T,
 			Metrics:             metrics.NewNoopCollector(),
 			IdentityProvider:    id.NewFixedIdentityProvider(ids),
 			ReceiveCache:        receiveCache,
-			ConduitFactory: conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-				Logger:               unittest.Logger(),
-				SpamRecordsCacheSize: uint32(1000),
-				AlspMetrics:          metrics.NewNoopCollector(),
-				CacheMetrics:         metrics.NewNoopCollector(),
-			}),
-			Options: opts,
+			ConduitFactory:      cf,
+			Options:             opts,
 		})
 		require.NoError(t, err)
 
