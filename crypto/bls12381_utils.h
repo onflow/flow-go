@@ -127,8 +127,6 @@ BLST_ERROR  unsafe_map_bytes_to_G2complement(E2*, const byte*, int);
 // pairing and Fp12
 bool_t      Fp12_is_one(Fp12*);
 void        Fp12_set_one(Fp12*);
-void        Fp12_inv(Fp12*); // TODO: remove
-void        Fp12_mult(Fp12*, const Fp12*, const Fp12*); // TODO: remove
 void        multi_pairing(Fp12*, const E1*, const E2*, const int);
 
 // Utility functions

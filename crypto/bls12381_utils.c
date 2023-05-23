@@ -1317,25 +1317,11 @@ BLST_ERROR unsafe_map_bytes_to_G2complement(E2* p, const byte* bytes, int len) {
 // ------------------- Pairing utilities 
 
 bool_t Fp12_is_one(Fp12 *a) {
-    //return vec_is_equal(a[0][0], BLS12_381_Rx.p2, sizeof(a[0][0])) &
-    //       vec_is_zero(a[0][1], sizeof(a) - sizeof(a[0][0]));
     return vec_is_equal(a, BLS12_381_Rx.p12, sizeof(Fp12));
 }
 
 void Fp12_set_one(Fp12 *a) {
     vec_copy(a, BLS12_381_Rx.p12, sizeof(Fp12));
-    //vec_copy(a[0][0], BLS12_381_Rx.p2, sizeof(a[0][0]));
-    //vec_zero(a[0][1], sizeof(a) - sizeof(a[0][0]));
-}
-
-// TODO: remove
-void Fp12_inv(Fp12 *a) {
-    conjugate_fp12((vec384fp6*)a);
-}
-
-// TODO: remove
-void Fp12_mult(Fp12* ret, const Fp12* a, const Fp12* b){
-    mul_fp12((vec384fp6*)ret, (vec384fp6*)a, (vec384fp6*)b);
 }
 
 static void e(Fp12* res, const E1* p, const E2* q) {
