@@ -230,13 +230,13 @@ func NetworksFixture(t *testing.T,
 	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
-	sms []network.SubscriptionManager, paramOpts ...p2p.NetworkParamOption) []network.Network {
+	sms []network.SubscriptionManager) []network.Network {
 
 	count := len(ids)
 	nets := make([]network.Network, 0)
 
 	for i := 0; i < count; i++ {
-		params := NetworkConfigFixture(t, log, *ids[i], ids, mws[i], sms[i], paramOpts...)
+		params := NetworkConfigFixture(t, log, *ids[i], ids, mws[i], sms[i])
 		net, err := p2p.NewNetwork(params)
 		require.NoError(t, err)
 
