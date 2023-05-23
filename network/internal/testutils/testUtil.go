@@ -252,7 +252,7 @@ func NetworkConfigFixture(
 	myId flow.Identity,
 	allIds flow.IdentityList,
 	mw network.Middleware,
-	subMgr network.SubscriptionManager, opts ...p2p.NetworkParamOption) *p2p.NetworkParameters {
+	subMgr network.SubscriptionManager, opts ...p2p.NetworkConfigOption) *p2p.NetworkConfig {
 
 	me := mock.NewLocal(t)
 	me.On("NodeID").Return(myId.NodeID).Maybe()
@@ -260,7 +260,7 @@ func NetworkConfigFixture(
 	me.On("Address").Return(myId.Address).Maybe()
 
 	receiveCache := netcache.NewHeroReceiveCache(p2p.DefaultReceiveCacheSize, logger, metrics.NewNoopCollector())
-	params := &p2p.NetworkParameters{
+	params := &p2p.NetworkConfig{
 		Logger:              logger,
 		Codec:               cbor.NewCodec(),
 		Me:                  me,

@@ -13,7 +13,7 @@ type NetworkParamOption struct {
 }
 
 // Execute provides a mock function with given fields: _a0
-func (_m *NetworkParamOption) Execute(_a0 *p2p.NetworkParameters) {
+func (_m *NetworkParamOption) Execute(_a0 *p2p.NetworkConfig) {
 	_m.Called(_a0)
 }
 

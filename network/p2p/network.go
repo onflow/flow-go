@@ -89,7 +89,9 @@ type registerBlobServiceResp struct {
 
 var ErrNetworkShutdown = errors.New("network has already shutdown")
 
-type NetworkParameters struct {
+// NetworkConfig is a configuration struct for the network. It contains all the
+// necessary components to create a new network.
+type NetworkConfig struct {
 	Logger              zerolog.Logger
 	Codec               network.Codec
 	Me                  module.Local
@@ -103,14 +105,24 @@ type NetworkParameters struct {
 	AlspCfg             *alspmgr.MisbehaviorReportManagerConfig
 }
 
-type NetworkParamOption func(*NetworkParameters)
+// NetworkConfigOption is a function that can be used to override network config parmeters.
+type NetworkConfigOption func(*NetworkConfig)
 
-func WithAlspConfig(cfg *alspmgr.MisbehaviorReportManagerConfig) NetworkParamOption {
-	return func(params *NetworkParameters) {
+// WithAlspConfig overrides the default misbehavior report manager config. It is mostly used for testing purposes.
+// Note: do not override the default misbehavior report manager config in production unless you know what you are doing.
+// Args:
+// cfg: misbehavior report manager config
+// Returns:
+// NetworkConfigOption: network param option
+func WithAlspConfig(cfg *alspmgr.MisbehaviorReportManagerConfig) NetworkConfigOption {
+	return func(params *NetworkConfig) {
 		params.AlspCfg = cfg
 	}
 }
 
+// NetworkOption is a function that can be used to override network attributes.
+// It is mostly used for testing purposes.
+// Note: do not override network attributes in production unless you know what you are doing.
 type NetworkOption func(*Network)
 
 // WithAlspManager sets the misbehavior report manager for the network. It overrides the default
@@ -135,7 +147,7 @@ func WithAlspManager(mgr network.MisbehaviorReportManager) NetworkOption {
 // communicate to direct peers, using the given codec for serialization, and
 // using the given state & cache interfaces to track volatile information.
 // csize determines the size of the cache dedicated to keep track of received messages
-func NewNetwork(param *NetworkParameters, opts ...NetworkOption) (*Network, error) {
+func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 	mw, err := param.MiddlewareFactory()
 	if err != nil {
 		return nil, fmt.Errorf("could not create middleware: %w", err)

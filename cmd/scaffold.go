@@ -489,7 +489,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	}
 
 	// creates network instance
-	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
 		Logger:              fnb.Logger,
 		Codec:               fnb.CodecFactory(),
 		Me:                  fnb.Me,
