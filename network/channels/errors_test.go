@@ -9,8 +9,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TestErrInvalidTopicRoundTrip ensures correct error formatting for InvalidTopicErr.
-func TestErrInvalidTopicRoundTrip(t *testing.T) {
+// TestInvalidTopicErrRoundTrip ensures correct error formatting for InvalidTopicErr.
+func TestInvalidTopicErrRoundTrip(t *testing.T) {
 	topic := Topic("invalid-topic")
 	wrapErr := fmt.Errorf("this err should be wrapped with topic to add context")
 	err := NewInvalidTopicErr(topic, wrapErr)
@@ -27,8 +27,8 @@ func TestErrInvalidTopicRoundTrip(t *testing.T) {
 	assert.False(t, IsInvalidTopicErr(dummyErr), "IsInvalidTopicErr should return false for non-IsInvalidTopicErr error")
 }
 
-// TestErrUnknownClusterIDRoundTrip ensures correct error formatting for UnknownClusterIDErr.
-func TestErrUnknownClusterIDRoundTrip(t *testing.T) {
+// TestUnknownClusterIDErrRoundTrip ensures correct error formatting for UnknownClusterIDErr.
+func TestUnknownClusterIDErrRoundTrip(t *testing.T) {
 	clusterId := flow.ChainID("cluster-id")
 	activeClusterIds := flow.ChainIDList{"active", "cluster", "ids"}
 	err := NewUnknownClusterIdErr(clusterId, activeClusterIds)
