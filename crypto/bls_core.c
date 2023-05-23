@@ -290,8 +290,6 @@ static void free_tree(node* root) {
     // as an entire array in `bls_batch_verify`.
     if (root->left) {   // no need to check the right child for the leaf check because
                         //  the recursive build starts with the left side first
-        // relic free 
-        if (root->sig) ep_free(root->sig);
         // pointer free
         free(root->sig);
         free(root->pk);

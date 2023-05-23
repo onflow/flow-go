@@ -8,6 +8,7 @@
 #include "bls_include.h"
 #include "assert.h"
 
+// compile all blst C src along with this file
 #include "blst_src.c"
 
 // The functions are tested for ALLOC=AUTO (not for ALLOC=DYNAMIC)
@@ -27,33 +28,6 @@ int get_Fr_BYTES() {
 
 int get_mapToG1_input_len() {
     return MAP_TO_G1_INPUT_LEN;
-}
-
-
-// Initializes Relic context with BLS12-381 parameters
-ctx_t* relic_init_BLS12_381() { 
-    // check Relic was compiled with the right conf 
-    assert(ALLOC == AUTO);
-
-    // sanity check of Relic constants the package is relying on
-    assert(RLC_OK == RLC_EQ);
-
-    // initialize relic core with a new context
-    ctx_t* bls_ctx = (ctx_t*) calloc(1, sizeof(ctx_t));
-    if (!bls_ctx) return NULL;
-    core_set(bls_ctx);
-    if (core_init() != RLC_OK) return NULL;
-
-    // init BLS curve
-    int ret = RLC_OK;
-    #if (FP_PRIME == 381)
-    ret = ep_param_set_any_pairf(); // sets B12_P381 if FP_PRIME = 381 in relic config
-    #else
-    ep_param_set(B12_P381);
-    ep2_curve_set_twist(EP_MTYPE);  // Multiplicative twist 
-    #endif 
-    if (ret != RLC_OK) return NULL;
-    return core_get();
 }
 
 // ------------------- Fr utilities
@@ -397,44 +371,6 @@ void Fp_write_bytes(byte *bin, const Fp* a) {
     be_bytes_from_limbs(bin, (limb_t*)a, Fp_BYTES);
 }
 
-// fp_read_bin_safe is a modified version of Relic's (void fp_read_bin).
-// It reads a field element from a buffer and makes sure the big number read can be 
-// written as a field element (is reduced modulo p). 
-// Unlike Relic's versions, the function does not reduce the read integer modulo p and does
-// not throw an exception for an integer larger than p. The function returns RLC_OK if the input
-// corresponds to a field element, and returns RLC_ERR otherwise. 
-static int fp_read_bin_safe(fp_t a, const byte *bin, int len) {
-    if (len != Fp_BYTES) {
-        return RLC_ERR;
-    }
-
-    int ret = RLC_ERR; 
-    bn_t t;
-    bn_new(t);
-    bn_read_bin(t, bin, Fp_BYTES);
-
-    // make sure read bn is reduced modulo p
-    // first check is sanity check, since current implementation of `bn_read_bin` insures
-    // output bn is positive
-    if (bn_sign(t) == RLC_NEG || bn_cmp(t, &core_get()->prime) != RLC_LT) {
-        goto out;
-    } 
-
-    if (bn_is_zero(t)) {
-        fp_zero(a);
-    } else {
-        if (t->used == 1) {
-            fp_prime_conv_dig(a, t->dp[0]);
-        } else {
-            fp_prime_conv(a, t);
-        }
-    }	
-    ret = RLC_OK;
-out:
-    bn_free(t);
-    return ret;
-}
-
 // returns the sign of y.
 // 1 if y > (p - 1)/2 and 0 otherwise.
 // y is in montgomery form
@@ -523,81 +459,6 @@ void Fp2_write_bytes(byte *bin, const Fp2* a) {
 }
 
 // ------------------- E1 utilities
-
-// TODO: to delete, only used by temporary E2_blst_to_relic
-static int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
-    // check the length
-    const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
-    if (len!=G1_size) {
-        return RLC_ERR;
-    }
-
-    // check the compression bit
-    int compressed = bin[0] >> 7;
-    if ((compressed == 1) != (G1_SERIALIZATION == COMPRESSED)) {
-        return RLC_ERR;
-    } 
-
-    // check if the point is infinity
-    int is_infinity = bin[0] & (1<<6);
-    if (is_infinity) {
-        // check if the remaining bits are cleared
-        if (bin[0] & 0x3F) {
-            return RLC_ERR;
-        }
-        for (int i=1; i<G1_size-1; i++) {
-            if (bin[i]) {
-                return RLC_ERR;
-            } 
-        }
-		ep_set_infty(a);
-		return RLC_OK;
-	} 
-
-    // read the sign bit and check for consistency
-    int y_sign = (bin[0] >> 5) & 1;
-    if (y_sign && (!compressed)) {
-        return RLC_ERR;
-    } 
-
-	a->coord = BASIC;
-	fp_set_dig(a->z, 1);
-    // use a temporary buffer to mask the header bits and read a.x 
-    byte temp[Fp_BYTES];
-    memcpy(temp, bin, Fp_BYTES);
-    temp[0] &= 0x1F;
-    if (fp_read_bin_safe(a->x, temp, sizeof(temp)) != RLC_OK) {
-        return RLC_ERR;
-    }
-
-    if (G1_SERIALIZATION == UNCOMPRESSED) { 
-        if (fp_read_bin_safe(a->y, bin + Fp_BYTES, Fp_BYTES) != RLC_OK) {
-            return RLC_ERR;
-        }
-        // check read point is on curve
-        if (!ep_on_curve(a)) {
-            return RLC_ERR;
-        }
-        return RLC_OK;
-    }
-    fp_zero(a->y);
-    fp_set_bit(a->y, 0, y_sign);
-    if (ep_upk(a, a) == 1) {
-        // resulting point is guaranteed to be on curve
-        return RLC_OK;
-    }
-    return RLC_ERR;
-}
-
-// TODO: temp utility function to delete
-ep_st* E1_blst_to_relic(const E1* x) {
-    ep_st* out = (ep_st*)malloc(sizeof(ep_st)); 
-    byte* data = (byte*)malloc(G1_SER_BYTES);
-    E1_write_bytes(data, x);
-    ep_read_bin_compact(out, data, G1_SER_BYTES);
-    free(data);
-    return out;
-}
 
 void E1_copy(E1* res, const E1* p) {
     if ((uptr_t)p == (uptr_t)res) {
@@ -871,97 +732,6 @@ int map_to_G1(E1* h, const byte* hash, const int len) {
 const E1* BLS12_381_g1 = (const E1*)&BLS12_381_G1; /// TODO:delete
 const E2* BLS12_381_g2 = (const E2*)&BLS12_381_G2;
 const E2* BLS12_381_minus_g2 = (const E2*)&BLS12_381_NEG_G2;
-
-// TODO: to delete
-static int fp2_read_bin_safe(fp2_t a, const byte *bin, int len) {
-    if (len != Fp2_BYTES) {
-        return RLC_ERR;
-    }
-    if (fp_read_bin_safe(a[0], bin, Fp_BYTES) != RLC_OK) {
-        return RLC_ERR;
-    }
-    if (fp_read_bin_safe(a[1], bin + Fp_BYTES, Fp_BYTES) != RLC_OK) {
-        return RLC_ERR;
-    }
-    return RLC_OK;
-}
-
-// TODO: to delete, only used by temporary E2_blst_to_relic
-static int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
-    // check the length
-    const int G2size = (G2_BYTES/(G2_SERIALIZATION+1));
-    if (len!=G2size) {
-        return RLC_ERR;
-    }
-
-    // check the compression bit
-    int compressed = bin[0] >> 7;
-    if ((compressed == 1) != (G2_SERIALIZATION == COMPRESSED)) {
-        return RLC_ERR;
-    } 
-
-    // check if the point in infinity
-    int is_infinity = bin[0] & 0x40;
-    if (is_infinity) {
-        // the remaining bits need to be cleared
-        if (bin[0] & 0x3F) {
-            return RLC_ERR;
-        }
-        for (int i=1; i<G2size-1; i++) {
-            if (bin[i]) {
-                return RLC_ERR;
-            } 
-        }
-		ep2_set_infty(a);
-		return RLC_OK;
-	} 
-
-    // read the sign bit and check for consistency
-    int y_sign = (bin[0] >> 5) & 1;
-    if (y_sign && (!compressed)) {
-        return RLC_ERR;
-    } 
-    
-	a->coord = BASIC;
-    fp2_set_dig(a->z, 1);   // a.z
-    // use a temporary buffer to mask the header bits and read a.x
-    byte temp[Fp2_BYTES];
-    memcpy(temp, bin, Fp2_BYTES);
-    temp[0] &= 0x1F;        // clear the header bits
-    if (fp2_read_bin_safe(a->x, temp, sizeof(temp)) != RLC_OK) {
-        return RLC_ERR;
-    }
-
-    if (G2_SERIALIZATION == UNCOMPRESSED) {
-        if (fp2_read_bin_safe(a->y, bin + Fp2_BYTES, Fp2_BYTES) != RLC_OK){ 
-            return RLC_ERR;
-        }
-        // check read point is on curve
-        if (!ep2_on_curve(a)) {
-            return RLC_ERR;
-        }
-        return RLC_OK;
-    }
-    
-    fp2_zero(a->y);
-    fp_set_bit(a->y[0], 0, y_sign);
-    fp_zero(a->y[1]);
-    if (ep2_upk(a, a) == 1) {
-        // resulting point is guaranteed to be on curve
-        return RLC_OK;
-    }
-    return RLC_ERR;
-}
-
-// TODO: temp utility function to delete
-ep2_st* E2_blst_to_relic(const E2* x) {
-    ep2_st* out = (ep2_st*)malloc(sizeof(ep2_st)); 
-    byte* data = (byte*)malloc(G2_SER_BYTES);
-    E2_write_bytes(data, x);
-    ep2_read_bin_compact(out, data, G2_SER_BYTES);
-    free(data);
-    return out;
-}
 
 // E2_read_bytes imports a E2(Fp^2) point from a buffer in a compressed or uncompressed form.
 // The resulting point is guaranteed to be on curve E2 (no G2 check is included).
@@ -1324,13 +1094,6 @@ void Fp12_set_one(Fp12 *a) {
     vec_copy(a, BLS12_381_Rx.p12, sizeof(Fp12));
 }
 
-static void e(Fp12* res, const E1* p, const E2* q) {
-    E1 p_aff; E1_to_affine(&p_aff, p); 
-    E2 q_aff; E2_to_affine(&q_aff, q);
-    miller_loop_n((vec384fp6*)res, (POINTonE2_affine*)&q_aff, (POINTonE1_affine*)&p_aff, 1);
-    final_exp((vec384fp6*)res, (vec384fp6*)res);
-}
-
 // computes e(p[0], q[0]) * ... * e(q[len-1], q[len-1]) 
 // by optimizing a common final exponentiation for all pairings.
 // result is stored in `res`.
@@ -1401,8 +1164,7 @@ void xmd_sha256(byte *hash, int len_hash, byte *msg, int len_msg, byte *dst, int
 
 
 // DEBUG printing functions 
-#define DEBUG 1
-#if DEBUG==1
+#if (DEBUG == 1)
 void bytes_print_(char* s, byte* data, int len) {
     if (strlen(s)) printf("[%s]:\n", s);
     for (int i=0; i<len; i++) 
@@ -1462,34 +1224,5 @@ void E2_print_(char* s, const E2* p, const int jacob) {
     Fp2_print_("", &(a.y));
     if (jacob) Fp2_print_("", &(a.z));
 }
- 
 
-void fp_print_(char* s, fp_st a) {
-    char* str = malloc(sizeof(char) * fp_size_str(a, 16));
-    fp_write_str(str, 100, a, 16);
-    printf("[%s]:\n%s\n", s, str);
-    free(str);
-}
-
-void fp12_print_(char* s, fp12_t p) {
-    printf("[%s]:\n", s);
-    fp12_print(p);
-}
-
-void bn_print_(char* s, bn_st *a) {
-    char* str = malloc(sizeof(char) * bn_size_str(a, 16));
-    bn_write_str(str, 128, a, 16);
-    printf("[%s]:\n%s\n", s, str);
-    free(str);
-}
-
-void ep_print_(char* s, ep_st* p) {
-    printf("[%s]:\n", s);
-    g1_print(p);
-}
-
-void ep2_print_(char* s, ep2_st* p) {
-    printf("[%s]:\n", s);
-    g2_print(p);
-}
 #endif
