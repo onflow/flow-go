@@ -309,7 +309,7 @@ func sporkIdStrFromTopic(topic Topic) (string, error) {
 	return sporkId.String(), nil
 }
 
-// clusterIDStrFromTopic returns the pre-pended cluster ID in flow.ChainID format for the cluster prefixed topic.
+// clusterIDStrFromTopic returns the appended cluster ID in flow.ChainID format for the cluster prefixed topic.
 // A valid cluster-prefixed channel includes the cluster prefix and cluster ID suffix:
 //
 //	sync-cluster/some_cluster_id
