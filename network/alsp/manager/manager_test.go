@@ -419,16 +419,6 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 	m.Start(signalerCtx)
 	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
 
-	// start the ALSP manager
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
-	}()
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	m.Start(signalerCtx)
-	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
-
 	// create a mock misbehavior report with a negative penalty value
 	penalty := float64(-5)
 	report := mocknetwork.NewMisbehaviorReport(t)
@@ -552,16 +542,6 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentiall
 	m.Start(signalerCtx)
 	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
 
-	// start the ALSP manager
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
-	}()
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	m.Start(signalerCtx)
-	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
-
 	// creates a list of mock misbehavior reports with negative penalty values for a single peer
 	originId := unittest.IdentifierFixture()
 	reports := createRandomMisbehaviorReportsForOriginId(t, originId, 5)
@@ -619,16 +599,6 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 
 	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
 	require.NoError(t, err)
-
-	// start the ALSP manager
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
-	}()
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	m.Start(signalerCtx)
-	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
 
 	// start the ALSP manager
 	ctx, cancel := context.WithCancel(context.Background())
@@ -717,16 +687,6 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequential
 	m.Start(signalerCtx)
 	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
 
-	// start the ALSP manager
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
-	}()
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	m.Start(signalerCtx)
-	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
-
 	// creates a list of single misbehavior reports for multiple peers (10 peers)
 	numPeers := 10
 	reports := createRandomMisbehaviorReports(t, numPeers)
@@ -783,16 +743,6 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 
 	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
 	require.NoError(t, err)
-
-	// start the ALSP manager
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
-	}()
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	m.Start(signalerCtx)
-	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
 
 	// start the ALSP manager
 	ctx, cancel := context.WithCancel(context.Background())
@@ -870,16 +820,6 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 
 	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
 	require.NoError(t, err)
-
-	// start the ALSP manager
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
-	}()
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	m.Start(signalerCtx)
-	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
 
 	// start the ALSP manager
 	ctx, cancel := context.WithCancel(context.Background())
@@ -970,16 +910,6 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurre
 
 	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
 	require.NoError(t, err)
-
-	// start the ALSP manager
-	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
-	}()
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	m.Start(signalerCtx)
-	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
 
 	// start the ALSP manager
 	ctx, cancel := context.WithCancel(context.Background())
