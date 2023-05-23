@@ -48,6 +48,15 @@ var _ network.Adapter = (*Network)(nil)
 // The committee has the identity of the node already, so only `committee` is needed
 // in order for a mock hub to find each other.
 func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Network)) *Network {
+	cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
+		SpamRecordCacheSize:     uint32(1000),
+		SpamReportQueueSize:     uint32(1000),
+		Logger:                  unittest.Logger(),
+		AlspMetrics:             metrics.NewNoopCollector(),
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+	})
+	require.NoError(t, err)
+
 	net := &Network{
 		ctx:            context.Background(),
 		myId:           myId,
