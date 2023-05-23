@@ -287,7 +287,7 @@ func sporkIdFromTopic(topic Topic) (flow.Identifier, error) {
 	if index := strings.LastIndex(topic.String(), "/"); index != -1 {
 		id, err := flow.HexStringToIdentifier(string(topic)[index+1:])
 		if err != nil {
-			return flow.Identifier{}, fmt.Errorf("failed to get spork ID from topic %s", topic)
+			return flow.Identifier{}, fmt.Errorf("failed to get spork ID from topic %s: %w", topic, err)
 		}
 
 		return id, nil
