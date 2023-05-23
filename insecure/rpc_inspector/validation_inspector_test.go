@@ -184,7 +184,7 @@ func TestValidationInspector_HardThresholdIHave_Detection(t *testing.T) {
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.Equal(t, uint64(messageCount), notification.Count)
-			require.True(t, channels.IsErrInvalidTopic(notification.Err))
+			require.True(t, channels.IsInvalidTopicErr(notification.Err))
 			switch notification.MsgType {
 			case p2p.CtrlMsgIHave:
 				invIhaveNotifCount.Inc()
@@ -339,7 +339,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			require.True(t, channels.IsErrInvalidTopic(notification.Err))
+			require.True(t, channels.IsInvalidTopicErr(notification.Err))
 			switch notification.MsgType {
 			case p2p.CtrlMsgGraft:
 				invGraftNotifCount.Inc()

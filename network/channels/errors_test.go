@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TestErrInvalidTopicRoundTrip ensures correct error formatting for ErrInvalidTopic.
+// TestErrInvalidTopicRoundTrip ensures correct error formatting for InvalidTopicErr.
 func TestErrInvalidTopicRoundTrip(t *testing.T) {
 	topic := Topic("invalid-topic")
 	wrapErr := fmt.Errorf("this err should be wrapped with topic to add context")
@@ -20,11 +20,11 @@ func TestErrInvalidTopicRoundTrip(t *testing.T) {
 	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
 
 	// tests the IsErrActiveClusterIDsNotSet function.
-	assert.True(t, IsErrInvalidTopic(err), "IsErrInvalidTopic should return true for ErrInvalidTopic error")
+	assert.True(t, IsInvalidTopicErr(err), "IsInvalidTopicErr should return true for InvalidTopicErr error")
 
 	// test IsErrActiveClusterIDsNotSet with a different error type.
 	dummyErr := fmt.Errorf("dummy error")
-	assert.False(t, IsErrInvalidTopic(dummyErr), "IsErrInvalidTopic should return false for non-IsErrInvalidTopic error")
+	assert.False(t, IsInvalidTopicErr(dummyErr), "IsInvalidTopicErr should return false for non-IsInvalidTopicErr error")
 }
 
 // TestErrUnknownClusterIDRoundTrip ensures correct error formatting for ErrUnknownClusterID.

@@ -391,7 +391,7 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 
 // validateTopics ensures all topics in the specified control message are valid flow topic/channel and no duplicate topics exist.
 // Expected error returns during normal operations:
-//   - channels.ErrInvalidTopic: if topic is invalid.
+//   - channels.InvalidTopicErr: if topic is invalid.
 //   - ErrDuplicateTopic: if a duplicate topic ID is encountered.
 func (c *ControlMsgValidationInspector) validateTopics(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) error {
 	activeClusterIDS := c.tracker.GetActiveClusterIds()
@@ -480,7 +480,7 @@ func (c *ControlMsgValidationInspector) validateTopicsSample(from peer.ID, valid
 
 // validateTopic ensures the topic is a valid flow topic/channel.
 // Expected error returns during normal operations:
-//   - channels.ErrInvalidTopic: if topic is invalid.
+//   - channels.InvalidTopicErr: if topic is invalid.
 //   - ErrActiveClusterIdsNotSet: if the cluster ID provider is not set.
 //   - channels.ErrUnknownClusterID: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
 //
@@ -508,7 +508,7 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 // validateClusterPrefixedTopic validates cluster prefixed topics.
 // Expected error returns during normal operations:
 //   - ErrActiveClusterIdsNotSet: if the cluster ID provider is not set.
-//   - channels.ErrInvalidTopic: if topic is invalid.
+//   - channels.InvalidTopicErr: if topic is invalid.
 //   - channels.ErrUnknownClusterID: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
 //
 // In the case where an ErrActiveClusterIdsNotSet or ErrUnknownClusterID is encountered and the cluster prefixed topic received

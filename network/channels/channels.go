@@ -340,7 +340,7 @@ func SyncCluster(clusterID flow.ChainID) Channel {
 // IsValidNonClusterFlowTopic ensures the topic is a valid Flow network topic and
 // ensures the sporkID part of the Topic is equal to the current network sporkID.
 // Expected errors:
-// - ErrInvalidTopic if the topic is not a if the topic is not a valid topic for the given spork.
+// - InvalidTopicErr if the topic is not a if the topic is not a valid topic for the given spork.
 func IsValidNonClusterFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
 	sporkID, err := sporkIdStrFromTopic(topic)
 	if err != nil {
@@ -358,7 +358,7 @@ func IsValidNonClusterFlowTopic(topic Topic, expectedSporkID flow.Identifier) er
 // ensures the cluster ID part of the Topic is equal to one of the provided active cluster IDs.
 // All errors returned from this function can be considered benign.
 // Expected errors:
-// - ErrInvalidTopic if the topic is not a valid Flow topic or the cluster ID cannot be derived from the topic.
+// - InvalidTopicErr if the topic is not a valid Flow topic or the cluster ID cannot be derived from the topic.
 // - ErrUnknownClusterID if the cluster ID from the topic is not in the activeClusterIDS list.
 func IsValidFlowClusterTopic(topic Topic, activeClusterIDS flow.ChainIDList) error {
 	err := isValidFlowTopic(topic)
@@ -384,7 +384,7 @@ func IsValidFlowClusterTopic(topic Topic, activeClusterIDS flow.ChainIDList) err
 // A valid Topic has the following properties:
 // - A Channel can be derived from the Topic and that channel exists.
 // Expected errors:
-// - ErrInvalidTopic if the topic is not a valid Flow topic.
+// - InvalidTopicErr if the topic is not a valid Flow topic.
 func isValidFlowTopic(topic Topic) error {
 	channel, ok := ChannelFromTopic(topic)
 	if !ok {
