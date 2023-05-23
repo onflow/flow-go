@@ -40,7 +40,7 @@ type ControlMsgValidationInspector struct {
 	distributor p2p.GossipSubInspectorNotifDistributor
 	// workerPool queue that stores *InspectMsgRequest that will be processed by component workers.
 	workerPool *worker.Pool[*InspectMsgRequest]
-	// clusterPrefixTopicsReceivedTracker is a map that associates the hash of a peer's ID with the
+	// tracker is a map that associates the hash of a peer's ID with the
 	// number of cluster-prefix topic control messages received from that peer. It helps in tracking
 	// and managing the rate of incoming control messages from each peer, ensuring that the system
 	// stays performant and resilient against potential spam or abuse.
@@ -48,8 +48,8 @@ type ControlMsgValidationInspector struct {
 	// 1. The cluster prefix topic is received while the inspector waits for the cluster IDs provider to be set (this can happen during the startup or epoch transitions).
 	// 2. The node sends a cluster prefix topic where the cluster prefix does not match any of the active cluster IDs.
 	// In such cases, the inspector will allow a configured number of these messages from the corresponding peer.
-	clusterPrefixTopicsReceivedTracker *cache.ClusterPrefixTopicsReceivedTracker
-	idProvider                         module.IdentityProvider
+	tracker    *cache.ClusterPrefixedMessagesReceivedTracker
+	idProvider module.IdentityProvider
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
@@ -78,19 +78,19 @@ func NewControlMsgValidationInspector(
 	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics) (*ControlMsgValidationInspector, error) {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 
-	tracker, err := cache.NewClusterPrefixTopicsReceivedTracker(logger, config.ClusterPrefixedTopicsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedTopicsReceivedCacheDecay)
+	tracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(logger, config.ClusterPrefixedTopicsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedTopicsReceivedCacheDecay)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
 	}
 
 	c := &ControlMsgValidationInspector{
-		logger:                             lg,
-		sporkID:                            sporkID,
-		config:                             config,
-		distributor:                        distributor,
-		clusterPrefixTopicsReceivedTracker: tracker,
-		idProvider:                         idProvider,
-		metrics:                            inspectorMetrics,
+		logger:      lg,
+		sporkID:     sporkID,
+		config:      config,
+		distributor: distributor,
+		tracker:     tracker,
+		idProvider:  idProvider,
+		metrics:     inspectorMetrics,
 	}
 
 	cfg := &queue.HeroStoreConfig{
@@ -204,7 +204,7 @@ func (c *ControlMsgValidationInspector) Name() string {
 
 // ClusterIdsUpdated consumes cluster ID update protocol events.
 func (c *ControlMsgValidationInspector) ClusterIdsUpdated(clusterIDList flow.ChainIDList) {
-	c.clusterPrefixTopicsReceivedTracker.StoreActiveClusterIds(clusterIDList)
+	c.tracker.StoreActiveClusterIds(clusterIDList)
 }
 
 // blockingPreprocessingRpc ensures the RPC control message count does not exceed the configured discard threshold.
@@ -271,7 +271,7 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 	if validationConfig.ControlMsg != p2p.CtrlMsgIHave && validationConfig.ControlMsg != p2p.CtrlMsgIWant {
 		return fmt.Errorf("unexpected control message type %s encountered during blocking pre-processing sample rpc, expected %s or %s", validationConfig.ControlMsg, p2p.CtrlMsgIHave, p2p.CtrlMsgIWant)
 	}
-	activeClusterIDS := c.clusterPrefixTopicsReceivedTracker.GetActiveClusterIds()
+	activeClusterIDS := c.tracker.GetActiveClusterIds()
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
 		Uint64("ctrl_msg_count", count).
@@ -394,7 +394,7 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 //   - channels.ErrInvalidTopic: if topic is invalid.
 //   - ErrDuplicateTopic: if a duplicate topic ID is encountered.
 func (c *ControlMsgValidationInspector) validateTopics(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) error {
-	activeClusterIDS := c.clusterPrefixTopicsReceivedTracker.GetActiveClusterIds()
+	activeClusterIDS := c.tracker.GetActiveClusterIds()
 	switch validationConfig.ControlMsg {
 	case p2p.CtrlMsgGraft:
 		return c.validateGrafts(from, ctrlMsg, activeClusterIDS)
@@ -514,25 +514,27 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 // In the case where an ErrActiveClusterIdsNotSet or ErrUnknownClusterID is encountered and the cluster prefixed topic received
 // tracker for the peer is less than or equal to the configured ClusterPrefixHardThreshold an error will only be logged and not returned.
 // At the point where the hard threshold is crossed the error will be returned and the sender will start to be penalized.
+// Any errors encountered while incrementing or loading the cluster prefixed control message gauge for a peer will result in a fatal log, these
+// errors are unexpected and irrecoverable indicating a bug.
 func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) error {
 	lg := c.logger.With().
 		Str("from", from.String()).
 		Logger()
 	// reject messages from unstaked nodes for cluster prefixed topics
-	identifier, err := c.getFlowIdentifier(from)
+	nodeID, err := c.getFlowIdentifier(from)
 	if err != nil {
 		return err
 	}
 
 	if len(activeClusterIds) == 0 {
 		// cluster IDs have not been updated yet
-		_, err = c.clusterPrefixTopicsReceivedTracker.Inc(identifier)
+		_, err = c.tracker.Inc(nodeID)
 		if err != nil {
 			return err
 		}
 
 		// if the amount of messages received is below our hard threshold log the error and return nil.
-		if c.checkClusterPrefixHardThreshold(identifier) {
+		if c.checkClusterPrefixHardThreshold(nodeID) {
 			lg.Warn().
 				Err(err).
 				Str("topic", topic.String()).
@@ -548,12 +550,15 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 		if channels.IsErrUnknownClusterID(err) {
 			// unknown cluster ID error could indicate that a node has fallen
 			// behind and needs to catchup increment to topics received cache.
-			_, incErr := c.clusterPrefixTopicsReceivedTracker.Inc(identifier)
+			_, incErr := c.tracker.Inc(nodeID)
 			if incErr != nil {
-				return incErr
+				// irrecoverable error encountered
+				c.logger.Fatal().Err(incErr).
+					Str("node_id", nodeID.String()).
+					Msg("unexpected irrecoverable error encountered while incrementing the cluster prefixed control message gauge")
 			}
 			// if the amount of messages received is below our hard threshold log the error and return nil.
-			if c.checkClusterPrefixHardThreshold(identifier) {
+			if c.checkClusterPrefixHardThreshold(nodeID) {
 				lg.Warn().
 					Err(err).
 					Str("topic", topic.String()).
@@ -582,6 +587,15 @@ func (c *ControlMsgValidationInspector) getFlowIdentifier(peerID peer.ID) (flow.
 
 // checkClusterPrefixHardThreshold returns true if the cluster prefix received tracker count is less than
 // the configured ClusterPrefixHardThreshold, false otherwise.
-func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(identifier flow.Identifier) bool {
-	return c.clusterPrefixTopicsReceivedTracker.Load(identifier) <= c.config.ClusterPrefixHardThreshold
+// If any error is encountered while loading from the tracker this func will emit a fatal level log, these errors
+// are unexpected and irrecoverable indicating a bug.
+func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID flow.Identifier) bool {
+	gauge, err := c.tracker.Load(nodeID)
+	if err != nil {
+		// irrecoverable error encountered
+		c.logger.Fatal().Err(err).
+			Str("node_id", nodeID.String()).
+			Msg("unexpected irrecoverable error encountered while loading the cluster prefixed control message gauge during hard threshold check")
+	}
+	return gauge <= c.config.ClusterPrefixHardThreshold
 }
