@@ -17,6 +17,14 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo, se
 
 	partners := model.ToIdentityList(partnerNodes).Filter(filter.HasRole(flow.RoleCollection))
 	internals := model.ToIdentityList(internalNodes).Filter(filter.HasRole(flow.RoleCollection))
+	nClusters := flagCollectionClusters
+	nCollectors := len(partners) + len(internals)
+
+	// ensure we have at least as many collection nodes as clusters
+	if nCollectors < int(flagCollectionClusters) {
+		log.Fatal().Msgf("network bootstrap is configured with %d collection nodes, but %d clusters - must have at least one collection node per cluster",
+			nCollectors, flagCollectionClusters)
+	}
 
 	// deterministically shuffle both collector lists based on the input seed
 	// by using a different seed each spork, we will have different clusters
@@ -24,7 +32,6 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo, se
 	partners = partners.DeterministicShuffle(seed)
 	internals = internals.DeterministicShuffle(seed)
 
-	nClusters := flagCollectionClusters
 	identifierLists := make([]flow.IdentifierList, nClusters)
 
 	// first, round-robin internal nodes into each cluster

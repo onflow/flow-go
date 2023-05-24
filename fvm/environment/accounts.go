@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -34,20 +34,18 @@ type Accounts interface {
 	DeleteContract(contractName string, address flow.Address) error
 	Create(publicKeys []flow.AccountPublicKey, newAddress flow.Address) error
 	GetValue(id flow.RegisterID) (flow.RegisterValue, error)
-	CheckAccountNotFrozen(address flow.Address) error
 	GetStorageUsed(address flow.Address) (uint64, error)
 	SetValue(id flow.RegisterID, value flow.RegisterValue) error
 	AllocateStorageIndex(address flow.Address) (atree.StorageIndex, error)
-	SetAccountFrozen(address flow.Address, frozen bool) error
 }
 
 var _ Accounts = &StatefulAccounts{}
 
 type StatefulAccounts struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 }
 
-func NewAccounts(txnState state.NestedTransaction) *StatefulAccounts {
+func NewAccounts(txnState state.NestedTransactionPreparer) *StatefulAccounts {
 	return &StatefulAccounts{
 		txnState: txnState,
 	}
@@ -731,43 +729,6 @@ func (a *StatefulAccounts) setAccountStatus(
 			"failed to store the account status for account (%s): %w",
 			address.String(),
 			err)
-	}
-	return nil
-}
-
-func (a *StatefulAccounts) GetAccountFrozen(
-	address flow.Address,
-) (
-	bool,
-	error,
-) {
-	status, err := a.getAccountStatus(address)
-	if err != nil {
-		return false, err
-	}
-	return status.IsAccountFrozen(), nil
-}
-
-func (a *StatefulAccounts) SetAccountFrozen(
-	address flow.Address,
-	frozen bool,
-) error {
-	status, err := a.getAccountStatus(address)
-	if err != nil {
-		return err
-	}
-	status.SetFrozenFlag(frozen)
-	return a.setAccountStatus(address, status)
-}
-
-// handy function to error out if account is frozen
-func (a *StatefulAccounts) CheckAccountNotFrozen(address flow.Address) error {
-	frozen, err := a.GetAccountFrozen(address)
-	if err != nil {
-		return fmt.Errorf("cannot check account freeze status: %w", err)
-	}
-	if frozen {
-		return errors.NewFrozenAccountError(address)
 	}
 	return nil
 }

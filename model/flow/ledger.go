@@ -118,7 +118,6 @@ func (id RegisterID) IsSlabIndex() bool {
 	return len(id.Key) == 9 && id.Key[0] == '$'
 }
 
-// TODO(patrick): pretty print flow internal register ids.
 // String returns formatted string representation of the RegisterID.
 func (id RegisterID) String() string {
 	formattedKey := ""
@@ -148,6 +147,7 @@ type RegisterEntry struct {
 }
 
 // handy container for sorting
+// TODO(ramtin): add canonical encoding and fingerprint for RegisterEntries
 type RegisterEntries []RegisterEntry
 
 func (d RegisterEntries) Len() int {
@@ -179,6 +179,24 @@ func (d RegisterEntries) Values() []RegisterValue {
 		r[i] = entry.Value
 	}
 	return r
+}
+
+// handy container for sorting
+type RegisterIDs []RegisterID
+
+func (d RegisterIDs) Len() int {
+	return len(d)
+}
+
+func (d RegisterIDs) Less(i, j int) bool {
+	if d[i].Owner != d[j].Owner {
+		return d[i].Owner < d[j].Owner
+	}
+	return d[i].Key < d[j].Key
+}
+
+func (d RegisterIDs) Swap(i, j int) {
+	d[i], d[j] = d[j], d[i]
 }
 
 // StorageProof (proof of a read or update to the state, Merkle path of some sort)

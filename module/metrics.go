@@ -1,14 +1,17 @@
 package module
 
 import (
+	"context"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	httpmetrics "github.com/slok/go-http-metrics/metrics"
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 type EntriesFunc func() uint
@@ -81,6 +84,12 @@ type GossipSubRouterMetrics interface {
 	OnPublishedGossipMessagesReceived(count int)
 }
 
+// GossipSubLocalMeshMetrics encapsulates the metrics collectors for GossipSub mesh of the networking layer.
+type GossipSubLocalMeshMetrics interface {
+	// OnLocalMeshSizeUpdated tracks the size of the local mesh for a topic.
+	OnLocalMeshSizeUpdated(topic string, size int)
+}
+
 // UnicastManagerMetrics unicast manager metrics.
 type UnicastManagerMetrics interface {
 	// OnStreamCreated tracks the overall time it takes to create a stream successfully and the number of retry attempts.
@@ -101,13 +110,59 @@ type UnicastManagerMetrics interface {
 	OnEstablishStreamFailure(duration time.Duration, attempts int)
 }
 
-type LibP2PMetrics interface {
+type GossipSubMetrics interface {
+	GossipSubScoringMetrics
 	GossipSubRouterMetrics
+	GossipSubLocalMeshMetrics
+	GossipSubRpcValidationInspectorMetrics
+}
+
+type LibP2PMetrics interface {
+	GossipSubMetrics
 	ResolverMetrics
 	DHTMetrics
 	rcmgr.MetricsReporter
 	LibP2PConnectionMetrics
 	UnicastManagerMetrics
+}
+
+// GossipSubScoringMetrics encapsulates the metrics collectors for the peer scoring module of GossipSub protocol.
+// It tracks the scores of the peers in the local mesh and the different factors that contribute to the score of a peer.
+// It also tracks the scores of the topics in the local mesh and the different factors that contribute to the score of a topic.
+type GossipSubScoringMetrics interface {
+	// OnOverallPeerScoreUpdated tracks the overall score of peers in the local mesh.
+	OnOverallPeerScoreUpdated(float64)
+	// OnAppSpecificScoreUpdated tracks the application specific score of peers in the local mesh.
+	OnAppSpecificScoreUpdated(float64)
+	// OnIPColocationFactorUpdated tracks the IP colocation factor of peers in the local mesh.
+	OnIPColocationFactorUpdated(float64)
+	// OnBehaviourPenaltyUpdated tracks the behaviour penalty of peers in the local mesh.
+	OnBehaviourPenaltyUpdated(float64)
+	// OnTimeInMeshUpdated tracks the time in mesh factor of peers in the local mesh for a given topic.
+	OnTimeInMeshUpdated(channels.Topic, time.Duration)
+	// OnFirstMessageDeliveredUpdated tracks the first message delivered factor of peers in the local mesh for a given topic.
+	OnFirstMessageDeliveredUpdated(channels.Topic, float64)
+	// OnMeshMessageDeliveredUpdated tracks the mesh message delivered factor of peers in the local mesh for a given topic.
+	OnMeshMessageDeliveredUpdated(channels.Topic, float64)
+	// OnInvalidMessageDeliveredUpdated tracks the invalid message delivered factor of peers in the local mesh for a given topic.
+	OnInvalidMessageDeliveredUpdated(channels.Topic, float64)
+	// SetWarningStateCount tracks the warning score state of peers in the local mesh. It updates the total number of
+	// peers in the local mesh that are in the warning state based on their score.
+	SetWarningStateCount(uint)
+}
+
+// GossipSubRpcValidationInspectorMetrics encapsulates the metrics collectors for the gossipsub rpc validation control message inspectors.
+type GossipSubRpcValidationInspectorMetrics interface {
+	// BlockingPreProcessingStarted increments the metric tracking the number of messages being pre-processed by the rpc validation inspector.
+	BlockingPreProcessingStarted(msgType string, sampleSize uint)
+	// BlockingPreProcessingFinished tracks the time spent by the rpc validation inspector to pre-process a message and decrements the metric tracking
+	// the number of messages being pre-processed by the rpc validation inspector.
+	BlockingPreProcessingFinished(msgType string, sampleSize uint, duration time.Duration)
+	// AsyncProcessingStarted increments the metric tracking the number of inspect message request being processed by workers in the rpc validator worker pool.
+	AsyncProcessingStarted(msgType string)
+	// AsyncProcessingFinished tracks the time spent by a rpc validation inspector worker to process an inspect message request asynchronously and decrements the metric tracking
+	// the number of inspect message requests  being processed asynchronously by the rpc validation inspector workers.
+	AsyncProcessingFinished(msgType string, duration time.Duration)
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
@@ -126,6 +181,7 @@ type NetworkInboundQueueMetrics interface {
 // NetworkCoreMetrics encapsulates the metrics collectors for the core networking layer functionality.
 type NetworkCoreMetrics interface {
 	NetworkInboundQueueMetrics
+	AlspMetrics
 	// OutboundMessageSent collects metrics related to a message sent by the node.
 	OutboundMessageSent(sizeBytes int, topic string, protocol string, messageType string)
 	// InboundMessageReceived collects metrics related to a message received by the node.
@@ -150,6 +206,18 @@ type LibP2PConnectionMetrics interface {
 
 	// InboundConnections updates the metric tracking the number of inbound connections of this node
 	InboundConnections(connectionCount uint)
+}
+
+// AlspMetrics encapsulates the metrics collectors for the Application Layer Spam Prevention (ALSP) module, which
+// is part of the networking layer. ALSP is responsible to prevent spam attacks on the application layer messages that
+// appear to be valid for the networking layer but carry on a malicious intent on the application layer (i.e., Flow protocols).
+type AlspMetrics interface {
+	// OnMisbehaviorReported is called when a misbehavior is reported by the application layer to ALSP.
+	// An engine detecting a spamming-related misbehavior reports it to the ALSP module.
+	// Args:
+	// - channel: the channel on which the misbehavior was reported
+	// - misbehaviorType: the type of misbehavior reported
+	OnMisbehaviorReported(channel string, misbehaviorType string)
 }
 
 // NetworkMetrics is the blanket abstraction that encapsulates the metrics collectors for the networking layer.
@@ -182,6 +250,7 @@ type EngineMetrics interface {
 type ComplianceMetrics interface {
 	FinalizedHeight(height uint64)
 	CommittedEpochFinalView(view uint64)
+	EpochTransitionHeight(height uint64)
 	SealedHeight(height uint64)
 	BlockFinalized(*flow.Block)
 	BlockSealed(*flow.Block)
@@ -517,7 +586,15 @@ type ExecutionDataPrunerMetrics interface {
 	Pruned(height uint64, duration time.Duration)
 }
 
+// Example recorder taken from:
+// https://github.com/slok/go-http-metrics/blob/master/metrics/prometheus/prometheus.go
+type RestMetrics interface {
+	httpmetrics.Recorder
+	AddTotalRequests(ctx context.Context, service string, id string)
+}
+
 type AccessMetrics interface {
+	RestMetrics
 	// TotalConnectionsInPool updates the number connections to collection/execution nodes stored in the pool, and the size of the pool
 	TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint)
 
@@ -596,7 +673,7 @@ type ExecutionMetrics interface {
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
 	ExecutionTransactionExecuted(dur time.Duration,
-		compUsed, memoryUsed, actualMemoryUsed uint64,
+		compUsed, memoryUsed uint64,
 		eventCounts, eventSize int,
 		failed bool)
 
@@ -702,7 +779,7 @@ type HeroCacheMetrics interface {
 	// OnEntityEjectionDueToFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
 	// This normally happens -- and is expected -- when the cache is full.
 	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-	OnEntityEjectionDueToFullCapacity(ejectedEntity flow.Entity)
+	OnEntityEjectionDueToFullCapacity()
 
 	// OnEntityEjectionDueToEmergency is called whenever a bucket is found full and all of its keys are valid, i.e.,
 	// each key belongs to an existing (key, entity) pair.

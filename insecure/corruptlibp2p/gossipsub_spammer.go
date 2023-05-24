@@ -21,37 +21,36 @@ import (
 type GossipSubRouterSpammer struct {
 	router      *atomicRouter
 	SpammerNode p2p.LibP2PNode
+	SpammerId   flow.Identity
 }
 
 // NewGossipSubRouterSpammer is the main method tests call for spamming attacks.
 func NewGossipSubRouterSpammer(t *testing.T, sporkId flow.Identifier, role flow.Role) *GossipSubRouterSpammer {
-	spammerNode, router := createSpammerNode(t, sporkId, role)
+	spammerNode, spammerId, router := createSpammerNode(t, sporkId, role)
 	return &GossipSubRouterSpammer{
 		router:      router,
 		SpammerNode: spammerNode,
+		SpammerId:   spammerId,
 	}
 }
 
-// SpamIHave spams the victim with junk iHave messages.
+// SpamControlMessage spams the victim with junk control messages.
 // ctlMessages is the list of spam messages to send to the victim node.
-func (s *GossipSubRouterSpammer) SpamIHave(t *testing.T, victim p2p.LibP2PNode, ctlMessages []pb.ControlMessage) {
+func (s *GossipSubRouterSpammer) SpamControlMessage(t *testing.T, victim p2p.LibP2PNode, ctlMessages []pb.ControlMessage) {
 	for _, ctlMessage := range ctlMessages {
 		require.True(t, s.router.Get().SendControl(victim.Host().ID(), &ctlMessage))
 	}
 }
 
-// GenerateIHaveCtlMessages generates IHAVE control messages before they are sent so the test can prepare
+// GenerateCtlMessages generates control messages before they are sent so the test can prepare
 // to expect receiving them before they are sent by the spammer.
-func (s *GossipSubRouterSpammer) GenerateIHaveCtlMessages(t *testing.T, msgCount, msgSize int) []pb.ControlMessage {
-	var iHaveCtlMsgs []pb.ControlMessage
+func (s *GossipSubRouterSpammer) GenerateCtlMessages(msgCount int, opts ...GossipSubCtrlOption) []pb.ControlMessage {
+	var ctlMgs []pb.ControlMessage
 	for i := 0; i < msgCount; i++ {
-		iHaveCtlMsg := GossipSubCtrlFixture(WithIHave(msgCount, msgSize))
-
-		iHaves := iHaveCtlMsg.GetIhave()
-		require.Equal(t, msgCount, len(iHaves))
-		iHaveCtlMsgs = append(iHaveCtlMsgs, *iHaveCtlMsg)
+		ctlMsg := GossipSubCtrlFixture(opts...)
+		ctlMgs = append(ctlMgs, *ctlMsg)
 	}
-	return iHaveCtlMsgs
+	return ctlMgs
 }
 
 // Start starts the spammer and waits until it is fully initialized before returning.
@@ -64,9 +63,9 @@ func (s *GossipSubRouterSpammer) Start(t *testing.T) {
 	s.router.set(s.router.Get())
 }
 
-func createSpammerNode(t *testing.T, sporkId flow.Identifier, role flow.Role) (p2p.LibP2PNode, *atomicRouter) {
+func createSpammerNode(t *testing.T, sporkId flow.Identifier, role flow.Role) (p2p.LibP2PNode, flow.Identity, *atomicRouter) {
 	router := newAtomicRouter()
-	spammerNode, _ := p2ptest.NodeFixture(
+	spammerNode, spammerId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
@@ -80,7 +79,7 @@ func createSpammerNode(t *testing.T, sporkId flow.Identifier, role flow.Role) (p
 				return nil
 			})),
 	)
-	return spammerNode, router
+	return spammerNode, spammerId, router
 }
 
 // atomicRouter is a wrapper around the corrupt.GossipSubRouter that allows atomic access to the router.

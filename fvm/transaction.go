@@ -1,10 +1,8 @@
 package fvm
 
 import (
-	"github.com/onflow/flow-go/fvm/derived"
-	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -15,41 +13,27 @@ func Transaction(
 	return NewTransaction(txn.ID(), txnIndex, txn)
 }
 
-// TODO(patrick): pass in initial snapshot time when we start supporting
-// speculative pre-processing / execution.
 func NewTransaction(
 	txnId flow.Identifier,
 	txnIndex uint32,
 	txnBody *flow.TransactionBody,
 ) *TransactionProcedure {
 	return &TransactionProcedure{
-		ID:                     txnId,
-		Transaction:            txnBody,
-		InitialSnapshotTxIndex: txnIndex,
-		TxIndex:                txnIndex,
-		ComputationIntensities: make(meter.MeteredComputationIntensities),
+		ID:          txnId,
+		Transaction: txnBody,
+		TxIndex:     txnIndex,
 	}
 }
 
 type TransactionProcedure struct {
-	ID                     flow.Identifier
-	Transaction            *flow.TransactionBody
-	InitialSnapshotTxIndex uint32
-	TxIndex                uint32
-
-	Logs                   []string
-	Events                 flow.EventsList
-	ServiceEvents          flow.EventsList
-	ConvertedServiceEvents flow.ServiceEventList
-	ComputationUsed        uint64
-	ComputationIntensities meter.MeteredComputationIntensities
-	MemoryEstimate         uint64
-	Err                    errors.CodedError
+	ID          flow.Identifier
+	Transaction *flow.TransactionBody
+	TxIndex     uint32
 }
 
 func (proc *TransactionProcedure) NewExecutor(
 	ctx Context,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) ProcedureExecutor {
 	return newTransactionExecutor(ctx, proc, txnState)
 }
@@ -94,10 +78,6 @@ func (TransactionProcedure) Type() ProcedureType {
 	return TransactionProcedureType
 }
 
-func (proc *TransactionProcedure) InitialSnapshotTime() derived.LogicalTime {
-	return derived.LogicalTime(proc.InitialSnapshotTxIndex)
-}
-
-func (proc *TransactionProcedure) ExecutionTime() derived.LogicalTime {
-	return derived.LogicalTime(proc.TxIndex)
+func (proc *TransactionProcedure) ExecutionTime() logical.Time {
+	return logical.Time(proc.TxIndex)
 }

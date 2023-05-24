@@ -31,14 +31,17 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -158,7 +161,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		var opts []nodeBuilderOption
 
 		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
-		opts = append(opts, withPeerManagerOptions(connection.ConnectionPruningEnabled, o.peerUpdateInterval))
+		opts = append(opts, withPeerManagerOptions(connection.PruningEnabled, o.peerUpdateInterval))
 		opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
 		opts = append(opts, withConnectionGater(o.connectionGater))
 		opts = append(opts, withUnicastManagerOpts(o.createStreamRetryInterval))
@@ -227,7 +230,9 @@ func GenerateNetworks(t *testing.T,
 	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
-	sms []network.SubscriptionManager) []network.Network {
+	sms []network.SubscriptionManager,
+	opts ...p2p.NetworkOptFunction) []network.Network {
+
 	count := len(ids)
 	nets := make([]network.Network, 0)
 
@@ -240,6 +245,14 @@ func GenerateNetworks(t *testing.T,
 		me.On("Address").Return(ids[i].Address)
 
 		receiveCache := netcache.NewHeroReceiveCache(p2p.DefaultReceiveCacheSize, log, metrics.NewNoopCollector())
+		cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  unittest.Logger(),
+			SpamRecordCacheSize:     uint32(1000),
+			SpamReportQueueSize:     uint32(1000),
+			AlspMetrics:             metrics.NewNoopCollector(),
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		})
+		require.NoError(t, err)
 
 		// create the network
 		net, err := p2p.NewNetwork(&p2p.NetworkParameters{
@@ -252,6 +265,8 @@ func GenerateNetworks(t *testing.T,
 			Metrics:             metrics.NewNoopCollector(),
 			IdentityProvider:    id.NewFixedIdentityProvider(ids),
 			ReceiveCache:        receiveCache,
+			ConduitFactory:      cf,
+			Options:             opts,
 		})
 		require.NoError(t, err)
 
@@ -366,16 +381,36 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	return engs
 }
 
-// StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel
-func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.Network, duration time.Duration) {
+// StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel.
+// Arguments:
+// - ctx: the irrecoverable context to use for starting the nodes and networks.
+// - t: the test object.
+// - nodes: the libp2p nodes to start.
+// - nets: the networks to start.
+// - timeout: the timeout to use for waiting for the nodes and networks to start.
+//
+// This function fails the test if the nodes or networks do not start within the given timeout.
+func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.Network, timeout time.Duration) {
+	StartNetworks(ctx, t, nets, timeout)
+
+	// start up nodes and Peer managers
+	StartNodes(ctx, t, nodes, timeout)
+}
+
+// StartNetworks starts the provided networks using the provided irrecoverable context
+// Arguments:
+// - ctx: the irrecoverable context to use for starting the networks.
+// - t: the test object.
+// - nets: the networks to start.
+// - duration: the timeout to use for waiting for the networks to start.
+//
+// This function fails the test if the networks do not start within the given timeout.
+func StartNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nets []network.Network, duration time.Duration) {
 	// start up networks (this will implicitly start middlewares)
 	for _, net := range nets {
 		net.Start(ctx)
 		unittest.RequireComponentsReadyBefore(t, duration, net)
 	}
-
-	// start up nodes and Peer managers
-	StartNodes(ctx, t, nodes, duration)
 }
 
 // StartNodes starts the provided nodes and their peer managers using the provided irrecoverable context
@@ -401,10 +436,10 @@ func StopComponents[R module.ReadyDoneAware](t *testing.T, rda []R, duration tim
 	unittest.RequireComponentsDoneBefore(t, duration, comps...)
 }
 
-type nodeBuilderOption func(p2pbuilder.NodeBuilder)
+type nodeBuilderOption func(p2p.NodeBuilder)
 
 func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, pc.ID(protocols.FlowDHTProtocolIDPrefix+prefix), zerolog.Nop(), metrics.NewNoopCollector(), dhtOpts...)
 		})
@@ -412,25 +447,25 @@ func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 }
 
 func withPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetPeerManagerOptions(connectionPruning, updateInterval)
 	}
 }
 
 func withRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetRateLimiterDistributor(distributor)
 	}
 }
 
 func withConnectionGater(connectionGater connmgr.ConnectionGater) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetConnectionGater(connectionGater)
 	}
 }
 
 func withUnicastManagerOpts(delay time.Duration) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetStreamCreationRetryInterval(delay)
 	}
 }
@@ -447,6 +482,9 @@ func generateLibP2PNode(t *testing.T,
 	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, connection.DefaultConnManagerConfig())
 	require.NoError(t, err)
 
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig()).Build()
+	require.NoError(t, err)
+
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
 		metrics.NewNoopCollector(),
@@ -456,7 +494,8 @@ func generateLibP2PNode(t *testing.T,
 		p2pbuilder.DefaultResourceManagerConfig()).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t)).
-		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay)
+		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
+		SetGossipSubRpcInspectorSuite(rpcInspectorSuite)
 
 	for _, opt := range opts {
 		opt(builder)
@@ -478,7 +517,7 @@ func OptionalSleep(send ConduitSendWrapperFunc) {
 
 // generateNetworkingKey generates a Flow ECDSA key using the given seed
 func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
 }
@@ -543,7 +582,6 @@ func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.
 		idProvider,
 		connection.WithOnInterceptPeerDialFilters(filters),
 		connection.WithOnInterceptSecuredFilters(filters))
-
 }
 
 // IsRateLimitedPeerFilter returns a p2p.PeerFilter that will return an error if the peer is rate limited.

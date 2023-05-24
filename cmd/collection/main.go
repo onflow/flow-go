@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
@@ -37,7 +38,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/collection"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/epochs"
@@ -50,7 +50,6 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
-	storagekv "github.com/onflow/flow-go/storage/badger"
 )
 
 func main() {
@@ -79,16 +78,14 @@ func main() {
 		rpcConf                 rpc.Config
 		clusterComplianceConfig modulecompliance.Config
 
-		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
-		followerBuffer          *buffer.PendingBlocks       // pending block cache for follower
-		finalizationDistributor *pubsub.FinalizationDistributor
-		finalizedHeader         *consync.FinalizedHeaderCache
+		pools               *epochpool.TransactionPools // epoch-scoped transaction pools
+		followerDistributor *pubsub.FollowerDistributor
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
 		mainChainSyncCore *chainsync.Core
 		followerCore      *hotstuff.FollowerLoop // follower hotstuff logic
-		followerEng       *followereng.Engine
+		followerEng       *followereng.ComplianceEngine
 		colMetrics        module.CollectionMetrics
 		err               error
 
@@ -137,7 +134,10 @@ func main() {
 			"maximum byte size of the proposed collection")
 		flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", flow.DefaultMaxCollectionTotalGas,
 			"maximum total amount of maxgas of transactions in proposed collections")
-		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond,
+		// Collection Nodes use a lower min timeout than Consensus Nodes (1.5s vs 2.5s) because:
+		//  - they tend to have higher happy-path view rate, allowing a shorter timeout
+		//  - since they have smaller committees, 1-2 offline replicas has a larger negative impact, which is mitigating with a smaller timeout
+		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 1500*time.Millisecond,
 			"the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
 		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor,
 			"adjustment of timeout duration in case of time out event")
@@ -173,6 +173,11 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
+		Module("follower distributor", func(node *cmd.NodeConfig) error {
+			followerDistributor = pubsub.NewFollowerDistributor()
+			followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
+			return nil
+		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -180,7 +185,15 @@ func main() {
 			if !ok {
 				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
-			followerState, err = badgerState.NewFollowerState(state, node.Storage.Index, node.Storage.Payloads, node.Tracer, node.ProtocolEvents, blocktimer.DefaultBlockTimer)
+			followerState, err = badgerState.NewFollowerState(
+				node.Logger,
+				node.Tracer,
+				node.ProtocolEvents,
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				blocktimer.DefaultBlockTimer,
+			)
 			return err
 		}).
 		Module("transactions mempool", func(node *cmd.NodeConfig) error {
@@ -198,10 +211,6 @@ func main() {
 			pools = epochpool.NewTransactionPools(create)
 			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
-		}).
-		Module("pending block cache", func(node *cmd.NodeConfig) error {
-			followerBuffer = buffer.NewPendingBlocks()
-			return nil
 		}).
 		Module("metrics", func(node *cmd.NodeConfig) error {
 			colMetrics = metrics.NewCollectionCollector(node.Tracer)
@@ -230,7 +239,7 @@ func main() {
 			return nil
 		}).
 		Component("machine account config validator", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
+			// @TODO use fallback logic for flowClient similar to DKG/QC contract clients
 			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
@@ -267,18 +276,12 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
-			packer := hotsignature.NewConsensusSigDataPacker(mainConsensusCommittee)
-			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, packer)
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
 			// creates a consensus follower with noop consumer as the notifier
 			followerCore, err = consensus.NewFollower(
 				node.Logger,
-				mainConsensusCommittee,
 				node.Storage.Headers,
 				finalizer,
-				verifier,
-				finalizationDistributor,
+				followerDistributor,
 				node.RootBlock.Header,
 				node.RootQC,
 				finalized,
@@ -290,45 +293,47 @@ func main() {
 			return followerCore, nil
 		}).
 		Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// initialize cleaner for DB
-			cleaner := storagekv.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-
 			packer := hotsignature.NewConsensusSigDataPacker(mainConsensusCommittee)
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, packer)
 
 			validator := validator.New(mainConsensusCommittee, verifier)
 
-			followerEng, err = followereng.New(
+			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if node.HeroCacheMetricsEnable {
+				heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
+			}
+
+			core, err := followereng.NewComplianceCore(
 				node.Logger,
-				node.Network,
-				node.Me,
-				node.Metrics.Engine,
 				node.Metrics.Mempool,
-				cleaner,
-				node.Storage.Headers,
-				node.Storage.Payloads,
+				heroCacheCollector,
+				followerDistributor,
 				followerState,
-				followerBuffer,
 				followerCore,
 				validator,
 				mainChainSyncCore,
 				node.Tracer,
-				followereng.WithComplianceOptions(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create follower core: %w", err)
+			}
+
+			followerEng, err = followereng.NewComplianceLayer(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.Metrics.Engine,
+				node.Storage.Headers,
+				node.FinalizedHeader,
+				core,
+				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
 			return followerEng, nil
-		}).
-		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			finalizedHeader, err = consync.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
-			if err != nil {
-				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-			}
-
-			return finalizedHeader, nil
 		}).
 		Component("main chain sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
@@ -338,15 +343,16 @@ func main() {
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
+				node.State,
 				node.Storage.Blocks,
 				followerEng,
 				mainChainSyncCore,
-				finalizedHeader,
 				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
+			followerDistributor.AddFinalizationConsumer(sync)
 
 			return sync, nil
 		}).
@@ -397,7 +403,10 @@ func main() {
 				collectionRequestQueue,
 				collectionProviderWorkers,
 				channels.ProvideCollections,
-				filter.HasRole(flow.RoleAccess, flow.RoleExecution),
+				filter.And(
+					filter.HasWeight(true),
+					filter.HasRole(flow.RoleAccess, flow.RoleExecution),
+				),
 				retrieve,
 			)
 		}).
@@ -431,6 +440,7 @@ func main() {
 
 			builderFactory, err := factories.NewBuilderFactory(
 				node.DB,
+				node.State,
 				node.Storage.Headers,
 				node.Tracer,
 				colMetrics,

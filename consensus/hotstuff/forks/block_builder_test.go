@@ -42,51 +42,54 @@ func NewBlockBuilder() *BlockBuilder {
 	}
 }
 
-// Add adds a block with the given qcView and blockView.
-func (f *BlockBuilder) Add(qcView uint64, blockView uint64) {
-	f.blockViews = append(f.blockViews, &BlockView{
+// Add adds a block with the given qcView and blockView. Returns self-reference for chaining.
+func (bb *BlockBuilder) Add(qcView uint64, blockView uint64) *BlockBuilder {
+	bb.blockViews = append(bb.blockViews, &BlockView{
 		View:   blockView,
 		QCView: qcView,
 	})
+	return bb
 }
 
 // GenesisBlock returns the genesis block, which is always finalized.
-func (f *BlockBuilder) GenesisBlock() *model.Block {
-	return makeGenesis().Block
+func (bb *BlockBuilder) GenesisBlock() *model.CertifiedBlock {
+	return makeGenesis()
 }
 
 // AddVersioned adds a block with the given qcView and blockView.
-// In addition the version identifier of the QC embedded within the block
+// In addition, the version identifier of the QC embedded within the block
 // is specified by `qcVersion`. The version identifier for the block itself
 // (primarily for emulating different payloads) is specified by `blockVersion`.
-// [3,4] denotes a block of view 4, with a qc of view 3
-// [3,4'] denotes a block of view 4, with a qc of view 3, but has a different BlockID than [3,4]
-// [3,4'] can be created by AddVersioned(3, 4, 0, 1)
-// [3',4] can be created by AddVersioned(3, 4, 1, 0)
-func (f *BlockBuilder) AddVersioned(qcView uint64, blockView uint64, qcVersion int, blockVersion int) {
-	f.blockViews = append(f.blockViews, &BlockView{
+// [(◄3) 4] denotes a block of view 4, with a qc for view 3
+// [(◄3) 4'] denotes a block of view 4 that is different than [(◄3) 4], with a qc for view 3
+// [(◄3) 4'] can be created by AddVersioned(3, 4, 0, 1)
+// [(◄3') 4] can be created by AddVersioned(3, 4, 1, 0)
+// Returns self-reference for chaining.
+func (bb *BlockBuilder) AddVersioned(qcView uint64, blockView uint64, qcVersion int, blockVersion int) *BlockBuilder {
+	bb.blockViews = append(bb.blockViews, &BlockView{
 		View:         blockView,
 		QCView:       qcView,
 		BlockVersion: blockVersion,
 		QCVersion:    qcVersion,
 	})
+	return bb
 }
 
-// Blocks returns a list of all blocks added to the BlockBuilder.
+// Proposals returns a list of all proposals added to the BlockBuilder.
 // Returns an error if the blocks do not form a connected tree rooted at genesis.
-func (f *BlockBuilder) Blocks() ([]*model.Proposal, error) {
-	blocks := make([]*model.Proposal, 0, len(f.blockViews))
+func (bb *BlockBuilder) Proposals() ([]*model.Proposal, error) {
+	blocks := make([]*model.Proposal, 0, len(bb.blockViews))
 
-	genesisBQ := makeGenesis()
+	genesisBlock := makeGenesis()
 	genesisBV := &BlockView{
-		View:   genesisBQ.Block.View,
-		QCView: genesisBQ.QC.View,
+		View:   genesisBlock.Block.View,
+		QCView: genesisBlock.CertifyingQC.View,
 	}
 
 	qcs := make(map[string]*flow.QuorumCertificate)
-	qcs[genesisBV.QCIndex()] = genesisBQ.QC
+	qcs[genesisBV.QCIndex()] = genesisBlock.CertifyingQC
 
-	for _, bv := range f.blockViews {
+	for _, bv := range bb.blockViews {
 		qc, ok := qcs[bv.QCIndex()]
 		if !ok {
 			return nil, fmt.Errorf("test fail: no qc found for qc index: %v", bv.QCIndex())
@@ -121,6 +124,16 @@ func (f *BlockBuilder) Blocks() ([]*model.Proposal, error) {
 	return blocks, nil
 }
 
+// Blocks returns a list of all blocks added to the BlockBuilder.
+// Returns an error if the blocks do not form a connected tree rooted at genesis.
+func (bb *BlockBuilder) Blocks() ([]*model.Block, error) {
+	proposals, err := bb.Proposals()
+	if err != nil {
+		return nil, fmt.Errorf("BlockBuilder failed to generate proposals: %w", err)
+	}
+	return toBlocks(proposals), nil
+}
+
 func makePayloadHash(view uint64, qc *flow.QuorumCertificate, blockVersion int) flow.Identifier {
 	return flow.MakeID(struct {
 		View         uint64
@@ -145,7 +158,8 @@ func makeBlockID(block *model.Block) flow.Identifier {
 	})
 }
 
-func makeGenesis() *BlockQC {
+// constructs the genesis block (identical for all calls)
+func makeGenesis() *model.CertifiedBlock {
 	genesis := &model.Block{
 		View: 1,
 	}
@@ -155,9 +169,18 @@ func makeGenesis() *BlockQC {
 		View:    1,
 		BlockID: genesis.BlockID,
 	}
-	genesisBQ := &BlockQC{
-		Block: genesis,
-		QC:    genesisQC,
+	certifiedGenesisBlock, err := model.NewCertifiedBlock(genesis, genesisQC)
+	if err != nil {
+		panic(fmt.Sprintf("combining genesis block and genensis QC to certified block failed: %s", err.Error()))
 	}
-	return genesisBQ
+	return &certifiedGenesisBlock
+}
+
+// toBlocks converts the given proposals to slice of blocks
+func toBlocks(proposals []*model.Proposal) []*model.Block {
+	blocks := make([]*model.Block, 0, len(proposals))
+	for _, b := range proposals {
+		blocks = append(blocks, b.Block)
+	}
+	return blocks
 }

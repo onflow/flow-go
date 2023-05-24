@@ -36,17 +36,17 @@ import (
 //   - The only exception is calls to `ProcessFinalizedView`, which is the only concurrency-safe
 //     method of compliance.Core
 type Core struct {
-	log               zerolog.Logger // used to log relevant actions with context
-	config            compliance.Config
-	engineMetrics     module.EngineMetrics
-	mempoolMetrics    module.MempoolMetrics
-	hotstuffMetrics   module.HotstuffMetrics
-	complianceMetrics module.ComplianceMetrics
-	tracer            module.Tracer
-	cleaner           storage.Cleaner
-	headers           storage.Headers
-	payloads          storage.Payloads
-	state             protocol.ParticipantState
+	log                       zerolog.Logger // used to log relevant actions with context
+	config                    compliance.Config
+	engineMetrics             module.EngineMetrics
+	mempoolMetrics            module.MempoolMetrics
+	hotstuffMetrics           module.HotstuffMetrics
+	complianceMetrics         module.ComplianceMetrics
+	proposalViolationNotifier hotstuff.ProposalViolationConsumer
+	tracer                    module.Tracer
+	headers                   storage.Headers
+	payloads                  storage.Payloads
+	state                     protocol.ParticipantState
 	// track latest finalized view/height - used to efficiently drop outdated or too-far-ahead blocks
 	finalizedView     counters.StrictMonotonousCounter
 	finalizedHeight   counters.StrictMonotonousCounter
@@ -65,8 +65,8 @@ func NewCore(
 	mempool module.MempoolMetrics,
 	hotstuffMetrics module.HotstuffMetrics,
 	complianceMetrics module.ComplianceMetrics,
+	proposalViolationNotifier hotstuff.ProposalViolationConsumer,
 	tracer module.Tracer,
-	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
 	state protocol.ParticipantState,
@@ -85,23 +85,23 @@ func NewCore(
 	}
 
 	c := &Core{
-		log:               log.With().Str("compliance", "core").Logger(),
-		config:            config,
-		engineMetrics:     collector,
-		tracer:            tracer,
-		mempoolMetrics:    mempool,
-		hotstuffMetrics:   hotstuffMetrics,
-		complianceMetrics: complianceMetrics,
-		cleaner:           cleaner,
-		headers:           headers,
-		payloads:          payloads,
-		state:             state,
-		pending:           pending,
-		sync:              sync,
-		hotstuff:          hotstuff,
-		validator:         validator,
-		voteAggregator:    voteAggregator,
-		timeoutAggregator: timeoutAggregator,
+		log:                       log.With().Str("compliance", "core").Logger(),
+		config:                    config,
+		engineMetrics:             collector,
+		tracer:                    tracer,
+		mempoolMetrics:            mempool,
+		hotstuffMetrics:           hotstuffMetrics,
+		complianceMetrics:         complianceMetrics,
+		proposalViolationNotifier: proposalViolationNotifier,
+		headers:                   headers,
+		payloads:                  payloads,
+		state:                     state,
+		pending:                   pending,
+		sync:                      sync,
+		hotstuff:                  hotstuff,
+		validator:                 validator,
+		voteAggregator:            voteAggregator,
+		timeoutAggregator:         timeoutAggregator,
 	}
 
 	// initialize finalized boundary cache
@@ -161,10 +161,10 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// ignore proposals which are too far ahead of our local finalized state
 	// instead, rely on sync engine to catch up finalization more effectively, and avoid
 	// large subtree of blocks to be cached.
-	if header.Height > finalHeight+c.config.SkipNewProposalsThreshold {
+	if header.View > finalView+c.config.SkipNewProposalsThreshold {
 		log.Debug().
 			Uint64("skip_new_proposals_threshold", c.config.SkipNewProposalsThreshold).
-			Msg("dropping block too far ahead of locally finalized height")
+			Msg("dropping block too far ahead of locally finalized view")
 		return nil
 	}
 
@@ -213,17 +213,17 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// if the proposal is connected to a block that is neither in the cache, nor
 	// in persistent storage, its direct parent is missing; cache the proposal
 	// and request the parent
-	parent, err := c.headers.ByBlockID(header.ParentID)
-	if errors.Is(err, storage.ErrNotFound) {
+	exists, err := c.headers.Exists(header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not check parent exists: %w", err)
+	}
+	if !exists {
 		_ = c.pending.Add(originID, block)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
 		log.Debug().Msg("requesting missing parent for proposal")
 		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("could not check parent: %w", err)
 	}
 
 	// At this point, we should be able to connect the proposal to the finalized
@@ -232,17 +232,11 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(block, parent)
+	err = c.processBlockAndDescendants(block)
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
-
-	// most of the heavy database checks are done at this point, so this is a
-	// good moment to potentially kick-off a garbage collection of the DB
-	// NOTE: this is only effectively run every 1000th calls, which corresponds
-	// to every 1000th successfully processed block
-	c.cleaner.RunGC()
 
 	return nil
 }
@@ -253,18 +247,18 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 // processed as well.
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
-func (c *Core) processBlockAndDescendants(proposal *flow.Block, parent *flow.Header) error {
+func (c *Core) processBlockAndDescendants(proposal *flow.Block) error {
 	blockID := proposal.Header.ID()
 
 	log := c.log.With().
 		Str("block_id", blockID.String()).
 		Uint64("block_height", proposal.Header.Height).
 		Uint64("block_view", proposal.Header.View).
-		Uint64("parent_view", parent.View).
+		Uint64("parent_view", proposal.Header.ParentView).
 		Logger()
 
 	// process block itself
-	err := c.processBlockProposal(proposal, parent)
+	err := c.processBlockProposal(proposal)
 	if err != nil {
 		if checkForAndLogOutdatedInputError(err, log) {
 			return nil
@@ -293,7 +287,7 @@ func (c *Core) processBlockAndDescendants(proposal *flow.Block, parent *flow.Hea
 		return nil
 	}
 	for _, child := range children {
-		cpr := c.processBlockAndDescendants(child.Message, proposal.Header)
+		cpr := c.processBlockAndDescendants(child.Message)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr
@@ -311,7 +305,7 @@ func (c *Core) processBlockAndDescendants(proposal *flow.Block, parent *flow.Hea
 // Expected errors during normal operations:
 //   - engine.OutdatedInputError if the block proposal is outdated (e.g. orphaned)
 //   - engine.InvalidInputError if the block proposal is invalid
-func (c *Core) processBlockProposal(proposal *flow.Block, parent *flow.Header) error {
+func (c *Core) processBlockProposal(proposal *flow.Block) error {
 	startTime := time.Now()
 	defer func() {
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
@@ -329,7 +323,8 @@ func (c *Core) processBlockProposal(proposal *flow.Block, parent *flow.Header) e
 	hotstuffProposal := model.ProposalFromFlow(header)
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
-		if model.IsInvalidBlockError(err) {
+		if invalidBlockErr, ok := model.AsInvalidProposalError(err); ok {
+			c.proposalViolationNotifier.OnInvalidBlockDetected(*invalidBlockErr)
 			return engine.NewInvalidInputErrorf("invalid block proposal: %w", err)
 		}
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {

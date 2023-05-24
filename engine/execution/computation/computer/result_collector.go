@@ -6,15 +6,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -24,11 +25,12 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// ViewCommitter commits views's deltas to the ledger and collects the proofs
+// ViewCommitter commits execution snapshot to the ledger and collects
+// the proofs
 type ViewCommitter interface {
-	// CommitView commits a views' register delta and collects proofs
+	// CommitView commits an execution snapshot and collects proofs
 	CommitView(
-		state.View,
+		*snapshot.ExecutionSnapshot,
 		flow.StateCommitment,
 	) (
 		flow.StateCommitment,
@@ -38,41 +40,47 @@ type ViewCommitter interface {
 	)
 }
 
-type collectionResult struct {
-	collectionItem
-	startTime time.Time
-	state.View
+type transactionResult struct {
+	transactionRequest
+	*snapshot.ExecutionSnapshot
+	fvm.ProcedureOutput
+	timeSpent time.Duration
 }
 
+// TODO(ramtin): move committer and other folks to consumers layer
 type resultCollector struct {
 	tracer    module.Tracer
 	blockSpan otelTrace.Span
 
 	metrics module.ExecutionMetrics
 
-	closeOnce sync.Once
+	closeOnce          sync.Once
+	processorInputChan chan transactionResult
+	processorDoneChan  chan struct{}
+	processorError     error
 
-	committer          ViewCommitter
-	committerInputChan chan collectionResult
-	committerDoneChan  chan struct{}
-	committerError     error
+	committer ViewCommitter
 
 	signer        module.Local
 	spockHasher   hash.Hasher
 	receiptHasher hash.Hasher
 
-	snapshotHasherInputChan chan collectionResult
-	snapshotHasherDoneChan  chan struct{}
-	snapshotHasherError     error
-
 	executionDataProvider *provider.Provider
 
 	parentBlockExecutionResultID flow.Identifier
 
-	result *execution.ComputationResult
+	result    *execution.ComputationResult
+	consumers []result.ExecutedCollectionConsumer
 
-	chunks          []*flow.Chunk
 	spockSignatures []crypto.Signature
+
+	blockStartTime time.Time
+	blockStats     module.ExecutionResultStats
+	blockMeter     *meter.Meter
+
+	currentCollectionStartTime time.Time
+	currentCollectionState     *state.ExecutionState
+	currentCollectionStats     module.ExecutionResultStats
 }
 
 func newResultCollector(
@@ -86,186 +94,250 @@ func newResultCollector(
 	receiptHasher hash.Hasher,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	numCollections int,
+	numTransactions int,
+	consumers []result.ExecutedCollectionConsumer,
 ) *resultCollector {
+	numCollections := len(block.Collections()) + 1
+	now := time.Now()
 	collector := &resultCollector{
 		tracer:                       tracer,
 		blockSpan:                    blockSpan,
 		metrics:                      metrics,
+		processorInputChan:           make(chan transactionResult, numTransactions),
+		processorDoneChan:            make(chan struct{}),
 		committer:                    committer,
-		committerInputChan:           make(chan collectionResult, numCollections),
-		committerDoneChan:            make(chan struct{}),
 		signer:                       signer,
 		spockHasher:                  spockHasher,
 		receiptHasher:                receiptHasher,
-		snapshotHasherInputChan:      make(chan collectionResult, numCollections),
-		snapshotHasherDoneChan:       make(chan struct{}),
 		executionDataProvider:        executionDataProvider,
 		parentBlockExecutionResultID: parentBlockExecutionResultID,
 		result:                       execution.NewEmptyComputationResult(block),
-		chunks:                       make([]*flow.Chunk, 0, numCollections),
+		consumers:                    consumers,
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
+		blockStartTime:               now,
+		blockMeter:                   meter.NewMeter(meter.DefaultParameters()),
+		currentCollectionStartTime:   now,
+		currentCollectionState:       state.NewExecutionState(nil, state.DefaultParameters()),
+		currentCollectionStats: module.ExecutionResultStats{
+			NumberOfCollections: 1,
+		},
 	}
 
-	go collector.runCollectionCommitter()
-	go collector.runSnapshotHasher()
+	go collector.runResultProcessor()
 
 	return collector
 }
 
-func (collector *resultCollector) runCollectionCommitter() {
-	defer close(collector.committerDoneChan)
+func (collector *resultCollector) commitCollection(
+	collection collectionInfo,
+	startTime time.Time,
+	collectionExecutionSnapshot *snapshot.ExecutionSnapshot,
+) error {
+	defer collector.tracer.StartSpanFromParent(
+		collector.blockSpan,
+		trace.EXECommitDelta).End()
 
-	for collection := range collector.committerInputChan {
-		span := collector.tracer.StartSpanFromParent(
-			collector.blockSpan,
-			trace.EXECommitDelta)
-
-		startState := collector.result.EndState
-		endState, proof, trieUpdate, err := collector.committer.CommitView(
-			collection.View,
-			startState)
-		if err != nil {
-			collector.committerError = fmt.Errorf(
-				"commit view failed: %w",
-				err)
-			return
-		}
-
-		collector.result.StateCommitments = append(
-			collector.result.StateCommitments,
-			endState)
-		collector.result.Proofs = append(collector.result.Proofs, proof)
-
-		eventsHash, err := flow.EventsMerkleRootHash(
-			collector.result.Events[collection.collectionIndex])
-		if err != nil {
-			collector.committerError = fmt.Errorf(
-				"hash events failed: %w",
-				err)
-			return
-		}
-
-		collector.result.EventsHashes = append(
-			collector.result.EventsHashes,
-			eventsHash)
-
-		chunk := flow.NewChunk(
-			collection.blockId,
-			collection.collectionIndex,
-			startState,
-			len(collection.transactions),
-			eventsHash,
-			endState)
-		collector.chunks = append(collector.chunks, chunk)
-
-		collectionStruct := collection.Collection()
-
-		// Note: There's some inconsistency in how chunk execution data and
-		// chunk data pack populate their collection fields when the collection
-		// is the system collection.
-		executionCollection := &collectionStruct
-		dataPackCollection := executionCollection
-		if collection.isSystemCollection {
-			dataPackCollection = nil
-		}
-
-		collector.result.ChunkDataPacks = append(
-			collector.result.ChunkDataPacks,
-			flow.NewChunkDataPack(
-				chunk.ID(),
-				startState,
-				proof,
-				dataPackCollection))
-
-		collector.result.ChunkExecutionDatas = append(
-			collector.result.ChunkExecutionDatas,
-			&execution_data.ChunkExecutionData{
-				Collection: executionCollection,
-				Events:     collector.result.Events[collection.collectionIndex],
-				TrieUpdate: trieUpdate,
-			})
-
-		collector.metrics.ExecutionChunkDataPackGenerated(
-			len(proof),
-			len(collection.transactions))
-
-		collector.result.EndState = endState
-
-		span.End()
+	startState := collector.result.CurrentEndState()
+	endState, proof, trieUpdate, err := collector.committer.CommitView(
+		collectionExecutionSnapshot,
+		startState)
+	if err != nil {
+		return fmt.Errorf("commit view failed: %w", err)
 	}
+
+	execColRes := collector.result.CollectionExecutionResultAt(collection.collectionIndex)
+	execColRes.UpdateExecutionSnapshot(collectionExecutionSnapshot)
+
+	events := execColRes.Events()
+	eventsHash, err := flow.EventsMerkleRootHash(events)
+	if err != nil {
+		return fmt.Errorf("hash events failed: %w", err)
+	}
+
+	col := collection.Collection()
+	chunkExecData := &execution_data.ChunkExecutionData{
+		Collection: &col,
+		Events:     events,
+		TrieUpdate: trieUpdate,
+	}
+
+	collector.result.AppendCollectionAttestationResult(
+		startState,
+		endState,
+		proof,
+		eventsHash,
+		chunkExecData,
+	)
+
+	collector.metrics.ExecutionChunkDataPackGenerated(
+		len(proof),
+		len(collection.Transactions))
+
+	spock, err := collector.signer.SignFunc(
+		collectionExecutionSnapshot.SpockSecret,
+		collector.spockHasher,
+		SPOCKProve)
+	if err != nil {
+		return fmt.Errorf("signing spock hash failed: %w", err)
+	}
+
+	collector.spockSignatures = append(collector.spockSignatures, spock)
+
+	collector.currentCollectionStats.EventCounts = len(events)
+	collector.currentCollectionStats.EventSize = events.ByteSize()
+	collector.currentCollectionStats.NumberOfRegistersTouched = len(
+		collectionExecutionSnapshot.AllRegisterIDs())
+	for _, entry := range collectionExecutionSnapshot.UpdatedRegisters() {
+		collector.currentCollectionStats.NumberOfBytesWrittenToRegisters += len(
+			entry.Value)
+	}
+
+	collector.metrics.ExecutionCollectionExecuted(
+		time.Since(startTime),
+		collector.currentCollectionStats)
+
+	collector.blockStats.Merge(collector.currentCollectionStats)
+	collector.blockMeter.MergeMeter(collectionExecutionSnapshot.Meter)
+
+	collector.currentCollectionStartTime = time.Now()
+	collector.currentCollectionState = state.NewExecutionState(nil, state.DefaultParameters())
+	collector.currentCollectionStats = module.ExecutionResultStats{
+		NumberOfCollections: 1,
+	}
+
+	for _, consumer := range collector.consumers {
+		err = consumer.OnExecutedCollection(collector.result.CollectionExecutionResultAt(collection.collectionIndex))
+		if err != nil {
+			return fmt.Errorf("consumer failed: %w", err)
+		}
+	}
+
+	return nil
 }
 
-func (collector *resultCollector) runSnapshotHasher() {
-	defer close(collector.snapshotHasherDoneChan)
+func (collector *resultCollector) processTransactionResult(
+	txn transactionRequest,
+	txnExecutionSnapshot *snapshot.ExecutionSnapshot,
+	output fvm.ProcedureOutput,
+	timeSpent time.Duration,
+) error {
+	logger := txn.ctx.Logger.With().
+		Uint64("computation_used", output.ComputationUsed).
+		Uint64("memory_used", output.MemoryEstimate).
+		Int64("time_spent_in_ms", timeSpent.Milliseconds()).
+		Logger()
 
-	for collection := range collector.snapshotHasherInputChan {
+	if output.Err != nil {
+		logger = logger.With().
+			Str("error_message", output.Err.Error()).
+			Uint16("error_code", uint16(output.Err.Code())).
+			Logger()
+		logger.Info().Msg("transaction execution failed")
 
-		snapshot := collection.View.(*delta.View).Interactions()
-		collector.result.AddCollection(snapshot)
-
-		collector.metrics.ExecutionCollectionExecuted(
-			time.Since(collection.startTime),
-			collector.result.CollectionStats(collection.collectionIndex))
-
-		spock, err := collector.signer.SignFunc(
-			snapshot.SpockSecret,
-			collector.spockHasher,
-			SPOCKProve)
-		if err != nil {
-			collector.snapshotHasherError = fmt.Errorf(
-				"signing spock hash failed: %w",
-				err)
-			return
+		if txn.isSystemTransaction {
+			// This log is used as the data source for an alert on grafana.
+			// The system_chunk_error field must not be changed without adding
+			// the corresponding changes in grafana.
+			// https://github.com/dapperlabs/flow-internal/issues/1546
+			logger.Error().
+				Bool("system_chunk_error", true).
+				Bool("system_transaction_error", true).
+				Bool("critical_error", true).
+				Msg("error executing system chunk transaction")
 		}
-
-		collector.spockSignatures = append(collector.spockSignatures, spock)
+	} else {
+		logger.Info().Msg("transaction executed successfully")
 	}
+
+	collector.metrics.ExecutionTransactionExecuted(
+		timeSpent,
+		output.ComputationUsed,
+		output.MemoryEstimate,
+		len(output.Events),
+		flow.EventsList(output.Events).ByteSize(),
+		output.Err != nil,
+	)
+
+	txnResult := flow.TransactionResult{
+		TransactionID:   txn.ID,
+		ComputationUsed: output.ComputationUsed,
+		MemoryUsed:      output.MemoryEstimate,
+	}
+	if output.Err != nil {
+		txnResult.ErrorMessage = output.Err.Error()
+	}
+
+	collector.result.
+		CollectionExecutionResultAt(txn.collectionIndex).
+		AppendTransactionResults(
+			output.Events,
+			output.ServiceEvents,
+			output.ConvertedServiceEvents,
+			txnResult,
+		)
+
+	err := collector.currentCollectionState.Merge(txnExecutionSnapshot)
+	if err != nil {
+		return fmt.Errorf("failed to merge into collection view: %w", err)
+	}
+
+	collector.currentCollectionStats.ComputationUsed += output.ComputationUsed
+	collector.currentCollectionStats.MemoryUsed += output.MemoryEstimate
+	collector.currentCollectionStats.NumberOfTransactions += 1
+
+	if !txn.lastTransactionInCollection {
+		return nil
+	}
+
+	return collector.commitCollection(
+		txn.collectionInfo,
+		collector.currentCollectionStartTime,
+		collector.currentCollectionState.Finalize())
 }
 
 func (collector *resultCollector) AddTransactionResult(
-	collectionIndex int,
-	txn *fvm.TransactionProcedure,
+	request transactionRequest,
+	snapshot *snapshot.ExecutionSnapshot,
+	output fvm.ProcedureOutput,
+	timeSpent time.Duration,
 ) {
-	collector.result.AddTransactionResult(collectionIndex, txn)
+	result := transactionResult{
+		transactionRequest: request,
+		ExecutionSnapshot:  snapshot,
+		ProcedureOutput:    output,
+		timeSpent:          timeSpent,
+	}
+
+	select {
+	case collector.processorInputChan <- result:
+		// Do nothing
+	case <-collector.processorDoneChan:
+		// Processor exited (probably due to an error)
+	}
 }
 
-func (collector *resultCollector) CommitCollection(
-	collection collectionItem,
-	startTime time.Time,
-	collectionView state.View,
-) {
+func (collector *resultCollector) runResultProcessor() {
+	defer close(collector.processorDoneChan)
 
-	result := collectionResult{
-		collectionItem: collection,
-		startTime:      startTime,
-		View:           collectionView,
-	}
-
-	select {
-	case collector.committerInputChan <- result:
-		// Do nothing
-	case <-collector.committerDoneChan:
-		// Committer exited (probably due to an error)
-	}
-
-	select {
-	case collector.snapshotHasherInputChan <- result:
-		// do nothing
-	case <-collector.snapshotHasherDoneChan:
-		// Snapshot hasher exited (probably due to an error)
+	for result := range collector.processorInputChan {
+		err := collector.processTransactionResult(
+			result.transactionRequest,
+			result.ExecutionSnapshot,
+			result.ProcedureOutput,
+			result.timeSpent)
+		if err != nil {
+			collector.processorError = err
+			return
+		}
 	}
 }
 
 func (collector *resultCollector) Stop() {
 	collector.closeOnce.Do(func() {
-		close(collector.committerInputChan)
-		close(collector.snapshotHasherInputChan)
+		close(collector.processorInputChan)
 	})
 }
 
-// TODO(patrick): refactor execution receipt generation from ingress engine
-// to here to improve benchmarking.
 func (collector *resultCollector) Finalize(
 	ctx context.Context,
 ) (
@@ -274,20 +346,10 @@ func (collector *resultCollector) Finalize(
 ) {
 	collector.Stop()
 
-	<-collector.committerDoneChan
-	<-collector.snapshotHasherDoneChan
+	<-collector.processorDoneChan
 
-	var err error
-	if collector.committerError != nil {
-		err = multierror.Append(err, collector.committerError)
-	}
-
-	if collector.snapshotHasherError != nil {
-		err = multierror.Append(err, collector.snapshotHasherError)
-	}
-
-	if err != nil {
-		return nil, err
+	if collector.processorError != nil {
+		return nil, collector.processorError
 	}
 
 	executionDataID, err := collector.executionDataProvider.Provide(
@@ -301,8 +363,8 @@ func (collector *resultCollector) Finalize(
 	executionResult := flow.NewExecutionResult(
 		collector.parentBlockExecutionResultID,
 		collector.result.ExecutableBlock.ID(),
-		collector.chunks,
-		collector.result.ConvertedServiceEvents,
+		collector.result.AllChunks(),
+		collector.result.AllConvertedServiceEvents(),
 		executionDataID)
 
 	executionReceipt, err := GenerateExecutionReceipt(
@@ -315,6 +377,17 @@ func (collector *resultCollector) Finalize(
 	}
 
 	collector.result.ExecutionReceipt = executionReceipt
+
+	collector.metrics.ExecutionBlockExecuted(
+		time.Since(collector.blockStartTime),
+		collector.blockStats)
+
+	for kind, intensity := range collector.blockMeter.ComputationIntensities() {
+		collector.metrics.ExecutionBlockExecutionEffortVectorComponent(
+			kind.String(),
+			intensity)
+	}
+
 	return collector.result, nil
 }
 

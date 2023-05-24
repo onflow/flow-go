@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/prometheus/client_golang/prometheus"
@@ -25,13 +23,14 @@ import (
 	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/scoring"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -185,35 +184,57 @@ type NetworkConfig struct {
 	// that are not part of protocol state should be trimmed
 	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
 	NetworkConnectionPruning bool
-
-	// PeerScoringEnabled enables peer scoring on pubsub
-	PeerScoringEnabled bool
+	// GossipSubConfig core gossipsub configuration.
+	GossipSubConfig *p2pbuilder.GossipSubConfig
 	// PreferredUnicastProtocols list of unicast protocols in preferred order
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
-	// UnicastRateLimitDryRun will disable connection disconnects and gating when unicast rate limiters are configured
-	UnicastRateLimitDryRun bool
-	//UnicastRateLimitLockoutDuration the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node
-	// after being rate limited.
-	UnicastRateLimitLockoutDuration time.Duration
-	// UnicastMessageRateLimit amount of unicast messages that can be sent by a peer per second.
-	UnicastMessageRateLimit int
-	// UnicastBandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
-	UnicastBandwidthRateLimit int
-	// UnicastBandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
-	UnicastBandwidthBurstLimit int
-	// PeerUpdateInterval interval used by the libp2p node peer manager component to periodically request peer updates.
-	PeerUpdateInterval time.Duration
-	// UnicastMessageTimeout how long a unicast transmission can take to complete.
-	UnicastMessageTimeout time.Duration
+
+	PeerUpdateInterval          time.Duration
+	UnicastMessageTimeout       time.Duration
+	DNSCacheTTL                 time.Duration
+	LibP2PResourceManagerConfig *p2pbuilder.ResourceManagerConfig
+	ConnectionManagerConfig     *connection.ManagerConfig
 	// UnicastCreateStreamRetryDelay initial delay used in the exponential backoff for create stream retries
 	UnicastCreateStreamRetryDelay time.Duration
-	// DNSCacheTTL time to live for DNS cache
-	DNSCacheTTL time.Duration
-	// LibP2PResourceManagerConfig configuration for p2pbuilder.ResourceManagerConfig
-	LibP2PResourceManagerConfig *p2pbuilder.ResourceManagerConfig
-	// ConnectionManagerConfig configuration for connection.ManagerConfig=
-	ConnectionManagerConfig *connection.ManagerConfig
+	// size of the queue for notifications about new peers in the disallow list.
+	DisallowListNotificationCacheSize uint32
+	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
+	UnicastRateLimitersConfig *UnicastRateLimitersConfig
+	AlspConfig                *AlspConfig
+}
+
+// AlspConfig is the config for the Application Layer Spam Prevention (ALSP) protocol.
+type AlspConfig struct {
+	// Size of the cache for spam records. There is at most one spam record per authorized (i.e., staked) node.
+	// Recommended size is 10 * number of authorized nodes to allow for churn.
+	SpamRecordCacheSize uint32
+
+	// SpamReportQueueSize is the size of the queue for spam records. The queue is used to store spam records
+	// temporarily till they are picked by the workers. When the queue is full, new spam records are dropped.
+	// Recommended size is 100 * number of authorized nodes to allow for churn.
+	SpamReportQueueSize uint32
+
+	// DisablePenalty indicates whether applying the penalty to the misbehaving node is disabled.
+	// When disabled, the ALSP module logs the misbehavior reports and updates the metrics, but does not apply the penalty.
+	// This is useful for managing production incidents.
+	// Note: under normal circumstances, the ALSP module should not be disabled.
+	DisablePenalty bool
+}
+
+// UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
+type UnicastRateLimitersConfig struct {
+	// DryRun setting this to true will disable connection disconnects and gating when unicast rate limiters are configured
+	DryRun bool
+	// LockoutDuration the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node
+	// after being rate limited.
+	LockoutDuration time.Duration
+	// MessageRateLimit amount of unicast messages that can be sent by a peer per second.
+	MessageRateLimit int
+	// BandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
+	BandwidthRateLimit int
+	// BandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
+	BandwidthBurstLimit int
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -256,21 +277,29 @@ type NodeConfig struct {
 
 	// root state information
 	RootSnapshot protocol.Snapshot
-	// cached properties of RootSnapshot for convenience
-	RootBlock   *flow.Block
-	RootQC      *flow.QuorumCertificate
-	RootResult  *flow.ExecutionResult
-	RootSeal    *flow.Seal
-	RootChainID flow.ChainID
-	SporkID     flow.Identifier
+	// excerpt of root snapshot and latest finalized snapshot, when we boot up
+	StateExcerptAtBoot
 
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool
 
 	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
-	// NodeBlockListDistributor notifies consumers of updates to the node block list
-	NodeBlockListDistributor *cache.NodeBlockListDistributor
+	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
+	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
+}
+
+// StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.
+type StateExcerptAtBoot struct {
+	// properties of RootSnapshot for convenience
+	RootBlock   *flow.Block
+	RootQC      *flow.QuorumCertificate
+	RootResult  *flow.ExecutionResult
+	RootSeal    *flow.Seal
+	RootChainID flow.ChainID
+	SporkID     flow.Identifier
+	// finalized block for use in bootstrapping
+	FinalizedHeader *flow.Header
 }
 
 func DefaultBaseConfig() *BaseConfig {
@@ -287,18 +316,24 @@ func DefaultBaseConfig() *BaseConfig {
 			PeerUpdateInterval:              connection.DefaultPeerUpdateInterval,
 			UnicastMessageTimeout:           middleware.DefaultUnicastTimeout,
 			NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
-			// By default we let networking layer trim connections to all nodes that
-			// are no longer part of protocol state.
-			NetworkConnectionPruning:        connection.ConnectionPruningEnabled,
-			PeerScoringEnabled:              scoring.DefaultPeerScoringEnabled,
-			UnicastMessageRateLimit:         0,
-			UnicastBandwidthRateLimit:       0,
-			UnicastBandwidthBurstLimit:      middleware.LargeMsgMaxUnicastMsgSize,
-			UnicastRateLimitLockoutDuration: 10,
-			UnicastRateLimitDryRun:          true,
-			DNSCacheTTL:                     dns.DefaultTimeToLive,
-			LibP2PResourceManagerConfig:     p2pbuilder.DefaultResourceManagerConfig(),
-			ConnectionManagerConfig:         connection.DefaultConnManagerConfig(),
+			UnicastRateLimitersConfig: &UnicastRateLimitersConfig{
+				DryRun:              true,
+				LockoutDuration:     10,
+				MessageRateLimit:    0,
+				BandwidthRateLimit:  0,
+				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
+			},
+			GossipSubConfig:                   p2pbuilder.DefaultGossipSubConfig(),
+			DNSCacheTTL:                       dns.DefaultTimeToLive,
+			LibP2PResourceManagerConfig:       p2pbuilder.DefaultResourceManagerConfig(),
+			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),
+			NetworkConnectionPruning:          connection.PruningEnabled,
+			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
+			AlspConfig: &AlspConfig{
+				SpamRecordCacheSize: alsp.DefaultSpamRecordCacheSize,
+				SpamReportQueueSize: alsp.DefaultSpamReportQueueSize,
+				DisablePenalty:      false, // by default, apply the penalty
+			},
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,

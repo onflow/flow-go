@@ -33,13 +33,39 @@ type Snapshot struct {
 	blockID flow.Identifier // reference block for this snapshot
 }
 
-var _ protocol.Snapshot = (*Snapshot)(nil)
+// FinalizedSnapshot represents a read-only immutable snapshot of the protocol state
+// at a finalized block. It is guaranteed to have a header available.
+type FinalizedSnapshot struct {
+	Snapshot
+	header *flow.Header
+}
 
-func NewSnapshot(state *State, blockID flow.Identifier) *Snapshot {
+var _ protocol.Snapshot = (*Snapshot)(nil)
+var _ protocol.Snapshot = (*FinalizedSnapshot)(nil)
+
+// newSnapshotWithIncorporatedReferenceBlock creates a new state snapshot with the given reference block.
+// CAUTION: The caller is responsible for ensuring that the reference block has been incorporated.
+func newSnapshotWithIncorporatedReferenceBlock(state *State, blockID flow.Identifier) *Snapshot {
 	return &Snapshot{
 		state:   state,
 		blockID: blockID,
 	}
+}
+
+// NewFinalizedSnapshot instantiates a `FinalizedSnapshot`.
+// CAUTION: the header's ID _must_ match `blockID` (not checked)
+func NewFinalizedSnapshot(state *State, blockID flow.Identifier, header *flow.Header) *FinalizedSnapshot {
+	return &FinalizedSnapshot{
+		Snapshot: Snapshot{
+			state:   state,
+			blockID: blockID,
+		},
+		header: header,
+	}
+}
+
+func (s *FinalizedSnapshot) Head() (*flow.Header, error) {
+	return s.header, nil
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
@@ -84,7 +110,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, err
 	}
 
-	// sort the identities so the 'Exists' binary search works
+	// sort the identities so the 'IsCached' binary search works
 	identities := setup.Participants.Sort(order.Canonical)
 
 	// get identities that are in either last/next epoch but NOT in the current epoch
@@ -374,6 +400,15 @@ func (s *Snapshot) Epochs() protocol.EpochQuery {
 
 func (s *Snapshot) Params() protocol.GlobalParams {
 	return s.state.Params()
+}
+
+func (s *Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
+	head, err := s.state.headers.ByBlockID(s.blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.state.versionBeacons.Highest(head.Height)
 }
 
 // EpochQuery encapsulates querying epochs w.r.t. a snapshot.

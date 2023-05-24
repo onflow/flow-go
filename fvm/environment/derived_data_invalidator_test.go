@@ -6,15 +6,13 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/testutils"
-	"github.com/onflow/flow-go/fvm/tracing"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -32,22 +30,24 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	addressA := flow.HexToAddress("0xa")
 	cAddressA := common.MustBytesToAddress(addressA.Bytes())
 	programALoc := common.AddressLocation{Address: cAddressA, Name: "A"}
+	programA2Loc := common.AddressLocation{Address: cAddressA, Name: "A2"}
 	programA := &derived.Program{
 		Program: nil,
-		Dependencies: map[flow.Address]struct{}{
-			addressA: {},
-		},
+		Dependencies: derived.NewProgramDependencies().
+			Add(programALoc),
 	}
 
 	addressB := flow.HexToAddress("0xb")
 	cAddressB := common.MustBytesToAddress(addressB.Bytes())
 	programBLoc := common.AddressLocation{Address: cAddressB, Name: "B"}
+	programBDep := derived.NewProgramDependencies()
+	programBDep.Add(programALoc)
+	programBDep.Add(programBLoc)
 	programB := &derived.Program{
 		Program: nil,
-		Dependencies: map[flow.Address]struct{}{
-			addressA: {},
-			addressB: {},
-		},
+		Dependencies: derived.NewProgramDependencies().
+			Add(programALoc).
+			Add(programBLoc),
 	}
 
 	addressD := flow.HexToAddress("0xd")
@@ -55,9 +55,8 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	programDLoc := common.AddressLocation{Address: cAddressD, Name: "D"}
 	programD := &derived.Program{
 		Program: nil,
-		Dependencies: map[flow.Address]struct{}{
-			addressD: {},
-		},
+		Dependencies: derived.NewProgramDependencies().
+			Add(programDLoc),
 	}
 
 	addressC := flow.HexToAddress("0xc")
@@ -65,13 +64,11 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 	programCLoc := common.AddressLocation{Address: cAddressC, Name: "C"}
 	programC := &derived.Program{
 		Program: nil,
-		Dependencies: map[flow.Address]struct{}{
-			// C indirectly depends on A trough B
-			addressA: {},
-			addressB: {},
-			addressC: {},
-			addressD: {},
-		},
+		Dependencies: derived.NewProgramDependencies().
+			Add(programALoc).
+			Add(programBLoc).
+			Add(programCLoc).
+			Add(programDLoc),
 	}
 
 	t.Run("empty invalidator does not invalidate entries", func(t *testing.T) {
@@ -95,54 +92,11 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 		require.True(t, invalidator.ShouldInvalidateEntry(programDLoc, programD, nil))
 	})
 
-	t.Run("address invalidator A invalidates all but D", func(t *testing.T) {
+	t.Run("contract A update invalidation", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
-			FrozenAccounts: []flow.Address{
-				addressA,
-			},
-		}.ProgramInvalidator()
-
-		require.True(t, invalidator.ShouldInvalidateEntries())
-		require.True(t, invalidator.ShouldInvalidateEntry(programALoc, programA, nil))
-		require.True(t, invalidator.ShouldInvalidateEntry(programBLoc, programB, nil))
-		require.True(t, invalidator.ShouldInvalidateEntry(programCLoc, programC, nil))
-		require.False(t, invalidator.ShouldInvalidateEntry(programDLoc, programD, nil))
-	})
-
-	t.Run("address invalidator D invalidates D, C", func(t *testing.T) {
-		invalidator := environment.DerivedDataInvalidator{
-			FrozenAccounts: []flow.Address{
-				addressD,
-			},
-		}.ProgramInvalidator()
-
-		require.True(t, invalidator.ShouldInvalidateEntries())
-		require.False(t, invalidator.ShouldInvalidateEntry(programALoc, programA, nil))
-		require.False(t, invalidator.ShouldInvalidateEntry(programBLoc, programB, nil))
-		require.True(t, invalidator.ShouldInvalidateEntry(programCLoc, programC, nil))
-		require.True(t, invalidator.ShouldInvalidateEntry(programDLoc, programD, nil))
-	})
-
-	t.Run("address invalidator B invalidates B, C", func(t *testing.T) {
-		invalidator := environment.DerivedDataInvalidator{
-			FrozenAccounts: []flow.Address{
-				addressB,
-			},
-		}.ProgramInvalidator()
-
-		require.True(t, invalidator.ShouldInvalidateEntries())
-		require.False(t, invalidator.ShouldInvalidateEntry(programALoc, programA, nil))
-		require.True(t, invalidator.ShouldInvalidateEntry(programBLoc, programB, nil))
-		require.True(t, invalidator.ShouldInvalidateEntry(programCLoc, programC, nil))
-		require.False(t, invalidator.ShouldInvalidateEntry(programDLoc, programD, nil))
-	})
-
-	t.Run("contract invalidator A invalidates all but D", func(t *testing.T) {
-		invalidator := environment.DerivedDataInvalidator{
-			ContractUpdateKeys: []environment.ContractUpdateKey{
-				{
-					Address: addressA,
-					Name:    "A",
+			ContractUpdates: environment.ContractUpdates{
+				Updates: []common.AddressLocation{
+					programALoc,
 				},
 			},
 		}.ProgramInvalidator()
@@ -154,12 +108,43 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 		require.False(t, invalidator.ShouldInvalidateEntry(programDLoc, programD, nil))
 	})
 
+	t.Run("contract D update invalidate", func(t *testing.T) {
+		invalidator := environment.DerivedDataInvalidator{
+			ContractUpdates: environment.ContractUpdates{
+				Updates: []common.AddressLocation{
+					programDLoc,
+				},
+			},
+		}.ProgramInvalidator()
+
+		require.True(t, invalidator.ShouldInvalidateEntries())
+		require.False(t, invalidator.ShouldInvalidateEntry(programALoc, programA, nil))
+		require.False(t, invalidator.ShouldInvalidateEntry(programBLoc, programB, nil))
+		require.True(t, invalidator.ShouldInvalidateEntry(programCLoc, programC, nil))
+		require.True(t, invalidator.ShouldInvalidateEntry(programDLoc, programD, nil))
+	})
+
+	t.Run("contract B update invalidate", func(t *testing.T) {
+		invalidator := environment.DerivedDataInvalidator{
+			ContractUpdates: environment.ContractUpdates{
+				Updates: []common.AddressLocation{
+					programBLoc,
+				},
+			},
+		}.ProgramInvalidator()
+
+		require.True(t, invalidator.ShouldInvalidateEntries())
+		require.False(t, invalidator.ShouldInvalidateEntry(programALoc, programA, nil))
+		require.True(t, invalidator.ShouldInvalidateEntry(programBLoc, programB, nil))
+		require.True(t, invalidator.ShouldInvalidateEntry(programCLoc, programC, nil))
+		require.False(t, invalidator.ShouldInvalidateEntry(programDLoc, programD, nil))
+	})
+
 	t.Run("contract invalidator C invalidates C", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
-			ContractUpdateKeys: []environment.ContractUpdateKey{
-				{
-					Address: addressC,
-					Name:    "C",
+			ContractUpdates: environment.ContractUpdates{
+				Updates: []common.AddressLocation{
+					programCLoc,
 				},
 			},
 		}.ProgramInvalidator()
@@ -173,10 +158,9 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 
 	t.Run("contract invalidator D invalidates C, D", func(t *testing.T) {
 		invalidator := environment.DerivedDataInvalidator{
-			ContractUpdateKeys: []environment.ContractUpdateKey{
-				{
-					Address: addressD,
-					Name:    "D",
+			ContractUpdates: environment.ContractUpdates{
+				Updates: []common.AddressLocation{
+					programDLoc,
 				},
 			},
 		}.ProgramInvalidator()
@@ -186,6 +170,38 @@ func TestDerivedDataProgramInvalidator(t *testing.T) {
 		require.False(t, invalidator.ShouldInvalidateEntry(programBLoc, programB, nil))
 		require.True(t, invalidator.ShouldInvalidateEntry(programCLoc, programC, nil))
 		require.True(t, invalidator.ShouldInvalidateEntry(programDLoc, programD, nil))
+	})
+
+	t.Run("new contract deploy on address A", func(t *testing.T) {
+		invalidator := environment.DerivedDataInvalidator{
+			ContractUpdates: environment.ContractUpdates{
+				Deploys: []common.AddressLocation{
+					programA2Loc,
+				},
+			},
+		}.ProgramInvalidator()
+
+		require.True(t, invalidator.ShouldInvalidateEntries())
+		require.True(t, invalidator.ShouldInvalidateEntry(programALoc, programA, nil))
+		require.True(t, invalidator.ShouldInvalidateEntry(programBLoc, programB, nil))
+		require.True(t, invalidator.ShouldInvalidateEntry(programCLoc, programC, nil))
+		require.False(t, invalidator.ShouldInvalidateEntry(programDLoc, programD, nil))
+	})
+
+	t.Run("contract delete on address A", func(t *testing.T) {
+		invalidator := environment.DerivedDataInvalidator{
+			ContractUpdates: environment.ContractUpdates{
+				Deletions: []common.AddressLocation{
+					programA2Loc,
+				},
+			},
+		}.ProgramInvalidator()
+
+		require.True(t, invalidator.ShouldInvalidateEntries())
+		require.True(t, invalidator.ShouldInvalidateEntry(programALoc, programA, nil))
+		require.True(t, invalidator.ShouldInvalidateEntry(programBLoc, programB, nil))
+		require.True(t, invalidator.ShouldInvalidateEntry(programCLoc, programC, nil))
+		require.False(t, invalidator.ShouldInvalidateEntry(programDLoc, programD, nil))
 	})
 }
 
@@ -200,8 +216,7 @@ func TestMeterParamOverridesInvalidator(t *testing.T) {
 		nil))
 
 	invalidator = environment.DerivedDataInvalidator{
-		ContractUpdateKeys:         nil,
-		FrozenAccounts:             nil,
+		ContractUpdates:            environment.ContractUpdates{},
 		MeterParamOverridesUpdated: true,
 	}.MeterParamOverridesInvalidator()
 
@@ -227,31 +242,29 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 		memKind: memWeight,
 	}
 
-	baseView := delta.NewDeltaView(nil)
+	snapshotTree := snapshot.NewSnapshotTree(nil)
+
 	ctx := fvm.NewContext(fvm.WithChain(flow.Testnet.Chain()))
 
 	vm := fvm.NewVirtualMachine()
-	err := vm.Run(
+	executionSnapshot, _, err := vm.Run(
 		ctx,
 		fvm.Bootstrap(
 			unittest.ServiceAccountPublicKey,
 			fvm.WithExecutionMemoryLimit(memoryLimit),
 			fvm.WithExecutionEffortWeights(computationWeights),
 			fvm.WithExecutionMemoryWeights(memoryWeights)),
-		baseView)
+		snapshotTree)
 	require.NoError(t, err)
 
-	view := baseView.NewChild()
-	nestedTxn := state.NewTransactionState(view, state.DefaultParameters())
+	blockDatabase := storage.NewBlockDatabase(
+		snapshotTree.Append(executionSnapshot),
+		0,
+		nil)
 
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
-	derivedTxnData, err := derivedBlockData.NewDerivedTransactionData(0, 0)
+	txnState, err := blockDatabase.NewTransaction(0, state.DefaultParameters())
 	require.NoError(t, err)
 
-	txnState := storage.SerialTransaction{
-		NestedTransaction:           nestedTxn,
-		DerivedTransactionCommitter: derivedTxnData,
-	}
 	computer := fvm.NewMeterParamOverridesComputer(ctx, txnState)
 
 	overrides, err := computer.Compute(txnState, struct{}{})
@@ -271,21 +284,23 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	ctx.TxBody = &flow.TransactionBody{}
 
 	checkForUpdates := func(id flow.RegisterID, expected bool) {
-		txnState := testutils.NewSimpleTransaction(nil)
+		snapshot := &snapshot.ExecutionSnapshot{
+			WriteSet: map[flow.RegisterID]flow.RegisterValue{
+				id: flow.RegisterValue("blah"),
+			},
+		}
 
-		err := txnState.Set(id, flow.RegisterValue("blah"))
-		require.NoError(t, err)
-
-		env := environment.NewTransactionEnvironment(
-			tracing.NewTracerSpan(),
-			ctx.EnvironmentParams,
-			txnState)
-
-		invalidator := environment.NewDerivedDataInvalidator(nil, env)
+		invalidator := environment.NewDerivedDataInvalidator(
+			environment.ContractUpdates{},
+			ctx.Chain.ServiceAddress(),
+			snapshot)
 		require.Equal(t, expected, invalidator.MeterParamOverridesUpdated)
 	}
 
-	for _, registerId := range view.AllRegisterIDs() {
+	executionSnapshot, err = txnState.FinalizeMainTransaction()
+	require.NoError(t, err)
+
+	for _, registerId := range executionSnapshot.AllRegisterIDs() {
 		checkForUpdates(registerId, true)
 		checkForUpdates(
 			flow.NewRegisterID("other owner", registerId.Key),

@@ -8,8 +8,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -36,10 +36,9 @@ func (b *Bootstrapper) BootstrapLedger(
 	chain flow.Chain,
 	opts ...fvm.BootstrapProcedureOption,
 ) (flow.StateCommitment, error) {
-	view := delta.NewDeltaView(
-		state.NewLedgerStorageSnapshot(
-			ledger,
-			flow.StateCommitment(ledger.InitialState())))
+	storageSnapshot := state.NewLedgerStorageSnapshot(
+		ledger,
+		flow.StateCommitment(ledger.InitialState()))
 
 	vm := fvm.NewVirtualMachine()
 
@@ -54,12 +53,15 @@ func (b *Bootstrapper) BootstrapLedger(
 		opts...,
 	)
 
-	err := vm.Run(ctx, bootstrap, view)
+	executionSnapshot, _, err := vm.Run(ctx, bootstrap, storageSnapshot)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
 
-	newStateCommitment, _, err := state.CommitDelta(ledger, view.Delta(), flow.StateCommitment(ledger.InitialState()))
+	newStateCommitment, _, err := state.CommitDelta(
+		ledger,
+		executionSnapshot,
+		flow.StateCommitment(ledger.InitialState()))
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
@@ -111,8 +113,8 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(db *badger.DB, commit flow.Sta
 			return fmt.Errorf("could not index genesis state commitment: %w", err)
 		}
 
-		views := make([]*delta.Snapshot, 0)
-		err = operation.InsertExecutionStateInteractions(genesis.ID(), views)(txn)
+		snapshots := make([]*snapshot.ExecutionSnapshot, 0)
+		err = operation.InsertExecutionStateInteractions(genesis.ID(), snapshots)(txn)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution state interactions: %w", err)
 		}

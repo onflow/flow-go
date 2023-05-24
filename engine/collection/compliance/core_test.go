@@ -2,9 +2,7 @@ package compliance
 
 import (
 	"errors"
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -45,36 +43,34 @@ type CommonSuite struct {
 	// storage data
 	headerDB map[flow.Identifier]*cluster.Block
 
-	pendingDB  map[flow.Identifier]flow.Slashable[cluster.Block]
-	childrenDB map[flow.Identifier][]flow.Slashable[cluster.Block]
+	pendingDB  map[flow.Identifier]flow.Slashable[*cluster.Block]
+	childrenDB map[flow.Identifier][]flow.Slashable[*cluster.Block]
 
 	// mocked dependencies
-	state             *clusterstate.MutableState
-	snapshot          *clusterstate.Snapshot
-	metrics           *metrics.NoopCollector
-	headers           *storage.Headers
-	pending           *module.PendingClusterBlockBuffer
-	hotstuff          *module.HotStuff
-	sync              *module.BlockRequester
-	validator         *hotstuff.Validator
-	voteAggregator    *hotstuff.VoteAggregator
-	timeoutAggregator *hotstuff.TimeoutAggregator
+	state                     *clusterstate.MutableState
+	snapshot                  *clusterstate.Snapshot
+	metrics                   *metrics.NoopCollector
+	proposalViolationNotifier *hotstuff.ProposalViolationConsumer
+	headers                   *storage.Headers
+	pending                   *module.PendingClusterBlockBuffer
+	hotstuff                  *module.HotStuff
+	sync                      *module.BlockRequester
+	validator                 *hotstuff.Validator
+	voteAggregator            *hotstuff.VoteAggregator
+	timeoutAggregator         *hotstuff.TimeoutAggregator
 
 	// engine under test
 	core *Core
 }
 
 func (cs *CommonSuite) SetupTest() {
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
-
 	block := unittest.ClusterBlockFixture()
 	cs.head = &block
 
 	// initialize the storage data
 	cs.headerDB = make(map[flow.Identifier]*cluster.Block)
-	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[cluster.Block])
-	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[cluster.Block])
+	cs.pendingDB = make(map[flow.Identifier]flow.Slashable[*cluster.Block])
+	cs.childrenDB = make(map[flow.Identifier][]flow.Slashable[*cluster.Block])
 
 	// store the head header and payload
 	cs.headerDB[block.ID()] = cs.head
@@ -96,6 +92,13 @@ func (cs *CommonSuite) SetupTest() {
 			return nil
 		},
 	)
+	cs.headers.On("Exists", mock.Anything).Return(
+		func(blockID flow.Identifier) bool {
+			_, exists := cs.headerDB[blockID]
+			return exists
+		}, func(blockID flow.Identifier) error {
+			return nil
+		})
 
 	// set up protocol state mock
 	cs.state = &clusterstate.MutableState{}
@@ -124,7 +127,7 @@ func (cs *CommonSuite) SetupTest() {
 	cs.pending = &module.PendingClusterBlockBuffer{}
 	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
 	cs.pending.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) flow.Slashable[cluster.Block] {
+		func(blockID flow.Identifier) flow.Slashable[*cluster.Block] {
 			return cs.pendingDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -133,7 +136,7 @@ func (cs *CommonSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("ByParentID", mock.Anything).Return(
-		func(blockID flow.Identifier) []flow.Slashable[cluster.Block] {
+		func(blockID flow.Identifier) []flow.Slashable[*cluster.Block] {
 			return cs.childrenDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -166,6 +169,9 @@ func (cs *CommonSuite) SetupTest() {
 	// set up no-op metrics mock
 	cs.metrics = metrics.NewNoopCollector()
 
+	// set up notifier for reporting protocol violations
+	cs.proposalViolationNotifier = hotstuff.NewProposalViolationConsumer(cs.T())
+
 	// initialize the engine
 	core, err := NewCore(
 		unittest.Logger(),
@@ -173,6 +179,7 @@ func (cs *CommonSuite) SetupTest() {
 		cs.metrics,
 		cs.metrics,
 		cs.metrics,
+		cs.proposalViolationNotifier,
 		cs.headers,
 		cs.state,
 		cs.pending,
@@ -272,7 +279,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	cs.Run("invalid block error", func() {
 		// the block fails HotStuff validation
 		*cs.validator = *hotstuff.NewValidator(cs.T())
-		cs.validator.On("ValidateProposal", hotstuffProposal).Return(model.InvalidBlockError{})
+		sentinelError := model.NewInvalidProposalErrorf(hotstuffProposal, "")
+		cs.validator.On("ValidateProposal", hotstuffProposal).Return(sentinelError)
+		cs.proposalViolationNotifier.On("OnInvalidBlockDetected", sentinelError).Return().Once()
 		// we should notify VoteAggregator about the invalid block
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
@@ -407,8 +416,8 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	block2 := unittest.ClusterBlockWithParent(&parent)
 	block3 := unittest.ClusterBlockWithParent(&parent)
 
-	pendingFromBlock := func(block *cluster.Block) flow.Slashable[cluster.Block] {
-		return flow.Slashable[cluster.Block]{
+	pendingFromBlock := func(block *cluster.Block) flow.Slashable[*cluster.Block] {
+		return flow.Slashable[*cluster.Block]{
 			OriginID: block.Header.ProposerID,
 			Message:  block,
 		}
@@ -436,7 +445,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	}
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(&parent, cs.head.Header)
+	err := cs.core.processBlockAndDescendants(&parent)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check that we submitted each child to hotstuff

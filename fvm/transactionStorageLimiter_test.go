@@ -10,24 +10,19 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	fvmmock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/storage/testutils"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestTransactionStorageLimiter(t *testing.T) {
-	txnState := testutils.NewSimpleTransaction(nil)
-
 	owner := flow.HexToAddress("1")
-
-	err := txnState.Set(
-		flow.NewRegisterID(string(owner[:]), "a"),
-		flow.RegisterValue("foo"))
-	require.NoError(t, err)
-	err = txnState.Set(
-		flow.NewRegisterID(string(owner[:]), "b"),
-		flow.RegisterValue("bar"))
-	require.NoError(t, err)
+	executionSnapshot := &snapshot.ExecutionSnapshot{
+		WriteSet: map[flow.RegisterID]flow.RegisterValue{
+			flow.NewRegisterID(string(owner[:]), "a"): flow.RegisterValue("foo"),
+			flow.NewRegisterID(string(owner[:]), "b"): flow.RegisterValue("bar"),
+		},
+	}
 
 	t.Run("capacity > storage -> OK", func(t *testing.T) {
 		chain := flow.Mainnet.Chain()
@@ -45,7 +40,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(env, txnState, flow.EmptyAddress, 0)
+		err := d.CheckStorageLimits(env, executionSnapshot, flow.EmptyAddress, 0)
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("capacity = storage -> OK", func(t *testing.T) {
@@ -64,7 +59,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(env, txnState, flow.EmptyAddress, 0)
+		err := d.CheckStorageLimits(env, executionSnapshot, flow.EmptyAddress, 0)
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
 	t.Run("capacity = storage -> OK (dedup payer)", func(t *testing.T) {
@@ -83,7 +78,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(env, txnState, owner, 0)
+		err := d.CheckStorageLimits(env, executionSnapshot, owner, 0)
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
 	t.Run("capacity < storage -> Not OK", func(t *testing.T) {
@@ -102,7 +97,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(env, txnState, flow.EmptyAddress, 0)
+		err := d.CheckStorageLimits(env, executionSnapshot, flow.EmptyAddress, 0)
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
 	t.Run("capacity > storage -> OK (payer not updated)", func(t *testing.T) {
@@ -120,12 +115,10 @@ func TestTransactionStorageLimiter(t *testing.T) {
 			nil,
 		)
 
-		txnState := testutils.NewSimpleTransaction(nil)
-		// sanity check
-		require.Empty(t, txnState.UpdatedRegisterIDs())
+		executionSnapshot = &snapshot.ExecutionSnapshot{}
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(env, txnState, owner, 1)
+		err := d.CheckStorageLimits(env, executionSnapshot, owner, 1)
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("capacity < storage -> Not OK (payer not updated)", func(t *testing.T) {
@@ -143,12 +136,10 @@ func TestTransactionStorageLimiter(t *testing.T) {
 			nil,
 		)
 
-		txnState := testutils.NewSimpleTransaction(nil)
-		// sanity check
-		require.Empty(t, txnState.UpdatedRegisterIDs())
+		executionSnapshot = &snapshot.ExecutionSnapshot{}
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(env, txnState, owner, 1000)
+		err := d.CheckStorageLimits(env, executionSnapshot, owner, 1000)
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
 	t.Run("if ctx LimitAccountStorage false-> OK", func(t *testing.T) {
@@ -168,7 +159,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(env, txnState, flow.EmptyAddress, 0)
+		err := d.CheckStorageLimits(env, executionSnapshot, flow.EmptyAddress, 0)
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("non existing accounts or any other errors on fetching storage used -> Not OK", func(t *testing.T) {
@@ -187,7 +178,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 		)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckStorageLimits(env, txnState, flow.EmptyAddress, 0)
+		err := d.CheckStorageLimits(env, executionSnapshot, flow.EmptyAddress, 0)
 		require.Error(t, err, "check storage used on non existing account (not general registers) should fail")
 	})
 }

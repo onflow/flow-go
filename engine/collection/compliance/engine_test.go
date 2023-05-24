@@ -165,14 +165,12 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		for i := 0; i < blockCount; i++ {
 			block := unittest.ClusterBlockWithParent(cs.head)
 			proposal := messages.NewClusterBlockProposal(&block)
-			// store the data for retrieval
-			cs.headerDB[block.Header.ParentID] = cs.head
 			hotstuffProposal := model.ProposalFromFlow(block.Header)
 			cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 			cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
 			// execute the block submission
-			cs.engine.OnClusterBlockProposal(flow.Slashable[messages.ClusterBlockProposal]{
+			cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
 				OriginID: unittest.IdentifierFixture(),
 				Message:  proposal,
 			})
@@ -185,13 +183,11 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		block := unittest.ClusterBlockWithParent(cs.head)
 		proposal := messages.NewClusterBlockProposal(&block)
 
-		// store the data for retrieval
-		cs.headerDB[block.Header.ParentID] = cs.head
 		hotstuffProposal := model.ProposalFromFlow(block.Header)
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
 		cs.validator.On("ValidateProposal", hotstuffProposal).Return(nil).Once()
-		cs.engine.OnClusterBlockProposal(flow.Slashable[messages.ClusterBlockProposal]{
+		cs.engine.OnClusterBlockProposal(flow.Slashable[*messages.ClusterBlockProposal]{
 			OriginID: unittest.IdentifierFixture(),
 			Message:  proposal,
 		})
@@ -224,6 +220,7 @@ func (cs *EngineSuite) TestOnFinalizedBlock() {
 		Run(func(_ mock.Arguments) { wg.Done() }).
 		Return(uint(0)).Once()
 
-	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock.Header))
+	err := cs.engine.processOnFinalizedBlock(model.BlockFromFlow(finalizedBlock.Header))
+	require.NoError(cs.T(), err)
 	unittest.AssertReturnsBefore(cs.T(), wg.Wait, time.Second, "an expected call to block buffer wasn't made")
 }

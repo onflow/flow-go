@@ -134,9 +134,11 @@ func (f *LevelledForest) GetSize() uint64 {
 // GetChildren returns a VertexIterator to iterate over the children
 // An empty VertexIterator is returned, if no vertices are known whose parent is `id`.
 func (f *LevelledForest) GetChildren(id flow.Identifier) VertexIterator {
-	container := f.vertices[id]
-	// if vertex does not exist, container is the default zero value for vertexContainer, which contains a nil-slice for its children
-	return newVertexIterator(container.children) // VertexIterator gracefully handles nil slices
+	// if vertex does not exist, container will be nil
+	if container, ok := f.vertices[id]; ok {
+		return newVertexIterator(container.children)
+	}
+	return newVertexIterator(nil) // VertexIterator gracefully handles nil slices
 }
 
 // GetNumberOfChildren returns number of children of given vertex
@@ -194,11 +196,17 @@ func (f *LevelledForest) AddVertex(vertex Vertex) {
 	f.size += 1
 }
 
+// registerWithParent retrieves the parent and registers the given vertex as a child.
+// For a block, whose level equal to the pruning threshold, we do not inspect the parent at all.
+// Thereby, this implementation can gracefully handle the corner case where the tree has a defined
+// end vertex (distinct root). This is commonly the case in blockchain (genesis, or spork root block).
+// Mathematically, this means that this library can also represent bounded trees.
 func (f *LevelledForest) registerWithParent(vertexContainer *vertexContainer) {
-	// caution: do not modify this combination of check (a) and (a)
-	// Deliberate handling of root vertex (genesis block) whose view is _exactly_ at LowestLevel
-	// For this block, we don't care about its parent and the exception is allowed where
-	// vertex.level = vertex.Parent().Level = LowestLevel = 0
+	// caution, necessary for handling bounded trees:
+	// For root vertex (genesis block) the view is _exactly_ at LowestLevel. For these blocks,
+	// a parent does not exist. In the implementation, we deliberately do not call the `Parent()` method,
+	// as its output is conceptually undefined. Thereby, we can gracefully handle the corner case of
+	//   vertex.level = vertex.Parent().Level = LowestLevel = 0
 	if vertexContainer.level <= f.LowestLevel { // check (a)
 		return
 	}

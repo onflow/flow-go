@@ -57,9 +57,6 @@ type SyncSuite struct {
 }
 
 func (ss *SyncSuite) SetupTest() {
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
-
 	// generate own ID
 	ss.participants = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleCollection))
 	ss.myID = ss.participants[0].NodeID
@@ -444,7 +441,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	res.Blocks = append(res.Blocks, messages.UntrustedClusterBlockFromInternal(&unprocessable))
 
 	ss.comp.On("OnSyncedClusterBlock", mock.Anything).Run(func(args mock.Arguments) {
-		res := args.Get(0).(flow.Slashable[messages.ClusterBlockProposal])
+		res := args.Get(0).(flow.Slashable[*messages.ClusterBlockProposal])
 		converted := res.Message.Block.ToInternal()
 		ss.Assert().Equal(processable.Header, converted.Header)
 		ss.Assert().Equal(processable.Payload, converted.Payload)

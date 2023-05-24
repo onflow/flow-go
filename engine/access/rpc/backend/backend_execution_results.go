@@ -13,12 +13,12 @@ type backendExecutionResults struct {
 }
 
 func (b *backendExecutionResults) GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error) {
-	er, err := b.executionResults.ByBlockID(blockID)
+	result, err := b.executionResults.ByBlockID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	return er, nil
+	return result, nil
 }
 
 // GetExecutionResultByID gets an execution result by its ID.

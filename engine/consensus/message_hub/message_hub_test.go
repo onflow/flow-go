@@ -2,7 +2,6 @@ package message_hub
 
 import (
 	"context"
-	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -65,9 +64,6 @@ type MessageHubSuite struct {
 }
 
 func (s *MessageHubSuite) SetupTest() {
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
-
 	// initialize the paramaters
 	s.participants = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleConsensus),
@@ -179,7 +175,7 @@ func (s *MessageHubSuite) TestProcessIncomingMessages() {
 		block := unittest.BlockFixture()
 
 		blockProposalMsg := messages.NewBlockProposal(&block)
-		expectedComplianceMsg := flow.Slashable[messages.BlockProposal]{
+		expectedComplianceMsg := flow.Slashable[*messages.BlockProposal]{
 			OriginID: originID,
 			Message:  blockProposalMsg,
 		}

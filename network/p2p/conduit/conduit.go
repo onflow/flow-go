@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	"github.com/onflow/flow-go/network/channels"
 )
 
@@ -15,23 +16,61 @@ import (
 // It directly passes the incoming messages to the corresponding methods of the
 // network Adapter.
 type DefaultConduitFactory struct {
-	*component.ComponentManager
-	adapter network.Adapter
+	component.Component
+	adapter            network.Adapter
+	misbehaviorManager network.MisbehaviorReportManager
 }
 
-func NewDefaultConduitFactory() *DefaultConduitFactory {
-	d := &DefaultConduitFactory{}
-	// worker added so conduit factory doesn't immediately shut down when it's started
+// DefaultConduitFactoryOpt is a function that applies an option to the DefaultConduitFactory.
+type DefaultConduitFactoryOpt func(*DefaultConduitFactory)
+
+// WithMisbehaviorManager overrides the misbehavior manager for the conduit factory.
+func WithMisbehaviorManager(misbehaviorManager network.MisbehaviorReportManager) DefaultConduitFactoryOpt {
+	return func(d *DefaultConduitFactory) {
+		d.misbehaviorManager = misbehaviorManager
+	}
+}
+
+// NewDefaultConduitFactory creates a new DefaultConduitFactory, this is the default conduit factory used by the node.
+// Args:
+//
+//	alspCfg: the config for the misbehavior report manager.
+//	opts: the options for the conduit factory.
+//
+// Returns:
+//
+//		a new instance of the DefaultConduitFactory.
+//	 an error if the initialization of the conduit factory fails. The error is irrecoverable.
+func NewDefaultConduitFactory(alspCfg *alspmgr.MisbehaviorReportManagerConfig, opts ...DefaultConduitFactoryOpt) (*DefaultConduitFactory, error) {
+	m, err := alspmgr.NewMisbehaviorReportManager(alspCfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not create misbehavior report manager: %w", err)
+	}
+	d := &DefaultConduitFactory{
+		misbehaviorManager: m,
+	}
+
+	for _, apply := range opts {
+		apply(d)
+	}
+
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
+			d.misbehaviorManager.Start(ctx)
+			select {
+			case <-d.misbehaviorManager.Ready():
+				ready()
+			case <-ctx.Done():
+				// jumps out of select statement to let a graceful shutdown.
+			}
 
 			<-ctx.Done()
+			<-d.misbehaviorManager.Done()
 		}).Build()
 
-	d.ComponentManager = cm
+	d.Component = cm
 
-	return d
+	return d, nil
 }
 
 // RegisterAdapter sets the Adapter component of the factory.
@@ -57,10 +96,11 @@ func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel channels
 	child, cancel := context.WithCancel(ctx)
 
 	return &Conduit{
-		ctx:     child,
-		cancel:  cancel,
-		channel: channel,
-		adapter: d.adapter,
+		ctx:                child,
+		cancel:             cancel,
+		channel:            channel,
+		adapter:            d.adapter,
+		misbehaviorManager: d.misbehaviorManager,
 	}, nil
 }
 
@@ -68,11 +108,14 @@ func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel channels
 // sending messages within a single engine process. It sends all messages to
 // what can be considered a bus reserved for that specific engine.
 type Conduit struct {
-	ctx     context.Context
-	cancel  context.CancelFunc
-	channel channels.Channel
-	adapter network.Adapter
+	ctx                context.Context
+	cancel             context.CancelFunc
+	channel            channels.Channel
+	adapter            network.Adapter
+	misbehaviorManager network.MisbehaviorReportManager
 }
+
+var _ network.Conduit = (*Conduit)(nil)
 
 // Publish sends an event to the network layer for unreliable delivery
 // to subscribers of the given event on the network layer. It uses a
@@ -102,6 +145,14 @@ func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Ident
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
 	return c.adapter.MulticastOnChannel(c.channel, event, num, targetIDs...)
+}
+
+// ReportMisbehavior reports the misbehavior of a node on sending a message to the current node that appears valid
+// based on the networking layer but is considered invalid by the current node based on the Flow protocol.
+// The misbehavior is reported to the networking layer to penalize the misbehaving node.
+// The implementation must be thread-safe and non-blocking.
+func (c *Conduit) ReportMisbehavior(report network.MisbehaviorReport) {
+	c.misbehaviorManager.HandleMisbehaviorReport(c.channel, report)
 }
 
 func (c *Conduit) Close() error {

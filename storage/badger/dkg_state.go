@@ -137,19 +137,21 @@ func NewSafeBeaconPrivateKeys(state *DKGState) *SafeBeaconPrivateKeys {
 // epoch, only if my key has been confirmed valid and safe for use.
 //
 // Returns:
-// * (key, true, nil) if the key is present and confirmed valid
-// * (nil, false, nil) if the key has been marked invalid (by SetDKGEnded)
-// * (nil, false, error) for any other condition, or exception
+//   - (key, true, nil) if the key is present and confirmed valid
+//   - (nil, false, nil) if the key has been marked invalid or unavailable
+//     -> no beacon key will ever be available for the epoch in this case
+//   - (nil, false, storage.ErrNotFound) if the DKG has not ended
+//   - (nil, false, error) for any unexpected exception
 func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error) {
 	err = keys.state.db.View(func(txn *badger.Txn) error {
 
-		// retrieve the end state, error on any storage error (including not found)
+		// retrieve the end state
 		var endState flow.DKGEndState
 		err = operation.RetrieveDKGEndStateForEpoch(epochCounter, &endState)(txn)
 		if err != nil {
 			key = nil
 			safe = false
-			return err
+			return err // storage.ErrNotFound or exception
 		}
 
 		// for any end state besides success, the key is not safe
@@ -159,13 +161,13 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 			return nil
 		}
 
-		// retrieve the key, error on any storage error
+		// retrieve the key - any storage error (including not found) is an exception
 		var encodableKey *encodable.RandomBeaconPrivKey
 		encodableKey, err = keys.state.retrieveKeyTx(epochCounter)(txn)
 		if err != nil {
 			key = nil
 			safe = false
-			return err
+			return fmt.Errorf("[unexpected] could not retrieve beacon key for epoch %d with successful DKG: %v", epochCounter, err)
 		}
 
 		// return the key only for successful end state

@@ -15,13 +15,13 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	chunksmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/convert"
-	convertfixtures "github.com/onflow/flow-go/model/convert/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
@@ -48,8 +48,8 @@ var eventsList = flow.EventsList{
 
 // the chain we use for this test suite
 var testChain = flow.Emulator
-var epochSetupEvent, _ = convertfixtures.EpochSetupFixtureByChainID(testChain)
-var epochCommitEvent, _ = convertfixtures.EpochCommitFixtureByChainID(testChain)
+var epochSetupEvent, _ = unittest.EpochSetupFixtureByChainID(testChain)
+var epochCommitEvent, _ = unittest.EpochCommitFixtureByChainID(testChain)
 
 var epochSetupServiceEvent, _ = convert.ServiceEvent(testChain, epochSetupEvent)
 var epochCommitServiceEvent, _ = convert.ServiceEvent(testChain, epochCommitEvent)
@@ -355,27 +355,49 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 
 type vmMock struct{}
 
-func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
+func (vm *vmMock) NewExecutor(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	panic("not implemented")
+}
+
+func (vm *vmMock) Run(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storage snapshot.StorageSnapshot,
+) (
+	*snapshot.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
 	tx, ok := proc.(*fvm.TransactionProcedure)
 	if !ok {
-		return fmt.Errorf("invokable is not a transaction")
+		return nil, fvm.ProcedureOutput{}, fmt.Errorf(
+			"invokable is not a transaction")
 	}
+
+	snapshot := &snapshot.ExecutionSnapshot{}
+	output := fvm.ProcedureOutput{}
 
 	id0 := flow.NewRegisterID("00", "")
 	id5 := flow.NewRegisterID("05", "")
 
 	switch string(tx.Transaction.Script) {
 	case "wrongEndState":
-		// add updates to the ledger
-		_ = led.Set(id0, []byte{'F'})
-		tx.Logs = []string{"log1", "log2"}
-		tx.Events = eventsList
+		snapshot.WriteSet = map[flow.RegisterID]flow.RegisterValue{
+			id0: []byte{'F'},
+		}
+		output.Logs = []string{"log1", "log2"}
+		output.Events = eventsList
 	case "failedTx":
-		// add updates to the ledger
-		_ = led.Set(id5, []byte{'B'})
-		tx.Err = fvmErrors.NewCadenceRuntimeError(runtime.Error{}) // inside the runtime (e.g. div by zero, access account)
+		snapshot.WriteSet = map[flow.RegisterID]flow.RegisterValue{
+			id5: []byte{'B'},
+		}
+		output.Err = fvmErrors.NewCadenceRuntimeError(runtime.Error{}) // inside the runtime (e.g. div by zero, access account)
 	case "eventsMismatch":
-		tx.Events = append(eventsList, flow.Event{
+		output.Events = append(eventsList, flow.Event{
 			Type:             "event.Extra",
 			TransactionID:    flow.Identifier{2, 3},
 			TransactionIndex: 0,
@@ -383,59 +405,128 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error
 			Payload:          []byte{88},
 		})
 	default:
-		_, _ = led.Get(id0)
-		_, _ = led.Get(id5)
-		_ = led.Set(id5, []byte{'B'})
-		tx.Logs = []string{"log1", "log2"}
-		tx.Events = eventsList
+		snapshot.ReadSet = map[flow.RegisterID]struct{}{
+			id0: struct{}{},
+			id5: struct{}{},
+		}
+		snapshot.WriteSet = map[flow.RegisterID]flow.RegisterValue{
+			id5: []byte{'B'},
+		}
+		output.Logs = []string{"log1", "log2"}
+		output.Events = eventsList
 	}
 
-	return nil
+	return snapshot, output, nil
 }
 
-func (vmMock) GetAccount(_ fvm.Context, _ flow.Address, _ state.View) (*flow.Account, error) {
+func (vmMock) GetAccount(
+	_ fvm.Context,
+	_ flow.Address,
+	_ snapshot.StorageSnapshot,
+) (
+	*flow.Account,
+	error) {
 	panic("not expected")
 }
 
 type vmSystemOkMock struct{}
 
-func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
-	tx, ok := proc.(*fvm.TransactionProcedure)
-	if !ok {
-		return fmt.Errorf("invokable is not a transaction")
-	}
+func (vm *vmSystemOkMock) NewExecutor(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	panic("not implemented")
+}
 
-	tx.ConvertedServiceEvents = flow.ServiceEventList{*epochSetupServiceEvent}
+func (vm *vmSystemOkMock) Run(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storage snapshot.StorageSnapshot,
+) (
+	*snapshot.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
+	_, ok := proc.(*fvm.TransactionProcedure)
+	if !ok {
+		return nil, fvm.ProcedureOutput{}, fmt.Errorf(
+			"invokable is not a transaction")
+	}
 
 	id0 := flow.NewRegisterID("00", "")
 	id5 := flow.NewRegisterID("05", "")
 
 	// add "default" interaction expected in tests
-	_, _ = led.Get(id0)
-	_, _ = led.Get(id5)
-	_ = led.Set(id5, []byte{'B'})
-	tx.Logs = []string{"log1", "log2"}
+	snapshot := &snapshot.ExecutionSnapshot{
+		ReadSet: map[flow.RegisterID]struct{}{
+			id0: struct{}{},
+			id5: struct{}{},
+		},
+		WriteSet: map[flow.RegisterID]flow.RegisterValue{
+			id5: []byte{'B'},
+		},
+	}
+	output := fvm.ProcedureOutput{
+		ConvertedServiceEvents: flow.ServiceEventList{*epochSetupServiceEvent},
+		Logs:                   []string{"log1", "log2"},
+	}
 
-	return nil
+	return snapshot, output, nil
 }
 
-func (vmSystemOkMock) GetAccount(_ fvm.Context, _ flow.Address, _ state.View) (*flow.Account, error) {
+func (vmSystemOkMock) GetAccount(
+	_ fvm.Context,
+	_ flow.Address,
+	_ snapshot.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
 	panic("not expected")
 }
 
 type vmSystemBadMock struct{}
 
-func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
-	tx, ok := proc.(*fvm.TransactionProcedure)
-	if !ok {
-		return fmt.Errorf("invokable is not a transaction")
-	}
-	// EpochSetup event is expected, but we emit EpochCommit here resulting in a chunk fault
-	tx.ConvertedServiceEvents = flow.ServiceEventList{*epochCommitServiceEvent}
-
-	return nil
+func (vm *vmSystemBadMock) NewExecutor(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	panic("not implemented")
 }
 
-func (vmSystemBadMock) GetAccount(_ fvm.Context, _ flow.Address, _ state.View) (*flow.Account, error) {
+func (vm *vmSystemBadMock) Run(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storage snapshot.StorageSnapshot,
+) (
+	*snapshot.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
+	_, ok := proc.(*fvm.TransactionProcedure)
+	if !ok {
+		return nil, fvm.ProcedureOutput{}, fmt.Errorf(
+			"invokable is not a transaction")
+	}
+
+	// EpochSetup event is expected, but we emit EpochCommit here resulting in
+	// a chunk fault
+	output := fvm.ProcedureOutput{
+		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
+	}
+
+	return &snapshot.ExecutionSnapshot{}, output, nil
+}
+
+func (vmSystemBadMock) GetAccount(
+	_ fvm.Context,
+	_ flow.Address,
+	_ snapshot.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
 	panic("not expected")
 }

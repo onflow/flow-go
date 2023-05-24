@@ -9,12 +9,13 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
-func NewServer(backend access.API, listenAddress string, logger zerolog.Logger, chain flow.Chain) (*http.Server, error) {
+func NewServer(backend access.API, listenAddress string, logger zerolog.Logger, chain flow.Chain, restCollector module.RestMetrics) (*http.Server, error) {
 
-	router, err := newRouter(backend, logger, chain)
+	router, err := newRouter(backend, logger, chain, restCollector)
 	if err != nil {
 		return nil, err
 	}

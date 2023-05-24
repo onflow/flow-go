@@ -11,10 +11,11 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
-	fvmState "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	fvmState "github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/partial"
 	chmodels "github.com/onflow/flow-go/model/chunks"
@@ -93,7 +94,7 @@ func (fcv *ChunkVerifier) Verify(
 }
 
 type partialLedgerStorageSnapshot struct {
-	snapshot fvmState.StorageSnapshot
+	snapshot snapshot.StorageSnapshot
 
 	unknownRegTouch map[flow.RegisterID]struct{}
 }
@@ -165,27 +166,28 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	context = fvm.NewContextFromParent(
 		context,
 		fvm.WithDerivedBlockData(
-			derived.NewEmptyDerivedBlockDataWithTransactionOffset(
-				transactionOffset)))
+			derived.NewEmptyDerivedBlockData(logical.Time(transactionOffset))))
 
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which
 	// are not expanded and values are unknown.
 	unknownRegTouch := make(map[flow.RegisterID]struct{})
-	chunkView := delta.NewDeltaView(
+	snapshotTree := snapshot.NewSnapshotTree(
 		&partialLedgerStorageSnapshot{
 			snapshot: executionState.NewLedgerStorageSnapshot(
 				psmt,
 				chunkDataPack.StartState),
 			unknownRegTouch: unknownRegTouch,
 		})
+	chunkState := fvmState.NewExecutionState(nil, fvmState.DefaultParameters())
 
 	var problematicTx flow.Identifier
 	// executes all transactions in this chunk
 	for i, tx := range transactions {
-		txView := chunkView.NewChild()
-
-		err := fcv.vm.Run(context, tx, txView)
+		executionSnapshot, output, err := fcv.vm.Run(
+			context,
+			tx,
+			snapshotTree)
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )
@@ -196,13 +198,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 			problematicTx = tx.ID
 		}
 
-		events = append(events, tx.Events...)
-		serviceEvents = append(serviceEvents, tx.ConvertedServiceEvents...)
+		events = append(events, output.Events...)
+		serviceEvents = append(serviceEvents, output.ConvertedServiceEvents...)
 
-		// always merge back the tx view (fvm is responsible for changes on tx errors)
-		err = chunkView.Merge(txView)
+		snapshotTree = snapshotTree.Append(executionSnapshot)
+		err = chunkState.Merge(executionSnapshot)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
+			return nil, nil, fmt.Errorf("failed to merge: %d (%w)", i, err)
 		}
 	}
 
@@ -220,9 +222,11 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, nil, fmt.Errorf("cannot calculate events collection hash: %w", err)
 	}
 	if chunk.EventCollection != eventsHash {
-
+		collectionID := ""
+		if chunkDataPack.Collection != nil {
+			collectionID = chunkDataPack.Collection.ID().String()
+		}
 		for i, event := range events {
-
 			fcv.logger.Warn().Int("list_index", i).
 				Str("event_id", event.ID().String()).
 				Hex("event_fingerptint", event.Fingerprint()).
@@ -232,7 +236,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 				Uint32("event_index", event.EventIndex).
 				Bytes("event_payload", event.Payload).
 				Str("block_id", chunk.BlockID.String()).
-				Str("collection_id", chunkDataPack.Collection.ID().String()).
+				Str("collection_id", collectionID).
 				Str("result_id", result.ID().String()).
 				Uint64("chunk_index", chunk.Index).
 				Msg("not matching events debug")
@@ -251,11 +255,12 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		}
 	}
 
-	// applying chunk delta (register updates at chunk level) to the partial trie
-	// this returns the expected end state commitment after updates and the list of
-	// register keys that was not provided by the chunk data package (err).
+	// Applying chunk updates to the partial trie.	This returns the expected
+	// end state commitment after updates and the list of register keys that
+	// was not provided by the chunk data package (err).
+	chunkExecutionSnapshot := chunkState.Finalize()
 	keys, values := executionState.RegisterEntriesToKeysValues(
-		chunkView.Delta().UpdatedRegisters())
+		chunkExecutionSnapshot.UpdatedRegisters())
 
 	update, err := ledger.NewUpdate(
 		ledger.State(chunkDataPack.StartState),
@@ -285,5 +290,5 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	if flow.StateCommitment(expEndStateComm) != endState {
 		return nil, chmodels.NewCFNonMatchingFinalState(flow.StateCommitment(expEndStateComm), endState, chIndex, execResID), nil
 	}
-	return chunkView.SpockSecret(), nil, nil
+	return chunkExecutionSnapshot.SpockSecret, nil, nil
 }

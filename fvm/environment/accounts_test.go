@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -23,8 +23,11 @@ func TestAccounts_Create(t *testing.T) {
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
 
+		snapshot, err := txnState.FinalizeMainTransaction()
+		require.NoError(t, err)
+
 		// account status
-		require.Equal(t, len(txnState.AllRegisterIDs()), 1)
+		require.Equal(t, len(snapshot.AllRegisterIDs()), 1)
 	})
 
 	t.Run("Fails if account exists", func(t *testing.T) {
@@ -65,7 +68,7 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 
 		for _, value := range [][]byte{{}, nil} {
 			txnState := testutils.NewSimpleTransaction(
-				state.MapStorageSnapshot{
+				snapshot.MapStorageSnapshot{
 					registerId: value,
 				})
 			accounts := environment.NewAccounts(txnState)
@@ -74,7 +77,7 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 			require.NoError(t, err)
 
 			_, err = accounts.GetPublicKey(address, 0)
-			require.True(t, errors.IsAccountAccountPublicKeyNotFoundError(err))
+			require.True(t, errors.IsAccountPublicKeyNotFoundError(err))
 		}
 	})
 }
@@ -90,7 +93,7 @@ func TestAccounts_GetPublicKeyCount(t *testing.T) {
 
 		for _, value := range [][]byte{{}, nil} {
 			txnState := testutils.NewSimpleTransaction(
-				state.MapStorageSnapshot{
+				snapshot.MapStorageSnapshot{
 					registerId: value,
 				})
 			accounts := environment.NewAccounts(txnState)
@@ -116,7 +119,7 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 
 		for _, value := range [][]byte{{}, nil} {
 			txnState := testutils.NewSimpleTransaction(
-				state.MapStorageSnapshot{
+				snapshot.MapStorageSnapshot{
 					registerId: value,
 				})
 

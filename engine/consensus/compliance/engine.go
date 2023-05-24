@@ -5,8 +5,8 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/events"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
@@ -29,20 +30,20 @@ const defaultBlockQueueCapacity = 10_000
 // `compliance.Core` implements the actual compliance logic.
 // Implements consensus.Compliance interface.
 type Engine struct {
-	*component.ComponentManager
-	log                    zerolog.Logger
-	mempoolMetrics         module.MempoolMetrics
-	engineMetrics          module.EngineMetrics
-	me                     module.Local
-	headers                storage.Headers
-	payloads               storage.Payloads
-	tracer                 module.Tracer
-	state                  protocol.State
-	core                   *Core
-	pendingBlocks          *fifoqueue.FifoQueue // queue for processing inbound blocks
-	pendingBlocksNotifier  engine.Notifier
-	finalizedBlockTracker  *tracker.NewestBlockTracker
-	finalizedBlockNotifier engine.Notifier
+	component.Component
+	hotstuff.FinalizationConsumer
+
+	log                   zerolog.Logger
+	mempoolMetrics        module.MempoolMetrics
+	engineMetrics         module.EngineMetrics
+	me                    module.Local
+	headers               storage.Headers
+	payloads              storage.Payloads
+	tracer                module.Tracer
+	state                 protocol.State
+	core                  *Core
+	pendingBlocks         *fifoqueue.FifoQueue // queue for processing inbound blocks
+	pendingBlocksNotifier engine.Notifier
 }
 
 var _ consensus.Compliance = (*Engine)(nil)
@@ -63,25 +64,24 @@ func NewEngine(
 	}
 
 	eng := &Engine{
-		log:                    log.With().Str("compliance", "engine").Logger(),
-		me:                     me,
-		mempoolMetrics:         core.mempoolMetrics,
-		engineMetrics:          core.engineMetrics,
-		headers:                core.headers,
-		payloads:               core.payloads,
-		pendingBlocks:          blocksQueue,
-		state:                  core.state,
-		tracer:                 core.tracer,
-		core:                   core,
-		pendingBlocksNotifier:  engine.NewNotifier(),
-		finalizedBlockTracker:  tracker.NewNewestBlockTracker(),
-		finalizedBlockNotifier: engine.NewNotifier(),
+		log:                   log.With().Str("compliance", "engine").Logger(),
+		me:                    me,
+		mempoolMetrics:        core.mempoolMetrics,
+		engineMetrics:         core.engineMetrics,
+		headers:               core.headers,
+		payloads:              core.payloads,
+		pendingBlocks:         blocksQueue,
+		state:                 core.state,
+		tracer:                core.tracer,
+		core:                  core,
+		pendingBlocksNotifier: engine.NewNotifier(),
 	}
-
+	finalizationActor, finalizationWorker := events.NewFinalizationActor(eng.processOnFinalizedBlock)
+	eng.FinalizationConsumer = finalizationActor
 	// create the component manager and worker threads
-	eng.ComponentManager = component.NewComponentManagerBuilder().
+	eng.Component = component.NewComponentManagerBuilder().
 		AddWorker(eng.processBlocksLoop).
-		AddWorker(eng.finalizationProcessingLoop).
+		AddWorker(finalizationWorker).
 		Build()
 
 	return eng, nil
@@ -120,11 +120,13 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 
 		msg, ok := e.pendingBlocks.Pop()
 		if ok {
-			inBlock := msg.(flow.Slashable[messages.BlockProposal])
-			err := e.core.OnBlockProposal(inBlock.OriginID, inBlock.Message)
-			e.core.engineMetrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockProposal)
-			if err != nil {
-				return fmt.Errorf("could not handle block proposal: %w", err)
+			batch := msg.(flow.Slashable[[]*messages.BlockProposal])
+			for _, block := range batch.Message {
+				err := e.core.OnBlockProposal(batch.OriginID, block)
+				e.core.engineMetrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockProposal)
+				if err != nil {
+					return fmt.Errorf("could not handle block proposal: %w", err)
+				}
 			}
 			continue
 		}
@@ -135,56 +137,43 @@ func (e *Engine) processQueuedBlocks(doneSignal <-chan struct{}) error {
 	}
 }
 
-// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-// It informs compliance.Core about finalization of the respective block.
-//
-// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
-// from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(block *model.Block) {
-	if e.finalizedBlockTracker.Track(block) {
-		e.finalizedBlockNotifier.Notify()
-	}
-}
-
 // OnBlockProposal feeds a new block proposal into the processing pipeline.
 // Incoming proposals are queued and eventually dispatched by worker.
-func (e *Engine) OnBlockProposal(proposal flow.Slashable[messages.BlockProposal]) {
+func (e *Engine) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) {
 	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
-	if e.pendingBlocks.Push(proposal) {
+	proposalAsList := flow.Slashable[[]*messages.BlockProposal]{
+		OriginID: proposal.OriginID,
+		Message:  []*messages.BlockProposal{proposal.Message},
+	}
+	if e.pendingBlocks.Push(proposalAsList) {
 		e.pendingBlocksNotifier.Notify()
 	} else {
 		e.core.engineMetrics.InboundMessageDropped(metrics.EngineCompliance, metrics.MessageBlockProposal)
 	}
 }
 
-// OnSyncedBlock feeds a block obtained from sync proposal into the processing pipeline.
+// OnSyncedBlocks feeds a batch of blocks obtained via sync into the processing pipeline.
+// Blocks in batch aren't required to be in any particular order.
 // Incoming proposals are queued and eventually dispatched by worker.
-func (e *Engine) OnSyncedBlock(syncedBlock flow.Slashable[messages.BlockProposal]) {
-	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
-	if e.pendingBlocks.Push(syncedBlock) {
+func (e *Engine) OnSyncedBlocks(blocks flow.Slashable[[]*messages.BlockProposal]) {
+	e.core.engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlocks)
+	if e.pendingBlocks.Push(blocks) {
 		e.pendingBlocksNotifier.Notify()
 	} else {
-		e.core.engineMetrics.InboundMessageDropped(metrics.EngineCompliance, metrics.MessageSyncedBlock)
+		e.core.engineMetrics.InboundMessageDropped(metrics.EngineCompliance, metrics.MessageSyncedBlocks)
 	}
 }
 
-// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
-func (e *Engine) finalizationProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
-	doneSignal := ctx.Done()
-	blockFinalizedSignal := e.finalizedBlockNotifier.Channel()
-	for {
-		select {
-		case <-doneSignal:
-			return
-		case <-blockFinalizedSignal:
-			// retrieve the latest finalized header, so we know the height
-			finalHeader, err := e.headers.ByBlockID(e.finalizedBlockTracker.NewestBlock().BlockID)
-			if err != nil { // no expected errors
-				ctx.Throw(err)
-			}
-			e.core.ProcessFinalizedBlock(finalHeader)
-		}
+// processOnFinalizedBlock informs compliance.Core about finalization of the respective block.
+// The input to this callback is treated as trusted. This method should be executed on
+// `OnFinalizedBlock` notifications from the node-internal consensus instance.
+// No errors expected during normal operations.
+func (e *Engine) processOnFinalizedBlock(block *model.Block) error {
+	// retrieve the latest finalized header, so we know the height
+	finalHeader, err := e.headers.ByBlockID(block.BlockID)
+	if err != nil { // no expected errors
+		return fmt.Errorf("could not get finalized header: %w", err)
 	}
+	e.core.ProcessFinalizedBlock(finalHeader)
+	return nil
 }
