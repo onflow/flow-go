@@ -1162,17 +1162,17 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		builder.IdentityProvider,
 		builder.GossipSubConfig.LocalMeshLogInterval)
 
-		// setup RPC inspectors
-		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector)
-		rpcInspectorSuite, err := rpcInspectorBuilder.
-			SetNetworkType(network.PublicNetwork).
-			SetMetrics(&p2pconfig.MetricsConfig{
-				HeroCacheFactory: builder.HeroCacheMetricsFactory(),
-				Metrics:          builder.Metrics.Network,
-			}).Build()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for access node: %w", err)
-		}
+	// setup RPC inspectors
+	rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector)
+	rpcInspectorSuite, err := rpcInspectorBuilder.
+		SetNetworkType(network.PublicNetwork).
+		SetMetrics(&p2pconfig.MetricsConfig{
+			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+			Metrics:          builder.Metrics.Network,
+		}).Build()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for access node: %w", err)
+	}
 
 	libp2pNode, err := p2pbuilder.NewNodeBuilder(
 		builder.Logger,
