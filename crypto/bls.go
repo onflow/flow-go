@@ -28,8 +28,6 @@ package crypto
 //  - membership checks G2 using Bowe's method (https://eprint.iacr.org/2019/814.pdf)
 //  - implement a G1/G2 swap (signatures on G2 and public keys on G1)
 
-// #cgo CFLAGS:
-// #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
 // #include "bls_include.h"
 import "C"
 

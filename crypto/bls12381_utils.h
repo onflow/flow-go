@@ -5,12 +5,12 @@
 #ifndef _REL_MISC_INCLUDE_H
 #define _REL_MISC_INCLUDE_H
 
-#include "relic.h"
+#include <string.h>
 #include "blst_include.h"
 
 #define SEC_BITS  128
-#define VALID     RLC_OK
-#define INVALID   RLC_ERR
+#define VALID     0
+#define INVALID   1
 #define UNDEFINED (((VALID&1)^1) | ((INVALID&2)^2)) // different value than RLC_OK and RLC_ERR
 
 #define BITS_TO_BYTES(x) ((x+7)>>3)
