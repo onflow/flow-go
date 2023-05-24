@@ -541,7 +541,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	// setup cluster prefixed topic with an invalid cluster ID
 	unknownClusterID := channels.Topic(channels.SyncCluster("unknown-cluster-ID"))
 	// consume cluster ID update so that active cluster IDs set
-	validationInspector.ClusterIdsUpdated(flow.ChainIDList{"known-cluster-id"})
+	validationInspector.ActiveClustersChanged(flow.ChainIDList{"known-cluster-id"})
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
@@ -743,7 +743,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	clusterID := flow.ChainID("known-cluster-id")
 	clusterIDTopic := channels.Topic(channels.SyncCluster(clusterID))
 	// consume cluster ID update so that active cluster IDs set
-	validationInspector.ClusterIdsUpdated(flow.ChainIDList{clusterID})
+	validationInspector.ActiveClustersChanged(flow.ChainIDList{clusterID})
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}

@@ -203,7 +203,7 @@ func (c *ControlMsgValidationInspector) Name() string {
 }
 
 // ClusterIdsUpdated consumes cluster ID update protocol events.
-func (c *ControlMsgValidationInspector) ClusterIdsUpdated(clusterIDList flow.ChainIDList) {
+func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow.ChainIDList) {
 	c.tracker.StoreActiveClusterIds(clusterIDList)
 }
 

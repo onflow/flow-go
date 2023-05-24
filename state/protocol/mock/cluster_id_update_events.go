@@ -13,7 +13,7 @@ type ClusterIDUpdateEvents struct {
 }
 
 // ClusterIdsUpdated provides a mock function with given fields: _a0
-func (_m *ClusterIDUpdateEvents) ClusterIdsUpdated(_a0 flow.ChainIDList) {
+func (_m *ClusterIDUpdateEvents) ActiveClustersChanged(_a0 flow.ChainIDList) {
 	_m.Called(_a0)
 }
 

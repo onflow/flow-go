@@ -18,6 +18,11 @@ type GossipSubMsgValidationRpcInspector struct {
 	mock.Mock
 }
 
+// ActiveClustersChanged provides a mock function with given fields: _a0
+func (_m *GossipSubMsgValidationRpcInspector) ActiveClustersChanged(_a0 flow.ChainIDList) {
+	_m.Called(_a0)
+}
+
 // BlockFinalized provides a mock function with given fields: block
 func (_m *GossipSubMsgValidationRpcInspector) BlockFinalized(block *flow.Header) {
 	_m.Called(block)
@@ -26,11 +31,6 @@ func (_m *GossipSubMsgValidationRpcInspector) BlockFinalized(block *flow.Header)
 // BlockProcessable provides a mock function with given fields: block, certifyingQC
 func (_m *GossipSubMsgValidationRpcInspector) BlockProcessable(block *flow.Header, certifyingQC *flow.QuorumCertificate) {
 	_m.Called(block, certifyingQC)
-}
-
-// ClusterIdsUpdated provides a mock function with given fields: _a0
-func (_m *GossipSubMsgValidationRpcInspector) ClusterIdsUpdated(_a0 flow.ChainIDList) {
-	_m.Called(_a0)
 }
 
 // Done provides a mock function with given fields:

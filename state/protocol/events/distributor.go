@@ -72,10 +72,10 @@ func (d *Distributor) EpochEmergencyFallbackTriggered() {
 	}
 }
 
-func (d *Distributor) ClusterIdsUpdated(list flow.ChainIDList) {
+func (d *Distributor) ActiveClustersChanged(list flow.ChainIDList) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
-		sub.ClusterIdsUpdated(list)
+		sub.ActiveClustersChanged(list)
 	}
 }
