@@ -1,6 +1,3 @@
-//go:build relic
-// +build relic
-
 package crypto
 
 // this file contains utility functions for the curve BLS 12-381

@@ -1,6 +1,3 @@
-//go:build relic
-// +build relic
-
 package crypto
 
 // BLS signature scheme implementation using BLS12-381 curve
@@ -39,7 +36,6 @@ import "C"
 import (
 	"bytes"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 
 	"golang.org/x/crypto/hkdf"
@@ -530,17 +526,6 @@ func (pk *pubKeyBLSBLS12381) String() string {
 var signatureLengthBLSBLS12381 = int(C.get_signature_len())
 var pubKeyLengthBLSBLS12381 = int(C.get_pk_len())
 var prKeyLengthBLSBLS12381 = int(C.get_sk_len())
-
-// init sets the context of BLS12-381 curve
-func (a *blsBLS12381Algo) init() error {
-	// compare the Go and C layer constants as a sanity check
-	if signatureLengthBLSBLS12381 != SignatureLenBLSBLS12381 ||
-		pubKeyLengthBLSBLS12381 != PubKeyLenBLSBLS12381 ||
-		prKeyLengthBLSBLS12381 != PrKeyLenBLSBLS12381 {
-		return errors.New("BLS-12381 length settings in Go and C are not consistent, check hardcoded lengths and compressions")
-	}
-	return nil
-}
 
 // This is only a TEST function.
 // signWithXMDSHA256 signs a message using XMD_SHA256 as a hash to field.

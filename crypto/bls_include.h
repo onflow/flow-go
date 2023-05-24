@@ -1,5 +1,3 @@
-// +build relic
-
 // this file is about the core functions required by the BLS signature scheme
 
 #ifndef _REL_BLS_INCLUDE_H

@@ -1,6 +1,3 @@
-//go:build relic
-// +build relic
-
 package crypto
 
 // This file contains tests against the library BLST (https://github.com/supranational/blst).

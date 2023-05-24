@@ -1,5 +1,3 @@
-// +build relic
-
 #include "bls_thresholdsign_include.h"
 
 // the highest index of a threshold participant

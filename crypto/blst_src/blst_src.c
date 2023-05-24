@@ -1,5 +1,3 @@
-// +build relic
-
 #include "keygen.c"
 #include "hash_to_field.c"
 #include "e1.c"
