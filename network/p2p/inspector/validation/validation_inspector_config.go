@@ -20,6 +20,7 @@ const (
 
 // ControlMsgValidationInspectorConfig validation configuration for each type of RPC control message.
 type ControlMsgValidationInspectorConfig struct {
+	*ClusterPrefixedMessageConfig
 	// NumberOfWorkers number of component workers to start for processing RPC messages.
 	NumberOfWorkers int
 	// InspectMsgStoreOpts options used to configure the underlying herocache message store.
@@ -30,6 +31,10 @@ type ControlMsgValidationInspectorConfig struct {
 	PruneValidationCfg *CtrlMsgValidationConfig
 	// IHaveValidationCfg validation configuration for IHAVE control messages.
 	IHaveValidationCfg *CtrlMsgValidationConfig
+}
+
+// ClusterPrefixedMessageConfig configuration values for cluster prefixed control message validation.
+type ClusterPrefixedMessageConfig struct {
 	// ClusterPrefixHardThreshold the upper bound on the amount of cluster prefixed control messages that will be processed
 	// before a node starts to get penalized. This allows LN nodes to process some cluster prefixed control messages during startup
 	// when the cluster ID's provider is set asynchronously. It also allows processing of some stale messages that may be sent by nodes

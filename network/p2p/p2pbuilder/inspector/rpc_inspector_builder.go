@@ -92,10 +92,12 @@ func (b *GossipSubInspectorBuilder) validationInspectorConfig(validationConfigs 
 	}
 	// setup gossip sub RPC control message inspector config
 	controlMsgRPCInspectorCfg := &validation.ControlMsgValidationInspectorConfig{
-		ClusterPrefixHardThreshold:                   validationConfigs.ClusterPrefixHardThreshold,
-		ClusterPrefixedControlMsgsReceivedCacheSize:  validationConfigs.ClusterPrefixedControlMsgsReceivedCacheSize,
-		ClusterPrefixedControlMsgsReceivedCacheDecay: validationConfigs.ClusterPrefixedControlMsgsReceivedCacheDecay,
-		NumberOfWorkers:                              validationConfigs.NumberOfWorkers,
+		ClusterPrefixedMessageConfig: &validation.ClusterPrefixedMessageConfig{
+			ClusterPrefixHardThreshold:                   validationConfigs.ClusterPrefixHardThreshold,
+			ClusterPrefixedControlMsgsReceivedCacheSize:  validationConfigs.ClusterPrefixedControlMsgsReceivedCacheSize,
+			ClusterPrefixedControlMsgsReceivedCacheDecay: validationConfigs.ClusterPrefixedControlMsgsReceivedCacheDecay,
+		},
+		NumberOfWorkers: validationConfigs.NumberOfWorkers,
 		InspectMsgStoreOpts: []queue.HeroStoreConfigOption{
 			queue.WithHeroStoreSizeLimit(validationConfigs.CacheSize),
 			queue.WithHeroStoreCollector(metrics.GossipSubRPCInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.publicNetwork))},
