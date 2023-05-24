@@ -230,8 +230,6 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) (
 
 	firstUnexecuted := lastExecuted + 1
 
-	e.log.Info().Msgf("last finalized and executed height: %v", lastExecuted)
-
 	unexecuted := make([]flow.Identifier, 0)
 
 	// starting from the first unexecuted block, go through each unexecuted and finalized block
@@ -244,6 +242,15 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) (
 
 		unexecuted = append(unexecuted, header.ID())
 	}
+
+	e.log.Info().
+		Uint64("last_finalized", final.Height).
+		Uint64("last_finalized_executed", lastExecuted).
+		Uint64("sealed_root", rootBlock.Height).
+		Hex("sealed_root_id", logging.Entity(rootBlock)).
+		Uint64("first_unexecuted", firstUnexecuted).
+		Int("total_finalized_unexecuted", len(unexecuted)).
+		Msgf("finalized unexecuted blocks")
 
 	return unexecuted, nil
 }
