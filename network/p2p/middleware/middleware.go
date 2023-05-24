@@ -78,9 +78,11 @@ var (
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
+	component.Component
 	ctx context.Context
 	log zerolog.Logger
 	ov  network.Overlay
+
 	// TODO: using a waitgroup here doesn't actually guarantee that we'll wait for all
 	// goroutines to exit, because new goroutines could be started after we've already
 	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
@@ -100,7 +102,6 @@ type Middleware struct {
 	slashingViolationsConsumer slashing.ViolationsConsumer
 	unicastRateLimiters        *ratelimit.RateLimiters
 	authorizedSenderValidator  *validator.AuthorizedSenderValidator
-	component.Component
 }
 
 type OptionFn func(*Middleware)
@@ -142,10 +143,10 @@ func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) OptionFn {
 // During normal operations any error returned by Middleware.start is considered to be catastrophic
 // and will be thrown by the irrecoverable.SignalerContext causing the node to crash.
 func NewMiddleware(
-	log zerolog.Logger,
+	logger zerolog.Logger,
 	libP2PNode p2p.LibP2PNode,
 	flowID flow.Identifier,
-	bitswapMet module.BitswapMetrics,
+	bitswapMetrics module.BitswapMetrics,
 	rootBlockID flow.Identifier,
 	unicastMessageTimeout time.Duration,
 	idTranslator p2p.IDTranslator,
@@ -159,12 +160,12 @@ func NewMiddleware(
 
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
-		log:                        log,
+		log:                        logger,
 		me:                         flowID,
 		libP2PNode:                 libP2PNode,
-		bitswapMetrics:             bitswapMet,
+		bitswapMetrics:             bitswapMetrics,
 		rootBlockID:                rootBlockID,
-		validators:                 DefaultValidators(log, flowID),
+		validators:                 DefaultValidators(logger, flowID),
 		unicastMessageTimeout:      unicastMessageTimeout,
 		idTranslator:               idTranslator,
 		codec:                      codec,
@@ -198,7 +199,7 @@ func NewMiddleware(
 			mw.slashingViolationsConsumer,
 			mw.ov.Identity)
 
-		err := mw.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream, m.preferredUnicasts)
+		err := mw.libP2PNode.WithDefaultUnicastProtocol(mw.handleIncomingStream, mw.preferredUnicasts)
 		if err != nil {
 			ctx.Throw(fmt.Errorf("could not register preferred unicast protocols on libp2p node: %w", err))
 		}
