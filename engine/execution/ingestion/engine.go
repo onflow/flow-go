@@ -235,7 +235,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) (
 	// starting from the first unexecuted block, go through each unexecuted and finalized block
 	// reload its block to execution queues
 	for height := firstUnexecuted; height <= final.Height; height++ {
-		header, err := e.getHeaderByHeight(lastExecuted)
+		header, err := e.getHeaderByHeight(height)
 		if err != nil {
 			return nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
 		}
