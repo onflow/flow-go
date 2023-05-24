@@ -36,10 +36,23 @@ var (
 	// ErrSpamReportQueueSizeNotSet is returned when the spam report queue size is not set, it is a fatal irrecoverable error,
 	// and the ALSP module cannot be initialized.
 	ErrSpamReportQueueSizeNotSet = errors.New("spam report queue size is not set")
-	// ErrHeartBeatIntervalNotSet is returned when the heartbeat interval is not set, it is a fatal irrecoverable error,
-	ErrHeartBeatIntervalNotSet = errors.New("heartbeat interval is not set")
 )
 
+type SpamRecordCacheFactory func(zerolog.Logger, uint32, module.HeroCacheMetrics) alsp.SpamRecordCache
+
+// defaultSpamRecordCacheFactory is the default spam record cache factory. It creates a new spam record cache with the given parameter.
+func defaultSpamRecordCacheFactory() SpamRecordCacheFactory {
+	return func(logger zerolog.Logger, size uint32, cacheMetrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		return internal.NewSpamRecordCache(
+			size,
+			logger.With().Str("component", "spam_record_cache").Logger(),
+			cacheMetrics,
+			model.SpamRecordFactory())
+	}
+}
+
+	ErrHeartBeatIntervalNotSet = errors.New("heartbeat interval is not set")
+	// ErrHeartBeatIntervalNotSet is returned when the heartbeat interval is not set, it is a fatal irrecoverable error,
 // MisbehaviorReportManager is responsible for handling misbehavior reports.
 // The current version is at the minimum viable product stage and only logs the reports.
 // TODO: the mature version should be able to handle the reports and take actions accordingly, i.e., penalize the misbehaving node
@@ -49,7 +62,13 @@ type MisbehaviorReportManager struct {
 	component.Component
 	logger  zerolog.Logger
 	metrics module.AlspMetrics
-	cache   alsp.SpamRecordCache
+	// cacheFactory is the factory for creating the spam record cache. MisbehaviorReportManager is coming with a
+	// default factory that creates a new spam record cache with the given parameter. However, this factory can be
+	// overridden with a custom factory.
+	cacheFactory SpamRecordCacheFactory
+	// cache is the spam record cache that stores the spam records for the authorized nodes. It is initialized by
+	// invoking the cacheFactory.
+	cache alsp.SpamRecordCache
 	// disablePenalty indicates whether applying the penalty to the misbehaving node is disabled.
 	// When disabled, the ALSP module logs the misbehavior reports and updates the metrics, but does not apply the penalty.
 	// This is useful for managing production incidents.
@@ -113,21 +132,20 @@ func (c MisbehaviorReportManagerConfig) validate() error {
 
 type MisbehaviorReportManagerOption func(*MisbehaviorReportManager)
 
-// WithSpamRecordsCache sets the spam record cache for the MisbehaviorReportManager.
+// WithSpamRecordsCacheFactory sets the spam record cache factory for the MisbehaviorReportManager.
 // Args:
 //
-//	cache: the spam record cache instance.
+//	f: the spam record cache factory.
 //
 // Returns:
 //
 //	a MisbehaviorReportManagerOption that sets the spam record cache for the MisbehaviorReportManager.
 //
-// Note: this option is used for testing purposes. The production version of the MisbehaviorReportManager should use the
-//
-//	NewSpamRecordCache function to create the spam record cache.
-func WithSpamRecordsCache(cache alsp.SpamRecordCache) MisbehaviorReportManagerOption {
+// Note: this option is useful primarily for testing purposes. The default factory should be sufficient for the production, and
+// do not change it unless you are confident that you know what you are doing.
+func WithSpamRecordsCacheFactory(f SpamRecordCacheFactory) MisbehaviorReportManagerOption {
 	return func(m *MisbehaviorReportManager) {
-		m.cache = cache
+		m.cacheFactory = f
 	}
 }
 
@@ -152,18 +170,18 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 		logger:         lg,
 		metrics:        cfg.AlspMetrics,
 		disablePenalty: cfg.DisablePenalty,
+		cacheFactory:   defaultSpamRecordCacheFactory(),
 	}
-
-	m.cache = internal.NewSpamRecordCache(
-		cfg.SpamRecordCacheSize,
-		lg.With().Str("component", "spam_record_cache").Logger(),
-		metrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory, cfg.NetworkType),
-		model.SpamRecordFactory())
 
 	store := queue.NewHeroStore(
 		cfg.SpamReportQueueSize,
 		lg.With().Str("component", "spam_record_queue").Logger(),
-		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory))
+		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory, cfg.NetworkType))
+
+	m.workerPool = worker.NewWorkerPoolBuilder[internal.ReportedMisbehaviorWork](
+		cfg.Logger,
+		store,
+		m.processMisbehaviorReport).Build()
 
 	m.workerPool = worker.NewWorkerPoolBuilder[internal.ReportedMisbehaviorWork](
 		cfg.Logger,
@@ -173,6 +191,11 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 	for _, opt := range opts {
 		opt(m)
 	}
+
+	m.cache = m.cacheFactory(
+		lg,
+		cfg.SpamRecordCacheSize,
+		metrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory, cfg.NetworkType))
 
 	builder := component.NewComponentManagerBuilder()
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -341,7 +364,7 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 			// this should never happen, unless there is a bug in the misbehavior report handling logic.
 			// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
 			// we return the error as it is considered as a fatal error.
-			return record, fmt.Errorf(FatalMsgNegativePositivePenalty, report.Penalty)
+			return record, fmt.Errorf("penalty value is positive, expected negative %f", report.Penalty)
 		}
 		record.Penalty += report.Penalty // penalty value is negative. We add it to the current penalty.
 		return record, nil

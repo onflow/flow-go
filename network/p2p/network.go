@@ -153,11 +153,11 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 			n.conduitFactory.Start(ctx)
 
 			select {
-			case <-ctx.Done():
-				return
 			case <-n.conduitFactory.Ready():
 				n.logger.Debug().Msg("conduit factory is ready")
 				ready()
+			case <-ctx.Done():
+				// jumps to the end of the select statement to let a graceful shutdown.
 			}
 
 			<-ctx.Done()

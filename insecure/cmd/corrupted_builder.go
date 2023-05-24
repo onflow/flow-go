@@ -86,7 +86,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		}
 
 		// create default libp2p factory if corrupt node should enable the topic validator
-		libP2PNodeFactory := corruptlibp2p.NewCorruptLibP2PNodeFactory(
+		corruptLibp2pNode, err := corruptlibp2p.InitCorruptLibp2pNode(
 			cnb.Logger,
 			cnb.RootChainID,
 			myAddr,
@@ -105,19 +105,17 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			cnb.WithPubSubMessageSigning,
 			cnb.WithPubSubStrictSignatureVerification,
 		)
-
-		libp2pNode, err := libP2PNodeFactory()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p node: %w", err)
 		}
-		cnb.LibP2PNode = libp2pNode
+		cnb.LibP2PNode = corruptLibp2pNode
 		cnb.Logger.Info().
 			Hex("node_id", logging.ID(cnb.NodeID)).
 			Str("address", myAddr).
 			Bool("topic_validator_disabled", cnb.TopicValidatorDisabled).
 			Msg("corrupted libp2p node initialized")
 
-		return libp2pNode, nil
+		return corruptLibp2pNode, nil
 	})
 	cnb.FlowNodeBuilder.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := cnb.FlowNodeBuilder.NodeConfig.Me.Address()

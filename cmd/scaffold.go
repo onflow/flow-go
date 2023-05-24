@@ -383,7 +383,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
 
-		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
+		builder, err := p2pbuilder.DefaultNodeBuilder(
 			fnb.Logger,
 			myAddr,
 			fnb.NetworkKey,
@@ -397,18 +397,20 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
 			peerManagerCfg,
-			// run peer manager with the specified interval and let it also prune connections
 			fnb.GossipSubConfig,
 			fnb.LibP2PResourceManagerConfig,
-			uniCfg,
-		)
+			uniCfg)
 
-		libp2pNode, err := libP2PNodeFactory()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create libp2p node: %w", err)
+			return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
 		}
-		fnb.LibP2PNode = libp2pNode
 
+		libp2pNode, err := builder.Build()
+		if err != nil {
+			return nil, fmt.Errorf("could not build libp2p node: %w", err)
+		}
+
+		fnb.LibP2PNode = libp2pNode
 		return libp2pNode, nil
 	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {

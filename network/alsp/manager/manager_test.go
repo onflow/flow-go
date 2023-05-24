@@ -9,11 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -424,7 +426,13 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport_PenaltyDisable(t *testing.T
 	cfg.AlspMetrics = alspMetrics
 
 	// we use a mock cache but we do not expect any calls to the cache, since the penalty is disabled.
-	cache := mockalsp.NewSpamRecordCache(t)
+	var cache *mockalsp.SpamRecordCache
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg,
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			cache = mockalsp.NewSpamRecordCache(t)
+			return cache
+		}))
+	require.NoError(t, err)
 
 	// create a new MisbehaviorReportManager
 	m, err := alspmgr.NewMisbehaviorReportManager(cfg, alspmgr.WithSpamRecordsCache(cache))
