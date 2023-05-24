@@ -36,6 +36,9 @@ var (
 	// ErrSpamReportQueueSizeNotSet is returned when the spam report queue size is not set, it is a fatal irrecoverable error,
 	// and the ALSP module cannot be initialized.
 	ErrSpamReportQueueSizeNotSet = errors.New("spam report queue size is not set")
+	// ErrHeartBeatIntervalNotSet is returned when the heartbeat interval is not set, it is a fatal irrecoverable error,
+	// and the ALSP module cannot be initialized.
+	ErrHeartBeatIntervalNotSet = errors.New("heartbeat interval is not set")
 )
 
 type SpamRecordCacheFactory func(zerolog.Logger, uint32, module.HeroCacheMetrics) alsp.SpamRecordCache
@@ -51,8 +54,6 @@ func defaultSpamRecordCacheFactory() SpamRecordCacheFactory {
 	}
 }
 
-	ErrHeartBeatIntervalNotSet = errors.New("heartbeat interval is not set")
-	// ErrHeartBeatIntervalNotSet is returned when the heartbeat interval is not set, it is a fatal irrecoverable error,
 // MisbehaviorReportManager is responsible for handling misbehavior reports.
 // The current version is at the minimum viable product stage and only logs the reports.
 // TODO: the mature version should be able to handle the reports and take actions accordingly, i.e., penalize the misbehaving node
