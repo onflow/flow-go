@@ -85,8 +85,6 @@ var expandMsgOutput = int(C.get_mapToG1_input_len())
 
 // blsBLS12381Algo, embeds SignAlgo
 type blsBLS12381Algo struct {
-	// points to Relic context of BLS12-381 with all the parameters
-	context ctx
 	// the signing algo and parameters
 	algo SigningAlgorithm
 }
@@ -535,11 +533,6 @@ var prKeyLengthBLSBLS12381 = int(C.get_sk_len())
 
 // init sets the context of BLS12-381 curve
 func (a *blsBLS12381Algo) init() error {
-	// initializes relic context and sets the B12_381 parameters
-	if err := a.context.initContext(); err != nil {
-		return err
-	}
-
 	// compare the Go and C layer constants as a sanity check
 	if signatureLengthBLSBLS12381 != SignatureLenBLSBLS12381 ||
 		pubKeyLengthBLSBLS12381 != PubKeyLenBLSBLS12381 ||

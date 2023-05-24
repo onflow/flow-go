@@ -51,11 +51,6 @@ type scalar C.Fr
 // BLS12-381 related lengths
 var frBytesLen = int(C.get_Fr_BYTES())
 
-// context required for the BLS set-up
-type ctx struct {
-	relicCtx *C.ctx_t
-}
-
 // get some constants from the C layer
 // (Cgo does not export C macros)
 var valid = C.get_valid()
@@ -78,16 +73,6 @@ func (p *pointE2) String() string {
 	encoding := make([]byte, pubKeyLengthBLSBLS12381)
 	writePointE2(encoding, p)
 	return fmt.Sprintf("%#x", encoding)
-}
-
-// initContext sets relic B12_381 parameters and precomputes some data in the C layer
-func (ct *ctx) initContext() error {
-	c := C.relic_init_BLS12_381()
-	if c == nil {
-		return errors.New("Relic core init failed")
-	}
-	ct.relicCtx = c
-	return nil
 }
 
 // Scalar multiplication of a generic point `p` in G1

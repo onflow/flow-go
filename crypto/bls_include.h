@@ -16,10 +16,6 @@
 #define SK_BITS             (Fr_BITS)
 #define SK_LEN              BITS_TO_BYTES(SK_BITS)    
 
-// Simultaneous Pairing in verification
-#define DOUBLE_PAIRING 1
-#define SINGLE_PAIRING (DOUBLE_PAIRING^1)
-
 // bls core (functions in bls_core.c)
 int      get_signature_len();
 int      get_pk_len();

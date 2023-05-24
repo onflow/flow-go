@@ -104,4 +104,8 @@ typedef vec384x Fp2;
 // `E2` is also used to represent all subgroup G_2 elements. 
 typedef struct {Fp2 x,y,z;} E2;
 
+// Fp12 is the codomain of the pairing function `e`, specifically the subgroup
+// G_T of Fp12.
+// Fp12 represents G_T elements and is equivalent to `vec384fp12` (used internally by BLST)
+typedef vec384fp12 Fp12;
 #endif

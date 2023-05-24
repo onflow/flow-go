@@ -42,21 +42,13 @@
 #define G2_SER_BYTES        (G2_BYTES/(G2_SERIALIZATION+1))
 
 
-// TODO: to delete when Relic is removed
-ep2_st*     E2_blst_to_relic(const E2* x);
-ep_st*      E1_blst_to_relic(const E1* x);
-
 int      get_valid();
 int      get_invalid();
 int      get_Fr_BYTES();
 int      get_mapToG1_input_len();
 
 // BLS based SPoCK
-int bls_spock_verify(const E2*, const byte*, const E2*, const byte*);
-
-// hash to curve functions (functions in bls12381_hashtocurve.c)
-#define MAP_TO_G1_INPUT_LEN (2*(Fp_BYTES + SEC_BITS/8))
-int     map_to_G1(E1*, const byte*, const int);
+int     bls_spock_verify(const E2*, const byte*, const E2*, const byte*);
 
 // Fr utilities
 extern const Fr BLS12_381_rR;
@@ -95,6 +87,7 @@ bool_t      E1_affine_on_curve(const E1*);
 bool_t      E1_in_G1(const E1*);
 void        E1_mult(E1*, const E1*, const Fr*);
 void        E1_add(E1*, const E1*, const E1*);
+void        E1_neg(E1*, const E1*);
 void        E1_sum_vector(E1*, const E1*, const int);
 int         E1_sum_vector_byte(byte*, const byte*, const int);
 void        G1_mult_gen(E1*, const Fr*);
@@ -102,6 +95,9 @@ BLST_ERROR  E1_read_bytes(E1*, const byte *,  const int);
 void        E1_write_bytes(byte *, const E1*);
 void        unsafe_map_bytes_to_G1(E1*, const byte*, int);
 BLST_ERROR  unsafe_map_bytes_to_G1complement(E1*, const byte*, int);
+// hash to curve functions (functions in bls12381_hashtocurve.c)
+#define MAP_TO_G1_INPUT_LEN (2*(Fp_BYTES + SEC_BITS/8))
+int         map_to_G1(E1*, const byte*, const int);
 
 // E2 and G2 utilities
 void        E2_set_infty(E2* p);
@@ -116,28 +112,31 @@ void        G2_mult_gen(E2*, const Fr*);
 void        E2_mult(E2*, const E2*, const Fr*);
 void        E2_mult_small_expo(E2*, const E2*, const byte);
 void        E2_add(E2* res, const E2* a, const E2* b);
+void        E2_neg(E2*, const E2*);
 void        E2_sum_vector(E2*, const E2*, const int);
 void        E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len);
 bool_t      E2_in_G2(const E2*);
 void        unsafe_map_bytes_to_G2(E2*, const byte*, int);
 BLST_ERROR  unsafe_map_bytes_to_G2complement(E2*, const byte*, int);
 
-// Utility functions
-ctx_t*   relic_init_BLS12_381();
+// pairing and Fp12
+bool_t      Fp12_is_one(Fp12*);
+void        Fp12_set_one(Fp12*);
+void        multi_pairing(Fp12*, const E1*, const E2*, const int);
 
 // utility testing function
 void xmd_sha256(byte *, int, byte *, int, byte *, int);
 
 // Debugging related functions
+#define DEBUG 0
+#if (DEBUG == 1)
 void     bytes_print_(char*, byte*, int);
 void     Fr_print_(char*, Fr*);
 void     Fp_print_(char*, const Fp*);
 void     Fp2_print_(char*, const Fp2*);
+void     Fp12_print_(char*, const Fp12*);
 void     E1_print_(char*, const E1*, const int);
 void     E2_print_(char*, const E2*, const int);
-void     fp_print_(char*, fp_t);
-void     bn_print_(char*, bn_st*);
-void     ep_print_(char*, ep_st*);
-void     ep2_print_(char*, ep2_st*);
+#endif // DEBUG
 
 #endif
