@@ -188,12 +188,23 @@ func NewMiddleware(
 		})
 	}
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		// TODO: refactor to avoid storing ctx altogether
 		mw.ctx = ctx
-
-		if err := mw.start(ctx); err != nil {
-			ctx.Throw(err)
+		if mw.ov == nil {
+			ctx.Throw(fmt.Errorf("overlay has not been set"))
 		}
+
+		mw.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(
+			mw.log,
+			mw.slashingViolationsConsumer,
+			mw.ov.Identity)
+
+		err := mw.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream, m.preferredUnicasts)
+		if err != nil {
+			ctx.Throw(fmt.Errorf("could not register preferred unicast protocols on libp2p node: %w", err))
+		}
+
+		mw.UpdateNodeAddresses()
+		mw.libP2PNode.WithPeersProvider(mw.topologyPeers)
 
 		ready()
 
@@ -202,7 +213,6 @@ func NewMiddleware(
 
 		// wait for the readConnection and readSubscription routines to stop
 		mw.wg.Wait()
-
 		mw.log.Info().Str("component", "middleware").Msg("stopped subroutines")
 	})
 
@@ -296,27 +306,6 @@ func (m *Middleware) UpdateNodeAddresses() {
 
 func (m *Middleware) SetOverlay(ov network.Overlay) {
 	m.ov = ov
-}
-
-// start will start the middleware.
-// No errors are expected during normal operation.
-func (m *Middleware) start(ctx context.Context) error {
-	if m.ov == nil {
-		return fmt.Errorf("could not start middleware: overlay must be configured by calling SetOverlay before middleware can be started")
-	}
-
-	m.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(m.log, m.slashingViolationsConsumer, m.ov.Identity)
-
-	err := m.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream, m.preferredUnicasts)
-	if err != nil {
-		return fmt.Errorf("could not register preferred unicast protocols on libp2p node: %w", err)
-	}
-
-	m.UpdateNodeAddresses()
-
-	m.libP2PNode.WithPeersProvider(m.topologyPeers)
-
-	return nil
 }
 
 // topologyPeers callback used by the peer manager to get the list of peer ID's
