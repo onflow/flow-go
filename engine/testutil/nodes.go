@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	"math"
 	"path/filepath"
 	"testing"
@@ -390,6 +391,8 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	rootQCVoter := new(mockmodule.ClusterRootQCVoter)
 	rootQCVoter.On("Vote", mock.Anything, mock.Anything).Return(nil)
 
+	engineEventsDistributor := mockcollection.NewEngineEvents(t)
+	engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Maybe()
 	heights := gadgets.NewHeights()
 	node.ProtocolEvents.AddConsumer(heights)
 
@@ -401,7 +404,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		rootQCVoter,
 		factory,
 		heights,
-		node.ProtocolEvents,
+		engineEventsDistributor,
 	)
 	require.NoError(t, err)
 	node.ProtocolEvents.AddConsumer(epochManager)
@@ -895,12 +898,12 @@ func WithGenericNode(genericNode *testmock.GenericNode) VerificationOpt {
 // (integration) testing.
 func VerificationNode(t testing.TB,
 	hub *stub.Hub,
-	verIdentity *flow.Identity, // identity of this verification node.
+	verIdentity *flow.Identity,     // identity of this verification node.
 	participants flow.IdentityList, // identity of all nodes in system including this verification node.
 	assigner module.ChunkAssigner,
 	chunksLimit uint,
 	chainID flow.ChainID,
-	collector module.VerificationMetrics, // used to enable collecting metrics on happy path integration
+	collector module.VerificationMetrics,   // used to enable collecting metrics on happy path integration
 	mempoolCollector module.MempoolMetrics, // used to enable collecting metrics on happy path integration
 	opts ...VerificationOpt) testmock.VerificationNode {
 
