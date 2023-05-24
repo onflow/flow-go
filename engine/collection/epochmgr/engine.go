@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -56,10 +57,10 @@ type Engine struct {
 	epochs map[uint64]*RunningEpochComponents // epoch-scoped components per epoch
 
 	// internal event notifications
-	epochTransitionEvents        chan *flow.Header      // sends first block of new epoch
-	epochSetupPhaseStartedEvents chan *flow.Header      // sends first block of EpochSetup phase
-	epochStopEvents              chan uint64            // sends counter of epoch to stop
-	clusterIDUpdateDistributor   protocol.ClusterEvents // sends cluster ID updates to consumers
+	epochTransitionEvents        chan *flow.Header        // sends first block of new epoch
+	epochSetupPhaseStartedEvents chan *flow.Header        // sends first block of EpochSetup phase
+	epochStopEvents              chan uint64              // sends counter of epoch to stop
+	clusterIDUpdateDistributor   collection.ClusterEvents // sends cluster ID updates to consumers
 	cm                           *component.ComponentManager
 	component.Component
 }
@@ -75,7 +76,7 @@ func New(
 	voter module.ClusterRootQCVoter,
 	factory EpochComponentsFactory,
 	heightEvents events.Heights,
-	clusterIDUpdateDistributor protocol.ClusterEvents,
+	clusterIDUpdateDistributor collection.ClusterEvents,
 ) (*Engine, error) {
 	e := &Engine{
 		log:                          log.With().Str("engine", "epochmgr").Logger(),

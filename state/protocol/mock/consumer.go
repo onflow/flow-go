@@ -12,11 +12,6 @@ type Consumer struct {
 	mock.Mock
 }
 
-// ActiveClustersChanged provides a mock function with given fields: _a0
-func (_m *Consumer) ActiveClustersChanged(_a0 flow.ChainIDList) {
-	_m.Called(_a0)
-}
-
 // BlockFinalized provides a mock function with given fields: block
 func (_m *Consumer) BlockFinalized(block *flow.Header) {
 	_m.Called(block)

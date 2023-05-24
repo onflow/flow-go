@@ -23,16 +23,6 @@ func (_m *GossipSubMsgValidationRpcInspector) ActiveClustersChanged(_a0 flow.Cha
 	_m.Called(_a0)
 }
 
-// BlockFinalized provides a mock function with given fields: block
-func (_m *GossipSubMsgValidationRpcInspector) BlockFinalized(block *flow.Header) {
-	_m.Called(block)
-}
-
-// BlockProcessable provides a mock function with given fields: block, certifyingQC
-func (_m *GossipSubMsgValidationRpcInspector) BlockProcessable(block *flow.Header, certifyingQC *flow.QuorumCertificate) {
-	_m.Called(block, certifyingQC)
-}
-
 // Done provides a mock function with given fields:
 func (_m *GossipSubMsgValidationRpcInspector) Done() <-chan struct{} {
 	ret := _m.Called()
@@ -47,26 +37,6 @@ func (_m *GossipSubMsgValidationRpcInspector) Done() <-chan struct{} {
 	}
 
 	return r0
-}
-
-// EpochCommittedPhaseStarted provides a mock function with given fields: currentEpochCounter, first
-func (_m *GossipSubMsgValidationRpcInspector) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
-	_m.Called(currentEpochCounter, first)
-}
-
-// EpochEmergencyFallbackTriggered provides a mock function with given fields:
-func (_m *GossipSubMsgValidationRpcInspector) EpochEmergencyFallbackTriggered() {
-	_m.Called()
-}
-
-// EpochSetupPhaseStarted provides a mock function with given fields: currentEpochCounter, first
-func (_m *GossipSubMsgValidationRpcInspector) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
-	_m.Called(currentEpochCounter, first)
-}
-
-// EpochTransition provides a mock function with given fields: newEpochCounter, first
-func (_m *GossipSubMsgValidationRpcInspector) EpochTransition(newEpochCounter uint64, first *flow.Header) {
-	_m.Called(newEpochCounter, first)
 }
 
 // Inspect provides a mock function with given fields: _a0, _a1

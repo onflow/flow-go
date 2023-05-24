@@ -28,6 +28,7 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
+	"github.com/onflow/flow-go/engine/collection/events"
 	"github.com/onflow/flow-go/engine/collection/ingest"
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	"github.com/onflow/flow-go/engine/collection/rpc"
@@ -563,6 +564,8 @@ func main() {
 			heightEvents := gadgets.NewHeights()
 			node.ProtocolEvents.AddConsumer(heightEvents)
 
+			clusterEvents := events.NewDistributor()
+
 			manager, err := epochmgr.New(
 				node.Logger,
 				node.Me,
@@ -571,7 +574,7 @@ func main() {
 				rootQCVoter,
 				factory,
 				heightEvents,
-				node.ProtocolEvents,
+				clusterEvents,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create epoch manager: %w", err)
@@ -582,7 +585,7 @@ func main() {
 
 			for _, rpcInspector := range node.GossipSubRpcInspectorSuite.Inspectors() {
 				if r, ok := rpcInspector.(p2p.GossipSubMsgValidationRpcInspector); ok {
-					node.ProtocolEvents.AddConsumer(r)
+					clusterEvents.AddConsumer(r)
 				}
 			}
 

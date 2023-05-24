@@ -29,8 +29,6 @@ import (
 // NOTE: the epoch-related callbacks are only called once the fork containing
 // the relevant event has been finalized.
 type Consumer interface {
-	ClusterEvents
-
 	// BlockFinalized is called when a block is finalized.
 	// Formally, this callback is informationally idempotent. I.e. the consumer
 	// of this callback must handle repeated calls for the same block.
@@ -95,15 +93,4 @@ type Consumer interface {
 	// no further epoch phase transitions will occur, and no further epoch-related
 	// related protocol events (the events defined in this interface) will be emitted.
 	EpochEmergencyFallbackTriggered()
-}
-
-// ClusterEvents defines methods used to disseminate cluster ID update events.
-// Cluster IDs are updated when a new set of epoch components start and the old set of epoch components stops.
-// A new list of cluster IDs will be assigned when the new set of epoch components are started, and the old set of cluster
-// IDs are removed when the current set of epoch components are stopped. The implementation must be concurrency safe and  non-blocking.
-type ClusterEvents interface {
-	// ActiveClustersChanged is called when a new cluster ID update event is distributed.
-	// Any error encountered on consuming event must handle internally by the implementation.
-	// The implementation must be concurrency safe, but can be blocking.
-	ActiveClustersChanged(flow.ChainIDList)
 }

@@ -10,8 +10,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/state/protocol"
 )
 
 type ValidationResult int
@@ -98,7 +98,7 @@ type GossipSubRPCInspector interface {
 //   - be concurrency safe
 //   - be non-blocking
 type GossipSubMsgValidationRpcInspector interface {
-	protocol.Consumer
+	collection.ClusterEvents
 	GossipSubRPCInspector
 }
 
