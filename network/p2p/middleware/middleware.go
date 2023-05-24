@@ -103,15 +103,15 @@ type Middleware struct {
 	component.Component
 }
 
-type MiddlewareOption func(*Middleware)
+type OptionFn func(*Middleware)
 
-func WithMessageValidators(validators ...network.MessageValidator) MiddlewareOption {
+func WithMessageValidators(validators ...network.MessageValidator) OptionFn {
 	return func(mw *Middleware) {
 		mw.validators = validators
 	}
 }
 
-func WithPreferredUnicastProtocols(unicasts []protocols.ProtocolName) MiddlewareOption {
+func WithPreferredUnicastProtocols(unicasts []protocols.ProtocolName) OptionFn {
 	return func(mw *Middleware) {
 		mw.preferredUnicasts = unicasts
 	}
@@ -119,14 +119,14 @@ func WithPreferredUnicastProtocols(unicasts []protocols.ProtocolName) Middleware
 
 // WithPeerManagerFilters sets a list of p2p.PeerFilter funcs that are used to
 // filter out peers provided by the peer manager PeersProvider.
-func WithPeerManagerFilters(peerManagerFilters []p2p.PeerFilter) MiddlewareOption {
+func WithPeerManagerFilters(peerManagerFilters []p2p.PeerFilter) OptionFn {
 	return func(mw *Middleware) {
 		mw.peerManagerFilters = peerManagerFilters
 	}
 }
 
 // WithUnicastRateLimiters sets the unicast rate limiters.
-func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) MiddlewareOption {
+func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) OptionFn {
 	return func(mw *Middleware) {
 		mw.unicastRateLimiters = rateLimiters
 	}
@@ -151,7 +151,7 @@ func NewMiddleware(
 	idTranslator p2p.IDTranslator,
 	codec network.Codec,
 	slashingViolationsConsumer slashing.ViolationsConsumer,
-	opts ...MiddlewareOption) *Middleware {
+	opts ...OptionFn) *Middleware {
 
 	if unicastMessageTimeout <= 0 {
 		unicastMessageTimeout = DefaultUnicastTimeout
@@ -204,7 +204,7 @@ func NewMiddleware(
 		}
 
 		mw.UpdateNodeAddresses()
-		mw.libP2PNode.WithPeersProvider(mw.topologyPeers)
+		mw.libP2PNode.WithPeersProvider(mw.authorizedPeers)
 
 		ready()
 
@@ -308,12 +308,18 @@ func (m *Middleware) SetOverlay(ov network.Overlay) {
 	m.ov = ov
 }
 
-// topologyPeers callback used by the peer manager to get the list of peer ID's
-// which this node should be directly connected to as peers. The peer ID list
-// returned will be filtered through any configured m.peerManagerFilters. If the
-// underlying libp2p node has a peer manager configured this func will be used as the
-// peers provider.
-func (m *Middleware) topologyPeers() peer.IDSlice {
+// authorizedPeers is a peer manager callback used by the underlying libp2p node that updates who can connect to this node (as
+// well as who this node can connect to).
+// and who is not allowed to connect to this node. This function is called by the peer manager and connection gater components
+// of libp2p.
+//
+// Args:
+// none
+// Returns:
+// - peer.IDSlice: a list of peer IDs that are allowed to connect to this node (and that this node can connect to). Any peer
+// not in this list is assumed to be disconnected from this node (if connected) and not allowed to connect to this node.
+// This is the guarantee that the underlying libp2p node implementation makes.
+func (m *Middleware) authorizedPeers() peer.IDSlice {
 	peerIDs := make([]peer.ID, 0)
 	for _, id := range m.peerIDs(m.ov.Topology().NodeIDs()) {
 		peerAllowed := true
