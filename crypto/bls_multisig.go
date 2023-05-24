@@ -455,8 +455,11 @@ func VerifyBLSSignatureManyMessages(
 // Each signature at index (i) of the input signature slice is verified against
 // the public key of the same index (i) in the input key slice.
 // The input hasher is the same used to generate all signatures.
-// The returned boolean slice is a slice so that the value at index (i) is true
-// if signature (i) verifies against public key (i), and false otherwise.
+// The returned boolean slice is of the same length of the signatures sliice,
+// where the boolean at index (i) is true if signature (i) verifies against
+// public key (i), and false otherwise.
+// In the case where an error occurs during the execution of the function,
+// all the returned boolean values are `false`.
 //
 // The caller must make sure the input public keys's proofs of possession have been
 // verified prior to calling this function (or each input key is sum of public
