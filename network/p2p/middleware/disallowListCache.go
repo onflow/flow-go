@@ -18,33 +18,29 @@ const (
 // DisallowListCache is an interface for a cache that keeps the list of disallow-listed peers.
 // It is designed to present a centralized interface for keeping track of disallow-listed peers for different reasons.
 type DisallowListCache interface {
-	// IsDisallowed returns true if the given peer is disallow-listed for any cause.
+	// GetAllDisallowedListCausesFor returns the list of causes for which the given peer is disallow-listed.
 	// Args:
 	// - peerID: the peer to check.
 	// Returns:
-	// - a list of causes for which the peer is disallow-listed.
-	// - true if the peer is disallow-listed for any cause.
-	// - false if the peer is not disallow-listed for any cause.
-	IsDisallowed(peerID peer.ID) ([]DisallowListedCause, bool)
+	// - the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
+	// an empty list is returned.
+	GetAllDisallowedListCausesFor(peerID peer.ID) []DisallowListedCause
 
-	// DisallowFor disallow-lists the given peer for the given cause.
-	// If the peer is already disallow-listed for the given cause, this method is a no-op.
+	// DisallowFor disallow-lists a peer for a cause.
 	// Args:
-	// - peerID: the peer to disallow-list.
-	// - cause: the cause for disallow-listing.
+	// - peerID: the peerID of the peer to be disallow-listed.
+	// - cause: the cause for disallow-listing the peer.
 	// Returns:
-	// - nil if the peer was successfully disallow-listed.
-	// - an error if the peer could not be disallow-listed in the cache, the error is irrecoverable and the current node should
-	// crash.
-	DisallowFor(peerID peer.ID, cause DisallowListedCause) error
+	// - the list of causes for which the peer is disallow-listed.
+	// - error if the operation fails, error is irrecoverable.
+	DisallowFor(peerID peer.ID, cause DisallowListedCause) ([]DisallowListedCause, error)
 
-	// AllowFor allow-lists the given peer for the given cause.
-	// If the peer is not disallow-listed for the given cause, this method is a no-op.
+	// AllowFor removes a cause from the disallow list cache entity for the peerID.
 	// Args:
-	// - peerID: the peer to allow-list.
-	// - cause: the cause for allow-listing.
+	// - peerID: the peerID of the peer to be allow-listed.
+	// - cause: the cause for allow-listing the peer.
 	// Returns:
-	// - nil if the peer was successfully allow-listed.
-	// - an error if the peer could not be allow-listed in the cache, the error is irrecoverable and the current node should
-	AllowFor(peerID peer.ID, cause DisallowListedCause) error
+	// - the list of causes for which the peer is disallow-listed.
+	// - error if the entity for the peerID is not found in the cache it returns ErrDisallowCacheEntityNotFound, which is a benign error.
+	AllowFor(peerID peer.ID, cause DisallowListedCause) ([]DisallowListedCause, error)
 }

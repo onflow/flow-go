@@ -8,6 +8,9 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
+	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 )
@@ -16,35 +19,57 @@ var (
 	ErrDisallowCacheEntityNotFound = errors.New("disallow list cache entity not found")
 )
 
+// DisallowListCache is the disallow-list cache. It is used to keep track of the disallow-listed peers and the reasons for it.
 type DisallowListCache struct {
-	c      *stdmap.Backend
-	logger zerolog.Logger
+	c *stdmap.Backend
 }
 
 var _ middleware.DisallowListCache = (*DisallowListCache)(nil)
 
-func NewDisallowListCache() DisallowListCache {
-	return DisallowListCache{
-		c: stdmap.NewBackend(),
+// NewDisallowListCache creates a new disallow-list cache. The cache is backed by a stdmap.Backend.
+// Args:
+// - sizeLimit: the size limit of the cache, i.e., the maximum number of records that the cache can hold, recommended size is 100 * number of authorized nodes.
+// - logger: the logger used by the cache.
+// - collector: the metrics collector used by the cache.
+// Returns:
+// - *DisallowListCache, the created cache.
+func NewDisallowListCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *DisallowListCache {
+	backData := herocache.NewCache(sizeLimit,
+		herocache.DefaultOversizeFactor,
+		// this cache is supposed to keep the disallow-list causes for the authorized (staked) nodes. Since the number of such nodes is
+		// expected to be small, we do not eject any records from the cache. The cache size must be large enough to hold all
+		// the spam records of the authorized nodes. Also, this cache is keeping at most one record per peer id, so the
+		// size of the cache must be at least the number of authorized nodes.
+		heropool.NoEjection,
+		logger.With().Str("mempool", "disallow-list-records").Logger(),
+		collector)
+
+	return &DisallowListCache{
+		c: stdmap.NewBackend(stdmap.WithBackData(backData)),
 	}
 }
 
-func (d *DisallowListCache) IsDisallowed(peerID peer.ID) ([]middleware.DisallowListedCause, bool) {
+// GetAllDisallowedListCausesFor returns the list of causes for which the given peer is disallow-listed.
+// Args:
+// - peerID: the peer to check.
+// Returns:
+// - the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
+// an empty list is returned.
+func (d *DisallowListCache) GetAllDisallowedListCausesFor(peerID peer.ID) []middleware.DisallowListedCause {
+	causes := make([]middleware.DisallowListedCause, 0)
 	entity, exists := d.c.ByID(makeId(peerID))
 	if !exists {
-		return nil, false
+		return causes
 	}
-	dEntity := mustBeDisallowListEntity(entity)
 
-	// returning a deep copy of causes (to avoid being mutated externally).
-	causes := make([]middleware.DisallowListedCause, 0, len(dEntity.causes))
+	dEntity := mustBeDisallowListEntity(entity)
 	for cause := range dEntity.causes {
 		causes = append(causes, cause)
 	}
-	return causes, true
+	return causes
 }
 
-// init initializes the disallow list cache entity for the peerID.
+// init initializes the disallow-list cache entity for the peerID.
 // Args:
 // - peerID: the peerID of the peer to be disallow-listed.
 // Returns:
@@ -120,9 +145,32 @@ func (d *DisallowListCache) disallowListFor(peerID peer.ID, cause middleware.Dis
 	return updatedCauses, nil
 }
 
-func (d *DisallowListCache) AllowFor(peerID peer.ID, cause middleware.DisallowListedCause) error {
-	//TODO implement me
-	panic("implement me")
+// AllowFor removes a cause from the disallow list cache entity for the peerID.
+// Args:
+// - peerID: the peerID of the peer to be allow-listed.
+// - cause: the cause for allow-listing the peer.
+// Returns:
+// - the list of causes for which the peer is disallow-listed.
+// - error if the entity for the peerID is not found in the cache it returns ErrDisallowCacheEntityNotFound, which is a benign error.
+func (d *DisallowListCache) AllowFor(peerID peer.ID, cause middleware.DisallowListedCause) ([]middleware.DisallowListedCause, error) {
+	adjustedEntity, adjusted := d.c.Adjust(makeId(peerID), func(entity flow.Entity) flow.Entity {
+		dEntity := mustBeDisallowListEntity(entity)
+		delete(dEntity.causes, cause)
+		return dEntity
+	})
+
+	if !adjusted {
+		// if the entity is not found in the cache, we return a benign error.
+		return nil, ErrDisallowCacheEntityNotFound
+	}
+
+	dEntity := mustBeDisallowListEntity(adjustedEntity)
+	// returning a deep copy of causes (to avoid being mutated externally).
+	causes := make([]middleware.DisallowListedCause, 0, len(dEntity.causes))
+	for cause := range dEntity.causes {
+		causes = append(causes, cause)
+	}
+	return causes, nil
 }
 
 // mustBeDisallowListEntity is a helper function for type assertion of the flow.Entity to disallowListCacheEntity.

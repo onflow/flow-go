@@ -44,7 +44,7 @@ func NewSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector modul
 		// the spam records of the authorized nodes. Also, this cache is keeping at most one record per origin id, so the
 		// size of the cache must be at least the number of authorized nodes.
 		heropool.NoEjection,
-		logger.With().Str("mempool", "aslp=spam-records").Logger(),
+		logger.With().Str("mempool", "aslp-spam-records").Logger(),
 		collector)
 
 	return &SpamRecordCache{
