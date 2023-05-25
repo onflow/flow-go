@@ -34,7 +34,13 @@ type State struct {
 	}
 	// cache the root height because it cannot change over the lifecycle of a protocol state instance
 	rootHeight uint64
-	// cache the spork root block height because it cannot change over the lifecycle of a protocol state instance
+	// sealedRootHeight returns the root block that is sealed.
+	// sealedRootHeight == rootSnapshot.SealingSegment.Sealed().Header.Height < rootHeight == rootSnapshot.SealingSegment.Highest().Header.Height
+	sealedRootHeight uint64
+	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
+	// the state, because it cannot change over the lifecycle of a protocol state instance.
+	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
+	// know the spork's root block in full (though it will always know the height).
 	sporkRootBlockHeight uint64
 }
 
@@ -106,11 +112,13 @@ func Bootstrap(
 		// sealing segment is in ascending height order, so the tail is the
 		// oldest ancestor and head is the newest child in the segment
 		// TAIL <- ... <- HEAD
-		highest := segment.Highest() // reference block of the snapshot
-		lowest := segment.Sealed()   // last sealed block
+		lastFinalized := segment.Highest() // the highest block in sealing segment is the last finalized block
+		lastSealed := segment.Sealed()     // the lowest block in sealing segment is the last sealed block
 
 		// 1) bootstrap the sealing segment
-		err = state.bootstrapSealingSegment(segment, highest, rootResult)(tx)
+		// creating sealed root block with the rootResult
+		// creating finalized root block with lastFinalized
+		err = state.bootstrapSealingSegment(segment, lastFinalized, rootResult)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
 		}
@@ -148,9 +156,9 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not update epoch metrics: %w", err)
 		}
-		state.metrics.BlockSealed(lowest)
-		state.metrics.SealedHeight(lowest.Header.Height)
-		state.metrics.FinalizedHeight(highest.Header.Height)
+		state.metrics.BlockSealed(lastSealed)
+		state.metrics.SealedHeight(lastSealed.Header.Height)
+		state.metrics.FinalizedHeight(lastFinalized.Header.Height)
 		for _, block := range segment.Blocks {
 			state.metrics.BlockFinalized(block)
 		}
