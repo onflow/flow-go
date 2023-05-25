@@ -333,7 +333,7 @@ func main() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
-				node.FinalizedHeader,
+				node.FinalizedRootBlock.Header,
 				core,
 				node.ComplianceConfig,
 			)
