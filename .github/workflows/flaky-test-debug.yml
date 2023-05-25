@@ -55,20 +55,6 @@ jobs:
           cache: true
       - name: Run tidy
         run: make tidy
-      - name: Emulator no relic check
-        run: make emulator-norelic-check
-
-  #  shell-check:
-  #    name: ShellCheck
-  #    runs-on: ubuntu-latest
-  #    steps:
-  #      - name: Checkout repo
-  #        uses: actions/checkout@v3
-  #      - name: Run ShellCheck
-  #        uses: ludeeus/action-shellcheck@203a3fd018dfe73f8ae7e3aa8da2c149a5f41c33
-  #        with:
-  #          scandir: './crypto'
-  #          ignore: 'relic'
 
   create-dynamic-test-matrix:
     name: Create Dynamic Test Matrix

@@ -49,14 +49,14 @@ jobs:
 
       - name: Run benchmark on current branch
         run: |
-          (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm ./engine/execution/computation --bench . --tags relic -shuffle=on --benchmem --run ^$; done) | tee new.txt
+          (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm ./engine/execution/computation --bench . -shuffle=on --benchmem --run ^$; done) | tee new.txt
 
       - name: Checkout base branch
         run: git checkout ${{ github.event.pull_request.base.sha }}
 
       - name: Run benchmark on base branch
         run: |
-          (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm ./engine/execution/computation --bench . --tags relic -shuffle=on --benchmem --run ^$; done) | tee old.txt
+          (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm ./engine/execution/computation --bench . -shuffle=on --benchmem --run ^$; done) | tee old.txt
 
       # see https://trstringer.com/github-actions-multiline-strings/ to see why this part is complex
       - name: Use benchstat for comparison
@@ -85,7 +85,7 @@ jobs:
 
             This branch with compared with the base branch ${{  github.event.pull_request.base.label }} commit ${{ github.event.pull_request.base.sha }}
 
-            The command `(for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm ./engine/execution/computation --bench . --tags relic -shuffle=on --benchmem --run ^$; done)` was used.
+            The command `(for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm ./engine/execution/computation --bench . -shuffle=on --benchmem --run ^$; done)` was used.
 
             <details>
             <summary>Collapsed results for better readability</summary>

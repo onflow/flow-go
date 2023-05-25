@@ -28,7 +28,7 @@ import (
  * 5. Strip "time" field from JSON log line output for shorter read, and
  * 6. Show the amount of code coverage from the tests.
  *
- * pushd utils/binstat ; go fmt ./*.go ; golangci-lint run && go test -v -vv -coverprofile=coverage.txt -covermode=atomic --tags relic ./... | perl -lane 's~\\n~\n~g; s~"time".*?,~~g; print;' ; go tool cover -func=coverage.txt ; popd
+ * pushd utils/binstat ; go fmt ./*.go ; golangci-lint run && go test -v -vv -coverprofile=coverage.txt -covermode=atomic ./... | perl -lane 's~\\n~\n~g; s~"time".*?,~~g; print;' ; go tool cover -func=coverage.txt ; popd
  */
 
 /*

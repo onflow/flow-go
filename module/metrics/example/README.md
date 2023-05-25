@@ -18,7 +18,7 @@ You can choose one of the following:
     Note: Running example with `-happypath` flag examines the metrics collection on a real
     happy path of verification node. 
     ```
-    go run --tags=relic module/metrics/example/verification/main.go
+    go run module/metrics/example/verification/main.go
     ```
  - Consensus Node: 
     ```

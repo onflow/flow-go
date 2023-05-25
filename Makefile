@@ -42,19 +42,11 @@ K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
 export DOCKER_BUILDKIT := 1
 
-# setup the crypto package under the GOPATH: needed to test packages importing flow-go/crypto
-# TODO: replace by bash crypto_setup.sh after removing replace statements
-.PHONY: crypto_setup_gopath
-crypto_setup_gopath:
-	(cd ./crypto && make setup)
-	
-
-
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
 
 cmd/util/util:
-	go build -o cmd/util/util --tags relic cmd/util/main.go
+	go build -o cmd/util/util cmd/util/main.go
 
 .PHONY: update-core-contracts-version
 update-core-contracts-version:
@@ -65,8 +57,8 @@ update-core-contracts-version:
 
 .PHONY: unittest-main
 unittest-main:
-	# test all packages with Relic library enabled
-	go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic $(GO_TEST_PACKAGES)
+	# test all packages
+	go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES)
 
 .PHONY: install-mock-generators
 install-mock-generators:
@@ -88,15 +80,10 @@ verify-mocks: generate-mocks
 
 ############################################################################################
 
-.PHONY: emulator-norelic-check
-emulator-norelic-check:
-	# test the fvm package compiles with Relic library disabled (required for the emulator build)
-	cd ./fvm && go test ./... -run=NoTestHasThisPrefix
-
 .PHONY: fuzz-fvm
 fuzz-fvm:
 	# run fuzz tests in the fvm package
-	cd ./fvm && go test -fuzz=Fuzz -run ^$$ --tags relic
+	cd ./fvm && go test -fuzz=Fuzz -run ^$$
 
 .PHONY: test
 test: verify-mocks unittest-main
@@ -154,7 +141,7 @@ generate-mocks: install-mock-generators
 	mockery --name 'ProviderEngine' --dir=engine/execution/provider --case=underscore --output="engine/execution/provider/mock" --outpkg="mock"
 	(cd ./crypto && mockery --name 'PublicKey' --case=underscore --output="../module/mock" --outpkg="mock")
 	mockery --name '.*' --dir=state/cluster --case=underscore --output="state/cluster/mock" --outpkg="mock"
-	mockery --name '.*' --dir=module --case=underscore --tags="relic" --output="./module/mock" --outpkg="mock"
+	mockery --name '.*' --dir=module --case=underscore --output="./module/mock" --outpkg="mock"
 	mockery --name '.*' --dir=module/mempool --case=underscore --output="./module/mempool/mock" --outpkg="mempool"
 	mockery --name '.*' --dir=module/component --case=underscore --output="./module/component/mock" --outpkg="component"
 	mockery --name '.*' --dir=network --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
@@ -182,7 +169,7 @@ generate-mocks: install-mock-generators
 	mockery --name 'API' --dir="./engine/protocol" --case=underscore --output="./engine/protocol/mock" --outpkg="mock"
 	mockery --name 'API' --dir="./engine/access/state_stream" --case=underscore --output="./engine/access/state_stream/mock" --outpkg="mock"
 	mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/backend" --case=underscore --output="./engine/access/rpc/backend/mock" --outpkg="mock"
-	mockery --name 'IngestRPC' --dir="./engine/execution/ingestion" --case=underscore --tags relic --output="./engine/execution/ingestion/mock" --outpkg="mock"
+	mockery --name 'IngestRPC' --dir="./engine/execution/ingestion" --case=underscore --output="./engine/execution/ingestion/mock" --outpkg="mock"
 	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
 	mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
 	mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"
@@ -207,12 +194,12 @@ tidy:
 .PHONY: lint
 lint: tidy
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	golangci-lint run -v --build-tags relic ./...
+	golangci-lint run -v ./...
 
 .PHONY: fix-lint
 fix-lint:
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	golangci-lint run -v --build-tags relic --fix ./...
+	golangci-lint run -v --fix ./...
 
 # Runs unit tests with different list of packages as passed by CI so they run in parallel
 .PHONY: ci
@@ -242,7 +229,6 @@ docker-ci:
 # Runs integration tests in Docker  (for mac)
 .PHONY: docker-ci-integration
 docker-ci-integration:
-	rm -rf crypto/relic
 	docker run \
 		--env DOCKER_API_VERSION='1.39' \
 		--network host \
@@ -262,7 +248,7 @@ docker-build-collection:
 
 .PHONY: docker-build-collection-without-netgo
 docker-build-collection-without-netgo:
-	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
 		-t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_NO_NETGO)"  .
@@ -281,7 +267,7 @@ docker-build-consensus:
 
 .PHONY: docker-build-consensus-without-netgo
 docker-build-consensus-without-netgo:
-	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
 		-t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_NO_NETGO)" .
@@ -300,7 +286,7 @@ docker-build-execution:
 
 .PHONY: docker-build-execution-without-netgo
 docker-build-execution-without-netgo:
-	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
 		-t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_NO_NETGO)" .
@@ -329,7 +315,7 @@ docker-build-verification:
 
 .PHONY: docker-build-verification-without-netgo
 docker-build-verification-without-netgo:
-	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
 		-t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG_NO_NETGO)" .
@@ -358,7 +344,7 @@ docker-build-access:
 
 .PHONY: docker-build-access-without-netgo
 docker-build-access-without-netgo:
-	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
 		-t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG_NO_NETGO)" .
@@ -387,7 +373,7 @@ docker-build-observer:
 
 .PHONY: docker-build-observer-without-netgo
 docker-build-observer-without-netgo:
-	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/observer --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/observer --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
 		-t "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG_NO_NETGO)" .
