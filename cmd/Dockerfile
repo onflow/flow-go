@@ -25,8 +25,7 @@ COPY . .
 
 RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=secret,id=git_creds,dst=/root/.netrc \
-    make crypto_setup_gopath
+    --mount=type=secret,id=git_creds,dst=/root/.netrc
 
 ####################################
 ## (3) Build the production app binary

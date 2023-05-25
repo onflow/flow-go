@@ -67,7 +67,7 @@ install-mock-generators:
     go install github.com/golang/mock/mockgen@v1.6.0;
 
 .PHONY: install-tools
-install-tools: crypto_setup_gopath check-go-version install-mock-generators
+install-tools: check-go-version install-mock-generators
 	cd ${GOPATH}; \
 	go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
@@ -207,7 +207,7 @@ ci: install-tools test
 
 # Runs integration tests
 .PHONY: ci-integration
-ci-integration: crypto_setup_gopath
+ci-integration:
 	$(MAKE) -C integration ci-integration-test
 
 # Runs benchmark tests
