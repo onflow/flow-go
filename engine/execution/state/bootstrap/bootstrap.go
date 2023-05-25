@@ -103,7 +103,7 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 		}
 
 		err = operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID)(txn)
-		if err != nil {
+		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 			return fmt.Errorf("could not index result for root result: %w", err)
 		}
 
