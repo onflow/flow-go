@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
@@ -72,7 +73,7 @@ func InitCorruptLibp2pNode(
 	}
 
 	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, gossipSubCfg.RpcInspector, idProvider, metricsCfg).
-		SetPublicNetwork(p2p.PrivateNetwork).
+		SetNetworkType(network.PrivateNetwork).
 		SetMetrics(metCfg).
 		Build()
 	if err != nil {
