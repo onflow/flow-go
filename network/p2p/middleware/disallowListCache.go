@@ -16,8 +16,14 @@ const (
 // DisallowListCache is an interface for a cache that keeps the list of disallow-listed peers.
 // It is designed to present a centralized interface for keeping track of disallow-listed peers for different reasons.
 type DisallowListCache interface {
-	// IsDisallowedFor returns true if the given peer is disallow-listed for the given cause.
-	IsDisallowedFor(peerID string, cause DisallowListedCause) bool
+	// IsDisallowed returns true if the given peer is disallow-listed for any cause.
+	// Args:
+	// - peerID: the peer to check.
+	// Returns:
+	// - a list of causes for which the peer is disallow-listed.
+	// - true if the peer is disallow-listed for any cause.
+	// - false if the peer is not disallow-listed for any cause.
+	IsDisallowed(peerID string) ([]DisallowListedCause, bool)
 
 	// DisallowFor disallow-lists the given peer for the given cause.
 	// If the peer is already disallow-listed for the given cause, this method is a no-op.
