@@ -107,8 +107,8 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 			return fmt.Errorf("could not index initial genesis execution block: %w", err)
 		}
 
-		err = operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID)(txn)
-		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+		err = operation.SkipDuplicates(operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID))(txn)
+		if err != nil {
 			return fmt.Errorf("could not index result for root result: %w", err)
 		}
 
