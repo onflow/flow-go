@@ -189,34 +189,6 @@ func (m *MockHeaders) EXPECT() *MockHeadersMockRecorder {
 	return m.recorder
 }
 
-// BatchIndexByChunkID mocks base method.
-func (m *MockHeaders) BatchIndexByChunkID(arg0, arg1 flow.Identifier, arg2 storage.BatchStorage) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchIndexByChunkID", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// BatchIndexByChunkID indicates an expected call of BatchIndexByChunkID.
-func (mr *MockHeadersMockRecorder) BatchIndexByChunkID(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchIndexByChunkID", reflect.TypeOf((*MockHeaders)(nil).BatchIndexByChunkID), arg0, arg1, arg2)
-}
-
-// BatchRemoveChunkBlockIndexByChunkID mocks base method.
-func (m *MockHeaders) BatchRemoveChunkBlockIndexByChunkID(arg0 flow.Identifier, arg1 storage.BatchStorage) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchRemoveChunkBlockIndexByChunkID", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// BatchRemoveChunkBlockIndexByChunkID indicates an expected call of BatchRemoveChunkBlockIndexByChunkID.
-func (mr *MockHeadersMockRecorder) BatchRemoveChunkBlockIndexByChunkID(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchRemoveChunkBlockIndexByChunkID", reflect.TypeOf((*MockHeaders)(nil).BatchRemoveChunkBlockIndexByChunkID), arg0, arg1)
-}
-
 // BlockIDByHeight mocks base method.
 func (m *MockHeaders) BlockIDByHeight(arg0 uint64) (flow.Identifier, error) {
 	m.ctrl.T.Helper()
@@ -290,35 +262,6 @@ func (m *MockHeaders) Exists(arg0 flow.Identifier) (bool, error) {
 func (mr *MockHeadersMockRecorder) Exists(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Exists", reflect.TypeOf((*MockHeaders)(nil).Exists), arg0)
-}
-
-// IDByChunkID mocks base method.
-func (m *MockHeaders) IDByChunkID(arg0 flow.Identifier) (flow.Identifier, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IDByChunkID", arg0)
-	ret0, _ := ret[0].(flow.Identifier)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// IDByChunkID indicates an expected call of IDByChunkID.
-func (mr *MockHeadersMockRecorder) IDByChunkID(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IDByChunkID", reflect.TypeOf((*MockHeaders)(nil).IDByChunkID), arg0)
-}
-
-// IndexByChunkID mocks base method.
-func (m *MockHeaders) IndexByChunkID(arg0, arg1 flow.Identifier) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IndexByChunkID", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// IndexByChunkID indicates an expected call of IndexByChunkID.
-func (mr *MockHeadersMockRecorder) IndexByChunkID(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IndexByChunkID", reflect.TypeOf((*MockHeaders)(nil).IndexByChunkID), arg0, arg1)
 }
 
 // Store mocks base method.

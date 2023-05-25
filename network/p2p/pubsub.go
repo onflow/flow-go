@@ -16,12 +16,6 @@ import (
 type ValidationResult int
 
 const (
-	PublicNetworkEnabled  = true
-	PublicNetworkDisabled = false
-
-	MetricsEnabled  = true
-	MetricsDisabled = false
-
 	ValidationAccept ValidationResult = iota
 	ValidationIgnore
 	ValidationReject
@@ -60,11 +54,11 @@ type PubSubAdapterConfig interface {
 	WithSubscriptionFilter(SubscriptionFilter)
 	WithScoreOption(ScoreOptionBuilder)
 	WithMessageIdFunction(f func([]byte) string)
-	WithAppSpecificRpcInspectors(...GossipSubRPCInspector)
 	WithTracer(t PubSubTracer)
 	// WithScoreTracer sets the tracer for the underlying pubsub score implementation.
 	// This is used to expose the local scoring table of the GossipSub node to its higher level components.
 	WithScoreTracer(tracer PeerScoreTracer)
+	WithInspectorSuite(GossipSubInspectorSuite)
 }
 
 // GossipSubControlMetricsObserver funcs used to observe gossipsub related metrics.

@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -21,6 +22,10 @@ type DisallowListConsumer interface {
 
 // ControlMessageType is the type of control message, as defined in the libp2p pubsub spec.
 type ControlMessageType string
+
+func (c ControlMessageType) String() string {
+	return string(c)
+}
 
 const (
 	CtrlMsgIHave ControlMessageType = "IHAVE"
@@ -59,25 +64,25 @@ type DisallowListNotificationDistributor interface {
 	AddConsumer(DisallowListNotificationConsumer)
 }
 
-// GossipSubInspectorNotificationDistributor is the interface for the distributor that distributes gossip sub inspector notifications.
+// GossipSubInspectorNotifDistributor is the interface for the distributor that distributes gossip sub inspector notifications.
 // It is used to distribute notifications to the consumers in an asynchronous manner and non-blocking manner.
 // The implementation should guarantee that all registered consumers are called upon distribution of a new event.
-type GossipSubInspectorNotificationDistributor interface {
+type GossipSubInspectorNotifDistributor interface {
 	component.Component
 	// DistributeInvalidControlMessageNotification distributes the event to all the consumers.
 	// Any error returned by the distributor is non-recoverable and will cause the node to crash.
 	// Implementation must be concurrency safe, and non-blocking.
-	DistributeInvalidControlMessageNotification(notification *InvalidControlMessageNotification) error
+	Distribute(notification *InvCtrlMsgNotif) error
 
 	// AddConsumer adds a consumer to the distributor. The consumer will be called the distributor distributes a new event.
 	// AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.
 	// There is no guarantee that the consumer will be called for events that were already received by the distributor.
-	AddConsumer(GossipSubInvalidControlMessageNotificationConsumer)
+	AddConsumer(GossipSubInvCtrlMsgNotifConsumer)
 }
 
-// InvalidControlMessageNotification is the notification sent to the consumer when an invalid control message is received.
+// InvCtrlMsgNotif is the notification sent to the consumer when an invalid control message is received.
 // It models the information that is available to the consumer about a misbehaving peer.
-type InvalidControlMessageNotification struct {
+type InvCtrlMsgNotif struct {
 	// PeerID is the ID of the peer that sent the invalid control message.
 	PeerID peer.ID
 	// MsgType is the type of control message that was received.
@@ -88,9 +93,9 @@ type InvalidControlMessageNotification struct {
 	Err error
 }
 
-// NewInvalidControlMessageNotification returns a new *InvalidControlMessageNotification
-func NewInvalidControlMessageNotification(peerID peer.ID, msgType ControlMessageType, count uint64, err error) *InvalidControlMessageNotification {
-	return &InvalidControlMessageNotification{
+// NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
+func NewInvalidControlMessageNotification(peerID peer.ID, msgType ControlMessageType, count uint64, err error) *InvCtrlMsgNotif {
+	return &InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: msgType,
 		Count:   count,
@@ -98,13 +103,29 @@ func NewInvalidControlMessageNotification(peerID peer.ID, msgType ControlMessage
 	}
 }
 
-// GossipSubInvalidControlMessageNotificationConsumer is the interface for the consumer that consumes gossip sub inspector notifications.
+// GossipSubInvCtrlMsgNotifConsumer is the interface for the consumer that consumes gossip sub inspector notifications.
 // It is used to consume notifications in an asynchronous manner.
 // The implementation must be concurrency safe, but can be blocking. This is due to the fact that the consumer is called
 // asynchronously by the distributor.
-type GossipSubInvalidControlMessageNotificationConsumer interface {
+type GossipSubInvCtrlMsgNotifConsumer interface {
 	// OnInvalidControlMessageNotification is called when a new invalid control message notification is distributed.
 	// Any error on consuming event must handle internally.
 	// The implementation must be concurrency safe, but can be blocking.
-	OnInvalidControlMessageNotification(*InvalidControlMessageNotification)
+	OnInvalidControlMessageNotification(*InvCtrlMsgNotif)
+}
+
+// GossipSubInspectorSuite is the interface for the GossipSub inspector suite.
+// It encapsulates the rpc inspectors and the notification distributors.
+type GossipSubInspectorSuite interface {
+	component.Component
+	// InspectFunc returns the inspect function that is used to inspect the gossipsub rpc messages.
+	// This function follows a dependency injection pattern, where the inspect function is injected into the gossipsu, and
+	// is called whenever a gossipsub rpc message is received.
+	InspectFunc() func(peer.ID, *pubsub.RPC) error
+
+	// AddInvalidCtrlMsgNotificationConsumer adds a consumer to the invalid control message notification distributor.
+	// This consumer is notified when a misbehaving peer regarding gossipsub control messages is detected. This follows a pub/sub
+	// pattern where the consumer is notified when a new notification is published.
+	// A consumer is only notified once for each notification, and only receives notifications that were published after it was added.
+	AddInvCtrlMsgNotifConsumer(GossipSubInvCtrlMsgNotifConsumer)
 }

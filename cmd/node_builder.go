@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
@@ -30,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -186,8 +186,6 @@ type NetworkConfig struct {
 	NetworkConnectionPruning bool
 	// GossipSubConfig core gossipsub configuration.
 	GossipSubConfig *p2pbuilder.GossipSubConfig
-	// GossipSubRPCInspectorsConfig configuration for all gossipsub RPC control message inspectors.
-	GossipSubRPCInspectorsConfig *inspectorbuilder.GossipSubRPCInspectorsConfig
 	// PreferredUnicastProtocols list of unicast protocols in preferred order
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
@@ -203,6 +201,25 @@ type NetworkConfig struct {
 	DisallowListNotificationCacheSize uint32
 	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
 	UnicastRateLimitersConfig *UnicastRateLimitersConfig
+	AlspConfig                *AlspConfig
+}
+
+// AlspConfig is the config for the Application Layer Spam Prevention (ALSP) protocol.
+type AlspConfig struct {
+	// Size of the cache for spam records. There is at most one spam record per authorized (i.e., staked) node.
+	// Recommended size is 10 * number of authorized nodes to allow for churn.
+	SpamRecordCacheSize uint32
+
+	// SpamReportQueueSize is the size of the queue for spam records. The queue is used to store spam records
+	// temporarily till they are picked by the workers. When the queue is full, new spam records are dropped.
+	// Recommended size is 100 * number of authorized nodes to allow for churn.
+	SpamReportQueueSize uint32
+
+	// DisablePenalty indicates whether applying the penalty to the misbehaving node is disabled.
+	// When disabled, the ALSP module logs the misbehavior reports and updates the metrics, but does not apply the penalty.
+	// This is useful for managing production incidents.
+	// Note: under normal circumstances, the ALSP module should not be disabled.
+	DisablePenalty bool
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
@@ -260,13 +277,8 @@ type NodeConfig struct {
 
 	// root state information
 	RootSnapshot protocol.Snapshot
-	// cached properties of RootSnapshot for convenience
-	RootBlock   *flow.Block
-	RootQC      *flow.QuorumCertificate
-	RootResult  *flow.ExecutionResult
-	RootSeal    *flow.Seal
-	RootChainID flow.ChainID
-	SporkID     flow.Identifier
+	// excerpt of root snapshot and latest finalized snapshot, when we boot up
+	StateExcerptAtBoot
 
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool
@@ -275,8 +287,19 @@ type NodeConfig struct {
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
 	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
-	// GossipSubInspectorNotifDistributor notifies consumers when an invalid RPC message is encountered.
-	GossipSubInspectorNotifDistributor p2p.GossipSubInspectorNotificationDistributor
+}
+
+// StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.
+type StateExcerptAtBoot struct {
+	// properties of RootSnapshot for convenience
+	RootBlock   *flow.Block
+	RootQC      *flow.QuorumCertificate
+	RootResult  *flow.ExecutionResult
+	RootSeal    *flow.Seal
+	RootChainID flow.ChainID
+	SporkID     flow.Identifier
+	// finalized block for use in bootstrapping
+	FinalizedHeader *flow.Header
 }
 
 func DefaultBaseConfig() *BaseConfig {
@@ -301,12 +324,16 @@ func DefaultBaseConfig() *BaseConfig {
 				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
 			},
 			GossipSubConfig:                   p2pbuilder.DefaultGossipSubConfig(),
-			GossipSubRPCInspectorsConfig:      inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(),
 			DNSCacheTTL:                       dns.DefaultTimeToLive,
 			LibP2PResourceManagerConfig:       p2pbuilder.DefaultResourceManagerConfig(),
 			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),
-			NetworkConnectionPruning:          connection.ConnectionPruningEnabled,
+			NetworkConnectionPruning:          connection.PruningEnabled,
 			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
+			AlspConfig: &AlspConfig{
+				SpamRecordCacheSize: alsp.DefaultSpamRecordCacheSize,
+				SpamReportQueueSize: alsp.DefaultSpamReportQueueSize,
+				DisablePenalty:      false, // by default, apply the penalty
+			},
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,

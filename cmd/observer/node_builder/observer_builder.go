@@ -52,6 +52,7 @@ import (
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	consensus_follower "github.com/onflow/flow-go/module/upstream"
 	"github.com/onflow/flow-go/network"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
@@ -59,10 +60,12 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/network/p2p/conduit"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -171,13 +174,11 @@ type ObserverServiceBuilder struct {
 	FollowerState           stateprotocol.FollowerState
 	SyncCore                *chainsync.Core
 	RpcEng                  *rpc.Engine
-	FinalizationDistributor *pubsub.FinalizationDistributor
-	FinalizedHeader         *synceng.FinalizedHeaderCache
+	FollowerDistributor     *pubsub.FollowerDistributor
 	Committee               hotstuff.DynamicCommittee
 	Finalized               *flow.Header
 	Pending                 []*flow.Header
 	FollowerCore            module.HotStuffFollower
-	Validator               hotstuff.Validator
 	ExecutionDataDownloader execution_data.Downloader
 	ExecutionDataRequester  state_synchronization.ExecutionDataRequester // for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
@@ -330,18 +331,11 @@ func (builder *ObserverServiceBuilder) buildFollowerCore() *ObserverServiceBuild
 		// state when the follower detects newly finalized blocks
 		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
 
-		packer := hotsignature.NewConsensusSigDataPacker(builder.Committee)
-		// initialize the verifier for the protocol consensus
-		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
-		builder.Validator = hotstuffvalidator.New(builder.Committee, verifier)
-
 		followerCore, err := consensus.NewFollower(
 			node.Logger,
-			builder.Committee,
 			node.Storage.Headers,
 			final,
-			verifier,
-			builder.FinalizationDistributor,
+			builder.FollowerDistributor,
 			node.RootBlock.Header,
 			node.RootQC,
 			builder.Finalized,
@@ -364,14 +358,18 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 		if node.HeroCacheMetricsEnable {
 			heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 		}
+		packer := hotsignature.NewConsensusSigDataPacker(builder.Committee)
+		verifier := verification.NewCombinedVerifier(builder.Committee, packer) // verifier for HotStuff signature constructs (QCs, TCs, votes)
+		val := hotstuffvalidator.New(builder.Committee, verifier)
+
 		core, err := follower.NewComplianceCore(
 			node.Logger,
 			node.Metrics.Mempool,
 			heroCacheCollector,
-			builder.FinalizationDistributor,
+			builder.FollowerDistributor,
 			builder.FollowerState,
 			builder.FollowerCore,
-			builder.Validator,
+			val,
 			builder.SyncCore,
 			node.Tracer,
 		)
@@ -400,20 +398,6 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 	return builder
 }
 
-func (builder *ObserverServiceBuilder) buildFinalizedHeader() *ObserverServiceBuilder {
-	builder.Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FinalizationDistributor)
-		if err != nil {
-			return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-		}
-		builder.FinalizedHeader = finalizedHeader
-
-		return builder.FinalizedHeader, nil
-	})
-
-	return builder
-}
-
 func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder {
 	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		sync, err := synceng.New(
@@ -421,16 +405,17 @@ func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder
 			node.Metrics.Engine,
 			node.Network,
 			node.Me,
+			node.State,
 			node.Storage.Blocks,
 			builder.FollowerEng,
 			builder.SyncCore,
-			builder.FinalizedHeader,
 			builder.SyncEngineParticipantsProviderFactory(),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
 		builder.SyncEng = sync
+		builder.FollowerDistributor.AddFinalizationConsumer(sync)
 
 		return builder.SyncEng, nil
 	})
@@ -446,7 +431,6 @@ func (builder *ObserverServiceBuilder) BuildConsensusFollower() cmd.NodeBuilder 
 		buildLatestHeader().
 		buildFollowerCore().
 		buildFollowerEngine().
-		buildFinalizedHeader().
 		buildSyncEngine()
 
 	return builder
@@ -550,7 +534,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionDataRequester() *ObserverSe
 				builder.executionDataConfig,
 			)
 
-			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
 			return builder.ExecutionDataRequester, nil
 		})
@@ -566,11 +550,11 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 		opt(config)
 	}
 	anb := &ObserverServiceBuilder{
-		ObserverServiceConfig:   config,
-		FlowNodeBuilder:         cmd.FlowNode("observer"),
-		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
+		ObserverServiceConfig: config,
+		FlowNodeBuilder:       cmd.FlowNode("observer"),
+		FollowerDistributor:   pubsub.NewFollowerDistributor(),
 	}
-	anb.FinalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
+	anb.FollowerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	anb.FlowNodeBuilder.SkipNwAddressBasedValidations = true
@@ -643,6 +627,19 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
 
+	cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
+		Logger:                  builder.Logger,
+		SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
+		SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
+		DisablePenalty:          builder.AlspConfig.DisablePenalty,
+		AlspMetrics:             builder.Metrics.Network,
+		HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
+		NetworkType:             network.PublicNetwork,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize conduit factory: %w", err)
+	}
+
 	// creates network instance
 	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
 		Logger:              builder.Logger,
@@ -654,6 +651,7 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 		Metrics:             networkMetrics,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
+		ConduitFactory:      cf,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -845,7 +843,7 @@ func (builder *ObserverServiceBuilder) validateParams() error {
 	return nil
 }
 
-// initPublicLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the observer.
+// initPublicLibp2pNode creates a libp2p node for the observer service in the public (unstaked) network.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
 // The LibP2P host is created with the following options:
 // * DHT as client and seeded with the given bootstrap peers
@@ -854,70 +852,73 @@ func (builder *ObserverServiceBuilder) validateParams() error {
 // * No connection gater
 // * No connection manager
 // * No peer manager
-// * Default libp2p pubsub options
-func (builder *ObserverServiceBuilder) initPublicLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
-	return func() (p2p.LibP2PNode, error) {
-		var pis []peer.AddrInfo
+// * Default libp2p pubsub options.
+// Args:
+// - networkKey: the private key to use for the libp2p node
+// Returns:
+// - p2p.LibP2PNode: the libp2p node
+// - error: if any error occurs. Any error returned is considered irrecoverable.
+func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.PrivateKey) (p2p.LibP2PNode, error) {
+	var pis []peer.AddrInfo
 
-		for _, b := range builder.bootstrapIdentities {
-			pi, err := utils.PeerAddressInfo(*b)
-
-			if err != nil {
-				return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
-			}
-
-			pis = append(pis, pi)
-		}
-
-		meshTracer := tracer.NewGossipSubMeshTracer(
-			builder.Logger,
-			builder.Metrics.Network,
-			builder.IdentityProvider,
-			builder.GossipSubConfig.LocalMeshLogInterval)
-
-		rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubRPCInspectorsConfig, builder.GossipSubInspectorNotifDistributor)
-		rpcInspectors, err := rpcInspectorBuilder.
-			SetPublicNetwork(p2p.PublicNetworkEnabled).
-			SetMetrics(builder.Metrics.Network, builder.MetricsRegisterer).
-			SetMetricsEnabled(builder.MetricsEnabled).Build()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors: %w", err)
-		}
-
-		node, err := p2pbuilder.NewNodeBuilder(
-			builder.Logger,
-			builder.Metrics.Network,
-			builder.BaseConfig.BindAddr,
-			networkKey,
-			builder.SporkID,
-			builder.LibP2PResourceManagerConfig).
-			SetSubscriptionFilter(
-				subscription.NewRoleBasedFilter(
-					subscription.UnstakedRole, builder.IdentityProvider,
-				),
-			).
-			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return p2pdht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID),
-					builder.Logger,
-					builder.Metrics.Network,
-					p2pdht.AsClient(),
-					dht.BootstrapPeers(pis...),
-				)
-			}).
-			SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
-			SetGossipSubTracer(meshTracer).
-			SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
-			SetGossipSubRPCInspectors(rpcInspectors...).
-			Build()
+	for _, b := range builder.bootstrapIdentities {
+		pi, err := utils.PeerAddressInfo(*b)
 
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
 		}
 
-		builder.LibP2PNode = node
-
-		return builder.LibP2PNode, nil
+		pis = append(pis, pi)
 	}
+
+	meshTracer := tracer.NewGossipSubMeshTracer(
+		builder.Logger,
+		builder.Metrics.Network,
+		builder.IdentityProvider,
+		builder.GossipSubConfig.LocalMeshLogInterval)
+	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector).
+		SetNetworkType(network.PublicNetwork).
+		SetMetrics(&p2pconfig.MetricsConfig{
+			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+			Metrics:          builder.Metrics.Network,
+		}).Build()
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize gossipsub inspectors for observer node: %w", err)
+	}
+
+	node, err := p2pbuilder.NewNodeBuilder(
+		builder.Logger,
+		builder.Metrics.Network,
+		builder.BaseConfig.BindAddr,
+		networkKey,
+		builder.SporkID,
+		builder.LibP2PResourceManagerConfig).
+		SetSubscriptionFilter(
+			subscription.NewRoleBasedFilter(
+				subscription.UnstakedRole, builder.IdentityProvider,
+			),
+		).
+		SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
+			return p2pdht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID),
+				builder.Logger,
+				builder.Metrics.Network,
+				p2pdht.AsClient(),
+				dht.BootstrapPeers(pis...),
+			)
+		}).
+		SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
+		SetGossipSubTracer(meshTracer).
+		SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
+		SetGossipSubRpcInspectorSuite(rpcInspectorSuite).
+		Build()
+
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize libp2p node for observer: %w", err)
+	}
+
+	builder.LibP2PNode = node
+
+	return builder.LibP2PNode, nil
 }
 
 // initObserverLocal initializes the observer's ID, network key and network address
@@ -955,36 +956,30 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
 func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
-	var libp2pNode p2p.LibP2PNode
+	var publicLibp2pNode p2p.LibP2PNode
 	builder.
 		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			libP2PFactory := builder.initPublicLibP2PFactory(node.NetworkKey)
-
 			var err error
-			libp2pNode, err = libP2PFactory()
+			publicLibp2pNode, err = builder.initPublicLibp2pNode(node.NetworkKey)
 			if err != nil {
 				return nil, fmt.Errorf("could not create public libp2p node: %w", err)
 			}
 
-			return libp2pNode, nil
+			return publicLibp2pNode, nil
 		}).
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-			if builder.HeroCacheMetricsEnable {
-				heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
-			}
 			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 				builder.Logger,
-				heroCacheCollector)
+				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork))
 
-			err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+			err := node.Metrics.Mempool.Register(metrics.PrependPublicPrefix(metrics.ResourceNetworkingReceiveCache), receiveCache.Size)
 			if err != nil {
 				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 			}
 
 			msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)
 
-			builder.initMiddleware(node.NodeID, libp2pNode, msgValidators...)
+			builder.initMiddleware(node.NodeID, publicLibp2pNode, msgValidators...)
 
 			// topology is nil since it is automatically managed by libp2p
 			net, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil, receiveCache)
@@ -1038,6 +1033,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.rpcMetricsEnabled,
 			builder.apiRatelimits,
 			builder.apiBurstlimits,
+			builder.Me,
 		)
 		if err != nil {
 			return nil, err
@@ -1069,6 +1065,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, err
 		}
+		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 		return builder.RpcEng, nil
 	})
 }

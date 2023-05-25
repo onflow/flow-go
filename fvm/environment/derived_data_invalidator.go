@@ -3,8 +3,8 @@ package environment
 import (
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -31,11 +31,10 @@ type DerivedDataInvalidator struct {
 
 var _ derived.TransactionInvalidator = DerivedDataInvalidator{}
 
-// TODO(patrick): extract contractKeys from executionSnapshot
 func NewDerivedDataInvalidator(
 	contractUpdates ContractUpdates,
 	serviceAddress flow.Address,
-	executionSnapshot *state.ExecutionSnapshot,
+	executionSnapshot *snapshot.ExecutionSnapshot,
 ) DerivedDataInvalidator {
 	return DerivedDataInvalidator{
 		ContractUpdates: contractUpdates,
@@ -47,7 +46,7 @@ func NewDerivedDataInvalidator(
 
 func meterParamOverridesUpdated(
 	serviceAddress flow.Address,
-	executionSnapshot *state.ExecutionSnapshot,
+	executionSnapshot *snapshot.ExecutionSnapshot,
 ) bool {
 	serviceAccount := string(serviceAddress.Bytes())
 	storageDomain := common.PathDomainStorage.Identifier()
@@ -98,7 +97,7 @@ func (invalidator ProgramInvalidator) ShouldInvalidateEntries() bool {
 func (invalidator ProgramInvalidator) ShouldInvalidateEntry(
 	location common.AddressLocation,
 	program *derived.Program,
-	snapshot *state.ExecutionSnapshot,
+	snapshot *snapshot.ExecutionSnapshot,
 ) bool {
 	if invalidator.MeterParamOverridesUpdated {
 		// if meter parameters changed we need to invalidate all programs
@@ -144,7 +143,7 @@ func (invalidator MeterParamOverridesInvalidator) ShouldInvalidateEntries() bool
 func (invalidator MeterParamOverridesInvalidator) ShouldInvalidateEntry(
 	_ struct{},
 	_ derived.MeterParamOverrides,
-	_ *state.ExecutionSnapshot,
+	_ *snapshot.ExecutionSnapshot,
 ) bool {
 	return invalidator.MeterParamOverridesUpdated
 }

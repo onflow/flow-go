@@ -12,9 +12,10 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
-	fvmState "github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	fvmState "github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/partial"
 	chmodels "github.com/onflow/flow-go/model/chunks"
@@ -93,7 +94,7 @@ func (fcv *ChunkVerifier) Verify(
 }
 
 type partialLedgerStorageSnapshot struct {
-	snapshot fvmState.StorageSnapshot
+	snapshot snapshot.StorageSnapshot
 
 	unknownRegTouch map[flow.RegisterID]struct{}
 }
@@ -165,14 +166,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	context = fvm.NewContextFromParent(
 		context,
 		fvm.WithDerivedBlockData(
-			derived.NewEmptyDerivedBlockDataWithTransactionOffset(
-				transactionOffset)))
+			derived.NewEmptyDerivedBlockData(logical.Time(transactionOffset))))
 
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which
 	// are not expanded and values are unknown.
 	unknownRegTouch := make(map[flow.RegisterID]struct{})
-	snapshotTree := storage.NewSnapshotTree(
+	snapshotTree := snapshot.NewSnapshotTree(
 		&partialLedgerStorageSnapshot{
 			snapshot: executionState.NewLedgerStorageSnapshot(
 				psmt,
@@ -222,9 +222,11 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, nil, fmt.Errorf("cannot calculate events collection hash: %w", err)
 	}
 	if chunk.EventCollection != eventsHash {
-
+		collectionID := ""
+		if chunkDataPack.Collection != nil {
+			collectionID = chunkDataPack.Collection.ID().String()
+		}
 		for i, event := range events {
-
 			fcv.logger.Warn().Int("list_index", i).
 				Str("event_id", event.ID().String()).
 				Hex("event_fingerptint", event.Fingerprint()).
@@ -234,7 +236,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 				Uint32("event_index", event.EventIndex).
 				Bytes("event_payload", event.Payload).
 				Str("block_id", chunk.BlockID.String()).
-				Str("collection_id", chunkDataPack.Collection.ID().String()).
+				Str("collection_id", collectionID).
 				Str("result_id", result.ID().String()).
 				Uint64("chunk_index", chunk.Index).
 				Msg("not matching events debug")

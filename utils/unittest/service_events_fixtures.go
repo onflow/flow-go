@@ -146,6 +146,31 @@ func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCom
 	return event, expected
 }
 
+// VersionBeaconFixtureByChainID returns a VersionTable service event as a Cadence event
+// representation and as a protocol model representation.
+func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.VersionBeacon) {
+
+	events, err := systemcontracts.ServiceEventsForChain(chain)
+	if err != nil {
+		panic(err)
+	}
+
+	event := EventFixture(events.VersionBeacon.EventType(), 1, 1, IdentifierFixture(), 0)
+	event.Payload = []byte(VersionBeaconFixtureJSON)
+
+	expected := &flow.VersionBeacon{
+		VersionBoundaries: []flow.VersionBoundary{
+			{
+				BlockHeight: 44,
+				Version:     "2.13.7",
+			},
+		},
+		Sequence: 5,
+	}
+
+	return event, expected
+}
+
 var EpochSetupFixtureJSON = `
 {
   "type": "Event",
@@ -1225,4 +1250,90 @@ var EpochCommitFixtureJSON = `
             }
         ]
     }
+}`
+
+var VersionBeaconFixtureJSON = `{
+  "type": "Event",
+  "value": {
+    "id": "A.01cf0e2f2f715450.NodeVersionBeacon.VersionBeacon",
+    "fields": [
+      {
+        "value": {
+          "type": "Array",
+          "value": [
+            {
+              "type": "Struct",
+              "value": {
+                "id": "A.01cf0e2f2f715450.NodeVersionBeacon.VersionBoundary",
+                "fields": [
+                  {
+                    "name": "blockHeight",
+                    "value": {
+                      "type": "UInt64",
+                      "value": "44"
+                    }
+                  },
+                  {
+                    "name": "version",
+                    "value": {
+                      "type": "String",
+                      "value": {
+                        "id": "A.01cf0e2f2f715450.NodeVersionBeacon.Semver",
+                        "fields": [
+                          {
+                            "value": {
+                              "value": "2",
+                              "type": "UInt8"
+                            },
+                            "name": "major"
+                          },
+                          {
+                            "value": {
+                              "value": "13",
+                              "type": "UInt8"
+                            },
+                            "name": "minor"
+                          },
+                          {
+                            "value": {
+                              "value": "7",
+                              "type": "UInt8"
+                            },
+                            "name": "patch"
+                          },
+                          {
+                            "value": {
+                              "value": {
+                                "value": "",
+                                "type": "String"
+                              },
+                              "type": "Optional"
+                            },
+                            "name": "preRelease"
+                          }
+                        ]
+                      },
+                      "type": "Struct"
+                    },
+                    "name": "version"
+                  }
+                ]
+              },
+              "type": "Struct"
+            }
+          ],
+          "type": "Array"
+        },
+        "name": "versionBoundaries"
+      },
+      {
+        "value": {
+          "value": "5",
+          "type": "UInt64"
+        },
+        "name": "sequence"
+      }
+    ]
+  },
+  "type": "Event"
 }`

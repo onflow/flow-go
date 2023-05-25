@@ -18,6 +18,8 @@ const (
 	LabelConnectionDirection = "direction"
 	LabelConnectionUseFD     = "usefd" // whether the connection is using a file descriptor
 	LabelSuccess             = "success"
+	LabelCtrlMsgType         = "control_message"
+	LabelMisbehavior         = "misbehavior"
 )
 
 const (
@@ -79,21 +81,23 @@ const (
 	ResourceEpochSetup                                       = "epoch_setup"
 	ResourceEpochCommit                                      = "epoch_commit"
 	ResourceEpochStatus                                      = "epoch_status"
-	ResourceNetworkingReceiveCache                           = "networking_received_message"        // networking layer
-	ResourcePublicNetworkingReceiveCache                     = "public_networking_received_message" // networking layer
-	ResourceNetworkingDnsIpCache                             = "networking_dns_ip_cache"            // networking layer
-	ResourceNetworkingDnsTxtCache                            = "networking_dns_txt_cache"           // networking layer
+	ResourceNetworkingReceiveCache                           = "networking_received_message" // networking layer
+	ResourceNetworkingDnsIpCache                             = "networking_dns_ip_cache"     // networking layer
+	ResourceNetworkingDnsTxtCache                            = "networking_dns_txt_cache"    // networking layer
 	ResourceNetworkingDisallowListNotificationQueue          = "networking_disallow_list_notification_queue"
 	ResourceNetworkingRpcInspectorNotificationQueue          = "networking_rpc_inspector_notification_queue"
 	ResourceNetworkingRpcValidationInspectorQueue            = "networking_rpc_validation_inspector_queue"
 	ResourceNetworkingRpcMetricsObserverInspectorQueue       = "networking_rpc_metrics_observer_inspector_queue"
 	ResourceNetworkingPublicRpcValidationInspectorQueue      = "networking_public_rpc_validation_inspector_queue"
 	ResourceNetworkingPublicRpcMetricsObserverInspectorQueue = "networking_public_rpc_metrics_observer_inspector_queue"
+	ResourceNetworkingApplicationLayerSpamRecordCache        = "application_layer_spam_record_cache"
+	ResourceNetworkingApplicationLayerSpamReportQueue        = "application_layer_spam_report_queue"
 
 	ResourceFollowerPendingBlocksCache = "follower_pending_block_cache"      // follower engine
 	ResourceClusterBlockProposalQueue  = "cluster_compliance_proposal_queue" // collection node, compliance engine
 	ResourceTransactionIngestQueue     = "ingest_transaction_queue"          // collection node, ingest engine
 	ResourceBeaconKey                  = "beacon-key"                        // consensus node, DKG engine
+	ResourceDKGMessage                 = "dkg_private_message"               // consensus, DKG messaging engine
 	ResourceApprovalQueue              = "sealing_approval_queue"            // consensus node, sealing engine
 	ResourceReceiptQueue               = "sealing_receipt_queue"             // consensus node, sealing engine
 	ResourceApprovalResponseQueue      = "sealing_approval_response_queue"   // consensus node, sealing engine

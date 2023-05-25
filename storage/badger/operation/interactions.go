@@ -1,7 +1,7 @@
 package operation
 
 import (
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/dgraph-io/badger/v2"
@@ -9,7 +9,7 @@ import (
 
 func InsertExecutionStateInteractions(
 	blockID flow.Identifier,
-	executionSnapshots []*state.ExecutionSnapshot,
+	executionSnapshots []*snapshot.ExecutionSnapshot,
 ) func(*badger.Txn) error {
 	return insert(
 		makePrefix(codeExecutionStateInteractions, blockID),
@@ -18,7 +18,7 @@ func InsertExecutionStateInteractions(
 
 func RetrieveExecutionStateInteractions(
 	blockID flow.Identifier,
-	executionSnapshots *[]*state.ExecutionSnapshot,
+	executionSnapshots *[]*snapshot.ExecutionSnapshot,
 ) func(*badger.Txn) error {
 	return retrieve(
 		makePrefix(codeExecutionStateInteractions, blockID), executionSnapshots)

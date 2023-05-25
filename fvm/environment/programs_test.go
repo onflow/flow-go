@@ -11,9 +11,10 @@ import (
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -87,16 +88,14 @@ var (
 	`
 )
 
-func setupProgramsTest(t *testing.T) storage.SnapshotTree {
-	txnState := storage.SerialTransaction{
-		NestedTransaction: state.NewTransactionState(
-			nil,
-			state.DefaultParameters()),
-	}
+func setupProgramsTest(t *testing.T) snapshot.SnapshotTree {
+	blockDatabase := storage.NewBlockDatabase(nil, 0, nil)
+	txnState, err := blockDatabase.NewTransaction(0, state.DefaultParameters())
+	require.NoError(t, err)
 
 	accounts := environment.NewAccounts(txnState)
 
-	err := accounts.Create(nil, addressA)
+	err = accounts.Create(nil, addressA)
 	require.NoError(t, err)
 
 	err = accounts.Create(nil, addressB)
@@ -108,11 +107,11 @@ func setupProgramsTest(t *testing.T) storage.SnapshotTree {
 	executionSnapshot, err := txnState.FinalizeMainTransaction()
 	require.NoError(t, err)
 
-	return storage.NewSnapshotTree(nil).Append(executionSnapshot)
+	return snapshot.NewSnapshotTree(nil).Append(executionSnapshot)
 }
 
 func getTestContract(
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 	location common.AddressLocation,
 ) (
 	[]byte,
@@ -126,7 +125,7 @@ func getTestContract(
 
 func Test_Programs(t *testing.T) {
 	vm := fvm.NewVirtualMachine()
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
 	mainSnapshot := setupProgramsTest(t)
 
@@ -137,9 +136,9 @@ func Test_Programs(t *testing.T) {
 		fvm.WithCadenceLogging(true),
 		fvm.WithDerivedBlockData(derivedBlockData))
 
-	var contractASnapshot *state.ExecutionSnapshot
-	var contractBSnapshot *state.ExecutionSnapshot
-	var txASnapshot *state.ExecutionSnapshot
+	var contractASnapshot *snapshot.ExecutionSnapshot
+	var contractBSnapshot *snapshot.ExecutionSnapshot
+	var txASnapshot *snapshot.ExecutionSnapshot
 
 	t.Run("contracts can be updated", func(t *testing.T) {
 		retrievedContractA, err := getTestContract(
@@ -193,7 +192,7 @@ func Test_Programs(t *testing.T) {
 		// run a TX using contract A
 
 		loadedCode := false
-		execASnapshot := state.NewReadFuncStorageSnapshot(
+		execASnapshot := snapshot.NewReadFuncStorageSnapshot(
 			func(id flow.RegisterID) (flow.RegisterValue, error) {
 				expectedId := flow.ContractRegisterID(
 					flow.BytesToAddress([]byte(id.Owner)),
@@ -238,7 +237,7 @@ func Test_Programs(t *testing.T) {
 		txASnapshot = executionSnapshotA
 
 		// execute transaction again, this time make sure it doesn't load code
-		execA2Snapshot := state.NewReadFuncStorageSnapshot(
+		execA2Snapshot := snapshot.NewReadFuncStorageSnapshot(
 			func(id flow.RegisterID) (flow.RegisterValue, error) {
 				notId := flow.ContractRegisterID(
 					flow.BytesToAddress([]byte(id.Owner)),
@@ -339,7 +338,7 @@ func Test_Programs(t *testing.T) {
 		// rerun transaction
 
 		// execute transaction again, this time make sure it doesn't load code
-		execB2Snapshot := state.NewReadFuncStorageSnapshot(
+		execB2Snapshot := snapshot.NewReadFuncStorageSnapshot(
 			func(id flow.RegisterID) (flow.RegisterValue, error) {
 				idA := flow.ContractRegisterID(
 					flow.BytesToAddress([]byte(id.Owner)),
@@ -443,7 +442,7 @@ func Test_Programs(t *testing.T) {
 		// rerun transaction
 
 		// execute transaction again, this time make sure it doesn't load code
-		execB2Snapshot := state.NewReadFuncStorageSnapshot(
+		execB2Snapshot := snapshot.NewReadFuncStorageSnapshot(
 			func(id flow.RegisterID) (flow.RegisterValue, error) {
 				idA := flow.ContractRegisterID(
 					flow.BytesToAddress([]byte(id.Owner)),
@@ -483,7 +482,7 @@ func Test_Programs(t *testing.T) {
 		// at this point programs cache should contain data for contract A
 		// only because contract B has been called
 
-		execASnapshot := state.NewReadFuncStorageSnapshot(
+		execASnapshot := snapshot.NewReadFuncStorageSnapshot(
 			func(id flow.RegisterID) (flow.RegisterValue, error) {
 				notId := flow.ContractRegisterID(
 					flow.BytesToAddress([]byte(id.Owner)),
@@ -583,7 +582,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 	snapshotTree := setupProgramsTest(t)
 
 	vm := fvm.NewVirtualMachine()
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
+	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
 	metrics := &metricsReporter{}
 	context := fvm.NewContext(
@@ -657,7 +656,7 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		require.Equal(t, 0, cached)
 	})
 
-	callC := func(snapshotTree storage.SnapshotTree) storage.SnapshotTree {
+	callC := func(snapshotTree snapshot.SnapshotTree) snapshot.SnapshotTree {
 		procCallC := fvm.Transaction(
 			flow.NewTransactionBody().SetScript(
 				[]byte(
@@ -780,7 +779,7 @@ func updateContractTx(name, code string, address flow.Address) *flow.Transaction
 	).AddAuthorizer(address)
 }
 
-func compareExecutionSnapshots(t *testing.T, a, b *state.ExecutionSnapshot) {
+func compareExecutionSnapshots(t *testing.T, a, b *snapshot.ExecutionSnapshot) {
 	require.Equal(t, a.WriteSet, b.WriteSet)
 	require.Equal(t, a.ReadSet, b.ReadSet)
 	require.Equal(t, a.SpockSecret, b.SpockSecret)

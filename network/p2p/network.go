@@ -20,7 +20,6 @@ import (
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
 	"github.com/onflow/flow-go/utils/logging"
@@ -106,8 +105,11 @@ type NetworkParameters struct {
 	Metrics             module.NetworkCoreMetrics
 	IdentityProvider    module.IdentityProvider
 	ReceiveCache        *netcache.ReceiveCache
+	ConduitFactory      network.ConduitFactory
 	Options             []NetworkOptFunction
 }
+
+var _ network.Network = (*Network)(nil)
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
@@ -121,7 +123,7 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 	}
 
 	n := &Network{
-		logger:                      param.Logger,
+		logger:                      param.Logger.With().Str("component", "network").Logger(),
 		codec:                       param.Codec,
 		me:                          param.Me,
 		mw:                          mw,
@@ -130,7 +132,7 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 		metrics:                     param.Metrics,
 		subscriptionManager:         param.SubscriptionManager,
 		identityProvider:            param.IdentityProvider,
-		conduitFactory:              conduit.NewDefaultConduitFactory(),
+		conduitFactory:              param.ConduitFactory,
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
 	}
@@ -146,6 +148,23 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 	}
 
 	n.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			n.logger.Debug().Msg("starting conduit factory")
+			n.conduitFactory.Start(ctx)
+
+			select {
+			case <-n.conduitFactory.Ready():
+				n.logger.Debug().Msg("conduit factory is ready")
+				ready()
+			case <-ctx.Done():
+				// jumps to the end of the select statement to let a graceful shutdown.
+			}
+
+			<-ctx.Done()
+			n.logger.Debug().Msg("stopping conduit factory")
+			<-n.conduitFactory.Done()
+			n.logger.Debug().Msg("conduit factory stopped")
+		}).
 		AddWorker(n.runMiddleware).
 		AddWorker(n.processRegisterEngineRequests).
 		AddWorker(n.processRegisterBlobServiceRequests).Build()

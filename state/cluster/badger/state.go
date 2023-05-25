@@ -17,7 +17,8 @@ import (
 
 type State struct {
 	db        *badger.DB
-	clusterID flow.ChainID
+	clusterID flow.ChainID // the chain ID for the cluster
+	epoch     uint64       // the operating epoch for the cluster
 }
 
 // Bootstrap initializes the persistent cluster state with a genesis block.
@@ -31,7 +32,7 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 	if isBootstrapped {
 		return nil, fmt.Errorf("expected empty cluster state for cluster ID %s", stateRoot.ClusterID())
 	}
-	state := newState(db, stateRoot.ClusterID())
+	state := newState(db, stateRoot.ClusterID(), stateRoot.EpochCounter())
 
 	genesis := stateRoot.Block()
 	rootQC := stateRoot.QC()
@@ -84,7 +85,7 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 	return state, nil
 }
 
-func OpenState(db *badger.DB, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads, clusterID flow.ChainID) (*State, error) {
+func OpenState(db *badger.DB, _ module.Tracer, _ storage.Headers, _ storage.ClusterPayloads, clusterID flow.ChainID, epoch uint64) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db, clusterID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
@@ -92,14 +93,15 @@ func OpenState(db *badger.DB, tracer module.Tracer, headers storage.Headers, pay
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	state := newState(db, clusterID)
+	state := newState(db, clusterID, epoch)
 	return state, nil
 }
 
-func newState(db *badger.DB, clusterID flow.ChainID) *State {
+func newState(db *badger.DB, clusterID flow.ChainID, epoch uint64) *State {
 	state := &State{
 		db:        db,
 		clusterID: clusterID,
+		epoch:     epoch,
 	}
 	return state
 }
@@ -149,7 +151,7 @@ func (s *State) AtBlockID(blockID flow.Identifier) cluster.Snapshot {
 	return snapshot
 }
 
-// IsBootstrapped returns whether or not the database contains a bootstrapped state
+// IsBootstrapped returns whether the database contains a bootstrapped state.
 func IsBootstrapped(db *badger.DB, clusterID flow.ChainID) (bool, error) {
 	var finalized uint64
 	err := db.View(operation.RetrieveClusterFinalizedHeight(clusterID, &finalized))

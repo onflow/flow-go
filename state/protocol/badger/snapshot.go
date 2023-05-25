@@ -33,7 +33,15 @@ type Snapshot struct {
 	blockID flow.Identifier // reference block for this snapshot
 }
 
+// FinalizedSnapshot represents a read-only immutable snapshot of the protocol state
+// at a finalized block. It is guaranteed to have a header available.
+type FinalizedSnapshot struct {
+	Snapshot
+	header *flow.Header
+}
+
 var _ protocol.Snapshot = (*Snapshot)(nil)
+var _ protocol.Snapshot = (*FinalizedSnapshot)(nil)
 
 // newSnapshotWithIncorporatedReferenceBlock creates a new state snapshot with the given reference block.
 // CAUTION: The caller is responsible for ensuring that the reference block has been incorporated.
@@ -42,6 +50,22 @@ func newSnapshotWithIncorporatedReferenceBlock(state *State, blockID flow.Identi
 		state:   state,
 		blockID: blockID,
 	}
+}
+
+// NewFinalizedSnapshot instantiates a `FinalizedSnapshot`.
+// CAUTION: the header's ID _must_ match `blockID` (not checked)
+func NewFinalizedSnapshot(state *State, blockID flow.Identifier, header *flow.Header) *FinalizedSnapshot {
+	return &FinalizedSnapshot{
+		Snapshot: Snapshot{
+			state:   state,
+			blockID: blockID,
+		},
+		header: header,
+	}
+}
+
+func (s *FinalizedSnapshot) Head() (*flow.Header, error) {
+	return s.header, nil
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
@@ -376,6 +400,15 @@ func (s *Snapshot) Epochs() protocol.EpochQuery {
 
 func (s *Snapshot) Params() protocol.GlobalParams {
 	return s.state.Params()
+}
+
+func (s *Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
+	head, err := s.state.headers.ByBlockID(s.blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.state.versionBeacons.Highest(head.Height)
 }
 
 // EpochQuery encapsulates querying epochs w.r.t. a snapshot.
