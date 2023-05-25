@@ -49,7 +49,7 @@ type signer interface {
 	decodePublicKeyCompressed([]byte) (PublicKey, error)
 }
 
-// newSigner returns a signer that does not depend on Relic library.
+// newSigner returns a signer instance
 func newSigner(algo SigningAlgorithm) (signer, error) {
 	switch algo {
 	case ECDSAP256:
@@ -63,7 +63,7 @@ func newSigner(algo SigningAlgorithm) (signer, error) {
 	}
 }
 
-// Initialize the context of all algos not requiring Relic
+// Initialize the context of all algos
 func init() {
 	// P-256
 	p256Instance = &(ecdsaAlgo{

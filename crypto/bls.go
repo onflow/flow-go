@@ -1,12 +1,13 @@
 package crypto
 
-// BLS signature scheme implementation using BLS12-381 curve
-// ([zcash]https://electriccoin.co/blog/new-snark-curve/)
-// Pairing, ellipic curve and modular arithmetic is using Relic library.
-// This implementation does not include any security against side-channel attacks.
+// BLS signature scheme implementation using the BLS12-381 curve
+// ([zcash]https://electriccoin.co/blog/new-snark-curve/).
+// Pairing, ellipic curve and modular arithmetic are using [BLST](https://github.com/supranational/blst/tree/master/src)
+// tools underneath.
+// This implementation does not include security against side-channel or fault attacks.
 
-// existing features:
-//  - the implementation variant is minimal-signature-size signatures:
+// Existing features:
+//  - the implementation variant is minimal-signature-size:
 //    shorter signatures in G1, longer public keys in G2
 //  - serialization of points on G1 and G2 is compressed ([zcash]
 //     https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
@@ -18,15 +19,12 @@ package crypto
 //    and BLS_POP_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_ for proofs of possession.
 //  - signature verification checks the membership of signature in G1.
 //  - the public key membership check in G2 is implemented separately from the signature verification.
-//  - membership check in G1 is implemented using fast Bowe's check (to be updated to Scott's check).
-//  - membership check in G2 is using a simple scalar multiplication with the group order (to be updated to Scott's check).
 //  - multi-signature tools are defined in bls_multisg.go
-//  - SPoCK scheme based on BLS: verifies two signatures have been generated from the same message,
-//    that is unknown to the verifier.
+//  - SPoCK scheme based on BLS: verifies two signatures are generated from the same message,
+//    even though the message is unknown to the verifier.
 
 // future features:
-//  - membership checks G2 using Bowe's method (https://eprint.iacr.org/2019/814.pdf)
-//  - implement a G1/G2 swap (signatures on G2 and public keys on G1)
+//  - implement a G1/G2 swap (minimal-pubkey-size variant)
 
 // #include "bls_include.h"
 import "C"

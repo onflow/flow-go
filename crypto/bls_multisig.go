@@ -15,20 +15,21 @@ import (
 
 // BLS multi-signature using BLS12-381 curve
 // ([zcash]https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#bls12-381)
-// Pairing, ellipic curve and modular arithmetic is using Relic library.
-// This implementation does not include any security against side-channel attacks.
+// Pairing, ellipic curve and modular arithmetic are using [BLST](https://github.com/supranational/blst/tree/master/src)
+// tools underneath.
+// This implementation does not include any security against side-channel side-channel or fault attacks.
 
-// existing features:
+// Existing features:
 //  - the same BLS set-up in bls.go
 //  - Use the proof of possession scheme (PoP) to prevent against rogue public-key attack.
-//  - Non-interactive aggregation of private keys, public keys and signatures.
-//  - Non-interactive subtraction of multiple public keys from an (aggregated) public key.
+//  - Aggregation of private keys, public keys and signatures.
+//  - Subtraction of multiple public keys from an (aggregated) public key.
 //  - Multi-signature verification of an aggregated signature of a single message
 //  under multiple public keys.
 //  - Multi-signature verification of an aggregated signature of multiple messages under
 //  multiple public keys.
 //  - batch verification of multiple signatures of a single message under multiple
-//  public keys: use a binary tree of aggregations to find the invalid signatures.
+//  public keys, using a binary tree of aggregations.
 
 // #include "bls12381_utils.h"
 // #include "bls_include.h"
