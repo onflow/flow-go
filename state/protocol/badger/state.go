@@ -190,9 +190,9 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			}
 
 			// first seal contains the result ID for the sealed root block, indexing it allows dynamically bootstrapped EN to execute
-			// the next block
+			// the next block.
 			err = transaction.WithTx(operation.IndexExecutionResult(rootResult.BlockID, rootResult.ID()))(tx)
-			if err != nil {
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return fmt.Errorf("could not index root result: %w", err)
 			}
 		}
