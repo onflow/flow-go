@@ -17,14 +17,13 @@ type Params interface {
 // different instance params.
 type InstanceParams interface {
 
-	// Root returns the root header of the current protocol state. This will be
+	// FinalizedRoot returns the root header of the current protocol state. This will be
 	// the head of the protocol state snapshot used to bootstrap this state and
 	// may differ from node to node for the same protocol state.
 	// No errors are expected during normal operation.
-	// TODO(leo): rename to FinalizedRoot
-	Root() (*flow.Header, error)
+	FinalizedRoot() (*flow.Header, error)
 
-	// SealedRoot returns the sealed root block. If it's different from Root() block,
+	// SealedRoot returns the sealed root block. If it's different from FinalizedRoot() block,
 	// it means the node is bootstrapped from mid-spork.
 	// No errors are expected during normal operation.
 	SealedRoot() (*flow.Header, error)
