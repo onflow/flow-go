@@ -48,19 +48,23 @@ func WithConduitFactory(factory network.ConduitFactory) func(*Network) {
 // The committee has the identity of the node already, so only `committee` is needed
 // in order for a mock hub to find each other.
 func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Network)) *Network {
+	cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
+		SpamRecordCacheSize:     uint32(1000),
+		SpamReportQueueSize:     uint32(1000),
+		Logger:                  unittest.Logger(),
+		AlspMetrics:             metrics.NewNoopCollector(),
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+	})
+	require.NoError(t, err)
+
 	net := &Network{
-		ctx:          context.Background(),
-		myId:         myId,
-		hub:          hub,
-		engines:      make(map[channels.Channel]network.MessageProcessor),
-		seenEventIDs: make(map[string]struct{}),
-		qCD:          make(chan struct{}),
-		conduitFactory: conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-			DisablePenalty: true,
-			Logger:         unittest.Logger(),
-			AlspMetrics:    metrics.NewNoopCollector(),
-			CacheMetrics:   metrics.NewNoopCollector(),
-		}),
+		ctx:            context.Background(),
+		myId:           myId,
+		hub:            hub,
+		engines:        make(map[channels.Channel]network.MessageProcessor),
+		seenEventIDs:   make(map[string]struct{}),
+		qCD:            make(chan struct{}),
+		conduitFactory: cf,
 	}
 
 	for _, opt := range opts {

@@ -168,6 +168,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
 			MaxGlobalStreams:        state_stream.DefaultMaxGlobalStreams,
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
+			ResponseLimit:           state_stream.DefaultResponseLimit,
 		},
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
@@ -577,6 +578,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				node.Storage.Seals,
 				node.Storage.Results,
 				node.RootChainID,
+				builder.executionDataConfig.InitialBlockHeight,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
 				heroCacheCollector,
@@ -662,9 +664,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize, "execution-data-cache-size", defaultConfig.stateStreamConf.ExecutionDataCacheSize, "block execution data cache size")
 		flags.Uint32Var(&builder.stateStreamConf.MaxGlobalStreams, "state-stream-global-max-streams", defaultConfig.stateStreamConf.MaxGlobalStreams, "global maximum number of concurrent streams")
 		flags.UintVar(&builder.stateStreamConf.MaxExecutionDataMsgSize, "state-stream-max-message-size", defaultConfig.stateStreamConf.MaxExecutionDataMsgSize, "maximum size for a gRPC message containing block execution data")
+		flags.StringToIntVar(&builder.stateStreamFilterConf, "state-stream-event-filter-limits", defaultConfig.stateStreamFilterConf, "event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
 		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout, "state-stream-send-timeout", defaultConfig.stateStreamConf.ClientSendTimeout, "maximum wait before timing out while sending a response to a streaming client e.g. 30s")
 		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
-		flags.StringToIntVar(&builder.stateStreamFilterConf, "state-stream-event-filter-limits", defaultConfig.stateStreamFilterConf, "event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
+		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -706,6 +709,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 					return errors.New("state-stream-event-filter-limits may only contain the keys EventTypes, Addresses, Contracts")
 				}
 			}
+			if builder.stateStreamConf.ResponseLimit < 0 {
+				return errors.New("state-stream-response-limit must be greater than or equal to 0")
+			}
 		}
 
 		return nil
@@ -721,6 +727,18 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	topology network.Topology,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
+	cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
+		Logger:                  builder.Logger,
+		SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
+		SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
+		DisablePenalty:          builder.AlspConfig.DisablePenalty,
+		AlspMetrics:             builder.Metrics.Network,
+		NetworkType:             network.PublicNetwork,
+		HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize conduit factory: %w", err)
+	}
 
 	// creates network instance
 	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
@@ -733,13 +751,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		Metrics:             networkMetrics,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
-		ConduitFactory: conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-			Logger:               builder.Logger,
-			SpamRecordsCacheSize: builder.AlspConfig.SpamRecordCacheSize,
-			DisablePenalty:       builder.AlspConfig.DisablePenalty,
-			AlspMetrics:          builder.Metrics.Network,
-			CacheMetrics:         metrics.ApplicationLayerSpamRecordCacheMetricFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork),
-		}),
+		ConduitFactory:      cf,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -1105,7 +1117,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 			top := topology.EmptyTopology{}
 			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 				builder.Logger,
-				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork))
+				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork))
 
 			err := node.Metrics.Mempool.Register(metrics.PrependPublicPrefix(metrics.ResourceNetworkingReceiveCache), receiveCache.Size)
 			if err != nil {
@@ -1158,7 +1170,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	// setup RPC inspectors
 	rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector, builder.IdentityProvider, builder.Metrics.Network)
 	rpcInspectorSuite, err := rpcInspectorBuilder.
-		SetPublicNetwork(p2p.PublicNetwork).
+		SetNetworkType(network.PublicNetwork).
 		SetMetrics(&p2pconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 			Metrics:          builder.Metrics.Network,

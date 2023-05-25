@@ -16,7 +16,7 @@ import (
 // It directly passes the incoming messages to the corresponding methods of the
 // network Adapter.
 type DefaultConduitFactory struct {
-	*component.ComponentManager
+	component.Component
 	adapter            network.Adapter
 	misbehaviorManager network.MisbehaviorReportManager
 }
@@ -39,27 +39,38 @@ func WithMisbehaviorManager(misbehaviorManager network.MisbehaviorReportManager)
 //
 // Returns:
 //
-//	a new instance of the DefaultConduitFactory.
-func NewDefaultConduitFactory(alspCfg *alspmgr.MisbehaviorReportManagerConfig, opts ...DefaultConduitFactoryOpt) *DefaultConduitFactory {
+//		a new instance of the DefaultConduitFactory.
+//	 an error if the initialization of the conduit factory fails. The error is irrecoverable.
+func NewDefaultConduitFactory(alspCfg *alspmgr.MisbehaviorReportManagerConfig, opts ...DefaultConduitFactoryOpt) (*DefaultConduitFactory, error) {
+	m, err := alspmgr.NewMisbehaviorReportManager(alspCfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not create misbehavior report manager: %w", err)
+	}
 	d := &DefaultConduitFactory{
-		misbehaviorManager: alspmgr.NewMisbehaviorReportManager(alspCfg),
+		misbehaviorManager: m,
 	}
 
 	for _, apply := range opts {
 		apply(d)
 	}
 
-	// worker added so conduit factory doesn't immediately shut down when it's started
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
+			d.misbehaviorManager.Start(ctx)
+			select {
+			case <-d.misbehaviorManager.Ready():
+				ready()
+			case <-ctx.Done():
+				// jumps out of select statement to let a graceful shutdown.
+			}
 
 			<-ctx.Done()
+			<-d.misbehaviorManager.Done()
 		}).Build()
 
-	d.ComponentManager = cm
+	d.Component = cm
 
-	return d
+	return d, nil
 }
 
 // RegisterAdapter sets the Adapter component of the factory.
