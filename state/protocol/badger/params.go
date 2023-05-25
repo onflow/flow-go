@@ -19,7 +19,7 @@ var _ protocol.Params = (*Params)(nil)
 func (p Params) ChainID() (flow.ChainID, error) {
 
 	// retrieve root header
-	root, err := p.Root()
+	root, err := p.FinalizedRoot()
 	if err != nil {
 		return "", fmt.Errorf("could not get root: %w", err)
 	}
@@ -78,7 +78,7 @@ func (p Params) EpochFallbackTriggered() (bool, error) {
 	return triggered, nil
 }
 
-func (p Params) Root() (*flow.Header, error) {
+func (p Params) FinalizedRoot() (*flow.Header, error) {
 
 	// look up root block ID
 	var rootID flow.Identifier
@@ -106,7 +106,7 @@ func (p Params) SealedRoot() (*flow.Header, error) {
 	// This check can be removed after a spork, where all nodes should have bootstrapped with this key
 	// saved in database
 	if errors.Is(err, storage.ErrNotFound) {
-		return p.Root()
+		return p.FinalizedRoot()
 	}
 
 	if err != nil {
