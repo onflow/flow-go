@@ -1,8 +1,11 @@
 // Package cruisectl implements a "cruise control" system for Flow by adjusting
-// nodes' block rate delay in response to changes in the measured block rate.
+// nodes' proposal delay in response to changes in the measured block rate and
+// target epoch switchover time.
 //
-// It uses a PID controller with the block rate as the process variable and
-// the set-point computed using the current view and epoch length config.
+// It uses a PID controller with the estimated epoch switchover time as the process
+// variable and the set-point computed using epoch length config. The error is
+// the difference between the projected epoch switchover time, assuming an
+// ideal view time τ, and the target epoch switchover time (based on a schedule).
 package cruisectl
 
 import (
@@ -18,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// measurement represents one measurement of block rate and error.
+// measurement represents one measurement of block rate and error. TODO adjust
 // A measurement is taken each time the view changes for any reason.
 // Each measurement measures the instantaneous and exponentially weighted
 // moving average (EWMA) block rates, computes the target block rate,
@@ -26,21 +29,28 @@ import (
 type measurement struct {
 	view            uint64    // v       - the current view
 	time            time.Time // t[v]    - when we entered view v
-	viewRate        float64   // r[v]    - measured instantaneous view rate at view v
-	aveViewRate     float64   // r_N[v]  - EWMA block rate over past views [v-N, v]
-	targetViewRate  float64   // r_SP[v] - computed target block rate at view v
-	proportionalErr float64   // e_N[v]  - proportional error at view v
-	integralErr     float64   // E_N[v]  - integral of error at view v
-	derivativeErr   float64   // ∆_N[v]  - derivative of error at view v
+	instErr         float64   // e[v]    - instantaneous error at view v (seconds)
+	proportionalErr float64   // e_N[v]  - proportional error at view v  (seconds)
+	integralErr     float64   // I_N[v]  - integral of error at view v   (seconds)
+	derivativeErr   float64   // ∆_N[v]  - derivative of error at view v (seconds)
+
+	// informational fields - not required for controller operation - may be used for metrics/logging later, or removed
+	viewDiff uint64        // number of views since the previous measurement
+	viewTime time.Duration // time (per view)
 }
 
 // epochInfo stores data about the current and next epoch. It is updated when we enter
 // the first view of a new epoch, or the EpochSetup phase of the current epoch.
 type epochInfo struct {
 	curEpochFirstView     uint64
-	curEpochFinalView     uint64
-	curEpochTargetEndTime time.Time
+	curEpochFinalView     uint64    // F[v] - the final view of the epoch
+	curEpochTargetEndTime time.Time // T[v] - the target end time of the current epoch
 	nextEpochFinalView    *uint64
+}
+
+// targetViewTime returns τ[v], the ideal, steady-state view time for the current epoch.
+func (epoch *epochInfo) targetViewTime() time.Duration {
+	return time.Duration(float64(epochLength) / float64(epoch.curEpochFinalView-epoch.curEpochFirstView+1))
 }
 
 // pctComplete returns the percentage of views completed of the epoch for the given curView.
@@ -63,7 +73,7 @@ type BlockRateController struct {
 	lastMeasurement measurement // the most recently taken measurement
 	epochInfo                   // scheduled transition view for current/next epoch
 
-	proposalDelayDur       atomic.Int64 // PID output, stored as ns so it is convertible to time.Duration
+	proposalDelayDur       atomic.Int64 // PID output, in nanoseconds, so it is directly convertible to time.Duration
 	epochFallbackTriggered bool
 
 	viewChanges    chan uint64       // OnViewChange events           (view entered)
@@ -98,20 +108,15 @@ func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.S
 // initLastMeasurement initializes the lastMeasurement field.
 // We set the measured view rate to the computed target view rate and the error to 0.
 func (ctl *BlockRateController) initLastMeasurement(curView uint64, now time.Time) {
-	viewsRemaining := float64(ctl.curEpochFinalView - curView)              // views remaining in current epoch
-	timeRemaining := ctl.epochInfo.curEpochTargetEndTime.Sub(now).Seconds() // time remaining (s) until target epoch end
-	targetViewRate := viewsRemaining / timeRemaining
 	ctl.lastMeasurement = measurement{
 		view:            curView,
 		time:            now,
-		viewRate:        targetViewRate,
-		aveViewRate:     targetViewRate,
-		targetViewRate:  targetViewRate,
 		proportionalErr: 0,
 		integralErr:     0,
 		derivativeErr:   0,
 	}
-	ctl.proposalDelayDur.Store(ctl.config.DefaultProposalDelay.Nanoseconds())
+	fmt.Println("init: ", ctl.targetViewTime())
+	ctl.proposalDelayDur.Store(ctl.targetViewTime().Nanoseconds())
 }
 
 // initEpochInfo initializes the epochInfo state upon component startup.
@@ -158,7 +163,7 @@ func (ctl *BlockRateController) initEpochInfo(curView uint64) error {
 // ProposalDelay returns the current proposal delay value to use when proposing.
 // This function reflects the most recently computed output of the PID controller.
 // The proposal delay is the delay introduced when this node produces a block proposal,
-// and is the variable adjusted by the BlockRateController to achieve a target view rate.
+// and is the variable adjusted by the BlockRateController to achieve a target switchover time.
 //
 // For a given proposal, suppose the time to produce the proposal is P:
 //   - if P < ProposalDelay to produce, then we wait ProposalDelay-P before broadcasting the proposal (total proposal time of ProposalDelay)
@@ -281,30 +286,33 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 		return fmt.Errorf("got invalid OnViewChange event, transition from view %d to %d", lastMeasurement.view, view)
 	}
 
-	alpha := ctl.config.alpha()
-	viewDiff := float64(view - lastMeasurement.view)                        // views between current and last measurement
-	timeDiff := now.Sub(lastMeasurement.time).Seconds()                     // time between current and last measurement
-	viewsRemaining := float64(ctl.curEpochFinalView - view)                 // views remaining in current epoch
-	timeRemaining := ctl.epochInfo.curEpochTargetEndTime.Sub(now).Seconds() // time remaining until target epoch end
+	alpha := ctl.config.alpha()                             // α    - inclusion parameter for error EWMA
+	beta := ctl.config.beta()                               // ß    - memory parameter for error integration
+	viewsRemaining := float64(ctl.curEpochFinalView - view) // k[v] - views remaining in current epoch
 
 	// compute and store the rate and error for the current view
-	var nextMeasurement measurement
-	nextMeasurement.view = view
-	nextMeasurement.time = now
-	nextMeasurement.viewRate = viewDiff / timeDiff
-	nextMeasurement.aveViewRate = (alpha * nextMeasurement.viewRate) + ((1.0 - alpha) * lastMeasurement.aveViewRate)
-	nextMeasurement.targetViewRate = viewsRemaining / timeRemaining
-	nextMeasurement.proportionalErr = nextMeasurement.targetViewRate - nextMeasurement.aveViewRate
-	nextMeasurement.integralErr = lastMeasurement.integralErr + nextMeasurement.proportionalErr
-	nextMeasurement.derivativeErr = (nextMeasurement.proportionalErr - lastMeasurement.proportionalErr) / viewDiff
-	ctl.lastMeasurement = nextMeasurement
+	var curMeasurement measurement
+	curMeasurement.view = view
+	curMeasurement.time = now
+	curMeasurement.viewTime = now.Sub(lastMeasurement.time) // time since the last measurement
+	curMeasurement.viewDiff = view - lastMeasurement.view   // views since the last measurement
 
-	// compute and store the new proposal delay value
-	delayMS := ctl.config.DefaultProposalDelayMs() +
-		nextMeasurement.proportionalErr*ctl.config.KP +
-		nextMeasurement.integralErr*ctl.config.KI +
-		nextMeasurement.derivativeErr*ctl.config.KD
-	delay := time.Duration(delayMS) * time.Millisecond
+	// γ[v] = k[v]•τ - the projected time remaining in the epoch
+	estTimeRemaining := time.Duration(viewsRemaining * float64(ctl.targetViewTime()))
+	// e[v] = t[v]+γ-T[v] - the projected difference from target switchover
+	curMeasurement.instErr = now.Add(estTimeRemaining).Sub(ctl.curEpochTargetEndTime).Seconds()
+
+	// e_N[v] = α•e[v] + (1-α)e_N[v-1]
+	curMeasurement.proportionalErr = alpha*curMeasurement.instErr + (1.0-alpha)*lastMeasurement.proportionalErr
+	// I_N[v] = e[v] + (1-ß)I_N[v-1]
+	curMeasurement.integralErr = curMeasurement.instErr + (1.0-beta)*lastMeasurement.integralErr
+	// ∆_N[v] = e_N[v] - e_n[v-1]
+	curMeasurement.derivativeErr = (curMeasurement.proportionalErr - lastMeasurement.proportionalErr) / float64(curMeasurement.viewDiff)
+	ctl.lastMeasurement = curMeasurement
+
+	// compute the controller output for this measurement
+	delay := ctl.targetViewTime() - ctl.controllerOutput()
+	// constrain the proposal time according to configured boundaries
 	if delay < ctl.config.MinProposalDelay {
 		ctl.proposalDelayDur.Store(ctl.config.MinProposalDelay.Nanoseconds())
 		return nil
@@ -315,6 +323,19 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 	}
 	ctl.proposalDelayDur.Store(delay.Nanoseconds())
 	return nil
+}
+
+// controllerOutput returns u[v], the output of the controller for the most recent measurement.
+// It represents the amount of time by which the controller wishes to deviate from the ideal view duration τ[v].
+// Then, the proposal delay is given by:
+//
+//	τ[v]-u[v]
+func (ctl *BlockRateController) controllerOutput() time.Duration {
+	curMeasurement := ctl.lastMeasurement
+	u := curMeasurement.proportionalErr*ctl.config.KP +
+		curMeasurement.integralErr*ctl.config.KI +
+		curMeasurement.derivativeErr*ctl.config.KD
+	return time.Duration(float64(time.Second) * u)
 }
 
 // processEpochSetupPhaseStarted processes EpochSetupPhaseStarted events from the protocol state.

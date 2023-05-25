@@ -2,6 +2,7 @@ package cruisectl
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -47,13 +47,10 @@ func TestBlockRateController(t *testing.T) {
 // SetupTest initializes mocks and default values.
 func (bs *BlockRateControllerSuite) SetupTest() {
 	bs.config = DefaultConfig()
-	bs.config.KP = 1.0
-	bs.config.KI = 1.0
-	bs.config.KD = 1.0
 	bs.initialView = 0
 	bs.epochCounter = uint64(0)
 	bs.curEpochFirstView = uint64(0)
-	bs.curEpochFinalView = uint64(100_000)
+	bs.curEpochFinalView = uint64(604_800) // 1 view/sec
 	bs.epochFallbackTriggered = false
 
 	bs.state = mockprotocol.NewState(bs.T())
@@ -126,9 +123,6 @@ func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
 	lastMeasurement := bs.ctl.lastMeasurement
 	assert.Equal(bs.T(), bs.initialView, lastMeasurement.view)
 	assert.WithinDuration(bs.T(), time.Now(), lastMeasurement.time, time.Minute)
-	// measured view rates should be set to the target as an initial target
-	assert.Equal(bs.T(), lastMeasurement.targetViewRate, lastMeasurement.viewRate)
-	assert.Equal(bs.T(), lastMeasurement.targetViewRate, lastMeasurement.aveViewRate)
 	// errors should be initialized to zero
 	assert.Equal(bs.T(), float64(0), lastMeasurement.proportionalErr+lastMeasurement.integralErr+lastMeasurement.derivativeErr)
 }
@@ -142,9 +136,15 @@ func (bs *BlockRateControllerSuite) SanityCheckSubsequentMeasurements(m1, m2 mea
 	assert.NotEqual(bs.T(), m1.proportionalErr, m2.proportionalErr)
 	assert.NotEqual(bs.T(), m1.integralErr, m2.integralErr)
 	assert.NotEqual(bs.T(), m1.derivativeErr, m2.derivativeErr)
-	// new measurement should observe a different view rate
-	assert.NotEqual(bs.T(), m1.viewRate, m2.viewRate)
-	assert.NotEqual(bs.T(), m1.aveViewRate, m2.aveViewRate)
+}
+
+// PrintMeasurement prints the current state of the controller and the last measurement.
+func (bs *BlockRateControllerSuite) PrintMeasurement() {
+	ctl := bs.ctl
+	m := ctl.lastMeasurement
+	fmt.Printf("v=%d\tt=%s\tu=%s\tPD=%s\te=%.3f\te_N=%.3f\tI_N=%.3f\t∆_N=%.3f\n",
+		m.view, m.time, ctl.controllerOutput(), ctl.ProposalDelay(),
+		m.instErr, m.proportionalErr, m.instErr, m.derivativeErr)
 }
 
 // TestStartStop tests that the component can be started and stopped gracefully.
@@ -191,7 +191,7 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	defer bs.StopController()
 
 	// update error so that proposal delay is non-default
-	bs.ctl.lastMeasurement.aveViewRate *= 1.1
+	bs.ctl.lastMeasurement.instErr *= 1.1
 	err := bs.ctl.measureViewRate(bs.initialView+1, time.Now())
 	require.NoError(bs.T(), err)
 	assert.NotEqual(bs.T(), bs.config.DefaultProposalDelayMs(), bs.ctl.ProposalDelay())
@@ -306,80 +306,77 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_AfterTargetTransitionTime(
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
 		// we have passed the target end time of the epoch
 		enteredViewAt := bs.ctl.curEpochTargetEndTime.Add(time.Duration(view) * time.Second)
-		err := bs.ctl.measureViewRate(bs.initialView+1, enteredViewAt)
+		err := bs.ctl.measureViewRate(view, enteredViewAt)
 		require.NoError(bs.T(), err)
 
 		assert.LessOrEqual(bs.T(), bs.ctl.ProposalDelay(), lastProposalDelay)
 		lastProposalDelay = bs.ctl.ProposalDelay()
 
-		// transition views until the end of the epoch, or 100 views
+		// transition views until the end of the epoch, or for 100 views
 		if view-bs.initialView >= 100 {
 			break
 		}
 	}
 }
 
-// TODO - once we have some basic parameters, can broadly test behaviour under conditions like:
-//func (bs *BlockRateControllerSuite) TestProposalDelay_BehindSchedule() {}
-//func (bs *BlockRateControllerSuite) TestProposalDelay_AheadOfSchedule() {}
-
-// TestMeasurementsPrecisely bypasses the worker thread and directly instigates a new measurement.
-// Since we control the "view-entered" time, we precisely validate the resulting measurements.
-// For each measurement, we select a number of views to skip (0-99) and a view time (10ms-10s)
-// then assert that the measurements match expectations, which are computed differently where reasonable.
-func (bs *BlockRateControllerSuite) TestMeasurementsPrecisely() {
+// TestProposalDelay_BehindSchedule tests the behaviour of the controller when the
+// projected epoch switchover is LATER than the target switchover time (in other words,
+// we are behind schedule.
+// We should respond by lowering the ProposalDelay (increasing view rate)
+func (bs *BlockRateControllerSuite) TestProposalDelay_BehindSchedule() {
+	// we are 50% of the way through the epoch in view terms
+	bs.initialView = uint64(float64(bs.curEpochFinalView) * .5)
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
-	rapid.Check(bs.T(), func(t *rapid.T) {
-		lastMeasurement := bs.ctl.lastMeasurement
-		curView := lastMeasurement.view
-
-		// draw a random view distance and average view time over that distance
-		viewDiff := rapid.Uint64Range(1, 100).Draw(t, "view_diff").(uint64)
-		msPerView := rapid.Float64Range(10, 10_000).Draw(t, "ms_pr_view").(float64)
-
-		timeDiff := time.Duration(msPerView*float64(viewDiff)) * time.Millisecond
-		nextView := curView + viewDiff
-		nextViewEnteredAt := lastMeasurement.time.Add(timeDiff)
-		viewsRemainingInEpoch := float64(bs.ctl.curEpochFinalView - nextView)
-		timeRemainingInEpoch := float64(bs.ctl.curEpochTargetEndTime.Sub(nextViewEnteredAt).Milliseconds() / 1000)
-		alpha := bs.ctl.config.alpha()
-
-		// perform a measurement
-		err := bs.ctl.measureViewRate(nextView, nextViewEnteredAt)
+	lastProposalDelay := bs.ctl.ProposalDelay()
+	idealEnteredViewTime := bs.ctl.curEpochTargetEndTime.Add(-epochLength / 2)
+	// 1s behind of schedule
+	enteredViewAt := idealEnteredViewTime.Add(time.Second)
+	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
+		// hold the instantaneous error constant for each view
+		enteredViewAt = enteredViewAt.Add(bs.ctl.targetViewTime())
+		err := bs.ctl.measureViewRate(view, enteredViewAt)
 		require.NoError(bs.T(), err)
-		nextMeasurement := bs.ctl.lastMeasurement
 
-		// assert view/time are updated
-		assert.Equal(bs.T(), nextView, nextMeasurement.view)
-		assert.Equal(bs.T(), nextViewEnteredAt, nextMeasurement.time)
-		// assert view rate is calculated correctly
-		expectedViewRate := float64(viewDiff) / (float64(timeDiff.Milliseconds()) / 1000)
-		assert.InDelta(bs.T(), expectedViewRate, nextMeasurement.viewRate, 0.001)
-		expectedAveViewRate := (alpha * expectedViewRate) + ((1.0 - alpha) * lastMeasurement.aveViewRate)
-		assert.InDelta(bs.T(), expectedAveViewRate, nextMeasurement.aveViewRate, 0.001)
-		expectedTargetViewRate := viewsRemainingInEpoch / timeRemainingInEpoch
-		assert.InDelta(bs.T(), expectedTargetViewRate, nextMeasurement.targetViewRate, 0.001)
-		// assert error is calculated correctly
-		expectedProportionalErr := expectedTargetViewRate - expectedAveViewRate
-		assert.InDelta(bs.T(), expectedProportionalErr, nextMeasurement.proportionalErr, 0.001)
-		expectedIntegralErr := lastMeasurement.integralErr + expectedProportionalErr
-		assert.InDelta(bs.T(), expectedIntegralErr, nextMeasurement.integralErr, 0.001)
-		expectedDerivativeErr := (expectedProportionalErr - lastMeasurement.proportionalErr) / float64(viewDiff)
-		assert.InDelta(bs.T(), expectedDerivativeErr, nextMeasurement.derivativeErr, 0.001)
+		// decreasing proposal delay
+		assert.LessOrEqual(bs.T(), bs.ctl.ProposalDelay(), lastProposalDelay)
+		lastProposalDelay = bs.ctl.ProposalDelay()
 
-		// assert delay is calculated correctly
-		expectedDelayMS := bs.config.DefaultProposalDelayMs() +
-			expectedProportionalErr*bs.config.KP +
-			expectedIntegralErr*bs.config.KI +
-			expectedDerivativeErr*bs.config.KD
-		if expectedDelayMS > bs.config.MaxProposalDelayMs() {
-			assert.Equal(bs.T(), bs.config.MaxProposalDelay, bs.ctl.ProposalDelay())
-		} else if expectedDelayMS < bs.config.MinProposalDelayMs() {
-			assert.Equal(bs.T(), bs.config.MinProposalDelay, bs.ctl.ProposalDelay())
-		} else {
-			assert.InDelta(bs.T(), expectedDelayMS, bs.ctl.ProposalDelay().Milliseconds(), 1)
+		// transition views until the end of the epoch, or for 100 views
+		if view-bs.initialView >= 100 {
+			break
 		}
-	})
+	}
+}
+
+// TestProposalDelay_AheadOfSchedule tests the behaviour of the controller when the
+// projected epoch switchover is EARLIER than the target switchover time (in other words,
+// we are ahead of schedule.
+// We should respond by increasing the ProposalDelay (lowering view rate)
+func (bs *BlockRateControllerSuite) TestProposalDelay_AheadOfSchedule() {
+	// we are 50% of the way through the epoch in view terms
+	bs.initialView = uint64(float64(bs.curEpochFinalView) * .5)
+	bs.CreateAndStartController()
+	defer bs.StopController()
+
+	lastProposalDelay := bs.ctl.ProposalDelay()
+	idealEnteredViewTime := bs.ctl.curEpochTargetEndTime.Add(-epochLength / 2)
+	// 1s ahead of schedule
+	enteredViewAt := idealEnteredViewTime.Add(-time.Second)
+	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
+		// hold the instantaneous error constant for each view
+		enteredViewAt = enteredViewAt.Add(bs.ctl.targetViewTime())
+		err := bs.ctl.measureViewRate(view, enteredViewAt)
+		require.NoError(bs.T(), err)
+
+		// increasing proposal delay
+		assert.GreaterOrEqual(bs.T(), bs.ctl.ProposalDelay(), lastProposalDelay)
+		lastProposalDelay = bs.ctl.ProposalDelay()
+
+		// transition views until the end of the epoch, or for 100 views
+		if view-bs.initialView >= 100 {
+			break
+		}
+	}
 }

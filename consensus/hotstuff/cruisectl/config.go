@@ -1,7 +1,6 @@
 package cruisectl
 
 import (
-	"math"
 	"time"
 )
 
@@ -14,10 +13,11 @@ func DefaultConfig() *Config {
 		MaxProposalDelay:     1000 * time.Millisecond,
 		MinProposalDelay:     250 * time.Millisecond,
 		Enabled:              true,
-		N:                    600,        // 10 minutes @ 1 view/second
-		KP:                   math.NaN(), // TODO
-		KI:                   math.NaN(), // TODO
-		KD:                   math.NaN(), // TODO
+		N_ewma:               5,
+		N_itg:                50,
+		KP:                   2.0,
+		KI:                   0.6,
+		KD:                   3.0,
 	}
 }
 
@@ -42,9 +42,17 @@ type Config struct {
 	// When disabled, the DefaultProposalDelay is used.
 	Enabled bool
 
-	// N is the number of views over which the view rate average is measured.
+	// N_ewma defines how historical measurements are incorporated into the EWMA for the proportional error term.
+	// Intuition: Suppose the input changes from x to y instantaneously:
+	//  - N_ewma is the number of samples required to move the EWMA output about 2/3 of the way from x to y
 	// Per convention, this must be a _positive_ integer.
-	N uint
+	N_ewma uint
+	// N_itg defines how historical measurements are incorporated into the integral error term.
+	// Intuition: For a constant error x:
+	//  - the integrator value will saturate at `x•N_itg`
+	//  - an integrator initialized at 0 reaches 2/3 of the saturation value after N_itg samples
+	// Per convention, this must be a _positive_ integer.
+	N_itg uint
 	// KP, KI, KD, are the coefficients to the PID controller and define its response.
 	// KP adjusts the proportional term (responds to the magnitude of error).
 	// KI adjusts the integral term (responds to the error sum over a recent time interval).
@@ -52,10 +60,14 @@ type Config struct {
 	KP, KI, KD float64
 }
 
-// alpha returns the sample inclusion proportion used when calculating the exponentially moving average.
-// We use 2/(N+1) to incorporate the most recent N samples into the average.
+// alpha returns α, the inclusion parameter for the error EWMA. See N_ewma for details.
 func (c *Config) alpha() float64 {
-	return 2.0 / float64(c.N+1)
+	return 1.0 / float64(c.N_ewma)
+}
+
+// beta returns ß, the memory parameter of the leaky error integrator. See N_itg for details.
+func (c *Config) beta() float64 {
+	return 1.0 / float64(c.N_itg)
 }
 
 // defaultViewRate returns 1/Config.DefaultProposalDelay - the default view rate in views/s.
