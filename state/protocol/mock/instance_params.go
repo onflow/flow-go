@@ -33,8 +33,8 @@ func (_m *InstanceParams) EpochFallbackTriggered() (bool, error) {
 	return r0, r1
 }
 
-// Root provides a mock function with given fields:
-func (_m *InstanceParams) Root() (*flow.Header, error) {
+// FinalizedRoot provides a mock function with given fields:
+func (_m *InstanceParams) FinalizedRoot() (*flow.Header, error) {
 	ret := _m.Called()
 
 	var r0 *flow.Header

@@ -75,6 +75,7 @@ func (_m *Params) EpochFallbackTriggered() (bool, error) {
 	return r0, r1
 }
 
+<<<<<<< HEAD
 // ProtocolVersion provides a mock function with given fields:
 func (_m *Params) ProtocolVersion() (uint, error) {
 	ret := _m.Called()
@@ -98,6 +99,10 @@ func (_m *Params) ProtocolVersion() (uint, error) {
 
 // Root provides a mock function with given fields:
 func (_m *Params) Root() (*flow.Header, error) {
+=======
+// FinalizedRoot provides a mock function with given fields:
+func (_m *Params) FinalizedRoot() (*flow.Header, error) {
+>>>>>>> 420f5e72d3 (add comment)
 	ret := _m.Called()
 
 	var r0 *flow.Header
@@ -110,6 +115,30 @@ func (_m *Params) Root() (*flow.Header, error) {
 	}
 
 	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ProtocolVersion provides a mock function with given fields:
+func (_m *Params) ProtocolVersion() (uint, error) {
+	ret := _m.Called()
+
+	var r0 uint
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (uint, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() uint); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint)
+	}
+
 	if rf, ok := ret.Get(1).(func() error); ok {
 		r1 = rf()
 	} else {
