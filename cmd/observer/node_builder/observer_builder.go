@@ -863,7 +863,6 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 
 	for _, b := range builder.bootstrapIdentities {
 		pi, err := utils.PeerAddressInfo(*b)
-
 		if err != nil {
 			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
 		}
@@ -876,7 +875,8 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		builder.Metrics.Network,
 		builder.IdentityProvider,
 		builder.GossipSubConfig.LocalMeshLogInterval)
-	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector).
+
+	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector, builder.IdentityProvider, builder.Metrics.Network).
 		SetNetworkType(network.PublicNetwork).
 		SetMetrics(&p2pconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),

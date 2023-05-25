@@ -117,7 +117,7 @@ func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(f HeroCacheMetricsFa
 	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
 	r := ResourceNetworkingRpcMetricsObserverInspectorQueue
 	if networkType == network.PublicNetwork {
-		r = ResourceNetworkingPublicRpcMetricsObserverInspectorQueue
+		r = PrependPublicPrefix(r)
 	}
 	return f(namespaceNetwork, r)
 }
@@ -126,13 +126,22 @@ func GossipSubRPCInspectorQueueMetricFactory(f HeroCacheMetricsFactory, networkT
 	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
 	r := ResourceNetworkingRpcValidationInspectorQueue
 	if networkType == network.PublicNetwork {
-		r = ResourceNetworkingPublicRpcValidationInspectorQueue
+		r = PrependPublicPrefix(r)
 	}
 	return f(namespaceNetwork, r)
 }
 
 func RpcInspectorNotificationQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
 	r := ResourceNetworkingRpcInspectorNotificationQueue
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
+func GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
+	r := ResourceNetworkingRpcClusterPrefixReceivedCache
 	if networkType == network.PublicNetwork {
 		r = PrependPublicPrefix(r)
 	}
