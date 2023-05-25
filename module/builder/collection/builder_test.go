@@ -158,7 +158,7 @@ func (suite *BuilderSuite) Payload(transactions ...*flow.TransactionBody) model.
 
 // ProtoStateRoot returns the root block of the protocol state.
 func (suite *BuilderSuite) ProtoStateRoot() *flow.Header {
-	root, err := suite.protoState.Params().Root()
+	root, err := suite.protoState.Params().FinalizedRoot()
 	suite.Require().NoError(err)
 	return root
 }

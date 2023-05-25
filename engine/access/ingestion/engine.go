@@ -201,7 +201,7 @@ func (e *Engine) Start(parent irrecoverable.SignalerContext) {
 // If the index has already been initialized, this is a no-op.
 // No errors are expected during normal operation.
 func (e *Engine) initLastFullBlockHeightIndex() error {
-	rootBlock, err := e.state.Params().Root()
+	rootBlock, err := e.state.Params().FinalizedRoot()
 	if err != nil {
 		return fmt.Errorf("failed to get root block: %w", err)
 	}
@@ -701,7 +701,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 			return
 		}
 		// use the root height as the last full height
-		header, err := e.state.Params().Root()
+		header, err := e.state.Params().FinalizedRoot()
 		if err != nil {
 			logError(err)
 			return

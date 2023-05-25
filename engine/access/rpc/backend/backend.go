@@ -273,7 +273,7 @@ func executionNodesForBlockID(
 
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
-	rootBlock, err := state.Params().Root()
+	rootBlock, err := state.Params().FinalizedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
