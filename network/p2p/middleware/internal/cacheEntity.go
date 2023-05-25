@@ -13,7 +13,7 @@ import (
 // This means that the entities are deduplicated by their peerID.
 type disallowListCacheEntity struct {
 	peerID peer.ID
-	causes []middleware.DisallowListedCause
+	causes map[middleware.DisallowListedCause]struct{}
 	// id is the hash of the peerID which is used as the key for storing the entity in the cache.
 	// we cache it internally to avoid hashing the peerID multiple times.
 	id flow.Identifier
