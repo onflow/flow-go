@@ -46,7 +46,8 @@ type Engine struct {
 	me                     module.Local
 	request                module.Requester // used to request collections
 	state                  protocol.State
-	receiptHasher          hash.Hasher // used as hasher to sign the execution receipt
+	receiptHasher          hash.Hasher     // used as hasher to sign the execution receipt
+	headers                storage.Headers // see comments on getHeaderByHeight for why we need it
 	blocks                 storage.Blocks
 	collections            storage.Collections
 	events                 storage.Events
@@ -221,7 +222,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 	// blocks.
 	lastExecuted := final.Height
 
-	rootBlock, err := e.state.Params().Root()
+	rootBlock, err := e.state.Params().FinalizedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
 	}
@@ -343,7 +344,7 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 		}
 
 		// don't reload root block
-		rootBlock, err := e.state.Params().Root()
+		rootBlock, err := e.state.Params().FinalizedRoot()
 		if err != nil {
 			return fmt.Errorf("failed to retrieve root block: %w", err)
 		}
@@ -1391,4 +1392,13 @@ func (e *Engine) fetchCollection(blockID flow.Identifier, height uint64, guarant
 	))
 
 	return nil
+}
+
+// if the EN is dynamically bootstrapped, the finalized blocks at height range:
+// [ sealedRoot.Height, finalizedRoot.Height - 1] can not be retrieved from
+// protocol state, but only from headers
+func (e *Engine) getHeaderByHeight(height uint64) (*flow.Header, error) {
+	// we don't use protocol state because for dynamic boostrapped execution node
+	// the last executed and sealed block is below the root block
+	return e.headers.ByHeight(height)
 }
