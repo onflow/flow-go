@@ -270,7 +270,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 		}
 
 		// insert an empty child index for the final block in the segment
-		err := transaction.WithTx(operation.InsertBlockChildren(head.ID(), nil))(tx)
+		err = transaction.WithTx(operation.InsertBlockChildren(head.ID(), nil))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
