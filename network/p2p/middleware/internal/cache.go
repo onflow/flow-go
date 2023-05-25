@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -9,6 +10,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network/p2p/middleware"
+)
+
+var (
+	ErrDisallowCacheEntityNotFound = errors.New("disallow list cache entity not found")
 )
 
 type DisallowListCache struct {
@@ -39,25 +44,71 @@ func (d *DisallowListCache) IsDisallowed(peerID peer.ID) ([]middleware.DisallowL
 	return causes, true
 }
 
-func (d *DisallowListCache) DisallowFor(peerID peer.ID, cause middleware.DisallowListedCause) error {
-
+// init initializes the disallow list cache entity for the peerID.
+// Args:
+// - peerID: the peerID of the peer to be disallow-listed.
+// Returns:
+// - true if the entity is successfully added to the cache.
+// - false if the entity already exists in the cache.
+func (d *DisallowListCache) init(peerID peer.ID) bool {
+	return d.c.Add(&disallowListCacheEntity{
+		peerID: peerID,
+		causes: make(map[middleware.DisallowListedCause]struct{}),
+		id:     makeId(peerID),
+	})
 }
 
+// DisallowFor disallow-lists a peer for a cause.
+// Args:
+// - peerID: the peerID of the peer to be disallow-listed.
+// - cause: the cause for disallow-listing the peer.
+// Returns:
+// - the list of causes for which the peer is disallow-listed.
+// - error if the operation fails, error is irrecoverable.
+func (d *DisallowListCache) DisallowFor(peerID peer.ID, cause middleware.DisallowListedCause) ([]middleware.DisallowListedCause, error) {
+	// first, we try to optimistically add the peer to the disallow list.
+	causes, err := d.disallowListFor(peerID, cause)
+
+	switch {
+	case err == nil:
+		return causes, nil
+	case err == ErrDisallowCacheEntityNotFound:
+		// if the entity not exist, we initialize it and try again.
+		// Note: there is an edge case where the entity is initialized by another goroutine between the two calls.
+		// In this case, the init function is invoked twice, but it is not a problem because the underlying
+		// cache is thread-safe. Hence, we do not need to synchronize the two calls. In such cases, one of the
+		// two calls returns false, and the other call returns true. We do not care which call returns false, hence,
+		// we ignore the return value of the init function.
+		_ = d.init(peerID)
+		causes, err = d.disallowListFor(peerID, cause)
+		if err != nil {
+			// any error after the init is irrecoverable.
+			return nil, fmt.Errorf("failed to disallow list peer %s for cause %s: %w", peerID, cause, err)
+		}
+		return causes, nil
+	default:
+		return nil, fmt.Errorf("failed to disallow list peer %s for cause %s: %w", peerID, cause, err)
+	}
+}
+
+// disallowListFor is a helper function for disallowing a peer for a cause.
+// It adds the cause to the disallow list cache entity for the peerID and returns the updated list of causes for the peer.
+// Args:
+// - peerID: the peerID of the peer to be disallow-listed.
+// - cause: the cause for disallow-listing the peer.
+// Returns:
+// - the updated list of causes for the peer.
+// - error if the entity for the peerID is not found in the cache it returns ErrDisallowCacheEntityNotFound, which is a benign error.
 func (d *DisallowListCache) disallowListFor(peerID peer.ID, cause middleware.DisallowListedCause) ([]middleware.DisallowListedCause, error) {
-	var rErr error
 	adjustedEntity, adjusted := d.c.Adjust(makeId(peerID), func(entity flow.Entity) flow.Entity {
 		dEntity := mustBeDisallowListEntity(entity)
 		dEntity.causes[cause] = struct{}{}
-
 		return dEntity
 	})
 
-	if rErr != nil {
-		return nil, fmt.Errorf("failed to update disallow list cache entity: %w", rErr)
-	}
-
 	if !adjusted {
-		return ErrDisallowCacheEntityNotFound, nil
+		// if the entity is not found in the cache, we return a benign error.
+		return nil, ErrDisallowCacheEntityNotFound
 	}
 
 	dEntity := mustBeDisallowListEntity(adjustedEntity)
