@@ -7,8 +7,6 @@
 /cmd/util/util
 /cmd/bootstrap/bootstrap
 
-# crypto relic folder
-crypto/relic/
 
 # Test binary, build with `go test -c`
 *.test
