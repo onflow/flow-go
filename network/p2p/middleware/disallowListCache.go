@@ -1,5 +1,7 @@
 package middleware
 
+import "github.com/libp2p/go-libp2p/core/peer"
+
 // DisallowListedCause is a type representing the cause of disallow listing. A remote node may be disallow-listed by the
 // current node for a variety of reasons. This type is used to represent the reason for disallow-listing, so that if
 // a node is disallow-listed for reasons X and Y, allow-listing it back for reason X does not automatically allow-list
@@ -23,7 +25,7 @@ type DisallowListCache interface {
 	// - a list of causes for which the peer is disallow-listed.
 	// - true if the peer is disallow-listed for any cause.
 	// - false if the peer is not disallow-listed for any cause.
-	IsDisallowed(peerID string) ([]DisallowListedCause, bool)
+	IsDisallowed(peerID peer.ID) ([]DisallowListedCause, bool)
 
 	// DisallowFor disallow-lists the given peer for the given cause.
 	// If the peer is already disallow-listed for the given cause, this method is a no-op.
@@ -34,7 +36,7 @@ type DisallowListCache interface {
 	// - nil if the peer was successfully disallow-listed.
 	// - an error if the peer could not be disallow-listed in the cache, the error is irrecoverable and the current node should
 	// crash.
-	DisallowFor(peerID string, cause DisallowListedCause) error
+	DisallowFor(peerID peer.ID, cause DisallowListedCause) error
 
 	// AllowFor allow-lists the given peer for the given cause.
 	// If the peer is not disallow-listed for the given cause, this method is a no-op.
@@ -44,5 +46,5 @@ type DisallowListCache interface {
 	// Returns:
 	// - nil if the peer was successfully allow-listed.
 	// - an error if the peer could not be allow-listed in the cache, the error is irrecoverable and the current node should
-	AllowFor(peerID string, cause DisallowListedCause) error
+	AllowFor(peerID peer.ID, cause DisallowListedCause) error
 }
