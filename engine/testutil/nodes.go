@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	"math"
 	"path/filepath"
 	"testing"
@@ -29,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
+	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	"github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
@@ -898,12 +898,12 @@ func WithGenericNode(genericNode *testmock.GenericNode) VerificationOpt {
 // (integration) testing.
 func VerificationNode(t testing.TB,
 	hub *stub.Hub,
-	verIdentity *flow.Identity,     // identity of this verification node.
+	verIdentity *flow.Identity, // identity of this verification node.
 	participants flow.IdentityList, // identity of all nodes in system including this verification node.
 	assigner module.ChunkAssigner,
 	chunksLimit uint,
 	chainID flow.ChainID,
-	collector module.VerificationMetrics,   // used to enable collecting metrics on happy path integration
+	collector module.VerificationMetrics, // used to enable collecting metrics on happy path integration
 	mempoolCollector module.MempoolMetrics, // used to enable collecting metrics on happy path integration
 	opts ...VerificationOpt) testmock.VerificationNode {
 
