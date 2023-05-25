@@ -259,16 +259,17 @@ type NodeConfig struct {
 // StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.
 type StateExcerptAtBoot struct {
 	// properties of RootSnapshot for convenience
-	FinalizedRootBlock *flow.Block
-	SealedRootBlock    *flow.Block
+	// For node bootstrapped with a root snapshot for the first block of a spork,
+	// 		FinalizedRootBlock and SealedRootBlock are the same block
+	// For node bootstrapped with a root snapshot for a block above the first bloc of a spork (dynamically bootstrapped),
+	// 		FinalizedRootBlock.Height > SealedRootBlock.Height
+	FinalizedRootBlock *flow.Block             // The last finalized block when bootstrapped.
+	SealedRootBlock    *flow.Block             // The last sealed block when bootstrapped.
 	RootQC             *flow.QuorumCertificate // QC for Finalized Root Block
 	RootResult         *flow.ExecutionResult   // Result for SealedRootBlock
 	RootSeal           *flow.Seal              //Seal for RootResult
 	RootChainID        flow.ChainID
 	SporkID            flow.Identifier
-	// finalized block for use in bootstrapping
-	// TODO:(leo) isn't it FinalizedRootBlock.Header?
-	FinalizedHeader *flow.Header
 }
 
 func DefaultBaseConfig() *BaseConfig {
