@@ -1175,19 +1175,11 @@ func (fnb *FlowNodeBuilder) initState() error {
 		}
 	}
 
-	lastFinalized, err := fnb.State.Final().Head()
-	if err != nil {
-		return fmt.Errorf("could not get last finalized block header: %w", err)
-	}
-	fnb.NodeConfig.FinalizedHeader = lastFinalized
-
 	fnb.Logger.Info().
 		Hex("root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
 		Uint64("root_block_height", fnb.FinalizedRootBlock.Header.Height).
 		Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
 		Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
-		Hex("finalized_block_id", logging.Entity(lastFinalized)).
-		Uint64("finalized_block_height", lastFinalized.Height).
 		Msg("successfully opened protocol state")
 
 	return nil
