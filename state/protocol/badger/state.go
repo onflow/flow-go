@@ -47,7 +47,6 @@ type State struct {
 	// `sporkRootBlockHeight`), for instance if the node joined in an epoch after the last spork.
 	rootHeight uint64
 	// sealedRootHeight returns the root block that is sealed.
-	// sealedRootHeight == rootSnapshot.SealingSegment.Sealed().Header.Height < rootHeight == rootSnapshot.SealingSegment.Highest().Header.Height
 	sealedRootHeight uint64
 	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
 	// the state, because it cannot change over the lifecycle of a protocol state instance.
