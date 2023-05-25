@@ -79,14 +79,17 @@ func (database *BlockDatabase) NewSnapshotReadTransaction(
 }
 
 func (txn *transaction) Validate() error {
-	err := txn.TransactionData.Validate()
-	if err != nil {
-		return fmt.Errorf("primary index validate failed: %w", err)
-	}
-
-	err = txn.DerivedTransactionData.Validate()
+	err := txn.DerivedTransactionData.Validate()
 	if err != nil {
 		return fmt.Errorf("derived indices validate failed: %w", err)
+	}
+
+	// NOTE: Since the primary txn's SnapshotTime() is exposed to the user,
+	// the primary txn should be validated last to prevent primary txn'
+	// snapshot time advancement in case of derived txn validation failure.
+	err = txn.TransactionData.Validate()
+	if err != nil {
+		return fmt.Errorf("primary index validate failed: %w", err)
 	}
 
 	return nil
@@ -98,14 +101,17 @@ func (txn *transaction) Finalize() error {
 }
 
 func (txn *transaction) Commit() (*snapshot.ExecutionSnapshot, error) {
+	err := txn.DerivedTransactionData.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("derived indices commit failed: %w", err)
+	}
+
+	// NOTE: Since the primary txn's SnapshotTime() is exposed to the user,
+	// the primary txn should be committed last to prevent primary txn'
+	// snapshot time advancement in case of derived txn commit failure.
 	executionSnapshot, err := txn.TransactionData.Commit()
 	if err != nil {
 		return nil, fmt.Errorf("primary index commit failed: %w", err)
-	}
-
-	err = txn.DerivedTransactionData.Commit()
-	if err != nil {
-		return nil, fmt.Errorf("derived indices commit failed: %w", err)
 	}
 
 	return executionSnapshot, nil

@@ -45,6 +45,7 @@ import (
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
@@ -234,6 +235,12 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxSize, "sync-max-size", defaultConfig.SyncCoreConfig.MaxSize, "the maximum number of blocks we request in the same block request message")
 	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
 
+	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
+
+	// application layer spam prevention (alsp) protocol
+	fnb.flags.BoolVar(&fnb.BaseConfig.AlspConfig.DisablePenalty, "alsp-disable", defaultConfig.AlspConfig.DisablePenalty, "disable the penalty mechanism of the alsp protocol. default value (recommended) is false")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.AlspConfig.SpamRecordCacheSize, "alsp-spam-record-cache-size", defaultConfig.AlspConfig.SpamRecordCacheSize, "size of spam record cache, recommended to be 10x the number of authorized nodes")
+	fnb.flags.Uint32Var(&fnb.BaseConfig.AlspConfig.SpamReportQueueSize, "alsp-spam-report-queue-size", defaultConfig.AlspConfig.SpamReportQueueSize, "size of spam report queue, recommended to be 100x the number of authorized nodes")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -388,8 +395,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
 		}
 
-		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.GossipSubConfig.RpcInspector).
-			SetPublicNetwork(p2p.PrivateNetwork).
+		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.GossipSubConfig.RpcInspector, fnb.IdentityProvider, fnb.Metrics.Network).
+			SetNetworkType(network.PrivateNetwork).
 			SetMetrics(metricsCfg).
 			Build()
 		if err != nil {
@@ -398,7 +405,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		fnb.GossipSubRpcInspectorSuite = rpcInspectorSuite
 
-		libP2PNodeFactory := p2pbuilder.DefaultLibP2PNodeFactory(
+		builder, err := p2pbuilder.DefaultNodeBuilder(
 			fnb.Logger,
 			myAddr,
 			fnb.NetworkKey,
@@ -409,23 +416,36 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
 			peerManagerCfg,
-			// run peer manager with the specified interval and let it also prune connections
 			fnb.GossipSubConfig,
 			fnb.GossipSubRpcInspectorSuite,
 			fnb.LibP2PResourceManagerConfig,
-			uniCfg,
-		)
+			uniCfg)
 
-		libp2pNode, err := libP2PNodeFactory()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create libp2p node: %w", err)
+			return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
 		}
-		fnb.LibP2PNode = libp2pNode
 
+		libp2pNode, err := builder.Build()
+		if err != nil {
+			return nil, fmt.Errorf("could not build libp2p node: %w", err)
+		}
+
+		fnb.LibP2PNode = libp2pNode
 		return libp2pNode, nil
 	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		cf := conduit.NewDefaultConduitFactory(fnb.Logger, fnb.Metrics.Network)
+		cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  fnb.Logger,
+			SpamRecordCacheSize:     fnb.AlspConfig.SpamRecordCacheSize,
+			SpamReportQueueSize:     fnb.AlspConfig.SpamReportQueueSize,
+			DisablePenalty:          fnb.AlspConfig.DisablePenalty,
+			AlspMetrics:             fnb.Metrics.Network,
+			HeroCacheMetricsFactory: fnb.HeroCacheMetricsFactory(),
+			NetworkType:             network.PrivateNetwork,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create default conduit factory: %w", err)
+		}
 		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
 		return fnb.InitFlowNetworkWithConduitFactory(node, cf, unicastRateLimiters, peerManagerFilters)
 	})
@@ -490,7 +510,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 
 	receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
 		fnb.Logger,
-		metrics.NetworkReceiveCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), p2p.PrivateNetwork))
+		metrics.NetworkReceiveCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork))
 
 	err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
 	if err != nil {
@@ -508,7 +528,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		Metrics:             fnb.Metrics.Network,
 		IdentityProvider:    fnb.IdentityProvider,
 		ReceiveCache:        receiveCache,
-		Options:             []p2p.NetworkOptFunction{p2p.WithConduitFactory(cf)},
+		ConduitFactory:      cf,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -1174,6 +1194,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 	if err != nil {
 		return fmt.Errorf("could not get last finalized block header: %w", err)
 	}
+	fnb.NodeConfig.FinalizedHeader = lastFinalized
 
 	fnb.Logger.Info().
 		Hex("root_block_id", logging.Entity(fnb.RootBlock)).

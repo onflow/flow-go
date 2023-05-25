@@ -13,20 +13,25 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestClusterPrefixTopicsReceivedTracker_Inc ensures cluster prefixed received tracker increments a counter correctly.
-func TestClusterPrefixTopicsReceivedTracker_Inc(t *testing.T) {
+// TestClusterPrefixedMessagesReceivedTracker_Inc ensures cluster prefixed received tracker increments a cluster prefixed control messages received gauge value correctly.
+func TestClusterPrefixedMessagesReceivedTracker_Inc(t *testing.T) {
 	tracker := mockTracker(t)
 	id := unittest.IdentifierFixture()
 	n := float64(5)
+	prevGuage := 0.0
 	for i := float64(1); i <= n; i++ {
-		j, err := tracker.Inc(id)
+		guage, err := tracker.Inc(id)
 		require.NoError(t, err)
-		require.Equal(t, i, j)
+		// on each increment the current gauge value should
+		// always be greater than the previous gauge value but
+		// slightly less than i due to the decay.
+		require.LessOrEqual(t, guage, i)
+		require.Greater(t, guage, prevGuage)
 	}
 }
 
-// TestClusterPrefixTopicsReceivedTracker_IncConcurrent ensures cluster prefixed received tracker increments a counter correctly concurrently.
-func TestClusterPrefixTopicsReceivedTracker_IncConcurrent(t *testing.T) {
+// TestClusterPrefixedMessagesReceivedTracker_IncConcurrent ensures cluster prefixed received tracker increments a cluster prefixed control messages received gauge value correctly concurrently.
+func TestClusterPrefixedMessagesReceivedTracker_IncConcurrent(t *testing.T) {
 	tracker := mockTracker(t)
 	n := float64(5)
 	id := unittest.IdentifierFixture()
@@ -40,11 +45,14 @@ func TestClusterPrefixTopicsReceivedTracker_IncConcurrent(t *testing.T) {
 		}()
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
-	require.Equal(t, n, tracker.Load(id))
+	// after each decay is applied the gauge value result should be slightly less than n
+	gaugeVal, err := tracker.Load(id)
+	require.NoError(t, err)
+	require.InDelta(t, n, gaugeVal, .2)
 }
 
-// TestClusterPrefixTopicsReceivedTracker_ConcurrentIncAndLoad ensures cluster prefixed received tracker increments/loads a counter correctly concurrently.
-func TestClusterPrefixTopicsReceivedTracker_ConcurrentIncAndLoad(t *testing.T) {
+// TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad ensures cluster prefixed received tracker increments/loads the cluster prefixed control messages received gauge value correctly concurrently.
+func TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad(t *testing.T) {
 	tracker := mockTracker(t)
 	n := float64(5)
 	id := unittest.IdentifierFixture()
@@ -63,16 +71,21 @@ func TestClusterPrefixTopicsReceivedTracker_ConcurrentIncAndLoad(t *testing.T) {
 		for i := float64(0); i < n; i++ {
 			go func() {
 				defer wg.Done()
-				j := tracker.Load(id)
-				require.NotNil(t, j)
+				gaugeVal, err := tracker.Load(id)
+				require.NoError(t, err)
+				require.Greater(t, gaugeVal, float64(0))
+				require.LessOrEqual(t, gaugeVal, n)
 			}()
 		}
 	}()
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
-	require.Equal(t, float64(5), tracker.Load(id))
+	gaugeVal, err := tracker.Load(id)
+	require.NoError(t, err)
+	// after each decay is applied the gauge value result should be slightly less than n
+	require.InDelta(t, n, gaugeVal, .2)
 }
 
-func TestClusterPrefixTopicsReceivedTracker_StoreAndGetActiveClusterIds(t *testing.T) {
+func TestClusterPrefixedMessagesReceivedTracker_StoreAndGetActiveClusterIds(t *testing.T) {
 	tracker := mockTracker(t)
 	activeClusterIds := []flow.ChainIDList{chainIDListFixture(), chainIDListFixture(), chainIDListFixture()}
 	for _, chainIDList := range activeClusterIds {
@@ -82,7 +95,7 @@ func TestClusterPrefixTopicsReceivedTracker_StoreAndGetActiveClusterIds(t *testi
 	}
 }
 
-func TestClusterPrefixTopicsReceivedTracker_StoreAndGetActiveClusterIdsConcurrent(t *testing.T) {
+func TestClusterPrefixedMessagesReceivedTracker_StoreAndGetActiveClusterIdsConcurrent(t *testing.T) {
 	tracker := mockTracker(t)
 	activeClusterIds := []flow.ChainIDList{chainIDListFixture(), chainIDListFixture(), chainIDListFixture()}
 	expectedLen := len(activeClusterIds[0])
@@ -105,12 +118,12 @@ func TestClusterPrefixTopicsReceivedTracker_StoreAndGetActiveClusterIdsConcurren
 	require.Equal(t, expectedLen, len(actualChainIdList)) // each fixture is of the same len
 }
 
-func mockTracker(t *testing.T) *ClusterPrefixTopicsReceivedTracker {
+func mockTracker(t *testing.T) *ClusterPrefixedMessagesReceivedTracker {
 	logger := zerolog.Nop()
 	sizeLimit := uint32(100)
 	collector := metrics.NewNoopCollector()
-	decay := float64(0)
-	tracker, err := NewClusterPrefixTopicsReceivedTracker(logger, sizeLimit, collector, decay)
+	decay := defaultDecay
+	tracker, err := NewClusterPrefixedMessagesReceivedTracker(logger, sizeLimit, collector, decay)
 	require.NoError(t, err)
 	return tracker
 }

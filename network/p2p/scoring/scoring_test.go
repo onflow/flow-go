@@ -92,6 +92,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.WithPeerScoringEnabled(idProvider),
 		p2ptest.WithGossipSubRpcInspectorSuite(inspectorSuite1))
@@ -100,6 +101,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.WithPeerScoringEnabled(idProvider))
 

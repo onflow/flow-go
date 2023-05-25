@@ -176,17 +176,20 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	idProvider := mock.NewIdentityProvider(t)
 	// one consensus node.
 	conNode, conId := p2ptest.NodeFixture(t, sporkId, t.Name(),
+		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
 		p2ptest.WithPeerScoringEnabled(idProvider),
 		p2ptest.WithRole(flow.RoleConsensus))
 
 	// two verification node.
 	verNode1, verId1 := p2ptest.NodeFixture(t, sporkId, t.Name(),
+		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
 		p2ptest.WithPeerScoringEnabled(idProvider),
 		p2ptest.WithRole(flow.RoleVerification))
 
 	verNode2, verId2 := p2ptest.NodeFixture(t, sporkId, t.Name(),
+		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
 		p2ptest.WithPeerScoringEnabled(idProvider),
 		p2ptest.WithRole(flow.RoleVerification))

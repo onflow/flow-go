@@ -23,16 +23,16 @@ type DisallowListConsumer interface {
 // ControlMessageType is the type of control message, as defined in the libp2p pubsub spec.
 type ControlMessageType string
 
+func (c ControlMessageType) String() string {
+	return string(c)
+}
+
 const (
 	CtrlMsgIHave ControlMessageType = "IHAVE"
 	CtrlMsgIWant ControlMessageType = "IWANT"
 	CtrlMsgGraft ControlMessageType = "GRAFT"
 	CtrlMsgPrune ControlMessageType = "PRUNE"
 )
-
-func (c ControlMessageType) String() string {
-	return string(c)
-}
 
 // ControlMessageTypes returns list of all libp2p control message types.
 func ControlMessageTypes() []ControlMessageType {
@@ -69,7 +69,7 @@ type DisallowListNotificationDistributor interface {
 // The implementation should guarantee that all registered consumers are called upon distribution of a new event.
 type GossipSubInspectorNotifDistributor interface {
 	component.Component
-	// DistributeInvalidControlMessageNotification distributes the event to all the consumers.
+	// Distribute distributes the event to all the consumers.
 	// Any error returned by the distributor is non-recoverable and will cause the node to crash.
 	// Implementation must be concurrency safe, and non-blocking.
 	Distribute(notification *InvCtrlMsgNotif) error

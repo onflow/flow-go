@@ -4,14 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/alsp"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	"github.com/onflow/flow-go/network/channels"
 )
 
@@ -19,7 +16,7 @@ import (
 // It directly passes the incoming messages to the corresponding methods of the
 // network Adapter.
 type DefaultConduitFactory struct {
-	*component.ComponentManager
+	component.Component
 	adapter            network.Adapter
 	misbehaviorManager network.MisbehaviorReportManager
 }
@@ -37,33 +34,43 @@ func WithMisbehaviorManager(misbehaviorManager network.MisbehaviorReportManager)
 // NewDefaultConduitFactory creates a new DefaultConduitFactory, this is the default conduit factory used by the node.
 // Args:
 //
-//	logger: zerolog.Logger, the logger used by the conduit factory.
-//	metrics: module.AlspMetrics (an instance of module.NetworkMetrics can be used).
-//	opts: DefaultConduitFactoryOpt, optional arguments to override the default behavior of the conduit factory.
+//	alspCfg: the config for the misbehavior report manager.
+//	opts: the options for the conduit factory.
 //
 // Returns:
 //
-//	*DefaultConduitFactory, the created conduit factory.
-func NewDefaultConduitFactory(logger zerolog.Logger, metrics module.AlspMetrics, opts ...DefaultConduitFactoryOpt) *DefaultConduitFactory {
+//		a new instance of the DefaultConduitFactory.
+//	 an error if the initialization of the conduit factory fails. The error is irrecoverable.
+func NewDefaultConduitFactory(alspCfg *alspmgr.MisbehaviorReportManagerConfig, opts ...DefaultConduitFactoryOpt) (*DefaultConduitFactory, error) {
+	m, err := alspmgr.NewMisbehaviorReportManager(alspCfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not create misbehavior report manager: %w", err)
+	}
 	d := &DefaultConduitFactory{
-		misbehaviorManager: alsp.NewMisbehaviorReportManager(logger, metrics),
+		misbehaviorManager: m,
 	}
 
 	for _, apply := range opts {
 		apply(d)
 	}
 
-	// worker added so conduit factory doesn't immediately shut down when it's started
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
+			d.misbehaviorManager.Start(ctx)
+			select {
+			case <-d.misbehaviorManager.Ready():
+				ready()
+			case <-ctx.Done():
+				// jumps out of select statement to let a graceful shutdown.
+			}
 
 			<-ctx.Done()
+			<-d.misbehaviorManager.Done()
 		}).Build()
 
-	d.ComponentManager = cm
+	d.Component = cm
 
-	return d
+	return d, nil
 }
 
 // RegisterAdapter sets the Adapter component of the factory.

@@ -10,20 +10,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/state/protocol"
 )
 
 type ValidationResult int
 
 const (
-	// PublicNetwork indicates that the unstaked public-side of the Flow blockchain that nodes can join and leave at will
-	// with no staking requirement.
-	PublicNetwork = true
-	// PrivateNetwork indicates that the staked private-side of the Flow blockchain that nodes can only join and leave
-	// with a staking requirement.
-	PrivateNetwork = false
-
 	ValidationAccept ValidationResult = iota
 	ValidationIgnore
 	ValidationReject
@@ -90,12 +83,15 @@ type GossipSubRPCInspector interface {
 	Inspect(peer.ID, *pubsub.RPC) error
 }
 
-// GossipSubMsgValidationRpcInspector app specific RPC inspector used to inspect and validate incoming RPC messages before they are processed by libp2p.
+// GossipSubMsgValidationRpcInspector abstracts the general behavior of an app specific RPC inspector specifically
+// used to inspect and validate incoming. It is used to implement custom message validation logic. It is injected into
+// the GossipSubRouter and run on every incoming RPC message before the message is processed by libp2p. If the message
+// is invalid the RPC message will be dropped.
 // Implementations must:
 //   - be concurrency safe
 //   - be non-blocking
 type GossipSubMsgValidationRpcInspector interface {
-	protocol.Consumer
+	collection.ClusterEvents
 	GossipSubRPCInspector
 }
 

@@ -2,13 +2,13 @@ package approvals
 
 import (
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -28,30 +28,45 @@ type RequestTrackerItem struct {
 // NewRequestTrackerItem instantiates a new RequestTrackerItem where the
 // NextTimeout is evaluated to the current time plus a random blackout period
 // contained between min and max.
-func NewRequestTrackerItem(blackoutPeriodMin, blackoutPeriodMax int) RequestTrackerItem {
+func NewRequestTrackerItem(blackoutPeriodMin, blackoutPeriodMax int) (RequestTrackerItem, error) {
 	item := RequestTrackerItem{
 		blackoutPeriodMin: blackoutPeriodMin,
 		blackoutPeriodMax: blackoutPeriodMax,
 	}
-	item.NextTimeout = randBlackout(blackoutPeriodMin, blackoutPeriodMax)
-	return item
+	var err error
+	item.NextTimeout, err = randBlackout(blackoutPeriodMin, blackoutPeriodMax)
+	if err != nil {
+		return RequestTrackerItem{}, err
+	}
+
+	return item, err
 }
 
 // Update creates a _new_ RequestTrackerItem with incremented request number and updated NextTimeout.
-func (i RequestTrackerItem) Update() RequestTrackerItem {
+// No errors are expected during normal operation.
+func (i RequestTrackerItem) Update() (RequestTrackerItem, error) {
 	i.Requests++
-	i.NextTimeout = randBlackout(i.blackoutPeriodMin, i.blackoutPeriodMax)
-	return i
+	var err error
+	i.NextTimeout, err = randBlackout(i.blackoutPeriodMin, i.blackoutPeriodMax)
+	if err != nil {
+		return RequestTrackerItem{}, fmt.Errorf("could not get next timeout: %w", err)
+	}
+	return i, nil
 }
 
 func (i RequestTrackerItem) IsBlackout() bool {
 	return time.Now().Before(i.NextTimeout)
 }
 
-func randBlackout(min int, max int) time.Time {
-	blackoutSeconds := rand.Intn(max-min+1) + min
+// No errors are expected during normal operation.
+func randBlackout(min int, max int) (time.Time, error) {
+	random, err := rand.Uint64n(uint64(max - min + 1))
+	if err != nil {
+		return time.Now(), fmt.Errorf("failed to generate blackout: %w", err)
+	}
+	blackoutSeconds := random + uint64(min)
 	blackout := time.Now().Add(time.Duration(blackoutSeconds) * time.Second)
-	return blackout
+	return blackout, nil
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -93,10 +108,14 @@ func (rt *RequestTracker) TryUpdate(result *flow.ExecutionResult, incorporatedBl
 	rt.lock.Lock()
 	defer rt.lock.Unlock()
 	item, ok := rt.index[resultID][incorporatedBlockID][chunkIndex]
+	var err error
 
 	if !ok {
-		item = NewRequestTrackerItem(rt.blackoutPeriodMin, rt.blackoutPeriodMax)
-		err := rt.set(resultID, result.BlockID, incorporatedBlockID, chunkIndex, item)
+		item, err = NewRequestTrackerItem(rt.blackoutPeriodMin, rt.blackoutPeriodMax)
+		if err != nil {
+			return item, false, fmt.Errorf("could not create tracker item: %w", err)
+		}
+		err = rt.set(resultID, result.BlockID, incorporatedBlockID, chunkIndex, item)
 		if err != nil {
 			return item, false, fmt.Errorf("could not set created tracker item: %w", err)
 		}
@@ -104,7 +123,10 @@ func (rt *RequestTracker) TryUpdate(result *flow.ExecutionResult, incorporatedBl
 
 	canUpdate := !item.IsBlackout()
 	if canUpdate {
-		item = item.Update()
+		item, err = item.Update()
+		if err != nil {
+			return item, false, fmt.Errorf("could not update tracker item: %w", err)
+		}
 		rt.index[resultID][incorporatedBlockID][chunkIndex] = item
 	}
 
