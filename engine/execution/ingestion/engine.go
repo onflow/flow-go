@@ -207,6 +207,8 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) (
 	// blocks.
 	lastExecuted := final.Height
 
+	// dynamically bootstrapped execution node will reload blocks from
+	// [sealedRoot.Height + 1, finalizedRoot.Height] and execute them on startup.
 	rootBlock, err := e.state.Params().SealedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
