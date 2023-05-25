@@ -34,8 +34,6 @@ jobs:
       uses: actions/checkout@v2
       with:
         ref: ${{ inputs.tag }}
-    - name: Build relic
-      run: make crypto_setup_gopath
     - name: Build and upload boot-tools
       run: |
         make tool-bootstrap tool-transit

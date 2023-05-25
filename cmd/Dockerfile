@@ -36,7 +36,7 @@ WORKDIR /app
 ARG GOARCH=amd64
 
 # TAGS can be overriden to modify the go build tags (e.g. build without netgo)
-ARG TAGS="relic,netgo"
+ARG TAGS="netgo"
 
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
@@ -64,7 +64,7 @@ ARG GOARCH=amd64
 RUN --mount=type=ssh \
     --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=1 GOOS=linux go build --tags "relic,netgo" -ldflags "-extldflags -static \
+    CGO_ENABLED=1 GOOS=linux go build --tags "netgo" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
     -gcflags="all=-N -l" -o ./app ${TARGET}
 
