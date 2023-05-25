@@ -43,7 +43,7 @@ type Engine struct {
 	me                     module.Local
 	request                module.Requester // used to request collections
 	state                  protocol.State
-	headers                storage.Headers
+	headers                storage.Headers // see comments on getHeaderByHeight for why we need it
 	blocks                 storage.Blocks
 	collections            storage.Collections
 	events                 storage.Events
@@ -1312,6 +1312,9 @@ func (e *Engine) fetchCollection(
 	return nil
 }
 
+// if the EN is dynamically bootstrapped, the finalized blocks at height range:
+// [ sealedRoot.Height, finalizedRoot.Height - 1] can not be retrieved from
+// protocol state, but only from headers
 func (e *Engine) getHeaderByHeight(height uint64) (*flow.Header, error) {
 	// we don't use protocol state because for dynamic boostrapped execution node
 	// the last executed and sealed block is below the root block
