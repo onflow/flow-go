@@ -240,11 +240,9 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 		// different from the finalized root block, then it means the node dynamically bootstrapped.
 		// In that case, we should index the result of the sealed root block so that the EN is able
 		// to execute the next block.
-		if rootSeal.BlockID != head.ID() {
-			err := transaction.WithTx(operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID))(tx)
-			if err != nil {
-				return fmt.Errorf("could not index root result: %w", err)
-			}
+		err := transaction.WithTx(operation.SkipDuplicates(operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID)))(tx)
+		if err != nil {
+			return fmt.Errorf("could not index root result: %w", err)
 		}
 
 		for _, block := range segment.ExtraBlocks {
