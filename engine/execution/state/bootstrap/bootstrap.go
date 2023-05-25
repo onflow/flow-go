@@ -97,13 +97,12 @@ func (b *Bootstrapper) IsBootstrapped(db *badger.DB) (flow.StateCommitment, bool
 func (b *Bootstrapper) BootstrapExecutionDatabase(
 	db *badger.DB,
 	rootSeal *flow.Seal,
-	sealedRootBlock *flow.Header,
 ) error {
 
 	commit := rootSeal.FinalState
 	err := operation.RetryOnConflict(db.Update, func(txn *badger.Txn) error {
 
-		err := operation.InsertExecutedBlock(sealedRootBlock.ID())(txn)
+		err := operation.InsertExecutedBlock(rootSeal.BlockID)(txn)
 		if err != nil {
 			return fmt.Errorf("could not index initial genesis execution block: %w", err)
 		}
@@ -118,13 +117,13 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 			return fmt.Errorf("could not index void state commitment: %w", err)
 		}
 
-		err = operation.IndexStateCommitment(sealedRootBlock.ID(), commit)(txn)
+		err = operation.IndexStateCommitment(rootSeal.BlockID, commit)(txn)
 		if err != nil {
 			return fmt.Errorf("could not index genesis state commitment: %w", err)
 		}
 
 		snapshots := make([]*snapshot.ExecutionSnapshot, 0)
-		err = operation.InsertExecutionStateInteractions(sealedRootBlock.ID(), snapshots)(txn)
+		err = operation.InsertExecutionStateInteractions(rootSeal.BlockID, snapshots)(txn)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution state interactions: %w", err)
 		}

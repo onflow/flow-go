@@ -26,7 +26,7 @@ func TestReExecuteBlock(t *testing.T) {
 		genesis := unittest.BlockHeaderFixture()
 		rootSeal := unittest.Seal.Fixture()
 		unittest.Seal.WithBlock(genesis)(rootSeal)
-		err := bootstrapper.BootstrapExecutionDatabase(db, rootSeal, genesis)
+		err := bootstrapper.BootstrapExecutionDatabase(db, rootSeal)
 		require.NoError(t, err)
 
 		// create all modules
@@ -148,7 +148,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		genesis := unittest.BlockHeaderFixture()
 		rootSeal := unittest.Seal.Fixture()
 		unittest.Seal.WithBlock(genesis)(rootSeal)
-		err := bootstrapper.BootstrapExecutionDatabase(db, rootSeal, genesis)
+		err := bootstrapper.BootstrapExecutionDatabase(db, rootSeal)
 		require.NoError(t, err)
 
 		// create all modules

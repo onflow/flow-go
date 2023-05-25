@@ -604,7 +604,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	rootSeal := unittest.Seal.Fixture()
 	unittest.Seal.WithBlock(genesisHead)(rootSeal)
 
-	err = bootstrapper.BootstrapExecutionDatabase(node.PublicDB, rootSeal, genesisHead)
+	err = bootstrapper.BootstrapExecutionDatabase(node.PublicDB, rootSeal)
 	require.NoError(t, err)
 
 	execState := executionState.NewExecutionState(
