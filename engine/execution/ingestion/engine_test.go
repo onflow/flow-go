@@ -1512,7 +1512,7 @@ func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 // 	require.True(t, shouldTriggerStateSync(20, 29, 10))
 // }
 
-func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecutionState) *Engine {
+func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecutionState) (*Engine, *storage.MockHeaders) {
 	log := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
 	tracer, err := trace.NewTracer(log, "test", "test", trace.SensitivityCaptureAll)
@@ -1571,7 +1571,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 	)
 
 	require.NoError(t, err)
-	return engine
+	return engine, headers
 }
 
 func logChain(chain []*flow.Block) {
@@ -1593,7 +1593,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Bootstrap(genesis, result, seal))
 
 		es := newMockExecutionState(seal)
-		engine := newIngestionEngine(t, ps, es)
+		engine, _ := newIngestionEngine(t, ps, es)
 
 		finalized, pending, err := engine.unexecutedBlocks()
 		require.NoError(t, err)
@@ -1618,7 +1618,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Extend(blockD))
 
 		es := newMockExecutionState(seal)
-		engine := newIngestionEngine(t, ps, es)
+		engine, _ := newIngestionEngine(t, ps, es)
 
 		finalized, pending, err := engine.unexecutedBlocks()
 		require.NoError(t, err)
@@ -1643,7 +1643,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Extend(blockD))
 
 		es := newMockExecutionState(seal)
-		engine := newIngestionEngine(t, ps, es)
+		engine, _ := newIngestionEngine(t, ps, es)
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -1673,7 +1673,9 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Finalize(blockC.ID()))
 
 		es := newMockExecutionState(seal)
-		engine := newIngestionEngine(t, ps, es)
+		engine, headers := newIngestionEngine(t, ps, es)
+
+		headers.EXPECT().ByHeight(blockC.Header.Height).Return(blockC.Header, nil)
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -1704,7 +1706,9 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Finalize(blockC.ID()))
 
 		es := newMockExecutionState(seal)
-		engine := newIngestionEngine(t, ps, es)
+		engine, headers := newIngestionEngine(t, ps, es)
+
+		headers.EXPECT().ByHeight(blockC.Header.Height).Return(blockC.Header, nil)
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -1734,7 +1738,9 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Finalize(blockA.ID()))
 
 		es := newMockExecutionState(seal)
-		engine := newIngestionEngine(t, ps, es)
+		engine, headers := newIngestionEngine(t, ps, es)
+
+		headers.EXPECT().ByHeight(blockA.Header.Height).Return(blockA.Header, nil)
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -1790,7 +1796,9 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		es := newMockExecutionState(seal)
 
-		engine := newIngestionEngine(t, ps, es)
+		engine, headers := newIngestionEngine(t, ps, es)
+
+		headers.EXPECT().ByHeight(blockC.Header.Height).Return(blockC.Header, nil)
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
