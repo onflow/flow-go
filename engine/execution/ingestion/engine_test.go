@@ -1540,6 +1540,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		es := mocks.NewExecutionState(seal)
 		engine, headers := newIngestionEngine(t, ps, es)
 
+		// block C is the only finalized block, index its header by its height
 		headers.EXPECT().ByHeight(blockC.Header.Height).Return(blockC.Header, nil)
 
 		es.ExecuteBlock(t, blockA)
@@ -1573,6 +1574,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		es := mocks.NewExecutionState(seal)
 		engine, headers := newIngestionEngine(t, ps, es)
 
+		// block C is finalized, index its header by its height
 		headers.EXPECT().ByHeight(blockC.Header.Height).Return(blockC.Header, nil)
 
 		es.ExecuteBlock(t, blockA)
@@ -1605,6 +1607,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		es := mocks.NewExecutionState(seal)
 		engine, headers := newIngestionEngine(t, ps, es)
 
+		// block A is finalized, index its header by its height
 		headers.EXPECT().ByHeight(blockA.Header.Height).Return(blockA.Header, nil)
 
 		es.ExecuteBlock(t, blockA)
@@ -1663,6 +1666,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		engine, headers := newIngestionEngine(t, ps, es)
 
+		// block C is finalized, index its header by its height
 		headers.EXPECT().ByHeight(blockC.Header.Height).Return(blockC.Header, nil)
 
 		es.ExecuteBlock(t, blockA)
