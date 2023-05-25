@@ -21,11 +21,10 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// measurement represents one measurement of block rate and error. TODO adjust
+// measurement represents a measurement of error associated with entering view v.
 // A measurement is taken each time the view changes for any reason.
-// Each measurement measures the instantaneous and exponentially weighted
-// moving average (EWMA) block rates, computes the target block rate,
-// and computes the error terms.
+// Each measurement computes the instantaneous error based on the projected
+// and target epoch switchover times, and updates error terms.
 type measurement struct {
 	view            uint64    // v       - the current view
 	time            time.Time // t[v]    - when we entered view v
@@ -34,9 +33,9 @@ type measurement struct {
 	integralErr     float64   // I_N[v]  - integral of error at view v   (seconds)
 	derivativeErr   float64   // ∆_N[v]  - derivative of error at view v (seconds)
 
-	// informational fields - not required for controller operation - may be used for metrics/logging later, or removed
+	// informational fields - not required for controller operation
 	viewDiff uint64        // number of views since the previous measurement
-	viewTime time.Duration // time (per view)
+	viewTime time.Duration // time since the last measurement
 }
 
 // epochInfo stores data about the current and next epoch. It is updated when we enter
@@ -277,7 +276,7 @@ func (ctl *BlockRateController) checkForEpochTransition(curView uint64, now time
 	return nil
 }
 
-// measureViewRate computes a new measurement of view rate and error for the newly entered view.
+// measureViewRate computes a new measurement of projected epoch switchover time and error for the newly entered view.
 // It updates the proposal delay based on the new error.
 // No errors are expected during normal operation.
 func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) error {
@@ -290,7 +289,6 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 	beta := ctl.config.beta()                               // ß    - memory parameter for error integration
 	viewsRemaining := float64(ctl.curEpochFinalView - view) // k[v] - views remaining in current epoch
 
-	// compute and store the rate and error for the current view
 	var curMeasurement measurement
 	curMeasurement.view = view
 	curMeasurement.time = now
@@ -311,17 +309,17 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 	ctl.lastMeasurement = curMeasurement
 
 	// compute the controller output for this measurement
-	delay := ctl.targetViewTime() - ctl.controllerOutput()
+	proposalTime := ctl.targetViewTime() - ctl.controllerOutput()
 	// constrain the proposal time according to configured boundaries
-	if delay < ctl.config.MinProposalDelay {
+	if proposalTime < ctl.config.MinProposalDelay {
 		ctl.proposalDelayDur.Store(ctl.config.MinProposalDelay.Nanoseconds())
 		return nil
 	}
-	if delay > ctl.config.MaxProposalDelay {
+	if proposalTime > ctl.config.MaxProposalDelay {
 		ctl.proposalDelayDur.Store(ctl.config.MaxProposalDelay.Nanoseconds())
 		return nil
 	}
-	ctl.proposalDelayDur.Store(delay.Nanoseconds())
+	ctl.proposalDelayDur.Store(proposalTime.Nanoseconds())
 	return nil
 }
 

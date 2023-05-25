@@ -69,20 +69,3 @@ func (c *Config) alpha() float64 {
 func (c *Config) beta() float64 {
 	return 1.0 / float64(c.N_itg)
 }
-
-// defaultViewRate returns 1/Config.DefaultProposalDelay - the default view rate in views/s.
-// This is used as the initial block rate "measurement", before any measurements are taken.
-func (c *Config) defaultViewRate() float64 {
-	return 1.0 / c.DefaultProposalDelay.Seconds()
-}
-
-func (c *Config) DefaultProposalDelayMs() float64 {
-	return float64(c.DefaultProposalDelay.Milliseconds())
-}
-
-func (c *Config) MaxProposalDelayMs() float64 {
-	return float64(c.MaxProposalDelay.Milliseconds())
-}
-func (c *Config) MinProposalDelayMs() float64 {
-	return float64(c.MinProposalDelay.Milliseconds())
-}
