@@ -389,7 +389,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		}
 
 		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.GossipSubConfig.RpcInspector, fnb.IdentityProvider, fnb.Metrics.Network).
-			SetPublicNetwork(p2p.PrivateNetwork).
+			SetNetworkType(network.PrivateNetwork).
 			SetMetrics(metricsCfg).
 			Build()
 		if err != nil {
