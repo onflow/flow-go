@@ -102,7 +102,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("could not get sealing segment: %w", err)
 	}
 
-	rootResult, _, err := root.SealedResult()
+	_, rootSeal, err := root.SealedResult()
 	if err != nil {
 		return nil, fmt.Errorf("could not get sealed result for sealing segment: %w", err)
 	}
@@ -117,7 +117,7 @@ func Bootstrap(
 		// 1) bootstrap the sealing segment
 		// creating sealed root block with the rootResult
 		// creating finalized root block with lastFinalized
-		err = state.bootstrapSealingSegment(segment, lastFinalized, rootResult)(tx)
+		err = state.bootstrapSealingSegment(segment, lastFinalized, rootSeal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
 		}
@@ -179,7 +179,7 @@ func Bootstrap(
 
 // bootstrapSealingSegment inserts all blocks and associated metadata for the
 // protocol state root snapshot to disk.
-func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block, rootResult *flow.ExecutionResult) func(tx *transaction.Tx) error {
+func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block, rootSeal *flow.Seal) func(tx *transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 
 		for _, result := range segment.ExecutionResults {
@@ -199,11 +199,15 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			if err != nil {
 				return fmt.Errorf("could not insert first seal: %w", err)
 			}
+		}
 
-			// first seal contains the result ID for the sealed root block, indexing it allows dynamically bootstrapped EN to execute
-			// the next block.
-			err = transaction.WithTx(operation.IndexExecutionResult(rootResult.BlockID, rootResult.ID()))(tx)
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+		// root seal contains the result ID for the sealed root block. If the sealed root block is
+		// different from the finalized root block, then it means the node dynamically bootstrapped.
+		// In that case, we should index the result of the sealed root block so that the EN is able
+		// to execute the next block.
+		if rootSeal.BlockID != head.ID() {
+			err := transaction.WithTx(operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID))(tx)
+			if err != nil {
 				return fmt.Errorf("could not index root result: %w", err)
 			}
 		}
