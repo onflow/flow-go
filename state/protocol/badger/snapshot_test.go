@@ -647,7 +647,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 		// Thereby, the state should have b3 as its local root block. In addition, the blocks contained in the sealing
 		// segment, such as b2 should be stored in the state.
 		util.RunWithFollowerProtocolState(t, multipleBlockSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-			localStateRootBlock, err := state.Params().Root()
+			localStateRootBlock, err := state.Params().FinalizedRoot()
 			require.NoError(t, err)
 			assert.Equal(t, b3.ID(), localStateRootBlock.ID())
 
@@ -1230,7 +1230,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 		require.True(t, ok)
 
 		t.Run("should be able to query at root block", func(t *testing.T) {
-			root, err := state.Params().Root()
+			root, err := state.Params().FinalizedRoot()
 			require.NoError(t, err)
 			snapshot := state.AtHeight(root.Height)
 			identities, err := snapshot.Identities(filter.Any)
