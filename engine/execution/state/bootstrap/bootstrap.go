@@ -10,6 +10,10 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+<<<<<<< HEAD
+=======
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+>>>>>>> f6b26040d5 (use root seal)
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -91,19 +95,19 @@ func (b *Bootstrapper) IsBootstrapped(db *badger.DB) (flow.StateCommitment, bool
 
 func (b *Bootstrapper) BootstrapExecutionDatabase(
 	db *badger.DB,
-	rootResult *flow.ExecutionResult,
-	commit flow.StateCommitment,
-	genesis *flow.Header,
+	rootSeal *flow.Seal,
+	sealedRootBlock *flow.Header,
 ) error {
 
+	commit := rootSeal.FinalState
 	err := operation.RetryOnConflict(db.Update, func(txn *badger.Txn) error {
 
-		err := operation.InsertExecutedBlock(genesis.ID())(txn)
+		err := operation.InsertExecutedBlock(sealedRootBlock.ID())(txn)
 		if err != nil {
 			return fmt.Errorf("could not index initial genesis execution block: %w", err)
 		}
 
-		err = operation.IndexExecutionResult(rootResult.BlockID, rootResult.ID())(txn)
+		err = operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID)(txn)
 		if err != nil {
 			return fmt.Errorf("could not index result for root result: %w", err)
 		}
@@ -113,13 +117,18 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 			return fmt.Errorf("could not index void state commitment: %w", err)
 		}
 
-		err = operation.IndexStateCommitment(genesis.ID(), commit)(txn)
+		err = operation.IndexStateCommitment(sealedRootBlock.ID(), commit)(txn)
 		if err != nil {
 			return fmt.Errorf("could not index genesis state commitment: %w", err)
 		}
 
+<<<<<<< HEAD
 		views := make([]*delta.Snapshot, 0)
 		err = operation.InsertExecutionStateInteractions(genesis.ID(), views)(txn)
+=======
+		snapshots := make([]*snapshot.ExecutionSnapshot, 0)
+		err = operation.InsertExecutionStateInteractions(sealedRootBlock.ID(), snapshots)(txn)
+>>>>>>> f6b26040d5 (use root seal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution state interactions: %w", err)
 		}
