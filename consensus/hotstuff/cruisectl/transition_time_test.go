@@ -91,15 +91,17 @@ func drawTransitionTime(t *rapid.T) EpochTransitionTime {
 func TestInferTargetEndTime_Fixture(t *testing.T) {
 	// The target time is around midday Wednesday
 	// |S|M|T|W|T|F|S|
-	//        *
+	// |      *      |
 	ett := EpochTransitionTime{day: time.Wednesday, hour: 13, minute: 24}
 	// The current time is mid-morning on Friday. We are about 28% through the epoch in time terms
 	// |S|M|T|W|T|F|S|
-	//            *
+	// |          *  |
+	// Friday, November 20, 2020 11:44
 	curTime := time.Date(2020, 11, 20, 11, 44, 0, 0, time.UTC)
 	// We are 18% through the epoch in view terms - we are quite behind schedule
 	epochFractionComplete := .18
-	// We should still be able to infer that the target switchover time should be next wednesday
+	// We should still be able to infer the target switchover time:
+	// Wednesday, November 25, 2020 13:24
 	expectedTarget := time.Date(2020, 11, 25, 13, 24, 0, 0, time.UTC)
 	target := ett.inferTargetEndTime(curTime, epochFractionComplete)
 	assert.Equal(t, expectedTarget, target)
