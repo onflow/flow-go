@@ -264,22 +264,6 @@ func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
 	return result
 }
 
-// Me returns the flow identifier of this middleware
-func (m *Middleware) Me() flow.Identifier {
-	return m.me
-}
-
-// GetIPPort returns the ip address and port number associated with the middleware
-// All errors returned from this function can be considered benign.
-func (m *Middleware) GetIPPort() (string, string, error) {
-	ipOrHostname, port, err := m.libP2PNode.GetIPPort()
-	if err != nil {
-		return "", "", fmt.Errorf("failed to get ip and port from libP2P node: %w", err)
-	}
-
-	return ipOrHostname, port, nil
-}
-
 func (m *Middleware) UpdateNodeAddresses() {
 	m.log.Info().Msg("Updating protocol state node addresses")
 

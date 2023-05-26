@@ -41,6 +41,6 @@ type DisallowListCache interface {
 	// - cause: the cause for allow-listing the peer.
 	// Returns:
 	// - the list of causes for which the peer is disallow-listed. If the peer is not disallow-listed for any reason,
-	// an empty list is returned. 
+	// an empty list is returned.
 	AllowFor(peerID peer.ID, cause DisallowListedCause) []DisallowListedCause
 }
