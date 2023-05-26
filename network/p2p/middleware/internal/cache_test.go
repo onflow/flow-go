@@ -77,3 +77,67 @@ func TestDisallowFor_MultiplePeers(t *testing.T) {
 		require.ElementsMatch(t, causes, []middleware.DisallowListedCause{middleware.DisallowListedCauseAdmin, middleware.DisallowListedCauseAlsp})
 	}
 }
+
+// TestAllowFor_SinglePeer tests the AllowFor function for a single peer.
+// The test verifies the behavior of cache for:
+// 1. Allowing a peerID for a cause when it is not disallow-listed.
+// 2. Allowing a peerID for a cause when it is disallow-listed for the same cause.
+// 3. Disallowing a peerID for a cause when it is disallow-listed for a different cause.
+// 4. Disallowing a peerID for a cause when it is not disallow-listed.
+func TestAllowFor_SinglePeer(t *testing.T) {
+	disallowListCache := internal.NewDisallowListCache(uint32(100), unittest.Logger(), metrics.NewNoopCollector())
+	require.NotNil(t, disallowListCache)
+	peerID := peer.ID("peer1")
+
+	// allowing the peerID for a cause when the peerID already exists in the cache
+	causes := disallowListCache.AllowFor(peerID, middleware.DisallowListedCauseAdmin)
+	require.Len(t, causes, 0)
+
+	// disallowing the peerID for a cause when the peerID doesn't exist in the cache
+	causes, err := disallowListCache.DisallowFor(peerID, middleware.DisallowListedCauseAdmin)
+	require.NoError(t, err)
+	require.Len(t, causes, 1)
+	require.Contains(t, causes, middleware.DisallowListedCauseAdmin)
+
+	// getting the disallow-listed causes for the peerID
+	causes = disallowListCache.GetAllDisallowedListCausesFor(peerID)
+	require.Len(t, causes, 1)
+	require.Contains(t, causes, middleware.DisallowListedCauseAdmin)
+
+	// allowing a peerID for a cause when the peerID already exists in the cache
+	causes = disallowListCache.AllowFor(peerID, middleware.DisallowListedCauseAdmin)
+	require.NoError(t, err)
+	require.Len(t, causes, 0)
+
+	// getting the disallow-listed causes for the peerID
+	causes = disallowListCache.GetAllDisallowedListCausesFor(peerID)
+	require.Len(t, causes, 0)
+
+	// disallowing the peerID for a cause
+	causes, err = disallowListCache.DisallowFor(peerID, middleware.DisallowListedCauseAdmin)
+	require.NoError(t, err)
+	require.Len(t, causes, 1)
+
+	// allowing the peerID for a different cause than it is disallowed when the peerID already exists in the cache
+	causes = disallowListCache.AllowFor(peerID, middleware.DisallowListedCauseAlsp)
+	require.NoError(t, err)
+	require.Len(t, causes, 1)
+	require.Contains(t, causes, middleware.DisallowListedCauseAdmin) // the peerID is still disallow-listed for the previous cause
+
+	// disallowing the peerID for another cause
+	causes, err = disallowListCache.DisallowFor(peerID, middleware.DisallowListedCauseAlsp)
+	require.NoError(t, err)
+	require.Len(t, causes, 2)
+	require.ElementsMatch(t, causes, []middleware.DisallowListedCause{middleware.DisallowListedCauseAdmin, middleware.DisallowListedCauseAlsp})
+
+	// allowing the peerID for the first cause
+	causes = disallowListCache.AllowFor(peerID, middleware.DisallowListedCauseAdmin)
+	require.NoError(t, err)
+	require.Len(t, causes, 1)
+	require.Contains(t, causes, middleware.DisallowListedCauseAlsp) // the peerID is still disallow-listed for the previous cause
+
+	// allowing the peerID for the second cause
+	causes = disallowListCache.AllowFor(peerID, middleware.DisallowListedCauseAlsp)
+	require.NoError(t, err)
+	require.Len(t, causes, 0)
+}
