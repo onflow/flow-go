@@ -27,7 +27,7 @@ func GetEvents(r *request.Request, backend access.API, _ models.LinkGenerator) (
 			return nil, err
 		}
 
-		blocksEvents.Build(events)
+		blocksEvents.Build(events, false)
 		return blocksEvents, nil
 	}
 
@@ -51,6 +51,6 @@ func GetEvents(r *request.Request, backend access.API, _ models.LinkGenerator) (
 		return nil, err
 	}
 
-	blocksEvents.Build(events)
+	blocksEvents.Build(events, true)
 	return blocksEvents, nil
 }

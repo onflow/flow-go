@@ -34,7 +34,7 @@ func TestGetEvents(t *testing.T) {
 
 	// remove events from the last block to test that an empty BlockEvents is returned when the last
 	// block contains no events
-	trucatedEvents := append(events[:len(events)-1], flow.BlockEvents{
+	truncatedEvents := append(events[:len(events)-1], flow.BlockEvents{
 		BlockHeight:    events[len(events)-1].BlockHeight,
 		BlockID:        events[len(events)-1].BlockID,
 		BlockTimestamp: events[len(events)-1].BlockTimestamp,
@@ -68,9 +68,9 @@ func TestGetEvents(t *testing.T) {
 		},
 		{
 			description:      "Get events range ending after last block",
-			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "0", fmt.Sprint(events[len(events)-1].BlockHeight+1), nil),
+			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "0", fmt.Sprint(events[len(events)-1].BlockHeight+5), nil),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse(t, trucatedEvents),
+			expectedResponse: testBlockEventResponse(t, truncatedEvents),
 		},
 		// invalid
 		{
@@ -185,13 +185,13 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[len(events)-1].BlockHeight,
 	).Return(events, nil)
 
-	// range from first to last block + 1
+	// range from first to last block + 5
 	backend.Mock.On(
 		"GetEventsForHeightRange",
 		mocks.Anything,
 		mocks.Anything,
 		events[0].BlockHeight,
-		events[len(events)-1].BlockHeight+1,
+		events[len(events)-1].BlockHeight+5,
 	).Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), nil)
 
 	latestBlock := unittest.BlockHeaderFixture()
