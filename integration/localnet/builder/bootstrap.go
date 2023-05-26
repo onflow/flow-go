@@ -320,12 +320,12 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 		fmt.Sprintf("--nodeid=%s", container.NodeID),
 	)
 
-	if i == 0 {
-		// bring up access node before any other nodes
-		if container.Role == flow.RoleConsensus || container.Role == flow.RoleCollection {
-			service.DependsOn = append(service.DependsOn, "access_1")
-		}
-	}
+	//if i == 0 {
+	//	// bring up access node before any other nodes
+	//	if container.Role == flow.RoleConsensus || container.Role == flow.RoleCollection {
+	//		service.DependsOn = append(service.DependsOn, "access_1")
+	//	}
+	//}
 
 	return service
 }
