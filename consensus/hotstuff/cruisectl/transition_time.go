@@ -128,7 +128,7 @@ func (tt *EpochTransitionTime) inferTargetEndTime(curTime time.Time, epochFracti
 	earlierTargetDate := nearestTargetDate.AddDate(0, 0, -7)
 	laterTargetDate := nearestTargetDate.AddDate(0, 0, 7)
 
-	estimatedTimeRemainingInEpoch := time.Duration(epochFractionComplete * float64(epochLength))
+	estimatedTimeRemainingInEpoch := time.Duration((1.0 - epochFractionComplete) * float64(epochLength))
 	estimatedEpochEndTime := now.Add(estimatedTimeRemainingInEpoch)
 
 	minDiff := estimatedEpochEndTime.Sub(nearestTargetDate).Abs()

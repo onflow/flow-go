@@ -86,15 +86,35 @@ func drawTransitionTime(t *rapid.T) EpochTransitionTime {
 	return EpochTransitionTime{day, hour, minute}
 }
 
+// TestInferTargetEndTime_Fixture is a single human-readable fixture test,
+// in addition to the property-based rapid tests.
+func TestInferTargetEndTime_Fixture(t *testing.T) {
+	// The target time is around midday Wednesday
+	// |S|M|T|W|T|F|S|
+	//        *
+	ett := EpochTransitionTime{day: time.Wednesday, hour: 13, minute: 24}
+	// The current time is mid-morning on Friday. We are about 28% through the epoch in time terms
+	// |S|M|T|W|T|F|S|
+	//            *
+	curTime := time.Date(2020, 11, 20, 11, 44, 0, 0, time.UTC)
+	// We are 18% through the epoch in view terms - we are quite behind schedule
+	epochFractionComplete := .18
+	// We should still be able to infer that the target switchover time should be next wednesday
+	expectedTarget := time.Date(2020, 11, 25, 13, 24, 0, 0, time.UTC)
+	target := ett.inferTargetEndTime(curTime, epochFractionComplete)
+	assert.Equal(t, expectedTarget, target)
+}
+
 // TestInferTargetEndTime tests that we can infer "the most reasonable" target time.
-func TestInferTargetEndTime(t *testing.T) {
+func TestInferTargetEndTime_Rapid(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		ett := drawTransitionTime(t)
 		curTime := time.Unix(rapid.Int64().Draw(t, "ref_unix").(int64), 0).UTC()
-		epochPctComplete := rapid.Float64Range(0, 1).Draw(t, "pct_complete").(float64)
+		epochFractionComplete := rapid.Float64Range(0, 1).Draw(t, "pct_complete").(float64)
+		epochFractionRemaining := 1.0 - epochFractionComplete
 
-		target := ett.inferTargetEndTime(curTime, epochPctComplete)
-		computedEndTime := curTime.Add(time.Duration(float64(epochLength) * epochPctComplete))
+		target := ett.inferTargetEndTime(curTime, epochFractionComplete)
+		computedEndTime := curTime.Add(time.Duration(float64(epochLength) * epochFractionRemaining))
 		// selected target must be the nearest to the computed end time
 		delta := computedEndTime.Sub(target).Abs()
 		assert.LessOrEqual(t, delta.Hours(), float64(24*7)/2)
