@@ -3,6 +3,8 @@ package execution
 import (
 	"context"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
@@ -34,7 +36,9 @@ type StopAtHeightReq struct {
 func (s *StopAtHeightCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	sah := req.ValidatorData.(StopAtHeightReq)
 
-	err := s.stopControl.SetStop(ingestion.StopParameters{
+	oldParams := s.stopControl.GetStopParameters()
+
+	err := s.stopControl.SetStopParameters(ingestion.StopParameters{
 		StopHeight:  sah.height,
 		ShouldCrash: sah.crash,
 	})
@@ -42,6 +46,12 @@ func (s *StopAtHeightCommand) Handler(_ context.Context, req *admin.CommandReque
 	if err != nil {
 		return nil, err
 	}
+
+	newParams := s.stopControl.GetStopParameters()
+	log.Info().
+		Interface("newParams", newParams).
+		Interface("oldParams", oldParams).
+		Msgf("admintool: New En stop parameters set")
 
 	return "ok", nil
 }

@@ -25,11 +25,12 @@ import (
 //
 //  1. stop is already set manually and is set again manually.
 //     This is considered as an attempt to move the stop height. The resulting stop
-//     height is the new one.
+//     height is the new one. Note, the new height can be either lower or higher than
+//     previous value.
 //  2. stop is already set manually and is set by the version beacon.
-//     The resulting stop height is the earlier one.
+//     The resulting stop height is the lower one.
 //  3. stop is already set by the version beacon and is set manually.
-//     The resulting stop height is the earlier one.
+//     The resulting stop height is the lower one.
 //  4. stop is already set by the version beacon and is set by the version beacon.
 //     This means version boundaries were edited. The resulting stop
 //     height is the new one.
@@ -72,7 +73,7 @@ type stopBoundary struct {
 }
 
 // String returns string in the format "crash@20023[versionBeacon]" or
-// "crash@20023@blockID[versionBeacon]"
+// "stop@20023@blockID[manual]"
 // block ID is only present if stopAfterExecuting is set
 // the ID is from the block that should be executed last and has height one
 // less than StopHeight
@@ -105,6 +106,8 @@ func (s *stopBoundary) String() string {
 
 type StopControlOption func(*StopControl)
 
+// StopControlWithLogger sets logger for the StopControl
+// and adds a "component" field to it
 func StopControlWithLogger(log zerolog.Logger) StopControlOption {
 	return func(s *StopControl) {
 		s.log = log.With().Str("component", "stop_control").Logger()
@@ -180,9 +183,9 @@ func (s *StopControl) IsExecutionStopped() bool {
 	return s.stopped
 }
 
-// SetStop sets new stop parameters.
+// SetStopParameters sets new stop parameters.
 // Returns error if the stopping process has already commenced, or if already stopped.
-func (s *StopControl) SetStop(
+func (s *StopControl) SetStopParameters(
 	stop StopParameters,
 ) error {
 	s.Lock()
@@ -192,14 +195,25 @@ func (s *StopControl) SetStop(
 		StopParameters: stop,
 	}
 
+	return s.unsafeSetStopParameters(stopBoundary, false)
+}
+
+func (s *StopControl) unsafeSetStopParameters(
+	stopBoundary *stopBoundary,
+	fromVersionBeacon bool,
+) error {
 	log := s.log.With().
 		Stringer("old_stop", s.stopBoundary).
 		Stringer("new_stop", stopBoundary).
 		Logger()
 
+	stopHeight := uint64(math.MaxUint64)
+	if stopBoundary != nil {
+		stopHeight = stopBoundary.StopHeight
+	}
 	canChange, reason := s.canChangeStop(
-		stopBoundary.StopHeight,
-		false,
+		stopHeight,
+		fromVersionBeacon,
 	)
 	if !canChange {
 		err := fmt.Errorf(reason)
@@ -256,8 +270,8 @@ func (s *StopControl) canChangeStop(
 	return true, ""
 }
 
-// GetStop returns the upcoming stop parameters or nil if no stop is set.
-func (s *StopControl) GetStop() *StopParameters {
+// GetStopParameters returns the upcoming stop parameters or nil if no stop is set.
+func (s *StopControl) GetStopParameters() *StopParameters {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -458,7 +472,7 @@ func (s *StopControl) stopExecution() {
 func (s *StopControl) handleVersionBeacon(
 	height uint64,
 ) error {
-	if s.nodeVersion == nil || s.stopped {
+	if s.nodeVersion == nil {
 		return nil
 	}
 
@@ -484,11 +498,6 @@ func (s *StopControl) handleVersionBeacon(
 		return nil
 	}
 
-	if s.versionBeacon != nil && s.versionBeacon.SealHeight >= vb.SealHeight {
-		// we already processed this or a higher version beacon
-		return nil
-	}
-
 	s.log.Info().
 		Uint64("vb_seal_height", vb.SealHeight).
 		Uint64("vb_sequence", vb.Sequence).
@@ -510,23 +519,6 @@ func (s *StopControl) handleVersionBeacon(
 		return nil
 	}
 
-	log := s.log.With().
-		Stringer("old_stop", s.stopBoundary).
-		Logger()
-
-	canChange, reason := s.canChangeStop(
-		math.MaxUint64,
-		true,
-	)
-	if !canChange {
-		log.Warn().
-			Str("reason", reason).
-			Msg("Cannot change stop boundary when detecting new version beacon")
-		return nil
-	}
-
-	log.Info().Msg("stop cleared")
-
 	var newStop *stopBoundary
 	if shouldBeSet {
 		newStop = &stopBoundary{
@@ -538,12 +530,12 @@ func (s *StopControl) handleVersionBeacon(
 		}
 	}
 
-	s.log.Info().
-		Stringer("old_stop", s.stopBoundary).
-		Stringer("new_stop", newStop).
-		Msg("New stop set")
-
-	s.stopBoundary = newStop
+	err = s.unsafeSetStopParameters(newStop, true)
+	if err != nil {
+		s.log.Warn().
+			Err(err).
+			Msg("Cannot change stop boundary when detecting new version beacon")
+	}
 
 	return nil
 }

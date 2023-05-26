@@ -101,7 +101,7 @@ func TestCommandsSetsValues(t *testing.T) {
 	_, err := cmd.Handler(context.TODO(), req)
 	require.NoError(t, err)
 
-	s := stopControl.GetStop()
+	s := stopControl.GetStopParameters()
 
 	require.NotNil(t, s)
 	require.Equal(t, uint64(37), s.StopHeight)
