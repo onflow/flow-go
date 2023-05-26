@@ -203,12 +203,24 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 		return bs.config.DefaultProposalDelay == bs.ctl.ProposalDelay()
 	}, time.Second, time.Millisecond)
 
-	// additional events should be no-ops
+	// additional EpochEmergencyFallbackTriggered events should be no-ops
 	// (send capacity+1 events to guarantee one is processed)
 	for i := 0; i <= cap(bs.ctl.epochFallbacks); i++ {
 		bs.ctl.EpochEmergencyFallbackTriggered()
 	}
+	// state should be unchanged
 	assert.Equal(bs.T(), bs.config.DefaultProposalDelay, bs.ctl.ProposalDelay())
+
+	// addition OnViewChange events should be no-ops
+	for i := 0; i <= cap(bs.ctl.viewChanges); i++ {
+		bs.ctl.OnViewChange(0, bs.initialView+1)
+	}
+	// wait for the channel to drain, since OnViewChange doesn't block on sending
+	require.Eventually(bs.T(), func() bool {
+		return len(bs.ctl.viewChanges) == 0
+	}, time.Second, time.Millisecond)
+	// state should be unchanged
+	assert.Equal(bs.T(), bs.ctl.config.DefaultProposalDelay, bs.ctl.ProposalDelay())
 }
 
 // TestOnViewChange_UpdateProposalDelay tests that a new measurement is taken and

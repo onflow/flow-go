@@ -114,7 +114,6 @@ func (ctl *BlockRateController) initLastMeasurement(curView uint64, now time.Tim
 		integralErr:     0,
 		derivativeErr:   0,
 	}
-	fmt.Println("init: ", ctl.targetViewTime())
 	ctl.proposalDelayDur.Store(ctl.targetViewTime().Nanoseconds())
 }
 
