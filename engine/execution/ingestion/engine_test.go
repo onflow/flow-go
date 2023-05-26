@@ -614,7 +614,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 		ctx.state.On("AtHeight", blockC.Height()).Return(blockCSnapshot)
 
 		ctx.state.On("Params").Return(params)
-		params.On("Root").Return(&blockA, nil)
+		params.On("FinalizedRoot").Return(&blockA, nil)
 
 		<-ctx.engine.Ready()
 
