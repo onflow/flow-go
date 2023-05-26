@@ -237,6 +237,9 @@ func (ctl *BlockRateController) processOnViewChange(view uint64) error {
 	if ctl.lastMeasurement.view == view {
 		return nil
 	}
+	if view < ctl.lastMeasurement.view {
+		return fmt.Errorf("got invalid OnViewChange event, transition from view %d to %d", ctl.lastMeasurement.view, view)
+	}
 
 	now := time.Now()
 	err := ctl.checkForEpochTransition(view, now)
@@ -280,9 +283,6 @@ func (ctl *BlockRateController) checkForEpochTransition(curView uint64, now time
 // No errors are expected during normal operation.
 func (ctl *BlockRateController) measureViewDuration(view uint64, now time.Time) error {
 	lastMeasurement := ctl.lastMeasurement
-	if view < lastMeasurement.view {
-		return fmt.Errorf("got invalid OnViewChange event, transition from view %d to %d", lastMeasurement.view, view)
-	}
 
 	alpha := ctl.config.alpha()                             // α    - inclusion parameter for error EWMA
 	beta := ctl.config.beta()                               // ß    - memory parameter for error integration
