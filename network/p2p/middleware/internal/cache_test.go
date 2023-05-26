@@ -78,12 +78,18 @@ func TestDisallowFor_MultiplePeers(t *testing.T) {
 	}
 }
 
-// TestAllowFor_SinglePeer tests the AllowFor function for a single peer.
-// The test verifies the behavior of cache for:
-// 1. Allowing a peerID for a cause when it is not disallow-listed.
-// 2. Allowing a peerID for a cause when it is disallow-listed for the same cause.
-// 3. Disallowing a peerID for a cause when it is disallow-listed for a different cause.
-// 4. Disallowing a peerID for a cause when it is not disallow-listed.
+// TestAllowFor_SinglePeer is a unit test function to verify the behavior of DisallowListCache for a single peer.
+// The test checks the following functionalities in sequence:
+// 1. Allowing a peerID for a cause when the peerID already exists in the cache.
+// 2. Disallowing the peerID for a cause when the peerID doesn't exist in the cache.
+// 3. Getting the disallow-listed causes for the peerID.
+// 4. Allowing a peerID for a cause when the peerID already exists in the cache.
+// 5. Getting the disallow-listed causes for the peerID.
+// 6. Disallowing the peerID for a cause.
+// 7. Allowing the peerID for a different cause than it is disallowed when the peerID already exists in the cache.
+// 8. Disallowing the peerID for another cause.
+// 9. Allowing the peerID for the first cause.
+// 10. Allowing the peerID for the second cause.
 func TestAllowFor_SinglePeer(t *testing.T) {
 	disallowListCache := internal.NewDisallowListCache(uint32(100), unittest.Logger(), metrics.NewNoopCollector())
 	require.NotNil(t, disallowListCache)
@@ -140,4 +146,67 @@ func TestAllowFor_SinglePeer(t *testing.T) {
 	causes = disallowListCache.AllowFor(peerID, middleware.DisallowListedCauseAlsp)
 	require.NoError(t, err)
 	require.Len(t, causes, 0)
+}
+
+// TestAllowFor_MultiplePeers_Sequentially is a unit test function to test the behavior of DisallowListCache with multiple peers.
+// The test checks the following functionalities in sequence:
+// 1. Allowing a peerID for a cause when the peerID doesn't exist in the cache.
+// 2. Disallowing peers for a cause.
+// 3. Getting the disallow-listed causes for a peerID.
+// 4. Allowing the peer ids for a cause different than the one they are disallow-listed for.
+// 5. Disallowing the peer ids for a different cause.
+// 6. Allowing the peer ids for the first cause.
+// 7. Allowing the peer ids for the second cause.
+func TestAllowFor_MultiplePeers_Sequentially(t *testing.T) {
+	disallowListCache := internal.NewDisallowListCache(uint32(100), unittest.Logger(), metrics.NewNoopCollector())
+	require.NotNil(t, disallowListCache)
+
+	for i := 0; i <= 10; i++ {
+		// allowing a peerID for a cause when the peerID doesn't exist in the cache
+		causes := disallowListCache.AllowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAdmin)
+		require.Len(t, causes, 0)
+	}
+
+	for i := 0; i <= 10; i++ {
+		// disallowing peers for a cause
+		causes, err := disallowListCache.DisallowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAlsp)
+		require.NoError(t, err)
+		require.Len(t, causes, 1)
+		require.Contains(t, causes, middleware.DisallowListedCauseAlsp)
+	}
+
+	for i := 0; i <= 10; i++ {
+		// getting the disallow-listed causes for a peerID
+		causes := disallowListCache.GetAllDisallowedListCausesFor(peer.ID(fmt.Sprintf("peer-%d", i)))
+		require.Len(t, causes, 1)
+		require.Contains(t, causes, middleware.DisallowListedCauseAlsp)
+	}
+
+	for i := 0; i <= 10; i++ {
+		// allowing the peer ids for a cause different than the one they are disallow-listed for
+		causes := disallowListCache.AllowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAdmin)
+		require.Len(t, causes, 1)
+		require.Contains(t, causes, middleware.DisallowListedCauseAlsp)
+	}
+
+	for i := 0; i <= 10; i++ {
+		// disallowing the peer ids for a different cause
+		causes, err := disallowListCache.DisallowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAdmin)
+		require.NoError(t, err)
+		require.Len(t, causes, 2)
+		require.ElementsMatch(t, causes, []middleware.DisallowListedCause{middleware.DisallowListedCauseAdmin, middleware.DisallowListedCauseAlsp})
+	}
+
+	for i := 0; i <= 10; i++ {
+		// allowing the peer ids for the first cause
+		causes := disallowListCache.AllowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAdmin)
+		require.Len(t, causes, 1)
+		require.Contains(t, causes, middleware.DisallowListedCauseAlsp)
+	}
+
+	for i := 0; i <= 10; i++ {
+		// allowing the peer ids for the second cause
+		causes := disallowListCache.AllowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAlsp)
+		require.Len(t, causes, 0)
+	}
 }
