@@ -152,7 +152,7 @@ func (d *DisallowListCache) disallowListFor(peerID peer.ID, cause middleware.Dis
 // Returns:
 // - the list of causes for which the peer is disallow-listed.
 // - error if the entity for the peerID is not found in the cache it returns ErrDisallowCacheEntityNotFound, which is a benign error.
-func (d *DisallowListCache) AllowFor(peerID peer.ID, cause middleware.DisallowListedCause) ([]middleware.DisallowListedCause, error) {
+func (d *DisallowListCache) AllowFor(peerID peer.ID, cause middleware.DisallowListedCause) []middleware.DisallowListedCause {
 	adjustedEntity, adjusted := d.c.Adjust(makeId(peerID), func(entity flow.Entity) flow.Entity {
 		dEntity := mustBeDisallowListEntity(entity)
 		delete(dEntity.causes, cause)
@@ -160,8 +160,9 @@ func (d *DisallowListCache) AllowFor(peerID peer.ID, cause middleware.DisallowLi
 	})
 
 	if !adjusted {
-		// if the entity is not found in the cache, we return a benign error.
-		return nil, ErrDisallowCacheEntityNotFound
+		// if the entity is not found in the cache, we return an empty list.
+		// we don't return a nil to be consistent with the case that entity is found but the list of causes is empty.
+		return make([]middleware.DisallowListedCause, 0)
 	}
 
 	dEntity := mustBeDisallowListEntity(adjustedEntity)
@@ -170,7 +171,7 @@ func (d *DisallowListCache) AllowFor(peerID peer.ID, cause middleware.DisallowLi
 	for cause := range dEntity.causes {
 		causes = append(causes, cause)
 	}
-	return causes, nil
+	return causes
 }
 
 // mustBeDisallowListEntity is a helper function for type assertion of the flow.Entity to disallowListCacheEntity.
