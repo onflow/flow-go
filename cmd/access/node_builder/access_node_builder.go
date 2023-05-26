@@ -1169,7 +1169,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		builder.GossipSubConfig.LocalMeshLogInterval)
 
 	// setup RPC inspectors
-	rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector)
+	rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector, builder.IdentityProvider, builder.Metrics.Network)
 	rpcInspectorSuite, err := rpcInspectorBuilder.
 		SetNetworkType(network.PublicNetwork).
 		SetMetrics(&p2pconfig.MetricsConfig{

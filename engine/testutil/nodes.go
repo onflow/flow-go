@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
+	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	"github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
@@ -390,6 +391,8 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	rootQCVoter := new(mockmodule.ClusterRootQCVoter)
 	rootQCVoter.On("Vote", mock.Anything, mock.Anything).Return(nil)
 
+	engineEventsDistributor := mockcollection.NewEngineEvents(t)
+	engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Maybe()
 	heights := gadgets.NewHeights()
 	node.ProtocolEvents.AddConsumer(heights)
 
@@ -401,6 +404,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		rootQCVoter,
 		factory,
 		heights,
+		engineEventsDistributor,
 	)
 	require.NoError(t, err)
 	node.ProtocolEvents.AddConsumer(epochManager)

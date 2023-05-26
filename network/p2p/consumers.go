@@ -69,7 +69,7 @@ type DisallowListNotificationDistributor interface {
 // The implementation should guarantee that all registered consumers are called upon distribution of a new event.
 type GossipSubInspectorNotifDistributor interface {
 	component.Component
-	// DistributeInvalidControlMessageNotification distributes the event to all the consumers.
+	// Distribute distributes the event to all the consumers.
 	// Any error returned by the distributor is non-recoverable and will cause the node to crash.
 	// Implementation must be concurrency safe, and non-blocking.
 	Distribute(notification *InvCtrlMsgNotif) error
@@ -123,9 +123,11 @@ type GossipSubInspectorSuite interface {
 	// is called whenever a gossipsub rpc message is received.
 	InspectFunc() func(peer.ID, *pubsub.RPC) error
 
-	// AddInvalidCtrlMsgNotificationConsumer adds a consumer to the invalid control message notification distributor.
+	// AddInvCtrlMsgNotifConsumer adds a consumer to the invalid control message notification distributor.
 	// This consumer is notified when a misbehaving peer regarding gossipsub control messages is detected. This follows a pub/sub
 	// pattern where the consumer is notified when a new notification is published.
 	// A consumer is only notified once for each notification, and only receives notifications that were published after it was added.
 	AddInvCtrlMsgNotifConsumer(GossipSubInvCtrlMsgNotifConsumer)
+	// Inspectors returns all inspectors in the inspector suite.
+	Inspectors() []GossipSubRPCInspector
 }

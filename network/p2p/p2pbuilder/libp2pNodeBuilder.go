@@ -21,7 +21,6 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
-	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
@@ -499,6 +498,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	connGaterCfg *p2pconfig.ConnectionGaterConfig,
 	peerManagerCfg *p2pconfig.PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
+	rpcInspectorSuite p2p.GossipSubInspectorSuite,
 	rCfg *ResourceManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig) (p2p.NodeBuilder, error) {
 
@@ -515,14 +515,6 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		idProvider,
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
-
-	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, gossipCfg.RpcInspector).
-		SetNetworkType(flownet.PrivateNetwork).
-		SetMetrics(metricsCfg).
-		Build()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for default libp2p node: %w", err)
-	}
 
 	builder := NewNodeBuilder(log, metricsCfg.Metrics, address, flowKey, sporkId, rCfg).
 		SetBasicResolver(resolver).
