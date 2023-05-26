@@ -446,7 +446,7 @@ func TestValidationInspector_InvalidTopicID(t *testing.T) {
 }
 
 // TestGossipSubSpamMitigationIntegration tests that the spam mitigation feature of GossipSub is working as expected.
-// The test puts toghether the spam detection (through the GossipSubInspector) and the spam mitigation (through the
+// The test puts together the spam detection (through the GossipSubInspector) and the spam mitigation (through the
 // scoring system) and ensures that the mitigation is triggered when the spam detection detects spam.
 // The test scenario involves a spammer node that sends a large number of control messages to a victim node.
 // The victim node is configured to use the GossipSubInspector to detect spam and the scoring system to mitigate spam.
