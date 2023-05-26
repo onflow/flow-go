@@ -23,7 +23,7 @@ import (
 
 // measurement represents a measurement of error associated with entering view v.
 // A measurement is taken each time the view changes for any reason.
-// Each measurement computes the instantaneous error based on the projected
+// Each measurement computes the instantaneous error `e[v]` based on the projected
 // and target epoch switchover times, and updates error terms.
 type measurement struct {
 	view            uint64    // v       - the current view
