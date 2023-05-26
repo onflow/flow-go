@@ -41,6 +41,5 @@ type DisallowListCache interface {
 	// - cause: the cause for allow-listing the peer.
 	// Returns:
 	// - the list of causes for which the peer is disallow-listed.
-	// - error if the entity for the peerID is not found in the cache it returns ErrDisallowCacheEntityNotFound, which is a benign error.
-	AllowFor(peerID peer.ID, cause DisallowListedCause) ([]DisallowListedCause, error)
+	AllowFor(peerID peer.ID, cause DisallowListedCause) []DisallowListedCause
 }
