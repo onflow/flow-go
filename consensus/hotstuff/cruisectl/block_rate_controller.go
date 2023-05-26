@@ -243,7 +243,7 @@ func (ctl *BlockRateController) processOnViewChange(view uint64) error {
 	if err != nil {
 		return fmt.Errorf("could not check for epoch transition: %w", err)
 	}
-	err = ctl.measureViewRate(view, now)
+	err = ctl.measureViewDuration(view, now)
 	if err != nil {
 		return fmt.Errorf("could not measure view rate: %w", err)
 	}
@@ -275,10 +275,10 @@ func (ctl *BlockRateController) checkForEpochTransition(curView uint64, now time
 	return nil
 }
 
-// measureViewRate computes a new measurement of projected epoch switchover time and error for the newly entered view.
+// measureViewDuration computes a new measurement of projected epoch switchover time and error for the newly entered view.
 // It updates the ProposalDuration based on the new error.
 // No errors are expected during normal operation.
-func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) error {
+func (ctl *BlockRateController) measureViewDuration(view uint64, now time.Time) error {
 	lastMeasurement := ctl.lastMeasurement
 	if view < lastMeasurement.view {
 		return fmt.Errorf("got invalid OnViewChange event, transition from view %d to %d", lastMeasurement.view, view)

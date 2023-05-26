@@ -192,7 +192,7 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 
 	// update error so that ProposalDuration is non-default
 	bs.ctl.lastMeasurement.instErr *= 1.1
-	err := bs.ctl.measureViewRate(bs.initialView+1, time.Now())
+	err := bs.ctl.measureViewDuration(bs.initialView+1, time.Now())
 	require.NoError(bs.T(), err)
 	assert.NotEqual(bs.T(), bs.config.DefaultProposalDuration, bs.ctl.ProposalDuration())
 
@@ -318,7 +318,7 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_AfterTargetTransitionTime(
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
 		// we have passed the target end time of the epoch
 		enteredViewAt := bs.ctl.curEpochTargetEndTime.Add(time.Duration(view) * time.Second)
-		err := bs.ctl.measureViewRate(view, enteredViewAt)
+		err := bs.ctl.measureViewDuration(view, enteredViewAt)
 		require.NoError(bs.T(), err)
 
 		assert.LessOrEqual(bs.T(), bs.ctl.ProposalDuration(), lastProposalDelay)
@@ -348,7 +348,7 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_BehindSchedule() {
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
 		// hold the instantaneous error constant for each view
 		enteredViewAt = enteredViewAt.Add(bs.ctl.targetViewTime())
-		err := bs.ctl.measureViewRate(view, enteredViewAt)
+		err := bs.ctl.measureViewDuration(view, enteredViewAt)
 		require.NoError(bs.T(), err)
 
 		// decreasing ProposalDuration
@@ -379,7 +379,7 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_AheadOfSchedule() {
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
 		// hold the instantaneous error constant for each view
 		enteredViewAt = enteredViewAt.Add(bs.ctl.targetViewTime())
-		err := bs.ctl.measureViewRate(view, enteredViewAt)
+		err := bs.ctl.measureViewDuration(view, enteredViewAt)
 		require.NoError(bs.T(), err)
 
 		// increasing ProposalDuration
