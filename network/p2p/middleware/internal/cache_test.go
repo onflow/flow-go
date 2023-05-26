@@ -1,6 +1,7 @@
 package internal_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -45,4 +46,34 @@ func TestDisallowFor_SinglePeer(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, causes, 2)
 	require.ElementsMatch(t, causes, []middleware.DisallowListedCause{middleware.DisallowListedCauseAdmin, middleware.DisallowListedCauseAlsp})
+}
+
+// TestDisallowFor_MultiplePeers tests the DisallowFor function for multiple peers. It verifies that the peerIDs are
+// disallow-listed for the given cause and that the cause is returned when the peerIDs are disallow-listed again.
+func TestDisallowFor_MultiplePeers(t *testing.T) {
+	disallowListCache := internal.NewDisallowListCache(uint32(100), unittest.Logger(), metrics.NewNoopCollector())
+	require.NotNil(t, disallowListCache)
+
+	for i := 0; i <= 10; i++ {
+		// disallowing a peerID for a cause when the peerID doesn't exist in the cache
+		causes, err := disallowListCache.DisallowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAdmin)
+		require.NoError(t, err)
+		require.Len(t, causes, 1)
+		require.Contains(t, causes, middleware.DisallowListedCauseAdmin)
+	}
+
+	for i := 0; i <= 10; i++ {
+		// disallowing a peerID for a cause when the peerID already exists in the cache
+		causes, err := disallowListCache.DisallowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAlsp)
+		require.NoError(t, err)
+		require.Len(t, causes, 2)
+		require.ElementsMatch(t, causes, []middleware.DisallowListedCause{middleware.DisallowListedCauseAdmin, middleware.DisallowListedCauseAlsp})
+	}
+
+	for i := 0; i <= 10; i++ {
+		// getting the disallow-listed causes for a peerID
+		causes := disallowListCache.GetAllDisallowedListCausesFor(peer.ID(fmt.Sprintf("peer-%d", i)))
+		require.Len(t, causes, 2)
+		require.ElementsMatch(t, causes, []middleware.DisallowListedCause{middleware.DisallowListedCauseAdmin, middleware.DisallowListedCauseAlsp})
+	}
 }
