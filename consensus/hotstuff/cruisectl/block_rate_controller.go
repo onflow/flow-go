@@ -2,7 +2,7 @@
 // nodes' proposal delay in response to changes in the measured block rate and
 // target epoch switchover time.
 //
-// It uses a PID controller with the estimated epoch switchover time as the process
+// It uses a PID controller with the projected epoch switchover time as the process
 // variable and the set-point computed using epoch length config. The error is
 // the difference between the projected epoch switchover time, assuming an
 // ideal view time τ, and the target epoch switchover time (based on a schedule).
@@ -30,7 +30,7 @@ type measurement struct {
 	time            time.Time // t[v]    - when we entered view v
 	instErr         float64   // e[v]    - instantaneous error at view v (seconds)
 	proportionalErr float64   // e_N[v]  - proportional error at view v  (seconds)
-	integralErr     float64   // I_N[v]  - integral of error at view v   (seconds)
+	integralErr     float64   // I_M[v]  - integral of error at view v   (seconds)
 	derivativeErr   float64   // ∆_N[v]  - derivative of error at view v (seconds)
 
 	// informational fields - not required for controller operation
@@ -301,7 +301,7 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 
 	// e_N[v] = α•e[v] + (1-α)e_N[v-1]
 	curMeasurement.proportionalErr = alpha*curMeasurement.instErr + (1.0-alpha)*lastMeasurement.proportionalErr
-	// I_N[v] = e[v] + (1-ß)I_N[v-1]
+	// I_M[v] = e[v] + (1-ß)I_M[v-1]
 	curMeasurement.integralErr = curMeasurement.instErr + (1.0-beta)*lastMeasurement.integralErr
 	// ∆_N[v] = e_N[v] - e_n[v-1]
 	curMeasurement.derivativeErr = (curMeasurement.proportionalErr - lastMeasurement.proportionalErr) / float64(curMeasurement.viewDiff)

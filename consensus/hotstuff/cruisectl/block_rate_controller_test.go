@@ -142,7 +142,7 @@ func (bs *BlockRateControllerSuite) SanityCheckSubsequentMeasurements(m1, m2 mea
 func (bs *BlockRateControllerSuite) PrintMeasurement() {
 	ctl := bs.ctl
 	m := ctl.lastMeasurement
-	fmt.Printf("v=%d\tt=%s\tu=%s\tPD=%s\te=%.3f\te_N=%.3f\tI_N=%.3f\t∆_N=%.3f\n",
+	fmt.Printf("v=%d\tt=%s\tu=%s\tPD=%s\te=%.3f\te_N=%.3f\tI_M=%.3f\t∆_N=%.3f\n",
 		m.view, m.time, ctl.controllerOutput(), ctl.ProposalDelay(),
 		m.instErr, m.proportionalErr, m.instErr, m.derivativeErr)
 }
