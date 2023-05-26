@@ -779,6 +779,12 @@ func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionRes
 	}
 }
 
+func WithFinalState(commit flow.StateCommitment) func(*flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.Chunks[len(result.Chunks)-1].EndState = commit
+	}
+}
+
 func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.ServiceEvents = ServiceEventsFixture(n)
