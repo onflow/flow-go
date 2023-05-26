@@ -2,7 +2,9 @@ package internal_test
 
 import (
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
@@ -208,5 +210,140 @@ func TestAllowFor_MultiplePeers_Sequentially(t *testing.T) {
 		// allowing the peer ids for the second cause
 		causes := disallowListCache.AllowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAlsp)
 		require.Len(t, causes, 0)
+	}
+}
+
+// TestAllowFor_MultiplePeers_Concurrently is a unit test function that verifies the behavior of DisallowListCache
+// when multiple peerIDs are added and managed concurrently. This test is designed to confirm that DisallowListCache
+// works as expected under concurrent access, an important aspect for a system dealing with multiple connections.
+//
+// The test runs multiple goroutines simultaneously, each handling a different peerID and performs the following
+// operations in the sequence:
+// 1. Allowing a peerID for a cause when the peerID doesn't exist in the cache.
+// 2. Disallowing peers for a cause.
+// 3. Getting the disallow-listed causes for a peerID.
+// 4. Allowing the peer ids for a cause different than the one they are disallow-listed for.
+// 5. Disallowing the peer ids for a different cause.
+// 6. Allowing the peer ids for the first cause.
+// 7. Allowing the peer ids for the second cause.
+// 8. Getting the disallow-listed causes for a peerID.
+// 9. Allowing a peerID for a cause when the peerID doesn't exist in the cache for a new set of peers.
+func TestAllowFor_MultiplePeers_Concurrently(t *testing.T) {
+	disallowListCache := internal.NewDisallowListCache(uint32(100), unittest.Logger(), metrics.NewNoopCollector())
+	require.NotNil(t, disallowListCache)
+
+	var wg sync.WaitGroup
+	for i := 0; i <= 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			// allowing a peerID for a cause when the peerID doesn't exist in the cache
+			causes := disallowListCache.AllowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAdmin)
+			require.Len(t, causes, 0)
+		}(i)
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	for i := 0; i <= 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			// disallowing peers for a cause
+			causes, err := disallowListCache.DisallowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAlsp)
+			require.NoError(t, err)
+			require.Len(t, causes, 1)
+			require.Contains(t, causes, middleware.DisallowListedCauseAlsp)
+		}(i)
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	for i := 0; i <= 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			// getting the disallow-listed causes for a peerID
+			causes := disallowListCache.GetAllDisallowedListCausesFor(peer.ID(fmt.Sprintf("peer-%d", i)))
+			require.Len(t, causes, 1)
+			require.Contains(t, causes, middleware.DisallowListedCauseAlsp)
+		}(i)
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	for i := 0; i <= 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			// allowing the peer ids for a cause different than the one they are disallow-listed for
+			causes := disallowListCache.AllowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAdmin)
+			require.Len(t, causes, 1)
+			require.Contains(t, causes, middleware.DisallowListedCauseAlsp)
+		}(i)
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	for i := 0; i <= 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			// disallowing the peer ids for a different cause
+			causes, err := disallowListCache.DisallowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAdmin)
+			require.NoError(t, err)
+			require.Len(t, causes, 2)
+			require.ElementsMatch(t, causes, []middleware.DisallowListedCause{middleware.DisallowListedCauseAdmin, middleware.DisallowListedCauseAlsp})
+		}(i)
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	for i := 0; i <= 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			// allowing the peer ids for the first cause
+			causes := disallowListCache.AllowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAdmin)
+			require.Len(t, causes, 1)
+			require.Contains(t, causes, middleware.DisallowListedCauseAlsp)
+		}(i)
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	for i := 0; i <= 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			// allowing the peer ids for the second cause
+			causes := disallowListCache.AllowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAlsp)
+			require.Len(t, causes, 0)
+		}(i)
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	for i := 0; i <= 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			// getting the disallow-listed causes for a peerID
+			causes := disallowListCache.GetAllDisallowedListCausesFor(peer.ID(fmt.Sprintf("peer-%d", i)))
+			require.Len(t, causes, 0)
+		}(i)
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	for i := 11; i <= 20; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			// allowing a peerID for a cause when the peerID doesn't exist in the cache
+			causes := disallowListCache.AllowFor(peer.ID(fmt.Sprintf("peer-%d", i)), middleware.DisallowListedCauseAdmin)
+			require.Len(t, causes, 0)
+		}(i)
 	}
 }
