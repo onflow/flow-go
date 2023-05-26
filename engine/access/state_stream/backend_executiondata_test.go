@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization/requester"
@@ -49,7 +50,8 @@ type BackendExecutionDataSuite struct {
 	eds                 execution_data.ExecutionDataStore
 	broadcaster         *engine.Broadcaster
 	execDataDistributor *requester.ExecutionDataDistributor
-	execDataCache       *herocache.BlockExecutionData
+	execDataCache       *cache.ExecutionDataCache
+	execDataHeroCache   *herocache.BlockExecutionData
 	backend             *StateStreamBackend
 
 	blocks      []*flow.Block
@@ -82,7 +84,8 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.broadcaster = engine.NewBroadcaster()
 	s.execDataDistributor = requester.NewExecutionDataDistributor()
 
-	s.execDataCache = herocache.NewBlockExecutionData(DefaultCacheSize, logger, metrics.NewNoopCollector())
+	s.execDataHeroCache = herocache.NewBlockExecutionData(DefaultCacheSize, logger, metrics.NewNoopCollector())
+	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
 
 	conf := Config{
 		ClientSendTimeout:    DefaultSendTimeout,
@@ -263,7 +266,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 		assert.NoError(s.T(), err)
 	})
 
-	s.execDataCache.Clear()
+	s.execDataHeroCache.Clear()
 
 	s.Run("missing exec data for TestGetExecutionDataByBlockID failure", func() {
 		result.ExecutionDataID = unittest.IdentifierFixture()
@@ -319,7 +322,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			// make sure we're starting with a fresh cache
-			s.execDataCache.Clear()
+			s.execDataHeroCache.Clear()
 
 			s.T().Logf("len(s.execDataMap) %d", len(s.execDataMap))
 
@@ -407,7 +410,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 	})
 
 	// make sure we're starting with a fresh cache
-	s.execDataCache.Clear()
+	s.execDataHeroCache.Clear()
 
 	s.Run("returns error for unindexed start height", func() {
 		subCtx, subCancel := context.WithCancel(ctx)

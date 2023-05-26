@@ -196,7 +196,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 	})
 
 	// make sure we're starting with a fresh cache
-	s.execDataCache.Clear()
+	s.execDataHeroCache.Clear()
 
 	s.Run("returns error for unindexed start height", func() {
 		subCtx, subCancel := context.WithCancel(ctx)

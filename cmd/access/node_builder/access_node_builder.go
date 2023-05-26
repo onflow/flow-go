@@ -49,8 +49,10 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
@@ -226,6 +228,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataDownloader    execution_data.Downloader
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
 	ExecutionDataStore         execution_data.ExecutionDataStore
+	ExecutionDataCache         *execdatacache.ExecutionDataCache
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -423,6 +426,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
+	var execDataCacheBackend *herocache.BlockExecutionData
 
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -531,16 +535,31 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 
 			execDataDistributor = edrequester.NewExecutionDataDistributor()
 
+			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if builder.HeroCacheMetricsEnable {
+				heroCacheCollector = metrics.AccessNodeExecutionDataCacheMetrics(builder.MetricsRegisterer)
+			}
+
+			execDataCacheBackend = herocache.NewBlockExecutionData(builder.stateStreamConf.ExecutionDataCacheSize, builder.Logger, heroCacheCollector)
+			// Execution Data cache with a downloader as the backend. This is used by the requester
+			// to download and cache execution data for each block.
+			executionDataCache := execdatacache.NewExecutionDataCache(
+				builder.ExecutionDataDownloader,
+				builder.Storage.Headers,
+				builder.Storage.Seals,
+				builder.Storage.Results,
+				execDataCacheBackend,
+			)
+
 			builder.ExecutionDataRequester = edrequester.New(
 				builder.Logger,
 				metrics.NewExecutionDataRequesterCollector(),
 				builder.ExecutionDataDownloader,
+				executionDataCache,
 				processedBlockHeight,
 				processedNotifications,
 				builder.State,
 				builder.Storage.Headers,
-				builder.Storage.Results,
-				builder.Storage.Seals,
 				builder.executionDataConfig,
 			)
 
@@ -564,15 +583,23 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			}
 			builder.stateStreamConf.RpcMetricsEnabled = builder.rpcMetricsEnabled
 
-			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-			if builder.HeroCacheMetricsEnable {
-				heroCacheCollector = metrics.AccessNodeExecutionDataCacheMetrics(builder.MetricsRegisterer)
-			}
+			// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
+			// This ensures that it simply returns a not found error if the blob doesn't exist
+			// instead of attempting to download it from the network. It shares a cache backend instance
+			// with the requester's implementation.
+			executionDataCache := execdatacache.NewExecutionDataCache(
+				builder.ExecutionDataStore,
+				builder.Storage.Headers,
+				builder.Storage.Seals,
+				builder.Storage.Results,
+				execDataCacheBackend,
+			)
 
 			stateStreamEng, err := state_stream.NewEng(
 				node.Logger,
 				builder.stateStreamConf,
 				builder.ExecutionDataStore,
+				executionDataCache,
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
@@ -581,7 +608,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				builder.executionDataConfig.InitialBlockHeight,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
-				heroCacheCollector,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
