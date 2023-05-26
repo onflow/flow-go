@@ -588,16 +588,20 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	bootstrapper := bootstrapexec.NewBootstrapper(node.Log)
-	_, err = bootstrapper.BootstrapLedger(
+	commit, err := bootstrapper.BootstrapLedger(
 		ls,
 		unittest.ServiceAccountPublicKey,
 		node.ChainID.Chain(),
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply))
 	require.NoError(t, err)
 
+	rootResult := unittest.ExecutionResultFixture()
+	unittest.WithExecutionResultBlockID(genesisHead.ID())(rootResult)
+	unittest.WithFinalState(commit)(rootResult)
+
 	// TODO: use state commitment from BootstrapLedger?
 	rootSeal := unittest.Seal.Fixture()
-	unittest.Seal.WithBlock(genesisHead)(rootSeal)
+	unittest.Seal.WithResult(rootResult)(rootSeal)
 
 	err = bootstrapper.BootstrapExecutionDatabase(node.PublicDB, rootSeal)
 	require.NoError(t, err)
