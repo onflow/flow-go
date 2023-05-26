@@ -121,14 +121,14 @@ func ParseTransition(s string) (*EpochTransitionTime, error) {
 // NOTE 2: In the long run, the target end time should be specified by the smart contract
 // and stored along with the other protocol.Epoch information. This would remove the
 // need for this imperfect inference logic.
-func (tt *EpochTransitionTime) inferTargetEndTime(curTime time.Time, epochPctComplete float64) time.Time {
+func (tt *EpochTransitionTime) inferTargetEndTime(curTime time.Time, epochFractionComplete float64) time.Time {
 	now := curTime.UTC()
 	// find the nearest target end time, plus the targets one week before and after
 	nearestTargetDate := tt.findNearestTargetTime(now)
 	earlierTargetDate := nearestTargetDate.AddDate(0, 0, -7)
 	laterTargetDate := nearestTargetDate.AddDate(0, 0, 7)
 
-	estimatedTimeRemainingInEpoch := time.Duration(epochPctComplete * float64(epochLength))
+	estimatedTimeRemainingInEpoch := time.Duration(epochFractionComplete * float64(epochLength))
 	estimatedEpochEndTime := now.Add(estimatedTimeRemainingInEpoch)
 
 	minDiff := estimatedEpochEndTime.Sub(nearestTargetDate).Abs()

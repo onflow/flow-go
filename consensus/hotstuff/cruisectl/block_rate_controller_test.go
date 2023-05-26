@@ -105,7 +105,7 @@ func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
 
 	// should initialize epoch info
 	epoch := bs.ctl.epochInfo
-	expectedEndTime := bs.config.TargetTransition.inferTargetEndTime(time.Now(), epoch.pctComplete(bs.initialView))
+	expectedEndTime := bs.config.TargetTransition.inferTargetEndTime(time.Now(), epoch.fractionComplete(bs.initialView))
 	assert.Equal(bs.T(), bs.curEpochFirstView, epoch.curEpochFirstView)
 	assert.Equal(bs.T(), bs.curEpochFinalView, epoch.curEpochFinalView)
 	assert.Equal(bs.T(), expectedEndTime, epoch.curEpochTargetEndTime)

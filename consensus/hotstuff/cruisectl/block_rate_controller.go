@@ -52,10 +52,10 @@ func (epoch *epochInfo) targetViewTime() time.Duration {
 	return time.Duration(float64(epochLength) / float64(epoch.curEpochFinalView-epoch.curEpochFirstView+1))
 }
 
-// pctComplete returns the percentage of views completed of the epoch for the given curView.
+// fractionComplete returns the percentage of views completed of the epoch for the given curView.
 // curView must be within the range [curEpochFirstView, curEpochFinalView]
 // Returns the completion percentage as a float between [0, 1]
-func (epoch *epochInfo) pctComplete(curView uint64) float64 {
+func (epoch *epochInfo) fractionComplete(curView uint64) float64 {
 	return float64(curView-epoch.curEpochFirstView) / float64(epoch.curEpochFinalView-epoch.curEpochFirstView)
 }
 
@@ -147,7 +147,7 @@ func (ctl *BlockRateController) initEpochInfo(curView uint64) error {
 		ctl.epochInfo.nextEpochFinalView = &nextEpochFinalView
 	}
 
-	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(time.Now(), ctl.epochInfo.pctComplete(curView))
+	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(time.Now(), ctl.epochInfo.fractionComplete(curView))
 
 	epochFallbackTriggered, err := ctl.state.Params().EpochFallbackTriggered()
 	if err != nil {
@@ -271,7 +271,7 @@ func (ctl *BlockRateController) checkForEpochTransition(curView uint64, now time
 	ctl.curEpochFirstView = ctl.curEpochFinalView + 1
 	ctl.curEpochFinalView = *ctl.nextEpochFinalView
 	ctl.nextEpochFinalView = nil
-	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(now, ctl.epochInfo.pctComplete(curView))
+	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(now, ctl.epochInfo.fractionComplete(curView))
 	return nil
 }
 
