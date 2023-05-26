@@ -350,6 +350,7 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, n int) Se
 		"--emergency-sealing-active=false",
 		"--insecure-access-api=false",
 		"--access-node-ids=*",
+		"--unsafe-follower-attack-target=none",
 	)
 
 	service.Ports = []string{
