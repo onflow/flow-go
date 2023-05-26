@@ -6,7 +6,7 @@
 FROM golang:1.19-bullseye AS build-setup
 
 RUN apt-get update
-RUN apt-get -y install cmake zip
+RUN apt-get -y install zip
 
 ## (2) Setup crypto dependencies
 FROM build-setup AS build-env
