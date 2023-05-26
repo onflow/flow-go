@@ -134,7 +134,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 			unittest.WithChunkExecutionDatas(chunkDatas...),
 		)
 
-		result.ExecutionDataID, err = s.eds.AddExecutionData(context.TODO(), execData)
+		result.ExecutionDataID, err = s.eds.Add(context.TODO(), execData)
 		assert.NoError(s.T(), err)
 
 		s.blocks = append(s.blocks, block)
@@ -255,7 +255,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 
 	var err error
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
-		result.ExecutionDataID, err = s.eds.AddExecutionData(ctx, execData.BlockExecutionData)
+		result.ExecutionDataID, err = s.eds.Add(ctx, execData.BlockExecutionData)
 		require.NoError(s.T(), err)
 
 		res, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID())

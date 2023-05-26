@@ -139,7 +139,7 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, blockID flow.
 		return nil, fmt.Errorf("could not get execution result (id: %s): %w", seal.ResultID, err)
 	}
 
-	execData, err := b.execDataStore.GetExecutionData(ctx, result.ExecutionDataID)
+	execData, err := b.execDataStore.Get(ctx, result.ExecutionDataID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data (id: %s): %w", result.ExecutionDataID, err)
 	}

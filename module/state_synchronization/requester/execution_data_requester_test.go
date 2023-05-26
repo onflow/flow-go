@@ -112,7 +112,7 @@ func mockDownloader(edStore map[flow.Identifier]*testExecutionDataServiceEntry) 
 		return ed.ExecutionData, nil
 	}
 
-	downloader.On("Download", mock.Anything, mock.AnythingOfType("flow.Identifier")).
+	downloader.On("Get", mock.Anything, mock.AnythingOfType("flow.Identifier")).
 		Return(
 			func(ctx context.Context, id flow.Identifier) *execution_data.BlockExecutionData {
 				ed, _ := get(id)
@@ -478,7 +478,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestPauseResume(edr state_
 	unittest.RequireNeverClosedWithin(suite.T(), testDone, 500*time.Millisecond, "finished unexpectedly")
 
 	// confirm the expected number of downloads were attempted
-	suite.downloader.AssertNumberOfCalls(suite.T(), "Download", expectedDownloads)
+	suite.downloader.AssertNumberOfCalls(suite.T(), "Get", expectedDownloads)
 
 	suite.T().Log("Resuming")
 	resume()
@@ -658,7 +658,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 
 		ed := unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(block.ID()))
 
-		cid, err := eds.AddExecutionData(context.Background(), ed)
+		cid, err := eds.Add(context.Background(), ed)
 		require.NoError(suite.T(), err)
 
 		result := buildResult(block, cid, previousResult)

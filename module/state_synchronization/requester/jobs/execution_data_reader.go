@@ -111,7 +111,7 @@ func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerC
 	ctx, cancel := context.WithTimeout(signalCtx, r.fetchTimeout)
 	defer cancel()
 
-	executionData, err := r.downloader.Download(ctx, result.ExecutionDataID)
+	executionData, err := r.downloader.Get(ctx, result.ExecutionDataID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get execution data for block %s: %w", header.ID(), err)

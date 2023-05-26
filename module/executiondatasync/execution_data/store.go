@@ -12,17 +12,22 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 )
 
-// ExecutionDataStore handles adding / getting execution data to / from a local blobstore
-type ExecutionDataStore interface {
-	// GetExecutionData gets the BlockExecutionData for the given root ID from the blobstore.
+// ExecutionDataGetter handles getting execution data from a blobstore
+type ExecutionDataGetter interface {
+	// Get gets the BlockExecutionData for the given root ID from the blobstore.
 	// The returned error will be:
 	// - MalformedDataError if some level of the blob tree cannot be properly deserialized
 	// - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
-	GetExecutionData(ctx context.Context, rootID flow.Identifier) (*BlockExecutionData, error)
+	Get(ctx context.Context, rootID flow.Identifier) (*BlockExecutionData, error)
+}
 
-	// AddExecutionData constructs a blob tree for the given BlockExecutionData and adds it to the
+// ExecutionDataStore handles adding / getting execution data to / from a blobstore
+type ExecutionDataStore interface {
+	ExecutionDataGetter
+
+	// Add constructs a blob tree for the given BlockExecutionData and adds it to the
 	// blobstore, and then returns the root CID.
-	AddExecutionData(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error)
+	Add(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error)
 }
 
 type ExecutionDataStoreOption func(*store)
@@ -33,6 +38,8 @@ func WithMaxBlobSize(size int) ExecutionDataStoreOption {
 		s.maxBlobSize = size
 	}
 }
+
+var _ ExecutionDataStore = (*store)(nil)
 
 type store struct {
 	blobstore   blobs.Blobstore
@@ -55,7 +62,7 @@ func NewExecutionDataStore(blobstore blobs.Blobstore, serializer Serializer, opt
 	return s
 }
 
-func (s *store) AddExecutionData(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error) {
+func (s *store) Add(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error) {
 	executionDataRoot := &BlockExecutionDataRoot{
 		BlockID:               executionData.BlockID,
 		ChunkExecutionDataIDs: make([]cid.Cid, len(executionData.ChunkExecutionDatas)),
@@ -138,7 +145,7 @@ func (s *store) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, error) 
 	return cids, nil
 }
 
-func (s *store) GetExecutionData(ctx context.Context, rootID flow.Identifier) (*BlockExecutionData, error) {
+func (s *store) Get(ctx context.Context, rootID flow.Identifier) (*BlockExecutionData, error) {
 	rootCid := flow.IdToCid(rootID)
 
 	rootBlob, err := s.blobstore.Get(ctx, rootCid)

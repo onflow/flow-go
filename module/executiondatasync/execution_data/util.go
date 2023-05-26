@@ -10,7 +10,7 @@ import (
 func CalculateID(ctx context.Context, execData *BlockExecutionData, serializer Serializer) (flow.Identifier, error) {
 	executionDatastore := NewExecutionDataStore(&blobs.NoopBlobstore{}, serializer)
 
-	id, err := executionDatastore.AddExecutionData(ctx, execData)
+	id, err := executionDatastore.Add(ctx, execData)
 	if err != nil {
 		return flow.ZeroID, err
 	}
