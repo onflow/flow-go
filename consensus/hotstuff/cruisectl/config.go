@@ -9,15 +9,15 @@ func DefaultConfig() *Config {
 	return &Config{
 		TargetTransition: DefaultEpochTransitionTime(),
 		// TODO confirm default values
-		DefaultProposalDelay: 500 * time.Millisecond,
-		MaxProposalDelay:     1000 * time.Millisecond,
-		MinProposalDelay:     250 * time.Millisecond,
-		Enabled:              true,
-		N_ewma:               5,
-		N_itg:                50,
-		KP:                   2.0,
-		KI:                   0.6,
-		KD:                   3.0,
+		DefaultProposalDuration: 500 * time.Millisecond,
+		MaxProposalDuration:     1000 * time.Millisecond,
+		MinProposalDuration:     250 * time.Millisecond,
+		Enabled:                 true,
+		N_ewma:                  5,
+		N_itg:                   50,
+		KP:                      2.0,
+		KI:                      0.6,
+		KD:                      3.0,
 	}
 }
 
@@ -25,21 +25,21 @@ func DefaultConfig() *Config {
 type Config struct {
 	// TargetTransition defines the target time to transition epochs each week.
 	TargetTransition EpochTransitionTime
-	// DefaultProposalDelay is the baseline ProposalDelay value. It is used:
+	// DefaultProposalDuration is the baseline ProposalDuration value. It is used:
 	//  - when Enabled is false
 	//  - when epoch fallback has been triggered
-	//  - as the initial ProposalDelay value, to which the compensation computed by the PID controller is added
-	DefaultProposalDelay time.Duration
-	// MaxProposalDelay is a hard maximum on the ProposalDelay.
-	// If the BlockRateController computes a larger desired ProposalDelay value
+	//  - as the initial ProposalDuration value, to which the compensation computed by the PID controller is added
+	DefaultProposalDuration time.Duration
+	// MaxProposalDuration is a hard maximum on the ProposalDuration.
+	// If the BlockRateController computes a larger desired ProposalDuration value
 	// based on the observed error and tuning, this value will be used instead.
-	MaxProposalDelay time.Duration
-	// MinProposalDelay is a hard minimum on the ProposalDelay.
-	// If the BlockRateController computes a smaller desired ProposalDelay value
+	MaxProposalDuration time.Duration
+	// MinProposalDuration is a hard minimum on the ProposalDuration.
+	// If the BlockRateController computes a smaller desired ProposalDuration value
 	// based on the observed error and tuning, this value will be used instead.
-	MinProposalDelay time.Duration
-	// Enabled defines whether responsive control of the block rate is enabled.
-	// When disabled, the DefaultProposalDelay is used.
+	MinProposalDuration time.Duration
+	// Enabled defines whether responsive control of the ProposalDuration is enabled.
+	// When disabled, the DefaultProposalDuration is used.
 	Enabled bool
 
 	// N_ewma defines how historical measurements are incorporated into the EWMA for the proportional error term.

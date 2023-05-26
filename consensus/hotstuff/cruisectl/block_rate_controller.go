@@ -1,5 +1,5 @@
 // Package cruisectl implements a "cruise control" system for Flow by adjusting
-// nodes' proposal delay in response to changes in the measured block rate and
+// nodes' ProposalDuration in response to changes in the measured view rate and
 // target epoch switchover time.
 //
 // It uses a PID controller with the projected epoch switchover time as the process
@@ -59,9 +59,9 @@ func (epoch *epochInfo) pctComplete(curView uint64) float64 {
 	return float64(curView-epoch.curEpochFirstView) / float64(epoch.curEpochFinalView-epoch.curEpochFirstView)
 }
 
-// BlockRateController dynamically adjusts the proposal delay of this node,
-// based on the measured block rate of the consensus committee as a whole, in
-// order to achieve a target overall block rate.
+// BlockRateController dynamically adjusts the ProposalDuration of this node,
+// based on the measured view rate of the consensus committee as a whole, in
+// order to achieve a desired switchover time for each epoch.
 type BlockRateController struct {
 	component.Component
 
@@ -72,7 +72,7 @@ type BlockRateController struct {
 	lastMeasurement measurement // the most recently taken measurement
 	epochInfo                   // scheduled transition view for current/next epoch
 
-	proposalDelayDur       atomic.Int64 // PID output, in nanoseconds, so it is directly convertible to time.Duration
+	proposalDuration       atomic.Int64 // PID output, in nanoseconds, so it is directly convertible to time.Duration
 	epochFallbackTriggered bool
 
 	viewChanges    chan uint64       // OnViewChange events           (view entered)
@@ -114,7 +114,7 @@ func (ctl *BlockRateController) initLastMeasurement(curView uint64, now time.Tim
 		integralErr:     0,
 		derivativeErr:   0,
 	}
-	ctl.proposalDelayDur.Store(ctl.targetViewTime().Nanoseconds())
+	ctl.proposalDuration.Store(ctl.targetViewTime().Nanoseconds())
 }
 
 // initEpochInfo initializes the epochInfo state upon component startup.
@@ -158,16 +158,17 @@ func (ctl *BlockRateController) initEpochInfo(curView uint64) error {
 	return nil
 }
 
-// ProposalDelay returns the current proposal delay value to use when proposing.
+// ProposalDuration returns the current ProposalDuration value to use when proposing.
 // This function reflects the most recently computed output of the PID controller.
-// The proposal delay is the delay introduced when this node produces a block proposal,
-// and is the variable adjusted by the BlockRateController to achieve a target switchover time.
+// The ProposalDuration is the total time it takes for this node to produce a block proposal,
+// from the time we enter a view to when we transmit the proposal to the committee.
+// It is the variable adjusted by the BlockRateController to achieve a target switchover time.
 //
-// For a given proposal, suppose the time to produce the proposal is P:
-//   - if P < ProposalDelay to produce, then we wait ProposalDelay-P before broadcasting the proposal (total proposal time of ProposalDelay)
-//   - if P >= ProposalDelay to produce, then we immediately broadcast the proposal (total proposal time of P)
-func (ctl *BlockRateController) ProposalDelay() time.Duration {
-	return time.Duration(ctl.proposalDelayDur.Load())
+// For a given view where we are the leader, suppose the actual time taken to build our proposal is P:
+//   - if P < ProposalDuration, then we wait ProposalDuration-P before broadcasting the proposal (total proposal time of ProposalDuration)
+//   - if P >= ProposalDuration, then we immediately broadcast the proposal (total proposal time of P)
+func (ctl *BlockRateController) ProposalDuration() time.Duration {
+	return time.Duration(ctl.proposalDuration.Load())
 }
 
 // processEventsWorkerLogic is the logic for processing events received from other components.
@@ -222,14 +223,13 @@ func (ctl *BlockRateController) processEventsWorkerLogic(ctx irrecoverable.Signa
 
 // processOnViewChange processes OnViewChange events from HotStuff.
 // Whenever the view changes, we:
-//   - take a new measurement for instantaneous and EWMA block rate
-//   - compute a new target block rate (set-point)
-//   - compute error terms, compensation function output, and new block rate delay
+//   - compute a new projected epoch end time, assuming an ideal view rate
+//   - compute error terms, compensation function output, and new ProposalDuration
 //   - updates epoch info, if this is the first observed view of a new epoch
 //
 // No errors are expected during normal operation.
 func (ctl *BlockRateController) processOnViewChange(view uint64) error {
-	// if epoch fallback is triggered, we always use default proposal delay
+	// if epoch fallback is triggered, we always use default ProposalDuration
 	if ctl.epochFallbackTriggered {
 		return nil
 	}
@@ -276,7 +276,7 @@ func (ctl *BlockRateController) checkForEpochTransition(curView uint64, now time
 }
 
 // measureViewRate computes a new measurement of projected epoch switchover time and error for the newly entered view.
-// It updates the proposal delay based on the new error.
+// It updates the ProposalDuration based on the new error.
 // No errors are expected during normal operation.
 func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) error {
 	lastMeasurement := ctl.lastMeasurement
@@ -310,21 +310,21 @@ func (ctl *BlockRateController) measureViewRate(view uint64, now time.Time) erro
 	// compute the controller output for this measurement
 	proposalTime := ctl.targetViewTime() - ctl.controllerOutput()
 	// constrain the proposal time according to configured boundaries
-	if proposalTime < ctl.config.MinProposalDelay {
-		ctl.proposalDelayDur.Store(ctl.config.MinProposalDelay.Nanoseconds())
+	if proposalTime < ctl.config.MinProposalDuration {
+		ctl.proposalDuration.Store(ctl.config.MinProposalDuration.Nanoseconds())
 		return nil
 	}
-	if proposalTime > ctl.config.MaxProposalDelay {
-		ctl.proposalDelayDur.Store(ctl.config.MaxProposalDelay.Nanoseconds())
+	if proposalTime > ctl.config.MaxProposalDuration {
+		ctl.proposalDuration.Store(ctl.config.MaxProposalDuration.Nanoseconds())
 		return nil
 	}
-	ctl.proposalDelayDur.Store(proposalTime.Nanoseconds())
+	ctl.proposalDuration.Store(proposalTime.Nanoseconds())
 	return nil
 }
 
 // controllerOutput returns u[v], the output of the controller for the most recent measurement.
 // It represents the amount of time by which the controller wishes to deviate from the ideal view duration τ[v].
-// Then, the proposal delay is given by:
+// Then, the ProposalDuration is given by:
 //
 //	τ[v]-u[v]
 func (ctl *BlockRateController) controllerOutput() time.Duration {
@@ -356,11 +356,11 @@ func (ctl *BlockRateController) processEpochSetupPhaseStarted(snapshot protocol.
 
 // processEpochFallbackTriggered processes EpochFallbackTriggered events from the protocol state.
 // When epoch fallback mode is triggered, we:
-//   - set proposal delay to the default value
+//   - set ProposalDuration to the default value
 //   - set epoch fallback triggered, to disable the controller
 func (ctl *BlockRateController) processEpochFallbackTriggered() {
 	ctl.epochFallbackTriggered = true
-	ctl.proposalDelayDur.Store(ctl.config.DefaultProposalDelay.Nanoseconds())
+	ctl.proposalDuration.Store(ctl.config.DefaultProposalDuration.Nanoseconds())
 }
 
 // OnViewChange responds to a view-change notification from HotStuff.

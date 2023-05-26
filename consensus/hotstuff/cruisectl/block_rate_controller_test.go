@@ -96,7 +96,7 @@ func (bs *BlockRateControllerSuite) StopController() {
 // AssertCorrectInitialization checks that the controller is configured as expected after construction.
 func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
 	// proposal delay should be initialized to default value
-	assert.Equal(bs.T(), bs.ctl.targetViewTime(), bs.ctl.ProposalDelay())
+	assert.Equal(bs.T(), bs.ctl.targetViewTime(), bs.ctl.ProposalDuration())
 
 	// if epoch fallback is triggered, we don't care about anything else
 	if bs.ctl.epochFallbackTriggered {
@@ -143,7 +143,7 @@ func (bs *BlockRateControllerSuite) PrintMeasurement() {
 	ctl := bs.ctl
 	m := ctl.lastMeasurement
 	fmt.Printf("v=%d\tt=%s\tu=%s\tPD=%s\te=%.3f\te_N=%.3f\tI_M=%.3f\t∆_N=%.3f\n",
-		m.view, m.time, ctl.controllerOutput(), ctl.ProposalDelay(),
+		m.view, m.time, ctl.controllerOutput(), ctl.ProposalDuration(),
 		m.instErr, m.proportionalErr, m.instErr, m.derivativeErr)
 }
 
@@ -175,7 +175,7 @@ func (bs *BlockRateControllerSuite) TestInit_EpochSetupPhase() {
 }
 
 // TestInit_EpochFallbackTriggered tests initializing the component when epoch fallback is triggered.
-// Default proposal delay should be set.
+// Default ProposalDuration should be set.
 func (bs *BlockRateControllerSuite) TestInit_EpochFallbackTriggered() {
 	bs.epochFallbackTriggered = true
 	bs.CreateAndStartController()
@@ -184,23 +184,23 @@ func (bs *BlockRateControllerSuite) TestInit_EpochFallbackTriggered() {
 }
 
 // TestEpochFallbackTriggered tests epoch fallback:
-//   - the proposal delay should revert to default
+//   - the ProposalDuration should revert to default
 //   - duplicate events should be no-ops
 func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
-	// update error so that proposal delay is non-default
+	// update error so that ProposalDuration is non-default
 	bs.ctl.lastMeasurement.instErr *= 1.1
 	err := bs.ctl.measureViewRate(bs.initialView+1, time.Now())
 	require.NoError(bs.T(), err)
-	assert.NotEqual(bs.T(), bs.config.DefaultProposalDelay, bs.ctl.ProposalDelay())
+	assert.NotEqual(bs.T(), bs.config.DefaultProposalDuration, bs.ctl.ProposalDuration())
 
 	// send the event
 	bs.ctl.EpochEmergencyFallbackTriggered()
-	// async: should revert to default proposal delay
+	// async: should revert to default ProposalDuration
 	require.Eventually(bs.T(), func() bool {
-		return bs.config.DefaultProposalDelay == bs.ctl.ProposalDelay()
+		return bs.config.DefaultProposalDuration == bs.ctl.ProposalDuration()
 	}, time.Second, time.Millisecond)
 
 	// additional EpochEmergencyFallbackTriggered events should be no-ops
@@ -209,7 +209,7 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 		bs.ctl.EpochEmergencyFallbackTriggered()
 	}
 	// state should be unchanged
-	assert.Equal(bs.T(), bs.config.DefaultProposalDelay, bs.ctl.ProposalDelay())
+	assert.Equal(bs.T(), bs.config.DefaultProposalDuration, bs.ctl.ProposalDuration())
 
 	// addition OnViewChange events should be no-ops
 	for i := 0; i <= cap(bs.ctl.viewChanges); i++ {
@@ -220,26 +220,26 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 		return len(bs.ctl.viewChanges) == 0
 	}, time.Second, time.Millisecond)
 	// state should be unchanged
-	assert.Equal(bs.T(), bs.ctl.config.DefaultProposalDelay, bs.ctl.ProposalDelay())
+	assert.Equal(bs.T(), bs.ctl.config.DefaultProposalDuration, bs.ctl.ProposalDuration())
 }
 
 // TestOnViewChange_UpdateProposalDelay tests that a new measurement is taken and
-// proposal delay updated upon receiving an OnViewChange event.
+// ProposalDuration updated upon receiving an OnViewChange event.
 func (bs *BlockRateControllerSuite) TestOnViewChange_UpdateProposalDelay() {
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
 	initialMeasurement := bs.ctl.lastMeasurement
-	initialProposalDelay := bs.ctl.ProposalDelay()
+	initialProposalDelay := bs.ctl.ProposalDuration()
 	bs.ctl.OnViewChange(0, bs.initialView+1)
 	require.Eventually(bs.T(), func() bool {
 		return bs.ctl.lastMeasurement.view > bs.initialView
 	}, time.Second, time.Millisecond)
 	nextMeasurement := bs.ctl.lastMeasurement
-	nextProposalDelay := bs.ctl.ProposalDelay()
+	nextProposalDelay := bs.ctl.ProposalDuration()
 
 	bs.SanityCheckSubsequentMeasurements(initialMeasurement, nextMeasurement)
-	// new measurement should update proposal delay
+	// new measurement should update ProposalDuration
 	assert.NotEqual(bs.T(), initialProposalDelay, nextProposalDelay)
 
 	// duplicate events should be no-ops
@@ -253,7 +253,7 @@ func (bs *BlockRateControllerSuite) TestOnViewChange_UpdateProposalDelay() {
 
 	// state should be unchanged
 	assert.Equal(bs.T(), nextMeasurement, bs.ctl.lastMeasurement)
-	assert.Equal(bs.T(), nextProposalDelay, bs.ctl.ProposalDelay())
+	assert.Equal(bs.T(), nextProposalDelay, bs.ctl.ProposalDuration())
 }
 
 // TestOnViewChange_EpochTransition tests that a view change into the next epoch
@@ -307,22 +307,22 @@ func (bs *BlockRateControllerSuite) TestOnEpochSetupPhaseStarted() {
 
 // TestProposalDelay_AfterTargetTransitionTime tests the behaviour of the controller
 // when we have passed the target end time for the current epoch.
-// We should approach the min proposal delay (increase view rate as much as possible)
+// We should approach the min ProposalDuration (increase view rate as much as possible)
 func (bs *BlockRateControllerSuite) TestProposalDelay_AfterTargetTransitionTime() {
 	// we are near the end of the epoch in view terms
 	bs.initialView = uint64(float64(bs.curEpochFinalView) * .95)
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
-	lastProposalDelay := bs.ctl.ProposalDelay()
+	lastProposalDelay := bs.ctl.ProposalDuration()
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
 		// we have passed the target end time of the epoch
 		enteredViewAt := bs.ctl.curEpochTargetEndTime.Add(time.Duration(view) * time.Second)
 		err := bs.ctl.measureViewRate(view, enteredViewAt)
 		require.NoError(bs.T(), err)
 
-		assert.LessOrEqual(bs.T(), bs.ctl.ProposalDelay(), lastProposalDelay)
-		lastProposalDelay = bs.ctl.ProposalDelay()
+		assert.LessOrEqual(bs.T(), bs.ctl.ProposalDuration(), lastProposalDelay)
+		lastProposalDelay = bs.ctl.ProposalDuration()
 
 		// transition views until the end of the epoch, or for 100 views
 		if view-bs.initialView >= 100 {
@@ -334,14 +334,14 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_AfterTargetTransitionTime(
 // TestProposalDelay_BehindSchedule tests the behaviour of the controller when the
 // projected epoch switchover is LATER than the target switchover time (in other words,
 // we are behind schedule.
-// We should respond by lowering the ProposalDelay (increasing view rate)
+// We should respond by lowering the ProposalDuration (increasing view rate)
 func (bs *BlockRateControllerSuite) TestProposalDelay_BehindSchedule() {
 	// we are 50% of the way through the epoch in view terms
 	bs.initialView = uint64(float64(bs.curEpochFinalView) * .5)
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
-	lastProposalDelay := bs.ctl.ProposalDelay()
+	lastProposalDelay := bs.ctl.ProposalDuration()
 	idealEnteredViewTime := bs.ctl.curEpochTargetEndTime.Add(-epochLength / 2)
 	// 1s behind of schedule
 	enteredViewAt := idealEnteredViewTime.Add(time.Second)
@@ -351,9 +351,9 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_BehindSchedule() {
 		err := bs.ctl.measureViewRate(view, enteredViewAt)
 		require.NoError(bs.T(), err)
 
-		// decreasing proposal delay
-		assert.LessOrEqual(bs.T(), bs.ctl.ProposalDelay(), lastProposalDelay)
-		lastProposalDelay = bs.ctl.ProposalDelay()
+		// decreasing ProposalDuration
+		assert.LessOrEqual(bs.T(), bs.ctl.ProposalDuration(), lastProposalDelay)
+		lastProposalDelay = bs.ctl.ProposalDuration()
 
 		// transition views until the end of the epoch, or for 100 views
 		if view-bs.initialView >= 100 {
@@ -365,14 +365,14 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_BehindSchedule() {
 // TestProposalDelay_AheadOfSchedule tests the behaviour of the controller when the
 // projected epoch switchover is EARLIER than the target switchover time (in other words,
 // we are ahead of schedule.
-// We should respond by increasing the ProposalDelay (lowering view rate)
+// We should respond by increasing the ProposalDuration (lowering view rate)
 func (bs *BlockRateControllerSuite) TestProposalDelay_AheadOfSchedule() {
 	// we are 50% of the way through the epoch in view terms
 	bs.initialView = uint64(float64(bs.curEpochFinalView) * .5)
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
-	lastProposalDelay := bs.ctl.ProposalDelay()
+	lastProposalDelay := bs.ctl.ProposalDuration()
 	idealEnteredViewTime := bs.ctl.curEpochTargetEndTime.Add(-epochLength / 2)
 	// 1s ahead of schedule
 	enteredViewAt := idealEnteredViewTime.Add(-time.Second)
@@ -382,9 +382,9 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_AheadOfSchedule() {
 		err := bs.ctl.measureViewRate(view, enteredViewAt)
 		require.NoError(bs.T(), err)
 
-		// increasing proposal delay
-		assert.GreaterOrEqual(bs.T(), bs.ctl.ProposalDelay(), lastProposalDelay)
-		lastProposalDelay = bs.ctl.ProposalDelay()
+		// increasing ProposalDuration
+		assert.GreaterOrEqual(bs.T(), bs.ctl.ProposalDuration(), lastProposalDelay)
+		lastProposalDelay = bs.ctl.ProposalDuration()
 
 		// transition views until the end of the epoch, or for 100 views
 		if view-bs.initialView >= 100 {
