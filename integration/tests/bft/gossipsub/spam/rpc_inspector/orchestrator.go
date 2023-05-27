@@ -11,24 +11,13 @@ import (
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/integration/tests/bft"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/logging"
-)
-
-const (
-	typeExecutionReceipt  = "type-execution-receipt"
-	typeChunkDataRequest  = "type-chunk-data-request"
-	typeChunkDataResponse = "type-chunk-data-response"
-	typeResultApproval    = "type-result-approval"
 )
 
 // orchestrator represents a simple orchestrator that passes through all incoming events.
 type orchestrator struct {
 	*bft.BaseOrchestrator
 	sync.Mutex
-	egressEventTracker  map[string]flow.IdentifierList
-	ingressEventTracker map[string]flow.IdentifierList
 }
 
 var _ insecure.AttackOrchestrator = &orchestrator{}
@@ -37,38 +26,10 @@ func NewRPCOrchestrator(t *testing.T, Logger zerolog.Logger) *orchestrator {
 	o := &orchestrator{
 		BaseOrchestrator: &bft.BaseOrchestrator{
 			T:      t,
-			Logger: Logger.With().Str("component", "dummy-orchestrator").Logger(),
-		},
-		egressEventTracker: map[string]flow.IdentifierList{
-			typeExecutionReceipt:  {},
-			typeChunkDataRequest:  {},
-			typeChunkDataResponse: {},
-			typeResultApproval:    {},
-		},
-		ingressEventTracker: map[string]flow.IdentifierList{
-			typeChunkDataRequest:  {},
-			typeChunkDataResponse: {},
+			Logger: Logger.With().Str("component", "gossipsub-orchestrator").Logger(),
 		},
 	}
-
-	o.OnEgressEvent = append(o.OnEgressEvent, o.trackEgressEvents)
-
 	return o
-}
-
-// trackEgressEvent tracks egress events by event type, this func is used as a callback in the BaseOrchestrator OnEgressEvent callback list.
-func (o *orchestrator) trackEgressEvents(event *insecure.EgressEvent) error {
-	switch e := event.FlowProtocolEvent.(type) {
-	case *flow.ExecutionReceipt:
-		o.egressEventTracker[typeExecutionReceipt] = append(o.egressEventTracker[typeExecutionReceipt], e.ID())
-	case *messages.ChunkDataRequest:
-		o.egressEventTracker[typeChunkDataRequest] = append(o.egressEventTracker[typeChunkDataRequest], e.ChunkID)
-	case *messages.ChunkDataResponse:
-		o.egressEventTracker[typeChunkDataResponse] = append(o.egressEventTracker[typeChunkDataResponse], e.ChunkDataPack.ChunkID)
-	case *flow.ResultApproval:
-		o.egressEventTracker[typeResultApproval] = append(o.egressEventTracker[typeResultApproval], e.ID())
-	}
-	return nil
 }
 
 // HandleIngressEvent implements logic of processing the incoming (ingress) events to a corrupt node.
@@ -79,12 +40,6 @@ func (o *orchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
 		Str("corrupt_target_id", fmt.Sprintf("%v", event.CorruptTargetID)).
 		Str("flow_protocol_event", fmt.Sprintf("%T", event.FlowProtocolEvent)).Logger()
 
-	switch e := event.FlowProtocolEvent.(type) {
-	case *messages.ChunkDataRequest:
-		o.ingressEventTracker[typeChunkDataRequest] = append(o.ingressEventTracker[typeChunkDataRequest], e.ChunkID)
-	case *messages.ChunkDataResponse:
-		o.ingressEventTracker[typeChunkDataResponse] = append(o.ingressEventTracker[typeChunkDataResponse], e.ChunkDataPack.ChunkID)
-	}
 	err := o.OrchestratorNetwork.SendIngress(event)
 
 	if err != nil {
