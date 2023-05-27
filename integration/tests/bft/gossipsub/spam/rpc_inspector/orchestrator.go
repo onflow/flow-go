@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/integration/tests/bft"
@@ -100,26 +99,4 @@ func (o *orchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
 	}
 	lg.Info().Msg("ingress event passed through successfully")
 	return nil
-}
-
-// mustSeenEgressFlowProtocolEvent checks the dummy orchestrator has passed through the egress flow protocol events with given ids.
-// It fails if any entity is gone missing from sight of the orchestrator.
-func (o *orchestrator) mustSeenEgressFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
-	events, ok := o.egressEventTracker[eventType]
-	require.Truef(t, ok, "unknown type: %s", eventType)
-
-	for _, id := range ids {
-		require.Contains(t, events, id)
-	}
-}
-
-// mustSeenIngressFlowProtocolEvent checks the dummy orchestrator has passed through the ingress flow protocol events with given ids.
-// It fails if any entity is gone missing from sight of the orchestrator.
-func (o *orchestrator) mustSeenIngressFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
-	events, ok := o.ingressEventTracker[eventType]
-	require.Truef(t, ok, "unknown type: %s", eventType)
-
-	for _, id := range ids {
-		require.Contains(t, events, id)
-	}
 }
