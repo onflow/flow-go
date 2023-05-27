@@ -57,13 +57,7 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 	s.initialTC = nil
 	var err error
 
-	s.timeoutConf, err = timeout.NewConfig(
-		time.Duration(minRepTimeout*1e6),
-		time.Duration(maxRepTimeout*1e6),
-		multiplicativeIncrease,
-		happyPathMaxRoundFailures,
-		0,
-		time.Duration(maxRepTimeout*1e6))
+	s.timeoutConf, err = timeout.NewConfig(time.Duration(minRepTimeout*1e6), time.Duration(maxRepTimeout*1e6), multiplicativeIncrease, happyPathMaxRoundFailures, time.Duration(maxRepTimeout*1e6))
 	require.NoError(s.T(), err)
 
 	// init consumer for notifications emitted by PaceMaker

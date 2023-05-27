@@ -74,13 +74,7 @@ func (p *TestPaceMaker) LastViewTC() *flow.TimeoutCertificate {
 // using a real pacemaker for testing event handler
 func initPaceMaker(t require.TestingT, ctx context.Context, livenessData *hotstuff.LivenessData) hotstuff.PaceMaker {
 	notifier := &mocks.Consumer{}
-	tc, err := timeout.NewConfig(
-		time.Duration(minRepTimeout*1e6),
-		time.Duration(maxRepTimeout*1e6),
-		multiplicativeIncrease,
-		happyPathMaxRoundFailures,
-		0,
-		time.Duration(maxRepTimeout*1e6))
+	tc, err := timeout.NewConfig(time.Duration(minRepTimeout*1e6), time.Duration(maxRepTimeout*1e6), multiplicativeIncrease, happyPathMaxRoundFailures, time.Duration(maxRepTimeout*1e6))
 	require.NoError(t, err)
 	persist := &mocks.Persister{}
 	persist.On("PutLivenessData", mock.Anything).Return(nil).Maybe()

@@ -58,24 +58,9 @@ func NewParticipant(
 	}
 
 	// initialize dynamically updatable timeout config
-	timeoutConfig, err := timeout.NewConfig(
-		cfg.TimeoutMinimum,
-		cfg.TimeoutMaximum,
-		cfg.TimeoutAdjustmentFactor,
-		cfg.HappyPathMaxRoundFailures,
-		cfg.BlockRateDelay,
-		cfg.MaxTimeoutObjectRebroadcastInterval,
-	)
+	timeoutConfig, err := timeout.NewConfig(cfg.TimeoutMinimum, cfg.TimeoutMaximum, cfg.TimeoutAdjustmentFactor, cfg.HappyPathMaxRoundFailures, cfg.MaxTimeoutObjectRebroadcastInterval)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeout config: %w", err)
-	}
-
-	// register as dynamically updatable via admin command
-	if cfg.Registrar != nil {
-		err = cfg.Registrar.RegisterDurationConfig("hotstuff-block-rate-delay", timeoutConfig.GetBlockRateDelay, timeoutConfig.SetBlockRateDelay)
-		if err != nil {
-			return nil, fmt.Errorf("failed to register block rate delay config: %w", err)
-		}
 	}
 
 	// initialize the pacemaker
