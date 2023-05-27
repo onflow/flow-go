@@ -22,7 +22,7 @@ type orchestrator struct {
 
 var _ insecure.AttackOrchestrator = &orchestrator{}
 
-func NewRPCOrchestrator(t *testing.T, Logger zerolog.Logger) *orchestrator {
+func NewSpamOrchestrator(t *testing.T, Logger zerolog.Logger) *orchestrator {
 	o := &orchestrator{
 		BaseOrchestrator: &bft.BaseOrchestrator{
 			T:      t,

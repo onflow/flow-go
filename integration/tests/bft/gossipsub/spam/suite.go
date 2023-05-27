@@ -29,11 +29,11 @@ func (s *Suite) SetupSuite() {
 		testnet.AsCorrupted()))
 
 	s.BaseSuite.StartCorruptedNetwork(
-		"bft_rpc_inspector_test",
+		"bft_gossipsub_spam_test",
 		10_000,
 		100_000,
 		func() insecure.AttackOrchestrator {
-			s.Orchestrator = NewRPCOrchestrator(s.T(), s.Log)
+			s.Orchestrator = NewSpamOrchestrator(s.T(), s.Log)
 			return s.Orchestrator
 		},
 	)
