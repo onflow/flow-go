@@ -7,7 +7,7 @@
 // Computes the Lagrange coefficient L_i(0) in Fr with regards to the range [indices(0)..indices(t)]
 // and stores it in `res`, where t is the degree of the polynomial P.
 // `len` is equal to `t+1` where `t` is the polynomial degree.
-static void Fr_lagrange_coeff_at_zero(Fr* res, const int i, const uint8_t indices[], const int len){
+static void Fr_lagrange_coeff_at_zero(Fr* res, const int i, const byte indices[], const int len){
 
     // coefficient is computed as N * D^(-1)
     Fr numerator;  // eventually would represent N*R^k  
@@ -63,7 +63,7 @@ static void Fr_lagrange_coeff_at_zero(Fr* res, const int i, const uint8_t indice
 // Computes the Langrange interpolation at zero P(0) = LI(0) with regards to the indices [indices(0)..indices(t)] 
 // and their G1 images [shares(0)..shares(t)], and stores the resulting G1 point in `dest`.
 // `len` is equal to `t+1` where `t` is the polynomial degree.
-static void E1_lagrange_interpolate_at_zero(E1* out, const E1 shares[], const uint8_t indices[], const int len) {
+static void E1_lagrange_interpolate_at_zero(E1* out, const E1 shares[], const byte indices[], const int len) {
     // Purpose is to compute Q(0) where Q(x) = A_0 + A_1*x + ... +  A_t*x^t in G1 
     // where A_i = g1 ^ a_i
 
@@ -83,7 +83,7 @@ static void E1_lagrange_interpolate_at_zero(E1* out, const E1 shares[], const ui
 // Computes the Langrange interpolation at zero LI(0) with regards to the indices [indices(0)..indices(t)] 
 // and writes their E1 concatenated serializations [shares(1)..shares(t+1)] in `dest`.
 // `len` is equal to `t+1` where `t` is the polynomial degree.
-int E1_lagrange_interpolate_at_zero_write(byte* dest, const byte* shares, const uint8_t indices[], const int len) {
+int E1_lagrange_interpolate_at_zero_write(byte* dest, const byte* shares, const byte indices[], const int len) {
     int read_ret;
     E1* E1_shares = malloc(sizeof(E1) * len);
     for (int i=0; i < len; i++) {

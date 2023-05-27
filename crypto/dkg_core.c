@@ -78,7 +78,7 @@ BLST_ERROR E2_vector_read_bytes(E2* A, const byte* src, const int len){
 // checks the discrete log relationship in G2.
 // - returns 1 if g2^x = y, where g2 is the generator of G2
 // - returns 0 otherwise.
-bool_t G2_check_log(const Fr* x, const E2* y) {
+bool G2_check_log(const Fr* x, const E2* y) {
     E2 tmp;
     G2_mult_gen(&tmp, x);
     return E2_is_equal(&tmp, y);

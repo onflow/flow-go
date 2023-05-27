@@ -38,12 +38,12 @@ const Fr BLS12_381_rR = {{  \
     }};
 
 // returns true if a == 0 and false otherwise
-bool_t Fr_is_zero(const Fr* a) {
+bool Fr_is_zero(const Fr* a) {
     return bytes_are_zero((const byte*)a, sizeof(Fr));
 }
 
 // returns true if a == b and false otherwise
-bool_t Fr_is_equal(const Fr* a, const Fr* b) {
+bool Fr_is_equal(const Fr* a, const Fr* b) {
     return vec_is_equal(a, b, sizeof(Fr));
 }
 
@@ -265,7 +265,7 @@ static void Fr_from_be_bytes(Fr* out, const byte *bytes, size_t n)
 // Reads a scalar from an array and maps it to Fr using modular reduction.
 // Input is byte-big-endian as used by the external APIs.
 // It returns true if scalar is zero and false otherwise.
-bool_t map_bytes_to_Fr(Fr* a, const byte* bin, int len) {
+bool map_bytes_to_Fr(Fr* a, const byte* bin, int len) {
     Fr_from_be_bytes(a, bin, len);
     return Fr_is_zero(a);
 }
@@ -311,7 +311,7 @@ static void Fp_neg(Fp *res, const Fp *a) {
 // The boolean output is valid whether `a` is in Montgomery form or not,
 // since montgomery constant `R` is a quadratic residue.
 // However, the square root is valid only if `a` is in montgomery form.
-static bool_t Fp_sqrt_montg(Fp *res, const Fp* a) {
+static bool Fp_sqrt_montg(Fp *res, const Fp* a) {
    return sqrt_fp((limb_t*)res, (limb_t*)a);
 }
 
@@ -415,7 +415,7 @@ static void Fp2_squ_montg(Fp2 *res, const Fp2 *a) {
 // The boolean output is valid whether `a` is in Montgomery form or not,
 // since montgomery constant `R` is a quadratic residue.
 // However, the square root is valid only if `a` is in montgomery form.
-static bool_t Fp2_sqrt_montg(Fp2 *res, const Fp2* a) {
+static bool Fp2_sqrt_montg(Fp2 *res, const Fp2* a) {
    return sqrt_fp2((vec384*)res, (vec384*)a);
 }
 
@@ -466,13 +466,13 @@ void E1_copy(E1* res, const E1* p) {
 }
 
 // checks p1 == p2
-bool_t E1_is_equal(const E1* p1, const E1* p2) {
+bool E1_is_equal(const E1* p1, const E1* p2) {
     // `POINTonE1_is_equal` includes the infinity case
     return POINTonE1_is_equal((const POINTonE1*)p1, (const POINTonE1*)p2);
 }
 
 // compare p to infinity
-bool_t E1_is_infty(const E1* p) {
+bool E1_is_infty(const E1* p) {
     // BLST infinity points are defined by Z=0
     return vec_is_zero(p->z, sizeof(p->z));  
 }
@@ -495,14 +495,14 @@ void E1_to_affine(E1* res, const E1* p) {
 }
 
 // checks affine point `p` is in E1
-bool_t E1_affine_on_curve(const E1* p) {
+bool E1_affine_on_curve(const E1* p) {
     // BLST's `POINTonE1_affine_on_curve` does not include the inifity case!
     return POINTonE1_affine_on_curve((POINTonE1_affine*)p) | E1_is_infty(p);
 }
 
 // checks if input E1 point is on the subgroup G1.
 // It assumes input `p` is on E1.
-bool_t E1_in_G1(const E1* p){
+bool E1_in_G1(const E1* p){
     // currently uses Scott method
     return POINTonE1_in_G1((const POINTonE1*)p);
 }
@@ -859,19 +859,19 @@ void E2_set_infty(E2* p) {
 }
 
 // check if `p` is infinity
-bool_t E2_is_infty(const E2* p) {
+bool E2_is_infty(const E2* p) {
     // BLST infinity points are defined by Z=0
     return vec_is_zero(p->z, sizeof(p->z));
 }
 
 // checks affine point `p` is in E2
-bool_t E2_affine_on_curve(const E2* p) {
+bool E2_affine_on_curve(const E2* p) {
     // BLST's `POINTonE2_affine_on_curve` does not include the infinity case!
     return POINTonE2_affine_on_curve((POINTonE2_affine*)p) | E2_is_infty(p);
 }
 
 // checks p1 == p2
-bool_t E2_is_equal(const E2* p1, const E2* p2) {
+bool E2_is_equal(const E2* p1, const E2* p2) {
     // `POINTonE2_is_equal` includes the infinity case
     return POINTonE2_is_equal((const POINTonE2*)p1, (const POINTonE2*)p2);
 }
@@ -935,7 +935,7 @@ void G2_mult_gen(E2* res, const Fr* expo) {
 
 // checks if input E2 point is on the subgroup G2.
 // It assumes input `p` is on E2.
-bool_t E2_in_G2(const E2* p){
+bool E2_in_G2(const E2* p){
     // currently uses Scott method
     return POINTonE2_in_G2((const POINTonE2*)p);
 }
@@ -1084,7 +1084,7 @@ BLST_ERROR unsafe_map_bytes_to_G2complement(E2* p, const byte* bytes, int len) {
 
 // ------------------- Pairing utilities 
 
-bool_t Fp12_is_one(Fp12 *a) {
+bool Fp12_is_one(Fp12 *a) {
     return vec_is_equal(a, BLS12_381_Rx.p12, sizeof(Fp12));
 }
 

@@ -347,7 +347,7 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 	}
 
 	// membership check in G2
-	if C.E2_in_G2((*C.E2)(&pk.point)) == (C.ulonglong)(0) {
+	if !bool(C.E2_in_G2((*C.E2)(&pk.point))) {
 		return nil, invalidInputsErrorf("input key is infinity or does not encode a BLS12-381 point in the valid group")
 	}
 

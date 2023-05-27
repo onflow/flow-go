@@ -8,6 +8,9 @@
 #include <string.h>
 #include "blst_include.h"
 
+typedef uint8_t byte;
+typedef _Bool bool;  // assuming cgo is using a modern enough compiler
+
 #define SEC_BITS  128
 #define VALID     0
 #define INVALID   1
@@ -50,8 +53,8 @@ int     bls_spock_verify(const E2*, const byte*, const E2*, const byte*);
 
 // Fr utilities
 extern const Fr BLS12_381_rR;
-bool_t      Fr_is_zero(const Fr* a);
-bool_t      Fr_is_equal(const Fr* a, const Fr* b);
+bool      Fr_is_zero(const Fr* a);
+bool      Fr_is_equal(const Fr* a, const Fr* b);
 void        Fr_set_limb(Fr*, const limb_t);
 void        Fr_copy(Fr*, const Fr*);
 void        Fr_set_zero(Fr*);
@@ -69,7 +72,7 @@ void        Fr_inv_exp_montg(Fr *res, const Fr *a);
 BLST_ERROR  Fr_read_bytes(Fr* a, const byte *bin, int len);
 BLST_ERROR  Fr_star_read_bytes(Fr* a, const byte *bin, int len);
 void        Fr_write_bytes(byte *bin, const Fr* a);
-bool_t      map_bytes_to_Fr(Fr*, const byte*, int);
+bool      map_bytes_to_Fr(Fr*, const byte*, int);
 
 // Fp utilities
 void        Fp_mul_montg(Fp *, const Fp *, const Fp *);
@@ -77,12 +80,12 @@ void        Fp_squ_montg(Fp *, const Fp *);
 
 // E1 and G1 utilities
 void        E1_copy(E1*, const E1*);
-bool_t      E1_is_equal(const E1*, const E1*);
+bool      E1_is_equal(const E1*, const E1*);
 void        E1_set_infty(E1*);
-bool_t      E1_is_infty(const E1*);
+bool      E1_is_infty(const E1*);
 void        E1_to_affine(E1*, const E1*);
-bool_t      E1_affine_on_curve(const E1*);
-bool_t      E1_in_G1(const E1*);
+bool      E1_affine_on_curve(const E1*);
+bool     E1_in_G1(const E1*);
 void        E1_mult(E1*, const E1*, const Fr*);
 void        E1_add(E1*, const E1*, const E1*);
 void        E1_neg(E1*, const E1*);
@@ -99,9 +102,9 @@ int         map_to_G1(E1*, const byte*, const int);
 
 // E2 and G2 utilities
 void        E2_set_infty(E2* p);
-bool_t      E2_is_infty(const E2*);
-bool_t      E2_affine_on_curve(const E2*);
-bool_t      E2_is_equal(const E2*, const E2*);
+bool      E2_is_infty(const E2*);
+bool      E2_affine_on_curve(const E2*);
+bool      E2_is_equal(const E2*, const E2*);
 void        E2_copy(E2*, const E2*);
 void        E2_to_affine(E2*, const E2*);
 BLST_ERROR  E2_read_bytes(E2*, const byte *,  const int); 
@@ -113,12 +116,12 @@ void        E2_add(E2* res, const E2* a, const E2* b);
 void        E2_neg(E2*, const E2*);
 void        E2_sum_vector(E2*, const E2*, const int);
 void        E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len);
-bool_t      E2_in_G2(const E2*);
+bool      E2_in_G2(const E2*);
 void        unsafe_map_bytes_to_G2(E2*, const byte*, int);
 BLST_ERROR  unsafe_map_bytes_to_G2complement(E2*, const byte*, int);
 
 // pairing and Fp12
-bool_t      Fp12_is_one(Fp12*);
+bool      Fp12_is_one(Fp12*);
 void        Fp12_set_one(Fp12*);
 void        multi_pairing(Fp12*, const E1*, const E2*, const int);
 

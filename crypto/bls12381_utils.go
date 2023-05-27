@@ -89,28 +89,28 @@ func generatorScalarMultG2(res *pointE2, expo *scalar) {
 // comparison in Fr where r is the group order of G1/G2
 // (both scalars should be reduced mod r)
 func (x *scalar) equals(other *scalar) bool {
-	return C.Fr_is_equal((*C.Fr)(x), (*C.Fr)(other)) != 0
+	return bool(C.Fr_is_equal((*C.Fr)(x), (*C.Fr)(other)))
 }
 
 // comparison in E1
 func (p *pointE1) equals(other *pointE1) bool {
-	return C.E1_is_equal((*C.E1)(p), (*C.E1)(other)) != 0
+	return bool(C.E1_is_equal((*C.E1)(p), (*C.E1)(other)))
 }
 
 // comparison in E2
 func (p *pointE2) equals(other *pointE2) bool {
-	return C.E2_is_equal((*C.E2)(p), (*C.E2)(other)) != 0
+	return bool(C.E2_is_equal((*C.E2)(p), (*C.E2)(other)))
 }
 
 // Comparison to zero in Fr.
 // Scalar must be already reduced modulo r
 func (x *scalar) isZero() bool {
-	return C.Fr_is_zero((*C.Fr)(x)) != 0
+	return bool(C.Fr_is_zero((*C.Fr)(x)))
 }
 
 // Comparison to point at infinity in G2.
 func (p *pointE2) isInfinity() bool {
-	return C.E2_is_infty((*C.E2)(p)) != 0
+	return bool(C.E2_is_infty((*C.E2)(p)))
 }
 
 // generates a random element in F_r using input random source,
@@ -142,7 +142,7 @@ func mapToFr(x *scalar, src []byte) bool {
 	isZero := C.map_bytes_to_Fr((*C.Fr)(x),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
-	return isZero != (C.ulonglong)(0)
+	return bool(isZero)
 }
 
 // writeScalar writes a scalar in a slice of bytes
@@ -231,13 +231,13 @@ func readPointE1(a *pointE1, src []byte) error {
 // checkMembershipG1 wraps a call to a subgroup check in G1 since cgo can't be used
 // in go test files.
 func checkMembershipG1(pt *pointE1) bool {
-	return C.E1_in_G1((*C.E1)(pt)) != (C.ulonglong)(0)
+	return bool(C.E1_in_G1((*C.E1)(pt)))
 }
 
 // checkMembershipG2 wraps a call to a subgroup check in G2 since cgo can't be used
 // in go test files.
 func checkMembershipG2(pt *pointE2) bool {
-	return C.E2_in_G2((*C.E2)(pt)) != (C.ulonglong)(0)
+	return bool(C.E2_in_G2((*C.E2)(pt)))
 }
 
 // This is only a TEST/DEBUG/BENCH function.

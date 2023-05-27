@@ -473,9 +473,9 @@ func readVerifVector(A []pointE2, src []byte) error {
 
 func (s *feldmanVSSstate) verifyShare() bool {
 	// check y[current] == x.G2
-	return C.G2_check_log(
+	return bool(C.G2_check_log(
 		(*C.Fr)(&s.x),
-		(*C.E2)(&s.y[s.myIndex])) != 0
+		(*C.E2)(&s.y[s.myIndex])))
 }
 
 // computePublicKeys extracts the participants public keys from the verification vector

@@ -1,62 +1,18 @@
 #ifndef __BLST_INCLUDE_H__
 #define __BLST_INCLUDE_H__
 
-// extra tools to use BLST low level that are needed by the Flow crypto library
-// eventually this file would replace blst.h
-
+// BLST src headers
 #include "point.h"
 #include "fields.h"
 #include "consts.h"
-#include "errors.h"
-
-// types used by the Flow crypto library that are imported from BLST
-// these type definitions are used as an abstraction from BLST internal types
-
-// Parts of this file have been copied from blst.h in the BLST repo
-/*
- * Copyright Supranational LLC
- * Licensed under the Apache License, Version 2.0, see LICENSE for details.
- * SPDX-License-Identifier: Apache-2.0
- */
-
-#ifdef __SIZE_TYPE__
-typedef __SIZE_TYPE__ size_t;
-#else
-#include <stddef.h>
-#endif
-
-#if defined(__UINT8_TYPE__) && defined(__UINT32_TYPE__) \
-                            && defined(__UINT64_TYPE__)
-typedef __UINT8_TYPE__  uint8_t;
-typedef __UINT32_TYPE__ uint32_t;
-typedef __UINT64_TYPE__ uint64_t;
-#else
-#include <stdint.h>
-#endif
-
-typedef uint8_t byte;
-
-#ifdef __cplusplus
-extern "C" {
-#elif defined(__BLST_CGO__)
-typedef _Bool bool; /* it's assumed that cgo calls modern enough compiler */
-#elif defined(__STDC_VERSION__) && __STDC_VERSION__>=199901
-# define bool _Bool
-#else
-# define bool int
-#endif
-
-#ifdef SWIG
-# define DEFNULL =NULL
-#elif defined __cplusplus
-# define DEFNULL =0
-#else
-# define DEFNULL
-#endif
+#include "errors.h" 
 
 // TODO: add sanity checks that BLST_PK_IS_INFINITY is indeed the last
 // enum value (eventually submit a fix to BLST)
 #define BLST_BAD_SCALAR ((BLST_PK_IS_INFINITY)+1)
+
+// types used by the Flow crypto library that are imported from BLST
+// these type definitions are used as an abstraction from BLST internal types
 
 // field elements F_r
 // where `r` is the order of G1/G2.
