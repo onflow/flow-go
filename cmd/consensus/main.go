@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/cruisectl"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
@@ -84,13 +85,14 @@ func main() {
 		hotstuffMinTimeout                   time.Duration
 		hotstuffTimeoutAdjustmentFactor      float64
 		hotstuffHappyPathMaxRoundFailures    uint64
-		blockRateDelay                       time.Duration
 		chunkAlpha                           uint
 		requiredApprovalsForSealVerification uint
 		requiredApprovalsForSealConstruction uint
 		emergencySealing                     bool
 		dkgControllerConfig                  dkgmodule.ControllerConfig
 		dkgMessagingEngineConfig             = dkgeng.DefaultMessagingEngineConfig()
+		cruiseCtlConfig                      = cruisectl.DefaultConfig()
+		cruiseCtlTargetTransitionTimeStr     = cruiseCtlConfig.TargetTransition.String()
 		startupTimeString                    string
 		startupTime                          time.Time
 
@@ -118,6 +120,7 @@ func main() {
 		followerDistributor *pubsub.FollowerDistributor
 		dkgBrokerTunnel     *dkgmodule.BrokerTunnel
 		blockTimer          protocol.BlockTimer
+		proposalDurProvider consensus.ProposalDurationProvider
 		committee           *committees.Consensus
 		epochLookup         *epochs.EpochLookup
 		hotstuffModules     *consensus.HotstuffModules
@@ -142,7 +145,17 @@ func main() {
 		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
 		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor, "adjustment of timeout duration in case of time out event")
 		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures, "number of failed rounds before first timeout increase")
-		flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
+		// TODO flag descriptions
+		flags.StringVar(&cruiseCtlTargetTransitionTimeStr, "cruise-ctl-target-epoch-transition-time", cruiseCtlTargetTransitionTimeStr, "")
+		flags.DurationVar(&cruiseCtlConfig.DefaultProposalDuration, "cruise-ctl-default-proposal-duration", cruiseCtlConfig.DefaultProposalDuration, "")
+		flags.DurationVar(&cruiseCtlConfig.MinProposalDuration, "cruise-ctl-min-proposal-duration", cruiseCtlConfig.MinProposalDuration, "")
+		flags.DurationVar(&cruiseCtlConfig.MaxProposalDuration, "cruise-ctl-max-proposal-duration", cruiseCtlConfig.MaxProposalDuration, "")
+		flags.BoolVar(&cruiseCtlConfig.Enabled, "cruise-ctl-enabled", cruiseCtlConfig.Enabled, "")
+		flags.UintVar(&cruiseCtlConfig.N_ewma, "cruise-ctl-param-newma", cruiseCtlConfig.N_ewma, "")
+		flags.UintVar(&cruiseCtlConfig.N_itg, "cruise-ctl-param-nitg", cruiseCtlConfig.N_itg, "")
+		flags.Float64Var(&cruiseCtlConfig.KP, "cruise-ctl-param-kp", cruiseCtlConfig.KP, "")
+		flags.Float64Var(&cruiseCtlConfig.KI, "cruise-ctl-param-ki", cruiseCtlConfig.KI, "")
+		flags.Float64Var(&cruiseCtlConfig.KD, "cruise-ctl-param-kd", cruiseCtlConfig.KD, "")
 		flags.UintVar(&chunkAlpha, "chunk-alpha", flow.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", flow.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
 		flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", flow.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
@@ -165,6 +178,13 @@ func main() {
 			}
 			startupTime = t
 			nodeBuilder.Logger.Info().Time("startup_time", startupTime).Msg("got startup_time")
+		}
+		if cruiseCtlTargetTransitionTimeStr != cruiseCtlConfig.TargetTransition.String() {
+			transitionTime, err := cruisectl.ParseTransition(cruiseCtlTargetTransitionTimeStr)
+			if err != nil {
+				return fmt.Errorf("invalid epoch transition time string: %w", err)
+			}
+			cruiseCtlConfig.TargetTransition = *transitionTime
 		}
 		return nil
 	})
@@ -650,6 +670,19 @@ func main() {
 
 			return util.MergeReadyDone(voteAggregator, timeoutAggregator), nil
 		}).
+		Component("block rate cruise control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			livenessData, err := hotstuffModules.Persist.GetLivenessData()
+			if err != nil {
+				return nil, err
+			}
+			curView := livenessData.CurrentView
+			ctl, err := cruisectl.NewBlockRateController(node.Logger, cruiseCtlConfig, node.State, curView)
+			if err != nil {
+				return nil, err
+			}
+			proposalDurProvider = ctl
+			return ctl, nil
+		}).
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block builder
 			var build module.Builder
@@ -680,8 +713,7 @@ func main() {
 				consensus.WithMinTimeout(hotstuffMinTimeout),
 				consensus.WithTimeoutAdjustmentFactor(hotstuffTimeoutAdjustmentFactor),
 				consensus.WithHappyPathMaxRoundFailures(hotstuffHappyPathMaxRoundFailures),
-				consensus.WithBlockRateDelay(blockRateDelay),
-				consensus.WithConfigRegistrar(node.ConfigManager),
+				consensus.WithProposalDurationProvider(proposalDurProvider),
 			}
 
 			if !startupTime.IsZero() {

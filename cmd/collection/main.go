@@ -146,6 +146,7 @@ func main() {
 			"adjustment of timeout duration in case of time out event")
 		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures,
 			"number of failed rounds before first timeout increase")
+		// todo rename?
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
 		flags.Uint64Var(&clusterComplianceConfig.SkipNewProposalsThreshold,
@@ -501,7 +502,7 @@ func main() {
 			}
 
 			opts := []consensus.Option{
-				consensus.WithBlockRateDelay(blockRateDelay),
+				consensus.WithStaticProposalDuration(blockRateDelay),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
 				consensus.WithTimeoutAdjustmentFactor(hotstuffTimeoutAdjustmentFactor),
 				consensus.WithHappyPathMaxRoundFailures(hotstuffHappyPathMaxRoundFailures),
