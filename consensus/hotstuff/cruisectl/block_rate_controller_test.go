@@ -96,7 +96,7 @@ func (bs *BlockRateControllerSuite) StopController() {
 // AssertCorrectInitialization checks that the controller is configured as expected after construction.
 func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
 	// proposal delay should be initialized to default value
-	assert.Equal(bs.T(), bs.ctl.targetViewTime(), bs.ctl.ProposalDuration())
+	assert.Equal(bs.T(), bs.ctl.config.DefaultProposalDuration, bs.ctl.ProposalDuration())
 
 	// if epoch fallback is triggered, we don't care about anything else
 	if bs.ctl.epochFallbackTriggered {

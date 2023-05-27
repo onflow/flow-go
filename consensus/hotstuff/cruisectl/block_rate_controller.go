@@ -114,7 +114,7 @@ func (ctl *BlockRateController) initLastMeasurement(curView uint64, now time.Tim
 		integralErr:     0,
 		derivativeErr:   0,
 	}
-	ctl.proposalDuration.Store(ctl.targetViewTime().Nanoseconds())
+	ctl.proposalDuration.Store(ctl.config.DefaultProposalDuration.Nanoseconds())
 }
 
 // initEpochInfo initializes the epochInfo state upon component startup.
@@ -308,7 +308,7 @@ func (ctl *BlockRateController) measureViewDuration(view uint64, now time.Time) 
 	ctl.lastMeasurement = curMeasurement
 
 	// compute the controller output for this measurement
-	proposalTime := ctl.targetViewTime() - ctl.controllerOutput()
+	proposalTime := ctl.config.DefaultProposalDuration - ctl.controllerOutput()
 	// constrain the proposal time according to configured boundaries
 	if proposalTime < ctl.config.MinProposalDuration {
 		ctl.proposalDuration.Store(ctl.config.MinProposalDuration.Nanoseconds())
@@ -323,10 +323,10 @@ func (ctl *BlockRateController) measureViewDuration(view uint64, now time.Time) 
 }
 
 // controllerOutput returns u[v], the output of the controller for the most recent measurement.
-// It represents the amount of time by which the controller wishes to deviate from the ideal view duration τ[v].
+// It represents the amount of time by which the controller wishes to deviate from the default ProposalDuration.
 // Then, the ProposalDuration is given by:
 //
-//	τ[v]-u[v]
+//	DefaultProposalDuration-u[v]
 func (ctl *BlockRateController) controllerOutput() time.Duration {
 	curMeasurement := ctl.lastMeasurement
 	u := curMeasurement.proportionalErr*ctl.config.KP +
