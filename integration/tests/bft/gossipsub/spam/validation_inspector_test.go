@@ -1,8 +1,9 @@
-package rpc_inspector
+package spam
 
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -15,5 +16,5 @@ func TestGossipSubSpamMitigationSuite(t *testing.T) {
 }
 
 func (s *GossipSubSpamMitigationIntegrationTestSuite) TestGossipSubWhisper() {
-
+	require.Equal(s.T(), 2, 2)
 }

@@ -1,4 +1,4 @@
-package rpc_inspector
+package spam
 
 import (
 	"errors"
