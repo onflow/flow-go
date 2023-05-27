@@ -4,12 +4,10 @@
 // extra tools to use BLST low level that are needed by the Flow crypto library
 // eventually this file would replace blst.h
 
-#include "bls12381_utils.h"
 #include "point.h"
 #include "fields.h"
 #include "consts.h"
 #include "errors.h"
-#include "sha256.h"
 
 // types used by the Flow crypto library that are imported from BLST
 // these type definitions are used as an abstraction from BLST internal types
@@ -66,8 +64,8 @@ typedef _Bool bool; /* it's assumed that cgo calls modern enough compiler */
 // are represented as a little endian vector of limbs.
 // `Fr` is equivalent to type `vec256` (used internally by BLST for F_r elements).
 // `Fr` is defined as a struct to be exportable through cgo to the Go layer.
-#define R_BITS 255
-typedef struct {limb_t limbs[(R_BITS+63)/64];} Fr; // TODO: use Fr_LIMBS
+#define R_BITS 255 // equal to Fr_bits in bls12381_utils.h
+typedef struct {limb_t limbs[(R_BITS+63)/64];} Fr; 
 
 // field elements F_p
 // F_p elements are represented as big numbers reduced modulo `p`. Big numbers
