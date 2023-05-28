@@ -15,5 +15,5 @@ func TestGossipSubSpamMitigationSuite(t *testing.T) {
 }
 
 func (s *GossipSubSpamMitigationIntegrationTestSuite) TestGossipSubWhisper() {
-	s.Orchestrator.sendEgressMessage(s.T())
+	s.orchestrator.sendEgressMessage(s.T())
 }

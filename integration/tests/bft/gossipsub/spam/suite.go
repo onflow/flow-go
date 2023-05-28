@@ -15,7 +15,7 @@ type Suite struct {
 	attackerVNIDNoSigning   flow.Identifier // corrupt attacker EN id, this node has message signing disabled
 	attackerVNIDWithSigning flow.Identifier // corrupt attacker EN id, this node has message signing enabled
 	victimENID              flow.Identifier // corrupt attacker VN id
-	Orchestrator            *orchestrator
+	orchestrator            *orchestrator
 }
 
 func (s *Suite) SetupSuite() {
@@ -33,8 +33,8 @@ func (s *Suite) SetupSuite() {
 		10_000,
 		100_000,
 		func() insecure.AttackOrchestrator {
-			s.Orchestrator = NewSpamOrchestrator(s.T(), s.Log)
-			return s.Orchestrator
+			s.orchestrator = NewSpamOrchestrator(s.T(), s.Log)
+			return s.orchestrator
 		},
 	)
 }
