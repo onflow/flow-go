@@ -52,16 +52,10 @@ func NewCruiseCtlMetrics() *CruiseCtlMetrics {
 	}
 }
 
-func (c *CruiseCtlMetrics) ProportionalError(err float64) {
-	c.proportionalErr.Set(err)
-}
-
-func (c *CruiseCtlMetrics) IntegralError(err float64) {
-	c.integralErr.Set(err)
-}
-
-func (c *CruiseCtlMetrics) DerivativeError(err float64) {
-	c.derivativeErr.Set(err)
+func (c *CruiseCtlMetrics) PIDError(p, i, d float64) {
+	c.proportionalErr.Set(p)
+	c.integralErr.Set(i)
+	c.derivativeErr.Set(d)
 }
 
 func (c *CruiseCtlMetrics) TargetProposalDuration(duration time.Duration) {

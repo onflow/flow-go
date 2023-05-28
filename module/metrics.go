@@ -345,17 +345,9 @@ type HotstuffMetrics interface {
 
 type CruiseCtlMetrics interface {
 
-	// ProportionalError measures the proportional error observed by the controller.
-	// Errors are measured in seconds.
-	ProportionalError(err float64)
-
-	// IntegralError measures the integral error observed by the controller.
-	// Errors are measured in seconds.
-	IntegralError(err float64)
-
-	// DerivativeError measures the derivative error observed by the controller.
-	// Errors are measured in seconds.
-	DerivativeError(err float64)
+	// PIDError measures the current error values for the proportional, integration,
+	// and derivative terms of the PID controller.
+	PIDError(p, i, d float64)
 
 	// TargetProposalDuration measures the current value of the Block Rate Controller output:
 	// the target duration for a proposal, from entering the view to broadcasting.
