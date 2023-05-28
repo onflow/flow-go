@@ -19,7 +19,7 @@ func TestPassThrough(t *testing.T) {
 
 // TestSealingAndVerificationPassThrough evaluates the health of Corruptible Conduit Framework (CCF) for BFT testing.
 // It runs with two corrupted execution nodes and one corrupted verification node.
-// The corrupted nodes are controlled by a dummy orchestrator that lets all incoming events passing through.
+// The corrupted nodes are controlled by a passthrough orchestrator that lets all incoming events passing through.
 // The test deploys a transaction into the testnet hence causing an execution result with more than
 // one chunk, assigns all chunks to the same single verification node in this testnet, and then verifies whether verification node
 // generates a result approval for all chunks of that execution result.
