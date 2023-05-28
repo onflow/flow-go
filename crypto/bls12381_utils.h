@@ -46,6 +46,9 @@ typedef _Bool bool;  // assuming cgo is using a modern enough compiler
 int      get_valid();
 int      get_invalid();
 int      get_Fr_BYTES();
+int      get_Fp_BYTES();
+int      get_G1_SER_BYTES();
+int      get_G2_SER_BYTES();
 int      get_mapToG1_input_len();
 
 // BLS based SPoCK

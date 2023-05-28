@@ -26,7 +26,7 @@ func TestScalarMultBLS12381(t *testing.T) {
 		generatorScalarMultG1(&p, &expo)
 		expected, err := hex.DecodeString("96484ca50719f5d2533047960878b6bae8289646c0f00a942a1e6992be9981a9e0c7a51e9918f9b19d178cf04a8018a4")
 		require.NoError(t, err)
-		pBytes := make([]byte, SignatureLenBLSBLS12381)
+		pBytes := make([]byte, g1BytesLen)
 		writePointE1(pBytes, &p)
 		assert.Equal(t, pBytes, expected)
 	})
@@ -39,7 +39,7 @@ func TestScalarMultBLS12381(t *testing.T) {
 		generatorScalarMultG2(&p, &expo)
 		expected, err := hex.DecodeString("b35f5043f166848805b98da62dcb9c5d2f25e497bd0d9c461d4a00d19e4e67cc1e813de3c99479d5a2c62fb754fd7df40c4fd60c46834c8ae665343a3ff7dc3cc929de34ad62b7b55974f4e3fd20990d3e564b96e4d33de87716052d58cf823e")
 		require.NoError(t, err)
-		pBytes := make([]byte, PubKeyLenBLSBLS12381)
+		pBytes := make([]byte, g2BytesLen)
 		writePointE2(pBytes, &p)
 		assert.Equal(t, pBytes, expected)
 	})
@@ -130,7 +130,7 @@ func BenchmarkMapToG1(b *testing.B) {
 // test subgroup membership check in G1 and G2
 func TestSubgroupCheck(t *testing.T) {
 	prg := getPRG(t)
-	seed := make([]byte, PubKeyLenBLSBLS12381)
+	seed := make([]byte, g2BytesLen)
 	_, err := prg.Read(seed)
 	require.NoError(t, err)
 
@@ -165,7 +165,7 @@ func TestSubgroupCheck(t *testing.T) {
 
 // subgroup membership check bench
 func BenchmarkSubgroupCheck(b *testing.B) {
-	seed := make([]byte, PubKeyLenBLSBLS12381)
+	seed := make([]byte, g2BytesLen)
 	_, err := mrand.Read(seed)
 	require.NoError(b, err)
 
@@ -195,7 +195,7 @@ func BenchmarkSubgroupCheck(b *testing.B) {
 func TestReadWriteG1(t *testing.T) {
 	prg := getPRG(t)
 	seed := make([]byte, frBytesLen)
-	bytes := make([]byte, SignatureLenBLSBLS12381)
+	bytes := make([]byte, g1BytesLen)
 	// generate a random G1 point, encode it, decode it,
 	// and compare it the original point
 	iterations := 50

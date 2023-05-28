@@ -39,24 +39,16 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
-const (
-	// BLS12-381
-	// p size in bytes, where G1 is defined over the field Zp
-	fieldSize = 48
-	//
-	// 1 for compressed, 0 for uncompressed - values should not be changed
-	uncompressed = 0 //nolint
-	compressed   = 1
-	// Points compression when serialized
-	serializationG1 = compressed
-	serializationG2 = compressed
-	//
-	// SignatureLenBLSBLS12381 is the size of G1 elements
-	SignatureLenBLSBLS12381 = fieldSize * (2 - serializationG1) // the length is divided by 2 if compression is on
-	PrKeyLenBLSBLS12381     = 32                                // equal to frBytesLen
-	// PubKeyLenBLSBLS12381 is the size of G2 elements
-	PubKeyLenBLSBLS12381 = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
+var (
+	// SignatureLenBLSBLS12381 is the size of a `G_1` element.
+	SignatureLenBLSBLS12381 = g1BytesLen
+	// PubKeyLenBLSBLS12381 is the size of a `G_2` element.
+	PubKeyLenBLSBLS12381 = g2BytesLen
+	// PrKeyLenBLSBLS12381 is the size of a `F_r` element, where `r` is the order of `G_1` and `G_2`.
+	PrKeyLenBLSBLS12381 = frBytesLen
+)
 
+const (
 	// Hash to curve params
 	// hash to curve suite ID of the form : CurveID_ || HashID_ || MapID_ || encodingVariant_
 	h2cSuiteID = "BLS12381G1_XOF:KMAC128_SSWU_RO_"
@@ -70,8 +62,7 @@ const (
 )
 
 // expandMsgOutput is the output length of the expand_message step as required by the
-// hash_to_curve algorithm (and the map to G1 step)
-//
+// hash_to_curve algorithm (and the map to G1 step).
 // (Cgo does not export C macros)
 var expandMsgOutput = int(C.get_mapToG1_input_len())
 
@@ -360,7 +351,8 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 // decodePublicKeyCompressed decodes a slice of bytes into a public key.
 // since we use the compressed representation by default, this checks the default and delegates to decodePublicKeyCompressed
 func (a *blsBLS12381Algo) decodePublicKeyCompressed(publicKeyBytes []byte) (PublicKey, error) {
-	if serializationG2 != compressed {
+	// in compression mode, g2BytesLen is equal to 2 * Fp_bytes
+	if g2BytesLen != 2*fpBytesLen {
 		panic("library is not configured to use compressed public key serialization")
 	}
 	return a.decodePublicKey(publicKeyBytes)
@@ -490,7 +482,8 @@ func (pk *pubKeyBLSBLS12381) Size() int {
 // The encoding is a compressed encoding of the point
 // [zcash] https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-
 func (a *pubKeyBLSBLS12381) EncodeCompressed() []byte {
-	if serializationG2 != compressed {
+	// in compression mode, g2BytesLen is equal to 2 * Fp_bytes
+	if g2BytesLen != 2*fpBytesLen {
 		panic("library is not configured to use compressed public key serialization")
 	}
 	dest := make([]byte, pubKeyLengthBLSBLS12381)

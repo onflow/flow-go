@@ -24,6 +24,18 @@ int get_Fr_BYTES() {
     return Fr_BYTES;
 }
 
+int get_Fp_BYTES() {
+    return Fp_BYTES;
+}
+
+int get_G1_SER_BYTES() {
+    return G1_SER_BYTES;
+}
+
+int get_G2_SER_BYTES() {
+    return G2_SER_BYTES;
+}
+
 int get_mapToG1_input_len() {
     return MAP_TO_G1_INPUT_LEN;
 }

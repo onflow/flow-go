@@ -44,8 +44,12 @@ type scalar C.Fr
 // TODO: For now scalars are represented as field elements Fr since all scalars
 // are less than r - check if distinguishing two types in necessary
 
-// BLS12-381 related lengths
+// BLS12-381 related lengths, exported as functions
+// because cgo does not recognize C macros.
 var frBytesLen = int(C.get_Fr_BYTES())
+var g1BytesLen = int(C.get_G1_SER_BYTES())
+var g2BytesLen = int(C.get_G2_SER_BYTES())
+var fpBytesLen = int(C.get_Fp_BYTES())
 
 // get some constants from the C layer
 // (Cgo does not export C macros)
@@ -151,14 +155,14 @@ func writeScalar(dest []byte, x *scalar) {
 }
 
 // writePointE2 writes a G2 point in a slice of bytes
-// The slice should be of size PubKeyLenBLSBLS12381 and the serialization
+// The slice should be of size g2BytesLen and the serialization
 // follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func writePointE2(dest []byte, a *pointE2) {
 	C.E2_write_bytes((*C.uchar)(&dest[0]), (*C.E2)(a))
 }
 
 // writePointE1 writes a G1 point in a slice of bytes
-// The slice should be of size SignatureLenBLSBLS12381 and the serialization
+// The slice should be of size g1BytesLen and the serialization
 // follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func writePointE1(dest []byte, a *pointE1) {
 	C.E1_write_bytes((*C.uchar)(&dest[0]), (*C.E1)(a))
@@ -187,7 +191,7 @@ func readScalarFrStar(a *scalar, src []byte) error {
 }
 
 // readPointE2 reads a E2 point from a slice of bytes
-// The slice is expected to be of size PubKeyLenBLSBLS12381 and the deserialization
+// The slice is expected to be of size g2BytesLen and the deserialization
 // follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves.
 // No G2 membership check is performed.
 func readPointE2(a *pointE2, src []byte) error {
@@ -208,7 +212,7 @@ func readPointE2(a *pointE2, src []byte) error {
 }
 
 // readPointE1 reads a E1 point from a slice of bytes
-// The slice should be of size SignatureLenBLSBLS12381 and the deserialization
+// The slice should be of size g1BytesLen and the deserialization
 // follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves.
 // No G1 membership check is performed.
 func readPointE1(a *pointE1, src []byte) error {

@@ -134,7 +134,7 @@ func testEncodeDecodePublicKeyCrossBLST(t *rapid.T) {
 // testEncodeDecodeG1CrossBLST tests encoding and decoding of G1 points are consistent with BLST.
 // This test assumes signature serialization is identical to BLST.
 func testEncodeDecodeG1CrossBLST(t *rapid.T) {
-	randomSlice := rapid.SliceOfN(rapid.Byte(), SignatureLenBLSBLS12381, SignatureLenBLSBLS12381)
+	randomSlice := rapid.SliceOfN(rapid.Byte(), g1BytesLen, g1BytesLen)
 	validSignatureFlow := rapid.Custom(validSignatureBytesFlow)
 	validSignatureBLST := rapid.Custom(validSignatureBytesBLST)
 	// sigBytes are bytes of either a valid serialization of a E1/G1 point, or random bytes

@@ -201,9 +201,9 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	return x, Y, y, nil
 }
 
-const (
+var (
 	complaintSize       = 1
-	complaintAnswerSize = 1 + PrKeyLenBLSBLS12381
+	complaintAnswerSize = 1 + frBytesLen
 )
 
 // HandleBroadcastMsg processes a new broadcasted message received by the current participant.

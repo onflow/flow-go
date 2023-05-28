@@ -151,11 +151,11 @@ func (s *feldmanVSSstate) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	return x, Y, y, nil
 }
 
-const (
-	shareSize = PrKeyLenBLSBLS12381
+var (
+	shareSize = frBytesLen
 	// the actual verifVectorSize depends on the state and is:
-	// PubKeyLenBLSBLS12381*(t+1)
-	verifVectorSize = PubKeyLenBLSBLS12381
+	// g2BytesLen*(t+1)
+	verifVectorSize = g2BytesLen
 )
 
 // HandleBroadcastMsg processes a new broadcasted message received by the current participant.
