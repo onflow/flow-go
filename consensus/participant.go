@@ -65,7 +65,7 @@ func NewParticipant(
 
 	// initialize the pacemaker
 	controller := timeout.NewController(timeoutConfig)
-	pacemaker, err := pacemaker.New(controller, modules.Notifier, modules.Persist,
+	pacemaker, err := pacemaker.New(controller, cfg.ProposalDurationProvider, modules.Notifier, modules.Persist,
 		pacemaker.WithQCs(qcCollector.Retrieve()...),
 		pacemaker.WithTCs(tcCollector.Retrieve()...),
 	)

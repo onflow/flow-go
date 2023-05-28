@@ -143,27 +143,3 @@ func Test_CombinedIncreaseDecreaseDynamics(t *testing.T) {
 	testDynamicSequence([]bool{increase, decrease, increase, decrease, increase, decrease})
 	testDynamicSequence([]bool{increase, increase, increase, increase, increase, decrease})
 }
-
-// Test_BlockRateDelay check that correct block rate delay is returned
-func Test_BlockRateDelay(t *testing.T) {
-	c, err := NewConfig(time.Duration(minRepTimeout*float64(time.Millisecond)), time.Duration(maxRepTimeout*float64(time.Millisecond)), timeoutAdjustmentFactor, happyPathMaxRoundFailures, time.Duration(maxRepTimeout*float64(time.Millisecond)))
-	if err != nil {
-		t.Fail()
-	}
-	tc := NewController(c)
-	assert.Equal(t, time.Second, tc.BlockRateDelay())
-}
-
-// Test_AdjustBlockRateDelayAtRuntime tests timeout.Config can be passed by value
-// without breaking the ability to update `BlockRateDelayMS`
-func Test_AdjustBlockRateDelayAtRuntime(t *testing.T) {
-	origConf := NewDefaultConfig()
-	require.NoError(t, origConf.SetBlockRateDelay(2227*time.Millisecond))
-
-	tc := NewController(origConf) // here, we pass the timeout.Config BY VALUE
-	assert.Equal(t, 2227*time.Millisecond, tc.BlockRateDelay())
-
-	// adjust BlockRateDelay on `origConf`, which should be reflected by the `timeout.Controller`
-	require.NoError(t, origConf.SetBlockRateDelay(1101*time.Millisecond))
-	assert.Equal(t, 1101*time.Millisecond, tc.BlockRateDelay())
-}
