@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 )
 
@@ -24,13 +25,13 @@ type HotstuffModules struct {
 }
 
 type ParticipantConfig struct {
-	StartupTime                         time.Time                // the time when consensus participant enters first view
-	TimeoutMinimum                      time.Duration            // the minimum timeout for the pacemaker
-	TimeoutMaximum                      time.Duration            // the maximum timeout for the pacemaker
-	TimeoutAdjustmentFactor             float64                  // the factor at which the timeout duration is adjusted
-	HappyPathMaxRoundFailures           uint64                   // number of failed rounds before first timeout increase
-	MaxTimeoutObjectRebroadcastInterval time.Duration            // maximum interval for timeout object rebroadcast
-	ProposalDurationProvider            ProposalDurationProvider // a delay to broadcast block proposal in order to control the block production rate
+	StartupTime                         time.Time                          // the time when consensus participant enters first view
+	TimeoutMinimum                      time.Duration                      // the minimum timeout for the pacemaker
+	TimeoutMaximum                      time.Duration                      // the maximum timeout for the pacemaker
+	TimeoutAdjustmentFactor             float64                            // the factor at which the timeout duration is adjusted
+	HappyPathMaxRoundFailures           uint64                             // number of failed rounds before first timeout increase
+	MaxTimeoutObjectRebroadcastInterval time.Duration                      // maximum interval for timeout object rebroadcast
+	ProposalDurationProvider            pacemaker.ProposalDurationProvider // a delay to broadcast block proposal in order to control the block production rate
 }
 
 func DefaultParticipantConfig() ParticipantConfig {
@@ -41,7 +42,7 @@ func DefaultParticipantConfig() ParticipantConfig {
 		TimeoutAdjustmentFactor:             defTimeout.TimeoutAdjustmentFactor,
 		HappyPathMaxRoundFailures:           defTimeout.HappyPathMaxRoundFailures,
 		MaxTimeoutObjectRebroadcastInterval: time.Duration(defTimeout.MaxTimeoutObjectRebroadcastInterval) * time.Millisecond,
-		ProposalDurationProvider:            staticProposalDurationProvider{dur: 0},
+		ProposalDurationProvider:            pacemaker.NoProposalDelay(),
 	}
 	return cfg
 }
@@ -72,7 +73,7 @@ func WithHappyPathMaxRoundFailures(happyPathMaxRoundFailures uint64) Option {
 	}
 }
 
-func WithProposalDurationProvider(provider ProposalDurationProvider) Option {
+func WithProposalDurationProvider(provider pacemaker.ProposalDurationProvider) Option {
 	return func(cfg *ParticipantConfig) {
 		cfg.ProposalDurationProvider = provider
 	}
@@ -80,22 +81,6 @@ func WithProposalDurationProvider(provider ProposalDurationProvider) Option {
 
 func WithStaticProposalDuration(dur time.Duration) Option {
 	return func(cfg *ParticipantConfig) {
-		cfg.ProposalDurationProvider = staticProposalDurationProvider{dur: dur}
+		cfg.ProposalDurationProvider = pacemaker.NewStaticProposalDurationProvider(dur)
 	}
-}
-
-// ProposalDurationProvider provides the ProposalDelay to the Pacemaker.
-// The ProposalDelay is the time a leader should attempt to consume between
-// entering a view and broadcasting its proposal for that view.
-type ProposalDurationProvider interface {
-	ProposalDuration() time.Duration
-}
-
-// staticProposalDurationProvider is a ProposalDurationProvider which provides a static ProposalDuration.
-type staticProposalDurationProvider struct {
-	dur time.Duration
-}
-
-func (p staticProposalDurationProvider) ProposalDuration() time.Duration {
-	return p.dur
 }

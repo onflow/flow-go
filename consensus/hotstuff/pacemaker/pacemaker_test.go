@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -44,11 +45,12 @@ type ActivePaceMakerTestSuite struct {
 	initialQC   *flow.QuorumCertificate
 	initialTC   *flow.TimeoutCertificate
 
-	notifier    *mocks.Consumer
-	persist     *mocks.Persister
-	paceMaker   *ActivePaceMaker
-	stop        context.CancelFunc
-	timeoutConf timeout.Config
+	notifier                 *mocks.Consumer
+	proposalDurationProvider ProposalDurationProvider
+	persist                  *mocks.Persister
+	paceMaker                *ActivePaceMaker
+	stop                     context.CancelFunc
+	timeoutConf              timeout.Config
 }
 
 func (s *ActivePaceMakerTestSuite) SetupTest() {
@@ -76,7 +78,7 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 	s.persist.On("GetLivenessData").Return(livenessData, nil)
 
 	// init PaceMaker and start
-	s.paceMaker, err = New(timeout.NewController(s.timeoutConf), s.notifier, s.persist)
+	s.paceMaker, err = New(timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist)
 	require.NoError(s.T(), err)
 
 	var ctx context.Context
@@ -341,7 +343,7 @@ func (s *ActivePaceMakerTestSuite) Test_Initialization() {
 	// test that the constructor finds the newest QC and TC
 	s.Run("Random TCs and QCs combined", func() {
 		pm, err := New(
-			timeout.NewController(s.timeoutConf), s.notifier, s.persist,
+			timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist,
 			WithQCs(qcs...), WithTCs(tcs...),
 		)
 		require.NoError(s.T(), err)
@@ -361,7 +363,7 @@ func (s *ActivePaceMakerTestSuite) Test_Initialization() {
 		tcs[45] = helper.MakeTC(helper.WithTCView(highestView+15), helper.WithTCNewestQC(QC(highestView+12)))
 
 		pm, err := New(
-			timeout.NewController(s.timeoutConf), s.notifier, s.persist,
+			timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist,
 			WithTCs(tcs...), WithQCs(qcs...),
 		)
 		require.NoError(s.T(), err)
@@ -381,7 +383,7 @@ func (s *ActivePaceMakerTestSuite) Test_Initialization() {
 		tcs[45] = helper.MakeTC(helper.WithTCView(highestView+15), helper.WithTCNewestQC(QC(highestView+15)))
 
 		pm, err := New(
-			timeout.NewController(s.timeoutConf), s.notifier, s.persist,
+			timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist,
 			WithTCs(tcs...), WithQCs(qcs...),
 		)
 		require.NoError(s.T(), err)
@@ -397,11 +399,11 @@ func (s *ActivePaceMakerTestSuite) Test_Initialization() {
 	// Verify that WithTCs still works correctly if no TCs are given:
 	// the list of TCs is empty or all contained TCs are nil
 	s.Run("Only nil TCs", func() {
-		pm, err := New(timeout.NewController(s.timeoutConf), s.notifier, s.persist, WithTCs())
+		pm, err := New(timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist, WithTCs())
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), s.initialView, pm.CurView())
 
-		pm, err = New(timeout.NewController(s.timeoutConf), s.notifier, s.persist, WithTCs(nil, nil, nil))
+		pm, err = New(timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist, WithTCs(nil, nil, nil))
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), s.initialView, pm.CurView())
 	})
@@ -409,15 +411,34 @@ func (s *ActivePaceMakerTestSuite) Test_Initialization() {
 	// Verify that WithQCs still works correctly if no QCs are given:
 	// the list of QCs is empty or all contained QCs are nil
 	s.Run("Only nil QCs", func() {
-		pm, err := New(timeout.NewController(s.timeoutConf), s.notifier, s.persist, WithQCs())
+		pm, err := New(timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist, WithQCs())
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), s.initialView, pm.CurView())
 
-		pm, err = New(timeout.NewController(s.timeoutConf), s.notifier, s.persist, WithQCs(nil, nil, nil))
+		pm, err = New(timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist, WithQCs(nil, nil, nil))
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), s.initialView, pm.CurView())
 	})
 
+}
+
+type dynamicProposalDurationProvider struct {
+	dur time.Duration
+}
+
+func (p *dynamicProposalDurationProvider) ProposalDuration() time.Duration {
+	return p.dur
+}
+
+// TestProposalDuration tests that the active pacemaker forwards proposal duration values from the provider.
+func (s *ActivePaceMakerTestSuite) TestProposalDuration() {
+	proposalDurationProvider := &dynamicProposalDurationProvider{dur: time.Millisecond * 500}
+	pm, err := New(timeout.NewController(s.timeoutConf), proposalDurationProvider, s.notifier, s.persist)
+	require.NoError(s.T(), err)
+
+	assert.Equal(s.T(), time.Millisecond*500, pm.BlockRateDelay())
+	proposalDurationProvider.dur = time.Second
+	assert.Equal(s.T(), time.Second, pm.BlockRateDelay())
 }
 
 func max(a uint64, values ...uint64) uint64 {

@@ -87,19 +87,3 @@ type PaceMaker interface {
 	// TODO rename?
 	BlockRateDelay() time.Duration
 }
-
-// ProposalDurationProvider provides the ProposalDelay to the Pacemaker.
-// The ProposalDelay is the time a leader should attempt to consume between
-// entering a view and broadcasting its proposal for that view.
-type ProposalDurationProvider interface {
-	ProposalDuration() time.Duration
-}
-
-// staticProposalDurationProvider is a ProposalDurationProvider which provides a static ProposalDuration.
-type staticProposalDurationProvider struct {
-	dur time.Duration
-}
-
-func (p staticProposalDurationProvider) ProposalDuration() time.Duration {
-	return p.dur
-}

@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/cruisectl"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
@@ -121,7 +122,7 @@ func main() {
 		followerDistributor *pubsub.FollowerDistributor
 		dkgBrokerTunnel     *dkgmodule.BrokerTunnel
 		blockTimer          protocol.BlockTimer
-		proposalDurProvider consensus.ProposalDurationProvider
+		proposalDurProvider pacemaker.ProposalDurationProvider
 		committee           *committees.Consensus
 		epochLookup         *epochs.EpochLookup
 		hotstuffModules     *consensus.HotstuffModules
@@ -146,6 +147,7 @@ func main() {
 		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
 		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor, "adjustment of timeout duration in case of time out event")
 		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures, "number of failed rounds before first timeout increase")
+		// TODO backward-compatibility for --block-rate-delay? if we remove in full, will need to update many environments, partner setups...
 		// TODO flag descriptions
 		flags.StringVar(&cruiseCtlTargetTransitionTimeStr, "cruise-ctl-target-epoch-transition-time", cruiseCtlTargetTransitionTimeStr, "")
 		flags.DurationVar(&cruiseCtlConfig.DefaultProposalDuration, "cruise-ctl-default-proposal-duration", cruiseCtlConfig.DefaultProposalDuration, "")
