@@ -343,6 +343,29 @@ type HotstuffMetrics interface {
 	PayloadProductionDuration(duration time.Duration)
 }
 
+type CruiseCtlMetrics interface {
+
+	// ProportionalError measures the proportional error observed by the controller.
+	// Errors are measured in seconds.
+	ProportionalError(err float64)
+
+	// IntegralError measures the integral error observed by the controller.
+	// Errors are measured in seconds.
+	IntegralError(err float64)
+
+	// DerivativeError measures the derivative error observed by the controller.
+	// Errors are measured in seconds.
+	DerivativeError(err float64)
+
+	// TargetProposalDuration measures the current value of the Block Rate Controller output:
+	// the target duration for a proposal, from entering the view to broadcasting.
+	TargetProposalDuration(duration time.Duration)
+
+	// ControllerOutput measures the output of the cruise control PID controller.
+	// Concretely, this is the quantity to subtract from the baseline proposal duration.
+	ControllerOutput(duration time.Duration)
+}
+
 type CollectionMetrics interface {
 	// TransactionIngested is called when a new transaction is ingested by the
 	// node. It increments the total count of ingested transactions and starts

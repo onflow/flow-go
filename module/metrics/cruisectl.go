@@ -1,0 +1,73 @@
+package metrics
+
+import (
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+)
+
+// CruiseCtlMetrics captures metrics about the Block Rate Controller, which adjusts
+// the proposal duration to attain a target epoch switchover time.
+type CruiseCtlMetrics struct {
+	proportionalErr   prometheus.Gauge
+	integralErr       prometheus.Gauge
+	derivativeErr     prometheus.Gauge
+	targetProposalDur prometheus.Gauge
+	controllerOutput  prometheus.Gauge
+}
+
+func NewCruiseCtlMetrics() *CruiseCtlMetrics {
+	return &CruiseCtlMetrics{
+		proportionalErr: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "proportional_err_s",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCruiseCtl,
+			Help:      "The current proportional error measured by the controller",
+		}),
+		integralErr: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "integral_err_s",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCruiseCtl,
+			Help:      "The current integral error measured by the controller",
+		}),
+		derivativeErr: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "derivative_err_per_s",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCruiseCtl,
+			Help:      "The current derivative error measured by the controller",
+		}),
+		targetProposalDur: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "target_proposal_dur_s",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCruiseCtl,
+			Help:      "The current target duration for a proposal",
+		}),
+		controllerOutput: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "controller_output_s",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCruiseCtl,
+			Help:      "The most recent output of the controller; the adjust to subtract from the baseline proposal duration",
+		}),
+	}
+}
+
+func (c *CruiseCtlMetrics) ProportionalError(err float64) {
+	c.proportionalErr.Set(err)
+}
+
+func (c *CruiseCtlMetrics) IntegralError(err float64) {
+	c.integralErr.Set(err)
+}
+
+func (c *CruiseCtlMetrics) DerivativeError(err float64) {
+	c.derivativeErr.Set(err)
+}
+
+func (c *CruiseCtlMetrics) TargetProposalDuration(duration time.Duration) {
+	c.targetProposalDur.Set(duration.Seconds())
+}
+
+func (c *CruiseCtlMetrics) ControllerOutput(duration time.Duration) {
+	c.controllerOutput.Set(duration.Seconds())
+}
