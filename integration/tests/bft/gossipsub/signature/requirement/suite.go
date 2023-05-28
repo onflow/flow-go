@@ -16,7 +16,7 @@ type Suite struct {
 	attackerVNIDNoSigning   flow.Identifier // corrupt attacker EN id, this node has message signing disabled
 	attackerVNIDWithSigning flow.Identifier // corrupt attacker EN id, this node has message signing enabled
 	victimENID              flow.Identifier // corrupt attacker VN id
-	Orchestrator            *Orchestrator
+	orchestrator            *orchestrator
 }
 
 // SetupSuite runs a bare minimum Flow network to function correctly along with 2 attacker nodes and 1 victim node.
@@ -63,8 +63,8 @@ func (s *Suite) SetupSuite() {
 		10_000,
 		100_000,
 		func() insecure.AttackOrchestrator {
-			s.Orchestrator = NewOrchestrator(s.T(), s.Log, s.attackerVNIDNoSigning, s.attackerVNIDWithSigning, s.victimENID)
-			return s.Orchestrator
+			s.orchestrator = NewOrchestrator(s.T(), s.Log, s.attackerVNIDNoSigning, s.attackerVNIDWithSigning, s.victimENID)
+			return s.orchestrator
 		},
 	)
 }
