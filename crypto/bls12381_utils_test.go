@@ -9,6 +9,42 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Sanity check of G1 and G2 scalar multiplication
+func TestScalarMultBLS12381(t *testing.T) {
+	expoBytes, err := hex.DecodeString("444465cb6cc2dba9474e6beeb6a9013fbf1260d073429fb14a31e63e89129390")
+	require.NoError(t, err)
+
+	var expo scalar
+	isZero := mapToFr(&expo, expoBytes)
+	require.False(t, isZero)
+
+	// G1 generator multiplication
+	// Note that generator and random point multiplications
+	// are implemented with the same algorithm
+	t.Run("G1", func(t *testing.T) {
+		var p pointE1
+		generatorScalarMultG1(&p, &expo)
+		expected, err := hex.DecodeString("96484ca50719f5d2533047960878b6bae8289646c0f00a942a1e6992be9981a9e0c7a51e9918f9b19d178cf04a8018a4")
+		require.NoError(t, err)
+		pBytes := make([]byte, SignatureLenBLSBLS12381)
+		writePointE1(pBytes, &p)
+		assert.Equal(t, pBytes, expected)
+	})
+
+	// G2 generator multiplication
+	// Note that generator and random point multiplications
+	// are implemented with the same algorithm
+	t.Run("G2", func(t *testing.T) {
+		var p pointE2
+		generatorScalarMultG2(&p, &expo)
+		expected, err := hex.DecodeString("b35f5043f166848805b98da62dcb9c5d2f25e497bd0d9c461d4a00d19e4e67cc1e813de3c99479d5a2c62fb754fd7df40c4fd60c46834c8ae665343a3ff7dc3cc929de34ad62b7b55974f4e3fd20990d3e564b96e4d33de87716052d58cf823e")
+		require.NoError(t, err)
+		pBytes := make([]byte, PubKeyLenBLSBLS12381)
+		writePointE2(pBytes, &p)
+		assert.Equal(t, pBytes, expected)
+	})
+}
+
 // G1 and G2 scalar multiplication
 func BenchmarkScalarMult(b *testing.B) {
 	seed := make([]byte, securityBits/8)
