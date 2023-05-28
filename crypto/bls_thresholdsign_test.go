@@ -594,9 +594,14 @@ func testCentralizedStatelessAPI(t *testing.T) {
 			signers[randomDuplicate] = tmp
 		}
 
+		// check with not enough signatures
+		thresholdSignature, err = BLSReconstructThresholdSignature(n, threshold, signShares[:threshold], signers[:threshold])
+		assert.Error(t, err)
+		assert.True(t, IsNotEnoughSharesError(err))
+		assert.Nil(t, thresholdSignature)
+
 		// check with an invalid signature (invalid serialization)
-		invalidSig := make([]byte, signatureLengthBLSBLS12381)
-		signShares[0] = invalidSig
+		signShares[0] = BLSInvalidSignature()
 		thresholdSignature, err = BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
 		assert.Error(t, err)
 		assert.True(t, IsInvalidSignatureError(err))
