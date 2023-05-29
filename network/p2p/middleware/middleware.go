@@ -147,6 +147,20 @@ type DisallowListCacheConfig struct {
 	Metrics module.HeroCacheMetrics
 }
 
+// Config is the configuration for the middleware.
+type Config struct {
+	Logger                     zerolog.Logger
+	Libp2pNode                 p2p.LibP2PNode
+	FlowId                     flow.Identifier // This node's Flow ID
+	BitSwapMetrics             module.BitswapMetrics
+	RootBlockID                flow.Identifier
+	UnicastMessageTimeout      time.Duration
+	IdTranslator               p2p.IDTranslator
+	Codec                      network.Codec
+	SlashingViolationsConsumer slashing.ViolationsConsumer
+	DisallowListCacheConfig    DisallowListCacheConfig
+}
+
 // NewMiddleware creates a new middleware instance
 // libP2PNodeFactory is the factory used to create a LibP2PNode
 // flowID is this node's Flow ID
@@ -156,33 +170,22 @@ type DisallowListCacheConfig struct {
 // validators are the set of the different message validators that each inbound messages is passed through
 // During normal operations any error returned by Middleware.start is considered to be catastrophic
 // and will be thrown by the irrecoverable.SignalerContext causing the node to crash.
-func NewMiddleware(
-	logger zerolog.Logger,
-	libP2PNode p2p.LibP2PNode,
-	flowID flow.Identifier,
-	bitswapMetrics module.BitswapMetrics,
-	rootBlockID flow.Identifier,
-	unicastMessageTimeout time.Duration,
-	idTranslator p2p.IDTranslator,
-	codec network.Codec,
-	slashingViolationsConsumer slashing.ViolationsConsumer,
-	opts ...OptionFn) *Middleware {
-
-	if unicastMessageTimeout <= 0 {
-		unicastMessageTimeout = DefaultUnicastTimeout
+func NewMiddleware(cfg *Config, opts ...OptionFn) *Middleware {
+	if cfg.UnicastMessageTimeout <= 0 {
+		cfg.UnicastMessageTimeout = DefaultUnicastTimeout
 	}
 
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
-		log:                        logger,
-		libP2PNode:                 libP2PNode,
-		bitswapMetrics:             bitswapMetrics,
-		rootBlockID:                rootBlockID,
-		validators:                 DefaultValidators(logger, flowID),
-		unicastMessageTimeout:      unicastMessageTimeout,
-		idTranslator:               idTranslator,
-		codec:                      codec,
-		slashingViolationsConsumer: slashingViolationsConsumer,
+		log:                        cfg.Logger,
+		libP2PNode:                 cfg.Libp2pNode,
+		bitswapMetrics:             cfg.BitSwapMetrics,
+		rootBlockID:                cfg.RootBlockID,
+		validators:                 DefaultValidators(cfg.Logger, cfg.FlowId),
+		unicastMessageTimeout:      cfg.UnicastMessageTimeout,
+		idTranslator:               cfg.IdTranslator,
+		codec:                      cfg.Codec,
+		slashingViolationsConsumer: cfg.SlashingViolationsConsumer,
 		unicastRateLimiters:        ratelimit.NoopRateLimiters(),
 	}
 
