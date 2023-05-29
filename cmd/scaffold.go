@@ -471,18 +471,21 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	if len(peerManagerFilters) > 0 {
 		mwOpts = append(mwOpts, middleware.WithPeerManagerFilters(peerManagerFilters))
 	}
-
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
-	mw := middleware.NewMiddleware(
-		fnb.Logger,
-		fnb.LibP2PNode,
-		fnb.Me.NodeID(),
-		fnb.Metrics.Bitswap,
-		fnb.SporkID,
-		fnb.BaseConfig.UnicastMessageTimeout,
-		fnb.IDTranslator,
-		fnb.CodecFactory(),
-		slashingViolationsConsumer,
+	mw := middleware.NewMiddleware(&middleware.Config{
+		Logger:                     fnb.Logger,
+		Libp2pNode:                 fnb.LibP2PNode,
+		FlowId:                     fnb.Me.NodeID(),
+		BitSwapMetrics:             fnb.Metrics.Bitswap,
+		RootBlockID:                fnb.SporkID,
+		UnicastMessageTimeout:      fnb.BaseConfig.UnicastMessageTimeout,
+		IdTranslator:               fnb.IDTranslator,
+		Codec:                      fnb.CodecFactory(),
+		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network),
+		DisallowListCacheConfig: &middleware.DisallowListCacheConfig{
+			MaxSize: fnb.BaseConfig.NetworkConfig.DisallowListCacheSize,
+			Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
+		},
+	},
 		mwOpts...)
 	fnb.NodeDisallowListDistributor.AddConsumer(mw)
 	fnb.Middleware = mw
