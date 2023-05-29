@@ -341,6 +341,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
+			followerDistributor.AddOnBlockFinalizedConsumer(followerEng.OnFinalizedBlock)
 
 			return followerEng, nil
 		}).
