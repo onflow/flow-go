@@ -42,15 +42,6 @@ typedef _Bool bool;  // assuming cgo is using a modern enough compiler
 #define G1_SER_BYTES        (G1_BYTES/(G1_SERIALIZATION+1))
 #define G2_SER_BYTES        (G2_BYTES/(G2_SERIALIZATION+1))
 
-
-int      get_valid();
-int      get_invalid();
-int      get_Fr_BYTES();
-int      get_Fp_BYTES();
-int      get_G1_SER_BYTES();
-int      get_G2_SER_BYTES();
-int      get_mapToG1_input_len();
-
 // BLS based SPoCK
 int     bls_spock_verify(const E2*, const byte*, const E2*, const byte*);
 

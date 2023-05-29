@@ -59,12 +59,10 @@ const (
 	// Cipher suite used for BLS PoP of the form : BLS_POP_ || h2cSuiteID || SchemeTag_
 	// The PoP cipher suite is guaranteed to be different than all signature ciphersuites
 	blsPOPCipherSuite = "BLS_POP_" + h2cSuiteID + schemeTag
+	// expandMsgOutput is the output length of the expand_message step as required by the
+	// hash_to_curve algorithm (and the map to G1 step).
+	expandMsgOutput = int(C.MAP_TO_G1_INPUT_LEN)
 )
-
-// expandMsgOutput is the output length of the expand_message step as required by the
-// hash_to_curve algorithm (and the map to G1 step).
-// (Cgo does not export C macros)
-var expandMsgOutput = int(C.get_mapToG1_input_len())
 
 // blsBLS12381Algo, embeds SignAlgo
 type blsBLS12381Algo struct {

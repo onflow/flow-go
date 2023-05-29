@@ -9,37 +9,6 @@
 // compile all blst C src along with this file
 #include "blst_src.c"
 
-// The functions are tested for ALLOC=AUTO (not for ALLOC=DYNAMIC)
-
-// return macro values to the upper Go Layer
-int get_valid() {
-    return VALID;
-}
-
-int get_invalid() {
-    return INVALID;
-}
-
-int get_Fr_BYTES() {
-    return Fr_BYTES;
-}
-
-int get_Fp_BYTES() {
-    return Fp_BYTES;
-}
-
-int get_G1_SER_BYTES() {
-    return G1_SER_BYTES;
-}
-
-int get_G2_SER_BYTES() {
-    return G2_SER_BYTES;
-}
-
-int get_mapToG1_input_len() {
-    return MAP_TO_G1_INPUT_LEN;
-}
-
 // ------------------- Fr utilities
 
 // Montgomery constant R related to the curve order r
@@ -47,7 +16,7 @@ int get_mapToG1_input_len() {
 const Fr BLS12_381_rR = {{  \
     TO_LIMB_T(0x1824b159acc5056f), TO_LIMB_T(0x998c4fefecbc4ff5), \
     TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe), \
-    }};
+}};
 
 // returns true if a == 0 and false otherwise
 bool Fr_is_zero(const Fr* a) {

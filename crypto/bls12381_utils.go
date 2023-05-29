@@ -44,24 +44,21 @@ type scalar C.Fr
 // TODO: For now scalars are represented as field elements Fr since all scalars
 // are less than r - check if distinguishing two types in necessary
 
-// BLS12-381 related lengths, exported as functions
-// because cgo does not recognize C macros.
-var frBytesLen = int(C.get_Fr_BYTES())
-var g1BytesLen = int(C.get_G1_SER_BYTES())
-var g2BytesLen = int(C.get_G2_SER_BYTES())
-var fpBytesLen = int(C.get_Fp_BYTES())
+const (
+	// BLS12-381 related lengths imported from the C layer
+	frBytesLen = int(C.Fr_BYTES)
+	g1BytesLen = int(C.G1_SER_BYTES)
+	g2BytesLen = int(C.G2_SER_BYTES)
+	fpBytesLen = int(C.Fp_BYTES)
 
-// get some constants from the C layer
-// (Cgo does not export C macros)
-var valid = C.get_valid()
-var invalid = C.get_invalid()
-
-// get some constants from the C layer
-// var blst_errors = C.blst_get_errors()
-var blst_valid = (int)(C.BLST_SUCCESS)
-var blst_bad_encoding = (int)(C.BLST_BAD_ENCODING)
-var blst_bad_scalar = (int)(C.BLST_BAD_SCALAR)
-var blst_point_not_on_curve = (int)(C.BLST_POINT_NOT_ON_CURVE)
+	// more internal constants from the C layer
+	valid                   = C.VALID
+	invalid                 = C.INVALID
+	blst_valid              = int(C.BLST_SUCCESS)
+	blst_bad_encoding       = int(C.BLST_BAD_ENCODING)
+	blst_bad_scalar         = int(C.BLST_BAD_SCALAR)
+	blst_point_not_on_curve = int(C.BLST_POINT_NOT_ON_CURVE)
+)
 
 func (a *scalar) String() string {
 	encoding := make([]byte, frBytesLen)
