@@ -35,7 +35,7 @@ func (s *NodeBlocklistWrapperTestSuite) SetupTest() {
 
 	var err error
 	s.distributor = mockp2p.NewDisallowListNotificationDistributor(s.T())
-	s.wrapper, err = cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.distributor)
+	s.wrapper, err = cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.distributor)
 	require.NoError(s.T(), err)
 }
 
@@ -44,7 +44,7 @@ func TestNodeBlocklistWrapperTestSuite(t *testing.T) {
 }
 
 // TestHonestNode verifies:
-// For nodes _not_ on the blocklist, the `cache.NodeBlocklistWrapper` should forward
+// For nodes _not_ on the disallowList, the `cache.NodeBlocklistWrapper` should forward
 // the identities from the wrapped `IdentityProvider` without modification.
 func (s *NodeBlocklistWrapperTestSuite) TestHonestNode() {
 	s.Run("ByNodeID", func() {
@@ -78,8 +78,8 @@ func (s *NodeBlocklistWrapperTestSuite) TestHonestNode() {
 	})
 }
 
-// TestDenylistedNode tests proper handling of identities _on_ the blocklist:
-//   - For any identity `i` with `i.NodeID ∈ blocklist`, the returned identity
+// TestDenylistedNode tests proper handling of identities _on_ the disallowList:
+//   - For any identity `i` with `i.NodeID ∈ disallowList`, the returned identity
 //     should have `i.Ejected` set to `true` (irrespective of the `Ejected`
 //     flag's initial returned by the wrapped `IdentityProvider`).
 //   - The wrapper should _copy_ the identity and _not_ write into the wrapped
@@ -210,12 +210,12 @@ func (s *NodeBlocklistWrapperTestSuite) TestUnknownNode() {
 	}
 }
 
-// TestBlocklistAddRemove checks that adding and subsequently removing a node from the blocklist
+// TestBlocklistAddRemove checks that adding and subsequently removing a node from the disallowList
 // it in combination a no-op. We test two scenarious
 //   - Node whose original `Identity` has `Ejected = false`:
-//     After adding the node to the blocklist and then removing it again, the `Ejected` should be false.
+//     After adding the node to the disallowList and then removing it again, the `Ejected` should be false.
 //   - Node whose original `Identity` has `Ejected = true`:
-//     After adding the node to the blocklist and then removing it again, the `Ejected` should be still be true.
+//     After adding the node to the disallowList and then removing it again, the `Ejected` should be still be true.
 func (s *NodeBlocklistWrapperTestSuite) TestBlocklistAddRemove() {
 	for _, originalEjected := range []bool{true, false} {
 		s.Run(fmt.Sprintf("Add & remove node with Ejected = %v", originalEjected), func() {
@@ -225,7 +225,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestBlocklistAddRemove() {
 			s.provider.On("ByNodeID", originalIdentity.NodeID).Return(originalIdentity, true)
 			s.provider.On("ByPeerID", peerID).Return(originalIdentity, true)
 
-			// step 1: before putting node on blocklist,
+			// step 1: before putting node on disallowList,
 			// an Identity with `Ejected` equal to the original value should be returned
 			i, found := s.wrapper.ByNodeID(originalIdentity.NodeID)
 			require.True(s.T(), found)
@@ -235,7 +235,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestBlocklistAddRemove() {
 			require.True(s.T(), found)
 			require.Equal(s.T(), originalEjected, i.Ejected)
 
-			// step 2: _after_ putting node on blocklist,
+			// step 2: _after_ putting node on disallowList,
 			// an Identity with `Ejected` equal to `true` should be returned
 			s.distributor.On("DistributeBlockListNotification", flow.IdentifierList{originalIdentity.NodeID}).Return(nil).Once()
 			err := s.wrapper.Update(flow.IdentifierList{originalIdentity.NodeID})
@@ -249,7 +249,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestBlocklistAddRemove() {
 			require.True(s.T(), found)
 			require.True(s.T(), i.Ejected)
 
-			// step 3: after removing the node from the blocklist,
+			// step 3: after removing the node from the disallowList,
 			// an Identity with `Ejected` equal to the original value should be returned
 			s.distributor.On("DistributeBlockListNotification", flow.IdentifierList{}).Return(nil).Once()
 			err = s.wrapper.Update(flow.IdentifierList{})
@@ -266,10 +266,10 @@ func (s *NodeBlocklistWrapperTestSuite) TestBlocklistAddRemove() {
 	}
 }
 
-// TestUpdate tests updating, clearing and retrieving the blocklist.
+// TestUpdate tests updating, clearing and retrieving the disallowList.
 // This test verifies that the wrapper updates _its own internal state_ correctly.
 // Note:
-// conceptually, the blocklist is a set, i.e. not order dependent.
+// conceptually, the disallowList is a set, i.e. not order dependent.
 // The wrapper internally converts the list to a set and vice versa. Therefore
 // the order is not preserved by `GetBlocklist`. Consequently, we compare
 // map-based representations here.
@@ -300,7 +300,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestUpdate() {
 }
 
 // TestDataBasePersist verifies database interactions of the wrapper with the data base.
-// This test verifies that the blocklist updates are persisted across restarts.
+// This test verifies that the disallowList updates are persisted across restarts.
 // To decouple this test from the lower-level data base design, we proceed as follows:
 //   - We do data-base operation through the exported methods from `NodeBlocklistWrapper`
 //   - Then, we create a new `NodeBlocklistWrapper` backed by the same data base. Since it is a
@@ -314,34 +314,34 @@ func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 	blocklist := unittest.IdentifierListFixture(8)
 	blocklist2 := unittest.IdentifierListFixture(8)
 
-	s.Run("Get blocklist from empty database", func() {
+	s.Run("Get disallowList from empty database", func() {
 		require.Empty(s.T(), s.wrapper.GetBlocklist())
 	})
 
-	s.Run("Clear blocklist on empty database", func() {
+	s.Run("Clear disallowList on empty database", func() {
 		s.distributor.On("DistributeBlockListNotification", (flow.IdentifierList)(nil)).Return(nil).Once()
 		err := s.wrapper.ClearBlocklist() // No-op as data base does not contain any block list
 		require.NoError(s.T(), err)
 		require.Empty(s.T(), s.wrapper.GetBlocklist())
 
-		// newly created wrapper should read `blocklist` from data base during initialization
-		w, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.distributor)
+		// newly created wrapper should read `disallowList` from data base during initialization
+		w, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.distributor)
 		require.NoError(s.T(), err)
 		require.Empty(s.T(), w.GetBlocklist())
 	})
 
-	s.Run("Update blocklist and init new wrapper from database", func() {
+	s.Run("Update disallowList and init new wrapper from database", func() {
 		s.distributor.On("DistributeBlockListNotification", blocklist).Return(nil).Once()
 		err := s.wrapper.Update(blocklist)
 		require.NoError(s.T(), err)
 
-		// newly created wrapper should read `blocklist` from data base during initialization
-		w, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.distributor)
+		// newly created wrapper should read `disallowList` from data base during initialization
+		w, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.distributor)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), blocklist.Lookup(), w.GetBlocklist().Lookup())
 	})
 
-	s.Run("Update and overwrite blocklist and then init new wrapper from database", func() {
+	s.Run("Update and overwrite disallowList and then init new wrapper from database", func() {
 		s.distributor.On("DistributeBlockListNotification", blocklist).Return(nil).Once()
 		err := s.wrapper.Update(blocklist)
 		require.NoError(s.T(), err)
@@ -351,29 +351,29 @@ func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 		require.NoError(s.T(), err)
 
 		// newly created wrapper should read initial state from data base
-		w, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.distributor)
+		w, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.distributor)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), blocklist2.Lookup(), w.GetBlocklist().Lookup())
 	})
 
 	s.Run("Update & clear & update and then init new wrapper from database", func() {
-		// set blocklist ->
+		// set disallowList ->
 		// newly created wrapper should now read this list from data base during initialization
 		s.distributor.On("DistributeBlockListNotification", blocklist).Return(nil).Once()
 		err := s.wrapper.Update(blocklist)
 		require.NoError(s.T(), err)
 
-		w0, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.distributor)
+		w0, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.distributor)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), blocklist.Lookup(), w0.GetBlocklist().Lookup())
 
-		// clear blocklist ->
-		// newly created wrapper should now read empty blocklist from data base during initialization
+		// clear disallowList ->
+		// newly created wrapper should now read empty disallowList from data base during initialization
 		s.distributor.On("DistributeBlockListNotification", (flow.IdentifierList)(nil)).Return(nil).Once()
 		err = s.wrapper.ClearBlocklist()
 		require.NoError(s.T(), err)
 
-		w1, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.distributor)
+		w1, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.distributor)
 		require.NoError(s.T(), err)
 		require.Empty(s.T(), w1.GetBlocklist())
 
@@ -383,7 +383,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 		err = s.wrapper.Update(blocklist2)
 		require.NoError(s.T(), err)
 
-		w2, err := cache.NewNodeBlocklistWrapper(s.provider, s.DB, s.distributor)
+		w2, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.distributor)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), blocklist2.Lookup(), w2.GetBlocklist().Lookup())
 	})
