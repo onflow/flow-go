@@ -51,7 +51,6 @@ require (
 	github.com/libp2p/go-libp2p-kbucket v0.4.7
 	github.com/libp2p/go-libp2p-pubsub v0.8.2-0.20221201175637-3d2eab35722e
 	github.com/libp2p/go-libp2p-tls v0.4.1
-	github.com/m4ksio/wal v1.0.1-0.20221209164835-154a17396e4c
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-multiaddr v0.7.0
 	github.com/multiformats/go-multiaddr-dns v0.3.1
@@ -105,6 +104,7 @@ require github.com/slok/go-http-metrics v0.10.0
 
 require (
 	github.com/montanaflynn/stats v0.6.6
+	github.com/onflow/wal v0.0.0-20230529184820-bc9f8244608d
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/profile v1.7.0
 )

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	prometheusWAL "github.com/m4ksio/wal/wal"
+	prometheusWAL "github.com/onflow/wal/wal"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
