@@ -12,19 +12,15 @@ import (
 
 type Suite struct {
 	bft.BaseSuite
-	attackerVNIDNoSigning   flow.Identifier // corrupt attacker EN id, this node has message signing disabled
-	attackerVNIDWithSigning flow.Identifier // corrupt attacker EN id, this node has message signing enabled
-	victimENID              flow.Identifier // corrupt attacker VN id
-	orchestrator            *orchestrator
+	orchestrator *orchestrator
 }
 
 func (s *Suite) SetupSuite() {
 	s.BaseSuite.SetupSuite()
 
-	// create 1 victim VN node
-	s.attackerVNIDNoSigning = unittest.IdentifierFixture()
+	// create spam victim VN node
 	s.NodeConfigs = append(s.NodeConfigs, testnet.NewNodeConfig(flow.RoleVerification,
-		testnet.WithID(s.attackerVNIDNoSigning),
+		testnet.WithID(unittest.IdentifierFixture()),
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.AsCorrupted()))
 
@@ -33,7 +29,7 @@ func (s *Suite) SetupSuite() {
 		10_000,
 		100_000,
 		func() insecure.AttackOrchestrator {
-			s.orchestrator = NewSpamOrchestrator(s.T(), s.Log)
+			s.orchestrator = NewOrchestrator(s.T(), s.Log)
 			return s.orchestrator
 		},
 	)

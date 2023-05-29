@@ -2,8 +2,11 @@ package spam
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type GossipSubSpamMitigationIntegrationTestSuite struct {
@@ -15,5 +18,6 @@ func TestGossipSubSpamMitigationSuite(t *testing.T) {
 }
 
 func (s *GossipSubSpamMitigationIntegrationTestSuite) TestGossipSubWhisper() {
-	s.orchestrator.sendEgressMessage(s.T())
+	s.orchestrator.sendOneEgressMessage(s.T())
+	unittest.RequireReturnsBefore(s.T(), s.orchestrator.egressEventReceivedWg.Wait, 5*time.Second, "could not send messages on time")
 }
