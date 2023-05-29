@@ -72,8 +72,7 @@ const (
 )
 
 var (
-	_ network.Middleware                       = (*Middleware)(nil)
-	_ network.DisallowListNotificationConsumer = (*Middleware)(nil)
+	_ network.Middleware = (*Middleware)(nil)
 
 	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
 	// the middleware receives a message via unicast but does not have a corresponding subscription for
@@ -360,9 +359,17 @@ func (m *Middleware) authorizedPeers() peer.IDSlice {
 	return peerIDs
 }
 
-// OnDisallowListNotification is called when a new disallow list update notification is distributed.
-// It disconnects from all peers in the disallow list.
-func (m *Middleware) OnDisallowListNotification(notification *p2p.RemoteNodesAllowListingUpdate) {
+// GetAllDisallowedListCausesFor returns the list of causes for which the given peer is disallow-listed.
+// Args:
+// - peerID: the peer to check.
+// Returns:
+// - the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
+// an empty list is returned.
+func (m *Middleware) GetAllDisallowedListCausesFor(pid peer.ID) []network.DisallowListedCause {
+	return m.disallowListedCache.GetAllDisallowedListCausesFor(pid)
+}
+
+func (m *Middleware) OnDisallowListNotification(notification *network.DisallowListingUpdate) {
 	for _, pid := range m.peerIDs(notification.FlowIds) {
 		causes, err := m.disallowListedCache.DisallowFor(pid, notification.Cause)
 		if err != nil {
@@ -373,6 +380,7 @@ func (m *Middleware) OnDisallowListNotification(notification *p2p.RemoteNodesAll
 		// TODO: this code should further be refactored to also log the Flow id.
 		m.log.Warn().
 			Str("peer_id", pid.String()).
+			Str("notification_cause", notification.Cause.String()).
 			Str("causes", fmt.Sprintf("%v", causes)).
 			Msg("peer added to disallow list cache")
 
@@ -382,6 +390,17 @@ func (m *Middleware) OnDisallowListNotification(notification *p2p.RemoteNodesAll
 		if err != nil {
 			m.log.Error().Err(err).Str("peer_id", pid.String()).Msg("failed to disconnect from blocklisted peer")
 		}
+	}
+}
+
+func (m *Middleware) OnAllowListNotification(notification *network.AllowListingUpdate) {
+	for _, pid := range m.peerIDs(notification.FlowIds) {
+		m.disallowListedCache.AllowFor(pid, notification.Cause)
+
+		m.log.Debug().
+			Str("peer_id", pid.String()).
+			Str("causes", fmt.Sprintf("%v", notification.Cause)).
+			Msg("peer added to disallow list cache")
 	}
 }
 
