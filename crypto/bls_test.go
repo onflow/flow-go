@@ -411,7 +411,7 @@ func TestBLSAggregateSignatures(t *testing.T) {
 		assert.False(t, result)
 
 		// test with a signature of a wrong length
-		shortSig := sigs[0][:signatureLengthBLSBLS12381-1]
+		shortSig := sigs[0][:SignatureLenBLSBLS12381-1]
 		aggSig, err = AggregateBLSSignatures([]Signature{shortSig})
 		assert.Error(t, err)
 		assert.True(t, IsInvalidSignatureError(err))
@@ -1199,7 +1199,7 @@ func TestBLSIdentity(t *testing.T) {
 		sk := randomSK(t, rand)
 		sig, err := sk.Sign(msg, hasher)
 		require.NoError(t, err)
-		oppositeSig := make([]byte, signatureLengthBLSBLS12381)
+		oppositeSig := make([]byte, SignatureLenBLSBLS12381)
 		copy(oppositeSig, sig)
 		negatePoint(oppositeSig)
 		aggSig, err := AggregateBLSSignatures([]Signature{sig, oppositeSig})

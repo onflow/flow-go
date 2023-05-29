@@ -399,10 +399,10 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 		return nil, notEnoughSharesErrorf("number of signature shares %d is not enough, %d are required",
 			len(s.shares), s.threshold+1)
 	}
-	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
+	thresholdSignature := make([]byte, SignatureLenBLSBLS12381)
 
 	// prepare the C layer inputs
-	shares := make([]byte, 0, len(s.shares)*signatureLengthBLSBLS12381)
+	shares := make([]byte, 0, len(s.shares)*SignatureLenBLSBLS12381)
 	signers := make([]index, 0, len(s.shares))
 	for index, share := range s.shares {
 		shares = append(shares, share...)
@@ -482,7 +482,7 @@ func BLSReconstructThresholdSignature(size int, threshold int,
 	m := make(map[index]bool)
 
 	// flatten the shares (required by the C layer)
-	flatShares := make([]byte, 0, signatureLengthBLSBLS12381*(threshold+1))
+	flatShares := make([]byte, 0, SignatureLenBLSBLS12381*(threshold+1))
 	indexSigners := make([]index, 0, threshold+1)
 	for i, share := range shares {
 		flatShares = append(flatShares, share...)
@@ -500,7 +500,7 @@ func BLSReconstructThresholdSignature(size int, threshold int,
 		indexSigners = append(indexSigners, index(signers[i])+1)
 	}
 
-	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
+	thresholdSignature := make([]byte, SignatureLenBLSBLS12381)
 	// Lagrange Interpolate at point 0
 	if C.E1_lagrange_interpolate_at_zero_write(
 		(*C.uchar)(&thresholdSignature[0]),

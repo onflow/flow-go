@@ -4,19 +4,6 @@
 
 // The functions are tested for ALLOC=AUTO (not for ALLOC=DYNAMIC)
 
-// functions to export macros to the Go layer (because cgo does not import macros)
-int get_signature_len() {
-    return SIGNATURE_LEN;
-}
-
-int get_pk_len() {
-    return PK_LEN;
-}
-
-int get_sk_len() {
-    return SK_LEN;
-}
-
 // Computes a BLS signature from a G1 point and writes it in `out`.
 // `out` must be allocated properly with `G1_SER_BYTES` bytes.
 static void bls_sign_E1(byte* out, const Fr* sk, const E1* h) {
@@ -93,7 +80,7 @@ int bls_verifyPerDistinctMessage(const byte* sig,
     if (!elemsG2) goto outG2;
 
     // elemsG1[0] = sig
-    if (E1_read_bytes(&elemsG1[0], sig, SIGNATURE_LEN) != BLST_SUCCESS) {
+    if (E1_read_bytes(&elemsG1[0], sig, G1_SER_BYTES) != BLST_SUCCESS) {
         ret = INVALID;
         goto out;
     }
@@ -167,7 +154,7 @@ int bls_verifyPerDistinctKey(const byte* sig,
     if (!elemsG2) goto outG2;
 
     // elemsG1[0] = s
-    if (E1_read_bytes(&elemsG1[0], sig, SIGNATURE_LEN) != BLST_SUCCESS) {
+    if (E1_read_bytes(&elemsG1[0], sig, G1_SER_BYTES) != BLST_SUCCESS) {
         ret = INVALID;
         goto out;
     }
@@ -243,7 +230,7 @@ outG1:
 int bls_verify(const E2* pk, const byte* sig, const byte* hash, const int hash_len) {  
     E1 s, h;
     // deserialize the signature into a curve point
-    if (E1_read_bytes(&s, sig, SIGNATURE_LEN) != BLST_SUCCESS) {
+    if (E1_read_bytes(&s, sig, G1_SER_BYTES) != BLST_SUCCESS) {
         return INVALID;
     }
 
@@ -393,7 +380,7 @@ void bls_batch_verify(const int sigs_len, byte* results, const E2* pks_input,
         // the tree aggregations remain valid.
         // - valid points are multiplied by a random scalar (same for public keys at same index)
         // to make sure a signature at index (i) is verified against the public key at the same index.
-        int read_ret = E1_read_bytes(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
+        int read_ret = E1_read_bytes(&sigs[i], &sigs_bytes[G1_SER_BYTES*i], G1_SER_BYTES);
         if (read_ret != BLST_SUCCESS || !E1_in_G1(&sigs[i])) {
             // set signature and key to infinity (no effect on the aggregation tree)
             // and set result to invalid (result won't be overwritten)

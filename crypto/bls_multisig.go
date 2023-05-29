@@ -102,14 +102,14 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 	}
 
 	// flatten the shares (required by the C layer)
-	flatSigs := make([]byte, 0, signatureLengthBLSBLS12381*len(sigs))
+	flatSigs := make([]byte, 0, SignatureLenBLSBLS12381*len(sigs))
 	for i, sig := range sigs {
-		if len(sig) != signatureLengthBLSBLS12381 {
+		if len(sig) != SignatureLenBLSBLS12381 {
 			return nil, fmt.Errorf("signature at index %d has an invalid length: %w", i, invalidSignatureError)
 		}
 		flatSigs = append(flatSigs, sig...)
 	}
-	aggregatedSig := make([]byte, signatureLengthBLSBLS12381)
+	aggregatedSig := make([]byte, SignatureLenBLSBLS12381)
 
 	// add the points in the C layer
 	result := C.E1_sum_vector_byte(
@@ -325,7 +325,7 @@ func VerifyBLSSignatureManyMessages(
 ) (bool, error) {
 
 	// check signature length
-	if len(s) != signatureLengthBLSBLS12381 {
+	if len(s) != SignatureLenBLSBLS12381 {
 		return false, nil
 	}
 	// check the list lengths
@@ -494,7 +494,7 @@ func BatchVerifyBLSSignaturesOneMessage(
 	}
 
 	// flatten the shares (required by the C layer)
-	flatSigs := make([]byte, 0, signatureLengthBLSBLS12381*len(sigs))
+	flatSigs := make([]byte, 0, SignatureLenBLSBLS12381*len(sigs))
 	pkPoints := make([]pointE2, 0, len(pks))
 
 	getIdentityPoint := func() pointE2 {
@@ -508,7 +508,7 @@ func BatchVerifyBLSSignaturesOneMessage(
 			return falseSlice, fmt.Errorf("key at index %d is invalid: %w", i, notBLSKeyError)
 		}
 
-		if len(sigs[i]) != signatureLengthBLSBLS12381 || pkBLS.isIdentity {
+		if len(sigs[i]) != SignatureLenBLSBLS12381 || pkBLS.isIdentity {
 			// case of invalid signature: set the signature and public key at index `i`
 			// to identities so that there is no effect on the aggregation tree computation.
 			// However, the boolean return for index `i` is set to `false` and won't be overwritten.

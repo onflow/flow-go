@@ -80,7 +80,7 @@ func validSignatureBytesBLST(t *rapid.T) []byte {
 // testEncodeDecodePrivateKeyCrossBLST tests encoding and decoding of private keys are consistent with BLST.
 // This test assumes private key serialization is identical to the one in BLST.
 func testEncodeDecodePrivateKeyCrossBLST(t *rapid.T) {
-	randomSlice := rapid.SliceOfN(rapid.Byte(), prKeyLengthBLSBLS12381, prKeyLengthBLSBLS12381)
+	randomSlice := rapid.SliceOfN(rapid.Byte(), PrKeyLenBLSBLS12381, PrKeyLenBLSBLS12381)
 	validSliceFlow := rapid.Custom(validPrivateKeyBytesFlow)
 	validSliceBLST := rapid.Custom(validPrivateKeyBytesBLST)
 	// skBytes are bytes of either a valid or a random private key
@@ -154,7 +154,7 @@ func testEncodeDecodeG1CrossBLST(t *rapid.T) {
 
 	// check both serializations of G1 points are equal
 	if flowPass && blstPass {
-		sigFlowOutBytes := make([]byte, signatureLengthBLSBLS12381)
+		sigFlowOutBytes := make([]byte, g1BytesLen)
 		writePointE1(sigFlowOutBytes, &pointFlow)
 		sigBLSTOutBytes := pointBLST.Compress()
 		assert.Equal(t, sigFlowOutBytes, sigBLSTOutBytes)

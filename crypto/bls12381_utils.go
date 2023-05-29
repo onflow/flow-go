@@ -70,7 +70,7 @@ func (a *scalar) String() string {
 }
 
 func (p *pointE2) String() string {
-	encoding := make([]byte, pubKeyLengthBLSBLS12381)
+	encoding := make([]byte, g2BytesLen)
 	writePointE2(encoding, p)
 	return fmt.Sprintf("%#x", encoding)
 }
@@ -307,7 +307,7 @@ func hashToG1Bytes(data, dst []byte) []byte {
 	}
 
 	// serialize the point
-	pointBytes := make([]byte, signatureLengthBLSBLS12381)
+	pointBytes := make([]byte, g1BytesLen)
 	writePointE1(pointBytes, &point)
 	return pointBytes
 }

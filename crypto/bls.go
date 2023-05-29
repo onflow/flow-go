@@ -184,7 +184,7 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 		return false, err
 	}
 
-	if len(s) != signatureLengthBLSBLS12381 {
+	if len(s) != SignatureLenBLSBLS12381 {
 		return false, nil
 	}
 
@@ -214,7 +214,7 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 // 0xC0 is the header of the point at infinity serialization (either in G1 or G2)
 const infinityPointHeader = byte(0xC0)
 
-var identityBLSSignature = append([]byte{infinityPointHeader}, make([]byte, signatureLengthBLSBLS12381-1)...)
+var identityBLSSignature = append([]byte{infinityPointHeader}, make([]byte, SignatureLenBLSBLS12381-1)...)
 
 // IsBLSSignatureIdentity checks whether the input signature is
 // the identity signature (point at infinity in G1).
@@ -327,9 +327,9 @@ func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, 
 // a faster check during signature verifications. Any verification against an identity
 // public key outputs `false`.
 func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
-	if len(publicKeyBytes) != pubKeyLengthBLSBLS12381 {
+	if len(publicKeyBytes) != PubKeyLenBLSBLS12381 {
 		return nil, invalidInputsErrorf("input length must be %d, got %d",
-			pubKeyLengthBLSBLS12381, len(publicKeyBytes))
+			PubKeyLenBLSBLS12381, len(publicKeyBytes))
 	}
 	var pk pubKeyBLSBLS12381
 	err := readPointE2(&pk.point, publicKeyBytes)
@@ -415,7 +415,7 @@ func (sk *prKeyBLSBLS12381) PublicKey() PublicKey {
 // Encode returns a byte encoding of the private key.
 // The encoding is a raw encoding in big endian padded to the group order
 func (a *prKeyBLSBLS12381) Encode() []byte {
-	dest := make([]byte, prKeyLengthBLSBLS12381)
+	dest := make([]byte, frBytesLen)
 	writeScalar(dest, &a.scalar)
 	return dest
 }
@@ -486,7 +486,7 @@ func (a *pubKeyBLSBLS12381) EncodeCompressed() []byte {
 	if g2BytesLen != 2*fpBytesLen {
 		panic("library is not configured to use compressed public key serialization")
 	}
-	dest := make([]byte, pubKeyLengthBLSBLS12381)
+	dest := make([]byte, g2BytesLen)
 	writePointE2(dest, &a.point)
 	return dest
 }
@@ -510,11 +510,6 @@ func (pk *pubKeyBLSBLS12381) Equals(other PublicKey) bool {
 func (pk *pubKeyBLSBLS12381) String() string {
 	return pk.point.String()
 }
-
-// Get Macro definitions from the C layer as Cgo does not export macros
-var signatureLengthBLSBLS12381 = int(C.get_signature_len())
-var pubKeyLengthBLSBLS12381 = int(C.get_pk_len())
-var prKeyLengthBLSBLS12381 = int(C.get_sk_len())
 
 // This is only a TEST function.
 // signWithXMDSHA256 signs a message using XMD_SHA256 as a hash to field.

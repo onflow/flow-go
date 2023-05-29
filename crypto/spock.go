@@ -73,7 +73,7 @@ func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signatur
 		return false, notBLSKeyError
 	}
 
-	if len(proof1) != signatureLengthBLSBLS12381 || len(proof2) != signatureLengthBLSBLS12381 {
+	if len(proof1) != g1BytesLen || len(proof2) != g1BytesLen {
 		return false, nil
 	}
 
