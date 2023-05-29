@@ -72,8 +72,8 @@ const (
 )
 
 var (
-	_ network.Middleware                   = (*Middleware)(nil)
-	_ p2p.DisallowListNotificationConsumer = (*Middleware)(nil)
+	_ network.Middleware                       = (*Middleware)(nil)
+	_ network.DisallowListNotificationConsumer = (*Middleware)(nil)
 
 	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
 	// the middleware receives a message via unicast but does not have a corresponding subscription for
@@ -362,9 +362,23 @@ func (m *Middleware) authorizedPeers() peer.IDSlice {
 
 // OnDisallowListNotification is called when a new disallow list update notification is distributed.
 // It disconnects from all peers in the disallow list.
-func (m *Middleware) OnDisallowListNotification(notification *p2p.DisallowListUpdateNotification) {
-	for _, pid := range m.peerIDs(notification.DisallowList) {
-		err := m.libP2PNode.RemovePeer(pid)
+func (m *Middleware) OnDisallowListNotification(notification *p2p.RemoteNodesAllowListingUpdate) {
+	for _, pid := range m.peerIDs(notification.FlowIds) {
+		causes, err := m.disallowListedCache.DisallowFor(pid, notification.Cause)
+		if err != nil {
+			// returned error is fatal.
+			m.log.Fatal().Err(err).Str("peer_id", pid.String()).Msg("failed to add peer to disallow list")
+		}
+
+		// TODO: this code should further be refactored to also log the Flow id.
+		m.log.Warn().
+			Str("peer_id", pid.String()).
+			Str("causes", fmt.Sprintf("%v", causes)).
+			Msg("peer added to disallow list cache")
+
+		// TODO: technically, adding a peer to the disallow list should also remove its connection (through the peer manager)
+		// hence, this code part can be removed.
+		err = m.libP2PNode.RemovePeer(pid)
 		if err != nil {
 			m.log.Error().Err(err).Str("peer_id", pid.String()).Msg("failed to disconnect from blocklisted peer")
 		}

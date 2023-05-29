@@ -4,7 +4,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network"
 )
 
 // disallowListCacheEntity is the model data type for the disallow list cache.
@@ -13,7 +13,7 @@ import (
 // This means that the entities are deduplicated by their peerID.
 type disallowListCacheEntity struct {
 	peerID peer.ID
-	causes map[middleware.DisallowListedCause]struct{}
+	causes map[network.DisallowListedCause]struct{}
 	// id is the hash of the peerID which is used as the key for storing the entity in the cache.
 	// we cache it internally to avoid hashing the peerID multiple times.
 	id flow.Identifier

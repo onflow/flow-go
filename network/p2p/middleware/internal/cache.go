@@ -12,6 +12,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 )
 
@@ -55,8 +56,8 @@ func NewDisallowListCache(sizeLimit uint32, logger zerolog.Logger, collector mod
 // Returns:
 // - the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
 // an empty list is returned.
-func (d *DisallowListCache) GetAllDisallowedListCausesFor(peerID peer.ID) []middleware.DisallowListedCause {
-	causes := make([]middleware.DisallowListedCause, 0)
+func (d *DisallowListCache) GetAllDisallowedListCausesFor(peerID peer.ID) []network.DisallowListedCause {
+	causes := make([]network.DisallowListedCause, 0)
 	entity, exists := d.c.ByID(makeId(peerID))
 	if !exists {
 		return causes
@@ -78,7 +79,7 @@ func (d *DisallowListCache) GetAllDisallowedListCausesFor(peerID peer.ID) []midd
 func (d *DisallowListCache) init(peerID peer.ID) bool {
 	return d.c.Add(&disallowListCacheEntity{
 		peerID: peerID,
-		causes: make(map[middleware.DisallowListedCause]struct{}),
+		causes: make(map[network.DisallowListedCause]struct{}),
 		id:     makeId(peerID),
 	})
 }
@@ -90,7 +91,7 @@ func (d *DisallowListCache) init(peerID peer.ID) bool {
 // Returns:
 // - the list of causes for which the peer is disallow-listed.
 // - error if the operation fails, error is irrecoverable.
-func (d *DisallowListCache) DisallowFor(peerID peer.ID, cause middleware.DisallowListedCause) ([]middleware.DisallowListedCause, error) {
+func (d *DisallowListCache) DisallowFor(peerID peer.ID, cause network.DisallowListedCause) ([]network.DisallowListedCause, error) {
 	// first, we try to optimistically add the peer to the disallow list.
 	causes, err := d.disallowListFor(peerID, cause)
 
@@ -124,7 +125,7 @@ func (d *DisallowListCache) DisallowFor(peerID peer.ID, cause middleware.Disallo
 // Returns:
 // - the updated list of causes for the peer.
 // - error if the entity for the peerID is not found in the cache it returns ErrDisallowCacheEntityNotFound, which is a benign error.
-func (d *DisallowListCache) disallowListFor(peerID peer.ID, cause middleware.DisallowListedCause) ([]middleware.DisallowListedCause, error) {
+func (d *DisallowListCache) disallowListFor(peerID peer.ID, cause network.DisallowListedCause) ([]network.DisallowListedCause, error) {
 	adjustedEntity, adjusted := d.c.Adjust(makeId(peerID), func(entity flow.Entity) flow.Entity {
 		dEntity := mustBeDisallowListEntity(entity)
 		dEntity.causes[cause] = struct{}{}
@@ -137,7 +138,7 @@ func (d *DisallowListCache) disallowListFor(peerID peer.ID, cause middleware.Dis
 	}
 
 	dEntity := mustBeDisallowListEntity(adjustedEntity)
-	updatedCauses := make([]middleware.DisallowListedCause, 0, len(dEntity.causes))
+	updatedCauses := make([]network.DisallowListedCause, 0, len(dEntity.causes))
 	for cause := range dEntity.causes {
 		updatedCauses = append(updatedCauses, cause)
 	}
@@ -152,7 +153,7 @@ func (d *DisallowListCache) disallowListFor(peerID peer.ID, cause middleware.Dis
 // Returns:
 // - the list of causes for which the peer is disallow-listed.
 // - error if the entity for the peerID is not found in the cache it returns ErrDisallowCacheEntityNotFound, which is a benign error.
-func (d *DisallowListCache) AllowFor(peerID peer.ID, cause middleware.DisallowListedCause) []middleware.DisallowListedCause {
+func (d *DisallowListCache) AllowFor(peerID peer.ID, cause network.DisallowListedCause) []network.DisallowListedCause {
 	adjustedEntity, adjusted := d.c.Adjust(makeId(peerID), func(entity flow.Entity) flow.Entity {
 		dEntity := mustBeDisallowListEntity(entity)
 		delete(dEntity.causes, cause)
@@ -162,12 +163,12 @@ func (d *DisallowListCache) AllowFor(peerID peer.ID, cause middleware.DisallowLi
 	if !adjusted {
 		// if the entity is not found in the cache, we return an empty list.
 		// we don't return a nil to be consistent with the case that entity is found but the list of causes is empty.
-		return make([]middleware.DisallowListedCause, 0)
+		return make([]network.DisallowListedCause, 0)
 	}
 
 	dEntity := mustBeDisallowListEntity(adjustedEntity)
 	// returning a deep copy of causes (to avoid being mutated externally).
-	causes := make([]middleware.DisallowListedCause, 0, len(dEntity.causes))
+	causes := make([]network.DisallowListedCause, 0, len(dEntity.causes))
 	for cause := range dEntity.causes {
 		causes = append(causes, cause)
 	}

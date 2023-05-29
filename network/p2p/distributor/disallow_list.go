@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 )
 
@@ -27,8 +28,8 @@ type DisallowListNotificationDistributor struct {
 	logger zerolog.Logger
 
 	consumerLock sync.RWMutex // protects the consumer field from concurrent updates
-	consumers    []p2p.DisallowListNotificationConsumer
-	workerPool   *worker.Pool[*p2p.DisallowListUpdateNotification]
+	consumers    []network.DisallowListNotificationConsumer
+	workerPool   *worker.Pool[*p2p.RemoteNodesAllowListingUpdate]
 }
 
 var _ p2p.DisallowListNotificationDistributor = (*DisallowListNotificationDistributor)(nil)
@@ -58,7 +59,7 @@ func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *
 		logger: lg,
 	}
 
-	pool := worker.NewWorkerPoolBuilder[*p2p.DisallowListUpdateNotification](
+	pool := worker.NewWorkerPoolBuilder[*p2p.RemoteNodesAllowListingUpdate](
 		lg,
 		store,
 		d.distribute).Build()
@@ -77,7 +78,7 @@ func NewDisallowListConsumer(logger zerolog.Logger, store engine.MessageStore) *
 // distribute is called by the workers to process the event. It calls the OnDisallowListNotification method on all registered
 // consumers.
 // It does not return an error because the event is already in the store, so it will be retried.
-func (d *DisallowListNotificationDistributor) distribute(notification *p2p.DisallowListUpdateNotification) error {
+func (d *DisallowListNotificationDistributor) distribute(notification *p2p.RemoteNodesAllowListingUpdate) error {
 	d.consumerLock.RLock()
 	defer d.consumerLock.RUnlock()
 
@@ -91,7 +92,7 @@ func (d *DisallowListNotificationDistributor) distribute(notification *p2p.Disal
 // AddConsumer adds a consumer to the distributor. The consumer will be called the distributor distributes a new event.
 // AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.
 // There is no guarantee that the consumer will be called for events that were already received by the distributor.
-func (d *DisallowListNotificationDistributor) AddConsumer(consumer p2p.DisallowListNotificationConsumer) {
+func (d *DisallowListNotificationDistributor) AddConsumer(consumer network.DisallowListNotificationConsumer) {
 	d.consumerLock.Lock()
 	defer d.consumerLock.Unlock()
 
@@ -104,7 +105,7 @@ func (d *DisallowListNotificationDistributor) AddConsumer(consumer p2p.DisallowL
 // If the worker pool is full, the event will be dropped and a warning will be logged.
 // This implementation returns no error.
 func (d *DisallowListNotificationDistributor) DistributeBlockListNotification(disallowList flow.IdentifierList) error {
-	ok := d.workerPool.Submit(&p2p.DisallowListUpdateNotification{DisallowList: disallowList})
+	ok := d.workerPool.Submit(&p2p.RemoteNodesAllowListingUpdate{FlowIds: disallowList})
 	if !ok {
 		// we use a queue to buffer the events, so this may happen if the queue is full or the event is duplicate. In this case, we log a warning.
 		d.logger.Warn().Msg("node disallow list update notification queue is full or the event is duplicate, dropping event")

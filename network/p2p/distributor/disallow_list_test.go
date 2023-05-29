@@ -36,13 +36,13 @@ func TestDisallowListNotificationDistributor(t *testing.T) {
 	c1Done.Add(len(tt))
 	c1Seen := unittest.NewProtectedMap[flow.Identifier, struct{}]()
 	c1.On("OnDisallowListNotification", mock.Anything).Run(func(args mock.Arguments) {
-		n, ok := args.Get(0).(*p2p.DisallowListUpdateNotification)
+		n, ok := args.Get(0).(*p2p.RemoteNodesAllowListingUpdate)
 		require.True(t, ok)
 
 		require.Contains(t, tt, n)
 
 		// ensure consumer see each peer once
-		hash := flow.MerkleRoot(n.DisallowList...)
+		hash := flow.MerkleRoot(n.FlowIds...)
 		require.False(t, c1Seen.Has(hash))
 		c1Seen.Add(hash, struct{}{})
 
@@ -53,13 +53,13 @@ func TestDisallowListNotificationDistributor(t *testing.T) {
 	c2Done.Add(len(tt))
 	c2Seen := unittest.NewProtectedMap[flow.Identifier, struct{}]()
 	c2.On("OnDisallowListNotification", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		n, ok := args.Get(0).(*p2p.DisallowListUpdateNotification)
+		n, ok := args.Get(0).(*p2p.RemoteNodesAllowListingUpdate)
 		require.True(t, ok)
 
 		require.Contains(t, tt, n)
 
 		// ensure consumer see each peer once
-		hash := flow.MerkleRoot(n.DisallowList...)
+		hash := flow.MerkleRoot(n.FlowIds...)
 		require.False(t, c2Seen.Has(hash))
 		c2Seen.Add(hash, struct{}{})
 
@@ -75,7 +75,7 @@ func TestDisallowListNotificationDistributor(t *testing.T) {
 
 	for i := 0; i < len(tt); i++ {
 		go func(i int) {
-			require.NoError(t, d.DistributeBlockListNotification(tt[i].DisallowList))
+			require.NoError(t, d.DistributeBlockListNotification(tt[i].FlowIds))
 		}(i)
 	}
 
@@ -85,16 +85,16 @@ func TestDisallowListNotificationDistributor(t *testing.T) {
 	unittest.RequireCloseBefore(t, d.Done(), 100*time.Millisecond, "could not stop distributor")
 }
 
-func disallowListUpdateNotificationsFixture(n int) []*p2p.DisallowListUpdateNotification {
-	tt := make([]*p2p.DisallowListUpdateNotification, n)
+func disallowListUpdateNotificationsFixture(n int) []*p2p.RemoteNodesAllowListingUpdate {
+	tt := make([]*p2p.RemoteNodesAllowListingUpdate, n)
 	for i := 0; i < n; i++ {
 		tt[i] = disallowListUpdateNotificationFixture()
 	}
 	return tt
 }
 
-func disallowListUpdateNotificationFixture() *p2p.DisallowListUpdateNotification {
-	return &p2p.DisallowListUpdateNotification{
-		DisallowList: unittest.IdentifierListFixture(rand.Int()%100 + 1),
+func disallowListUpdateNotificationFixture() *p2p.RemoteNodesAllowListingUpdate {
+	return &p2p.RemoteNodesAllowListingUpdate{
+		FlowIds: unittest.IdentifierListFixture(rand.Int()%100 + 1),
 	}
 }

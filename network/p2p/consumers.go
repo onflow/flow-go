@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/network"
 )
 
 // DisallowListConsumer consumes notifications from the cache.NodeBlocklistWrapper whenever the block list is updated.
@@ -39,18 +40,6 @@ func ControlMessageTypes() []ControlMessageType {
 	return []ControlMessageType{CtrlMsgIHave, CtrlMsgIWant, CtrlMsgGraft, CtrlMsgPrune}
 }
 
-// DisallowListUpdateNotification is the event that is submitted to the distributor when the disallow list is updated.
-type DisallowListUpdateNotification struct {
-	DisallowList flow.IdentifierList
-}
-
-type DisallowListNotificationConsumer interface {
-	// OnDisallowListNotification is called when a new disallow list update notification is distributed.
-	// Any error on consuming event must handle internally.
-	// The implementation must be concurrency safe, but can be blocking.
-	OnDisallowListNotification(*DisallowListUpdateNotification)
-}
-
 type DisallowListNotificationDistributor interface {
 	component.Component
 	// DistributeBlockListNotification distributes the event to all the consumers.
@@ -61,7 +50,7 @@ type DisallowListNotificationDistributor interface {
 	// AddConsumer adds a consumer to the distributor. The consumer will be called the distributor distributes a new event.
 	// AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.
 	// There is no guarantee that the consumer will be called for events that were already received by the distributor.
-	AddConsumer(DisallowListNotificationConsumer)
+	AddConsumer(network.DisallowListNotificationConsumer)
 }
 
 // GossipSubInspectorNotifDistributor is the interface for the distributor that distributes gossip sub inspector notifications.

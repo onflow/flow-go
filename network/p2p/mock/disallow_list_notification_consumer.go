@@ -13,7 +13,7 @@ type DisallowListNotificationConsumer struct {
 }
 
 // OnDisallowListNotification provides a mock function with given fields: _a0
-func (_m *DisallowListNotificationConsumer) OnDisallowListNotification(_a0 *p2p.DisallowListUpdateNotification) {
+func (_m *DisallowListNotificationConsumer) OnDisallowListNotification(_a0 *p2p.RemoteNodesAllowListingUpdate) {
 	_m.Called(_a0)
 }
 
