@@ -105,12 +105,13 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		idProvider,
 		p2pbuilder.DefaultGossipSubConfig().LocalMeshLogInterval)
 
-	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig()).Build()
+	met := metrics.NewNoopCollector()
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), idProvider, met).Build()
 	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
-		metrics.NewNoopCollector(),
+		met,
 		unittest.DefaultAddress,
 		networkKey,
 		sporkID,

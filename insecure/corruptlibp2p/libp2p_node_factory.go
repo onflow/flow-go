@@ -14,9 +14,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 )
 
 // InitCorruptLibp2pNode initializes and returns a corrupt libp2p node that should only be used for BFT testing in
@@ -50,7 +52,7 @@ func InitCorruptLibp2pNode(
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metricsCfg module.LibP2PMetrics,
+	metricsCfg module.NetworkMetrics,
 	resolver madns.BasicResolver,
 	role string,
 	connGaterCfg *p2pconfig.ConnectionGaterConfig,
@@ -65,21 +67,32 @@ func InitCorruptLibp2pNode(
 		panic("illegal chain id for using corrupt libp2p node")
 	}
 
+	metCfg := &p2pconfig.MetricsConfig{
+		HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		Metrics:          metricsCfg,
+	}
+
+	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, gossipSubCfg.RpcInspector, idProvider, metricsCfg).
+		SetNetworkType(network.PrivateNetwork).
+		SetMetrics(metCfg).
+		Build()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for default libp2p node: %w", err)
+	}
+
 	builder, err := p2pbuilder.DefaultNodeBuilder(
 		log,
 		address,
 		flowKey,
 		sporkId,
 		idProvider,
-		&p2pconfig.MetricsConfig{
-			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
-			Metrics:          metricsCfg,
-		},
+		metCfg,
 		resolver,
 		role,
 		connGaterCfg,
 		peerManagerCfg,
 		gossipSubCfg,
+		rpcInspectorSuite,
 		p2pbuilder.DefaultResourceManagerConfig(),
 		uniCfg)
 

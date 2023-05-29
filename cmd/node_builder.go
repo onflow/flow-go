@@ -204,6 +204,8 @@ type NetworkConfig struct {
 	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
 	UnicastRateLimitersConfig *UnicastRateLimitersConfig
 	AlspConfig                *AlspConfig
+	// GossipSubRpcInspectorSuite rpc inspector suite.
+	GossipSubRpcInspectorSuite p2p.GossipSubInspectorSuite
 }
 
 // AlspConfig is the config for the Application Layer Spam Prevention (ALSP) protocol.
