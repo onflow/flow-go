@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"pgregory.net/rapid"
 )
 
 // TestParseTransition_Valid tests that valid transition configurations have
@@ -75,4 +76,70 @@ func TestParseTransition_Invalid(t *testing.T) {
 			assert.Error(t, err)
 		})
 	}
+}
+
+// drawTransitionTime draws a random EpochTransitionTime.
+func drawTransitionTime(t *rapid.T) EpochTransitionTime {
+	day := time.Weekday(rapid.IntRange(0, 6).Draw(t, "wd").(int))
+	hour := rapid.Uint8Range(0, 23).Draw(t, "h").(uint8)
+	minute := rapid.Uint8Range(0, 59).Draw(t, "m").(uint8)
+	return EpochTransitionTime{day, hour, minute}
+}
+
+// TestInferTargetEndTime_Fixture is a single human-readable fixture test,
+// in addition to the property-based rapid tests.
+func TestInferTargetEndTime_Fixture(t *testing.T) {
+	// The target time is around midday Wednesday
+	// |S|M|T|W|T|F|S|
+	// |      *      |
+	ett := EpochTransitionTime{day: time.Wednesday, hour: 13, minute: 24}
+	// The current time is mid-morning on Friday. We are about 28% through the epoch in time terms
+	// |S|M|T|W|T|F|S|
+	// |          *  |
+	// Friday, November 20, 2020 11:44
+	curTime := time.Date(2020, 11, 20, 11, 44, 0, 0, time.UTC)
+	// We are 18% through the epoch in view terms - we are quite behind schedule
+	epochFractionComplete := .18
+	// We should still be able to infer the target switchover time:
+	// Wednesday, November 25, 2020 13:24
+	expectedTarget := time.Date(2020, 11, 25, 13, 24, 0, 0, time.UTC)
+	target := ett.inferTargetEndTime(curTime, epochFractionComplete)
+	assert.Equal(t, expectedTarget, target)
+}
+
+// TestInferTargetEndTime tests that we can infer "the most reasonable" target time.
+func TestInferTargetEndTime_Rapid(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		ett := drawTransitionTime(t)
+		curTime := time.Unix(rapid.Int64().Draw(t, "ref_unix").(int64), 0).UTC()
+		epochFractionComplete := rapid.Float64Range(0, 1).Draw(t, "pct_complete").(float64)
+		epochFractionRemaining := 1.0 - epochFractionComplete
+
+		target := ett.inferTargetEndTime(curTime, epochFractionComplete)
+		computedEndTime := curTime.Add(time.Duration(float64(epochLength) * epochFractionRemaining))
+		// selected target must be the nearest to the computed end time
+		delta := computedEndTime.Sub(target).Abs()
+		assert.LessOrEqual(t, delta.Hours(), float64(24*7)/2)
+		// nearest date must be a target time
+		assert.Equal(t, ett.day, target.Weekday())
+		assert.Equal(t, int(ett.hour), target.Hour())
+		assert.Equal(t, int(ett.minute), target.Minute())
+	})
+}
+
+// TestFindNearestTargetTime tests finding the nearest target time to a reference time.
+func TestFindNearestTargetTime(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		ett := drawTransitionTime(t)
+		ref := time.Unix(rapid.Int64().Draw(t, "ref_unix").(int64), 0).UTC()
+
+		nearest := ett.findNearestTargetTime(ref)
+		distance := nearest.Sub(ref).Abs()
+		// nearest date must be at most 1/2 a week away
+		assert.LessOrEqual(t, distance.Hours(), float64(24*7)/2)
+		// nearest date must be a target time
+		assert.Equal(t, ett.day, nearest.Weekday())
+		assert.Equal(t, int(ett.hour), nearest.Hour())
+		assert.Equal(t, int(ett.minute), nearest.Minute())
+	})
 }
