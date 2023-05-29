@@ -199,6 +199,8 @@ type NetworkConfig struct {
 	UnicastCreateStreamRetryDelay time.Duration
 	// size of the queue for notifications about new peers in the disallow list.
 	DisallowListNotificationCacheSize uint32
+	// size of the cache keeping the status of disallow-listed peers. Recommended to be 100 * number of authorized nodes.
+	DisallowListCacheSize uint32
 	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
 	UnicastRateLimitersConfig *UnicastRateLimitersConfig
 	AlspConfig                *AlspConfig
@@ -333,6 +335,7 @@ func DefaultBaseConfig() *BaseConfig {
 			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),
 			NetworkConnectionPruning:          connection.PruningEnabled,
 			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
+			DisallowListCacheSize:             middleware.DisallowListCacheSize,
 			AlspConfig: &AlspConfig{
 				SpamRecordCacheSize: alsp.DefaultSpamRecordCacheSize,
 				SpamReportQueueSize: alsp.DefaultSpamReportQueueSize,
