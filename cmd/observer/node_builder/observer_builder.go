@@ -1078,15 +1078,21 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	validators ...network.MessageValidator,
 ) network.Middleware {
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network)
-	mw := middleware.NewMiddleware(
-		builder.Logger,
-		libp2pNode, nodeID,
-		builder.Metrics.Bitswap,
-		builder.SporkID,
-		middleware.DefaultUnicastTimeout,
-		builder.IDTranslator,
-		builder.CodecFactory(),
-		slashingViolationsConsumer,
+	mw := middleware.NewMiddleware(&middleware.Config{
+		Logger:                     builder.Logger,
+		Libp2pNode:                 libp2pNode,
+		FlowId:                     nodeID,
+		BitSwapMetrics:             builder.Metrics.Bitswap,
+		RootBlockID:                builder.SporkID,
+		UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
+		IdTranslator:               builder.IDTranslator,
+		Codec:                      builder.CodecFactory(),
+		SlashingViolationsConsumer: slashingViolationsConsumer,
+		DisallowListCacheConfig: &middleware.DisallowListCacheConfig{
+			MaxSize: builder.BaseConfig.NetworkConfig.DisallowListCacheSize,
+			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
+		},
+	},
 		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)
 	builder.NodeDisallowListDistributor.AddConsumer(mw)
