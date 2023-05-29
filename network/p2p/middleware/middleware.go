@@ -62,6 +62,13 @@ const (
 
 	// LargeMsgUnicastTimeout is the maximum time to wait for a unicast request to complete for large message size
 	LargeMsgUnicastTimeout = 1000 * time.Second
+
+	// DisallowListCacheSize is the maximum number of peers that can be disallow-listed at a time. The recommended
+	// size is 100 * number of staked nodes. Note that when the cache is full, there is no eviction policy and
+	// disallow-listing a new peer will fail. Hence, the cache size should be set to a value that is large enough
+	// to accommodate all the peers that can be disallow-listed at a time. Also, note that this cache is only taking
+	// the staked (authorized) peers. Hence, Sybil attacks are not possible.
+	DisallowListCacheSize = 100 * 1000
 )
 
 var (
@@ -158,7 +165,7 @@ type Config struct {
 	IdTranslator               p2p.IDTranslator
 	Codec                      network.Codec
 	SlashingViolationsConsumer slashing.ViolationsConsumer
-	DisallowListCacheConfig    DisallowListCacheConfig
+	DisallowListCacheConfig    *DisallowListCacheConfig
 }
 
 // NewMiddleware creates a new middleware instance
