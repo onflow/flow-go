@@ -24,6 +24,7 @@ func runNodes(signalerCtx irrecoverable.SignalerContext, nodes []*Node) {
 			n.timeoutAggregator.Start(signalerCtx)
 			n.compliance.Start(signalerCtx)
 			n.messageHub.Start(signalerCtx)
+			n.sync.Start(signalerCtx)
 			<-util.AllReady(n.committee, n.hot, n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync, n.messageHub)
 		}(n)
 	}

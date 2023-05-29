@@ -8,6 +8,7 @@ import (
 
 // GossipSubRPCValidationInspectorConfigs validation limits used for gossipsub RPC control message inspection.
 type GossipSubRPCValidationInspectorConfigs struct {
+	*validation.ClusterPrefixedMessageConfig
 	// NumberOfWorkers number of worker pool workers.
 	NumberOfWorkers int
 	// CacheSize size of the queue used by worker pool for the control message validation inspector.
@@ -66,6 +67,11 @@ func DefaultGossipSubRPCInspectorsConfig() *GossipSubRPCInspectorsConfig {
 		ValidationInspectorConfigs: &GossipSubRPCValidationInspectorConfigs{
 			NumberOfWorkers: validation.DefaultNumberOfWorkers,
 			CacheSize:       validation.DefaultControlMsgValidationInspectorQueueCacheSize,
+			ClusterPrefixedMessageConfig: &validation.ClusterPrefixedMessageConfig{
+				ClusterPrefixedControlMsgsReceivedCacheSize:  validation.DefaultClusterPrefixedControlMsgsReceivedCacheSize,
+				ClusterPrefixedControlMsgsReceivedCacheDecay: validation.DefaultClusterPrefixedControlMsgsReceivedCacheDecay,
+				ClusterPrefixHardThreshold:                   validation.DefaultClusterPrefixedMsgDropThreshold,
+			},
 			GraftLimits: map[string]int{
 				validation.HardThresholdMapKey:   validation.DefaultGraftHardThreshold,
 				validation.SafetyThresholdMapKey: validation.DefaultGraftSafetyThreshold,

@@ -166,7 +166,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		opts = append(opts, withConnectionGater(o.connectionGater))
 		opts = append(opts, withUnicastManagerOpts(o.createStreamRetryInterval))
 
-		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, opts...)
+		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, idProvider, opts...)
 
 		_, port, err := libP2PNodes[i].GetIPPort()
 		require.NoError(t, err)
@@ -245,6 +245,14 @@ func GenerateNetworks(t *testing.T,
 		me.On("Address").Return(ids[i].Address)
 
 		receiveCache := netcache.NewHeroReceiveCache(p2p.DefaultReceiveCacheSize, log, metrics.NewNoopCollector())
+		cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  unittest.Logger(),
+			SpamRecordCacheSize:     uint32(1000),
+			SpamReportQueueSize:     uint32(1000),
+			AlspMetrics:             metrics.NewNoopCollector(),
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		})
+		require.NoError(t, err)
 
 		// create the network
 		net, err := p2p.NewNetwork(&p2p.NetworkParameters{
@@ -257,13 +265,8 @@ func GenerateNetworks(t *testing.T,
 			Metrics:             metrics.NewNoopCollector(),
 			IdentityProvider:    id.NewFixedIdentityProvider(ids),
 			ReceiveCache:        receiveCache,
-			ConduitFactory: conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-				Logger:               unittest.Logger(),
-				SpamRecordsCacheSize: uint32(1000),
-				AlspMetrics:          metrics.NewNoopCollector(),
-				CacheMetrics:         metrics.NewNoopCollector(),
-			}),
-			Options: opts,
+			ConduitFactory:      cf,
+			Options:             opts,
 		})
 		require.NoError(t, err)
 
@@ -468,23 +471,20 @@ func withUnicastManagerOpts(delay time.Duration) nodeBuilderOption {
 }
 
 // generateLibP2PNode generates a `LibP2PNode` on localhost using a port assigned by the OS
-func generateLibP2PNode(t *testing.T,
-	logger zerolog.Logger,
-	key crypto.PrivateKey,
-	opts ...nodeBuilderOption) (p2p.LibP2PNode, observable.Observable) {
+func generateLibP2PNode(t *testing.T, logger zerolog.Logger, key crypto.PrivateKey, provider *UpdatableIDProvider, opts ...nodeBuilderOption) (p2p.LibP2PNode, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
 
 	// Inject some logic to be able to observe connections of this node
 	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, connection.DefaultConnManagerConfig())
 	require.NoError(t, err)
-
-	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig()).Build()
+	met := metrics.NewNoopCollector()
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), provider, met).Build()
 	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
-		metrics.NewNoopCollector(),
+		met,
 		unittest.DefaultAddress,
 		key,
 		sporkID,
