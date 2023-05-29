@@ -10,6 +10,10 @@ import (
 // it for reason Y.
 type DisallowListedCause string
 
+func (c DisallowListedCause) String() string {
+	return string(c)
+}
+
 const (
 	// DisallowListedCauseAdmin is the cause of disallow-listing a node by an admin command.
 	DisallowListedCauseAdmin DisallowListedCause = "disallow-listed-admin"
