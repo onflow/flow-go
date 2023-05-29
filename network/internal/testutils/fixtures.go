@@ -22,7 +22,7 @@ func MisbehaviorReportFixture(t *testing.T) network.MisbehaviorReport {
 	// pick a random misbehavior type
 	misbehaviorType := alsp.AllMisbehaviorTypes()[rand.Intn(len(alsp.AllMisbehaviorTypes()))]
 
-	amplification := rand.Intn(100)
+	amplification := 100 * rand.Float64()
 	report, err := alsp.NewMisbehaviorReport(
 		unittest.IdentifierFixture(),
 		misbehaviorType,

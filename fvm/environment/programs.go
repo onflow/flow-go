@@ -127,7 +127,7 @@ func (programs *Programs) getOrLoadAddressProgram(
 		loader,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error getting program: %w", err)
+		return nil, fmt.Errorf("error getting program %v: %w", location, err)
 	}
 
 	// Add dependencies to the stack.

@@ -69,3 +69,8 @@ func (s *GossipSubInspectorSuite) InspectFunc() func(peer.ID, *pubsub.RPC) error
 func (s *GossipSubInspectorSuite) AddInvCtrlMsgNotifConsumer(c p2p.GossipSubInvCtrlMsgNotifConsumer) {
 	s.ctrlMsgInspectDistributor.AddConsumer(c)
 }
+
+// Inspectors returns all inspectors in the inspector suite.
+func (s *GossipSubInspectorSuite) Inspectors() []p2p.GossipSubRPCInspector {
+	return s.aggregatedInspector.Inspectors()
+}

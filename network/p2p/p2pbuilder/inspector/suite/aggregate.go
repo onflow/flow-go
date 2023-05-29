@@ -32,3 +32,7 @@ func (a *AggregateRPCInspector) Inspect(peerID peer.ID, rpc *pubsub.RPC) error {
 	}
 	return errs.ErrorOrNil()
 }
+
+func (a *AggregateRPCInspector) Inspectors() []p2p.GossipSubRPCInspector {
+	return a.inspectors
+}

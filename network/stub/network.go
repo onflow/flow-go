@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/conduit"
@@ -47,6 +48,15 @@ func WithConduitFactory(factory network.ConduitFactory) func(*Network) {
 // The committee has the identity of the node already, so only `committee` is needed
 // in order for a mock hub to find each other.
 func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Network)) *Network {
+	cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
+		SpamRecordCacheSize:     uint32(1000),
+		SpamReportQueueSize:     uint32(1000),
+		Logger:                  unittest.Logger(),
+		AlspMetrics:             metrics.NewNoopCollector(),
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+	})
+	require.NoError(t, err)
+
 	net := &Network{
 		ctx:            context.Background(),
 		myId:           myId,
@@ -54,7 +64,7 @@ func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Netw
 		engines:        make(map[channels.Channel]network.MessageProcessor),
 		seenEventIDs:   make(map[string]struct{}),
 		qCD:            make(chan struct{}),
-		conduitFactory: conduit.NewDefaultConduitFactory(unittest.Logger(), metrics.NewNoopCollector()),
+		conduitFactory: cf,
 	}
 
 	for _, opt := range opts {

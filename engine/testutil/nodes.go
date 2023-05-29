@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
+	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	"github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
@@ -64,6 +65,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
@@ -339,6 +341,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Metrics, node.Metrics, node.Metrics,
 		node.State,
 		transactions,
+		compliance.DefaultConfig(),
 	)
 	require.NoError(t, err)
 
@@ -390,6 +393,8 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	rootQCVoter := new(mockmodule.ClusterRootQCVoter)
 	rootQCVoter.On("Vote", mock.Anything, mock.Anything).Return(nil)
 
+	engineEventsDistributor := mockcollection.NewEngineEvents(t)
+	engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Maybe()
 	heights := gadgets.NewHeights()
 	node.ProtocolEvents.AddConsumer(heights)
 
@@ -401,6 +406,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		rootQCVoter,
 		factory,
 		heights,
+		engineEventsDistributor,
 	)
 	require.NoError(t, err)
 	node.ProtocolEvents.AddConsumer(epochManager)
@@ -727,6 +733,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Headers,
 		finalizedHeader,
 		core,
+		compliance.DefaultConfig(),
 	)
 	require.NoError(t, err)
 
@@ -751,6 +758,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
+	followerDistributor.AddFinalizationConsumer(syncEngine)
 
 	return testmock.ExecutionNode{
 		GenericNode:         node,
