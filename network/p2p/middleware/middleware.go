@@ -168,6 +168,17 @@ type Config struct {
 	DisallowListCacheConfig    *DisallowListCacheConfig
 }
 
+// Validate validates the configuration, and sets default values for any missing fields.
+func (cfg *Config) Validate() {
+	if cfg.UnicastMessageTimeout <= 0 {
+		cfg.UnicastMessageTimeout = DefaultUnicastTimeout
+	}
+
+	if cfg.DisallowListCacheConfig.MaxSize == uint32(0) {
+		cfg.DisallowListCacheConfig.MaxSize = DisallowListCacheSize
+	}
+}
+
 // NewMiddleware creates a new middleware instance
 // libP2PNodeFactory is the factory used to create a LibP2PNode
 // flowID is this node's Flow ID
@@ -178,9 +189,7 @@ type Config struct {
 // During normal operations any error returned by Middleware.start is considered to be catastrophic
 // and will be thrown by the irrecoverable.SignalerContext causing the node to crash.
 func NewMiddleware(cfg *Config, opts ...OptionFn) *Middleware {
-	if cfg.UnicastMessageTimeout <= 0 {
-		cfg.UnicastMessageTimeout = DefaultUnicastTimeout
-	}
+	cfg.Validate()
 
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
