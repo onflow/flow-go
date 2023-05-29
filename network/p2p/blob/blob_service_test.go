@@ -56,36 +56,36 @@ func TestAuthorizedRequester(t *testing.T) {
 
 	// Allows requests from authorized nodes
 	t.Run("allows all ANs with empty allow list", func(t *testing.T) {
-		authorizer := blob.AuthorizedRequester(nil, idProvider, unittest.Logger())
+		authorizer := blob.AuthorizedRequester(unittest.Logger(), nil, idProvider)
 		assert.True(t, authorizer(an1PeerID, cid.Cid{}), "AN1 should be allowed")
 		assert.True(t, authorizer(an2PeerID, cid.Cid{}), "AN2 should be allowed")
 	})
 
 	t.Run("allows AN on allow list", func(t *testing.T) {
-		authorizer := blob.AuthorizedRequester(allowList, idProvider, unittest.Logger())
+		authorizer := blob.AuthorizedRequester(unittest.Logger(), allowList, idProvider)
 		assert.True(t, authorizer(an1PeerID, cid.Cid{}))
 	})
 
 	t.Run("always allows EN", func(t *testing.T) {
-		authorizer := blob.AuthorizedRequester(nil, idProvider, unittest.Logger())
+		authorizer := blob.AuthorizedRequester(unittest.Logger(), nil, idProvider)
 		assert.True(t, authorizer(en1PeerID, cid.Cid{}))
 
-		authorizer = blob.AuthorizedRequester(allowList, idProvider, unittest.Logger())
+		authorizer = blob.AuthorizedRequester(unittest.Logger(), allowList, idProvider)
 		assert.True(t, authorizer(en1PeerID, cid.Cid{}))
 	})
 
 	// Denies requests from nodes not on the allow list
 	t.Run("denies AN not on allow list", func(t *testing.T) {
-		authorizer := blob.AuthorizedRequester(allowList, idProvider, unittest.Logger())
+		authorizer := blob.AuthorizedRequester(unittest.Logger(), allowList, idProvider)
 		assert.False(t, authorizer(an2PeerID, cid.Cid{}))
 	})
 
 	// Denies requests from unknown nodes
 	t.Run("never allow SN", func(t *testing.T) {
-		authorizer := blob.AuthorizedRequester(nil, idProvider, unittest.Logger())
+		authorizer := blob.AuthorizedRequester(unittest.Logger(), nil, idProvider)
 		assert.False(t, authorizer(sn1PeerID, cid.Cid{}))
 
-		authorizer = blob.AuthorizedRequester(allowList, idProvider, unittest.Logger())
+		authorizer = blob.AuthorizedRequester(unittest.Logger(), allowList, idProvider)
 		assert.False(t, authorizer(sn1PeerID, cid.Cid{}))
 	})
 
@@ -94,29 +94,29 @@ func TestAuthorizedRequester(t *testing.T) {
 
 	// AN1 is on allow list (not passed) but is ejected
 	t.Run("always denies ejected AN", func(t *testing.T) {
-		authorizer := blob.AuthorizedRequester(nil, idProvider, unittest.Logger())
+		authorizer := blob.AuthorizedRequester(unittest.Logger(), nil, idProvider)
 		assert.False(t, authorizer(an1PeerID, cid.Cid{}))
 
-		authorizer = blob.AuthorizedRequester(allowList, idProvider, unittest.Logger())
+		authorizer = blob.AuthorizedRequester(unittest.Logger(), allowList, idProvider)
 		assert.False(t, authorizer(an1PeerID, cid.Cid{}))
 	})
 
 	// EN1 is on allow list (not passed) but is ejected
 	t.Run("always denies ejected EN", func(t *testing.T) {
-		authorizer := blob.AuthorizedRequester(nil, idProvider, unittest.Logger())
+		authorizer := blob.AuthorizedRequester(unittest.Logger(), nil, idProvider)
 		assert.False(t, authorizer(en1PeerID, cid.Cid{}))
 
-		authorizer = blob.AuthorizedRequester(allowList, idProvider, unittest.Logger())
+		authorizer = blob.AuthorizedRequester(unittest.Logger(), allowList, idProvider)
 		assert.False(t, authorizer(en1PeerID, cid.Cid{}))
 	})
 
 	// AN3 is on allow list (not passed) but is not in identity store
 	t.Run("always denies unknown peer", func(t *testing.T) {
-		authorizer := blob.AuthorizedRequester(nil, idProvider, unittest.Logger())
+		authorizer := blob.AuthorizedRequester(unittest.Logger(), nil, idProvider)
 		assert.False(t, authorizer(an3PeerID, cid.Cid{}))
 		assert.False(t, authorizer(en2PeerID, cid.Cid{}))
 
-		authorizer = blob.AuthorizedRequester(allowList, idProvider, unittest.Logger())
+		authorizer = blob.AuthorizedRequester(unittest.Logger(), allowList, idProvider)
 		assert.False(t, authorizer(an3PeerID, cid.Cid{}))
 		assert.False(t, authorizer(en2PeerID, cid.Cid{}))
 	})
