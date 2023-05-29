@@ -57,6 +57,23 @@ type Middleware interface {
 	IsConnected(nodeID flow.Identifier) (bool, error)
 }
 
+// DisallowedListOracle represents the interface that is exposed to the lower-level networking primitives (e.g. libp2p),
+// which allows them to check if a given peer ID is disallowed (by Flow protocol) from connecting to this node.
+// Disallow-listing is considered a temporary measure to prevent malicious nodes from connecting to the network. Hence,
+// the disallow-list status of a peer ID should not be treated as a permanent state.
+type DisallowedListOracle interface {
+	// IsDisallowed returns true if the given peer ID is disallowed from connecting to this node.
+	// This function should be called by the lower-level networking primitives (e.g. libp2p) before establishing a
+	// connection with a peer.
+	// Implementations of this function should be thread-safe.
+	// Args:
+	//  peer.ID: the peer ID of the node that is attempting to connect to (or be connected by) this node.
+	// Returns:
+	// bool: true if the given peer ID is disallowed from connecting to this node.
+	// 	 false otherwise.
+	IsDisallowed(peer.ID) bool
+}
+
 // Overlay represents the interface that middleware uses to interact with the
 // overlay network layer.
 type Overlay interface {
