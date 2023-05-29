@@ -210,16 +210,21 @@ func GenerateMiddlewares(t *testing.T,
 		idProviders[i] = NewUpdatableIDProvider(identities)
 
 		// creating middleware of nodes
-		mws[i] = middleware.NewMiddleware(
-			logger,
-			node,
-			nodeId,
-			bitswapmet,
-			sporkID,
-			middleware.DefaultUnicastTimeout,
-			translator.NewIdentityProviderIDTranslator(idProviders[i]),
-			codec,
-			consumer,
+		mws[i] = middleware.NewMiddleware(&middleware.Config{
+			Logger:                     logger,
+			Libp2pNode:                 node,
+			FlowId:                     nodeId,
+			BitSwapMetrics:             bitswapmet,
+			RootBlockID:                sporkID,
+			UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
+			IdTranslator:               translator.NewIdentityProviderIDTranslator(idProviders[i]),
+			Codec:                      codec,
+			SlashingViolationsConsumer: consumer,
+			DisallowListCacheConfig: &middleware.DisallowListCacheConfig{
+				MaxSize: uint32(1000),
+				Metrics: metrics.NewNoopCollector(),
+			},
+		},
 			middleware.WithUnicastRateLimiters(o.unicastRateLimiters),
 			middleware.WithPeerManagerFilters(o.peerManagerFilters))
 	}
