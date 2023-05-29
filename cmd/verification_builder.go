@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
-	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -385,7 +384,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Headers,
 				node.FinalizedHeader,
 				core,
-				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
+				node.ComplianceConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
