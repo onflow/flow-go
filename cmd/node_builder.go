@@ -27,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
@@ -197,8 +196,6 @@ type NetworkConfig struct {
 	ConnectionManagerConfig     *connection.ManagerConfig
 	// UnicastCreateStreamRetryDelay initial delay used in the exponential backoff for create stream retries
 	UnicastCreateStreamRetryDelay time.Duration
-	// size of the queue for notifications about new peers in the disallow list.
-	DisallowListNotificationCacheSize uint32
 	// size of the cache keeping the status of disallow-listed peers. Recommended to be 100 * number of authorized nodes.
 	DisallowListCacheSize uint32
 	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
@@ -329,13 +326,12 @@ func DefaultBaseConfig() *BaseConfig {
 				BandwidthRateLimit:  0,
 				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
 			},
-			GossipSubConfig:                   p2pbuilder.DefaultGossipSubConfig(),
-			DNSCacheTTL:                       dns.DefaultTimeToLive,
-			LibP2PResourceManagerConfig:       p2pbuilder.DefaultResourceManagerConfig(),
-			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),
-			NetworkConnectionPruning:          connection.PruningEnabled,
-			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
-			DisallowListCacheSize:             middleware.DisallowListCacheSize,
+			GossipSubConfig:             p2pbuilder.DefaultGossipSubConfig(),
+			DNSCacheTTL:                 dns.DefaultTimeToLive,
+			LibP2PResourceManagerConfig: p2pbuilder.DefaultResourceManagerConfig(),
+			ConnectionManagerConfig:     connection.DefaultConnManagerConfig(),
+			NetworkConnectionPruning:    connection.PruningEnabled,
+			DisallowListCacheSize:       middleware.DisallowListCacheSize,
 			AlspConfig: &AlspConfig{
 				SpamRecordCacheSize: alsp.DefaultSpamRecordCacheSize,
 				SpamReportQueueSize: alsp.DefaultSpamReportQueueSize,
