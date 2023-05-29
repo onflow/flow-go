@@ -1,5 +1,3 @@
-// +build relic
-
 #include "bls_include.h"
 
 // this file is about the core functions required by the BLS signature scheme

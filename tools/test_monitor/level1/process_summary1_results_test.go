@@ -33,19 +33,19 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 			RawJSONTestRunFile:    "test-result-crypto-hash-1-count-skip-pass.json",
 		},
 
-		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
+		// raw results generated with: go test -json -count 1 ./utils/unittest/...
 		"2 count all pass": {
 			ExpectedLevel1Summary: testdata.GetTestData_Level1_2CountPass(),
 			RawJSONTestRunFile:    "test-result-crypto-hash-2-count-pass.json",
 		},
 
-		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
+		// raw results generated with: go test -json -count 1 ./utils/unittest/...
 		"10 count all pass": {
 			ExpectedLevel1Summary: testdata.GetTestData_Level1_10CountPass(),
 			RawJSONTestRunFile:    "test-result-crypto-hash-10-count-pass.json",
 		},
 
-		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
+		// raw results generated with: go test -json -count 1 ./utils/unittest/...
 		"10 count some failures": {
 			ExpectedLevel1Summary: testdata.GetTestData_Level1_10CountSomeFailures(),
 			RawJSONTestRunFile:    "test-result-crypto-hash-10-count-fail.json",
@@ -54,14 +54,14 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 		// no result tests - tests below don't generate pass/fail result due to `go test` bug
 		// with using `fmt.printf("log message")` without newline `\n`
 
-		// raw results generated with: go test -v -tags relic -count=1 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
+		// raw results generated with: go test -v -count=1 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
 		// this is a single unit test that produces a no result
 		"1 count single no result test": {
 			ExpectedLevel1Summary: testdata.GetTestData_Level1_1CountSingleExceptionTest(),
 			RawJSONTestRunFile:    "test-result-exception-single-1-count-pass.json",
 		},
 
-		//raw results generated with: go test -v -tags relic -count=5 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
+		//raw results generated with: go test -v -count=5 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
 		//multiple no result tests in a row
 		"5 no result tests in a row": {
 			ExpectedLevel1Summary: testdata.GetTestData_Level1_5CountSingleExceptionTest(),
@@ -74,7 +74,7 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 			RawJSONTestRunFile:    "test-result-exception-single-5-count-4-nil-1-normal-pass.json",
 		},
 
-		// raw results generated with: go test -v -tags relic -count=3 -json ./model/encodable/.
+		// raw results generated with: go test -v -count=3 -json ./model/encodable/.
 		// group of unit tests with a single no result test
 		"3 count no result test with normal tests": {
 			ExpectedLevel1Summary: testdata.GetTestData_Leve1_3CountExceptionWithNormalTests(),

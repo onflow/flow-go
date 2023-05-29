@@ -27,8 +27,6 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: Build relic
-        run: make crypto_setup_gopath
       - name: Run go generate
         run: go generate
         working-directory: ${{ matrix.dir }}
@@ -37,7 +35,6 @@ jobs:
         with:
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
           version: v1.49
-          args: -v --build-tags relic
           working-directory: ${{ matrix.dir }}
           # https://github.com/golangci/golangci-lint-action/issues/244
           skip-cache: true
@@ -55,20 +52,6 @@ jobs:
           cache: true
       - name: Run tidy
         run: make tidy
-      - name: Emulator no relic check
-        run: make emulator-norelic-check
-
-  #  shell-check:
-  #    name: ShellCheck
-  #    runs-on: ubuntu-latest
-  #    steps:
-  #      - name: Checkout repo
-  #        uses: actions/checkout@v3
-  #      - name: Run ShellCheck
-  #        uses: ludeeus/action-shellcheck@203a3fd018dfe73f8ae7e3aa8da2c149a5f41c33
-  #        with:
-  #          scandir: './crypto'
-  #          ignore: 'relic'
 
   create-dynamic-test-matrix:
     name: Create Dynamic Test Matrix
@@ -206,8 +189,6 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: Build relic
-        run: make crypto_setup_gopath
       - name: Docker build
         run: make docker-build-flow docker-build-flow-corrupt
       - name: Run tests

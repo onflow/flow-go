@@ -1,5 +1,3 @@
-// +build relic
-
 #ifndef __BLST_INCLUDE_H__
 #define __BLST_INCLUDE_H__
 

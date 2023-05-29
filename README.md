@@ -55,7 +55,6 @@ The following table lists all work streams and links to their home directory and
 
 - Clone this repository
 - Install [Go](https://golang.org/doc/install) (Flow supports Go 1.18 and later)
-- Install [CMake](https://cmake.org/install/), which is used for building the crypto library
 - Install [Docker](https://docs.docker.com/get-docker/), which is used for running a local network and integration tests
 - Make sure the [`GOPATH`](https://golang.org/cmd/go/#hdr-GOPATH_environment_variable) and `GOBIN` environment variables
   are set, and `GOBIN` is added to your path:
@@ -74,12 +73,6 @@ The following table lists all work streams and links to their home directory and
     ```
 
 At this point, you should be ready to build, test, and run Flow! 🎉
-
-Note: Whenever the crypto module version imported by "go.mod" is updated to a version that was never locally imported before, the crypto dependency needs to be set-up. If not, you should notice errors about "relic" or "crypto". Run the following command to set-up the new module version:
-
-```bash
-make crypto_setup_gopath
-```
 
 ## Development Workflow
 

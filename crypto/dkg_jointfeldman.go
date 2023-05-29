@@ -1,10 +1,5 @@
-//go:build relic
-// +build relic
-
 package crypto
 
-// #cgo CFLAGS:
-// #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
 // #include "dkg_include.h"
 import "C"
 

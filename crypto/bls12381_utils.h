@@ -1,5 +1,3 @@
-// +build relic
-
 // this file contains utility functions for the curve BLS 12-381
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
 // and the BLS distributed key generation protocols
@@ -7,12 +5,12 @@
 #ifndef _REL_MISC_INCLUDE_H
 #define _REL_MISC_INCLUDE_H
 
-#include "relic.h"
+#include <string.h>
 #include "blst_include.h"
 
 #define SEC_BITS  128
-#define VALID     RLC_OK
-#define INVALID   RLC_ERR
+#define VALID     0
+#define INVALID   1
 #define UNDEFINED (((VALID&1)^1) | ((INVALID&2)^2)) // different value than RLC_OK and RLC_ERR
 
 #define BITS_TO_BYTES(x) ((x+7)>>3)

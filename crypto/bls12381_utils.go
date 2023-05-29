@@ -1,14 +1,10 @@
-//go:build relic
-// +build relic
-
 package crypto
 
 // this file contains utility functions for the curve BLS 12-381
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
 // and the BLS distributed key generation protocols
 
-// #cgo CFLAGS: -I${SRCDIR}/ -I${SRCDIR}/relic/build/include -I${SRCDIR}/relic/include -I${SRCDIR}/relic/include/low -I${SRCDIR}/blst_src -I${SRCDIR}/blst_src/build -O -D__BLST_PORTABLE__ -D__BLST_CGO__ -fno-builtin-memcpy -fno-builtin-memset -Wall -Wno-unused-function -Wno-unused-macros
-// #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
+// #cgo CFLAGS: -I${SRCDIR}/ -I${SRCDIR}/blst_src -I${SRCDIR}/blst_src/build -O -D__BLST_PORTABLE__ -D__BLST_CGO__ -fno-builtin-memcpy -fno-builtin-memset -Wall -Wno-unused-function -Wno-unused-macros
 // #cgo amd64 CFLAGS: -D__ADX__ -mno-avx
 // #cgo mips64 mips64le ppc64 ppc64le riscv64 s390x CFLAGS: -D__BLST_NO_ASM__
 // #include "bls12381_utils.h"
@@ -16,6 +12,7 @@ package crypto
 // #if defined(__x86_64__) && (defined(__unix__) || defined(__APPLE__))
 // # include <signal.h>
 // # include <unistd.h>
+// # include <string.h>
 // static void handler(int signum)
 // {	char text[1024] = "Caught SIGILL in blst_cgo_init, BLST library (used by flow-go/crypto) requires ADX support, build with CGO_CFLAGS=-O -D__BLST_PORTABLE__";
 //		ssize_t n = write(2, &text, strlen(text));
@@ -40,7 +37,6 @@ import (
 )
 
 // Go wrappers around BLST C types
-// Go wrappers around Relic C types
 type pointE1 C.E1
 type pointE2 C.E2
 type scalar C.Fr

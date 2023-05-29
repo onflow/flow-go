@@ -8,9 +8,6 @@ import (
 
 //revive:disable:var-naming
 
-// the `go generate` command requires bash scripting, `cmake` and `git`.
-//go:generate bash ./build_dependency.sh
-
 const (
 	// Minimum targeted bits of security.
 	// This is used as a reference but it doesn't mean all implemented primitives provide this minimum.

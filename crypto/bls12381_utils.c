@@ -1,5 +1,3 @@
-// +build relic
-
 // this file contains utility functions for the curve BLS 12-381
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
 // and the BLS distributed key generation protocols
@@ -1156,10 +1154,10 @@ void multi_pairing(Fp12* res, const E1 *p, const E2 *q, const int len) {
     final_exp(res_vec, res_vec);
 }
 
-// This is a testing function.
-// It wraps a call to a Relic macro since cgo can't call macros.
+// This is a testing function and is not used in exported functions
+// It uses an expand message XMD based on SHA2-256.
 void xmd_sha256(byte *hash, int len_hash, byte *msg, int len_msg, byte *dst, int len_dst){
-    md_xmd_sh256(hash, len_hash, msg, len_msg, dst, len_dst);
+    expand_message_xmd(hash, len_hash, NULL, 0, msg, len_msg, dst, len_dst);
 }
 
 

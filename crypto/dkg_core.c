@@ -1,5 +1,3 @@
-// +build relic
-
 #include "dkg_include.h"
 
 // computes P(x) = a_0 + a_1*x + .. + a_n x^n in F_r
