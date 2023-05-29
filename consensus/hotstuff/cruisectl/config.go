@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// DefaultConfig returns the default config for the BlockRateController.
+// DefaultConfig returns the default config for the BlockTimeController.
 func DefaultConfig() *Config {
 	return &Config{
 		TargetTransition: DefaultEpochTransitionTime(),
@@ -21,7 +21,7 @@ func DefaultConfig() *Config {
 	}
 }
 
-// Config defines configuration for the BlockRateController.
+// Config defines configuration for the BlockTimeController.
 type Config struct {
 	// TargetTransition defines the target time to transition epochs each week.
 	TargetTransition EpochTransitionTime
@@ -31,11 +31,11 @@ type Config struct {
 	//  - as the initial ProposalDuration value, to which the compensation computed by the PID controller is added
 	DefaultProposalDuration time.Duration
 	// MaxProposalDuration is a hard maximum on the ProposalDuration.
-	// If the BlockRateController computes a larger desired ProposalDuration value
+	// If the BlockTimeController computes a larger desired ProposalDuration value
 	// based on the observed error and tuning, this value will be used instead.
 	MaxProposalDuration time.Duration
 	// MinProposalDuration is a hard minimum on the ProposalDuration.
-	// If the BlockRateController computes a smaller desired ProposalDuration value
+	// If the BlockTimeController computes a smaller desired ProposalDuration value
 	// based on the observed error and tuning, this value will be used instead.
 	MinProposalDuration time.Duration
 	// Enabled defines whether responsive control of the ProposalDuration is enabled.

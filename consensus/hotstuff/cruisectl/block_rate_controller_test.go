@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-// BlockRateControllerSuite encapsulates tests for the BlockRateController.
+// BlockRateControllerSuite encapsulates tests for the BlockTimeController.
 type BlockRateControllerSuite struct {
 	suite.Suite
 
@@ -39,7 +39,7 @@ type BlockRateControllerSuite struct {
 	ctx      irrecoverable.SignalerContext
 	cancel   context.CancelFunc
 
-	ctl *BlockRateController
+	ctl *BlockTimeController
 }
 
 func TestBlockRateController(t *testing.T) {
@@ -84,7 +84,7 @@ func (bs *BlockRateControllerSuite) SetupTest() {
 	bs.ctx, bs.cancel = irrecoverable.NewMockSignalerContextWithCancel(bs.T(), context.Background())
 }
 
-// CreateAndStartController creates and starts the BlockRateController.
+// CreateAndStartController creates and starts the BlockTimeController.
 // Should be called only once per test case.
 func (bs *BlockRateControllerSuite) CreateAndStartController() {
 	ctl, err := NewBlockRateController(unittest.Logger(), bs.metrics, bs.config, bs.state, bs.initialView)
@@ -94,7 +94,7 @@ func (bs *BlockRateControllerSuite) CreateAndStartController() {
 	unittest.RequireCloseBefore(bs.T(), bs.ctl.Ready(), time.Second, "component did not start")
 }
 
-// StopController stops the BlockRateController.
+// StopController stops the BlockTimeController.
 func (bs *BlockRateControllerSuite) StopController() {
 	bs.cancel()
 	unittest.RequireCloseBefore(bs.T(), bs.ctl.Done(), time.Second, "component did not stop")
@@ -219,12 +219,12 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	assert.Equal(bs.T(), bs.config.DefaultProposalDuration, bs.ctl.ProposalDuration())
 
 	// addition OnViewChange events should be no-ops
-	for i := 0; i <= cap(bs.ctl.viewChanges); i++ {
+	for i := 0; i <= cap(bs.ctl.incorporatedBlocks); i++ {
 		bs.ctl.OnViewChange(0, bs.initialView+1)
 	}
 	// wait for the channel to drain, since OnViewChange doesn't block on sending
 	require.Eventually(bs.T(), func() bool {
-		return len(bs.ctl.viewChanges) == 0
+		return len(bs.ctl.incorporatedBlocks) == 0
 	}, time.Second, time.Millisecond)
 	// state should be unchanged
 	assert.Equal(bs.T(), bs.ctl.config.DefaultProposalDuration, bs.ctl.ProposalDuration())
@@ -250,12 +250,12 @@ func (bs *BlockRateControllerSuite) TestOnViewChange_UpdateProposalDelay() {
 	assert.NotEqual(bs.T(), initialProposalDelay, nextProposalDelay)
 
 	// duplicate events should be no-ops
-	for i := 0; i <= cap(bs.ctl.viewChanges); i++ {
+	for i := 0; i <= cap(bs.ctl.incorporatedBlocks); i++ {
 		bs.ctl.OnViewChange(0, bs.initialView+1)
 	}
 	// wait for the channel to drain, since OnViewChange doesn't block on sending
 	require.Eventually(bs.T(), func() bool {
-		return len(bs.ctl.viewChanges) == 0
+		return len(bs.ctl.incorporatedBlocks) == 0
 	}, time.Second, time.Millisecond)
 
 	// state should be unchanged
@@ -370,7 +370,7 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_BehindSchedule() {
 }
 
 // TestProposalDelay_AheadOfSchedule tests the behaviour of the controller when the
-// projected epoch switchover is EARLIER than the target switchover time (in other words,
+// projected epoch switchover is EARLIER than the target switchover time, i.e.
 // we are ahead of schedule.
 // We should respond by increasing the ProposalDuration (lowering view rate)
 func (bs *BlockRateControllerSuite) TestProposalDelay_AheadOfSchedule() {

@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
 // measurement represents a measurement of error associated with entering view v.
@@ -37,6 +38,20 @@ type measurement struct {
 	// informational fields - not required for controller operation
 	viewDiff uint64        // number of views since the previous measurement
 	viewTime time.Duration // time since the last measurement
+}
+
+// TimedBlock represents a block, with a time stamp recording when the BlockTimeController received the block
+type TimedBlock struct {
+	Block        *model.Block
+	TimeObserved time.Time // time stamp when BlockTimeController received the block, per convention in UTC
+}
+
+// ControllerViewDuration holds the _latest_ block observed and the duration as
+// desired by the controller until the child block is released. Per convention,
+// ControllerViewDuration should be treated as immutable.
+type ControllerViewDuration struct {
+	TimedBlock                          // latest block observed by the controller
+	ChildPublicationDelay time.Duration // desired duration until releasing the child block, measured from `LatestObservedBlock.TimeObserved`
 }
 
 // epochInfo stores data about the current and next epoch. It is updated when we enter
@@ -60,10 +75,10 @@ func (epoch *epochInfo) fractionComplete(curView uint64) float64 {
 	return float64(curView-epoch.curEpochFirstView) / float64(epoch.curEpochFinalView-epoch.curEpochFirstView)
 }
 
-// BlockRateController dynamically adjusts the ProposalDuration of this node,
+// BlockTimeController dynamically adjusts the ProposalDuration of this node,
 // based on the measured view rate of the consensus committee as a whole, in
 // order to achieve a desired switchover time for each epoch.
-type BlockRateController struct {
+type BlockTimeController struct {
 	component.Component
 
 	config  *Config
@@ -71,55 +86,55 @@ type BlockRateController struct {
 	log     zerolog.Logger
 	metrics module.CruiseCtlMetrics
 
-	lastMeasurement measurement // the most recently taken measurement
-	epochInfo                   // scheduled transition view for current/next epoch
-
-	proposalDuration       atomic.Int64 // PID output, in nanoseconds, so it is directly convertible to time.Duration
+	epochInfo              // scheduled transition view for current/next epoch
 	epochFallbackTriggered bool
 
-	viewChanges    chan uint64       // OnViewChange events           (view entered)
-	epochSetups    chan *flow.Header // EpochSetupPhaseStarted events (block header within setup phase)
-	epochFallbacks chan struct{}     // EpochFallbackTriggered events
+	proposalDuration       atomic.Int64 // PID output, in nanoseconds, so it is directly convertible to time.Duration
+	incorporatedBlocks chan TimedBlock   // OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
+	epochSetups        chan *flow.Header // EpochSetupPhaseStarted events (block header within setup phase)
+	epochFallbacks     chan struct{}     // EpochFallbackTriggered events
+
+	proportionalErr        Ewma
+	integralErr            LeakyIntegrator
+	latestControllerOutput atomic.Pointer[ControllerViewDuration]
 }
 
-// NewBlockRateController returns a new BlockRateController.
-func NewBlockRateController(log zerolog.Logger, metrics module.CruiseCtlMetrics, config *Config, state protocol.State, curView uint64) (*BlockRateController, error) {
-	ctl := &BlockRateController{
-		config:         config,
-		log:            log.With().Str("hotstuff", "cruise_ctl").Logger(),
+// NewBlockRateController returns a new BlockTimeController.
+func NewBlockRateController(log zerolog.Logger, metrics module.CruiseCtlMetrics, config *Config, state protocol.State, curView uint64) (*BlockTimeController, error) {
+	proportionalErr, err := NewEwma(config.alpha(), 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize EWMA for computing the proportional error: %w", err)
+	}
+	integralErr, err := NewLeakyIntegrator(config.beta(), 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize LeakyIntegrator for computing the integral error: %w", err)
+	}
+	ctl := &BlockTimeController{
+		config:                 config,
+		log:                    log.With().Str("hotstuff", "cruise_ctl").Logger(),
 		metrics:        metrics,
-		state:          state,
-		viewChanges:    make(chan uint64, 10),
-		epochSetups:    make(chan *flow.Header, 5),
-		epochFallbacks: make(chan struct{}, 5),
+		state:                  state,
+		incorporatedBlocks:     make(chan TimedBlock),
+		epochSetups:            make(chan *flow.Header, 5),
+		epochFallbacks:         make(chan struct{}, 5),
+		proportionalErr:        proportionalErr,
+		integralErr:            integralErr,
+		latestControllerOutput: atomic.Pointer[ControllerViewDuration]{},
 	}
 
 	ctl.Component = component.NewComponentManagerBuilder().
 		AddWorker(ctl.processEventsWorkerLogic).
 		Build()
 
-	err := ctl.initEpochInfo(curView)
+	err = ctl.initEpochInfo(curView)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize epoch info: %w", err)
 	}
-	ctl.initLastMeasurement(curView, time.Now())
 
-	return ctl, nil
-}
-
-// initLastMeasurement initializes the lastMeasurement field.
-// We set the measured view rate to the computed target view rate and the error to 0.
-func (ctl *BlockRateController) initLastMeasurement(curView uint64, now time.Time) {
-	ctl.lastMeasurement = measurement{
-		view:            curView,
-		time:            now,
-		proportionalErr: 0,
-		integralErr:     0,
-		derivativeErr:   0,
-	}
 	initialProposalDuration := ctl.config.DefaultProposalDuration
 	ctl.proposalDuration.Store(initialProposalDuration.Nanoseconds())
 
+	now := time.Now()
 	ctl.log.Debug().
 		Uint64("view", curView).
 		Time("time", now).
@@ -128,11 +143,13 @@ func (ctl *BlockRateController) initLastMeasurement(curView uint64, now time.Tim
 	ctl.metrics.PIDError(ctl.lastMeasurement.proportionalErr, ctl.lastMeasurement.integralErr, ctl.lastMeasurement.derivativeErr)
 	ctl.metrics.TargetProposalDuration(initialProposalDuration)
 	ctl.metrics.ControllerOutput(0)
+
+	return ctl, nil
 }
 
 // initEpochInfo initializes the epochInfo state upon component startup.
 // No errors are expected during normal operation.
-func (ctl *BlockRateController) initEpochInfo(curView uint64) error {
+func (ctl *BlockTimeController) initEpochInfo(curView uint64) error {
 	finalSnapshot := ctl.state.Final()
 	curEpoch := finalSnapshot.Epochs().Current()
 
@@ -168,32 +185,31 @@ func (ctl *BlockRateController) initEpochInfo(curView uint64) error {
 	}
 	ctl.epochFallbackTriggered = epochFallbackTriggered
 
-	ctl.log.Debug().
-		Uint64("cur_epoch_first_view", curEpochFirstView).
-		Uint64("cur_epoch_final_view", curEpochFinalView).
-		Str("phase", phase.String()).
-		Bool("epoch_fallback", epochFallbackTriggered).
-		Msg("initialized epoch config")
-
 	return nil
 }
 
-// ProposalDuration returns the current ProposalDuration value to use when proposing.
-// This function reflects the most recently computed output of the PID controller.
-// The ProposalDuration is the total time it takes for this node to produce a block proposal,
-// from the time we enter a view to when we transmit the proposal to the committee.
-// It is the variable adjusted by the BlockRateController to achieve a target switchover time.
+// ProposalDuration returns the controller's latest view duration:
+//   - ControllerViewDuration.Block represents the latest block observed by the controller
+//   - ControllerViewDuration.TimeObserved is the time stamp when the controller received the block, per convention in UTC
+//   - ControllerViewDuration.ChildPublicationDelay is the delay, relative to `TimeObserved`,
+//     when the controller would like the child block to be published
 //
-// For a given view where we are the leader, suppose the actual time taken to build our proposal is P:
-//   - if P < ProposalDuration, then we wait ProposalDuration-P before broadcasting the proposal (total proposal time of ProposalDuration)
-//   - if P >= ProposalDuration, then we immediately broadcast the proposal (total proposal time of P)
-func (ctl *BlockRateController) ProposalDuration() time.Duration {
-	return time.Duration(ctl.proposalDuration.Load())
+// This function reflects the most recently computed output of the PID controller, where `ChildPublicationDelay`
+// is adjusted by the BlockTimeController to achieve a target switchover time.
+//
+// For a given view where we are the leader, suppose the actual time we are done building our proposal is P:
+//   - if P < TimeObserved + ChildPublicationDelay, then we wait until time stamp TimeObserved + ProposalDuration
+//     to broadcast the proposal
+//   - if P >= TimeObserved + ChildPublicationDelay, then we immediately broadcast the proposal
+//
+// Concurrency safe.
+func (ctl *BlockTimeController) ProposalDuration() *ControllerViewDuration {
+	return ctl.latestControllerOutput.Load()
 }
 
 // processEventsWorkerLogic is the logic for processing events received from other components.
 // This method should be executed by a dedicated worker routine (not concurrency safe).
-func (ctl *BlockRateController) processEventsWorkerLogic(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (ctl *BlockTimeController) processEventsWorkerLogic(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	done := ctx.Done()
@@ -222,8 +238,8 @@ func (ctl *BlockRateController) processEventsWorkerLogic(ctx irrecoverable.Signa
 		select {
 		case <-done:
 			return
-		case enteredView := <-ctl.viewChanges:
-			err := ctl.processOnViewChange(enteredView)
+		case block := <-ctl.incorporatedBlocks:
+			err := ctl.processIncorporatedBlock(block)
 			if err != nil {
 				ctl.log.Err(err).Msgf("fatal error handling OnViewChange event")
 				ctx.Throw(err)
@@ -241,32 +257,27 @@ func (ctl *BlockRateController) processEventsWorkerLogic(ctx irrecoverable.Signa
 	}
 }
 
-// processOnViewChange processes OnViewChange events from HotStuff.
+// processIncorporatedBlock processes `OnBlockIncorporated` events from HotStuff.
 // Whenever the view changes, we:
 //   - compute a new projected epoch end time, assuming an ideal view rate
 //   - compute error terms, compensation function output, and new ProposalDuration
 //   - updates epoch info, if this is the first observed view of a new epoch
 //
 // No errors are expected during normal operation.
-func (ctl *BlockRateController) processOnViewChange(view uint64) error {
+func (ctl *BlockTimeController) processIncorporatedBlock(tb TimedBlock) error {
 	// if epoch fallback is triggered, we always use default ProposalDuration
 	if ctl.epochFallbackTriggered {
 		return nil
 	}
-	// duplicate events are no-ops
-	if ctl.lastMeasurement.view == view {
+	if tb.Block.View <= ctl.lastMeasurement.view { // we don't care about older blocks that are incorporated into the protocol state
 		return nil
 	}
-	if view < ctl.lastMeasurement.view {
-		return fmt.Errorf("got invalid OnViewChange event, transition from view %d to %d", ctl.lastMeasurement.view, view)
-	}
 
-	now := time.Now()
-	err := ctl.checkForEpochTransition(view, now)
+	err := ctl.checkForEpochTransition(tb)
 	if err != nil {
 		return fmt.Errorf("could not check for epoch transition: %w", err)
 	}
-	err = ctl.measureViewDuration(view, now)
+	err = ctl.measureViewDuration(tb)
 	if err != nil {
 		return fmt.Errorf("could not measure view rate: %w", err)
 	}
@@ -276,110 +287,63 @@ func (ctl *BlockRateController) processOnViewChange(view uint64) error {
 // checkForEpochTransition updates the epochInfo to reflect an epoch transition if curView
 // being entered causes a transition to the next epoch. Otherwise, this is a no-op.
 // No errors are expected during normal operation.
-func (ctl *BlockRateController) checkForEpochTransition(curView uint64, now time.Time) error {
-	if curView <= ctl.curEpochFinalView {
-		// typical case - no epoch transition
+func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
+	view := tb.Block.View
+	if view <= ctl.curEpochFinalView { // prevalent case: we are still within the current epoch
 		return nil
 	}
 
-	if ctl.nextEpochFinalView == nil {
+	// sanity checks, since we are beyond the final view of the most recently processed epoch:
+	if ctl.nextEpochFinalView == nil { // final view of epoch we are entering should be known
 		return fmt.Errorf("cannot transition without nextEpochFinalView set")
 	}
-	// sanity check
-	if curView > *ctl.nextEpochFinalView {
-		return fmt.Errorf("sanity check failed: curView is beyond both current and next epoch (%d > %d; %d > %d)",
-			curView, ctl.curEpochFinalView, curView, *ctl.nextEpochFinalView)
+	if view > *ctl.nextEpochFinalView { // the block's view should be within the upcoming epoch
+		return fmt.Errorf("sanity check failed: curView %d is beyond both current epoch (final view %d) and next epoch (final view %d)",
+			view, ctl.curEpochFinalView, *ctl.nextEpochFinalView)
 	}
 
 	ctl.curEpochFirstView = ctl.curEpochFinalView + 1
 	ctl.curEpochFinalView = *ctl.nextEpochFinalView
 	ctl.nextEpochFinalView = nil
-	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(now, ctl.epochInfo.fractionComplete(curView))
-
-	ctl.log.Info().
-		Uint64("cur_view", curView).
-		Time("now", now).
-		Uint64("cur_epoch_first_view", ctl.curEpochFirstView).
-		Uint64("cur_epoch_final_view", ctl.curEpochFinalView).
-		Time("cur_epoch_target_end_time", ctl.curEpochTargetEndTime).
-		Msg("processed epoch transition")
-
+	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(tb.Block.Timestamp, ctl.epochInfo.fractionComplete(view))
 	return nil
 }
 
 // measureViewDuration computes a new measurement of projected epoch switchover time and error for the newly entered view.
 // It updates the ProposalDuration based on the new error.
 // No errors are expected during normal operation.
-func (ctl *BlockRateController) measureViewDuration(view uint64, now time.Time) error {
-	lastMeasurement := ctl.lastMeasurement
+func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
+	view := tb.Block.View
 
-	alpha := ctl.config.alpha()                             // α    - inclusion parameter for error EWMA
-	beta := ctl.config.beta()                               // ß    - memory parameter for error integration
+	// compute the projected time still needed for the remaining views, assuming that we progress through the remaining views
+	// idealized target view time:
+	tau := ctl.targetViewTime().Seconds()                   // τ - idealized target view time in units of seconds
 	viewsRemaining := float64(ctl.curEpochFinalView - view) // k[v] - views remaining in current epoch
 
-	var curMeasurement measurement
-	curMeasurement.view = view
-	curMeasurement.time = now
-	curMeasurement.viewTime = now.Sub(lastMeasurement.time) // time since the last measurement
-	curMeasurement.viewDiff = view - lastMeasurement.view   // views since the last measurement
+	// compute instantaneous error term: e[v] = k[v]·τ - T[v] i.e. the projected difference from target switchover
+	// and update PID controller's error terms
+	instErr := viewsRemaining*tau - ctl.curEpochTargetEndTime.Sub(tb.Block.Timestamp).Seconds()
+	previousPropErr := ctl.proportionalErr.Value()
+	propErr := ctl.proportionalErr.AddObservation(instErr)
+	itgErr := ctl.integralErr.AddObservation(instErr)
 
-	// γ[v] = k[v]•τ - the projected time remaining in the epoch
-	estTimeRemaining := time.Duration(viewsRemaining * float64(ctl.targetViewTime()))
-	// e[v] = t[v]+γ-T[v] - the projected difference from target switchover
-	curMeasurement.instErr = now.Add(estTimeRemaining).Sub(ctl.curEpochTargetEndTime).Seconds()
-
-	// e_N[v] = α•e[v] + (1-α)e_N[v-1]
-	curMeasurement.proportionalErr = alpha*curMeasurement.instErr + (1.0-alpha)*lastMeasurement.proportionalErr
-	// I_M[v] = e[v] + (1-ß)I_M[v-1]
-	curMeasurement.integralErr = curMeasurement.instErr + (1.0-beta)*lastMeasurement.integralErr
-	// ∆_N[v] = e_N[v] - e_n[v-1]
-	curMeasurement.derivativeErr = (curMeasurement.proportionalErr - lastMeasurement.proportionalErr) / float64(curMeasurement.viewDiff)
-	ctl.lastMeasurement = curMeasurement
+	// controller output u[v] in units of second
+	u := propErr*ctl.config.KP + itgErr*ctl.config.KI + (propErr-previousPropErr)*ctl.config.KD
+	//return time.Duration(float64(time.Second) * u)
 
 	// compute the controller output for this measurement
-	controllerOutput := ctl.controllerOutput()
-	unconstrainedProposalDuration := ctl.config.DefaultProposalDuration - controllerOutput
-	constrainedProposalDuration := unconstrainedProposalDuration
+	desiredViewTime := tau - u
 	// constrain the proposal time according to configured boundaries
-	if unconstrainedProposalDuration < ctl.config.MinProposalDuration {
-		constrainedProposalDuration = ctl.config.MinProposalDuration
-	} else if unconstrainedProposalDuration > ctl.config.MaxProposalDuration {
-		constrainedProposalDuration = ctl.config.MaxProposalDuration
+	if desiredViewTime < ctl.config.MinProposalDuration.Seconds() {
+		ctl.proposalDuration.Store(ctl.config.MinProposalDuration.Nanoseconds())
+		return nil
 	}
-	ctl.proposalDuration.Store(constrainedProposalDuration.Nanoseconds())
-
-	ctl.log.Debug().
-		Uint64("last_view", lastMeasurement.view).
-		Uint64("cur_view", view).
-		Dur("since_last_view", curMeasurement.viewTime).
-		Dur("projected_time_remaining", estTimeRemaining).
-		Float64("inst_err", curMeasurement.instErr).
-		Float64("proportional_err", curMeasurement.proportionalErr).
-		Float64("integral_err", curMeasurement.integralErr).
-		Float64("derivative_err", curMeasurement.derivativeErr).
-		Dur("controller_output", controllerOutput).
-		Dur("unconstrained_proposal_duration", unconstrainedProposalDuration).
-		Dur("constrained_proposal_duration", constrainedProposalDuration).
-		Msg("measured error upon view change")
-
-	ctl.metrics.PIDError(ctl.lastMeasurement.proportionalErr, ctl.lastMeasurement.integralErr, ctl.lastMeasurement.derivativeErr)
-	ctl.metrics.TargetProposalDuration(constrainedProposalDuration)
-	ctl.metrics.ControllerOutput(controllerOutput)
-
+	if desiredViewTime > ctl.config.MaxProposalDuration.Seconds() {
+		ctl.proposalDuration.Store(ctl.config.MaxProposalDuration.Nanoseconds())
+		return nil
+	}
+	ctl.proposalDuration.Store(int64(desiredViewTime * float64(time.Second)))
 	return nil
-}
-
-// controllerOutput returns u[v], the output of the controller for the most recent measurement.
-// It represents the amount of time by which the controller wishes to deviate from the default ProposalDuration.
-// Then, the ProposalDuration is given by:
-//
-//	DefaultProposalDuration-u[v]
-func (ctl *BlockRateController) controllerOutput() time.Duration {
-	curMeasurement := ctl.lastMeasurement
-	u := curMeasurement.proportionalErr*ctl.config.KP +
-		curMeasurement.integralErr*ctl.config.KI +
-		curMeasurement.derivativeErr*ctl.config.KD
-	return time.Duration(float64(time.Second) * u)
 }
 
 // processEpochSetupPhaseStarted processes EpochSetupPhaseStarted events from the protocol state.
@@ -387,7 +351,7 @@ func (ctl *BlockRateController) controllerOutput() time.Duration {
 //   - store the next epoch's final view
 //
 // No errors are expected during normal operation.
-func (ctl *BlockRateController) processEpochSetupPhaseStarted(snapshot protocol.Snapshot) error {
+func (ctl *BlockTimeController) processEpochSetupPhaseStarted(snapshot protocol.Snapshot) error {
 	if ctl.epochFallbackTriggered {
 		return nil
 	}
@@ -405,29 +369,29 @@ func (ctl *BlockRateController) processEpochSetupPhaseStarted(snapshot protocol.
 // When epoch fallback mode is triggered, we:
 //   - set ProposalDuration to the default value
 //   - set epoch fallback triggered, to disable the controller
-func (ctl *BlockRateController) processEpochFallbackTriggered() {
+func (ctl *BlockTimeController) processEpochFallbackTriggered() {
 	ctl.epochFallbackTriggered = true
 	ctl.proposalDuration.Store(ctl.config.DefaultProposalDuration.Nanoseconds())
 }
 
-// OnViewChange responds to a view-change notification from HotStuff.
+// OnBlockIncorporated listens to notification from HotStuff about incorporating new blocks.
 // The event is queued for async processing by the worker. If the channel is full,
-// the event is discarded - since we are taking an average it doesn't matter if
+// the event is discarded - since we are taking an average it doesn't matter if we
 // occasionally miss a sample.
-func (ctl *BlockRateController) OnViewChange(_, newView uint64) {
+func (ctl *BlockTimeController) OnBlockIncorporated(block *model.Block) {
 	select {
-	case ctl.viewChanges <- newView:
+	case ctl.incorporatedBlocks <- TimedBlock{Block: block, TimeObserved: time.Now().UTC()}:
 	default:
 	}
 }
 
 // EpochSetupPhaseStarted responds to the EpochSetup phase starting for the current epoch.
 // The event is queued for async processing by the worker.
-func (ctl *BlockRateController) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
+func (ctl *BlockTimeController) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
 	ctl.epochSetups <- first
 }
 
 // EpochEmergencyFallbackTriggered responds to epoch fallback mode being triggered.
-func (ctl *BlockRateController) EpochEmergencyFallbackTriggered() {
+func (ctl *BlockTimeController) EpochEmergencyFallbackTriggered() {
 	ctl.epochFallbacks <- struct{}{}
 }
