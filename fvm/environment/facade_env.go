@@ -50,6 +50,11 @@ type facadeEnvironment struct {
 	txnState storage.TransactionPreparer
 }
 
+func (env *facadeEnvironment) GenerateAccountID(address common.Address) (uint64, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func newFacadeEnvironment(
 	tracer tracing.TracerSpan,
 	params EnvironmentParams,
