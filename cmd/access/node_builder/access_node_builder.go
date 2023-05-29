@@ -976,7 +976,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Receipts,
 				node.Storage.Results,
 				node.RootChainID,
-				builder.TransactionMetrics,
 				builder.AccessMetrics,
 				builder.collectionGRPCPort,
 				builder.executionGRPCPort,
