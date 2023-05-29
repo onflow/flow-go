@@ -29,7 +29,7 @@ type DiskWAL struct {
 func NewDiskWAL(logger zerolog.Logger, reg prometheus.Registerer, metrics module.WALMetrics, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*DiskWAL, error) {
 	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, false)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create disk wal from dir %v, segmentSize %v: %w", dir, segmentSize, err)
 	}
 	return &DiskWAL{
 		wal:            w,
