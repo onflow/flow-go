@@ -4,22 +4,8 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/network"
 )
-
-// DisallowListConsumer consumes notifications from the cache.NodeBlocklistWrapper whenever the block list is updated.
-// Implementations must:
-//   - be concurrency safe
-//   - be non-blocking
-type DisallowListConsumer interface {
-	// OnNodeDisallowListUpdate notifications whenever the node block list is updated.
-	// Prerequisites:
-	// Implementation must be concurrency safe; Non-blocking;
-	// and must handle repetition of the same events (with some processing overhead).
-	OnNodeDisallowListUpdate(list flow.IdentifierList)
-}
 
 // ControlMessageType is the type of control message, as defined in the libp2p pubsub spec.
 type ControlMessageType string
@@ -38,19 +24,6 @@ const (
 // ControlMessageTypes returns list of all libp2p control message types.
 func ControlMessageTypes() []ControlMessageType {
 	return []ControlMessageType{CtrlMsgIHave, CtrlMsgIWant, CtrlMsgGraft, CtrlMsgPrune}
-}
-
-type DisallowListNotificationDistributor interface {
-	component.Component
-	// DistributeBlockListNotification distributes the event to all the consumers.
-	// Any error returned by the distributor is non-recoverable and will cause the node to crash.
-	// Implementation must be concurrency safe, and non-blocking.
-	DistributeBlockListNotification(list flow.IdentifierList) error
-
-	// AddConsumer adds a consumer to the distributor. The consumer will be called the distributor distributes a new event.
-	// AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.
-	// There is no guarantee that the consumer will be called for events that were already received by the distributor.
-	AddConsumer(network.DisallowListNotificationConsumer)
 }
 
 // GossipSubInspectorNotifDistributor is the interface for the distributor that distributes gossip sub inspector notifications.
