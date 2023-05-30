@@ -36,7 +36,6 @@ func TestConstructor(t *testing.T) {
 	require.True(t, model.IsConfigurationError(err))
 
 	// should accept only positive values for maxRebroadcastInterval
-	// TODO this test only passed because of the blockrate delay value passed, need to update?
 	c, err = NewConfig(1200*time.Millisecond, 2000*time.Millisecond, 1.5, 3, 0)
 	require.True(t, model.IsConfigurationError(err))
 	c, err = NewConfig(1200*time.Millisecond, 2000*time.Millisecond, 1.5, 3, -1000*time.Millisecond)
