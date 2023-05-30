@@ -1,5 +1,5 @@
 // Package cruisectl implements a "cruise control" system for Flow by adjusting
-// nodes' ProposalDuration in response to changes in the measured view rate and
+// nodes' GetProposalTiming in response to changes in the measured view rate and
 // target epoch switchover time.
 //
 // It uses a PID controller with the projected epoch switchover time as the process
@@ -23,35 +23,10 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// measurement represents a measurement of error associated with entering view v.
-// A measurement is taken each time the view changes for any reason.
-// Each measurement computes the instantaneous error `e[v]` based on the projected
-// and target epoch switchover times, and updates error terms.
-type measurement struct {
-	view            uint64    // v       - the current view
-	time            time.Time // t[v]    - when we entered view v
-	instErr         float64   // e[v]    - instantaneous error at view v (seconds)
-	proportionalErr float64   // e_N[v]  - proportional error at view v  (seconds)
-	integralErr     float64   // I_M[v]  - integral of error at view v   (seconds)
-	derivativeErr   float64   // ∆_N[v]  - derivative of error at view v (seconds)
-
-	// informational fields - not required for controller operation
-	viewDiff uint64        // number of views since the previous measurement
-	viewTime time.Duration // time since the last measurement
-}
-
 // TimedBlock represents a block, with a time stamp recording when the BlockTimeController received the block
 type TimedBlock struct {
 	Block        *model.Block
 	TimeObserved time.Time // time stamp when BlockTimeController received the block, per convention in UTC
-}
-
-// ControllerViewDuration holds the _latest_ block observed and the duration as
-// desired by the controller until the child block is released. Per convention,
-// ControllerViewDuration should be treated as immutable.
-type ControllerViewDuration struct {
-	TimedBlock                          // latest block observed by the controller
-	ChildPublicationDelay time.Duration // desired duration until releasing the child block, measured from `LatestObservedBlock.TimeObserved`
 }
 
 // epochInfo stores data about the current and next epoch. It is updated when we enter
@@ -61,6 +36,11 @@ type epochInfo struct {
 	curEpochFinalView     uint64    // F[v] - the final view of the epoch
 	curEpochTargetEndTime time.Time // T[v] - the target end time of the current epoch
 	nextEpochFinalView    *uint64
+}
+
+// proposalTimingContainer wraps an instance of ProposalTiming for storing it in atomic.Pointer
+type proposalTimingContainer struct {
+	ProposalTiming
 }
 
 // targetViewTime returns τ[v], the ideal, steady-state view time for the current epoch.
@@ -75,7 +55,7 @@ func (epoch *epochInfo) fractionComplete(curView uint64) float64 {
 	return float64(curView-epoch.curEpochFirstView) / float64(epoch.curEpochFinalView-epoch.curEpochFirstView)
 }
 
-// BlockTimeController dynamically adjusts the ProposalDuration of this node,
+// BlockTimeController dynamically adjusts the GetProposalTiming of this node,
 // based on the measured view rate of the consensus committee as a whole, in
 // order to achieve a desired switchover time for each epoch.
 type BlockTimeController struct {
@@ -89,14 +69,15 @@ type BlockTimeController struct {
 	epochInfo              // scheduled transition view for current/next epoch
 	epochFallbackTriggered bool
 
-	proposalDuration   atomic.Int64      // PID output, in nanoseconds, so it is directly convertible to time.Duration
 	incorporatedBlocks chan TimedBlock   // OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
 	epochSetups        chan *flow.Header // EpochSetupPhaseStarted events (block header within setup phase)
 	epochFallbacks     chan struct{}     // EpochFallbackTriggered events
 
-	proportionalErr        Ewma
-	integralErr            LeakyIntegrator
-	latestControllerOutput atomic.Pointer[ControllerViewDuration] // CAN BE NIL
+	proportionalErr Ewma
+	integralErr     LeakyIntegrator
+
+	// latestControllerOutput holds the ProposalTiming that the controller generated in response to processing the latest observation
+	latestControllerOutput atomic.Pointer[proposalTimingContainer]
 }
 
 // NewBlockTimeController returns a new BlockTimeController.
@@ -110,38 +91,31 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize LeakyIntegrator for computing the integral error: %w", err)
 	}
-	ctl := &BlockTimeController{
-		config:                 config,
-		log:                    log.With().Str("hotstuff", "cruise_ctl").Logger(),
-		metrics:                metrics,
-		state:                  state,
-		incorporatedBlocks:     make(chan TimedBlock),
-		epochSetups:            make(chan *flow.Header, 5),
-		epochFallbacks:         make(chan struct{}, 5),
-		proportionalErr:        proportionalErr,
-		integralErr:            integralErr,
-		latestControllerOutput: atomic.Pointer[ControllerViewDuration]{},
-	}
 
+	ctl := &BlockTimeController{
+		config:             config,
+		log:                log.With().Str("hotstuff", "cruise_ctl").Logger(),
+		metrics:            metrics,
+		state:              state,
+		incorporatedBlocks: make(chan TimedBlock),
+		epochSetups:        make(chan *flow.Header, 5),
+		epochFallbacks:     make(chan struct{}, 5),
+		proportionalErr:    proportionalErr,
+		integralErr:        integralErr,
+	}
+	ctl.storeProposalTiming(newPublishImmediately(curView, time.Now().UTC()))
 	ctl.Component = component.NewComponentManagerBuilder().
 		AddWorker(ctl.processEventsWorkerLogic).
 		Build()
-
 	err = ctl.initEpochInfo(curView)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize epoch info: %w", err)
 	}
 
-	idealiViewTime := ctl.targetViewTime().Seconds()
-	initialProposalDuration := ctl.config.DefaultProposalDuration
-	ctl.proposalDuration.Store(initialProposalDuration.Nanoseconds())
-
 	ctl.log.Debug().
 		Uint64("view", curView).
-		Dur("proposal_duration", initialProposalDuration).
 		Msg("initialized BlockTimeController")
 	ctl.metrics.PIDError(initProptlErr, initItgErr, initDrivErr)
-	ctl.metrics.TargetProposalDuration(initialProposalDuration)
 	ctl.metrics.ControllerOutput(0)
 
 	return ctl, nil
@@ -188,23 +162,16 @@ func (ctl *BlockTimeController) initEpochInfo(curView uint64) error {
 	return nil
 }
 
-// ProposalDuration returns the controller's latest view duration:
-//   - ControllerViewDuration.Block represents the latest block observed by the controller
-//   - ControllerViewDuration.TimeObserved is the time stamp when the controller received the block, per convention in UTC
-//   - ControllerViewDuration.ChildPublicationDelay is the delay, relative to `TimeObserved`,
-//     when the controller would like the child block to be published
-//
-// This function reflects the most recently computed output of the PID controller, where `ChildPublicationDelay`
-// is adjusted by the BlockTimeController to achieve a target switchover time.
-//
-// For a given view where we are the leader, suppose the actual time we are done building our proposal is P:
-//   - if P < TimeObserved + ChildPublicationDelay, then we wait until time stamp TimeObserved + ProposalDuration
-//     to broadcast the proposal
-//   - if P >= TimeObserved + ChildPublicationDelay, then we immediately broadcast the proposal
-//
+// storeProposalTiming stores the latest ProposalTiming
 // Concurrency safe.
-func (ctl *BlockTimeController) ProposalDuration() *ControllerViewDuration {
-	return ctl.latestControllerOutput.Load()
+func (ctl *BlockTimeController) storeProposalTiming(proposalTiming ProposalTiming) {
+	ctl.latestControllerOutput.Store(&proposalTimingContainer{proposalTiming})
+}
+
+// GetProposalTiming returns the controller's latest ProposalTiming:
+// Concurrency safe.
+func (ctl *BlockTimeController) GetProposalTiming() ProposalTiming {
+	return ctl.latestControllerOutput.Load().ProposalTiming
 }
 
 // processEventsWorkerLogic is the logic for processing events received from other components.
@@ -260,17 +227,17 @@ func (ctl *BlockTimeController) processEventsWorkerLogic(ctx irrecoverable.Signa
 // processIncorporatedBlock processes `OnBlockIncorporated` events from HotStuff.
 // Whenever the view changes, we:
 //   - compute a new projected epoch end time, assuming an ideal view rate
-//   - compute error terms, compensation function output, and new ProposalDuration
+//   - compute error terms, compensation function output, and new GetProposalTiming
 //   - updates epoch info, if this is the first observed view of a new epoch
 //
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processIncorporatedBlock(tb TimedBlock) error {
-	// if epoch fallback is triggered, we always use default ProposalDuration
+	// if epoch fallback is triggered, we always use default GetProposalTiming
 	if ctl.epochFallbackTriggered {
 		return nil
 	}
 	latest := ctl.latestControllerOutput.Load()
-	if (latest != nil) && (tb.Block.View <= latest.Block.View) { // we don't care about older blocks that are incorporated into the protocol state
+	if (latest != nil) && (tb.Block.View <= latest.ObservationView()) { // we don't care about older blocks that are incorporated into the protocol state
 		return nil
 	}
 
@@ -311,39 +278,54 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 }
 
 // measureViewDuration computes a new measurement of projected epoch switchover time and error for the newly entered view.
-// It updates the ProposalDuration based on the new error.
+// It updates the GetProposalTiming based on the new error.
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
-	view := tb.Block.View
+	//
+	previousProposalTiming := ctl.GetProposalTiming()
+	previousPropErr := ctl.proportionalErr.Value()
 
 	// compute the projected time still needed for the remaining views, assuming that we progress through the remaining views
 	// idealized target view time:
-	tau := ctl.targetViewTime().Seconds()                   // τ - idealized target view time in units of seconds
-	viewsRemaining := float64(ctl.curEpochFinalView - view) // k[v] - views remaining in current epoch
+	view := tb.Block.View
+	tau := ctl.targetViewTime().Seconds()          // τ - idealized target view time in units of seconds
+	viewsRemaining := ctl.curEpochFinalView - view // k[v] - views remaining in current epoch
+	durationRemaining := ctl.curEpochTargetEndTime.Sub(tb.Block.Timestamp)
 
-	// compute instantaneous error term: e[v] = k[v]·τ - T[v] i.e. the projected difference from target switchover
-	// and update PID controller's error terms
-	instErr := viewsRemaining*tau - ctl.curEpochTargetEndTime.Sub(tb.Block.Timestamp).Seconds()
-	previousPropErr := ctl.proportionalErr.Value()
+	// Compute instantaneous error term: e[v] = k[v]·τ - T[v] i.e. the projected difference from target switchover
+	// and update PID controller's error terms. All UNITS in SECOND.
+	instErr := float64(viewsRemaining)*tau - durationRemaining.Seconds()
 	propErr := ctl.proportionalErr.AddObservation(instErr)
 	itgErr := ctl.integralErr.AddObservation(instErr)
+	drivErr := propErr - previousPropErr
 
 	// controller output u[v] in units of second
-	u := propErr*ctl.config.KP + itgErr*ctl.config.KI + (propErr-previousPropErr)*ctl.config.KD
+	u := propErr*ctl.config.KP + itgErr*ctl.config.KI + drivErr*ctl.config.KD
 	//return time.Duration(float64(time.Second) * u)
 
-	// compute the controller output for this measurement
-	desiredViewTime := tau - u
-	// constrain the proposal time according to configured boundaries
-	if desiredViewTime < ctl.config.MinProposalDuration.Seconds() {
-		ctl.proposalDuration.Store(ctl.config.MinProposalDuration.Nanoseconds())
-		return nil
-	}
-	if desiredViewTime > ctl.config.MaxProposalDuration.Seconds() {
-		ctl.proposalDuration.Store(ctl.config.MaxProposalDuration.Nanoseconds())
-		return nil
-	}
-	ctl.proposalDuration.Store(int64(desiredViewTime * float64(time.Second)))
+	// compute the controller output for this observation
+	unconstrainedBlockTime := time.Duration((tau - u) * float64(time.Second)) // desired time between parent and child block, in units of seconds
+	proposalTiming := newHappyPathBlockTime(tb, unconstrainedBlockTime, &ctl.config.TimingConfig)
+
+	ctl.log.Debug().
+		Uint64("last_observation", previousProposalTiming.ObservationView()).
+		Dur("duration_since_last_observation", tb.TimeObserved.Sub(previousProposalTiming.ObservationTime())).
+		Dur("projected_time_remaining", durationRemaining).
+		Uint64("views_remaining", viewsRemaining).
+		Float64("inst_err", instErr).
+		Float64("proportional_err", propErr).
+		Float64("integral_err", itgErr).
+		Float64("derivative_err", drivErr).
+		Dur("controller_output", time.Duration(u*float64(time.Second))).
+		Dur("unconstrained_block_time", unconstrainedBlockTime).
+		Dur("constrained_block_time", proposalTiming.ConstrainedBlockTime()).
+		Msg("measured error upon view change")
+
+	ctl.metrics.PIDError(propErr, itgErr, drivErr)
+	ctl.metrics.ControllerOutput(time.Duration(u * float64(time.Second)))
+	ctl.metrics.TargetProposalDuration(proposalTiming.ConstrainedBlockTime())
+
+	ctl.storeProposalTiming(proposalTiming)
 	return nil
 }
 
@@ -368,11 +350,11 @@ func (ctl *BlockTimeController) processEpochSetupPhaseStarted(snapshot protocol.
 
 // processEpochFallbackTriggered processes EpochFallbackTriggered events from the protocol state.
 // When epoch fallback mode is triggered, we:
-//   - set ProposalDuration to the default value
+//   - set GetProposalTiming to the default value
 //   - set epoch fallback triggered, to disable the controller
 func (ctl *BlockTimeController) processEpochFallbackTriggered() {
 	ctl.epochFallbackTriggered = true
-	ctl.proposalDuration.Store(ctl.config.DefaultProposalDuration.Nanoseconds())
+	ctl.latestControllerOutput.Store(nil)
 }
 
 // OnBlockIncorporated listens to notification from HotStuff about incorporating new blocks.
