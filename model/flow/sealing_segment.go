@@ -67,6 +67,11 @@ func (segment *SealingSegment) Highest() *Block {
 	return segment.Blocks[len(segment.Blocks)-1]
 }
 
+// Finalized returns the last finalized block, which is an alias of Highest
+func (segment *SealingSegment) Finalized() *Block {
+	return segment.Highest()
+}
+
 // Sealed returns the most recently sealed block based on head of sealing segment(highest block).
 func (segment *SealingSegment) Sealed() *Block {
 	return segment.Blocks[0]
