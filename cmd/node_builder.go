@@ -223,7 +223,7 @@ type AlspConfig struct {
 	// Note: under normal circumstances, the ALSP module should not be disabled.
 	DisablePenalty bool
 
-	// HearBeatInterval is the interval between heartbeats sent by the ALSP module. The heartbeats are recurring
+	// HeartBeatInterval is the interval between heartbeats sent by the ALSP module. The heartbeats are recurring
 	// events that are used to perform critical ALSP tasks, such as updating the spam records cache.
 	HearBeatInterval time.Duration
 }
