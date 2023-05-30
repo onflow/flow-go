@@ -1916,9 +1916,20 @@ func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 
 // BootstrapFixture generates all the artifacts necessary to bootstrap the
 // protocol state.
-func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block)) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+func BootstrapFixture(
+	participants flow.IdentityList,
+	opts ...func(*flow.Block),
+) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+	return BootstrapFixtureWithChainID(participants, flow.Emulator, opts...)
+}
 
-	root := GenesisFixture()
+func BootstrapFixtureWithChainID(
+	participants flow.IdentityList,
+	chainID flow.ChainID,
+	opts ...func(*flow.Block),
+) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+
+	root := flow.Genesis(chainID)
 	for _, apply := range opts {
 		apply(root)
 	}
@@ -1936,8 +1947,12 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 		WithDKGFromParticipants(participants),
 	)
 
-	result := BootstrapExecutionResultFixture(root, GenesisStateCommitment)
-	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
+	stateCommit := GenesisStateCommitmentByChainID(chainID)
+	result := BootstrapExecutionResultFixture(root, stateCommit)
+	result.ServiceEvents = []flow.ServiceEvent{
+		setup.ServiceEvent(),
+		commit.ServiceEvent(),
+	}
 
 	seal := Seal.Fixture(Seal.WithResult(result))
 
@@ -1946,8 +1961,19 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 
 // RootSnapshotFixture returns a snapshot representing a root chain state, for
 // example one as returned from BootstrapFixture.
-func RootSnapshotFixture(participants flow.IdentityList, opts ...func(*flow.Block)) *inmem.Snapshot {
-	block, result, seal := BootstrapFixture(participants.Sort(order.Canonical), opts...)
+func RootSnapshotFixture(
+	participants flow.IdentityList,
+	opts ...func(*flow.Block),
+) *inmem.Snapshot {
+	return RootSnapshotFixtureWithChainID(participants, flow.Emulator, opts...)
+}
+
+func RootSnapshotFixtureWithChainID(
+	participants flow.IdentityList,
+	chainID flow.ChainID,
+	opts ...func(*flow.Block),
+) *inmem.Snapshot {
+	block, result, seal := BootstrapFixtureWithChainID(participants.Sort(order.Canonical), chainID, opts...)
 	qc := QuorumCertificateFixture(QCWithRootBlockID(block.ID()))
 	root, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 	if err != nil {
