@@ -281,7 +281,10 @@ func (m *MisbehaviorReportManager) startHeartbeatTicks(ctx irrecoverable.Signale
 			return
 		case <-ticker.C:
 			m.logger.Trace().Msg("new heartbeat ticked")
-			m.onHeartbeat(ctx)
+			if err := m.onHeartbeat(); err != nil {
+				// any error returned from onHeartbeat is considered irrecoverable.
+				ctx.Throw(fmt.Errorf("failed to perform heartbeat: %w", err))
+			}
 		}
 	}
 }
@@ -294,8 +297,9 @@ func (m *MisbehaviorReportManager) startHeartbeatTicks(ctx irrecoverable.Signale
 //
 // Returns:
 //
-//	none.
-func (m *MisbehaviorReportManager) onHeartbeat(ctx irrecoverable.SignalerContext) {
+//	error: if an error occurs, it is returned. No error is expected during normal operation. Any returned error must
+//  be considered as irrecoverable.
+func (m *MisbehaviorReportManager) onHeartbeat() error {
 	allIds := m.cache.Identities()
 
 	for _, id := range allIds {
@@ -319,8 +323,7 @@ func (m *MisbehaviorReportManager) onHeartbeat(ctx irrecoverable.SignalerContext
 		// any error here is fatal because it indicates a bug in the cache. All ids being iterated over are in the cache,
 		// and adjust function above should not return an error unless there is a bug.
 		if err != nil {
-			ctx.Throw(fmt.Errorf("failed to decay spam record %x: %w", id, err))
-			return // should be no-op because Throw() is fatal. But just in case to avoid continuing on an invalid state.
+			return fmt.Errorf("failed to decay spam record %x: %w", id, err)
 		}
 
 		m.logger.Trace().
