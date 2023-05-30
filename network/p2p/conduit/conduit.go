@@ -20,14 +20,10 @@ var _ network.ConduitFactory = (*DefaultConduitFactory)(nil)
 
 // NewDefaultConduitFactory creates a new DefaultConduitFactory, this is the default conduit factory used by the node.
 // Args:
-//
-//	alspCfg: the config for the misbehavior report manager.
-//	opts: the options for the conduit factory.
+// 		none
 //
 // Returns:
-//
 //		a new instance of the DefaultConduitFactory.
-//	 an error if the initialization of the conduit factory fails. The error is irrecoverable.
 func NewDefaultConduitFactory() *DefaultConduitFactory {
 	return &DefaultConduitFactory{}
 }
