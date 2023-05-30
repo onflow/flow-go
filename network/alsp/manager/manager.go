@@ -325,6 +325,8 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			Float64("updated_penalty", penalty).
 			Msg("spam record decayed")
 	}
+
+	return nil
 }
 
 // processMisbehaviorReport is the worker function that processes the misbehavior reports.
