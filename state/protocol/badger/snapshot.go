@@ -213,7 +213,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get snapshot's reference block: %w", err)
 	}
-	if head.Header.Height < s.state.rootHeight {
+	if head.Header.Height < s.state.finalizedRootHeight {
 		return nil, protocol.ErrSealingSegmentBelowRootBlock
 	}
 

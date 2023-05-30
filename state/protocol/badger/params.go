@@ -82,7 +82,7 @@ func (p Params) FinalizedRoot() (*flow.Header, error) {
 
 	// look up root block ID
 	var rootID flow.Identifier
-	err := p.state.db.View(operation.LookupBlockHeight(p.state.rootHeight, &rootID))
+	err := p.state.db.View(operation.LookupBlockHeight(p.state.finalizedRootHeight, &rootID))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up root header: %w", err)
 	}
@@ -126,7 +126,7 @@ func (p Params) Seal() (*flow.Seal, error) {
 
 	// look up root header
 	var rootID flow.Identifier
-	err := p.state.db.View(operation.LookupBlockHeight(p.state.rootHeight, &rootID))
+	err := p.state.db.View(operation.LookupBlockHeight(p.state.finalizedRootHeight, &rootID))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up root header: %w", err)
 	}
