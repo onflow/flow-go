@@ -116,7 +116,7 @@ func NewControlMsgValidationInspector(
 		validationConfig := conf
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
-			limiter := ratelimit.NewControlMessageRateLimiter(rate.Limit(validationConfig.RateLimit), int(validationConfig.RateLimit))
+			limiter := ratelimit.NewControlMessageRateLimiter(rate.Limit(validationConfig.RateLimit), validationConfig.RateLimit)
 			limiter.Start(ctx)
 			validationConfig.SetRateLimiter(limiter)
 		})

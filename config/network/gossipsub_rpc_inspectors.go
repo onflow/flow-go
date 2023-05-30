@@ -90,7 +90,7 @@ type CtrlMsgValidationConfig struct {
 	// with a size < SafetyThreshold. These messages will be processed as soon as possible.
 	SafetyThreshold uint64 `mapstructure:"safety-threshold"`
 	// RateLimit number of allowed messages per second, use 0 to disable rate limiting.
-	RateLimit uint64 `mapstructure:"rate-limit"`
+	RateLimit int `mapstructure:"rate-limit"`
 	// rateLimiter basic limiter without lockout duration.
 	rateLimiter p2p.BasicRateLimiter
 }

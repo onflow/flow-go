@@ -34,7 +34,7 @@ type Config struct {
 	GossipSubRpcInspectorSuite p2p.GossipSubInspectorSuite
 }
 
-// Validate validate configuration values and all sub config structs. 
+// Validate validate configuration values and all sub config structs.
 func (c *Config) Validate() error {
 	err := c.GossipSubConfig.RpcInspector.Validate()
 	if err != nil {

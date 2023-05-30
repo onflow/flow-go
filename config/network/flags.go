@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/spf13/pflag"
+
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 const (
