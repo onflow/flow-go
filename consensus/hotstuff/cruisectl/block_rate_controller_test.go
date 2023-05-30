@@ -121,7 +121,7 @@ func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
 	assert.Equal(bs.T(), bs.curEpochFinalView, epoch.curEpochFinalView)
 	assert.Equal(bs.T(), expectedEndTime, epoch.curEpochTargetEndTime)
 
-	// if next epoch is setup, final view should be set
+	// if next epoch is set up, final view should be set
 	if phase := bs.epochs.Phase(); phase > flow.EpochPhaseStaking {
 		finalView, err := bs.epochs.Next().FinalView()
 		require.NoError(bs.T(), err)
@@ -315,7 +315,7 @@ func (bs *BlockRateControllerSuite) TestOnBlockIncorporated_EpochTransition() {
 	assert.Nil(bs.T(), bs.ctl.nextEpochFinalView)
 }
 
-// TestOnEpochSetupPhaseStarted ensures that the epoch info is updated when the next epoch is setup.
+// TestOnEpochSetupPhaseStarted ensures that the epoch info is updated when the next epoch is set up.
 func (bs *BlockRateControllerSuite) TestOnEpochSetupPhaseStarted() {
 	nextEpoch := mockprotocol.NewEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)

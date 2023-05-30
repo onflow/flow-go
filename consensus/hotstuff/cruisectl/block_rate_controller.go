@@ -15,8 +15,8 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -81,7 +81,7 @@ type BlockTimeController struct {
 	latestProposalTiming *atomic.Pointer[proposalTimingContainer]
 }
 
-var _ pacemaker.ProposalDurationProvider = (*BlockTimeController)(nil)
+var _ hotstuff.ProposalDurationProvider = (*BlockTimeController)(nil)
 
 // NewBlockTimeController returns a new BlockTimeController.
 func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics, config *Config, state protocol.State, curView uint64) (*BlockTimeController, error) {

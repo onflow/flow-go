@@ -3,7 +3,7 @@ package cruisectl
 import (
 	"time"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -17,7 +17,7 @@ import (
 // that the EventHandler understands. By convention, ProposalTiming should be treated as
 // immutable.
 type ProposalTiming interface {
-	pacemaker.ProposalDurationProvider
+	hotstuff.ProposalDurationProvider
 
 	// ObservationView returns the view of the observation that the controller
 	// processed and generated this ProposalTiming instance in response.

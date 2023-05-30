@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/cruisectl"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
@@ -121,7 +120,7 @@ func main() {
 		followerDistributor *pubsub.FollowerDistributor
 		dkgBrokerTunnel     *dkgmodule.BrokerTunnel
 		blockTimer          protocol.BlockTimer
-		proposalDurProvider pacemaker.ProposalDurationProvider
+		proposalDurProvider hotstuff.ProposalDurationProvider
 		committee           *committees.Consensus
 		epochLookup         *epochs.EpochLookup
 		hotstuffModules     *consensus.HotstuffModules
