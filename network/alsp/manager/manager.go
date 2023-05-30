@@ -184,11 +184,6 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 		store,
 		m.processMisbehaviorReport).Build()
 
-	m.workerPool = worker.NewWorkerPoolBuilder[internal.ReportedMisbehaviorWork](
-		cfg.Logger,
-		store,
-		m.processMisbehaviorReport).Build()
-
 	for _, opt := range opts {
 		opt(m)
 	}
