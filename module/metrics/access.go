@@ -89,10 +89,10 @@ func NewAccessCollector(opts ...AccessCollectorOpts) *AccessCollector {
 			Help:      "counter for the number of times a cached connection is evicted from the connection pool",
 		}),
 		lastFullBlockHeight: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "last_full_block_height",
+			Name:      "last_full_finalized_block_height",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemIngestion,
-			Help:      "gauge to track the highest consecutive height with all collections indexed",
+			Help:      "gauge to track the highest consecutive finalized block height with all collections indexed",
 		}),
 		maxReceiptHeight: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_receipt_height",
