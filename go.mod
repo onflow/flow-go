@@ -100,7 +100,6 @@ require (
 
 require (
 	github.com/coreos/go-semver v0.3.0
-	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/slok/go-http-metrics v0.10.0
 	gonum.org/v1/gonum v0.8.2
 )

@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
+	netconf "github.com/onflow/flow-go/config/network"
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -58,7 +59,7 @@ func InitCorruptLibp2pNode(
 	connGaterCfg *p2pconfig.ConnectionGaterConfig,
 	peerManagerCfg *p2pconfig.PeerManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig,
-	gossipSubCfg *p2pbuilder.GossipSubConfig,
+	netConfig *netconf.Config,
 	topicValidatorDisabled,
 	withMessageSigning,
 	withStrictSignatureVerification bool,
@@ -72,7 +73,7 @@ func InitCorruptLibp2pNode(
 		Metrics:          metricsCfg,
 	}
 
-	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, gossipSubCfg.RpcInspector, idProvider, metricsCfg).
+	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, netConfig.GossipSubConfig.RpcInspector, idProvider, metricsCfg).
 		SetNetworkType(network.PrivateNetwork).
 		SetMetrics(metCfg).
 		Build()
@@ -91,10 +92,11 @@ func InitCorruptLibp2pNode(
 		role,
 		connGaterCfg,
 		peerManagerCfg,
-		gossipSubCfg,
+		netConfig.GossipSubConfig,
 		rpcInspectorSuite,
-		p2pbuilder.DefaultResourceManagerConfig(),
-		uniCfg)
+		netConfig.LibP2PResourceManagerConfig,
+		uniCfg,
+		netConfig.ConnectionManagerConfig)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)

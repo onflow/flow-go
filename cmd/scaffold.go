@@ -26,6 +26,7 @@ import (
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/config"
+	netconf "github.com/onflow/flow-go/config/network"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -131,13 +132,15 @@ type FlowNodeBuilder struct {
 var _ NodeBuilder = (*FlowNodeBuilder)(nil)
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
-	err := fnb.InitFlowConfig()
+	defaultFlowConfig, err := config.DefaultConfig()
 	if err != nil {
 		fnb.Logger.Fatal().Err(err).Msg("failed to initialize flow config")
 	}
 
 	defaultConfig := DefaultBaseConfig()
 
+	// initialize network configuration flags
+	netconf.InitializeNetworkFlags(fnb.flags, defaultFlowConfig.NetworkConfig)
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", defaultConfig.nodeIDHex, "identity of our node")
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
@@ -171,50 +174,6 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminClientCAs, "admin-client-certs", defaultConfig.AdminClientCAs, "admin client certs (for mutual TLS)")
 	fnb.flags.UintVar(&fnb.BaseConfig.AdminMaxMsgSize, "admin-max-response-size", defaultConfig.AdminMaxMsgSize, "admin server max response size in bytes")
 
-	// network config cli flags
-	fnb.flags.Bool(config.NetworkingConnectionPruningKey, config.NetworkConnectionPruning(), "enabling connection trimming")
-	fnb.flags.Duration(config.DnsCacheTTLKey, config.DnsCacheTTL(), "time-to-live for dns cache")
-	fnb.flags.StringSlice(config.PreferredUnicastsProtocolsKey, config.PreferredUnicastsProtocols(), "preferred unicast protocols in ascending order of preference")
-	fnb.flags.Uint32(config.ReceivedMessageCacheSizeKey, config.ReceivedMessageCacheSize(), "incoming message cache size at networking layer")
-	fnb.flags.Uint32(config.DisallowListNotificationCacheSizeKey, config.DisallowListNotificationCacheSize(), "cache size for notification events from disallow list")
-	fnb.flags.Duration(config.PeerUpdateIntervalKey, config.PeerUpdateInterval(), "how often to refresh the peer connections for the node")
-	fnb.flags.Duration(config.UnicastMessageTimeoutKey, config.UnicastMessageTimeout(), "how long a unicast transmission can take to complete")
-	// unicast manager options
-	fnb.flags.Duration(config.UnicastCreateStreamRetryDelayKey, config.UnicastCreateStreamRetryDelay(), "Initial delay between failing to establish a connection with another node and retrying. This delay increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.")
-	// unicast stream handler rate limits
-	fnb.flags.Int(config.MessageRateLimitKey, config.MessageRateLimit(), "maximum number of unicast messages that a peer can send per second")
-	fnb.flags.Int(config.BandwidthRateLimitKey, config.BandwidthRateLimit(), "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
-	fnb.flags.Int(config.BandwidthBurstLimitKey, config.BandwidthBurstLimit(), "bandwidth size in bytes a peer is allowed to send at one time")
-	fnb.flags.Duration(config.LockoutDurationKey, config.LockoutDuration(), "the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
-	fnb.flags.Bool(config.DryRunKey, config.DryRun(), "disable peer disconnects and connections gating when rate limiting peers")
-	// resource manager cli flags
-	fnb.flags.Float64(config.FileDescriptorsRatioKey, config.FileDescriptorsRatio(), "ratio of available file descriptors to be used by libp2p (in (0,1])")
-	fnb.flags.Float64(config.MemoryLimitRatioKey, config.MemoryLimitRatio(), "ratio of available memory to be used by libp2p (in (0,1])")
-	fnb.flags.Int(config.PeerBaseLimitConnsInboundKey, config.PeerBaseLimitConnsInbound(), "the maximum amount of allowed inbound connections per peer")
-	// connection manager
-	fnb.flags.Int(config.LowWatermarkKey, config.ConnManagerLowWatermark(), "low watermarking for libp2p connection manager")
-	fnb.flags.Int(config.HighWatermarkKey, config.ConnManagerHighWatermark(), "high watermarking for libp2p connection manager")
-	fnb.flags.Duration(config.GracePeriodKey, config.ConnManagerGracePeriod(), "grace period for libp2p connection manager")
-	fnb.flags.Duration(config.SilencePeriodKey, config.ConnManagerSilencePeriod(), "silence period for libp2p connection manager")
-	fnb.flags.Bool(config.PeerScoringKey, config.GossipsubPeerScoring(), "enabling peer scoring on pubsub network")
-	fnb.flags.Duration(config.LocalMeshLogIntervalKey, config.GossipsubLocalMeshLogInterval(), "logging interval for local mesh in gossipsub")
-	fnb.flags.Duration(config.ScoreTracerIntervalKey, config.GossipsubScoreTracerInterval(), "logging interval for peer score tracer in gossipsub, set to 0 to disable")
-	// gossipsub RPC control message validation limits used for validation configuration and rate limiting
-	fnb.flags.Int(config.ValidationInspectorNumberOfWorkersKey, config.ValidationInspectorNumberOfWorkers(), "number of gossupsub RPC control message validation inspector component workers")
-	fnb.flags.Uint32(config.ValidationInspectorInspectMessageQueueCacheSizeKey, config.ValidationInspectorInspectMessageQueueCacheSize(), "cache size for gossipsub RPC validation inspector events worker pool queue.")
-	fnb.flags.Uint32(config.ValidationInspectorClusterPrefixedTopicsReceivedCacheSizeKey, config.ValidationInspectorClusterPrefixedTopicsReceivedCacheSize(), "cache size for gossipsub RPC validation inspector cluster prefix received tracker.")
-	fnb.flags.Float64(config.ValidationInspectorClusterPrefixedTopicsReceivedCacheDecayKey, config.ValidationInspectorClusterPrefixedTopicsReceivedCacheDecay(), "the decay value used to decay cluster prefix received topics received cached counters.")
-	fnb.flags.Float64(config.ValidationInspectorClusterPrefixDiscardThresholdKey, config.ValidationInspectorClusterPrefixDiscardThreshold(), "the maximum number of cluster-prefixed control messages allowed to be processed when the active cluster id is unset or a mismatch is detected, exceeding this threshold will result in node penalization by gossipsub.")
-	fnb.flags.StringToInt(config.ValidationInspectorGraftLimitsKey, config.ValidationInspectorGraftLimits(), fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC GRAFT message validation e.g: %s=1000,%s=100,%s=1000", config.DiscardThresholdMapKey, config.SafetyThresholdMapKey, config.RateLimitMapKey))
-	fnb.flags.StringToInt(config.ValidationInspectorPruneLimitsKey, config.ValidationInspectorPruneLimits(), fmt.Sprintf("discard threshold, safety and rate limits for gossipsub RPC PRUNE message validation e.g: %s=1000,%s=20,%s=1000", config.DiscardThresholdMapKey, config.SafetyThresholdMapKey, config.RateLimitMapKey))
-	// gossipsub RPC control message metrics observer inspector configuration
-	fnb.flags.Int(config.MetricsInspectorNumberOfWorkersKey, config.MetricsInspectorNumberOfWorkers(), "cache size for gossipsub RPC metrics inspector events worker pool queue.")
-	fnb.flags.Uint32(config.MetricsInspectorCacheSizeKey, config.MetricsInspectorCacheSize(), "cache size for gossipsub RPC metrics inspector events worker pool.")
-	// networking event notifications
-	fnb.flags.Uint32(config.GossipSubRPCInspectorNotificationCacheSizeKey, config.GossipSubRPCInspectorNotificationCacheSize(), "cache size for notification events from gossipsub rpc inspector")
-
-	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
-
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 
@@ -236,11 +195,6 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
 
 	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
-
-	// application layer spam prevention (alsp) protocol
-	fnb.flags.BoolVar(&fnb.BaseConfig.AlspConfig.DisablePenalty, "alsp-disable", defaultConfig.AlspConfig.DisablePenalty, "disable the penalty mechanism of the alsp protocol. default value (recommended) is false")
-	fnb.flags.Uint32Var(&fnb.BaseConfig.AlspConfig.SpamRecordCacheSize, "alsp-spam-record-cache-size", defaultConfig.AlspConfig.SpamRecordCacheSize, "size of spam record cache, recommended to be 10x the number of authorized nodes")
-	fnb.flags.Uint32Var(&fnb.BaseConfig.AlspConfig.SpamReportQueueSize, "alsp-spam-report-queue-size", defaultConfig.AlspConfig.SpamReportQueueSize, "size of spam report queue, recommended to be 100x the number of authorized nodes")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -307,7 +261,7 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 			node.Logger,
 			fnb.Metrics.Network,
 			cache,
-			dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
+			dns.WithTTL(fnb.BaseConfig.FlowConfig.NetworkConfig.DNSCacheTTL))
 
 		fnb.Resolver = resolver
 		return resolver, nil
@@ -324,21 +278,21 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 	// setup default rate limiter options
 	unicastRateLimiterOpts := []ratelimit.RateLimitersOption{
-		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.UnicastRateLimitersConfig.DryRun),
+		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.DryRun),
 		ratelimit.WithNotifier(fnb.UnicastRateLimiterDistributor),
 	}
 
 	// override noop unicast message rate limiter
-	if fnb.BaseConfig.UnicastRateLimitersConfig.MessageRateLimit > 0 {
+	if fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.MessageRateLimit > 0 {
 		unicastMessageRateLimiter := ratelimiter.NewRateLimiter(
-			rate.Limit(fnb.BaseConfig.UnicastRateLimitersConfig.MessageRateLimit),
-			fnb.BaseConfig.UnicastRateLimitersConfig.MessageRateLimit,
-			fnb.BaseConfig.UnicastRateLimitersConfig.LockoutDuration,
+			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.MessageRateLimit),
+			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.MessageRateLimit,
+			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.LockoutDuration,
 		)
 		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithMessageRateLimiter(unicastMessageRateLimiter))
 
 		// avoid connection gating and pruning during dry run
-		if !fnb.BaseConfig.UnicastRateLimitersConfig.DryRun {
+		if !fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.DryRun {
 			f := rateLimiterPeerFilter(unicastMessageRateLimiter)
 			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
 			// don't allow rate limited peers to establishing incoming connections
@@ -349,16 +303,16 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}
 
 	// override noop unicast bandwidth rate limiter
-	if fnb.BaseConfig.UnicastRateLimitersConfig.BandwidthRateLimit > 0 && fnb.BaseConfig.UnicastRateLimitersConfig.BandwidthBurstLimit > 0 {
+	if fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.BandwidthRateLimit > 0 && fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.BandwidthBurstLimit > 0 {
 		unicastBandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(
-			rate.Limit(fnb.BaseConfig.UnicastRateLimitersConfig.BandwidthRateLimit),
-			fnb.BaseConfig.UnicastRateLimitersConfig.BandwidthBurstLimit,
-			fnb.BaseConfig.UnicastRateLimitersConfig.LockoutDuration,
+			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.BandwidthRateLimit),
+			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.BandwidthBurstLimit,
+			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.LockoutDuration,
 		)
 		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithBandwidthRateLimiter(unicastBandwidthRateLimiter))
 
 		// avoid connection gating and pruning during dry run
-		if !fnb.BaseConfig.UnicastRateLimitersConfig.DryRun {
+		if !fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.DryRun {
 			f := rateLimiterPeerFilter(unicastBandwidthRateLimiter)
 			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
 			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, f)
@@ -370,7 +324,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	unicastRateLimiters := ratelimit.NewRateLimiters(unicastRateLimiterOpts...)
 
 	uniCfg := &p2pconfig.UnicastConfig{
-		StreamRetryInterval:    fnb.UnicastCreateStreamRetryDelay,
+		StreamRetryInterval:    fnb.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
 		RateLimiterDistributor: fnb.UnicastRateLimiterDistributor,
 	}
 
@@ -380,8 +334,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}
 
 	peerManagerCfg := &p2pconfig.PeerManagerConfig{
-		ConnectionPruning: fnb.NetworkConnectionPruning,
-		UpdateInterval:    fnb.PeerUpdateInterval,
+		ConnectionPruning: fnb.FlowConfig.NetworkConfig.NetworkConnectionPruning,
+		UpdateInterval:    fnb.FlowConfig.NetworkConfig.PeerUpdateInterval,
 	}
 
 	fnb.Component(LibP2PNodeComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
@@ -395,7 +349,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
 		}
 
-		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.GossipSubConfig.RpcInspector, fnb.IdentityProvider, fnb.Metrics.Network).
+		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.FlowConfig.NetworkConfig.GossipSubConfig.RpcInspector, fnb.IdentityProvider, fnb.Metrics.Network).
 			SetNetworkType(network.PrivateNetwork).
 			SetMetrics(metricsCfg).
 			Build()
@@ -403,7 +357,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for default libp2p node: %w", err)
 		}
 
-		fnb.GossipSubRpcInspectorSuite = rpcInspectorSuite
+		fnb.FlowConfig.NetworkConfig.GossipSubRpcInspectorSuite = rpcInspectorSuite
 
 		builder, err := p2pbuilder.DefaultNodeBuilder(
 			fnb.Logger,
@@ -416,10 +370,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
 			peerManagerCfg,
-			fnb.GossipSubConfig,
-			fnb.GossipSubRpcInspectorSuite,
-			fnb.LibP2PResourceManagerConfig,
-			uniCfg)
+			fnb.FlowConfig.NetworkConfig.GossipSubConfig,
+			fnb.FlowConfig.NetworkConfig.GossipSubRpcInspectorSuite,
+			fnb.FlowConfig.NetworkConfig.LibP2PResourceManagerConfig,
+			uniCfg,
+			fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
@@ -436,9 +391,9 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  fnb.Logger,
-			SpamRecordCacheSize:     fnb.AlspConfig.SpamRecordCacheSize,
-			SpamReportQueueSize:     fnb.AlspConfig.SpamReportQueueSize,
-			DisablePenalty:          fnb.AlspConfig.DisablePenalty,
+			SpamRecordCacheSize:     fnb.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
+			SpamReportQueueSize:     fnb.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
+			DisablePenalty:          fnb.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
 			AlspMetrics:             fnb.Metrics.Network,
 			HeroCacheMetricsFactory: fnb.HeroCacheMetricsFactory(),
 			NetworkType:             network.PrivateNetwork,
@@ -483,7 +438,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	mwOpts = append(mwOpts, middleware.WithUnicastRateLimiters(unicastRateLimiters))
 
 	mwOpts = append(mwOpts,
-		middleware.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.PreferredUnicastProtocols)),
+		middleware.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.FlowConfig.NetworkConfig.PreferredUnicastProtocols)),
 	)
 
 	// peerManagerFilters are used by the peerManager via the middleware to filter peers from the topology.
@@ -498,7 +453,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		fnb.Me.NodeID(),
 		fnb.Metrics.Bitswap,
 		fnb.SporkID,
-		fnb.BaseConfig.UnicastMessageTimeout,
+		fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastMessageTimeout,
 		fnb.IDTranslator,
 		fnb.CodecFactory(),
 		slashingViolationsConsumer,
@@ -508,7 +463,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 
 	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
 
-	receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
+	receiveCache := netcache.NewHeroReceiveCache(fnb.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 		fnb.Logger,
 		metrics.NetworkReceiveCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork))
 
@@ -621,7 +576,7 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 	// parse configuration parameters
 	pflag.Parse()
 
-	err := config.BindPFlags()
+	err := config.BindPFlags(&fnb.BaseConfig.FlowConfig)
 	if err != nil {
 		return err
 	}
@@ -636,11 +591,6 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 	log.Msg("flags loaded")
 
 	return fnb.extraFlagsValidation()
-}
-
-// InitFlowConfig initializes the Flow config.
-func (fnb *FlowNodeBuilder) InitFlowConfig() error {
-	return config.Initialize()
 }
 
 func (fnb *FlowNodeBuilder) ValidateRootSnapshot(f func(protocol.Snapshot) error) NodeBuilder {
@@ -1065,7 +1015,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		}
 		node.IDTranslator = idCache
 
-		fnb.NodeDisallowListDistributor = BuildDisallowListNotificationDisseminator(fnb.DisallowListNotificationCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
+		fnb.NodeDisallowListDistributor = BuildDisallowListNotificationDisseminator(fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
 
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true

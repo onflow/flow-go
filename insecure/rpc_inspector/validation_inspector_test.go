@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/config"
+	netconf "github.com/onflow/flow-go/config/network"
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
@@ -38,10 +40,12 @@ func TestValidationInspector_SafetyThreshold(t *testing.T) {
 	// if GRAFT/PRUNE message count is lower than safety threshold the RPC validation should pass
 	safetyThreshold := uint64(10)
 	// create our RPC validation inspector
-	inspectorConfig := internal.DefaultRPCValidationConfig()
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
 	inspectorConfig.NumberOfWorkers = 1
-	inspectorConfig.GraftValidationCfg.SafetyThreshold = safetyThreshold
-	inspectorConfig.PruneValidationCfg.SafetyThreshold = safetyThreshold
+	inspectorConfig.GraftLimits.SafetyThreshold = safetyThreshold
+	inspectorConfig.PruneLimits.SafetyThreshold = safetyThreshold
 
 	// expected log message logged when valid number GRAFT control messages spammed under safety threshold
 	graftExpectedMessageStr := fmt.Sprintf("control message %s inspection passed 5 is below configured safety threshold", p2p.CtrlMsgGraft)
@@ -100,10 +104,12 @@ func TestValidationInspector_HardThreshold_Detection(t *testing.T) {
 	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	hardThreshold := uint64(10)
 	// create our RPC validation inspector
-	inspectorConfig := internal.DefaultRPCValidationConfig()
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
 	inspectorConfig.NumberOfWorkers = 1
-	inspectorConfig.GraftValidationCfg.HardThreshold = hardThreshold
-	inspectorConfig.PruneValidationCfg.HardThreshold = hardThreshold
+	inspectorConfig.GraftLimits.HardThreshold = hardThreshold
+	inspectorConfig.PruneLimits.HardThreshold = hardThreshold
 
 	messageCount := 50
 	controlMessageCount := int64(1)
@@ -162,12 +168,14 @@ func TestValidationInspector_HardThresholdIHave_Detection(t *testing.T) {
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	// create our RPC validation inspector
-	inspectorConfig := internal.DefaultRPCValidationConfig()
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
 	inspectorConfig.NumberOfWorkers = 1
-	inspectorConfig.IHaveValidationCfg.HardThreshold = 50
-	inspectorConfig.IHaveValidationCfg.IHaveInspectionMaxSampleSize = 100
+	inspectorConfig.IHaveLimits.HardThreshold = 50
+	inspectorConfig.IHaveInspectionMaxSampleSize = 100
 	// set the sample size divisor to 2 which will force inspection of 50% of topic IDS
-	inspectorConfig.IHaveValidationCfg.IHaveSyncInspectSampleSizePercentage = .5
+	inspectorConfig.IHaveSyncInspectSampleSizePercentage = .5
 
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID))
 	messageCount := 100
@@ -224,7 +232,9 @@ func TestValidationInspector_RateLimitedPeer_Detection(t *testing.T) {
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	// create our RPC validation inspector
-	inspectorConfig := internal.DefaultRPCValidationConfig()
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
 	inspectorConfig.NumberOfWorkers = 1
 
 	// here we set the message count to the amount of flow channels
@@ -307,23 +317,25 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
-	inspectorConfig := internal.DefaultRPCValidationConfig()
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
 	// set safety thresholds to 0 to force inspector to validate all control messages
-	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
-	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
+	inspectorConfig.PruneLimits.SafetyThreshold = 0
+	inspectorConfig.GraftLimits.SafetyThreshold = 0
 	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
 	inspectorConfig.ClusterPrefixHardThreshold = 0
-	inspectorConfig.IHaveValidationCfg.SafetyThreshold = 0
-	inspectorConfig.IHaveValidationCfg.HardThreshold = 50
-	inspectorConfig.IHaveValidationCfg.IHaveAsyncInspectSampleSizePercentage = .5
-	inspectorConfig.IHaveValidationCfg.IHaveInspectionMaxSampleSize = 100
+	inspectorConfig.IHaveLimits.SafetyThreshold = 0
+	inspectorConfig.IHaveLimits.HardThreshold = 50
+	inspectorConfig.IHaveAsyncInspectSampleSizePercentage = .5
+	inspectorConfig.IHaveInspectionMaxSampleSize = 100
 	ihaveMessageCount := 100
 	inspectorConfig.NumberOfWorkers = 1
 
 	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
-	messageCount := inspectorConfig.GraftValidationCfg.SafetyThreshold + 1
+	messageCount := inspectorConfig.GraftLimits.SafetyThreshold + 1
 	controlMessageCount := int64(1)
 
 	count := atomic.NewUint64(0)
@@ -419,10 +431,12 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
-	inspectorConfig := internal.DefaultRPCValidationConfig()
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
 	// set safety thresholds to 0 to force inspector to validate all control messages
-	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
-	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
+	inspectorConfig.PruneLimits.SafetyThreshold = 0
+	inspectorConfig.GraftLimits.SafetyThreshold = 0
 	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
 	inspectorConfig.ClusterPrefixHardThreshold = 0
@@ -430,7 +444,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 
 	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
-	messageCount := inspectorConfig.GraftValidationCfg.SafetyThreshold + 3
+	messageCount := inspectorConfig.GraftLimits.SafetyThreshold + 3
 	controlMessageCount := int64(1)
 
 	count := atomic.NewInt64(0)
@@ -494,10 +508,12 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
-	inspectorConfig := internal.DefaultRPCValidationConfig()
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
 	// set safety thresholds to 0 to force inspector to validate all control messages
-	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
-	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
+	inspectorConfig.PruneLimits.SafetyThreshold = 0
+	inspectorConfig.GraftLimits.SafetyThreshold = 0
 	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
 	inspectorConfig.ClusterPrefixHardThreshold = 0
@@ -505,7 +521,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 
 	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
-	messageCount := inspectorConfig.GraftValidationCfg.SafetyThreshold + 1
+	messageCount := inspectorConfig.GraftLimits.SafetyThreshold + 1
 	controlMessageCount := int64(1)
 
 	count := atomic.NewInt64(0)
@@ -572,8 +588,10 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	sporkID := unittest.IdentifierFixture()
 	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
-	inspectorConfig := internal.DefaultRPCValidationConfig()
-	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
+	inspectorConfig.GraftLimits.SafetyThreshold = 0
 	inspectorConfig.ClusterPrefixHardThreshold = 5
 	inspectorConfig.NumberOfWorkers = 1
 	controlMessageCount := int64(10)
@@ -634,8 +652,10 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	sporkID := unittest.IdentifierFixture()
 	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
-	inspectorConfig := internal.DefaultRPCValidationConfig()
-	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
+	inspectorConfig.PruneLimits.SafetyThreshold = 0
 	inspectorConfig.ClusterPrefixHardThreshold = 5
 	inspectorConfig.NumberOfWorkers = 1
 	controlMessageCount := int64(10)
@@ -695,10 +715,12 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 	// if GRAFT/PRUNE message count is higher than hard threshold the RPC validation should fail and expected error should be returned
 	// create our RPC validation inspector
-	inspectorConfig := internal.DefaultRPCValidationConfig()
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
 	// set safety thresholds to 0 to force inspector to validate all control messages
-	inspectorConfig.PruneValidationCfg.SafetyThreshold = 0
-	inspectorConfig.GraftValidationCfg.SafetyThreshold = 0
+	inspectorConfig.PruneLimits.SafetyThreshold = 0
+	inspectorConfig.GraftLimits.SafetyThreshold = 0
 	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
 	inspectorConfig.ClusterPrefixHardThreshold = 0
@@ -706,7 +728,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 
 	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
-	messageCount := inspectorConfig.GraftValidationCfg.SafetyThreshold + 1
+	messageCount := inspectorConfig.GraftLimits.SafetyThreshold + 1
 	controlMessageCount := int64(1)
 
 	count := atomic.NewInt64(0)
@@ -783,7 +805,7 @@ func withExpectedNotificationDissemination(expectedNumOfTotalNotif int, f onNoti
 }
 
 // setupTest sets up common components of RPC inspector test.
-func setupTest(t *testing.T, logger zerolog.Logger, role flow.Role, sporkID flow.Identifier, inspectorConfig *validation.ControlMsgValidationInspectorConfig, mockDistributorOpts ...mockDistributorOption) (*irrecoverable.MockSignalerContext, context.CancelFunc, *corruptlibp2p.GossipSubRouterSpammer, p2p.LibP2PNode, flow.Identity, *mockp2p.GossipSubInspectorNotificationDistributor, *validation.ControlMsgValidationInspector, *mock.IdentityProvider) {
+func setupTest(t *testing.T, logger zerolog.Logger, role flow.Role, sporkID flow.Identifier, inspectorConfig *netconf.GossipSubRPCValidationInspectorConfigs, mockDistributorOpts ...mockDistributorOption) (*irrecoverable.MockSignalerContext, context.CancelFunc, *corruptlibp2p.GossipSubRouterSpammer, p2p.LibP2PNode, flow.Identity, *mockp2p.GossipSubInspectorNotificationDistributor, *validation.ControlMsgValidationInspector, *mock.IdentityProvider) {
 	idProvider := mock.NewIdentityProvider(t)
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -794,7 +816,7 @@ func setupTest(t *testing.T, logger zerolog.Logger, role flow.Role, sporkID flow
 	for _, mockDistributorOpt := range mockDistributorOpts {
 		mockDistributorOpt(distributor, spammer)
 	}
-	validationInspector, err := validation.NewControlMsgValidationInspector(logger, sporkID, inspectorConfig, distributor, metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector())
+	validationInspector, err := validation.NewControlMsgValidationInspector(logger, sporkID, inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector())
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(

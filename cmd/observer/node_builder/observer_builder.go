@@ -629,9 +629,9 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 
 	cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
 		Logger:                  builder.Logger,
-		SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
-		SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
-		DisablePenalty:          builder.AlspConfig.DisablePenalty,
+		SpamRecordCacheSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
+		SpamReportQueueSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
+		DisablePenalty:          builder.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
 		AlspMetrics:             builder.Metrics.Network,
 		HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
 		NetworkType:             network.PublicNetwork,
@@ -742,7 +742,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
-		builder.NodeDisallowListDistributor = cmd.BuildDisallowListNotificationDisseminator(builder.DisallowListNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
+		builder.NodeDisallowListDistributor = cmd.BuildDisallowListNotificationDisseminator(builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
 
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
@@ -874,9 +874,9 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		builder.Logger,
 		builder.Metrics.Network,
 		builder.IdentityProvider,
-		builder.GossipSubConfig.LocalMeshLogInterval)
+		builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval)
 
-	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector, builder.IdentityProvider, builder.Metrics.Network).
+	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.FlowConfig.NetworkConfig.GossipSubConfig.RpcInspector, builder.IdentityProvider, builder.Metrics.Network).
 		SetNetworkType(network.PublicNetwork).
 		SetMetrics(&p2pconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
@@ -892,7 +892,7 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		builder.BaseConfig.BindAddr,
 		networkKey,
 		builder.SporkID,
-		builder.LibP2PResourceManagerConfig).
+		builder.FlowConfig.NetworkConfig.LibP2PResourceManagerConfig).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, builder.IdentityProvider,
@@ -906,9 +906,9 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 				dht.BootstrapPeers(pis...),
 			)
 		}).
-		SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
+		SetStreamCreationRetryInterval(builder.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay).
 		SetGossipSubTracer(meshTracer).
-		SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
+		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
 		SetGossipSubRpcInspectorSuite(rpcInspectorSuite).
 		Build()
 
@@ -968,7 +968,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 			return publicLibp2pNode, nil
 		}).
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
+			receiveCache := netcache.NewHeroReceiveCache(builder.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 				builder.Logger,
 				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork))
 

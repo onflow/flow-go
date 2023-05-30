@@ -7,6 +7,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
 )
 
@@ -20,6 +21,11 @@ var _ p2p.BasicRateLimiter = (*ControlMessageRateLimiter)(nil)
 // NewControlMessageRateLimiter returns a new ControlMessageRateLimiter. The cleanup loop will be started in a
 // separate goroutine and should be stopped by calling Close.
 func NewControlMessageRateLimiter(limit rate.Limit, burst int) p2p.BasicRateLimiter {
+	if limit == 0 {
+		// setup noop rate limiter if rate limiting is disabled
+		return ratelimit.NewNoopRateLimiter()
+	}
+
 	// NOTE: we use a lockout duration of 0 because we only need to expose the basic functionality of the
 	// rate limiter and not the lockout feature.
 	lockoutDuration := time.Duration(0)

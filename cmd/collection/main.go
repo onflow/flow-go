@@ -48,7 +48,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -158,11 +157,6 @@ func main() {
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
 		flags.StringToIntVar(&apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,SendTransaction=500 etc. note limits apply globally to all clients.")
 		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,SendTransaction=100 etc. note limits apply globally to all clients.")
-
-		// gossipsub rpc validation inspector cluster prefixed control messages received flags
-		flags.Uint32Var(&nodeBuilder.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.ClusterPrefixedControlMsgsReceivedCacheSize, "gossipsub-cluster-prefix-tracker-cache-size", validation.DefaultClusterPrefixedControlMsgsReceivedCacheSize, "cache size for gossipsub RPC validation inspector cluster prefix received tracker.")
-		flags.Float64Var(&nodeBuilder.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.ClusterPrefixedControlMsgsReceivedCacheDecay, "gossipsub-cluster-prefix-tracker-cache-decay", validation.DefaultClusterPrefixedControlMsgsReceivedCacheDecay, "the decay value used to decay cluster prefix received topics received cached counters.")
-		flags.Float64Var(&nodeBuilder.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.ClusterPrefixHardThreshold, "gossipsub-rpc-cluster-prefixed-hard-threshold", validation.DefaultClusterPrefixedMsgDropThreshold, "the maximum number of cluster-prefixed control messages allowed to be processed when the active cluster id is unset or a mismatch is detected, exceeding this threshold will result in node penalization by gossipsub.")
 
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
@@ -583,7 +577,7 @@ func main() {
 			// register the manager for protocol events
 			node.ProtocolEvents.AddConsumer(manager)
 
-			for _, rpcInspector := range node.GossipSubRpcInspectorSuite.Inspectors() {
+			for _, rpcInspector := range node.FlowConfig.NetworkConfig.GossipSubRpcInspectorSuite.Inspectors() {
 				if r, ok := rpcInspector.(p2p.GossipSubMsgValidationRpcInspector); ok {
 					clusterEvents.AddConsumer(r)
 				}

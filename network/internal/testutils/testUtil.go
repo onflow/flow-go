@@ -20,6 +20,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
+	netconf "github.com/onflow/flow-go/config/network"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -112,7 +114,7 @@ func (tw *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 }
 
 // NewTagWatchingConnManager creates a new TagWatchingConnManager with the given config. It returns an error if the config is invalid.
-func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics, config *connection.ManagerConfig) (*TagWatchingConnManager, error) {
+func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics, config *netconf.ConnectionManagerConfig) (*TagWatchingConnManager, error) {
 	cm, err := connection.NewConnManager(log, metrics, config)
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
@@ -474,12 +476,14 @@ func withUnicastManagerOpts(delay time.Duration) nodeBuilderOption {
 func generateLibP2PNode(t *testing.T, logger zerolog.Logger, key crypto.PrivateKey, provider *UpdatableIDProvider, opts ...nodeBuilderOption) (p2p.LibP2PNode, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
+	defaultFlowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
 
 	// Inject some logic to be able to observe connections of this node
-	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, connection.DefaultConnManagerConfig())
+	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 	met := metrics.NewNoopCollector()
-	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), provider, met).Build()
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, defaultFlowConfig.NetworkConfig.GossipSubConfig.RpcInspector, provider, met).Build()
 	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
@@ -488,7 +492,7 @@ func generateLibP2PNode(t *testing.T, logger zerolog.Logger, key crypto.PrivateK
 		unittest.DefaultAddress,
 		key,
 		sporkID,
-		p2pbuilder.DefaultResourceManagerConfig()).
+		defaultFlowConfig.NetworkConfig.LibP2PResourceManagerConfig).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t)).
 		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
