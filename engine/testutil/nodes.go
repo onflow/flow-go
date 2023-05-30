@@ -600,13 +600,12 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply))
 	require.NoError(t, err)
 
-	rootResult := unittest.ExecutionResultFixture(
-		unittest.WithExecutionResultBlockID(genesisHead.ID()),
-		unittest.WithFinalState(commit))
-
 	// TODO: use state commitment from BootstrapLedger?
-	rootSeal := unittest.Seal.Fixture()
-	unittest.Seal.WithResult(rootResult)(rootSeal)
+	rootResult, rootSeal, err := protoState.Sealed().SealedResult()
+	require.NoError(t, err)
+
+	require.Equal(t, rootSeal.FinalState, commit)
+	require.Equal(t, rootSeal.ResultID, rootResult.ID())
 
 	err = bootstrapper.BootstrapExecutionDatabase(node.PublicDB, rootSeal)
 	require.NoError(t, err)
