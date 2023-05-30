@@ -291,7 +291,7 @@ func main() {
 			// their first beacon private key through the DKG in the EpochSetup phase
 			// prior to their first epoch as network participant).
 
-			rootSnapshot := node.State.AtBlockID(node.RootBlock.ID())
+			rootSnapshot := node.State.AtBlockID(node.FinalizedRootBlock.ID())
 			isSporkRoot, err := protocol.IsSporkRootSnapshot(rootSnapshot)
 			if err != nil {
 				return fmt.Errorf("could not check whether root snapshot is spork root: %w", err)
@@ -311,7 +311,7 @@ func main() {
 				return fmt.Errorf("could not load beacon key file: %w", err)
 			}
 
-			rootEpoch := node.State.AtBlockID(node.RootBlock.ID()).Epochs().Current()
+			rootEpoch := node.State.AtBlockID(node.FinalizedRootBlock.ID()).Epochs().Current()
 			epochCounter, err := rootEpoch.Counter()
 			if err != nil {
 				return fmt.Errorf("could not get root epoch counter: %w", err)
@@ -603,7 +603,7 @@ func main() {
 				node.Storage.Headers,
 				finalize,
 				notifier,
-				node.RootBlock.Header,
+				node.FinalizedRootBlock.Header,
 				node.RootQC,
 			)
 			if err != nil {

@@ -16,6 +16,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
@@ -65,9 +66,10 @@ func (epoch *epochInfo) fractionComplete(curView uint64) float64 {
 type BlockRateController struct {
 	component.Component
 
-	config *Config
-	state  protocol.State
-	log    zerolog.Logger
+	config  *Config
+	state   protocol.State
+	log     zerolog.Logger
+	metrics module.CruiseCtlMetrics
 
 	lastMeasurement measurement // the most recently taken measurement
 	epochInfo                   // scheduled transition view for current/next epoch
@@ -81,10 +83,11 @@ type BlockRateController struct {
 }
 
 // NewBlockRateController returns a new BlockRateController.
-func NewBlockRateController(log zerolog.Logger, config *Config, state protocol.State, curView uint64) (*BlockRateController, error) {
+func NewBlockRateController(log zerolog.Logger, metrics module.CruiseCtlMetrics, config *Config, state protocol.State, curView uint64) (*BlockRateController, error) {
 	ctl := &BlockRateController{
 		config:         config,
-		log:            log.With().Str("component", "cruise_ctl").Logger(),
+		log:            log.With().Str("hotstuff", "cruise_ctl").Logger(),
+		metrics:        metrics,
 		state:          state,
 		viewChanges:    make(chan uint64, 10),
 		epochSetups:    make(chan *flow.Header, 5),
@@ -114,7 +117,17 @@ func (ctl *BlockRateController) initLastMeasurement(curView uint64, now time.Tim
 		integralErr:     0,
 		derivativeErr:   0,
 	}
-	ctl.proposalDuration.Store(ctl.config.DefaultProposalDuration.Nanoseconds())
+	initialProposalDuration := ctl.config.DefaultProposalDuration
+	ctl.proposalDuration.Store(initialProposalDuration.Nanoseconds())
+
+	ctl.log.Debug().
+		Uint64("view", curView).
+		Time("time", now).
+		Dur("proposal_duration", initialProposalDuration).
+		Msg("initialized last measurement")
+	ctl.metrics.PIDError(ctl.lastMeasurement.proportionalErr, ctl.lastMeasurement.integralErr, ctl.lastMeasurement.derivativeErr)
+	ctl.metrics.TargetProposalDuration(initialProposalDuration)
+	ctl.metrics.ControllerOutput(0)
 }
 
 // initEpochInfo initializes the epochInfo state upon component startup.
@@ -154,6 +167,13 @@ func (ctl *BlockRateController) initEpochInfo(curView uint64) error {
 		return fmt.Errorf("could not check epoch fallback: %w", err)
 	}
 	ctl.epochFallbackTriggered = epochFallbackTriggered
+
+	ctl.log.Debug().
+		Uint64("cur_epoch_first_view", curEpochFirstView).
+		Uint64("cur_epoch_final_view", curEpochFinalView).
+		Str("phase", phase.String()).
+		Bool("epoch_fallback", epochFallbackTriggered).
+		Msg("initialized epoch config")
 
 	return nil
 }
@@ -275,6 +295,15 @@ func (ctl *BlockRateController) checkForEpochTransition(curView uint64, now time
 	ctl.curEpochFinalView = *ctl.nextEpochFinalView
 	ctl.nextEpochFinalView = nil
 	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(now, ctl.epochInfo.fractionComplete(curView))
+
+	ctl.log.Info().
+		Uint64("cur_view", curView).
+		Time("now", now).
+		Uint64("cur_epoch_first_view", ctl.curEpochFirstView).
+		Uint64("cur_epoch_final_view", ctl.curEpochFinalView).
+		Time("cur_epoch_target_end_time", ctl.curEpochTargetEndTime).
+		Msg("processed epoch transition")
+
 	return nil
 }
 
@@ -308,17 +337,35 @@ func (ctl *BlockRateController) measureViewDuration(view uint64, now time.Time) 
 	ctl.lastMeasurement = curMeasurement
 
 	// compute the controller output for this measurement
-	proposalTime := ctl.config.DefaultProposalDuration - ctl.controllerOutput()
+	controllerOutput := ctl.controllerOutput()
+	unconstrainedProposalDuration := ctl.config.DefaultProposalDuration - controllerOutput
+	constrainedProposalDuration := unconstrainedProposalDuration
 	// constrain the proposal time according to configured boundaries
-	if proposalTime < ctl.config.MinProposalDuration {
-		ctl.proposalDuration.Store(ctl.config.MinProposalDuration.Nanoseconds())
-		return nil
+	if unconstrainedProposalDuration < ctl.config.MinProposalDuration {
+		constrainedProposalDuration = ctl.config.MinProposalDuration
+	} else if unconstrainedProposalDuration > ctl.config.MaxProposalDuration {
+		constrainedProposalDuration = ctl.config.MaxProposalDuration
 	}
-	if proposalTime > ctl.config.MaxProposalDuration {
-		ctl.proposalDuration.Store(ctl.config.MaxProposalDuration.Nanoseconds())
-		return nil
-	}
-	ctl.proposalDuration.Store(proposalTime.Nanoseconds())
+	ctl.proposalDuration.Store(constrainedProposalDuration.Nanoseconds())
+
+	ctl.log.Debug().
+		Uint64("last_view", lastMeasurement.view).
+		Uint64("cur_view", view).
+		Dur("since_last_view", curMeasurement.viewTime).
+		Dur("projected_time_remaining", estTimeRemaining).
+		Float64("inst_err", curMeasurement.instErr).
+		Float64("proportional_err", curMeasurement.proportionalErr).
+		Float64("integral_err", curMeasurement.integralErr).
+		Float64("derivative_err", curMeasurement.derivativeErr).
+		Dur("controller_output", controllerOutput).
+		Dur("unconstrained_proposal_duration", unconstrainedProposalDuration).
+		Dur("constrained_proposal_duration", constrainedProposalDuration).
+		Msg("measured error upon view change")
+
+	ctl.metrics.PIDError(ctl.lastMeasurement.proportionalErr, ctl.lastMeasurement.integralErr, ctl.lastMeasurement.derivativeErr)
+	ctl.metrics.TargetProposalDuration(constrainedProposalDuration)
+	ctl.metrics.ControllerOutput(controllerOutput)
+
 	return nil
 }
 
