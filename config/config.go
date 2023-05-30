@@ -43,7 +43,7 @@ func (fc *FlowConfig) Validate() error {
 //	error: if there is any error encountered while initializing the configuration, all errors are considered irrecoverable.
 func DefaultConfig() (*FlowConfig, error) {
 	var flowConf FlowConfig
-	err := unmarshallFlowConfig(&flowConf)
+	err := Unmarshall(&flowConf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshall the Flow config: %w", err)
 	}
@@ -55,8 +55,11 @@ func DefaultConfig() (*FlowConfig, error) {
 // after all pflags have been parsed.
 // Args:
 //
-//	*FlowConfig: The Flow configuration that will be used to unmarshall the configuration values into after binding pflags.
+//	c: The Flow configuration that will be used to unmarshall the configuration values into after binding pflags.
 //	This needs to be done because pflags may override a configuration value.
+//
+// Returns:
+//
 //	error: if there is any error encountered binding pflags or unmarshalling the config struct, all errors are considered irrecoverable.
 //
 // Note: As configuration management is improved this func should accept the entire Flow config as the arg to unmarshall new config values into.
@@ -65,7 +68,7 @@ func BindPFlags(c *FlowConfig) error {
 		return fmt.Errorf("failed to bind pflags: %w", err)
 	}
 
-	err := unmarshallFlowConfig(c)
+	err := Unmarshall(c)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshall the Flow config: %w", err)
 	}
@@ -73,18 +76,20 @@ func BindPFlags(c *FlowConfig) error {
 	return nil
 }
 
-// Unmarshall unmarshalls the current contents of conf into the provided flow config struct.
+// Unmarshall unmarshalls the Flow configuration into the provided FlowConfig struct.
+// Args:
+//
+//	flowConfig: the flow config struct used for unmarshalling.
+//
+// Returns:
+//
+//	error: if there is any error encountered unmarshalling the configuration, all errors are considered irrecoverable.
 func Unmarshall(flowConfig *FlowConfig) error {
-	return unmarshallFlowConfig(flowConfig)
-}
-
-func unmarshallFlowConfig(c *FlowConfig) error {
-	err := conf.Unmarshal(c)
+	err := conf.Unmarshal(flowConfig)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal network config: %w", err)
 	}
-
-	return c.Validate()
+	return nil
 }
 
 func init() {
