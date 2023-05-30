@@ -785,12 +785,7 @@ func (state *State) populateCache() error {
 		// sealed root height
 		err = state.db.View(operation.RetrieveSealedRootHeight(&state.sealedRootHeight))
 		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				// to be backward compatible
-				state.sealedRootHeight = state.finalizedRootHeight
-			} else {
-				return fmt.Errorf("could not read sealed root block to populate cache: %w", err)
-			}
+			return fmt.Errorf("could not read sealed root block to populate cache: %w", err)
 		}
 		// spork root block height
 		err = state.db.View(operation.RetrieveSporkRootBlockHeight(&state.sporkRootBlockHeight))
