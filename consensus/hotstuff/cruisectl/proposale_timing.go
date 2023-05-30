@@ -37,6 +37,8 @@ type ProposalTiming interface {
 	ObservationTime() time.Time
 }
 
+/* *************************************** publishImmediately *************************************** */
+
 // publishImmediately implements ProposalTiming: it returns the time when the view
 // was entered as the TargetPublicationTime. By convention, publishImmediately should
 // be treated as immutable.
@@ -59,6 +61,8 @@ func (pt *publishImmediately) TargetPublicationTime(_ uint64, timeViewEntered ti
 }
 func (pt *publishImmediately) ObservationView() uint64    { return pt.observationView }
 func (pt *publishImmediately) ObservationTime() time.Time { return pt.observationTime }
+
+/* *************************************** happyPathBlockTime *************************************** */
 
 // happyPathBlockTime implements ProposalTiming for the happy path. Here, `TimedBlock` _latest_ block that the
 // controller observed, and the `unconstrainedBlockTime` for the _child_ of this block.
@@ -111,6 +115,34 @@ func (pt *happyPathBlockTime) TargetPublicationTime(proposalView uint64, timeVie
 	}
 	return pt.TimeObserved.Add(pt.ConstrainedBlockTime()) // happy path
 }
+
+/* *************************************** auxiliary functions *************************************** */
+
+// fallbackTiming implements ProposalTiming, for the basic fallback:
+// function `TargetPublicationTime(..)` always returns `timeViewEntered + defaultProposalDuration`
+type fallbackTiming struct {
+	observationView         uint64
+	observationTime         time.Time
+	defaultProposalDuration time.Duration
+}
+
+var _ ProposalTiming = (*fallbackTiming)(nil)
+
+func newFallbackTiming(observationView uint64, observationTime time.Time, defaultProposalDuration time.Duration) *fallbackTiming {
+	return &fallbackTiming{
+		observationView:         observationView,
+		observationTime:         observationTime,
+		defaultProposalDuration: defaultProposalDuration,
+	}
+}
+
+func (pt *fallbackTiming) TargetPublicationTime(_ uint64, timeViewEntered time.Time, _ flow.Identifier) time.Time {
+	return timeViewEntered.Add(pt.defaultProposalDuration)
+}
+func (pt *fallbackTiming) ObservationView() uint64    { return pt.observationView }
+func (pt *fallbackTiming) ObservationTime() time.Time { return pt.observationTime }
+
+/* *************************************** auxiliary functions *************************************** */
 
 func min(d1, d2 time.Duration) time.Duration {
 	if d1 < d2 {
