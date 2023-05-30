@@ -307,7 +307,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 			final,
 			verifier,
 			builder.FinalizationDistributor,
-			node.RootBlock.Header,
+			node.FinalizedRootBlock.Header,
 			node.RootQC,
 			builder.Finalized,
 			builder.Pending,
