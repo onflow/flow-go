@@ -595,6 +595,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				execDataCacheBackend,
 			)
 
+			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
+			if err != nil {
+				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
+			}
+
 			stateStreamEng, err := state_stream.NewEng(
 				node.Logger,
 				builder.stateStreamConf,
@@ -606,6 +611,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				node.Storage.Results,
 				node.RootChainID,
 				builder.executionDataConfig.InitialBlockHeight,
+				highestAvailableHeight,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
 			)

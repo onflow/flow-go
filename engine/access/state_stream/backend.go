@@ -75,6 +75,7 @@ func New(
 	execDataCache *cache.ExecutionDataCache,
 	broadcaster *engine.Broadcaster,
 	rootHeight uint64,
+	highestAvailableHeight uint64,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 

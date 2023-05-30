@@ -243,6 +243,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.execDataCache,
 		s.broadcaster,
 		rootBlock.Header.Height,
+		rootBlock.Header.Height, // initialize with no downloaded data
 	)
 	require.NoError(s.T(), err)
 }
