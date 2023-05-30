@@ -293,7 +293,7 @@ func main() {
 				finalizer,
 				verifier,
 				finalizationDistributor,
-				node.RootBlock.Header,
+				node.FinalizedRootBlock.Header,
 				node.RootQC,
 				finalized,
 				pending,
@@ -336,7 +336,7 @@ func main() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
-				node.RootBlock.Header,
+				node.FinalizedRootBlock.Header,
 				core,
 				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)

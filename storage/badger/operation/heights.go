@@ -14,6 +14,14 @@ func RetrieveRootHeight(height *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeFinalizedRootHeight), height)
 }
 
+func InsertSealedRootHeight(height uint64) func(*badger.Txn) error {
+	return insert(makePrefix(codeSealedRootHeight), height)
+}
+
+func RetrieveSealedRootHeight(height *uint64) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeSealedRootHeight), height)
+}
+
 func InsertFinalizedHeight(height uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeFinalizedHeight), height)
 }
