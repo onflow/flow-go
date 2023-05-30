@@ -2024,8 +2024,16 @@ func BootstrapFixture(
 	participants flow.IdentityList,
 	opts ...func(*flow.Block),
 ) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+	return BootstrapFixtureWithChainID(participants, flow.Emulator, opts...)
+}
 
-	root := GenesisFixture()
+func BootstrapFixtureWithChainID(
+	participants flow.IdentityList,
+	chainID flow.ChainID,
+	opts ...func(*flow.Block),
+) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+
+	root := flow.Genesis(chainID)
 	for _, apply := range opts {
 		apply(root)
 	}
@@ -2043,7 +2051,8 @@ func BootstrapFixture(
 		WithDKGFromParticipants(participants),
 	)
 
-	result := BootstrapExecutionResultFixture(root, GenesisStateCommitment)
+	stateCommit := GenesisStateCommitmentByChainID(chainID)
+	result := BootstrapExecutionResultFixture(root, stateCommit)
 	result.ServiceEvents = []flow.ServiceEvent{
 		setup.ServiceEvent(),
 		commit.ServiceEvent(),
@@ -2060,7 +2069,15 @@ func RootSnapshotFixture(
 	participants flow.IdentityList,
 	opts ...func(*flow.Block),
 ) *inmem.Snapshot {
-	block, result, seal := BootstrapFixture(participants.Sort(order.Canonical), opts...)
+	return RootSnapshotFixtureWithChainID(participants, flow.Emulator, opts...)
+}
+
+func RootSnapshotFixtureWithChainID(
+	participants flow.IdentityList,
+	chainID flow.ChainID,
+	opts ...func(*flow.Block),
+) *inmem.Snapshot {
+	block, result, seal := BootstrapFixtureWithChainID(participants.Sort(order.Canonical), chainID, opts...)
 	qc := QuorumCertificateFixture(QCWithRootBlockID(block.ID()))
 	root, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 	if err != nil {
