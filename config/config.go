@@ -2,7 +2,7 @@ package config
 
 import (
 	"bytes"
-	"embed"
+	_ "embed"
 	"fmt"
 
 	"github.com/spf13/pflag"
@@ -17,7 +17,7 @@ var (
 	conf = viper.New()
 
 	//go:embed config.yml
-	configFile embed.FS
+	configFile string
 )
 
 // FlowConfig Flow configuration.
@@ -85,19 +85,9 @@ func unmarshallFlowConfig(c *FlowConfig) error {
 }
 
 func init() {
-	f, err := configFile.Open(configFileName)
-	if err != nil {
-		panic(fmt.Errorf("failed to open config.yml: %w", err))
-	}
-	buf := new(bytes.Buffer)
-	_, err = buf.ReadFrom(f)
-	if err != nil {
-		panic(fmt.Errorf("failed to read config file into bytes buffer: %w", err))
-	}
-
+	buf := bytes.NewBufferString(configFile)
 	conf.SetConfigType("yaml")
-
-	if err = conf.ReadConfig(buf); err != nil {
+	if err := conf.ReadConfig(buf); err != nil {
 		panic(fmt.Errorf("failed to initialize flow config failed to read in config file: %w", err))
 	}
 }
