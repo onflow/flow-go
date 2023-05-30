@@ -5,10 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
-	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	"github.com/onflow/flow-go/network/channels"
 )
 
@@ -16,61 +13,21 @@ import (
 // It directly passes the incoming messages to the corresponding methods of the
 // network Adapter.
 type DefaultConduitFactory struct {
-	component.Component
-	adapter            network.Adapter
-	misbehaviorManager network.MisbehaviorReportManager
+	adapter network.Adapter
 }
 
-// DefaultConduitFactoryOpt is a function that applies an option to the DefaultConduitFactory.
-type DefaultConduitFactoryOpt func(*DefaultConduitFactory)
-
-// WithMisbehaviorManager overrides the misbehavior manager for the conduit factory.
-func WithMisbehaviorManager(misbehaviorManager network.MisbehaviorReportManager) DefaultConduitFactoryOpt {
-	return func(d *DefaultConduitFactory) {
-		d.misbehaviorManager = misbehaviorManager
-	}
-}
+var _ network.ConduitFactory = (*DefaultConduitFactory)(nil)
 
 // NewDefaultConduitFactory creates a new DefaultConduitFactory, this is the default conduit factory used by the node.
 // Args:
 //
-//	alspCfg: the config for the misbehavior report manager.
-//	opts: the options for the conduit factory.
+//	none
 //
 // Returns:
 //
-//		a new instance of the DefaultConduitFactory.
-//	 an error if the initialization of the conduit factory fails. The error is irrecoverable.
-func NewDefaultConduitFactory(alspCfg *alspmgr.MisbehaviorReportManagerConfig, opts ...DefaultConduitFactoryOpt) (*DefaultConduitFactory, error) {
-	m, err := alspmgr.NewMisbehaviorReportManager(alspCfg)
-	if err != nil {
-		return nil, fmt.Errorf("could not create misbehavior report manager: %w", err)
-	}
-	d := &DefaultConduitFactory{
-		misbehaviorManager: m,
-	}
-
-	for _, apply := range opts {
-		apply(d)
-	}
-
-	cm := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			d.misbehaviorManager.Start(ctx)
-			select {
-			case <-d.misbehaviorManager.Ready():
-				ready()
-			case <-ctx.Done():
-				// jumps out of select statement to let a graceful shutdown.
-			}
-
-			<-ctx.Done()
-			<-d.misbehaviorManager.Done()
-		}).Build()
-
-	d.Component = cm
-
-	return d, nil
+//	a new instance of the DefaultConduitFactory.
+func NewDefaultConduitFactory() *DefaultConduitFactory {
+	return &DefaultConduitFactory{}
 }
 
 // RegisterAdapter sets the Adapter component of the factory.
@@ -96,11 +53,10 @@ func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel channels
 	child, cancel := context.WithCancel(ctx)
 
 	return &Conduit{
-		ctx:                child,
-		cancel:             cancel,
-		channel:            channel,
-		adapter:            d.adapter,
-		misbehaviorManager: d.misbehaviorManager,
+		ctx:     child,
+		cancel:  cancel,
+		channel: channel,
+		adapter: d.adapter,
 	}, nil
 }
 
@@ -108,11 +64,10 @@ func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel channels
 // sending messages within a single engine process. It sends all messages to
 // what can be considered a bus reserved for that specific engine.
 type Conduit struct {
-	ctx                context.Context
-	cancel             context.CancelFunc
-	channel            channels.Channel
-	adapter            network.Adapter
-	misbehaviorManager network.MisbehaviorReportManager
+	ctx     context.Context
+	cancel  context.CancelFunc
+	channel channels.Channel
+	adapter network.Adapter
 }
 
 var _ network.Conduit = (*Conduit)(nil)
@@ -152,7 +107,7 @@ func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Ident
 // The misbehavior is reported to the networking layer to penalize the misbehaving node.
 // The implementation must be thread-safe and non-blocking.
 func (c *Conduit) ReportMisbehavior(report network.MisbehaviorReport) {
-	c.misbehaviorManager.HandleMisbehaviorReport(c.channel, report)
+	c.adapter.ReportMisbehaviorOnChannel(c.channel, report)
 }
 
 func (c *Conduit) Close() error {
