@@ -334,7 +334,7 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	if e.committee.Self() != currentLeader {
 		return nil
 	}
-	for _, b := range e.forks.GetBlocksForView(curView) {
+	for _, b := range e.forks.GetBlocksForView(curView) { // on the happy path, this slice is empty
 		if b.ProposerID == e.committee.Self() {
 			log.Debug().Msg("already proposed for current view")
 			return nil
