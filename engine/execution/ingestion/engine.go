@@ -346,7 +346,7 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 		}
 
 		// don't reload root block
-		rootBlock, err := e.state.Params().FinalizedRoot()
+		rootBlock, err := e.state.Params().SealedRoot()
 		if err != nil {
 			return fmt.Errorf("failed to retrieve root block: %w", err)
 		}
