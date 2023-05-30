@@ -69,8 +69,8 @@ func (pt *publishImmediately) ConstrainedBlockTime() time.Duration { return 0 }
 // By convention, happyPathBlockTime should be treated as immutable.
 // TODO: any additional logic for assiting the EventHandler in determining the applied delay should be added to the ControllerViewDuration
 type happyPathBlockTime struct {
-	TimedBlock    // latest block observed by the controller, including the time stamp when the controller received the block [UTC]
-	*TimingConfig // timing configuration for the controller, for retrieving the controller's limits of authority
+	TimedBlock   // latest block observed by the controller, including the time stamp when the controller received the block [UTC]
+	TimingConfig // timing configuration for the controller, for retrieving the controller's limits of authority
 
 	// unconstrainedBlockTime is the delay, relative to `TimedBlock.TimeObserved` when the controller would
 	// like the child block to be published. Caution, no limits of authority have been applied to this value yet.
@@ -83,7 +83,7 @@ type happyPathBlockTime struct {
 var _ ProposalTiming = (*happyPathBlockTime)(nil)
 
 // newHappyPathBlockTime instantiates a new happyPathBlockTime
-func newHappyPathBlockTime(timedBlock TimedBlock, unconstrainedBlockTime time.Duration, timingConfig *TimingConfig) *happyPathBlockTime {
+func newHappyPathBlockTime(timedBlock TimedBlock, unconstrainedBlockTime time.Duration, timingConfig TimingConfig) *happyPathBlockTime {
 	return &happyPathBlockTime{
 		TimingConfig:           timingConfig,
 		TimedBlock:             timedBlock,

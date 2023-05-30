@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// Ewma implements the exponentially weighted moving average with smoothing factor a.
+// Ewma implements the exponentially weighted moving average with smoothing factor α.
 // The Ewma is a filter commonly applied to time-discrete signals. Mathematically,
 // it is represented by the recursive update formula
 //
@@ -15,7 +15,7 @@ import (
 // α ≡ 1/N and consider an input that suddenly changes from x to y as a step
 // function. Then N is _roughly_ the number of samples required to move the output
 // average about 2/3 of the way from x to y.
-// For numeric stability, we require a to satisfy 0 < a < 1.
+// For numeric stability, we require α to satisfy 0 < a < 1.
 // Not concurrency safe.
 type Ewma struct {
 	alpha float64
@@ -113,7 +113,7 @@ func (e *LeakyIntegrator) Value() float64 {
 	return e.value
 }
 
-// PowWithIntegerExponent implements exponentiation b^k optimized for integer k >=1
+// powWithIntegerExponent implements exponentiation b^k optimized for integer k >=1
 func powWithIntegerExponent(b float64, k int) float64 {
 	r := 1.0
 	for {

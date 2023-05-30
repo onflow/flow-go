@@ -86,8 +86,8 @@ var _ hotstuff.ProposalDurationProvider = (*BlockTimeController)(nil)
 
 // NewBlockTimeController returns a new BlockTimeController.
 func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics, config *Config, state protocol.State, curView uint64) (*BlockTimeController, error) {
-	initProptlErr, initItgErr, initDrivErr := .0, .0, .0 // has to be 0 unless we are making assumptions of the prior history of the proportional error `e[v]`
-	initProposalTiming := newPublishImmediately(curView, time.Now().UTC())
+	// Initial error must be 0 unless we are making assumptions of the prior history of the proportional error `e[v]`
+	initProptlErr, initItgErr, initDrivErr := .0, .0, .0
 	proportionalErr, err := NewEwma(config.alpha(), initProptlErr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize EWMA for computing the proportional error: %w", err)
@@ -107,22 +107,25 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 		epochFallbacks:       make(chan struct{}, 5),
 		proportionalErr:      proportionalErr,
 		integralErr:          integralErr,
-		latestProposalTiming: atomic.NewPointer(&proposalTimingContainer{initProposalTiming}),
+		latestProposalTiming: atomic.NewPointer[proposalTimingContainer](nil), // set in initProposalTiming
 	}
 	ctl.Component = component.NewComponentManagerBuilder().
 		AddWorker(ctl.processEventsWorkerLogic).
 		Build()
+
+	// initialize state
 	err = ctl.initEpochInfo(curView)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize epoch info: %w", err)
 	}
+	ctl.initProposalTiming(curView)
 
 	ctl.log.Debug().
 		Uint64("view", curView).
 		Msg("initialized BlockTimeController")
 	ctl.metrics.PIDError(initProptlErr, initItgErr, initDrivErr)
 	ctl.metrics.ControllerOutput(0)
-	ctl.metrics.TargetProposalDuration(initProposalTiming.ConstrainedBlockTime())
+	ctl.metrics.TargetProposalDuration(0)
 
 	return ctl, nil
 }
@@ -166,6 +169,17 @@ func (ctl *BlockTimeController) initEpochInfo(curView uint64) error {
 	ctl.epochFallbackTriggered = epochFallbackTriggered
 
 	return nil
+}
+
+// initProposalTiming initializes the ProposalTiming value upon startup.
+// CAUTION: Must be called after initEpochInfo.
+func (ctl *BlockTimeController) initProposalTiming(curView uint64) {
+	// When disabled, or in epoch fallback, use fallback timing (constant ProposalDuration)
+	if ctl.epochFallbackTriggered || !ctl.config.Enabled {
+		ctl.storeProposalTiming(newFallbackTiming(curView, time.Now().UTC(), ctl.config.FallbackProposalDuration))
+	}
+	// Otherwise, before we observe any view changes, publish blocks immediately
+	ctl.storeProposalTiming(newPublishImmediately(curView, time.Now().UTC()))
 }
 
 // storeProposalTiming stores the latest ProposalTiming
@@ -266,6 +280,7 @@ func (ctl *BlockTimeController) processIncorporatedBlock(tb TimedBlock) error {
 	if err != nil {
 		return fmt.Errorf("could not check for epoch transition: %w", err)
 	}
+
 	err = ctl.measureViewDuration(tb)
 	if err != nil {
 		return fmt.Errorf("could not measure view rate: %w", err)
@@ -302,6 +317,16 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 // It updates the latest ProposalTiming based on the new error.
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
+	// if the controller is disabled, we don't update measurements and instead use a fallback timing
+	if !ctl.config.Enabled {
+		ctl.storeProposalTiming(newFallbackTiming(tb.Block.View, tb.TimeObserved, ctl.config.FallbackProposalDuration))
+		ctl.log.Debug().
+			Uint64("cur_view", tb.Block.View).
+			Dur("fallback_proposal_dur", ctl.config.FallbackProposalDuration).
+			Msg("controller is disabled - using fallback timing")
+		return nil
+	}
+
 	previousProposalTiming := ctl.GetProposalTiming()
 	previousPropErr := ctl.proportionalErr.Value()
 
@@ -321,11 +346,10 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 
 	// controller output u[v] in units of second
 	u := propErr*ctl.config.KP + itgErr*ctl.config.KI + drivErr*ctl.config.KD
-	//return time.Duration(float64(time.Second) * u)
 
 	// compute the controller output for this observation
 	unconstrainedBlockTime := time.Duration((tau - u) * float64(time.Second)) // desired time between parent and child block, in units of seconds
-	proposalTiming := newHappyPathBlockTime(tb, unconstrainedBlockTime, &ctl.config.TimingConfig)
+	proposalTiming := newHappyPathBlockTime(tb, unconstrainedBlockTime, ctl.config.TimingConfig)
 
 	ctl.log.Debug().
 		Uint64("last_observation", previousProposalTiming.ObservationView()).

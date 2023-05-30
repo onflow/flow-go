@@ -50,6 +50,7 @@ func TestBlockRateController(t *testing.T) {
 // SetupTest initializes mocks and default values.
 func (bs *BlockRateControllerSuite) SetupTest() {
 	bs.config = DefaultConfig()
+	bs.config.Enabled = true
 	bs.initialView = 0
 	bs.epochCounter = uint64(0)
 	bs.curEpochFirstView = uint64(0)
