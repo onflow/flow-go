@@ -265,7 +265,7 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 // Returns:
 //
 //	none.
-func (m *MisbehaviorReportManager) startHeartbeatTicks(ctx irrecoverable.SignalerContext, interval time.Duration) {
+func (m *MisbehaviorReportManager) heartbeatLoop(ctx irrecoverable.SignalerContext, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	m.logger.Info().Dur("interval", interval).Msg("starting heartbeat ticks")
 	defer ticker.Stop()
