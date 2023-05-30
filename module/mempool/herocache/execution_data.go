@@ -38,12 +38,14 @@ func (t *BlockExecutionData) Has(blockID flow.Identifier) bool {
 }
 
 // Add adds a block execution data to the mempool, keyed by block ID.
+// It returns false if the execution data was already in the mempool.
 func (t *BlockExecutionData) Add(ed *execution_data.BlockExecutionDataEntity) bool {
 	entity := internal.NewWrappedEntity(ed.BlockID, ed)
 	return t.c.Add(*entity)
 }
 
 // ByID returns the block execution data for the given block ID from the mempool.
+// It returns false if the execution data was not found in the mempool.
 func (t *BlockExecutionData) ByID(blockID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
 	entity, exists := t.c.ByID(blockID)
 	if !exists {
@@ -75,6 +77,7 @@ func (t *BlockExecutionData) Size() uint {
 }
 
 // Remove removes block execution data from mempool by block ID.
+// It returns true if the execution data was known and removed.
 func (t *BlockExecutionData) Remove(blockID flow.Identifier) bool {
 	return t.c.Remove(blockID)
 }

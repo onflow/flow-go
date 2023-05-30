@@ -8,21 +8,21 @@ import (
 // ExecutionData represents a concurrency-safe memory pool for BlockExecutionData.
 type ExecutionData interface {
 
-	// Has checks whether the execution data with the given hash is currently in
+	// Has checks whether the block execution data for the given block ID is currently in
 	// the memory pool.
-	Has(id flow.Identifier) bool
+	Has(flow.Identifier) bool
 
-	// Add adds the given execution data to the memory pool.
+	// Add adds a block execution data to the mempool, keyed by block ID.
 	// It returns false if the execution data was already in the mempool.
-	Add(ed *execution_data.BlockExecutionDataEntity) bool
+	Add(*execution_data.BlockExecutionDataEntity) bool
 
-	// Remove removes the given execution data from the memory pool.
+	// Remove removes block execution data from mempool by block ID.
 	// It returns true if the execution data was known and removed.
-	Remove(id flow.Identifier) bool
+	Remove(flow.Identifier) bool
 
-	// ByID retrieves the execution data with the given ID from the memory pool.
+	// ByID returns the block execution data for the given block ID from the mempool.
 	// It returns false if the execution data was not found in the mempool.
-	ByID(txID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool)
+	ByID(flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool)
 
 	// Size return the current size of the memory pool.
 	Size() uint
