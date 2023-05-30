@@ -20,10 +20,12 @@ var _ network.ConduitFactory = (*DefaultConduitFactory)(nil)
 
 // NewDefaultConduitFactory creates a new DefaultConduitFactory, this is the default conduit factory used by the node.
 // Args:
-// 		none
+//
+//	none
 //
 // Returns:
-//		a new instance of the DefaultConduitFactory.
+//
+//	a new instance of the DefaultConduitFactory.
 func NewDefaultConduitFactory() *DefaultConduitFactory {
 	return &DefaultConduitFactory{}
 }
