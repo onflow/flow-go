@@ -196,7 +196,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 	builder := component.NewComponentManagerBuilder()
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		ready()
-		m.startHeartbeatTicks(ctx, cfg.HeartBeatInterval) // blocking call
+		m.heartbeatLoop(ctx, cfg.HeartBeatInterval) // blocking call
 	})
 	for i := 0; i < defaultMisbehaviorReportManagerWorkers; i++ {
 		builder.AddWorker(m.workerPool.WorkerLogic())
@@ -284,15 +284,16 @@ func (m *MisbehaviorReportManager) heartbeatLoop(ctx irrecoverable.SignalerConte
 	}
 }
 
-// onHeartbeat is called upon a startHeartbeatTicks. It encapsulates the recurring tasks that should be performed
+// onHeartbeat is called upon a heartbeatLoop. It encapsulates the recurring tasks that should be performed
 // during a heartbeat, which currently includes decay of the spam records.
 // Args:
-// 	none.
+//
+//	none.
 //
 // Returns:
 //
-//	error: if an error occurs, it is returned. No error is expected during normal operation. Any returned error must
-//  be considered as irrecoverable.
+//		error: if an error occurs, it is returned. No error is expected during normal operation. Any returned error must
+//	 be considered as irrecoverable.
 func (m *MisbehaviorReportManager) onHeartbeat() error {
 	allIds := m.cache.Identities()
 
