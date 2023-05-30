@@ -18,6 +18,15 @@ func DefaultConfig() Config {
 	}
 }
 
+// GetSkipNewProposalsThreshold returns stored value in config possibly applying a lower bound.
+func (c *Config) GetSkipNewProposalsThreshold() uint64 {
+	if c.SkipNewProposalsThreshold < MinSkipNewProposalsThreshold {
+		return MinSkipNewProposalsThreshold
+	}
+
+	return c.SkipNewProposalsThreshold
+}
+
 type Opt func(*Config)
 
 // WithSkipNewProposalsThreshold returns an option to set the skip new proposals
