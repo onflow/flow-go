@@ -11,8 +11,8 @@ func DefaultConfig() *Config {
 			TargetTransition: DefaultEpochTransitionTime(),
 			// TODO confirm default values
 			FallbackProposalDuration: 500 * time.Millisecond,
-			MaxProposalDuration:      1000 * time.Millisecond,
-			MinProposalDuration:      250 * time.Millisecond,
+			MaxViewDuration:          1000 * time.Millisecond,
+			MinViewDuration:          250 * time.Millisecond,
 			Enabled:                  false,
 		},
 		ControllerParams{
@@ -38,16 +38,15 @@ type TimingConfig struct {
 	// FallbackProposalDuration is the baseline GetProposalTiming value. It is used:
 	//  - when Enabled is false
 	//  - when epoch fallback has been triggered
-	//  - as the initial GetProposalTiming value, to which the compensation computed by the PID controller is added
 	FallbackProposalDuration time.Duration
-	// MaxProposalDuration is a hard maximum on the GetProposalTiming.
-	// If the BlockTimeController computes a larger desired GetProposalTiming value
+	// MaxViewDuration is a hard maximum on the total view time targeted by ProposalTiming.
+	// If the BlockTimeController computes a larger desired ProposalTiming value
 	// based on the observed error and tuning, this value will be used instead.
-	MaxProposalDuration time.Duration
-	// MinProposalDuration is a hard minimum on the GetProposalTiming.
-	// If the BlockTimeController computes a smaller desired GetProposalTiming value
+	MaxViewDuration time.Duration
+	// MinViewDuration  is a hard maximum on the total view time targeted by ProposalTiming.
+	// If the BlockTimeController computes a smaller desired ProposalTiming value
 	// based on the observed error and tuning, this value will be used instead.
-	MinProposalDuration time.Duration
+	MinViewDuration time.Duration
 	// Enabled defines whether responsive control of the GetProposalTiming is enabled.
 	// When disabled, the FallbackProposalDuration is used.
 	Enabled bool
