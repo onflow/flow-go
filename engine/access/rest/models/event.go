@@ -40,14 +40,7 @@ type BlocksEvents []BlockEvents
 
 func (b *BlocksEvents) Build(blocksEvents []flow.BlockEvents, isRangeRequest bool) {
 	evs := make([]BlockEvents, 0)
-	for i, ev := range blocksEvents {
-		// don't include blocks without events, except for the last block of a range request.
-		// always include the last block for range requests so clients can identify the last block
-		// processed even when it doesn't contain any events
-		if len(ev.Events) == 0 && (!isRangeRequest || i < len(blocksEvents)-1) {
-			continue
-		}
-
+	for _, ev := range blocksEvents {
 		var blockEvent BlockEvents
 		blockEvent.Build(ev)
 		evs = append(evs, blockEvent)
