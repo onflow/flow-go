@@ -287,8 +287,7 @@ func (m *MisbehaviorReportManager) startHeartbeatTicks(ctx irrecoverable.Signale
 // onHeartbeat is called upon a startHeartbeatTicks. It encapsulates the recurring tasks that should be performed
 // during a heartbeat, which currently includes decay of the spam records.
 // Args:
-//
-//	ctx: the context.
+// 	none.
 //
 // Returns:
 //
