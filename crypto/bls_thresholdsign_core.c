@@ -22,7 +22,7 @@ static void Fr_lagrange_coeff_at_zero(Fr* res, const int i, const byte indices[]
 
     // the highest k such that fact(MAX_IND)/fact(MAX_IND-k) < 2^64 (approximately 64/MAX_IND_BITS)
     // this means we can multiply up to (k) indices in a limb (64 bits) without overflowing.
-    #define MAX_IND_LOOPS   64/MAX_IND_BITS
+    #define MAX_IND_LOOPS   (64/MAX_IND_BITS)
     const int loops = MAX_IND_LOOPS;
     int k,j = 0;
     Fr tmp;
@@ -88,7 +88,7 @@ int E1_lagrange_interpolate_at_zero_write(byte* dest, const byte* shares, const 
     E1* E1_shares = malloc(sizeof(E1) * len);
     for (int i=0; i < len; i++) {
         read_ret = E1_read_bytes(&E1_shares[i], &shares[G1_SER_BYTES * i], G1_SER_BYTES);
-        if (read_ret != BLST_SUCCESS) {
+        if (read_ret != VALID) {
             goto out;
         }
     }

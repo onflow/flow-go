@@ -5,12 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	_ "errors"
-
-	_ "fmt"
-
 	"github.com/onflow/flow-go/crypto/hash"
-	_ "github.com/onflow/flow-go/crypto/hash"
 )
 
 // BLS multi-signature using BLS12-381 curve
@@ -95,7 +90,6 @@ func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 //   - (nil, error) if an unexpected error occurs
 //   - (aggregated_signature, nil) otherwise
 func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
-
 	// check for empty list
 	if len(sigs) == 0 {
 		return nil, blsAggregateEmptyListError
@@ -140,7 +134,6 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 //   - (nil, blsAggregateEmptyListError) if no keys are provided (input slice is empty)
 //   - (aggregated_key, nil) otherwise
 func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
-
 	// check for empty list
 	if len(keys) == 0 {
 		return nil, blsAggregateEmptyListError

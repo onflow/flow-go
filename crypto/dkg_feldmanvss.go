@@ -464,7 +464,7 @@ func readVerifVector(A []pointE2, src []byte) error {
 		(*C.E2)(&A[0]),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(A)))
-	if int(read) == blst_valid {
+	if read == valid {
 		return nil
 	}
 	// invalid A vector

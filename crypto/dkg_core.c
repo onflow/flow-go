@@ -63,16 +63,16 @@ void G2_vector_write_bytes(byte* out, const E2* A, const int len) {
 
 // The function imports an array of E2 points from a concatenated array of bytes.
 // The bytes array is supposed to be in (len * G2_SER_BYTES) 
-BLST_ERROR E2_vector_read_bytes(E2* A, const byte* src, const int len){
+ERROR E2_vector_read_bytes(E2* A, const byte* src, const int len){
     byte* p = (byte*) src;
     for (int i=0; i<len; i++){
         int read_ret = E2_read_bytes(&A[i], p, G2_SER_BYTES);
-        if (read_ret != BLST_SUCCESS)
+        if (read_ret != VALID)
             return read_ret;
         p += G2_SER_BYTES;
     }
     // TODO: add G2 subgroup check?
-    return BLST_SUCCESS;
+    return VALID;
 }
 
 // checks the discrete log relationship in G2.

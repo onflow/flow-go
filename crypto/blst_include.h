@@ -5,11 +5,6 @@
 #include "point.h"
 #include "fields.h"
 #include "consts.h"
-#include "errors.h" 
-
-// TODO: add sanity checks that BLST_PK_IS_INFINITY is indeed the last
-// enum value (eventually submit a fix to BLST)
-#define BLST_BAD_SCALAR ((BLST_PK_IS_INFINITY)+1)
 
 // types used by the Flow crypto library that are imported from BLST
 // these type definitions are used as an abstraction from BLST internal types

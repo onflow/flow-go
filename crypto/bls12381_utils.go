@@ -41,23 +41,23 @@ type pointE1 C.E1
 type pointE2 C.E2
 type scalar C.Fr
 
-// TODO: For now scalars are represented as field elements Fr since all scalars
-// are less than r - check if distinguishing two types in necessary
+// Note that scalars and field elements F_r are represented in Go by the same type
+// called `scalar`, which is internally represented by C type `Fr`. Scalars used by the
+// Go layer are all reduced modulo the curve order `r`.
 
 const (
 	// BLS12-381 related lengths imported from the C layer
 	frBytesLen = int(C.Fr_BYTES)
+	fpBytesLen = int(C.Fp_BYTES)
 	g1BytesLen = int(C.G1_SER_BYTES)
 	g2BytesLen = int(C.G2_SER_BYTES)
-	fpBytesLen = int(C.Fp_BYTES)
 
-	// more internal constants from the C layer
-	valid                   = C.VALID
-	invalid                 = C.INVALID
-	blst_valid              = int(C.BLST_SUCCESS)
-	blst_bad_encoding       = int(C.BLST_BAD_ENCODING)
-	blst_bad_scalar         = int(C.BLST_BAD_SCALAR)
-	blst_point_not_on_curve = int(C.BLST_POINT_NOT_ON_CURVE)
+	// error constants imported from the C layer
+	valid           = C.VALID
+	invalid         = C.INVALID
+	badEncoding     = C.BAD_ENCODING
+	badValue        = C.BAD_VALUE
+	pointNotOnCurve = C.POINT_NOT_ON_CURVE
 )
 
 func (a *scalar) String() string {
@@ -173,18 +173,17 @@ func readScalarFrStar(a *scalar, src []byte) error {
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
 
-	switch int(read) {
-	case blst_valid:
+	switch read {
+	case valid:
 		return nil
-	case blst_bad_encoding:
+	case badEncoding:
 		return invalidInputsErrorf("input length must be %d, got %d",
 			frBytesLen, len(src))
-	case blst_bad_scalar:
+	case badValue:
 		return invalidInputsErrorf("scalar is not in the correct range w.r.t the BLS12-381 curve")
 	default:
 		return invalidInputsErrorf("reading the scalar failed")
 	}
-
 }
 
 // readPointE2 reads a E2 point from a slice of bytes
@@ -196,12 +195,12 @@ func readPointE2(a *pointE2, src []byte) error {
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
 
-	switch int(read) {
-	case blst_valid:
+	switch read {
+	case valid:
 		return nil
-	case blst_bad_encoding, blst_bad_scalar:
+	case badEncoding, badValue:
 		return invalidInputsErrorf("input could not deserialize to a E2 point")
-	case blst_point_not_on_curve:
+	case pointNotOnCurve:
 		return invalidInputsErrorf("input is not a point on curve E2")
 	default:
 		return errors.New("reading E2 point failed")
@@ -217,12 +216,12 @@ func readPointE1(a *pointE1, src []byte) error {
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
 
-	switch int(read) {
-	case blst_valid:
+	switch read {
+	case valid:
 		return nil
-	case blst_bad_encoding, blst_bad_scalar:
+	case badEncoding, badValue:
 		return invalidInputsErrorf("input could not deserialize to a E1 point")
-	case blst_point_not_on_curve:
+	case pointNotOnCurve:
 		return invalidInputsErrorf("input is not a point on curve E1")
 	default:
 		return errors.New("reading E1 point failed")
@@ -263,7 +262,7 @@ func unsafeMapToG1(pt *pointE1, seed []byte) {
 // It generates a random point in E2\G2 and stores it in input point.
 func unsafeMapToG1Complement(pt *pointE1, seed []byte) bool {
 	res := C.unsafe_map_bytes_to_G1complement((*C.E1)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
-	return int(res) == blst_valid
+	return int(res) == valid
 }
 
 // unsafeMapToG2 is a test function, it wraps a call to C since cgo can't be used in go test files.
@@ -277,7 +276,7 @@ func unsafeMapToG2(pt *pointE2, seed []byte) {
 // It generates a random point in E2\G2 and stores it in input point.
 func unsafeMapToG2Complement(pt *pointE2, seed []byte) bool {
 	res := C.unsafe_map_bytes_to_G2complement((*C.E2)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
-	return int(res) == blst_valid
+	return int(res) == valid
 }
 
 // This is only a TEST function.

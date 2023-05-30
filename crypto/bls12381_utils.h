@@ -11,10 +11,18 @@
 typedef uint8_t byte;
 typedef _Bool bool;  // assuming cgo is using a modern enough compiler
 
+// minimum targeted security level
 #define SEC_BITS  128
-#define VALID     0
-#define INVALID   1
-#define UNDEFINED (((VALID&1)^1) | ((INVALID&2)^2)) // different value than RLC_OK and RLC_ERR
+
+typedef enum {
+    VALID = 0,
+    INVALID,
+    BAD_ENCODING,
+    BAD_VALUE,
+    POINT_NOT_ON_CURVE,
+    POINT_NOT_IN_GROUP,
+    UNDEFINED,
+} ERROR;
 
 #define BITS_TO_BYTES(x) ((x+7)>>3)
 #define BITS_TO_LIMBS(x) ((x+63)>>6)
@@ -42,13 +50,10 @@ typedef _Bool bool;  // assuming cgo is using a modern enough compiler
 #define G1_SER_BYTES        (G1_BYTES/(G1_SERIALIZATION+1))
 #define G2_SER_BYTES        (G2_BYTES/(G2_SERIALIZATION+1))
 
-// BLS based SPoCK
-int     bls_spock_verify(const E2*, const byte*, const E2*, const byte*);
-
 // Fr utilities
 extern const Fr BLS12_381_rR;
-bool      Fr_is_zero(const Fr* a);
-bool      Fr_is_equal(const Fr* a, const Fr* b);
+bool        Fr_is_zero(const Fr* a);
+bool        Fr_is_equal(const Fr* a, const Fr* b);
 void        Fr_set_limb(Fr*, const limb_t);
 void        Fr_copy(Fr*, const Fr*);
 void        Fr_set_zero(Fr*);
@@ -63,10 +68,10 @@ void        Fr_from_montg(Fr *res, const Fr *a);
 void        Fr_exp_montg(Fr *res, const Fr* base, const limb_t* expo, const int expo_len);
 void        Fr_inv_montg_eucl(Fr *res, const Fr *a);
 void        Fr_inv_exp_montg(Fr *res, const Fr *a);
-BLST_ERROR  Fr_read_bytes(Fr* a, const byte *bin, int len);
-BLST_ERROR  Fr_star_read_bytes(Fr* a, const byte *bin, int len);
+ERROR       Fr_read_bytes(Fr* a, const byte *bin, int len);
+ERROR       Fr_star_read_bytes(Fr* a, const byte *bin, int len);
 void        Fr_write_bytes(byte *bin, const Fr* a);
-bool      map_bytes_to_Fr(Fr*, const byte*, int);
+bool        map_bytes_to_Fr(Fr*, const byte*, int);
 
 // Fp utilities
 void        Fp_mul_montg(Fp *, const Fp *, const Fp *);
@@ -74,34 +79,34 @@ void        Fp_squ_montg(Fp *, const Fp *);
 
 // E1 and G1 utilities
 void        E1_copy(E1*, const E1*);
-bool      E1_is_equal(const E1*, const E1*);
+bool        E1_is_equal(const E1*, const E1*);
 void        E1_set_infty(E1*);
-bool      E1_is_infty(const E1*);
+bool        E1_is_infty(const E1*);
 void        E1_to_affine(E1*, const E1*);
-bool      E1_affine_on_curve(const E1*);
-bool     E1_in_G1(const E1*);
+bool        E1_affine_on_curve(const E1*);
+bool        E1_in_G1(const E1*);
 void        E1_mult(E1*, const E1*, const Fr*);
 void        E1_add(E1*, const E1*, const E1*);
 void        E1_neg(E1*, const E1*);
 void        E1_sum_vector(E1*, const E1*, const int);
 int         E1_sum_vector_byte(byte*, const byte*, const int);
 void        G1_mult_gen(E1*, const Fr*);
-BLST_ERROR  E1_read_bytes(E1*, const byte *,  const int); 
+ERROR       E1_read_bytes(E1*, const byte *,  const int); 
 void        E1_write_bytes(byte *, const E1*);
 void        unsafe_map_bytes_to_G1(E1*, const byte*, int);
-BLST_ERROR  unsafe_map_bytes_to_G1complement(E1*, const byte*, int);
-// hash to curve functions (functions in bls12381_hashtocurve.c)
-#define MAP_TO_G1_INPUT_LEN (2*(Fp_BYTES + SEC_BITS/8))
-int         map_to_G1(E1*, const byte*, const int);
+ERROR       unsafe_map_bytes_to_G1complement(E1*, const byte*, int);
+
+#define     MAP_TO_G1_INPUT_LEN (2*(Fp_BYTES + SEC_BITS/8))
+int         map_to_G1(E1*, const byte*, const int); // functions in bls12381_hashtocurve.c
 
 // E2 and G2 utilities
 void        E2_set_infty(E2* p);
-bool      E2_is_infty(const E2*);
-bool      E2_affine_on_curve(const E2*);
-bool      E2_is_equal(const E2*, const E2*);
+bool        E2_is_infty(const E2*);
+bool        E2_affine_on_curve(const E2*);
+bool        E2_is_equal(const E2*, const E2*);
 void        E2_copy(E2*, const E2*);
 void        E2_to_affine(E2*, const E2*);
-BLST_ERROR  E2_read_bytes(E2*, const byte *,  const int); 
+ERROR       E2_read_bytes(E2*, const byte *,  const int); 
 void        E2_write_bytes(byte *, const E2*);
 void        G2_mult_gen(E2*, const Fr*);
 void        E2_mult(E2*, const E2*, const Fr*);
@@ -110,14 +115,14 @@ void        E2_add(E2* res, const E2* a, const E2* b);
 void        E2_neg(E2*, const E2*);
 void        E2_sum_vector(E2*, const E2*, const int);
 void        E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len);
-bool      E2_in_G2(const E2*);
+bool        E2_in_G2(const E2*);
 void        unsafe_map_bytes_to_G2(E2*, const byte*, int);
-BLST_ERROR  unsafe_map_bytes_to_G2complement(E2*, const byte*, int);
+ERROR       unsafe_map_bytes_to_G2complement(E2*, const byte*, int);
 
 // pairing and Fp12
-bool      Fp12_is_one(Fp12*);
+bool        Fp12_is_one(Fp12*);
 void        Fp12_set_one(Fp12*);
-void        multi_pairing(Fp12*, const E1*, const E2*, const int);
+void        Fp12_multi_pairing(Fp12*, const E1*, const E2*, const int);
 
 // utility testing function
 void xmd_sha256(byte *, int, byte *, int, byte *, int);
