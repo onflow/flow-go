@@ -109,6 +109,15 @@ func (p Params) SealedRoot() (*flow.Header, error) {
 		return p.FinalizedRoot()
 	}
 
+	// this method is called after a node is bootstrapped, which means the key must exist,
+	// however, if this code is running on an old execution node which was bootstrapped without this
+	// key, then this key might not exist. In order to be backward compatible, we fallback to Root().
+	// This check can be removed after a spork, where all nodes should have bootstrapped with this key
+	// saved in database
+	if errors.Is(err, storage.ErrNotFound) {
+		return p.FinalizedRoot()
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("could not look up root header: %w", err)
 	}
