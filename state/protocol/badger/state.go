@@ -116,8 +116,8 @@ func Bootstrap(
 		// sealing segment is in ascending height order, so the tail is the
 		// oldest ancestor and head is the newest child in the segment
 		// TAIL <- ... <- HEAD
-		lastFinalized := segment.Highest() // the highest block in sealing segment is the last finalized block
-		lastSealed := segment.Sealed()     // the lowest block in sealing segment is the last sealed block
+		lastFinalized := segment.Finalized() // the highest block in sealing segment is the last finalized block
+		lastSealed := segment.Sealed()       // the lowest block in sealing segment is the last sealed block
 
 		// 1) bootstrap the sealing segment
 		// creating sealed root block with the rootResult
@@ -292,7 +292,7 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
 		}
-		highest := segment.Highest()
+		highest := segment.Finalized()
 		lowest := segment.Sealed()
 		// find the finalized seal that seals the lowest block, meaning seal.BlockID == lowest.ID()
 		seal, err := segment.FinalizedSeal()
