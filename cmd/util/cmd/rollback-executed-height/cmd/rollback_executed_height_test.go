@@ -25,8 +25,7 @@ func TestReExecuteBlock(t *testing.T) {
 		// bootstrap to init highest executed height
 		bootstrapper := bootstrap.NewBootstrapper(unittest.Logger())
 		genesis := unittest.BlockHeaderFixture()
-		rootSeal := unittest.Seal.Fixture()
-		unittest.Seal.WithBlock(genesis)(rootSeal)
+		rootSeal := unittest.Seal.Fixture(unittest.Seal.WithBlock(genesis))
 		err := bootstrapper.BootstrapExecutionDatabase(db, rootSeal)
 		require.NoError(t, err)
 

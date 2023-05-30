@@ -235,7 +235,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 	e.log.Info().
 		Uint64("last_finalized", final.Height).
 		Uint64("last_finalized_executed", lastExecuted).
-		Uint64("sealed_root", rootBlock.Height).
+		Uint64("sealed_root_height", rootBlock.Height).
 		Hex("sealed_root_id", logging.Entity(rootBlock)).
 		Uint64("first_unexecuted", firstUnexecuted).
 		Int("total_finalized_unexecuted", len(unexecuted)).
@@ -1261,6 +1261,6 @@ func (e *Engine) fetchCollection(blockID flow.Identifier, height uint64, guarant
 // protocol state, but only from headers
 func (e *Engine) getHeaderByHeight(height uint64) (*flow.Header, error) {
 	// we don't use protocol state because for dynamic boostrapped execution node
-	// the last executed and sealed block is below the root block
+	// the last executed and sealed block is below the finalized root block
 	return e.headers.ByHeight(height)
 }
