@@ -31,8 +31,13 @@ type State struct {
 		commits  storage.EpochCommits
 		statuses storage.EpochStatuses
 	}
-	// cache the root height because it cannot change over the lifecycle of a protocol state instance
-	rootHeight uint64
+	versionBeacons storage.VersionBeacons
+
+	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
+	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
+	// larger than the height of the root block of the spork, (also cached below as
+	// `sporkRootBlockHeight`), for instance if the node joined in an epoch after the last spork.
+	finalizedRootHeight uint64
 	// sealedRootHeight returns the root block that is sealed.
 	sealedRootHeight uint64
 	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
@@ -327,8 +332,16 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		// insert height pointers
 		err = operation.InsertRootHeight(highest.Header.Height)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert root height: %w", err)
+			return fmt.Errorf("could not insert finalized root height: %w", err)
 		}
+<<<<<<< HEAD
+=======
+		// the sealed root height is the lowest block in sealing segment
+		err = operation.InsertSealedRootHeight(lowest.Header.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert sealed root height: %w", err)
+		}
+>>>>>>> a98da01683 (Apply suggestions from code review)
 		err = operation.InsertFinalizedHeight(highest.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)

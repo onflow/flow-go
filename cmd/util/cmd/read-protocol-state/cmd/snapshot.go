@@ -43,14 +43,10 @@ func runSnapshot(*cobra.Command, []string) {
 	if flagHeight > 0 {
 		log.Info().Msgf("get snapshot by height: %v", flagHeight)
 		snapshot = state.AtHeight(flagHeight)
-	}
-
-	if flagFinal {
+	} else if flagFinal {
 		log.Info().Msgf("get last finalized snapshot")
 		snapshot = state.Final()
-	}
-
-	if flagSealed {
+	} else if flagSealed {
 		log.Info().Msgf("get last sealed snapshot")
 		snapshot = state.Sealed()
 	}
