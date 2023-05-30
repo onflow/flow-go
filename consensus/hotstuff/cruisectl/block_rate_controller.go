@@ -15,12 +15,12 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
 // measurement represents a measurement of error associated with entering view v.
@@ -89,30 +89,31 @@ type BlockTimeController struct {
 	epochInfo              // scheduled transition view for current/next epoch
 	epochFallbackTriggered bool
 
-	proposalDuration       atomic.Int64 // PID output, in nanoseconds, so it is directly convertible to time.Duration
+	proposalDuration   atomic.Int64      // PID output, in nanoseconds, so it is directly convertible to time.Duration
 	incorporatedBlocks chan TimedBlock   // OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
 	epochSetups        chan *flow.Header // EpochSetupPhaseStarted events (block header within setup phase)
 	epochFallbacks     chan struct{}     // EpochFallbackTriggered events
 
 	proportionalErr        Ewma
 	integralErr            LeakyIntegrator
-	latestControllerOutput atomic.Pointer[ControllerViewDuration]
+	latestControllerOutput atomic.Pointer[ControllerViewDuration] // CAN BE NIL
 }
 
-// NewBlockRateController returns a new BlockTimeController.
-func NewBlockRateController(log zerolog.Logger, metrics module.CruiseCtlMetrics, config *Config, state protocol.State, curView uint64) (*BlockTimeController, error) {
-	proportionalErr, err := NewEwma(config.alpha(), 0)
+// NewBlockTimeController returns a new BlockTimeController.
+func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics, config *Config, state protocol.State, curView uint64) (*BlockTimeController, error) {
+	initProptlErr, initItgErr, initDrivErr := .0, .0, .0 // has to be 0 unless we are making assumptions of the prior history of the proportional error `e[v]`
+	proportionalErr, err := NewEwma(config.alpha(), initProptlErr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize EWMA for computing the proportional error: %w", err)
 	}
-	integralErr, err := NewLeakyIntegrator(config.beta(), 0)
+	integralErr, err := NewLeakyIntegrator(config.beta(), initItgErr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize LeakyIntegrator for computing the integral error: %w", err)
 	}
 	ctl := &BlockTimeController{
 		config:                 config,
 		log:                    log.With().Str("hotstuff", "cruise_ctl").Logger(),
-		metrics:        metrics,
+		metrics:                metrics,
 		state:                  state,
 		incorporatedBlocks:     make(chan TimedBlock),
 		epochSetups:            make(chan *flow.Header, 5),
@@ -131,16 +132,15 @@ func NewBlockRateController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 		return nil, fmt.Errorf("could not initialize epoch info: %w", err)
 	}
 
+	idealiViewTime := ctl.targetViewTime().Seconds()
 	initialProposalDuration := ctl.config.DefaultProposalDuration
 	ctl.proposalDuration.Store(initialProposalDuration.Nanoseconds())
 
-	now := time.Now()
 	ctl.log.Debug().
 		Uint64("view", curView).
-		Time("time", now).
 		Dur("proposal_duration", initialProposalDuration).
-		Msg("initialized last measurement")
-	ctl.metrics.PIDError(ctl.lastMeasurement.proportionalErr, ctl.lastMeasurement.integralErr, ctl.lastMeasurement.derivativeErr)
+		Msg("initialized BlockTimeController")
+	ctl.metrics.PIDError(initProptlErr, initItgErr, initDrivErr)
 	ctl.metrics.TargetProposalDuration(initialProposalDuration)
 	ctl.metrics.ControllerOutput(0)
 
@@ -269,7 +269,8 @@ func (ctl *BlockTimeController) processIncorporatedBlock(tb TimedBlock) error {
 	if ctl.epochFallbackTriggered {
 		return nil
 	}
-	if tb.Block.View <= ctl.lastMeasurement.view { // we don't care about older blocks that are incorporated into the protocol state
+	latest := ctl.latestControllerOutput.Load()
+	if (latest != nil) && (tb.Block.View <= latest.Block.View) { // we don't care about older blocks that are incorporated into the protocol state
 		return nil
 	}
 

@@ -87,7 +87,7 @@ func (bs *BlockRateControllerSuite) SetupTest() {
 // CreateAndStartController creates and starts the BlockTimeController.
 // Should be called only once per test case.
 func (bs *BlockRateControllerSuite) CreateAndStartController() {
-	ctl, err := NewBlockRateController(unittest.Logger(), bs.metrics, bs.config, bs.state, bs.initialView)
+	ctl, err := NewBlockTimeController(unittest.Logger(), bs.metrics, bs.config, bs.state, bs.initialView)
 	require.NoError(bs.T(), err)
 	bs.ctl = ctl
 	bs.ctl.Start(bs.ctx)
