@@ -13,7 +13,7 @@ func DefaultConfig() *Config {
 			FallbackProposalDuration: 500 * time.Millisecond,
 			MaxProposalDuration:      1000 * time.Millisecond,
 			MinProposalDuration:      250 * time.Millisecond,
-			Enabled:                  true,
+			Enabled:                  false,
 		},
 		ControllerParams{
 			N_ewma: 5,

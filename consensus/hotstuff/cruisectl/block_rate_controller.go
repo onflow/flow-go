@@ -69,6 +69,7 @@ type BlockTimeController struct {
 
 	epochInfo              // scheduled transition view for current/next epoch
 	epochFallbackTriggered bool
+	// TODO enabled flag
 
 	incorporatedBlocks chan TimedBlock   // OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
 	epochSetups        chan *flow.Header // EpochSetupPhaseStarted events (block header within setup phase)
