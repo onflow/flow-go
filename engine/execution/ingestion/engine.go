@@ -204,7 +204,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 	}
 
 	for ; lastExecuted > rootBlock.Height; lastExecuted-- {
-		header, err := e.state.AtHeight(lastExecuted).Head()
+		header, err := e.getHeaderByHeight(lastExecuted)
 		if err != nil {
 			return nil, fmt.Errorf("could not get header at height: %v, %w", lastExecuted, err)
 		}
