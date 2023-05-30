@@ -128,6 +128,7 @@ func main() {
 		safeBeaconKeys      *bstorage.SafeBeaconPrivateKeys
 		getSealingConfigs   module.SealingConfigsGetter
 	)
+	var deprecatedFlagBlockRateDelay time.Duration
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
 	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
@@ -145,12 +146,10 @@ func main() {
 		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
 		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor, "adjustment of timeout duration in case of time out event")
 		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures, "number of failed rounds before first timeout increase")
-		// TODO backward-compatibility for --block-rate-delay? if we remove in full, will need to update many environments, partner setups...
-		// TODO flag descriptions
-		flags.StringVar(&cruiseCtlTargetTransitionTimeStr, "cruise-ctl-target-epoch-transition-time", cruiseCtlTargetTransitionTimeStr, "")
-		flags.DurationVar(&cruiseCtlConfig.FallbackProposalDuration, "cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.FallbackProposalDuration, "")
-		flags.DurationVar(&cruiseCtlConfig.MinProposalDuration, "cruise-ctl-min-proposal-duration", cruiseCtlConfig.MinProposalDuration, "")
-		flags.DurationVar(&cruiseCtlConfig.MaxProposalDuration, "cruise-ctl-max-proposal-duration", cruiseCtlConfig.MaxProposalDuration, "")
+		flags.StringVar(&cruiseCtlTargetTransitionTimeStr, "cruise-ctl-target-epoch-transition-time", cruiseCtlTargetTransitionTimeStr, "the target epoch switchover schedule")
+		flags.DurationVar(&cruiseCtlConfig.FallbackProposalDuration, "cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.FallbackProposalDuration, "the proposal duration value to use when the controller is disabled, or in epoch fallback mode. In those modes, this value has the same as the old `--block-rate-delay`")
+		flags.DurationVar(&cruiseCtlConfig.MinProposalDuration, "cruise-ctl-min-view-duration", cruiseCtlConfig.MinProposalDuration, "the lower bound of authority for the controller, when active. This is the smallest amount of time a view is allowed to take.")
+		flags.DurationVar(&cruiseCtlConfig.MaxProposalDuration, "cruise-ctl-max-view-duration", cruiseCtlConfig.MaxProposalDuration, "the upper bound of authority for the controller when active. This is the largest amount of time a view is allowed to take.")
 		flags.BoolVar(&cruiseCtlConfig.Enabled, "cruise-ctl-enabled", cruiseCtlConfig.Enabled, "")
 		flags.UintVar(&chunkAlpha, "chunk-alpha", flow.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", flow.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
@@ -165,6 +164,7 @@ func main() {
 		flags.Uint64Var(&dkgMessagingEngineConfig.RetryMax, "dkg-messaging-engine-retry-max", dkgMessagingEngineConfig.RetryMax, "the maximum number of retry attempts for an outbound DKG message")
 		flags.Uint64Var(&dkgMessagingEngineConfig.RetryJitterPercent, "dkg-messaging-engine-retry-jitter-percent", dkgMessagingEngineConfig.RetryJitterPercent, "the percentage of jitter to apply to each inter-attempt wait time")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 1996-04-24T15:04:05-07:00)")
+		flags.DurationVar(&deprecatedFlagBlockRateDelay, "block-rate-delay", 0, "[deprecated in v0.30; Jun 2023] Use `cruise-ctl-*` flags instead, this flag has no effect and will eventually be removed")
 	}).ValidateFlags(func() error {
 		nodeBuilder.Logger.Info().Str("startup_time_str", startupTimeString).Msg("got startup_time_str")
 		if startupTimeString != cmd.NotSet {
@@ -181,6 +181,9 @@ func main() {
 				return fmt.Errorf("invalid epoch transition time string: %w", err)
 			}
 			cruiseCtlConfig.TargetTransition = *transitionTime
+		}
+		if deprecatedFlagBlockRateDelay > 0 {
+			nodeBuilder.Logger.Warn().Msg("A deprecated flag was specified (--block-rate-delay). This flag is deprecated as of v0.30 (Jun 2023), has no effect, and will eventually be removed.")
 		}
 		return nil
 	})

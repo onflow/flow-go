@@ -8,6 +8,8 @@ import (
 )
 
 // StaticProposalDurationProvider is a hotstuff.ProposalDurationProvider which provides a static ProposalDuration.
+// The constant dur represents the time to produce and broadcast the proposal (ProposalDuration),
+// NOT the time for the entire view (ViewDuration).
 type StaticProposalDurationProvider struct {
 	dur time.Duration
 }
