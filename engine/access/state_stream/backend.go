@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
@@ -61,7 +61,7 @@ type StateStreamBackend struct {
 
 	// highestHeight contains the highest consecutive block height for which we have received a
 	// new Execution Data notification.
-	highestHeight *atomic.Uint64
+	highestHeight counters.StrictMonotonousCounter
 }
 
 func New(
@@ -95,7 +95,7 @@ func New(
 		broadcaster:     broadcaster,
 		rootBlockHeight: rootHeight,
 		rootBlockID:     rootBlockID,
-		highestHeight:   atomic.NewUint64(0),
+		highestHeight:   counters.NewMonotonousCounter(0),
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
@@ -129,7 +129,7 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 	// fail early if no notification has been received for the given block height.
 	// note: it's possible for the data to exist in the data store before the notification is
 	// received. this ensures a consistent view is available to all streams.
-	if height > b.highestHeight.Load() {
+	if height > b.highestHeight.Value() {
 		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, storage.ErrNotFound)
 	}
 
@@ -189,6 +189,6 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 }
 
 // SetHighestHeight sets the highest height for which execution data is available.
-func (b *StateStreamBackend) setHighestHeight(height uint64) {
-	b.highestHeight.Store(height)
+func (b *StateStreamBackend) setHighestHeight(height uint64) bool {
+	return b.highestHeight.Set(height)
 }

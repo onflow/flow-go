@@ -147,6 +147,9 @@ func NewEng(
 }
 
 // OnExecutionData is called to notify the engine when a new execution data is received.
+// The caller must guarantee that execution data is locally available for all blocks with
+// heights between the initialBlockHeight provided during startup and the block height of
+// the execution data provided.
 func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) {
 	lg := e.log.With().Hex("block_id", logging.ID(executionData.BlockID)).Logger()
 
@@ -159,7 +162,14 @@ func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDat
 		return
 	}
 
-	e.backend.setHighestHeight(header.Height)
+	if ok := e.backend.setHighestHeight(header.Height); !ok {
+		// this means that the height was lower than the current highest height
+		// OnExecutionData is guaranteed by the requester to be called in order, but may be called
+		// multiple times for the same block.
+		lg.Debug().Msg("execution data for block already received")
+		return
+	}
+
 	e.execDataBroadcaster.Publish()
 }
 
