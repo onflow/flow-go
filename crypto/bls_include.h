@@ -1,7 +1,7 @@
 // this file is about the core functions required by the BLS signature scheme
 
-#ifndef _REL_BLS_INCLUDE_H
-#define _REL_BLS_INCLUDE_H
+#ifndef _BLS_INCLUDE_H
+#define _BLS_INCLUDE_H
 
 #include "bls12381_utils.h"
 

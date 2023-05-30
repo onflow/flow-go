@@ -65,19 +65,18 @@ func newSigner(algo SigningAlgorithm) (signer, error) {
 
 // Initialize the context of all algos
 func init() {
-	// P-256
+	// ECDSA
 	p256Instance = &(ecdsaAlgo{
 		curve: elliptic.P256(),
 		algo:  ECDSAP256,
 	})
-
-	// secp256k1
 	secp256k1Instance = &(ecdsaAlgo{
 		curve: btcec.S256(),
 		algo:  ECDSASecp256k1,
 	})
 
-	// bls12-381
+	// BLS
+	initBLS12381()
 	blsInstance = &blsBLS12381Algo{
 		algo: BLSBLS12381,
 	}

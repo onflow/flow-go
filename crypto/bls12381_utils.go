@@ -60,6 +60,28 @@ const (
 	pointNotOnCurve = C.POINT_NOT_ON_CURVE
 )
 
+// header of the point at infinity serializations
+var g1SerHeader byte // g1
+var g2SerHeader byte // g2
+
+// `g1“ serialization
+var g1Serialization []byte
+
+// initialization of BLS12-381 curve
+func initBLS12381() {
+	if isG1Compressed() {
+		g1SerHeader = 0xC0
+	} else {
+		g1SerHeader = 0x40
+	}
+	g1Serialization = append([]byte{g1SerHeader}, make([]byte, g1BytesLen-1)...)
+	if isG2Compressed() {
+		g2SerHeader = 0xC0
+	} else {
+		g2SerHeader = 0x40
+	}
+}
+
 func (a *scalar) String() string {
 	encoding := make([]byte, frBytesLen)
 	writeScalar(encoding, a)
@@ -260,9 +282,8 @@ func unsafeMapToG1(pt *pointE1, seed []byte) {
 
 // unsafeMapToG1Complement is a test function, it wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in E2\G2 and stores it in input point.
-func unsafeMapToG1Complement(pt *pointE1, seed []byte) bool {
-	res := C.unsafe_map_bytes_to_G1complement((*C.E1)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
-	return int(res) == valid
+func unsafeMapToG1Complement(pt *pointE1, seed []byte) {
+	C.unsafe_map_bytes_to_G1complement((*C.E1)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
 }
 
 // unsafeMapToG2 is a test function, it wraps a call to C since cgo can't be used in go test files.
@@ -306,4 +327,12 @@ func hashToG1Bytes(data, dst []byte) []byte {
 	pointBytes := make([]byte, g1BytesLen)
 	writePointE1(pointBytes, &point)
 	return pointBytes
+}
+
+func isG1Compressed() bool {
+	return g1BytesLen == fpBytesLen
+}
+
+func isG2Compressed() bool {
+	return g2BytesLen == 2*fpBytesLen
 }

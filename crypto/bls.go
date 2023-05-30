@@ -207,11 +207,6 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	}
 }
 
-// 0xC0 is the header of the point at infinity serialization (either in G1 or G2)
-const infinityPointHeader = byte(0xC0)
-
-var identityBLSSignature = append([]byte{infinityPointHeader}, make([]byte, SignatureLenBLSBLS12381-1)...)
-
 // IsBLSSignatureIdentity checks whether the input signature is
 // the identity signature (point at infinity in G1).
 //
@@ -221,7 +216,7 @@ var identityBLSSignature = append([]byte{infinityPointHeader}, make([]byte, Sign
 // suspected to be equal to identity, which avoids failing the aggregated
 // signature verification.
 func IsBLSSignatureIdentity(s Signature) bool {
-	return bytes.Equal(s, identityBLSSignature)
+	return bytes.Equal(s, g1Serialization)
 }
 
 // generatePrivateKey deterministically generates a private key for BLS on BLS12-381 curve.
@@ -347,8 +342,7 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 // decodePublicKeyCompressed decodes a slice of bytes into a public key.
 // since we use the compressed representation by default, this checks the default and delegates to decodePublicKeyCompressed
 func (a *blsBLS12381Algo) decodePublicKeyCompressed(publicKeyBytes []byte) (PublicKey, error) {
-	// in compression mode, g2BytesLen is equal to 2 * Fp_bytes
-	if g2BytesLen != 2*fpBytesLen {
+	if !isG2Compressed() {
 		panic("library is not configured to use compressed public key serialization")
 	}
 	return a.decodePublicKey(publicKeyBytes)
@@ -478,8 +472,7 @@ func (pk *pubKeyBLSBLS12381) Size() int {
 // The encoding is a compressed encoding of the point
 // [zcash] https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-
 func (a *pubKeyBLSBLS12381) EncodeCompressed() []byte {
-	// in compression mode, g2BytesLen is equal to 2 * Fp_bytes
-	if g2BytesLen != 2*fpBytesLen {
+	if !isG2Compressed() {
 		panic("library is not configured to use compressed public key serialization")
 	}
 	dest := make([]byte, g2BytesLen)

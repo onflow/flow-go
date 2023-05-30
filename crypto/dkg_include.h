@@ -1,5 +1,5 @@
-#ifndef _REL_DKG_INCLUDE_H
-#define _REL_DKG_INCLUDE_H
+#ifndef _DKG_INCLUDE_H
+#define _DKG_INCLUDE_H
 
 #include "bls12381_utils.h"
 

@@ -507,7 +507,7 @@ func BatchVerifyBLSSignaturesOneMessage(
 			// However, the boolean return for index `i` is set to `false` and won't be overwritten.
 			returnBool[i] = false
 			pkPoints = append(pkPoints, getIdentityPoint())
-			flatSigs = append(flatSigs, identityBLSSignature...)
+			flatSigs = append(flatSigs, g1Serialization...)
 		} else {
 			pkPoints = append(pkPoints, pkBLS.point)
 			flatSigs = append(flatSigs, sigs[i]...)

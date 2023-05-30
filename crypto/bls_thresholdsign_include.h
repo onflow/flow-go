@@ -1,5 +1,5 @@
-#ifndef _REL_THRESHOLD_INCLUDE_H
-#define _REL_THRESHOLD_INCLUDE_H
+#ifndef _THRESHOLD_INCLUDE_H
+#define _THRESHOLD_INCLUDE_H
 
 #include "bls_include.h"
 

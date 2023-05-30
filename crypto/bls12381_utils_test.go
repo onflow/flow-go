@@ -139,12 +139,7 @@ func TestSubgroupCheck(t *testing.T) {
 		unsafeMapToG1(&p, seed) // point in G1
 		assert.True(t, checkMembershipG1(&p))
 
-		inG1 := false
-		for !inG1 {
-			_, err := prg.Read(seed)
-			require.NoError(t, err)
-			inG1 = unsafeMapToG1Complement(&p, seed) // point in E2\G2
-		}
+		unsafeMapToG1Complement(&p, seed) // point in E2\G2
 		assert.False(t, checkMembershipG1(&p))
 	})
 
@@ -198,8 +193,8 @@ func TestReadWriteG1(t *testing.T) {
 	bytes := make([]byte, g1BytesLen)
 	// generate a random G1 point, encode it, decode it,
 	// and compare it the original point
-	iterations := 50
 	t.Run("random points", func(t *testing.T) {
+		iterations := 50
 		for i := 0; i < iterations; i++ {
 			var p, q pointE1
 			_, err := prg.Read(seed)
@@ -213,16 +208,14 @@ func TestReadWriteG1(t *testing.T) {
 	})
 
 	t.Run("infinity", func(t *testing.T) {
-		for i := 0; i < iterations; i++ {
-			var p, q pointE1
-			seed := make([]byte, frBytesLen)
-			unsafeMapToG1(&p, seed) // this results in the infinity point
-			writePointE1(bytes, &p)
-			require.True(t, IsBLSSignatureIdentity(bytes)) // sanity check
-			err := readPointE1(&q, bytes)
-			require.NoError(t, err)
-			assert.True(t, p.equals(&q))
-		}
+		var p, q pointE1
+		seed := make([]byte, frBytesLen)
+		unsafeMapToG1(&p, seed) // this results in the infinity point
+		writePointE1(bytes, &p)
+		require.True(t, IsBLSSignatureIdentity(bytes)) // sanity check
+		err := readPointE1(&q, bytes)
+		require.NoError(t, err)
+		assert.True(t, p.equals(&q))
 	})
 }
 

@@ -543,6 +543,7 @@ ERROR E1_read_bytes(E1* a, const byte *bin, const int len) {
     if (ret != VALID) {
         return ret;
     }
+    Fp_to_montg(&a->x, &a->x);
 
     // set a.z to 1
     Fp_copy(&a->z, &BLS12_381_pR);
@@ -552,6 +553,7 @@ ERROR E1_read_bytes(E1* a, const byte *bin, const int len) {
         if (ret != VALID){ 
             return ret;
         }
+        Fp_to_montg(&a->y, &a->y);
         // check read point is on curve
         if (!E1_affine_on_curve(a)) { 
             return POINT_NOT_ON_CURVE;
@@ -560,12 +562,12 @@ ERROR E1_read_bytes(E1* a, const byte *bin, const int len) {
     }
     
     // compute the possible square root
-    Fp_to_montg(&a->x, &a->x);
     Fp_squ_montg(&a->y, &a->x);
     Fp_mul_montg(&a->y, &a->y, &a->x);    // x^3
     Fp_add(&a->y, &a->y, &B_E1);          // B_E1 is already in Montg form             
-    if (!Fp_sqrt_montg(&a->y, &a->y))     // check whether x^3+b is a quadratic residue
+    if (!Fp_sqrt_montg(&a->y, &a->y)) {    // check whether x^3+b is a quadratic residue
         return POINT_NOT_ON_CURVE; 
+    }
 
     // resulting (x,y) is guaranteed to be on curve (y is already in Montg form)
     if (Fp_get_sign(&a->y) != y_sign) {
@@ -718,30 +720,18 @@ void unsafe_map_bytes_to_G1(E1* p, const byte* bytes, int len) {
     G1_mult_gen(p, &log);
 }
 
-// generates a point in E1\G1 and stores it in p
+// maps bytes to a point in E1\G1. 
+// `len` must be at least 96 bytes.
 // this is a testing file only, should not be used in any protocol!
-ERROR unsafe_map_bytes_to_G1complement(E1* p, const byte* bytes, int len) {
-    assert(G1_SERIALIZATION == COMPRESSED);
-    assert(len >= G1_SER_BYTES);
-
-    // attempt to deserilize a compressed E1 point from input bytes
-    // after fixing the header 2 bits
-    byte copy[G1_SER_BYTES];
-    memcpy(copy, bytes, sizeof(copy));
-    copy[0] |= 1<<7;        // set compression bit
-    copy[0] &= ~(1<<6);     // clear infinity bit - point is not infinity
-
-    ERROR ser = E1_read_bytes(p, copy, G1_SER_BYTES);
-    if (ser != VALID) {
-        return ser;
-    }
-
-    // map the point to E2\G2 by clearing G2 order
-    E1_mult(p, p, (const Fr*)BLS12_381_r);
-    E1_to_affine(p, p);
-
-    assert(E1_affine_on_curve(p));  // sanity check to make sure p is in E2
-    return VALID;
+void unsafe_map_bytes_to_G1complement(E1* p, const byte* bytes, int len) {
+    assert(len >= 96);
+    Fp u;
+    map_96_bytes_to_Fp(&u, bytes, 96);
+    // map to E1's isogenous and then to E1
+    map_to_isogenous_E1((POINTonE1 *)p, u);
+    isogeny_map_to_E1((POINTonE1 *)p, (POINTonE1 *)p);
+    // clear G1 order
+    E1_mult(p, p, (Fr*)&BLS12_381_r);
 }
 
 // ------------------- E2 utilities

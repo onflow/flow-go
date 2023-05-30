@@ -2,8 +2,8 @@
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
 // and the BLS distributed key generation protocols
 
-#ifndef _REL_MISC_INCLUDE_H
-#define _REL_MISC_INCLUDE_H
+#ifndef _BLS12_381_UTILS_H
+#define _BLS12_381_UTILS_H
 
 #include <string.h>
 #include "blst_include.h"
@@ -43,8 +43,8 @@ typedef enum {
 #define G2_BYTES (2*Fp2_BYTES)
 
 // Compressed and uncompressed points
-#define COMPRESSED      1
-#define UNCOMPRESSED    0
+#define COMPRESSED          1
+#define UNCOMPRESSED        0
 #define G1_SERIALIZATION    (COMPRESSED)
 #define G2_SERIALIZATION    (COMPRESSED)
 #define G1_SER_BYTES        (G1_BYTES/(G1_SERIALIZATION+1))
@@ -94,7 +94,7 @@ void        G1_mult_gen(E1*, const Fr*);
 ERROR       E1_read_bytes(E1*, const byte *,  const int); 
 void        E1_write_bytes(byte *, const E1*);
 void        unsafe_map_bytes_to_G1(E1*, const byte*, int);
-ERROR       unsafe_map_bytes_to_G1complement(E1*, const byte*, int);
+void        unsafe_map_bytes_to_G1complement(E1*, const byte*, int);
 
 #define     MAP_TO_G1_INPUT_LEN (2*(Fp_BYTES + SEC_BITS/8))
 int         map_to_G1(E1*, const byte*, const int); // functions in bls12381_hashtocurve.c
@@ -130,6 +130,7 @@ void xmd_sha256(byte *, int, byte *, int, byte *, int);
 // Debugging related functions
 #define DEBUG 0
 #if (DEBUG == 1)
+#include <stdio.h>
 void     bytes_print_(char*, byte*, int);
 void     Fr_print_(char*, Fr*);
 void     Fp_print_(char*, const Fp*);
@@ -137,6 +138,6 @@ void     Fp2_print_(char*, const Fp2*);
 void     Fp12_print_(char*, const Fp12*);
 void     E1_print_(char*, const E1*, const int);
 void     E2_print_(char*, const E2*, const int);
-#endif // DEBUG
+#endif /* DEBUG */
 
-#endif
+#endif /* BLS12_381_UTILS */
