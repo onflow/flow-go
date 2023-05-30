@@ -254,7 +254,7 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 	lg.Debug().Msg("misbehavior report submitted")
 }
 
-// startHeartbeatTicks starts the heartbeat ticks ticker to tick at the given intervals. It is a blocking function, and
+// heartbeatLoop starts the heartbeat ticks ticker to tick at the given intervals. It is a blocking function, and
 // should be called in a separate goroutine. It returns when the context is canceled. Hearbeats are recurring events that
 // are used to perform periodic tasks.
 // Args:
