@@ -38,7 +38,7 @@ func (b *BlockEvents) Build(blockEvents flow.BlockEvents) {
 
 type BlocksEvents []BlockEvents
 
-func (b *BlocksEvents) Build(blocksEvents []flow.BlockEvents, isRangeRequest bool) {
+func (b *BlocksEvents) Build(blocksEvents []flow.BlockEvents) {
 	evs := make([]BlockEvents, 0)
 	for _, ev := range blocksEvents {
 		var blockEvent BlockEvents
