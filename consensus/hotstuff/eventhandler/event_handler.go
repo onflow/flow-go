@@ -402,7 +402,7 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		Msg("forwarding proposal to communicator for broadcasting")
 
 	// raise a notification with proposal (also triggers broadcast)
-	targetPublicationTime := start.Add(e.paceMaker.BlockRateDelay())
+	targetPublicationTime := e.paceMaker.TargetPublicationTime(flowProposal.View, start, flowProposal.ParentID)
 	e.notifier.OnOwnProposal(flowProposal, targetPublicationTime)
 	return nil
 }
