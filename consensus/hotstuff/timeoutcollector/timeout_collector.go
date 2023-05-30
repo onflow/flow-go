@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
+	"github.com/onflow/flow-go/module/counters"
 )
 
 // TimeoutCollector implements logic for collecting timeout objects. Performs deduplication, caching and processing
