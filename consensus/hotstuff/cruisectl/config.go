@@ -35,7 +35,9 @@ type Config struct {
 type TimingConfig struct {
 	// TargetTransition defines the target time to transition epochs each week.
 	TargetTransition EpochTransitionTime
-	// FallbackProposalDuration is the baseline GetProposalTiming value. It is used:
+	// FallbackProposalDuration is the baseline GetProposalTiming value.
+	// When used, it behaves like the old --block-rate-delay flag.
+	// It is used:
 	//  - when Enabled is false
 	//  - when epoch fallback has been triggered
 	FallbackProposalDuration time.Duration
