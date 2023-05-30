@@ -9,7 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	fvmstate "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -122,7 +122,7 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 			return fmt.Errorf("could not index genesis state commitment: %w", err)
 		}
 
-		snapshots := make([]*snapshot.ExecutionSnapshot, 0)
+		snapshots := make([]*fvmstate.ExecutionSnapshot, 0)
 		err = operation.InsertExecutionStateInteractions(rootSeal.BlockID, snapshots)(txn)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution state interactions: %w", err)
