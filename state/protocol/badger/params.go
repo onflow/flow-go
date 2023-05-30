@@ -17,7 +17,7 @@ var _ protocol.Params = (*Params)(nil)
 func (p Params) ChainID() (flow.ChainID, error) {
 
 	// retrieve root header
-	root, err := p.Root()
+	root, err := p.FinalizedRoot()
 	if err != nil {
 		return "", fmt.Errorf("could not get root: %w", err)
 	}
@@ -76,11 +76,29 @@ func (p Params) EpochFallbackTriggered() (bool, error) {
 	return triggered, nil
 }
 
-func (p Params) Root() (*flow.Header, error) {
+func (p Params) FinalizedRoot() (*flow.Header, error) {
 
 	// look up root block ID
 	var rootID flow.Identifier
-	err := p.state.db.View(operation.LookupBlockHeight(p.state.rootHeight, &rootID))
+	err := p.state.db.View(operation.LookupBlockHeight(p.state.finalizedRootHeight, &rootID))
+	if err != nil {
+		return nil, fmt.Errorf("could not look up root header: %w", err)
+	}
+
+	// retrieve root header
+	header, err := p.state.headers.ByBlockID(rootID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve root header: %w", err)
+	}
+
+	return header, nil
+}
+
+func (p Params) SealedRoot() (*flow.Header, error) {
+	// look up root block ID
+	var rootID flow.Identifier
+	err := p.state.db.View(operation.LookupBlockHeight(p.state.sealedRootHeight, &rootID))
+
 	if err != nil {
 		return nil, fmt.Errorf("could not look up root header: %w", err)
 	}
@@ -98,7 +116,7 @@ func (p Params) Seal() (*flow.Seal, error) {
 
 	// look up root header
 	var rootID flow.Identifier
-	err := p.state.db.View(operation.LookupBlockHeight(p.state.rootHeight, &rootID))
+	err := p.state.db.View(operation.LookupBlockHeight(p.state.finalizedRootHeight, &rootID))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up root header: %w", err)
 	}
