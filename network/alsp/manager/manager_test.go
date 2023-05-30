@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,10 +53,6 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 
 	misbehaviorReportManger.On("Ready").Return(readyDoneChan).Once()
 	misbehaviorReportManger.On("Done").Return(readyDoneChan).Once()
-	conduitFactory, err := conduit.NewDefaultConduitFactory(
-		cfg,
-		conduit.WithMisbehaviorManager(misbehaviorReportManger))
-	require.NoError(t, err)
 
 	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
 		t,
@@ -66,23 +61,19 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 		unittest.NetworkCodec(),
 		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
 	sms := testutils.GenerateSubscriptionManagers(t, mws)
-	networks := testutils.GenerateNetworks(
-		t,
-		unittest.Logger(),
-		ids,
-		mws,
-		sms,
-		p2p.WithConduitFactory(conduitFactory))
+
+	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0])
+	net, err := p2p.NewNetwork(networkCfg, p2p.WithAlspManager(misbehaviorReportManger))
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, networks, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{net}, 100*time.Millisecond)
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
 	defer cancel()
 
 	e := mocknetwork.NewEngine(t)
-	con, err := networks[0].Register(channels.TestNetworkChannel, e)
+	con, err := net.Register(channels.TestNetworkChannel, e)
 	require.NoError(t, err)
 
 	reports := testutils.MisbehaviorReportsFixture(t, 10)
@@ -136,23 +127,19 @@ func TestHandleReportedMisbehavior_Integration(t *testing.T) {
 		unittest.NetworkCodec(),
 		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
 	sms := testutils.GenerateSubscriptionManagers(t, mws)
-	networks := testutils.GenerateNetworks(
-		t,
-		unittest.Logger(),
-		ids,
-		mws,
-		sms,
-		p2p.WithConduitFactory(conduitFactory))
+	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0], p2p.WithAlspConfig(cfg))
+	net, err := p2p.NewNetwork(networkCfg)
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, networks, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{net}, 100*time.Millisecond)
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
 	defer cancel()
 
 	e := mocknetwork.NewEngine(t)
-	con, err := networks[0].Register(channels.TestNetworkChannel, e)
+	con, err := net.Register(channels.TestNetworkChannel, e)
 	require.NoError(t, err)
 
 	// create a map of origin IDs to their respective misbehavior reports (10 peers, 5 reports each)
@@ -224,23 +211,20 @@ func TestMisbehaviorReportMetrics(t *testing.T) {
 		unittest.NetworkCodec(),
 		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
 	sms := testutils.GenerateSubscriptionManagers(t, mws)
-	networks := testutils.GenerateNetworks(
-		t,
-		unittest.Logger(),
-		ids,
-		mws,
-		sms,
-		p2p.WithConduitFactory(conduitFactory))
+
+	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0], p2p.WithAlspConfig(cfg))
+	net, err := p2p.NewNetwork(networkCfg)
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, networks, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{net}, 100*time.Millisecond)
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
 	defer cancel()
 
 	e := mocknetwork.NewEngine(t)
-	con, err := networks[0].Register(channels.TestNetworkChannel, e)
+	con, err := net.Register(channels.TestNetworkChannel, e)
 	require.NoError(t, err)
 
 	report := testutils.MisbehaviorReportFixture(t)

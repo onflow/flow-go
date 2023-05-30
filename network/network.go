@@ -60,4 +60,14 @@ type Adapter interface {
 	// UnRegisterChannel unregisters the engine for the specified channel. The engine will no longer be able to send or
 	// receive messages from that channel.
 	UnRegisterChannel(channel channels.Channel) error
+
+	// ReportMisbehaviorOnChannel reports the misbehavior of a node on sending a message to the current node that appears
+	// valid based on the networking layer but is considered invalid by the current node based on the Flow protocol.
+	// The misbehavior report is sent to the current node's networking layer on the given channel to be processed.
+	// Args:
+	// - channel: The channel on which the misbehavior report is sent.
+	// - report: The misbehavior report to be sent.
+	// Returns:
+	// none
+	ReportMisbehaviorOnChannel(channels.Channel, MisbehaviorReport)
 }

@@ -226,56 +226,67 @@ func GenerateMiddlewares(t *testing.T,
 	return mws, idProviders
 }
 
-// GenerateNetworks generates the network for the given middlewares
-func GenerateNetworks(t *testing.T,
+// NetworksFixture generates the network for the given middlewares
+func NetworksFixture(t *testing.T,
 	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
-	sms []network.SubscriptionManager,
-	opts ...p2p.NetworkOptFunction) []network.Network {
+	sms []network.SubscriptionManager) []network.Network {
 
 	count := len(ids)
 	nets := make([]network.Network, 0)
 
 	for i := 0; i < count; i++ {
-
-		// creates and mocks me
-		me := &mock.Local{}
-		me.On("NodeID").Return(ids[i].NodeID)
-		me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID(me.NodeID())))
-		me.On("Address").Return(ids[i].Address)
-
-		receiveCache := netcache.NewHeroReceiveCache(p2p.DefaultReceiveCacheSize, log, metrics.NewNoopCollector())
-		cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-			Logger:                  unittest.Logger(),
-			SpamRecordCacheSize:     alsp.DefaultSpamRecordCacheSize,
-			SpamReportQueueSize:     alsp.DefaultSpamReportQueueSize,
-			HeartBeatInterval:       alsp.DefaultHeartBeatInterval,
-			AlspMetrics:             metrics.NewNoopCollector(),
-			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
-		})
-		require.NoError(t, err)
-
-		// create the network
-		net, err := p2p.NewNetwork(&p2p.NetworkParameters{
-			Logger:              log,
-			Codec:               cbor.NewCodec(),
-			Me:                  me,
-			MiddlewareFactory:   func() (network.Middleware, error) { return mws[i], nil },
-			Topology:            unittest.NetworkTopology(),
-			SubscriptionManager: sms[i],
-			Metrics:             metrics.NewNoopCollector(),
-			IdentityProvider:    id.NewFixedIdentityProvider(ids),
-			ReceiveCache:        receiveCache,
-			ConduitFactory:      cf,
-			Options:             opts,
-		})
+		params := NetworkConfigFixture(t, log, *ids[i], ids, mws[i], sms[i])
+		net, err := p2p.NewNetwork(params)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
 	}
 
 	return nets
+}
+
+func NetworkConfigFixture(
+	t *testing.T,
+	logger zerolog.Logger,
+	myId flow.Identity,
+	allIds flow.IdentityList,
+	mw network.Middleware,
+	subMgr network.SubscriptionManager, opts ...p2p.NetworkConfigOption) *p2p.NetworkConfig {
+
+	me := mock.NewLocal(t)
+	me.On("NodeID").Return(myId.NodeID).Maybe()
+	me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID(me.NodeID()))).Maybe()
+	me.On("Address").Return(myId.Address).Maybe()
+
+	receiveCache := netcache.NewHeroReceiveCache(p2p.DefaultReceiveCacheSize, logger, metrics.NewNoopCollector())
+	params := &p2p.NetworkConfig{
+		Logger:              logger,
+		Codec:               cbor.NewCodec(),
+		Me:                  me,
+		MiddlewareFactory:   func() (network.Middleware, error) { return mw, nil },
+		Topology:            unittest.NetworkTopology(),
+		SubscriptionManager: subMgr,
+		Metrics:             metrics.NewNoopCollector(),
+		IdentityProvider:    id.NewFixedIdentityProvider(allIds),
+		ReceiveCache:        receiveCache,
+		ConduitFactory:      conduit.NewDefaultConduitFactory(),
+		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  unittest.Logger(),
+			SpamRecordCacheSize:     alsp.DefaultSpamRecordCacheSize,
+			SpamReportQueueSize:     alsp.DefaultSpamReportQueueSize,
+			HeartBeatInterval:       alsp.DefaultHeartBeatInterval,
+			AlspMetrics:             metrics.NewNoopCollector(),
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		},
+	}
+
+	for _, opt := range opts {
+		opt(params)
+	}
+
+	return params
 }
 
 // GenerateIDsAndMiddlewares returns nodeIDs, libp2pNodes, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
@@ -367,7 +378,7 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []network.Network, []observable.Observable) {
 	ids, libp2pNodes, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, consumer, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks := GenerateNetworks(t, log, ids, mws, sms)
+	networks := NetworksFixture(t, log, ids, mws, sms)
 
 	return ids, libp2pNodes, mws, networks, observables
 }

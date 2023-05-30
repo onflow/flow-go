@@ -26,7 +26,6 @@ import (
 const (
 	// defaultMisbehaviorReportManagerWorkers is the default number of workers in the worker pool.
 	defaultMisbehaviorReportManagerWorkers = 2
-	FatalMsgNegativePositivePenalty        = "penalty value is positive, expected negative %f"
 )
 
 var (
@@ -106,6 +105,7 @@ type MisbehaviorReportManagerConfig struct {
 	// HeartBeatInterval is the interval between the heartbeats. Heartbeat is a recurring event that is used to
 	// apply recurring actions, e.g., decay the penalty of the misbehaving nodes.
 	HeartBeatInterval time.Duration
+	Opts        []MisbehaviorReportManagerOption
 }
 
 // validate validates the MisbehaviorReportManagerConfig instance. It returns an error if the config is invalid.
@@ -161,7 +161,7 @@ func WithSpamRecordsCacheFactory(f SpamRecordCacheFactory) MisbehaviorReportMana
 //
 //		A new instance of the MisbehaviorReportManager.
 //	 An error if the config is invalid. The error is considered irrecoverable.
-func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...MisbehaviorReportManagerOption) (*MisbehaviorReportManager, error) {
+func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig) (*MisbehaviorReportManager, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration for MisbehaviorReportManager: %w", err)
 	}
@@ -184,7 +184,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 		store,
 		m.processMisbehaviorReport).Build()
 
-	for _, opt := range opts {
+	for _, opt := range cfg.Opts {
 		opt(m)
 	}
 

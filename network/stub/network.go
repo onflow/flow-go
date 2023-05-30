@@ -12,14 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/alsp"
-	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/conduit"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // Network is a mocked Network layer made for testing engine's behavior.
@@ -45,20 +41,13 @@ func WithConduitFactory(factory network.ConduitFactory) func(*Network) {
 	}
 }
 
+var _ network.Network = (*Network)(nil)
+var _ network.Adapter = (*Network)(nil)
+
 // NewNetwork create a mocked Network.
 // The committee has the identity of the node already, so only `committee` is needed
 // in order for a mock hub to find each other.
 func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Network)) *Network {
-	cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-		SpamRecordCacheSize:     alsp.DefaultSpamRecordCacheSize,
-		SpamReportQueueSize:     alsp.DefaultSpamReportQueueSize,
-		HeartBeatInterval:       alsp.DefaultHeartBeatInterval,
-		Logger:                  unittest.Logger(),
-		AlspMetrics:             metrics.NewNoopCollector(),
-		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
-	})
-	require.NoError(t, err)
-
 	net := &Network{
 		ctx:            context.Background(),
 		myId:           myId,
@@ -66,7 +55,7 @@ func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Netw
 		engines:        make(map[channels.Channel]network.MessageProcessor),
 		seenEventIDs:   make(map[string]struct{}),
 		qCD:            make(chan struct{}),
-		conduitFactory: cf,
+		conduitFactory: conduit.NewDefaultConduitFactory(),
 	}
 
 	for _, opt := range opts {
@@ -93,8 +82,6 @@ func NewNetwork(t testing.TB, myId flow.Identifier, hub *Hub, opts ...func(*Netw
 	hub.AddNetwork(net)
 	return net
 }
-
-var _ network.Network = (*Network)(nil)
 
 // GetID returns the identity of the attached node.
 func (n *Network) GetID() flow.Identifier {
@@ -317,4 +304,8 @@ func (n *Network) StartConDev(updateInterval time.Duration, recursive bool) {
 // StopConDev stops the continuous deliver mode of the Network.
 func (n *Network) StopConDev() {
 	close(n.qCD)
+}
+
+func (n *Network) ReportMisbehaviorOnChannel(channel channels.Channel, report network.MisbehaviorReport) {
+	// no-op for stub network.
 }
