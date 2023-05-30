@@ -870,7 +870,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 		final,
 		verifier,
 		exeNode.finalizationDistributor,
-		node.RootBlock.Header,
+		node.FinalizedRootBlock.Header,
 		node.RootQC,
 		finalized,
 		pending,

@@ -1135,8 +1135,8 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.Logger.Info().
 			Hex("root_result_id", logging.Entity(fnb.RootResult)).
 			Hex("root_state_commitment", fnb.RootSeal.FinalState[:]).
-			Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
-			Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
+			Hex("finalized_root_block_id", logging.Entity(fnb.RootBlock)).
+			Uint64("finalized_root_block_height", fnb.RootBlock.Header.Height).
 			Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
 			Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
 			Msg("protocol state bootstrapped")

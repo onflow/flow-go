@@ -346,14 +346,11 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		if err != nil {
 			return fmt.Errorf("could not insert finalized root height: %w", err)
 		}
-<<<<<<< HEAD
-=======
 		// the sealed root height is the lowest block in sealing segment
 		err = operation.InsertSealedRootHeight(lowest.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed root height: %w", err)
 		}
->>>>>>> a98da01683 (Apply suggestions from code review)
 		err = operation.InsertFinalizedHeight(highest.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
