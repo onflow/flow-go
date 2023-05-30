@@ -131,6 +131,6 @@ func initRpcInspectorValidationLimitsFlags(flags *pflag.FlagSet, defaultNetConfi
 		s := strings.ToLower(ctrlMsgType.String())
 		flags.Uint64(fmt.Sprintf(hardThresholdflagStrFmt, s), ctrlMsgValidationConfig.HardThreshold, fmt.Sprintf("discard threshold limit for gossipsub RPC %s message validation", ctrlMsgType))
 		flags.Uint64(fmt.Sprintf(safetyThresholdflagStrFmt, s), ctrlMsgValidationConfig.SafetyThreshold, fmt.Sprintf("safety threshold limit for gossipsub RPC %s message validation", ctrlMsgType))
-		flags.Uint64(fmt.Sprintf(rateLimitflagStrFmt, s), ctrlMsgValidationConfig.RateLimit, fmt.Sprintf("rate limit for gossipsub RPC %s message validation", ctrlMsgType))
+		flags.Int(fmt.Sprintf(rateLimitflagStrFmt, s), ctrlMsgValidationConfig.RateLimit, fmt.Sprintf("rate limit for gossipsub RPC %s message validation", ctrlMsgType))
 	}
 }
