@@ -176,7 +176,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		SetPayer(serviceAddress).
 		SetGasLimit(9999)
 
-	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	_, cancel := context.WithTimeout(ctx, defaultTimeout)
 	err = serviceAccountClient.SignAndSendTransaction(ctx, createAccountTx)
 	require.NoError(t, err)
 
@@ -234,7 +234,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
 	t.Log(">> funding new account...")
 
-	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
+	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	err = serviceAccountClient.SignAndSendTransaction(childCtx, fundAccountTx)
 	require.NoError(t, err)
 
