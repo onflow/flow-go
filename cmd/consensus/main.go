@@ -678,7 +678,7 @@ func main() {
 				return nil, err
 			}
 			curView := livenessData.CurrentView
-			ctl, err := cruisectl.NewBlockTimeController(node.Logger, cruiseCtlConfig, node.State, curView)
+			ctl, err := cruisectl.NewBlockTimeController(node.Logger, metrics.NewCruiseCtlMetrics(), cruiseCtlConfig, node.State, curView)
 			if err != nil {
 				return nil, err
 			}

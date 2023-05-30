@@ -16,6 +16,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -77,8 +78,10 @@ type BlockTimeController struct {
 	integralErr     LeakyIntegrator
 
 	// latestProposalTiming holds the ProposalTiming that the controller generated in response to processing the latest observation
-	latestProposalTiming atomic.Pointer[proposalTimingContainer]
+	latestProposalTiming *atomic.Pointer[proposalTimingContainer]
 }
+
+var _ pacemaker.ProposalDurationProvider = (*BlockTimeController)(nil)
 
 // NewBlockTimeController returns a new BlockTimeController.
 func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics, config *Config, state protocol.State, curView uint64) (*BlockTimeController, error) {
@@ -94,17 +97,17 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 	}
 
 	ctl := &BlockTimeController{
-		config:             config,
-		log:                log.With().Str("hotstuff", "cruise_ctl").Logger(),
-		metrics:            metrics,
-		state:              state,
-		incorporatedBlocks: make(chan TimedBlock, 3),
-		epochSetups:        make(chan *flow.Header, 5),
-		epochFallbacks:     make(chan struct{}, 5),
-		proportionalErr:    proportionalErr,
-		integralErr:        integralErr,
+		config:               config,
+		log:                  log.With().Str("hotstuff", "cruise_ctl").Logger(),
+		metrics:              metrics,
+		state:                state,
+		incorporatedBlocks:   make(chan TimedBlock, 3),
+		epochSetups:          make(chan *flow.Header, 5),
+		epochFallbacks:       make(chan struct{}, 5),
+		proportionalErr:      proportionalErr,
+		integralErr:          integralErr,
+		latestProposalTiming: atomic.NewPointer(&proposalTimingContainer{initProposalTiming}),
 	}
-	ctl.storeProposalTiming(initProposalTiming)
 	ctl.Component = component.NewComponentManagerBuilder().
 		AddWorker(ctl.processEventsWorkerLogic).
 		Build()
@@ -173,6 +176,10 @@ func (ctl *BlockTimeController) storeProposalTiming(proposalTiming ProposalTimin
 // GetProposalTiming returns the controller's latest ProposalTiming. Concurrency safe.
 func (ctl *BlockTimeController) GetProposalTiming() ProposalTiming {
 	return ctl.latestProposalTiming.Load().ProposalTiming
+}
+
+func (ctl *BlockTimeController) TargetPublicationTime(proposalView uint64, timeViewEntered time.Time, parentBlockId flow.Identifier) time.Time {
+	return ctl.GetProposalTiming().TargetPublicationTime(proposalView, timeViewEntered, parentBlockId)
 }
 
 // processEventsWorkerLogic is the logic for processing events received from other components.

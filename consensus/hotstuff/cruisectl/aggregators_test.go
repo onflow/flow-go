@@ -1,9 +1,10 @@
 package cruisectl
 
 import (
-	"github.com/stretchr/testify/require"
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // Test_Instantiation verifies successful instantiation of Ewma

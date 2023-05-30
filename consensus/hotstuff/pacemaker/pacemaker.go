@@ -227,27 +227,3 @@ func WithTCs(tcs ...*flow.TimeoutCertificate) recoveryInformation {
 		return nil
 	}
 }
-
-// ProposalDurationProvider provides the ProposalDelay to the Pacemaker.
-// The ProposalDelay is the time a leader should attempt to consume between
-// entering a view and broadcasting its proposal for that view.
-type ProposalDurationProvider interface {
-	ProposalDuration() time.Duration
-}
-
-// StaticProposalDurationProvider is a ProposalDurationProvider which provides a static ProposalDuration.
-type StaticProposalDurationProvider struct {
-	dur time.Duration
-}
-
-func NewStaticProposalDurationProvider(dur time.Duration) StaticProposalDurationProvider {
-	return StaticProposalDurationProvider{dur: dur}
-}
-
-func (p StaticProposalDurationProvider) ProposalDuration() time.Duration {
-	return p.dur
-}
-
-func NoProposalDelay() StaticProposalDurationProvider {
-	return NewStaticProposalDurationProvider(0)
-}
