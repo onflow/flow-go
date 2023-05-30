@@ -11,8 +11,6 @@ import (
 	"github.com/onflow/flow-go/config/network"
 )
 
-const configFileName = "config.yml"
-
 var (
 	conf = viper.New()
 
