@@ -734,7 +734,7 @@ func (state *State) populateCache() error {
 	// cache the initial value for finalized block
 	err := state.db.View(func(tx *badger.Txn) error {
 		// root height
-		err := state.db.View(operation.RetrieveRootHeight(&state.rootHeight))
+		err := state.db.View(operation.RetrieveRootHeight(&state.finalizedRootHeight))
 		if err != nil {
 			return fmt.Errorf("could not read root block to populate cache: %w", err)
 		}
@@ -743,7 +743,7 @@ func (state *State) populateCache() error {
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				// to be backward compatible
-				state.sealedRootHeight = state.rootHeight
+				state.sealedRootHeight = state.finalizedRootHeight
 			} else {
 				return fmt.Errorf("could not read sealed root block to populate cache: %w", err)
 			}
