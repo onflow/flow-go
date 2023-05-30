@@ -73,6 +73,11 @@ func BindPFlags(c *FlowConfig) error {
 	return nil
 }
 
+// Unmarshall unmarshalls the current contents of conf into the provided flow config struct.
+func Unmarshall(flowConfig *FlowConfig) error {
+	return unmarshallFlowConfig(flowConfig)
+}
+
 func unmarshallFlowConfig(c *FlowConfig) error {
 	err := conf.Unmarshal(c)
 	if err != nil {

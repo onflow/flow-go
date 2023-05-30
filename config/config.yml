@@ -4,7 +4,7 @@ network-config:
   # that are not part of protocol state should be trimmed
   networking-connection-pruning: true
   # Preferred unicasts protocols list of unicast protocols in preferred order
-  preferred-unicasts-protocols: [ ]
+  preferred-unicast-protocols: [ ]
   received-message-cache-size: 10e4
   peerupdate-interval: 10m
   unicast-message-timeout: 5s

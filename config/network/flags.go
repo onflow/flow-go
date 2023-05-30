@@ -12,7 +12,7 @@ import (
 const (
 	// network configuration
 	NetworkingConnectionPruning       = "networking-connection-pruning"
-	PreferredUnicastsProtocols        = "preferred-unicasts-protocols"
+	PreferredUnicastsProtocols        = "preferred-unicast-protocols"
 	ReceivedMessageCacheSize          = "received-message-cache-size"
 	PeerUpdateInterval                = "peerupdate-interval"
 	UnicastMessageTimeout             = "unicast-message-timeout"

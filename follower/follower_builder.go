@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -478,6 +479,7 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
+		fmt.Println(builder.BaseConfig.FlowConfig)
 
 		builder.NodeDisallowListDistributor = cmd.BuildDisallowListNotificationDisseminator(builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
 
@@ -522,6 +524,11 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 }
 
 func (builder *FollowerServiceBuilder) Initialize() error {
+	// initialize default flow configuration
+	if err := config.Unmarshall(&builder.FlowConfig); err != nil {
+		return fmt.Errorf("failed to initialize flow config for follower builder: %w", err)
+	}
+
 	if err := builder.deriveBootstrapPeerIdentities(); err != nil {
 		return err
 	}
@@ -605,7 +612,7 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		builder.Metrics.Network,
 		builder.IdentityProvider,
 		builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval)
-
+	fmt.Println(builder.BaseConfig)
 	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.FlowConfig.NetworkConfig.GossipSubConfig.RpcInspector, builder.IdentityProvider, builder.Metrics.Network).
 		SetNetworkType(network.PublicNetwork).
 		SetMetrics(&p2pconfig.MetricsConfig{

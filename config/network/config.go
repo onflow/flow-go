@@ -13,7 +13,7 @@ type Config struct {
 	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
 	NetworkConnectionPruning bool `mapstructure:"networking-connection-pruning"`
 	// PreferredUnicastProtocols list of unicast protocols in preferred order
-	PreferredUnicastProtocols       []string      `mapstructure:"preferred-unicasts-protocols"`
+	PreferredUnicastProtocols       []string      `mapstructure:"preferred-unicast-protocols"`
 	NetworkReceivedMessageCacheSize uint32        `mapstructure:"received-message-cache-size"`
 	PeerUpdateInterval              time.Duration `mapstructure:"peerupdate-interval"`
 	UnicastMessageTimeout           time.Duration `mapstructure:"unicast-message-timeout"`
