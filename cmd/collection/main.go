@@ -286,7 +286,7 @@ func main() {
 				finalizer,
 				verifier,
 				finalizationDistributor,
-				node.RootBlock.Header,
+				node.FinalizedRootBlock.Header,
 				node.RootQC,
 				finalized,
 				pending,

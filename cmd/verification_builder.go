@@ -357,7 +357,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				final,
 				verifier,
 				finalizationDistributor,
-				node.RootBlock.Header,
+				node.FinalizedRootBlock.Header,
 				node.RootQC,
 				finalized,
 				pending,
@@ -386,7 +386,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Metrics.Mempool,
 				cleaner,
 				node.Storage.Headers,
-<<<<<<< HEAD
 				node.Storage.Payloads,
 				followerState,
 				pendingBlocks,
@@ -395,11 +394,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				syncCore,
 				node.Tracer,
 				follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
-=======
-				node.RootBlock.Header,
-				core,
-				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
->>>>>>> 585ca94c52 (remove finalized header)
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)

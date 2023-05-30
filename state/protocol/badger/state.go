@@ -31,7 +31,6 @@ type State struct {
 		commits  storage.EpochCommits
 		statuses storage.EpochStatuses
 	}
-	versionBeacons storage.VersionBeacons
 
 	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
 	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
@@ -750,50 +749,11 @@ func (state *State) populateCache() error {
 		if err != nil {
 			return fmt.Errorf("could not get spork root block height: %w", err)
 		}
-		// finalized header
-		var finalizedHeight uint64
-		err = operation.RetrieveFinalizedHeight(&finalizedHeight)(tx)
-		if err != nil {
-			return fmt.Errorf("could not lookup finalized height: %w", err)
-		}
-		var cachedFinalHeader cachedHeader
-		err = operation.LookupBlockHeight(finalizedHeight, &cachedFinalHeader.id)(tx)
-		if err != nil {
-			return fmt.Errorf("could not lookup finalized id (height=%d): %w", finalizedHeight, err)
-		}
-		cachedFinalHeader.header, err = state.headers.ByBlockID(cachedFinalHeader.id)
-		if err != nil {
-			return fmt.Errorf("could not get finalized block (id=%x): %w", cachedFinalHeader.id, err)
-		}
-		state.cachedFinal.Store(&cachedFinalHeader)
-		// sealed header
-		var sealedHeight uint64
-		err = operation.RetrieveSealedHeight(&sealedHeight)(tx)
-		if err != nil {
-			return fmt.Errorf("could not lookup sealed height: %w", err)
-		}
-		var cachedSealedHeader cachedHeader
-		err = operation.LookupBlockHeight(finalizedHeight, &cachedSealedHeader.id)(tx)
-		if err != nil {
-			return fmt.Errorf("could not lookup sealed id (height=%d): %w", finalizedHeight, err)
-		}
-		cachedSealedHeader.header, err = state.headers.ByBlockID(cachedSealedHeader.id)
-		if err != nil {
-			return fmt.Errorf("could not get sealed block (id=%x): %w", cachedFinalHeader.id, err)
-		}
-		state.cachedSealed.Store(&cachedSealedHeader)
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("could not read root block to populate cache: %w", err)
 	}
-	state.rootHeight = rootHeight
-
-	sporkRootBlockHeight, err := state.Params().SporkRootBlockHeight()
-	if err != nil {
-		return fmt.Errorf("could not read spork root block height: %w", err)
-	}
-	state.sporkRootBlockHeight = sporkRootBlockHeight
 	return nil
 }
 
