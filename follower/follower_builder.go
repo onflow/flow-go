@@ -217,7 +217,7 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
 
 		followerCore, err := consensus.NewFollower(node.Logger, node.Storage.Headers, final,
-			builder.FollowerDistributor, node.RootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
+			builder.FollowerDistributor, node.FinalizedRootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize follower core: %w", err)
 		}

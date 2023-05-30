@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -28,6 +29,7 @@ type BlockRateControllerSuite struct {
 	curEpochFinalView      uint64
 	epochFallbackTriggered bool
 
+	metrics  *mockmodule.CruiseCtlMetrics
 	state    *mockprotocol.State
 	params   *mockprotocol.Params
 	snapshot *mockprotocol.Snapshot
@@ -52,6 +54,11 @@ func (bs *BlockRateControllerSuite) SetupTest() {
 	bs.curEpochFirstView = uint64(0)
 	bs.curEpochFinalView = uint64(604_800) // 1 view/sec
 	bs.epochFallbackTriggered = false
+
+	bs.metrics = mockmodule.NewCruiseCtlMetrics(bs.T())
+	bs.metrics.On("PIDError", mock.Anything, mock.Anything, mock.Anything).Maybe()
+	bs.metrics.On("TargetProposalDuration", mock.Anything).Maybe()
+	bs.metrics.On("ControllerOutput", mock.Anything).Maybe()
 
 	bs.state = mockprotocol.NewState(bs.T())
 	bs.params = mockprotocol.NewParams(bs.T())
@@ -80,7 +87,7 @@ func (bs *BlockRateControllerSuite) SetupTest() {
 // CreateAndStartController creates and starts the BlockRateController.
 // Should be called only once per test case.
 func (bs *BlockRateControllerSuite) CreateAndStartController() {
-	ctl, err := NewBlockRateController(unittest.Logger(), bs.config, bs.state, bs.initialView)
+	ctl, err := NewBlockRateController(unittest.Logger(), bs.metrics, bs.config, bs.state, bs.initialView)
 	require.NoError(bs.T(), err)
 	bs.ctl = ctl
 	bs.ctl.Start(bs.ctx)
@@ -391,4 +398,39 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_AheadOfSchedule() {
 			break
 		}
 	}
+}
+
+// TestMetrics tests that correct metrics are tracked when expected.
+func (bs *BlockRateControllerSuite) TestMetrics() {
+	bs.metrics = mockmodule.NewCruiseCtlMetrics(bs.T())
+	// should set metrics upon initialization
+	bs.metrics.On("PIDError", float64(0), float64(0), float64(0)).Once()
+	bs.metrics.On("TargetProposalDuration", bs.config.DefaultProposalDuration).Once()
+	bs.metrics.On("ControllerOutput", time.Duration(0)).Once()
+	bs.CreateAndStartController()
+	defer bs.StopController()
+	bs.metrics.AssertExpectations(bs.T())
+
+	// we are at view 1 of the epoch, but the time is suddenly the target end time
+	enteredViewAt := bs.ctl.curEpochTargetEndTime
+	view := bs.initialView + 1
+	// we should observe a large error
+	bs.metrics.On("PIDError", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		p := args[0].(float64)
+		i := args[1].(float64)
+		d := args[2].(float64)
+		assert.Greater(bs.T(), p, float64(0))
+		assert.Greater(bs.T(), i, float64(0))
+		assert.Greater(bs.T(), d, float64(0))
+	}).Once()
+	// should immediately use min proposal duration
+	bs.metrics.On("TargetProposalDuration", bs.config.MinProposalDuration).Once()
+	// should have a large negative controller output
+	bs.metrics.On("ControllerOutput", mock.Anything).Run(func(args mock.Arguments) {
+		output := args[0].(time.Duration)
+		assert.Greater(bs.T(), output, time.Duration(0))
+	}).Once()
+
+	err := bs.ctl.measureViewDuration(view, enteredViewAt)
+	require.NoError(bs.T(), err)
 }
