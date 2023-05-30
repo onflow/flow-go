@@ -40,6 +40,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	synccore "github.com/onflow/flow-go/module/chainsync"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -606,6 +607,7 @@ func createNode(
 		hot,
 		voteAggregator,
 		timeoutAggregator,
+		modulecompliance.DefaultConfig(),
 	)
 	require.NoError(t, err)
 
