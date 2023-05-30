@@ -140,22 +140,20 @@ func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
 
 // SanityCheckSubsequentMeasurements checks that two consecutive states of the BlockTimeController are different or equal and
 // broadly reasonable. It does not assert exact values, because part of the measurements depend on timing in the worker.
-func (bs *BlockRateControllerSuite) SanityCheckSubsequentMeasurements(c1, c2 BlockTimeController, expectedEqual bool) {
-	m1 := c1.GetProposalTiming()
-	m2 := c2.GetProposalTiming()
+func (bs *BlockRateControllerSuite) SanityCheckSubsequentMeasurements(d1, d2 *controllerStateDigest, expectedEqual bool) {
 	if expectedEqual {
 		// later input should have left state invariant, including the Observation
-		assert.Equal(bs.T(), m1.ObservationTime(), m2.ObservationTime())
-		assert.Equal(bs.T(), m1.ObservationView(), m2.ObservationView())
+		assert.Equal(bs.T(), d1.latestProposalTiming.ObservationTime(), d2.latestProposalTiming.ObservationTime())
+		assert.Equal(bs.T(), d1.latestProposalTiming.ObservationView(), d2.latestProposalTiming.ObservationView())
 		// new measurement should have same error
-		assert.Equal(bs.T(), c1.proportionalErr.Value(), c2.proportionalErr.Value())
-		assert.Equal(bs.T(), c1.integralErr.Value(), c2.integralErr.Value())
+		assert.Equal(bs.T(), d1.proportionalErr.Value(), d2.proportionalErr.Value())
+		assert.Equal(bs.T(), d1.integralErr.Value(), d2.integralErr.Value())
 	} else {
 		// later input should have caused a new Observation to be recorded
-		assert.True(bs.T(), m1.ObservationTime().Before(m2.ObservationTime()))
+		assert.True(bs.T(), d1.latestProposalTiming.ObservationTime().Before(d2.latestProposalTiming.ObservationTime()))
 		// new measurement should have different error
-		assert.NotEqual(bs.T(), c1.proportionalErr.Value(), c2.proportionalErr.Value())
-		assert.NotEqual(bs.T(), c1.integralErr.Value(), c2.integralErr.Value())
+		assert.NotEqual(bs.T(), d1.proportionalErr.Value(), d2.proportionalErr.Value())
+		assert.NotEqual(bs.T(), d1.integralErr.Value(), d2.integralErr.Value())
 	}
 }
 
@@ -257,14 +255,14 @@ func (bs *BlockRateControllerSuite) TestOnBlockIncorporated_UpdateProposalDelay(
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
-	initialControllerState := *(bs.ctl) // copy initial controller state
+	initialControllerState := captureControllerStateDigest(bs.ctl) // copy initial controller state
 	initialProposalDelay := bs.ctl.GetProposalTiming()
 	block := model.BlockFromFlow(unittest.BlockHeaderFixture(unittest.HeaderWithView(bs.initialView + 1)))
 	bs.ctl.OnBlockIncorporated(block)
 	require.Eventually(bs.T(), func() bool {
 		return bs.ctl.GetProposalTiming().ObservationView() > bs.initialView
 	}, time.Second, time.Millisecond)
-	nextControllerState := *(bs.ctl)
+	nextControllerState := captureControllerStateDigest(bs.ctl)
 	nextProposalDelay := bs.ctl.GetProposalTiming()
 
 	bs.SanityCheckSubsequentMeasurements(initialControllerState, nextControllerState, false)
@@ -284,7 +282,7 @@ func (bs *BlockRateControllerSuite) TestOnBlockIncorporated_UpdateProposalDelay(
 	}, time.Second, time.Millisecond)
 
 	// state should be unchanged
-	finalControllerState := *(bs.ctl)
+	finalControllerState := captureControllerStateDigest(bs.ctl)
 	bs.SanityCheckSubsequentMeasurements(nextControllerState, finalControllerState, true)
 	assert.Equal(bs.T(), nextProposalDelay, bs.ctl.GetProposalTiming())
 }
@@ -299,14 +297,13 @@ func (bs *BlockRateControllerSuite) TestOnBlockIncorporated_EpochTransition() {
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
-	initialControllerState := *(bs.ctl)
+	initialControllerState := captureControllerStateDigest(bs.ctl)
 	bs.epochs.Transition()
-	block := model.BlockFromFlow(unittest.BlockHeaderFixture(unittest.HeaderWithView(bs.curEpochFinalView + 1)))
-	bs.ctl.OnBlockIncorporated(block)
-	require.Eventually(bs.T(), func() bool {
-		return bs.ctl.GetProposalTiming().ObservationView() > bs.initialView
-	}, time.Second, time.Millisecond)
-	nextControllerState := *(bs.ctl)
+	timedBlock := makeTimedBlock(bs.curEpochFinalView+1, unittest.IdentifierFixture(), time.Now().UTC())
+	err := bs.ctl.processIncorporatedBlock(timedBlock)
+	require.True(bs.T(), bs.ctl.GetProposalTiming().ObservationView() > bs.initialView)
+	require.NoError(bs.T(), err)
+	nextControllerState := captureControllerStateDigest(bs.ctl)
 
 	bs.SanityCheckSubsequentMeasurements(initialControllerState, nextControllerState, false)
 	// epoch boundaries should be updated
@@ -485,5 +482,21 @@ func makeTimedBlock(view uint64, parentID flow.Identifier, time time.Time) Timed
 	return TimedBlock{
 		Block:        model.BlockFromFlow(header),
 		TimeObserved: time,
+	}
+}
+
+type controllerStateDigest struct {
+	proportionalErr Ewma
+	integralErr     LeakyIntegrator
+
+	// latestProposalTiming holds the ProposalTiming that the controller generated in response to processing the latest observation
+	latestProposalTiming ProposalTiming
+}
+
+func captureControllerStateDigest(ctl *BlockTimeController) *controllerStateDigest {
+	return &controllerStateDigest{
+		proportionalErr:      ctl.proportionalErr,
+		integralErr:          ctl.integralErr,
+		latestProposalTiming: ctl.GetProposalTiming(),
 	}
 }
