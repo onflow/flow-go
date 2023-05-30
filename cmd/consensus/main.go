@@ -677,8 +677,8 @@ func main() {
 			if err != nil {
 				return nil, err
 			}
-			curView := livenessData.CurrentView
-			ctl, err := cruisectl.NewBlockRateController(node.Logger, cruiseCtlConfig, node.State, curView)
+			ctlMetrics := metrics.NewCruiseCtlMetrics()
+			ctl, err := cruisectl.NewBlockRateController(node.Logger, ctlMetrics, cruiseCtlConfig, node.State, livenessData.CurrentView)
 			if err != nil {
 				return nil, err
 			}
