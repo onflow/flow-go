@@ -1108,7 +1108,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.State = state
 
 		// set root snapshot field
-		rootBlock, err := state.Params().Root()
+		rootBlock, err := state.Params().FinalizedRoot()
 		if err != nil {
 			return fmt.Errorf("could not get root block from protocol state: %w", err)
 		}
@@ -1163,8 +1163,10 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.Logger.Info().
 			Hex("root_result_id", logging.Entity(fnb.RootResult)).
 			Hex("root_state_commitment", fnb.RootSeal.FinalState[:]).
-			Hex("root_block_id", logging.Entity(fnb.RootBlock)).
-			Uint64("root_block_height", fnb.RootBlock.Header.Height).
+			Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
+			Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
+			Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
+			Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
 			Msg("protocol state bootstrapped")
 	}
 
@@ -1175,17 +1177,11 @@ func (fnb *FlowNodeBuilder) initState() error {
 		}
 	}
 
-	lastFinalized, err := fnb.State.Final().Head()
-	if err != nil {
-		return fmt.Errorf("could not get last finalized block header: %w", err)
-	}
-	fnb.NodeConfig.FinalizedHeader = lastFinalized
-
 	fnb.Logger.Info().
-		Hex("root_block_id", logging.Entity(fnb.RootBlock)).
-		Uint64("root_block_height", fnb.RootBlock.Header.Height).
-		Hex("finalized_block_id", logging.Entity(lastFinalized)).
-		Uint64("finalized_block_height", lastFinalized.Height).
+		Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
+		Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
+		Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
+		Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
 		Msg("successfully opened protocol state")
 
 	return nil
@@ -1221,13 +1217,14 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 		return fmt.Errorf("failed to read root sealing segment: %w", err)
 	}
 
-	fnb.RootBlock = sealingSegment.Highest()
+	fnb.FinalizedRootBlock = sealingSegment.Highest()
+	fnb.SealedRootBlock = sealingSegment.Sealed()
 	fnb.RootQC, err = fnb.RootSnapshot.QuorumCertificate()
 	if err != nil {
 		return fmt.Errorf("failed to read root QC: %w", err)
 	}
 
-	fnb.RootChainID = fnb.RootBlock.Header.ChainID
+	fnb.RootChainID = fnb.FinalizedRootBlock.Header.ChainID
 	fnb.SporkID, err = fnb.RootSnapshot.Params().SporkID()
 	if err != nil {
 		return fmt.Errorf("failed to read spork ID: %w", err)
@@ -1255,7 +1252,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
 	// are lenient, to allow ghost node to run as any role.
 	if self.Role.String() != fnb.BaseConfig.NodeRole {
-		rootBlockHeader, err := fnb.State.Params().Root()
+		rootBlockHeader, err := fnb.State.Params().FinalizedRoot()
 		if err != nil {
 			return fmt.Errorf("could not get root block from protocol state: %w", err)
 		}

@@ -309,7 +309,7 @@ func (builder *ObserverServiceBuilder) buildFollowerCore() *ObserverServiceBuild
 			node.Storage.Headers,
 			final,
 			builder.FollowerDistributor,
-			node.RootBlock.Header,
+			node.FinalizedRootBlock.Header,
 			node.RootQC,
 			builder.Finalized,
 			builder.Pending,
