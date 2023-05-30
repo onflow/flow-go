@@ -23,6 +23,8 @@ service CorruptNetwork {
 message Message {
   EgressMessage Egress = 1;
   IngressMessage Ingress = 2;
+  GossipSubEgressMessage GossipSubEgress = 3;
+  GossipSubIngressMessage GossipSubIngress = 4;
 }
 
 // EgressMessage represents an outgoing message from a corrupt node to another (honest or corrupt) node.
@@ -53,4 +55,12 @@ enum Protocol {
   UNICAST = 1;
   MULTICAST = 2;
   PUBLISH = 3;
+}
+
+message GossipSubEgressMessage {
+
+}
+
+message GossipSubIngressMessage {
+
 }
