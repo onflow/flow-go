@@ -17,7 +17,7 @@ type Params interface {
 // different instance params.
 type InstanceParams interface {
 
-	// FinalizedRoot returns the root header of the current protocol state. This will be
+	// FinalizedRoot returns the finalized root header of the current protocol state. This will be
 	// the head of the protocol state snapshot used to bootstrap this state and
 	// may differ from node to node for the same protocol state.
 	// No errors are expected during normal operation.

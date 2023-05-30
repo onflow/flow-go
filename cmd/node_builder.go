@@ -295,8 +295,8 @@ type NodeConfig struct {
 type StateExcerptAtBoot struct {
 	// properties of RootSnapshot for convenience
 	// For node bootstrapped with a root snapshot for the first block of a spork,
-	// 		FinalizedRootBlock and SealedRootBlock are the same block
-	// For node bootstrapped with a root snapshot for a block above the first bloc of a spork (dynamically bootstrapped),
+	// 		FinalizedRootBlock and SealedRootBlock are the same block (special case of self-sealing block)
+	// For node bootstrapped with a root snapshot for a block above the first block of a spork (dynamically bootstrapped),
 	// 		FinalizedRootBlock.Height > SealedRootBlock.Height
 	FinalizedRootBlock *flow.Block             // The last finalized block when bootstrapped.
 	SealedRootBlock    *flow.Block             // The last sealed block when bootstrapped.
