@@ -1088,7 +1088,6 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	},
 		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)
-	builder.NodeDisallowListDistributor.AddConsumer(mw)
 	builder.Middleware = mw
 	return builder.Middleware
 }
