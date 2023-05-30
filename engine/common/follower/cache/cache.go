@@ -6,9 +6,9 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 )
