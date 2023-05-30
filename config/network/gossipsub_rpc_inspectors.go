@@ -1,6 +1,10 @@
 package network
 
-import "github.com/onflow/flow-go/network/p2p"
+import (
+	"fmt"
+
+	"github.com/onflow/flow-go/network/p2p"
+)
 
 // GossipSubRPCInspectorsConfig encompasses configuration related to gossipsub RPC message inspectors.
 type GossipSubRPCInspectorsConfig struct {
@@ -10,6 +14,24 @@ type GossipSubRPCInspectorsConfig struct {
 	ValidationInspectorConfigs *GossipSubRPCValidationInspectorConfigs `mapstructure:"validation-inspector"`
 	// MetricsInspectorConfigs control message metrics inspector configuration.
 	MetricsInspectorConfigs *GossipSubRPCMetricsInspectorConfigs `mapstructure:"metrics-inspector"`
+}
+
+// Validate validates rpc inspectors configuration values.
+func (c *GossipSubRPCInspectorsConfig) Validate() error {
+	// validate all limit configuration values
+	err := c.ValidationInspectorConfigs.GraftLimits.Validate()
+	if err != nil {
+		return err
+	}
+	err = c.ValidationInspectorConfigs.PruneLimits.Validate()
+	if err != nil {
+		return err
+	}
+	err = c.ValidationInspectorConfigs.IHaveLimits.Validate()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // GossipSubRPCValidationInspectorConfigs validation limits used for gossipsub RPC control message inspection.
@@ -71,6 +93,20 @@ type CtrlMsgValidationConfig struct {
 	RateLimit uint64 `mapstructure:"rate-limit"`
 	// rateLimiter basic limiter without lockout duration.
 	rateLimiter p2p.BasicRateLimiter
+}
+
+// Validate validates control message validation limit values.
+func (c *CtrlMsgValidationConfig) Validate() error {
+	// check common config values used by all control message types
+	switch {
+	case c.RateLimit < 0:
+		return NewInvalidLimitConfigErr(c.ControlMsg, fmt.Errorf("invalid rate limit value %d must be greater than 0", c.RateLimit))
+	case c.HardThreshold <= 0:
+		return NewInvalidLimitConfigErr(c.ControlMsg, fmt.Errorf("invalid hard threshold value %d must be greater than 0", c.HardThreshold))
+	case c.SafetyThreshold <= 0:
+		return NewInvalidLimitConfigErr(c.ControlMsg, fmt.Errorf("invalid safety threshold value %d must be greater than 0", c.SafetyThreshold))
+	}
+	return nil
 }
 
 func (c *CtrlMsgValidationConfig) SetRateLimiter(r p2p.BasicRateLimiter) {

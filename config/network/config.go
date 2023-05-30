@@ -34,6 +34,15 @@ type Config struct {
 	GossipSubRpcInspectorSuite p2p.GossipSubInspectorSuite
 }
 
+// Validate validate configuration values and all sub config structs. 
+func (c *Config) Validate() error {
+	err := c.GossipSubConfig.RpcInspector.Validate()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
 type UnicastRateLimitersConfig struct {
 	// DryRun setting this to true will disable connection disconnects and gating when unicast rate limiters are configured

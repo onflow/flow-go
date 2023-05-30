@@ -25,6 +25,15 @@ type FlowConfig struct {
 	NetworkConfig *network.Config `mapstructure:"network-config"`
 }
 
+// Validate validate Flow config.
+func (fc *FlowConfig) Validate() error {
+	err := fc.NetworkConfig.Validate()
+	if err != nil {
+		return fmt.Errorf("failed to validate flow network configuration values: %w", err)
+	}
+	return nil
+}
+
 // DefaultConfig initializes the flow configuration. All default values for the Flow
 // configuration are stored in the config.yml file. These values can be overriden
 // by node operators by setting the corresponding cli flag. DefaultConfig should be called
@@ -72,7 +81,7 @@ func unmarshallFlowConfig(c *FlowConfig) error {
 		return fmt.Errorf("failed to unmarshal network config: %w", err)
 	}
 
-	return nil
+	return c.Validate()
 }
 
 func init() {
