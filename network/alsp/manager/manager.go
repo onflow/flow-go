@@ -105,7 +105,7 @@ type MisbehaviorReportManagerConfig struct {
 	// HeartBeatInterval is the interval between the heartbeats. Heartbeat is a recurring event that is used to
 	// apply recurring actions, e.g., decay the penalty of the misbehaving nodes.
 	HeartBeatInterval time.Duration
-	Opts        []MisbehaviorReportManagerOption
+	Opts              []MisbehaviorReportManagerOption
 }
 
 // validate validates the MisbehaviorReportManagerConfig instance. It returns an error if the config is invalid.
