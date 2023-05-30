@@ -537,7 +537,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 			}
 		} else {
 			// trigger BlockProcessable for parent blocks above root height
-			if parent.Height > m.rootHeight {
+			if parent.Height > m.finalizedRootHeight {
 				events = append(events, func() {
 					m.consumer.BlockProcessable(parent, qc)
 				})
