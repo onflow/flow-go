@@ -59,8 +59,9 @@ func newPublishImmediately(observationView uint64, observationTime time.Time) *p
 func (pt *publishImmediately) TargetPublicationTime(_ uint64, timeViewEntered time.Time, _ flow.Identifier) time.Time {
 	return timeViewEntered
 }
-func (pt *publishImmediately) ObservationView() uint64    { return pt.observationView }
-func (pt *publishImmediately) ObservationTime() time.Time { return pt.observationTime }
+func (pt *publishImmediately) ObservationView() uint64             { return pt.observationView }
+func (pt *publishImmediately) ObservationTime() time.Time          { return pt.observationTime }
+func (pt *publishImmediately) ConstrainedBlockTime() time.Duration { return 0 }
 
 /* *************************************** happyPathBlockTime *************************************** */
 

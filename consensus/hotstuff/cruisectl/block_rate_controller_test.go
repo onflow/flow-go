@@ -76,6 +76,7 @@ func (bs *BlockRateControllerSuite) SetupTest() {
 	bs.snapshot.On("Phase").Return(
 		func() flow.EpochPhase { return bs.epochs.Phase() },
 		func() error { return nil })
+	bs.snapshot.On("Head").Return(unittest.BlockHeaderFixture(unittest.HeaderWithView(bs.initialView+11)), nil).Maybe()
 	bs.snapshot.On("Epochs").Return(bs.epochs)
 	bs.curEpoch.On("Counter").Return(bs.epochCounter, nil)
 	bs.curEpoch.On("FirstView").Return(bs.curEpochFirstView, nil)
@@ -216,14 +217,14 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	bs.ctl.integralErr.AddObservation(20.0)
 	err := bs.ctl.measureViewDuration(makeTimedBlock(bs.initialView+1, unittest.IdentifierFixture(), time.Now()))
 	require.NoError(bs.T(), err)
-	assert.NotEqual(bs.T(), bs.config.DefaultProposalDuration, bs.ctl.GetProposalTiming())
+	assert.NotEqual(bs.T(), bs.config.FallbackProposalDuration, bs.ctl.GetProposalTiming())
 
 	// send the event
 	bs.ctl.EpochEmergencyFallbackTriggered()
 	// async: should revert to default GetProposalTiming
 	require.Eventually(bs.T(), func() bool {
 		now := time.Now().UTC()
-		return now.Add(bs.config.DefaultProposalDuration) == bs.ctl.GetProposalTiming().TargetPublicationTime(7, now, unittest.IdentifierFixture())
+		return now.Add(bs.config.FallbackProposalDuration) == bs.ctl.GetProposalTiming().TargetPublicationTime(7, now, unittest.IdentifierFixture())
 	}, time.Second, time.Millisecond)
 
 	// additional EpochEmergencyFallbackTriggered events should be no-ops
@@ -233,7 +234,7 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	}
 	// state should be unchanged
 	now := time.Now().UTC()
-	assert.Equal(bs.T(), now.Add(bs.config.DefaultProposalDuration), bs.ctl.GetProposalTiming().TargetPublicationTime(12, now, unittest.IdentifierFixture()))
+	assert.Equal(bs.T(), now.Add(bs.config.FallbackProposalDuration), bs.ctl.GetProposalTiming().TargetPublicationTime(12, now, unittest.IdentifierFixture()))
 
 	// additional OnBlockIncorporated events should be no-ops
 	for i := 0; i <= cap(bs.ctl.incorporatedBlocks); i++ {
@@ -247,7 +248,7 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	}, time.Second, time.Millisecond)
 	// state should be unchanged
 	now = time.Now().UTC()
-	assert.Equal(bs.T(), now.Add(bs.config.DefaultProposalDuration), bs.ctl.GetProposalTiming().TargetPublicationTime(17, now, unittest.IdentifierFixture()))
+	assert.Equal(bs.T(), now.Add(bs.config.FallbackProposalDuration), bs.ctl.GetProposalTiming().TargetPublicationTime(17, now, unittest.IdentifierFixture()))
 }
 
 // TestOnBlockIncorporated_UpdateProposalDelay tests that a new measurement is taken and
@@ -271,7 +272,7 @@ func (bs *BlockRateControllerSuite) TestOnBlockIncorporated_UpdateProposalDelay(
 	now := time.Now().UTC()
 	assert.NotEqual(bs.T(),
 		initialProposalDelay.TargetPublicationTime(bs.initialView+2, now, unittest.IdentifierFixture()),
-		nextProposalDelay.TargetPublicationTime(bs.initialView+2, now, unittest.IdentifierFixture()))
+		nextProposalDelay.TargetPublicationTime(bs.initialView+2, now, block.BlockID))
 
 	// duplicate events should be no-ops
 	for i := 0; i <= cap(bs.ctl.incorporatedBlocks); i++ {
@@ -347,16 +348,20 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_AfterTargetTransitionTime(
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
-	lastProposalDelay := bs.ctl.GetProposalTiming()
+	lastProposalDelay := time.Hour // start with large dummy value
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
 		// we have passed the target end time of the epoch
-		enteredViewAt := bs.ctl.curEpochTargetEndTime.Add(time.Duration(view) * time.Second)
-		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), enteredViewAt)
+		receivedParentBlockAt := bs.ctl.curEpochTargetEndTime.Add(time.Duration(view) * time.Second)
+		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), receivedParentBlockAt)
 		err := bs.ctl.measureViewDuration(timedBlock)
 		require.NoError(bs.T(), err)
 
-		assert.LessOrEqual(bs.T(), bs.ctl.GetProposalTiming(), lastProposalDelay)
-		lastProposalDelay = bs.ctl.GetProposalTiming()
+		// compute proposal delay:
+		pubTime := bs.ctl.GetProposalTiming().TargetPublicationTime(view+1, time.Now().UTC(), timedBlock.Block.BlockID) // simulate building a child of `timedBlock`
+		delay := pubTime.Sub(receivedParentBlockAt)
+
+		assert.LessOrEqual(bs.T(), delay, lastProposalDelay)
+		lastProposalDelay = delay
 
 		// transition views until the end of the epoch, or for 100 views
 		if view-bs.initialView >= 100 {
@@ -366,7 +371,7 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_AfterTargetTransitionTime(
 }
 
 // TestProposalDelay_BehindSchedule tests the behaviour of the controller when the
-// projected epoch switchover is LATER than the target switchover time (in other words,
+// projected epoch switchover is LATER than the target switchover time, i.e.
 // we are behind schedule.
 // We should respond by lowering the GetProposalTiming (increasing view rate)
 func (bs *BlockRateControllerSuite) TestProposalDelay_BehindSchedule() {
@@ -375,20 +380,25 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_BehindSchedule() {
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
-	lastProposalDelay := bs.ctl.GetProposalTiming()
+	lastProposalDelay := time.Hour // start with large dummy value
 	idealEnteredViewTime := bs.ctl.curEpochTargetEndTime.Add(-epochLength / 2)
+
 	// 1s behind of schedule
-	enteredViewAt := idealEnteredViewTime.Add(time.Second)
+	receivedParentBlockAt := idealEnteredViewTime.Add(time.Second)
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
+		fmt.Println(view)
 		// hold the instantaneous error constant for each view
-		enteredViewAt = enteredViewAt.Add(bs.ctl.targetViewTime())
-		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), enteredViewAt)
+		receivedParentBlockAt = receivedParentBlockAt.Add(bs.ctl.targetViewTime())
+		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), receivedParentBlockAt)
 		err := bs.ctl.measureViewDuration(timedBlock)
 		require.NoError(bs.T(), err)
 
-		// decreasing GetProposalTiming
-		assert.LessOrEqual(bs.T(), bs.ctl.GetProposalTiming(), lastProposalDelay)
-		lastProposalDelay = bs.ctl.GetProposalTiming()
+		// compute proposal delay:
+		pubTime := bs.ctl.GetProposalTiming().TargetPublicationTime(view+1, time.Now().UTC(), timedBlock.Block.BlockID) // simulate building a child of `timedBlock`
+		delay := pubTime.Sub(receivedParentBlockAt)
+		// expecting decreasing GetProposalTiming
+		assert.LessOrEqual(bs.T(), delay, lastProposalDelay)
+		lastProposalDelay = delay
 
 		// transition views until the end of the epoch, or for 100 views
 		if view-bs.initialView >= 100 {
@@ -407,20 +417,24 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_AheadOfSchedule() {
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
-	lastProposalDelay := bs.ctl.GetProposalTiming()
+	lastProposalDelay := time.Duration(0) // start with large dummy value
 	idealEnteredViewTime := bs.ctl.curEpochTargetEndTime.Add(-epochLength / 2)
 	// 1s ahead of schedule
-	enteredViewAt := idealEnteredViewTime.Add(-time.Second)
+	receivedParentBlockAt := idealEnteredViewTime.Add(-time.Second)
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
 		// hold the instantaneous error constant for each view
-		enteredViewAt = enteredViewAt.Add(bs.ctl.targetViewTime())
-		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), enteredViewAt)
+		receivedParentBlockAt = receivedParentBlockAt.Add(bs.ctl.targetViewTime())
+		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), receivedParentBlockAt)
 		err := bs.ctl.measureViewDuration(timedBlock)
 		require.NoError(bs.T(), err)
 
-		// increasing GetProposalTiming
-		assert.GreaterOrEqual(bs.T(), bs.ctl.GetProposalTiming(), lastProposalDelay)
-		lastProposalDelay = bs.ctl.GetProposalTiming()
+		// compute proposal delay:
+		pubTime := bs.ctl.GetProposalTiming().TargetPublicationTime(view+1, time.Now().UTC(), timedBlock.Block.BlockID) // simulate building a child of `timedBlock`
+		delay := pubTime.Sub(receivedParentBlockAt)
+
+		// expecting increasing GetProposalTiming
+		assert.GreaterOrEqual(bs.T(), delay, lastProposalDelay)
+		lastProposalDelay = delay
 
 		// transition views until the end of the epoch, or for 100 views
 		if view-bs.initialView >= 100 {
@@ -434,7 +448,7 @@ func (bs *BlockRateControllerSuite) TestMetrics() {
 	bs.metrics = mockmodule.NewCruiseCtlMetrics(bs.T())
 	// should set metrics upon initialization
 	bs.metrics.On("PIDError", float64(0), float64(0), float64(0)).Once()
-	bs.metrics.On("TargetProposalDuration", bs.config.DefaultProposalDuration).Once()
+	bs.metrics.On("TargetProposalDuration", time.Duration(0)).Once()
 	bs.metrics.On("ControllerOutput", time.Duration(0)).Once()
 	bs.CreateAndStartController()
 	defer bs.StopController()

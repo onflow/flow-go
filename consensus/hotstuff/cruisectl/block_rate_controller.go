@@ -83,6 +83,7 @@ type BlockTimeController struct {
 // NewBlockTimeController returns a new BlockTimeController.
 func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics, config *Config, state protocol.State, curView uint64) (*BlockTimeController, error) {
 	initProptlErr, initItgErr, initDrivErr := .0, .0, .0 // has to be 0 unless we are making assumptions of the prior history of the proportional error `e[v]`
+	initProposalTiming := newPublishImmediately(curView, time.Now().UTC())
 	proportionalErr, err := NewEwma(config.alpha(), initProptlErr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize EWMA for computing the proportional error: %w", err)
@@ -103,7 +104,7 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 		proportionalErr:    proportionalErr,
 		integralErr:        integralErr,
 	}
-	ctl.storeProposalTiming(newPublishImmediately(curView, time.Now().UTC()))
+	ctl.storeProposalTiming(initProposalTiming)
 	ctl.Component = component.NewComponentManagerBuilder().
 		AddWorker(ctl.processEventsWorkerLogic).
 		Build()
@@ -117,6 +118,7 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 		Msg("initialized BlockTimeController")
 	ctl.metrics.PIDError(initProptlErr, initItgErr, initDrivErr)
 	ctl.metrics.ControllerOutput(0)
+	ctl.metrics.TargetProposalDuration(initProposalTiming.ConstrainedBlockTime())
 
 	return ctl, nil
 }
@@ -371,7 +373,7 @@ func (ctl *BlockTimeController) processEpochFallbackTriggered() error {
 		return fmt.Errorf("failed to retrieve latest finalized block from protocol state %w", err)
 	}
 
-	ctl.storeProposalTiming(newFallbackTiming(latestFinalized.View, time.Now().UTC(), ctl.config.DefaultProposalDuration))
+	ctl.storeProposalTiming(newFallbackTiming(latestFinalized.View, time.Now().UTC(), ctl.config.FallbackProposalDuration))
 	return nil
 }
 

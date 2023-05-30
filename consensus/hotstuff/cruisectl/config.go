@@ -10,10 +10,10 @@ func DefaultConfig() *Config {
 		TimingConfig{
 			TargetTransition: DefaultEpochTransitionTime(),
 			// TODO confirm default values
-			DefaultProposalDuration: 500 * time.Millisecond,
-			MaxProposalDuration:     1000 * time.Millisecond,
-			MinProposalDuration:     250 * time.Millisecond,
-			Enabled:                 true,
+			FallbackProposalDuration: 500 * time.Millisecond,
+			MaxProposalDuration:      1000 * time.Millisecond,
+			MinProposalDuration:      250 * time.Millisecond,
+			Enabled:                  true,
 		},
 		ControllerParams{
 			N_ewma: 5,
@@ -35,11 +35,11 @@ type Config struct {
 type TimingConfig struct {
 	// TargetTransition defines the target time to transition epochs each week.
 	TargetTransition EpochTransitionTime
-	// DefaultProposalDuration is the baseline GetProposalTiming value. It is used:
+	// FallbackProposalDuration is the baseline GetProposalTiming value. It is used:
 	//  - when Enabled is false
 	//  - when epoch fallback has been triggered
 	//  - as the initial GetProposalTiming value, to which the compensation computed by the PID controller is added
-	DefaultProposalDuration time.Duration
+	FallbackProposalDuration time.Duration
 	// MaxProposalDuration is a hard maximum on the GetProposalTiming.
 	// If the BlockTimeController computes a larger desired GetProposalTiming value
 	// based on the observed error and tuning, this value will be used instead.
@@ -49,7 +49,7 @@ type TimingConfig struct {
 	// based on the observed error and tuning, this value will be used instead.
 	MinProposalDuration time.Duration
 	// Enabled defines whether responsive control of the GetProposalTiming is enabled.
-	// When disabled, the DefaultProposalDuration is used.
+	// When disabled, the FallbackProposalDuration is used.
 	Enabled bool
 }
 

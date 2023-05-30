@@ -149,7 +149,7 @@ func main() {
 		// TODO backward-compatibility for --block-rate-delay? if we remove in full, will need to update many environments, partner setups...
 		// TODO flag descriptions
 		flags.StringVar(&cruiseCtlTargetTransitionTimeStr, "cruise-ctl-target-epoch-transition-time", cruiseCtlTargetTransitionTimeStr, "")
-		flags.DurationVar(&cruiseCtlConfig.DefaultProposalDuration, "cruise-ctl-default-proposal-duration", cruiseCtlConfig.DefaultProposalDuration, "")
+		flags.DurationVar(&cruiseCtlConfig.FallbackProposalDuration, "cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.FallbackProposalDuration, "")
 		flags.DurationVar(&cruiseCtlConfig.MinProposalDuration, "cruise-ctl-min-proposal-duration", cruiseCtlConfig.MinProposalDuration, "")
 		flags.DurationVar(&cruiseCtlConfig.MaxProposalDuration, "cruise-ctl-max-proposal-duration", cruiseCtlConfig.MaxProposalDuration, "")
 		flags.BoolVar(&cruiseCtlConfig.Enabled, "cruise-ctl-enabled", cruiseCtlConfig.Enabled, "")
