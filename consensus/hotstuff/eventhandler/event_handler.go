@@ -363,7 +363,7 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	// Sanity checks to make sure that resulting proposal is valid:
 	// In its proposal, the leader for view N needs to present evidence that it has legitimately entered view N.
 	// As evidence, we include a QC or TC for view N-1, which should always be available as the PaceMaker advances
-	// to view N only after observing a QC or TC from view N-1. Moreover QC and TC are always processed together. As
+	// to view N only after observing a QC or TC from view N-1. Moreover, QC and TC are always processed together. As
 	// EventHandler is strictly single-threaded without reentrancy, we must have a QC or TC for the prior view (curView-1).
 	// Failing one of these sanity checks is a symptom of state corruption or a severe implementation bug.
 	if newestQC.View+1 != curView {
