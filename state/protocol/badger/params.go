@@ -100,14 +100,6 @@ func (p Params) SealedRoot() (*flow.Header, error) {
 	// look up root block ID
 	var rootID flow.Identifier
 	err := p.state.db.View(operation.LookupBlockHeight(p.state.sealedRootHeight, &rootID))
-	// TODO(leo): this method is called after a node is bootstrapped, which means the key must exist,
-	// however, if this code is running on an old execution node which was bootstrapped without this
-	// key, then this key might not exist. In order to be backward compatible, we fallback to Root().
-	// This check can be removed after a spork, where all nodes should have bootstrapped with this key
-	// saved in database
-	if errors.Is(err, storage.ErrNotFound) {
-		return p.FinalizedRoot()
-	}
 
 	// this method is called after a node is bootstrapped, which means the key must exist,
 	// however, if this code is running on an old execution node which was bootstrapped without this
