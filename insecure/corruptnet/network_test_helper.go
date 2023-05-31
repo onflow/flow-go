@@ -72,6 +72,7 @@ func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*
 		testutil.LocalFixture(t, corruptedIdentity),
 		codec,
 		flowNetwork,
+		nil,
 		ccf)
 	require.NoError(t, err)
 
