@@ -480,36 +480,6 @@ func (bs *BlockRateControllerSuite) TestMetrics() {
 	require.NoError(bs.T(), err)
 }
 
-// Test_vs_PythonSimulation implements a regression test. We implemented the controller in python
-// together with a statistical model for the view duration. We used the python implementation to tune
-// the PID controller parameters which we are using here.
-// In this test, we feed values pre-generated with the python simulation into the Go implementation
-// and compare the outputs to the pre-generated outputs from the python controller implementation.
-func (bs *BlockRateControllerSuite) Test_vs_PythonSimulation() {
-	// PART 1: setup system to mirror python simulation
-	bs.initialView = 0
-	bs.curEpochFirstView = uint64(0)
-	bs.curEpochFinalView = uint64(483000)
-	bs.epochFallbackTriggered = false
-
-	refT := time.Now().UTC()
-	refT = time.Date(refT.Year(), refT.Month(), refT.Day(), refT.Hour(), refT.Minute(), 0, 0, time.UTC) // truncate to past minute
-	epochStwitchoverTarget := refT.Add(604800 * time.Second)                                            // 1 week
-	bs.config = &Config{
-		TimingConfig: TimingConfig{
-			TargetTransition:         EpochTransitionTime{day: refT.Weekday(), hour: uint8(refT.Hour()), minute: uint8(refT.Minute())},
-			FallbackProposalDuration: 500 * time.Millisecond, // irrelevant for this test, as controller should never enter fallback mode
-			MinProposalDuration:      470 * time.Millisecond,
-			MaxProposalDuration:      2010 * time.Millisecond,
-			Enabled:                  true,
-		},
-		ControllerParams: ControllerParams{KP: 2.0, KI: 0.06, KD: 3.0, N_ewma: 5, N_itg: 50},
-	}
-
-	setupMocks(bs)
-
-}
-
 func makeTimedBlock(view uint64, parentID flow.Identifier, time time.Time) TimedBlock {
 	header := unittest.BlockHeaderFixture(unittest.HeaderWithView(view))
 	header.ParentID = parentID
