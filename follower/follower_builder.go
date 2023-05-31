@@ -31,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	synchronization "github.com/onflow/flow-go/module/chainsync"
-	"github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
@@ -217,7 +216,7 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
 
 		followerCore, err := consensus.NewFollower(node.Logger, node.Storage.Headers, final,
-			builder.FollowerDistributor, node.RootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
+			builder.FollowerDistributor, node.FinalizedRootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize follower core: %w", err)
 		}
@@ -263,12 +262,13 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 			node.Storage.Headers,
 			builder.Finalized,
 			core,
+			node.ComplianceConfig,
 			follower.WithChannel(channels.PublicReceiveBlocks),
-			follower.WithComplianceConfigOpt(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
+		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.FollowerEng.OnFinalizedBlock)
 
 		return builder.FollowerEng, nil
 	})
@@ -361,21 +361,7 @@ func (builder *FollowerServiceBuilder) initNetwork(nodeID module.Local,
 	topology network.Topology,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
-
-	cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-		Logger:                  builder.Logger,
-		SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
-		SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
-		DisablePenalty:          builder.AlspConfig.DisablePenalty,
-		AlspMetrics:             builder.Metrics.Network,
-		HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
-		NetworkType:             network.PublicNetwork,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not create conduit factory: %w", err)
-	}
-
-	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
 		Logger:              builder.Logger,
 		Codec:               cborcodec.NewCodec(),
 		Me:                  nodeID,
@@ -385,7 +371,17 @@ func (builder *FollowerServiceBuilder) initNetwork(nodeID module.Local,
 		Metrics:             networkMetrics,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
-		ConduitFactory:      cf,
+		ConduitFactory:      conduit.NewDefaultConduitFactory(),
+		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  builder.Logger,
+			SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
+			SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
+			DisablePenalty:          builder.AlspConfig.DisablePenalty,
+			HeartBeatInterval:       builder.AlspConfig.HearBeatInterval,
+			AlspMetrics:             builder.Metrics.Network,
+			HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
+			NetworkType:             network.PublicNetwork,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -593,7 +589,6 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 
 	for _, b := range builder.bootstrapIdentities {
 		pi, err := utils.PeerAddressInfo(*b)
-
 		if err != nil {
 			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
 		}
@@ -606,7 +601,8 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		builder.Metrics.Network,
 		builder.IdentityProvider,
 		builder.GossipSubConfig.LocalMeshLogInterval)
-	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector).
+
+	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector, builder.IdentityProvider, builder.Metrics.Network).
 		SetNetworkType(network.PublicNetwork).
 		SetMetrics(&p2pconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),

@@ -34,5 +34,10 @@ func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation
 		GraftValidationCfg:  graftCfg,
 		PruneValidationCfg:  pruneCfg,
 		IHaveValidationCfg:  iHaveCfg,
+		ClusterPrefixedMessageConfig: &validation.ClusterPrefixedMessageConfig{
+			ClusterPrefixHardThreshold:                   validation.DefaultClusterPrefixedMsgDropThreshold,
+			ClusterPrefixedControlMsgsReceivedCacheDecay: validation.DefaultClusterPrefixedControlMsgsReceivedCacheDecay,
+			ClusterPrefixedControlMsgsReceivedCacheSize:  validation.DefaultClusterPrefixedControlMsgsReceivedCacheSize,
+		},
 	}
 }

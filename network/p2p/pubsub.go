@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/module/component"
 )
 
@@ -80,6 +81,18 @@ type GossipSubRPCInspector interface {
 	// on ever RPC message received before the message is processed by libp2p.
 	// If this func returns any error the RPC message will be dropped.
 	Inspect(peer.ID, *pubsub.RPC) error
+}
+
+// GossipSubMsgValidationRpcInspector abstracts the general behavior of an app specific RPC inspector specifically
+// used to inspect and validate incoming. It is used to implement custom message validation logic. It is injected into
+// the GossipSubRouter and run on every incoming RPC message before the message is processed by libp2p. If the message
+// is invalid the RPC message will be dropped.
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+type GossipSubMsgValidationRpcInspector interface {
+	collection.ClusterEvents
+	GossipSubRPCInspector
 }
 
 // Topic is the abstraction of the underlying pubsub topic that is used by the Flow network.

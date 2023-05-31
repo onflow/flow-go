@@ -29,7 +29,7 @@ const (
 	// 10 times less than the default penalty value and the node will be disallow-listed after 10 times more misbehavior/sec.
 	DefaultPenaltyValue = 0.01 * misbehaviorDisallowListingThreshold // (Don't change this value)
 
-	// initialDecaySpeed is the initial decay speed of the penalty of a misbehaving node.
+	// InitialDecaySpeed is the initial decay speed of the penalty of a misbehaving node.
 	// The decay speed is applied on an arithmetic progression. The penalty value of the node is the first term of the
 	// progression and the decay speed is the common difference of the progression, i.e., p(n) = p(0) + n * d, where
 	// p(n) is the penalty value of the node after n decay intervals, p(0) is the initial penalty value of the node, and
