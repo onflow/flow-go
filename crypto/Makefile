@@ -10,20 +10,24 @@ else
 	RACE_FLAG :=
 endif
 
+# the crypto package uses BLST source files underneath which may use ADX insructions
 ADX_SUPPORT := $(shell if ([ -f "/proc/cpuinfo" ] && grep -q -e '^flags.*\badx\b' /proc/cpuinfo); then echo 1; else echo 0; fi)
+ifeq ($(ADX_SUPPORT), 1)
+# if ADX insructions are supported, default is to use a fast ADX BLST implementation 
+	CGO_FLAG :=
+else
+# if ADX insructions aren't supported, this CGO flags uses a slower non-ADX BLST implementation 
+	CGO_FLAG := CGO_CFLAGS="-O -D__BLST_PORTABLE__"
+endif
 
 # test all packages
 .PHONY: test
 test:
-# root package (it uses BLST source files underneath which requires testing for ADX support)
-ifeq ($(ADX_SUPPORT), 1)
-	go test -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,)
-else
-	CGO_CFLAGS="-O -D__BLST_PORTABLE__" go test -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,)
-endif
+# root package
+	$(CGO_FLAG) go test -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,)
 # sub packages
-	go test -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,) ./hash
-	go test -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,) ./random
+	$(CGO_FLAG) go test -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,) ./hash
+	$(CGO_FLAG) go test -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,) ./random
 
 .PHONY: docker-build
 docker-build:
