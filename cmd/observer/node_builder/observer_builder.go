@@ -39,6 +39,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
@@ -846,6 +847,28 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 }
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
+	secureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
+		builder.rpcConf.SecureGRPCListenAddr,
+		builder.rpcConf.MaxMsgSize,
+		grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials))
+
+	secureGrpcServer := grpcserver.NewGrpcServerBuilder(builder.Logger,
+		secureGrpcServerConfig,
+		builder.rpcMetricsEnabled,
+		builder.apiRatelimits,
+		builder.apiBurstlimits)
+
+	unsecureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
+		builder.rpcConf.UnsecureGRPCListenAddr,
+		builder.rpcConf.MaxMsgSize,
+	)
+
+	unsecureGrpcServer := grpcserver.NewGrpcServerBuilder(builder.Logger,
+		unsecureGrpcServerConfig,
+		builder.rpcMetricsEnabled,
+		builder.apiRatelimits,
+		builder.apiBurstlimits)
+
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
@@ -866,9 +889,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			0,
 			false,
 			builder.rpcMetricsEnabled,
-			builder.apiRatelimits,
-			builder.apiBurstlimits,
 			builder.Me,
+			secureGrpcServer,
+			unsecureGrpcServer,
 		)
 		if err != nil {
 			return nil, err
@@ -902,6 +925,26 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 		return builder.RpcEng, nil
+	})
+
+	// build secure grpc server
+	builder.Component("secure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		secureGrpcServer, err := secureGrpcServer.Build()
+		if err != nil {
+			return nil, err
+		}
+
+		return secureGrpcServer, nil
+	})
+
+	// build unsecure grpc server
+	builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		unsecureGrpcServer, err := unsecureGrpcServer.Build()
+		if err != nil {
+			return nil, err
+		}
+
+		return unsecureGrpcServer, nil
 	})
 }
 
