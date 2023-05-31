@@ -36,37 +36,4 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 	all := append(partners, internals...)
 
 	ensureUniformNodeWeightsPerRole(all)
-
-	// check collection committee threshold of internal nodes in each cluster
-	// although the assignmment is non-deterministic, the number of internal/partner
-	// nodes in each cluster is deterministic. The following check is only a sanity
-	// check about the number of internal/partner nodes in each cluster. The identites
-	// in each cluster do not matter for this sanity check.
-	_, clusters, err := constructClusterAssignment(partnerNodes, internalNodes)
-	if err != nil {
-		log.Fatal().Msgf("can't bootstrap because the cluster assignment failed: %s", err)
-	}
-	checkClusterConstraint(clusters, partners, internals)
-}
-
-// Sanity check about the number of internal/partner nodes in each cluster. The identites
-// in each cluster do not matter for this sanity check.
-func checkClusterConstraint(clusters flow.ClusterList, partners flow.IdentityList, internals flow.IdentityList) {
-	for i, cluster := range clusters {
-		var clusterPartnerCount, clusterInternalCount int
-		for _, node := range cluster {
-			if _, exists := partners.ByNodeID(node.NodeID); exists {
-				clusterPartnerCount++
-			}
-			if _, exists := internals.ByNodeID(node.NodeID); exists {
-				clusterInternalCount++
-			}
-		}
-		if clusterInternalCount <= clusterPartnerCount*2 {
-			log.Fatal().Msgf(
-				"can't bootstrap because cluster %d doesn't have enough internal nodes: "+
-					"(partners=%d, internals=%d, min_internals=%d)",
-				i, clusterPartnerCount, clusterInternalCount, clusterPartnerCount*2+1)
-		}
-	}
 }

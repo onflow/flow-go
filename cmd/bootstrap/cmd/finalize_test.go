@@ -107,8 +107,7 @@ func TestClusterAssignment(t *testing.T) {
 	// should not error
 	_, clusters, err := constructClusterAssignment(partners, internals)
 	require.NoError(t, err)
-	// should not log
-	checkClusterConstraint(clusters, model.ToIdentityList(partners), model.ToIdentityList(internals))
+	require.True(t, checkClusterConstraint(clusters, partners, internals))
 
 	// unhappy Path
 	internals = internals[:21] // reduce one internal node
@@ -117,4 +116,26 @@ func TestClusterAssignment(t *testing.T) {
 	require.Error(t, err)
 	// revert the flag value
 	flagCollectionClusters = tmp
+}
+
+// Check about the number of internal/partner nodes in each cluster. The identites
+// in each cluster do not matter for this check.
+func checkClusterConstraint(clusters flow.ClusterList, partnersInfo []model.NodeInfo, internalsInfo []model.NodeInfo) bool {
+	partners := model.ToIdentityList(partnersInfo)
+	internals := model.ToIdentityList(internalsInfo)
+	for _, cluster := range clusters {
+		var clusterPartnerCount, clusterInternalCount int
+		for _, node := range cluster {
+			if _, exists := partners.ByNodeID(node.NodeID); exists {
+				clusterPartnerCount++
+			}
+			if _, exists := internals.ByNodeID(node.NodeID); exists {
+				clusterInternalCount++
+			}
+		}
+		if clusterInternalCount <= clusterPartnerCount*2 {
+			return false
+		}
+	}
+	return true
 }
