@@ -1368,7 +1368,7 @@ func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 // 	require.True(t, shouldTriggerStateSync(20, 29, 10))
 // }
 
-func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecutionState) (*Engine, *storage.MockHeaders) {
+func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.ExecutionState) (*Engine, *storage.MockHeaders) {
 	log := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
 	tracer, err := trace.NewTracer(log, "test", "test", trace.SensitivityCaptureAll)

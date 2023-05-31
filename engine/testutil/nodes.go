@@ -121,7 +121,7 @@ func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity *flow.Ide
 
 	// creates state fixture and bootstrap it.
 	rootSnapshot := unittest.RootSnapshotFixtureWithChainID(participants, chainID)
-	stateFixture := CompleteStateFixture(t, log, metrics, tracer, rootSnapshot)
+	stateFixture := CompleteStateFixture(t, metrics, tracer, rootSnapshot)
 
 	require.NoError(t, err)
 	for _, option := range options {
