@@ -151,10 +151,10 @@ func main() {
 		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor, "adjustment of timeout duration in case of time out event")
 		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures, "number of failed rounds before first timeout increase")
 		flags.StringVar(&cruiseCtlTargetTransitionTimeFlag, "cruise-ctl-target-epoch-transition-time", cruiseCtlTargetTransitionTimeFlag, "the target epoch switchover schedule")
-		flags.DurationVar(&cruiseCtlFallbackProposalDurationFlag, "cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.FallbackProposalDuration.Load(), "the proposal duration value to use when the controller is disabled, or in epoch fallback mode. In those modes, this value has the same as the old `--block-rate-delay`")
+		flags.DurationVar(&cruiseCtlFallbackProposalDurationFlag, "cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.FallbackProposalDelay.Load(), "the proposal duration value to use when the controller is disabled, or in epoch fallback mode. In those modes, this value has the same as the old `--block-rate-delay`")
 		flags.DurationVar(&cruiseCtlMinViewDurationFlag, "cruise-ctl-min-view-duration", cruiseCtlConfig.MinViewDuration.Load(), "the lower bound of authority for the controller, when active. This is the smallest amount of time a view is allowed to take.")
 		flags.DurationVar(&cruiseCtlMaxViewDurationFlag, "cruise-ctl-max-view-duration", cruiseCtlConfig.MaxViewDuration.Load(), "the upper bound of authority for the controller when active. This is the largest amount of time a view is allowed to take.")
-		flags.BoolVar(&cruiseCtlEnabledFlag, "cruise-ctl-enabled", cruiseCtlConfig.Enabled.Load(), "whether the block time controller is enabled; when disabled, the FallbackProposalDuration is used")
+		flags.BoolVar(&cruiseCtlEnabledFlag, "cruise-ctl-enabled", cruiseCtlConfig.Enabled.Load(), "whether the block time controller is enabled; when disabled, the FallbackProposalDelay is used")
 		flags.UintVar(&chunkAlpha, "chunk-alpha", flow.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", flow.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
 		flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", flow.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
@@ -191,8 +191,8 @@ func main() {
 		if cruiseCtlEnabledFlag != cruiseCtlConfig.Enabled.Load() {
 			cruiseCtlConfig.Enabled.Store(cruiseCtlEnabledFlag)
 		}
-		if cruiseCtlFallbackProposalDurationFlag != cruiseCtlConfig.FallbackProposalDuration.Load() {
-			cruiseCtlConfig.FallbackProposalDuration.Store(cruiseCtlFallbackProposalDurationFlag)
+		if cruiseCtlFallbackProposalDurationFlag != cruiseCtlConfig.FallbackProposalDelay.Load() {
+			cruiseCtlConfig.FallbackProposalDelay.Store(cruiseCtlFallbackProposalDurationFlag)
 		}
 		if cruiseCtlMinViewDurationFlag != cruiseCtlConfig.MinViewDuration.Load() {
 			cruiseCtlConfig.MinViewDuration.Store(cruiseCtlMinViewDurationFlag)
