@@ -17,12 +17,12 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.2.0
-	github.com/onflow/cadence v0.38.2-0.20230505171606-1f47fbc00e0d
+	github.com/onflow/cadence v0.39.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.3
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
 	github.com/onflow/flow-emulator v0.48.1-0.20230502171545-1c91ebbf6870
 	github.com/onflow/flow-go v0.30.1-0.20230501182206-6a911be58b92
-	github.com/onflow/flow-go-sdk v0.40.0
+	github.com/onflow/flow-go-sdk v0.41.0
 	github.com/onflow/flow-go/crypto v0.24.7
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230428213521-89bcc9e8517e
@@ -193,6 +193,7 @@ require (
 	github.com/libp2p/go-reuseport v0.2.0 // indirect
 	github.com/libp2p/go-yamux/v4 v4.0.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
+	github.com/logrusorgru/aurora/v4 v4.0.0 // indirect
 	github.com/lucas-clemente/quic-go v0.31.1 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/m4ksio/wal v1.0.1-0.20221209164835-154a17396e4c // indirect
