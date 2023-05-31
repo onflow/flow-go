@@ -8,6 +8,24 @@ else
 	RACE_FLAG :=
 endif
 
+# `ADX_SUPPORT` is 1 if ADX instructions are supported and 0 otherwise.
+ifeq ($(shell uname -s),Linux)
+# detect ADX support on the CURRENT linux machine.
+	ADX_SUPPORT := $(shell if ([ -f "/proc/cpuinfo" ] && grep -q -e '^flags.*\badx\b' /proc/cpuinfo); then echo 1; else echo 0; fi)
+else
+# on non-linux machines, set the flag to 1 by default
+	ADX_SUPPORT := 1
+endif
+
+# the crypto package uses BLST source files underneath which may use ADX insructions.
+ifeq ($(ADX_SUPPORT), 1)
+# if ADX insructions are supported, default is to use a fast ADX BLST implementation 
+	CGO_FLAG :=
+else
+# if ADX insructions aren't supported, this CGO flags uses a slower non-ADX BLST implementation 
+	CGO_FLAG := CGO_CFLAGS="-O -D__BLST_PORTABLE__"
+endif
+
 # Run the integration test suite
 .PHONY: integration-test
 integration-test: access-tests ghost-tests mvp-tests execution-tests verification-tests upgrades-tests collection-tests epochs-tests network-tests consensus-tests
@@ -22,53 +40,53 @@ ci-integration-test: access-tests ghost-tests mvp-tests epochs-tests consensus-t
 # Run unit tests for test utilities in this module
 .PHONY: test
 test:
-	go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) `go list ./... | grep -v -e integration/tests`
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) `go list ./... | grep -v -e integration/tests`
 
 .PHONY: access-tests
 access-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/access/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/access/...
 
 .PHONY: collection-tests
 collection-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/collection/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/collection/...
 
 .PHONY: consensus-tests
 consensus-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/consensus/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/consensus/...
 
 .PHONY: epochs-tests
 epochs-tests:
 	# Use a higher timeout of 20m for the suite of tests which span full epochs
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -timeout 30m ./tests/epochs/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -timeout 30m ./tests/epochs/...
 
 .PHONY: ghost-tests
 ghost-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/ghost/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/ghost/...
 
 .PHONY: mvp-tests
 mvp-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/mvp/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/mvp/...
 
 .PHONY: execution-tests
 execution-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/execution/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/execution/...
 
 .PHONY: verification-tests
 verification-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/verification/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/verification/...
 
 .PHONY: upgrades-tests
 upgrades-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/upgrades/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/upgrades/...
 
 .PHONY: network-tests
 network-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/network/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/network/...
 
 # BFT tests need to be run sequentially (-p 1) due to interference between different Docker networks when tests are run in parallel
 .PHONY: bft-tests
 bft-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/bft/... -p 1
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/bft/... -p 1
 
 
 ############################################################################################

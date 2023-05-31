@@ -29,6 +29,9 @@ COPY . .
 FROM build-env as build-production
 WORKDIR /app
 
+# CGO_FLAG can be overwritten
+ARG CGO_FLAG
+
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
 # Also, allow ssh access
@@ -36,7 +39,7 @@ RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=ssh \
     cd integration && \
-    CGO_ENABLED=1 go build -ldflags "-extldflags -static" -o ./app ./${TARGET}
+    CGO_ENABLED=1 ${CGO_FLAG} go build -ldflags "-extldflags -static" -o ./app ./${TARGET}
 
 RUN mv /app/integration/app /app/app
 
