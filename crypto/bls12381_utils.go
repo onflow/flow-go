@@ -4,7 +4,7 @@ package crypto
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
 // and the BLS distributed key generation protocols
 
-// #cgo CFLAGS: -I${SRCDIR}/ -I${SRCDIR}/blst_src -I${SRCDIR}/blst_src/build -O -D__BLST_PORTABLE__ -D__BLST_CGO__ -fno-builtin-memcpy -fno-builtin-memset -Wall -Wno-unused-function -Wno-unused-macros
+// #cgo CFLAGS: -I${SRCDIR}/ -I${SRCDIR}/blst_src -I${SRCDIR}/blst_src/build -D__BLST_CGO__ -fno-builtin-memcpy -fno-builtin-memset -Wall -Wno-unused-function -Wno-unused-macros
 // #cgo amd64 CFLAGS: -D__ADX__ -mno-avx
 // #cgo mips64 mips64le ppc64 ppc64le riscv64 s390x CFLAGS: -D__BLST_NO_ASM__
 // #include "bls12381_utils.h"
