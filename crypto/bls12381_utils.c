@@ -792,17 +792,23 @@ ERROR E2_read_bytes(E2* a, const byte *bin, const int len) {
     if (ret != VALID) {
         return ret;
     }
+    Fp2* a_x = &(a->x);
+    Fp_to_montg(&real(a_x), &real(a_x));
+    Fp_to_montg(&imag(a_x), &imag(a_x));
 
     // set a.z to 1
     Fp2* a_z = &(a->z);
     Fp_copy(&real(a_z), &BLS12_381_pR);
     Fp_set_zero(&imag(a_z));   
 
+    Fp2* a_y = &(a->y);
     if (G2_SERIALIZATION == UNCOMPRESSED) {
-        ret = Fp2_read_bytes(&(a->y), bin + Fp2_BYTES, sizeof(a->y));
+        ret = Fp2_read_bytes(a_y, bin + Fp2_BYTES, sizeof(a->y));
         if (ret != VALID){ 
             return ret;
         }
+        Fp_to_montg(&real(a_y), &real(a_y));
+        Fp_to_montg(&imag(a_y), &imag(a_y));
         // check read point is on curve
         if (!E2_affine_on_curve(a)) { 
             return POINT_NOT_ON_CURVE;
@@ -811,14 +817,9 @@ ERROR E2_read_bytes(E2* a, const byte *bin, const int len) {
     }
     
     // compute the possible square root
-    Fp2* a_x = &(a->x);
-    Fp_to_montg(&real(a_x), &real(a_x));
-    Fp_to_montg(&imag(a_x), &imag(a_x));
-
-    Fp2* a_y = &(a->y);
     Fp2_squ_montg(a_y, a_x);
-    Fp2_mul_montg(a_y, a_y, a_x);
-    Fp2_add(a_y, a_y, &B_E2);          // B_E2 is already in Montg form             
+    Fp2_mul_montg(a_y, a_y, a_x);     // x^3
+    Fp2_add(a_y, a_y, &B_E2);         // B_E2 is already in Montg form             
     if (!Fp2_sqrt_montg(a_y, a_y))    // check whether x^3+b is a quadratic residue
         return POINT_NOT_ON_CURVE; 
 
@@ -976,33 +977,19 @@ void unsafe_map_bytes_to_G2(E2* p, const byte* bytes, int len) {
     G2_mult_gen(p, &log);
 }
 
-// attempts to map `bytes` to a point in E2\G2 and stores it in p.
-// `len` should be at least G2_SER_BYTES. It returns VALID only if mapping 
-// succeeds.
-// For now, function only works when E2 serialization is compressed.
+// maps `bytes` to a point in E2\G2 and stores it in p.
+// `len` should be at least 192. 
 // this is a testing tool only, it should not be used in any protocol!
-ERROR unsafe_map_bytes_to_G2complement(E2* p, const byte* bytes, int len) {
-    assert(G2_SERIALIZATION == COMPRESSED);
-    assert(len >= G2_SER_BYTES);
-
-    // attempt to deserilize a compressed E2 point from input bytes
-    // after fixing the header 2 bits
-    byte copy[G2_SER_BYTES];
-    memcpy(copy, bytes, sizeof(copy));
-    copy[0] |= 1<<7;        // set compression bit
-    copy[0] &= ~(1<<6);     // clear infinity bit - point is not infinity
-
-    ERROR ser = E2_read_bytes(p, copy, G2_SER_BYTES);
-    if (ser != VALID) {
-        return ser;
-    }
-
-    // map the point to E2\G2 by clearing G2 order
-    E2_mult(p, p, (const Fr*)BLS12_381_r);
-    E2_to_affine(p, p);
-
-    assert(E2_affine_on_curve(p));  // sanity check to make sure p is in E2
-    return VALID;
+void unsafe_map_bytes_to_G2complement(E2* p, const byte* bytes, int len) {
+    assert(len >= 192);
+    Fp2 u;
+    map_96_bytes_to_Fp(&real(&u), bytes, 96);
+    map_96_bytes_to_Fp(&imag(&u), bytes+96, 96);
+    // map to E2's isogenous and then to E2
+    map_to_isogenous_E2((POINTonE2 *)p, u);
+    isogeny_map_to_E2((POINTonE2 *)p, (POINTonE2 *)p);
+    // clear G2 order
+    E2_mult(p, p, (Fr*)&BLS12_381_r);
 }
 
 // ------------------- Pairing utilities 

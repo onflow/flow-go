@@ -29,7 +29,7 @@ func TestBLSMainMethods(t *testing.T) {
 	//  - signature decoding only accepts reduced x-coordinates to avoid signature malleability
 
 	t.Run("invalid x coordinate larger than p", func(t *testing.T) {
-		if !isG1Compressed() {
+		if !isG1Compressed() || !isG2Compressed() {
 			t.Skip()
 		}
 		msg, err := hex.DecodeString("7f26ba692dc2da7ff828ef4675ff1cd6ab855fca0637b6dab295f1df8e51bc8bb1b8f0c6610aabd486cf1f098f2ddbc6691d94e10f928816f890a3d366ce46249836a595c7ea1828af52e899ba2ab627ab667113bb563918c5d5a787c414399487b4e3a7")
@@ -221,6 +221,9 @@ func TestBLSEncodeDecode(t *testing.T) {
 	// may implicitely rely on the property.
 
 	t.Run("public key with non-reduced coordinates", func(t *testing.T) {
+		if !isG2Compressed() {
+			t.Skip()
+		}
 		// valid pk with x[0] < p and x[1] < p
 		validPk, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b8038360809700d36d761cb266af6babe9a069dc7364d3502e84536bd893d5f09ec2dd4f07cae1f8a178ffacc450f9b9a2")
 		require.NoError(t, err)

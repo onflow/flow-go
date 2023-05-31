@@ -295,9 +295,8 @@ func unsafeMapToG2(pt *pointE2, seed []byte) {
 
 // unsafeMapToG2Complement is a test function, it wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in E2\G2 and stores it in input point.
-func unsafeMapToG2Complement(pt *pointE2, seed []byte) bool {
-	res := C.unsafe_map_bytes_to_G2complement((*C.E2)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
-	return int(res) == valid
+func unsafeMapToG2Complement(pt *pointE2, seed []byte) {
+	C.unsafe_map_bytes_to_G2complement((*C.E2)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
 }
 
 // This is only a TEST function.

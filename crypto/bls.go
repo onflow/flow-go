@@ -286,7 +286,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 const invalidBLSSignatureHeader = byte(0xE0)
 
 // BLSInvalidSignature returns an invalid signature that fails when verified
-// with any message and public key.
+// with any message and public key, which can be used for testing.
 //
 // The signature bytes represent an invalid serialization of a point which
 // makes the verification fail early. The verification would return (false, nil).
@@ -475,15 +475,17 @@ func (a *pubKeyBLSBLS12381) EncodeCompressed() []byte {
 	if !isG2Compressed() {
 		panic("library is not configured to use compressed public key serialization")
 	}
+	return a.Encode()
+}
+
+// Encode returns a byte encoding of the public key (a G2 point).
+// The current encoding is a compressed serialization of G2 following [zcash] https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-
+//
+// The function should evolve in the future to support uncompressed compresion too.
+func (a *pubKeyBLSBLS12381) Encode() []byte {
 	dest := make([]byte, g2BytesLen)
 	writePointE2(dest, &a.point)
 	return dest
-}
-
-// Encode returns a byte encoding of the public key.
-// Since we use a compressed encoding by default, this delegates to EncodeCompressed
-func (a *pubKeyBLSBLS12381) Encode() []byte {
-	return a.EncodeCompressed()
 }
 
 // Equals checks is two public keys are equal

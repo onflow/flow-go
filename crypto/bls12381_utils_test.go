@@ -22,6 +22,9 @@ func TestScalarMultBLS12381(t *testing.T) {
 	// Note that generator and random point multiplications
 	// are implemented with the same algorithm
 	t.Run("G1", func(t *testing.T) {
+		if !isG1Compressed() {
+			t.Skip()
+		}
 		var p pointE1
 		generatorScalarMultG1(&p, &expo)
 		expected, err := hex.DecodeString("96484ca50719f5d2533047960878b6bae8289646c0f00a942a1e6992be9981a9e0c7a51e9918f9b19d178cf04a8018a4")
@@ -35,6 +38,9 @@ func TestScalarMultBLS12381(t *testing.T) {
 	// Note that generator and random point multiplications
 	// are implemented with the same algorithm
 	t.Run("G2", func(t *testing.T) {
+		if !isG2Compressed() {
+			t.Skip()
+		}
 		var p pointE2
 		generatorScalarMultG2(&p, &expo)
 		expected, err := hex.DecodeString("b35f5043f166848805b98da62dcb9c5d2f25e497bd0d9c461d4a00d19e4e67cc1e813de3c99479d5a2c62fb754fd7df40c4fd60c46834c8ae665343a3ff7dc3cc929de34ad62b7b55974f4e3fd20990d3e564b96e4d33de87716052d58cf823e")
@@ -81,6 +87,9 @@ func BenchmarkScalarMult(b *testing.B) {
 
 // Sanity-check of the map-to-G1 with regards to the IETF draft hash-to-curve
 func TestMapToG1(t *testing.T) {
+	if !isG1Compressed() {
+		t.Skip()
+	}
 	// test vectors from https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-14#appendix-J.9.1
 	dst := []byte("QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_")
 
@@ -130,7 +139,7 @@ func BenchmarkMapToG1(b *testing.B) {
 // test subgroup membership check in G1 and G2
 func TestSubgroupCheck(t *testing.T) {
 	prg := getPRG(t)
-	seed := make([]byte, g2BytesLen)
+	seed := make([]byte, 192)
 	_, err := prg.Read(seed)
 	require.NoError(t, err)
 
@@ -148,12 +157,7 @@ func TestSubgroupCheck(t *testing.T) {
 		unsafeMapToG2(&p, seed) // point in G2
 		assert.True(t, checkMembershipG2(&p))
 
-		inG2 := false
-		for !inG2 {
-			_, err := prg.Read(seed)
-			require.NoError(t, err)
-			inG2 = unsafeMapToG2Complement(&p, seed) // point in E2\G2
-		}
+		unsafeMapToG2Complement(&p, seed) // point in E2\G2
 		assert.False(t, checkMembershipG2(&p))
 	})
 }
