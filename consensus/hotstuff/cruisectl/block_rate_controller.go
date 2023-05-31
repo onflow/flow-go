@@ -177,6 +177,7 @@ func (ctl *BlockTimeController) initProposalTiming(curView uint64) {
 	// When disabled, or in epoch fallback, use fallback timing (constant ProposalDuration)
 	if ctl.epochFallbackTriggered || !ctl.config.Enabled.Load() {
 		ctl.storeProposalTiming(newFallbackTiming(curView, time.Now().UTC(), ctl.config.FallbackProposalDuration.Load()))
+		return
 	}
 	// Otherwise, before we observe any view changes, publish blocks immediately
 	ctl.storeProposalTiming(newPublishImmediately(curView, time.Now().UTC()))

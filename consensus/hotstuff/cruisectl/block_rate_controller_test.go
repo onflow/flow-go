@@ -108,9 +108,14 @@ func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
 	// at initialization, controller should be set up to release blocks without delay
 	controllerTiming := bs.ctl.GetProposalTiming()
 	now := time.Now().UTC()
-	assert.Equal(bs.T(), now, controllerTiming.TargetPublicationTime(7, now, unittest.IdentifierFixture()))
 
-	// if epoch fallback is triggered, we don't care about anything else
+	if bs.ctl.epochFallbackTriggered || !bs.ctl.config.Enabled.Load() {
+		// if epoch fallback is triggered or controller is disabled, use fallback timing
+		assert.Equal(bs.T(), now.Add(bs.ctl.config.FallbackProposalDuration.Load()), controllerTiming.TargetPublicationTime(7, now, unittest.IdentifierFixture()))
+	} else {
+		// otherwise should publish immediately
+		assert.Equal(bs.T(), now, controllerTiming.TargetPublicationTime(7, now, unittest.IdentifierFixture()))
+	}
 	if bs.ctl.epochFallbackTriggered {
 		return
 	}
@@ -288,9 +293,72 @@ func (bs *BlockRateControllerSuite) TestOnBlockIncorporated_UpdateProposalDelay(
 	assert.Equal(bs.T(), nextProposalDelay, bs.ctl.GetProposalTiming())
 }
 
-// TestOnBlockIncorporated_EpochTransition tests that a view change into the next epoch
+// TestEnableDisable tests that the controller responds to enabling and disabling.
+func (bs *BlockRateControllerSuite) TestEnableDisable() {
+	// start in a disabled state
+	err := bs.config.SetEnabled(false)
+	require.NoError(bs.T(), err)
+	bs.CreateAndStartController()
+	defer bs.StopController()
+
+	now := time.Now()
+
+	initialControllerState := captureControllerStateDigest(bs.ctl)
+	initialProposalDelay := bs.ctl.GetProposalTiming()
+	// the initial proposal timing should use fallback timing
+	assert.Equal(bs.T(), now.Add(bs.ctl.config.FallbackProposalDuration.Load()), initialProposalDelay.TargetPublicationTime(bs.initialView+1, now, unittest.IdentifierFixture()))
+
+	block := model.BlockFromFlow(unittest.BlockHeaderFixture(unittest.HeaderWithView(bs.initialView + 1)))
+	bs.ctl.OnBlockIncorporated(block)
+	require.Eventually(bs.T(), func() bool {
+		return bs.ctl.GetProposalTiming().ObservationView() > bs.initialView
+	}, time.Second, time.Millisecond)
+	secondProposalDelay := bs.ctl.GetProposalTiming()
+
+	// new measurement should not change GetProposalTiming
+	assert.Equal(bs.T(),
+		initialProposalDelay.TargetPublicationTime(bs.initialView+2, now, unittest.IdentifierFixture()),
+		secondProposalDelay.TargetPublicationTime(bs.initialView+2, now, block.BlockID))
+
+	// now, enable the controller
+	err = bs.ctl.config.SetEnabled(true)
+	require.NoError(bs.T(), err)
+
+	// send another block
+	block = model.BlockFromFlow(unittest.BlockHeaderFixture(unittest.HeaderWithView(bs.initialView + 2)))
+	bs.ctl.OnBlockIncorporated(block)
+	require.Eventually(bs.T(), func() bool {
+		return bs.ctl.GetProposalTiming().ObservationView() > bs.initialView
+	}, time.Second, time.Millisecond)
+
+	thirdControllerState := captureControllerStateDigest(bs.ctl)
+	thirdProposalDelay := bs.ctl.GetProposalTiming()
+
+	// new measurement should change GetProposalTiming
+	bs.SanityCheckSubsequentMeasurements(initialControllerState, thirdControllerState, false)
+	assert.NotEqual(bs.T(),
+		initialProposalDelay.TargetPublicationTime(bs.initialView+3, now, unittest.IdentifierFixture()),
+		thirdProposalDelay.TargetPublicationTime(bs.initialView+3, now, block.BlockID))
+
+}
+
+// TestOnBlockIncorporated_EpochTransition_Enabled tests epoch transition with controller enabled.
+func (bs *BlockRateControllerSuite) TestOnBlockIncorporated_EpochTransition_Enabled() {
+	err := bs.ctl.config.SetEnabled(true)
+	require.NoError(bs.T(), err)
+	bs.testOnBlockIncorporated_EpochTransition()
+}
+
+// TestOnBlockIncorporated_EpochTransition_Disabled tests epoch transition with controller disabled.
+func (bs *BlockRateControllerSuite) TestOnBlockIncorporated_EpochTransition_Disabled() {
+	err := bs.ctl.config.SetEnabled(false)
+	require.NoError(bs.T(), err)
+	bs.testOnBlockIncorporated_EpochTransition()
+}
+
+// testOnBlockIncorporated_EpochTransition tests that a view change into the next epoch
 // updates the local state to reflect the new epoch.
-func (bs *BlockRateControllerSuite) TestOnBlockIncorporated_EpochTransition() {
+func (bs *BlockRateControllerSuite) testOnBlockIncorporated_EpochTransition() {
 	nextEpoch := mockprotocol.NewEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView+100_000, nil)
