@@ -87,3 +87,34 @@ func (c *ControllerParams) alpha() float64 {
 func (c *ControllerParams) beta() float64 {
 	return 1.0 / float64(c.N_itg)
 }
+
+func (ctl *TimingConfig) GetFallbackProposalDuration() time.Duration {
+	return ctl.FallbackProposalDuration.Load()
+}
+func (ctl *TimingConfig) GetMaxViewDuration() time.Duration {
+	return ctl.MaxViewDuration.Load()
+}
+func (ctl *TimingConfig) GetMinViewDuration() time.Duration {
+	return ctl.MinViewDuration.Load()
+}
+func (ctl *TimingConfig) GetEnabled() bool {
+	return ctl.Enabled.Load()
+}
+
+func (ctl *TimingConfig) SetFallbackProposalDuration(dur time.Duration) error {
+	ctl.FallbackProposalDuration.Store(dur)
+	return nil
+}
+func (ctl *TimingConfig) SetMaxViewDuration(dur time.Duration) error {
+	ctl.MaxViewDuration.Store(dur)
+	return nil
+}
+func (ctl *TimingConfig) SetMinViewDuration(dur time.Duration) error {
+	ctl.MinViewDuration.Store(dur)
+	return nil
+
+}
+func (ctl *TimingConfig) SetEnabled(enabled bool) error {
+	ctl.Enabled.Store(enabled)
+	return nil
+}

@@ -431,36 +431,3 @@ func (ctl *BlockTimeController) EpochSetupPhaseStarted(_ uint64, first *flow.Hea
 func (ctl *BlockTimeController) EpochEmergencyFallbackTriggered() {
 	ctl.epochFallbacks <- struct{}{}
 }
-
-/* =================== DYNAMIC CONFIG UPDATES =================== */
-
-func (ctl *BlockTimeController) GetFallbackProposalDuration() time.Duration {
-	return ctl.config.FallbackProposalDuration.Load()
-}
-func (ctl *BlockTimeController) GetMaxViewDuration() time.Duration {
-	return ctl.config.MaxViewDuration.Load()
-}
-func (ctl *BlockTimeController) GetMinViewDuration() time.Duration {
-	return ctl.config.MinViewDuration.Load()
-}
-func (ctl *BlockTimeController) GetEnabled() bool {
-	return ctl.config.Enabled.Load()
-}
-
-func (ctl *BlockTimeController) SetFallbackProposalDuration(dur time.Duration) error {
-	ctl.config.FallbackProposalDuration.Store(dur)
-	return nil
-}
-func (ctl *BlockTimeController) SetMaxViewDuration(dur time.Duration) error {
-	ctl.config.MaxViewDuration.Store(dur)
-	return nil
-}
-func (ctl *BlockTimeController) SetMinViewDuration(dur time.Duration) error {
-	ctl.config.MinViewDuration.Store(dur)
-	return nil
-
-}
-func (ctl *BlockTimeController) SetEnabled(enabled bool) error {
-	ctl.config.Enabled.Store(enabled)
-	return nil
-}

@@ -700,19 +700,19 @@ func main() {
 			proposalDurProvider = ctl
 
 			// set up admin commands for dynamically updating configs
-			err = node.ConfigManager.RegisterBoolConfig("cruise-ctl-enabled", ctl.GetEnabled, ctl.SetEnabled)
+			err = node.ConfigManager.RegisterBoolConfig("cruise-ctl-enabled", cruiseCtlConfig.GetEnabled, cruiseCtlConfig.SetEnabled)
 			if err != nil {
 				return nil, err
 			}
-			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-fallback-proposal-duration", ctl.GetFallbackProposalDuration, ctl.SetFallbackProposalDuration)
+			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.GetFallbackProposalDuration, cruiseCtlConfig.SetFallbackProposalDuration)
 			if err != nil {
 				return nil, err
 			}
-			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-min-view-duration", ctl.GetMinViewDuration, ctl.SetMinViewDuration)
+			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-min-view-duration", cruiseCtlConfig.GetMinViewDuration, cruiseCtlConfig.SetMinViewDuration)
 			if err != nil {
 				return nil, err
 			}
-			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-max-view-duration", ctl.GetMaxViewDuration, ctl.SetMaxViewDuration)
+			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-max-view-duration", cruiseCtlConfig.GetMaxViewDuration, cruiseCtlConfig.SetMaxViewDuration)
 			if err != nil {
 				return nil, err
 			}
