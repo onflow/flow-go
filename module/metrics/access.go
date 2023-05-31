@@ -5,8 +5,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	metricsProm "github.com/slok/go-http-metrics/metrics/prometheus"
 
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 )
 
 type AccessCollectorOpts func(*AccessCollector)
