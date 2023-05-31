@@ -38,29 +38,30 @@ import (
 type Engine struct {
 	psEvents.Noop // satisfy protocol events consumer interface
 
-	unit                   *engine.Unit
-	log                    zerolog.Logger
-	me                     module.Local
-	request                module.Requester // used to request collections
-	state                  protocol.State
-	headers                storage.Headers // see comments on getHeaderByHeight for why we need it
-	blocks                 storage.Blocks
-	collections            storage.Collections
-	events                 storage.Events
-	serviceEvents          storage.ServiceEvents
-	transactionResults     storage.TransactionResults
-	computationManager     computation.ComputationManager
-	providerEngine         provider.ProviderEngine
-	mempool                *Mempool
-	execState              state.ExecutionState
-	metrics                module.ExecutionMetrics
-	maxCollectionHeight    uint64
-	tracer                 module.Tracer
-	extensiveLogging       bool
-	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
-	executionDataPruner    *pruner.Pruner
-	uploader               *uploader.Manager
-	stopControl            *StopControl
+	unit                           *engine.Unit
+	log                            zerolog.Logger
+	me                             module.Local
+	request                        module.Requester // used to request collections
+	state                          protocol.State
+	headers                        storage.Headers // see comments on getHeaderByHeight for why we need it
+	blocks                         storage.Blocks
+	collections                    storage.Collections
+	events                         storage.Events
+	serviceEvents                  storage.ServiceEvents
+	transactionResults             storage.TransactionResults
+	computationManager             computation.ComputationManager
+	providerEngine                 provider.ProviderEngine
+	mempool                        *Mempool
+	execState                      state.ExecutionState
+	metrics                        module.ExecutionMetrics
+	maxCollectionHeight            uint64
+	tracer                         module.Tracer
+	extensiveLogging               bool
+	checkAuthorizedAtBlock         func(blockID flow.Identifier) (bool, error)
+	executionDataPruner            *pruner.Pruner
+	uploader                       *uploader.Manager
+	stopControl                    *StopControl
+	finalizedAndExecutedDispatcher FinalizedAndExecutedDispatcher
 }
 
 func New(
@@ -85,35 +86,37 @@ func New(
 	pruner *pruner.Pruner,
 	uploader *uploader.Manager,
 	stopControl *StopControl,
+	finalizedAndExecutedDispatcher FinalizedAndExecutedDispatcher,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:                   engine.NewUnit(),
-		log:                    log,
-		me:                     me,
-		request:                request,
-		state:                  state,
-		headers:                headers,
-		blocks:                 blocks,
-		collections:            collections,
-		events:                 events,
-		serviceEvents:          serviceEvents,
-		transactionResults:     transactionResults,
-		computationManager:     executionEngine,
-		providerEngine:         providerEngine,
-		mempool:                mempool,
-		execState:              execState,
-		metrics:                metrics,
-		maxCollectionHeight:    0,
-		tracer:                 tracer,
-		extensiveLogging:       extLog,
-		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
-		executionDataPruner:    pruner,
-		uploader:               uploader,
-		stopControl:            stopControl,
+		unit:                           engine.NewUnit(),
+		log:                            log,
+		me:                             me,
+		request:                        request,
+		state:                          state,
+		headers:                        headers,
+		blocks:                         blocks,
+		collections:                    collections,
+		events:                         events,
+		serviceEvents:                  serviceEvents,
+		transactionResults:             transactionResults,
+		computationManager:             executionEngine,
+		providerEngine:                 providerEngine,
+		mempool:                        mempool,
+		execState:                      execState,
+		metrics:                        metrics,
+		maxCollectionHeight:            0,
+		tracer:                         tracer,
+		extensiveLogging:               extLog,
+		checkAuthorizedAtBlock:         checkAuthorizedAtBlock,
+		executionDataPruner:            pruner,
+		uploader:                       uploader,
+		stopControl:                    stopControl,
+		finalizedAndExecutedDispatcher: finalizedAndExecutedDispatcher,
 	}
 
 	return &eng, nil
@@ -461,6 +464,13 @@ func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 // Method gets called for every finalized block
 func (e *Engine) BlockFinalized(h *flow.Header) {
 	e.stopControl.blockFinalized(e.unit.Ctx(), e.execState, h)
+	err := e.finalizedAndExecutedDispatcher.OnBlockFinalized(e.unit.Ctx(), h)
+	if err != nil {
+		e.log.Error().
+			Err(err).
+			Stringer("block", h.ID()).
+			Msg("failed to process BlockFinalized")
+	}
 }
 
 // Main handling
@@ -704,9 +714,15 @@ func (e *Engine) executeBlock(
 		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
 	}
 
-	e.unit.Ctx()
-
 	e.stopControl.blockExecuted(executableBlock.Block.Header)
+
+	err = e.finalizedAndExecutedDispatcher.OnBlockExecuted(
+		e.unit.Ctx(),
+		executableBlock.Block.Header,
+	)
+	if err != nil {
+		lg.Err(err).Msg("failed to process block execution")
+	}
 }
 
 // we've executed the block, now we need to check:

@@ -3,6 +3,7 @@ package testutil
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"path/filepath"
@@ -94,6 +95,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/state/protocol/util"
+	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -680,6 +682,45 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	latestExecutedHeight, _, err := execState.GetHighestExecutedBlockID(context.TODO())
 	require.NoError(t, err)
 
+	latestFinalizedHeader, err :=
+		protoState.Final().Head()
+	require.NoError(t, err)
+
+	lastExecutedHeight, _, err :=
+		execState.GetHighestExecutedBlockID(context.TODO())
+	require.NoError(t, err, "cannot get the latest executed block height "+
+		"for the FinalizedAndExecutedDispatcher")
+
+	latestExecutedAndFinalizedHeight := lastExecutedHeight
+	// take the minimum of the two heights
+	if latestFinalizedHeader.Height < latestExecutedAndFinalizedHeight {
+		latestExecutedAndFinalizedHeight = latestFinalizedHeader.Height
+	}
+
+	isBlockFinalized := func(ctx context.Context, h *flow.Header) (bool, error) {
+		// This uses the fact that only finalized headers can be retrieved by height.
+		finalizedHeader, err := node.Headers.ByHeight(h.Height)
+		if err != nil {
+			if errors.Is(err, storageerr.ErrNotFound) {
+				return false, nil
+			}
+			return false, err
+		}
+
+		return finalizedHeader.View == h.View, nil
+	}
+
+	isBlockExecuted := func(ctx context.Context, h *flow.Header) (bool, error) {
+		return executionState.IsBlockExecuted(ctx, execState, h.ID())
+	}
+
+	finalizedAndExecutedDispatcher :=
+		ingestion.NewFinalizedAndExecutedDispatcher(
+			latestExecutedAndFinalizedHeight,
+			isBlockFinalized,
+			isBlockExecuted,
+		)
+
 	// disabled by default
 	uploader := uploader.NewManager(node.Tracer)
 
@@ -705,7 +746,12 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		checkAuthorizedAtBlock,
 		nil,
 		uploader,
-		ingestion.NewStopControl(node.Log.With().Str("compontent", "stop_control").Logger(), false, latestExecutedHeight),
+		ingestion.NewStopControl(
+			node.Log.With().Str("compontent", "stop_control").Logger(),
+			false,
+			latestExecutedHeight,
+		),
+		finalizedAndExecutedDispatcher,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)

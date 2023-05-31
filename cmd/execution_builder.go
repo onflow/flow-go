@@ -108,38 +108,39 @@ type ExecutionNode struct {
 	builder *FlowNodeBuilder // This is needed for accessing the ShutdownFunc
 	exeConf *ExecutionConfig
 
-	collector              module.ExecutionMetrics
-	executionState         state.ExecutionState
-	followerState          protocol.FollowerState
-	committee              hotstuff.DynamicCommittee
-	ledgerStorage          *ledger.Ledger
-	events                 *storage.Events
-	serviceEvents          *storage.ServiceEvents
-	txResults              *storage.TransactionResults
-	results                *storage.ExecutionResults
-	myReceipts             *storage.MyExecutionReceipts
-	providerEngine         *exeprovider.Engine
-	checkerEng             *checker.Engine
-	syncCore               *chainsync.Core
-	syncEngine             *synchronization.Engine
-	followerCore           *hotstuff.FollowerLoop        // follower hotstuff logic
-	followerEng            *followereng.ComplianceEngine // to sync blocks from consensus nodes
-	computationManager     *computation.Manager
-	collectionRequester    *requester.Engine
-	ingestionEng           *ingestion.Engine
-	followerDistributor    *pubsub.FollowerDistributor
-	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
-	diskWAL                *wal.DiskWAL
-	blockDataUploader      *uploader.Manager
-	executionDataStore     execution_data.ExecutionDataStore
-	toTriggerCheckpoint    *atomic.Bool           // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
-	stopControl            *ingestion.StopControl // stop the node at given block height
-	executionDataDatastore *badger.Datastore
-	executionDataPruner    *pruner.Pruner
-	executionDataBlobstore blobs.Blobstore
-	executionDataTracker   tracker.Storage
-	blobService            network.BlobService
-	blobserviceDependable  *module.ProxiedReadyDoneAware
+	collector                      module.ExecutionMetrics
+	executionState                 state.ExecutionState
+	followerState                  protocol.FollowerState
+	committee                      hotstuff.DynamicCommittee
+	ledgerStorage                  *ledger.Ledger
+	events                         *storage.Events
+	serviceEvents                  *storage.ServiceEvents
+	txResults                      *storage.TransactionResults
+	results                        *storage.ExecutionResults
+	myReceipts                     *storage.MyExecutionReceipts
+	providerEngine                 *exeprovider.Engine
+	checkerEng                     *checker.Engine
+	syncCore                       *chainsync.Core
+	syncEngine                     *synchronization.Engine
+	followerCore                   *hotstuff.FollowerLoop        // follower hotstuff logic
+	followerEng                    *followereng.ComplianceEngine // to sync blocks from consensus nodes
+	computationManager             *computation.Manager
+	collectionRequester            *requester.Engine
+	ingestionEng                   *ingestion.Engine
+	followerDistributor            *pubsub.FollowerDistributor
+	checkAuthorizedAtBlock         func(blockID flow.Identifier) (bool, error)
+	diskWAL                        *wal.DiskWAL
+	blockDataUploader              *uploader.Manager
+	executionDataStore             execution_data.ExecutionDataStore
+	toTriggerCheckpoint            *atomic.Bool           // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	stopControl                    *ingestion.StopControl // stop the node at given block height
+	executionDataDatastore         *badger.Datastore
+	executionDataPruner            *pruner.Pruner
+	executionDataBlobstore         blobs.Blobstore
+	executionDataTracker           tracker.Storage
+	blobService                    network.BlobService
+	blobserviceDependable          *module.ProxiedReadyDoneAware
+	finalizedAndExecutedDispatcher ingestion.FinalizedAndExecutedDispatcher
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
@@ -186,6 +187,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		// I prefer to use dummy component now and keep the bootstrapping steps properly separated,
 		// so it will be easier to follow and refactor later
 		Component("execution state", exeNode.LoadExecutionState).
+		Component("finalized and executed dispatcher", exeNode.LoadFinalizedAndExecutedDispatcher).
 		Component("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
@@ -644,6 +646,56 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	return &module.NoopReadyDoneAware{}, nil
 }
 
+func (exeNode *ExecutionNode) LoadFinalizedAndExecutedDispatcher(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	latestFinalizedHeight :=
+		exeNode.builder.FinalizedRootBlock.Header.Height
+
+	lastExecutedHeight, _, err :=
+		exeNode.executionState.GetHighestExecutedBlockID(context.TODO())
+	if err != nil {
+		return nil, fmt.Errorf("cannot get the latest executed block height for "+
+			"the FinalizedAndExecutedDispatcher: %w", err)
+	}
+
+	latestExecutedAndFinalizedHeight := lastExecutedHeight
+	// take the minimum of the two heights
+	if latestFinalizedHeight < latestExecutedAndFinalizedHeight {
+		latestExecutedAndFinalizedHeight = latestFinalizedHeight
+	}
+
+	isBlockFinalized := func(ctx context.Context, h *flow.Header) (bool, error) {
+		// This uses the fact that only finalized headers can be retrieved by height.
+		finalizedHeader, err := node.Storage.Headers.ByHeight(h.Height)
+		if err != nil {
+			if errors.Is(err, storageerr.ErrNotFound) {
+				return false, nil
+			}
+			return false, err
+		}
+
+		return finalizedHeader.View == h.View, nil
+	}
+
+	isBlockExecuted := func(ctx context.Context, h *flow.Header) (bool, error) {
+		return state.IsBlockExecuted(ctx, exeNode.executionState, h.ID())
+	}
+
+	exeNode.finalizedAndExecutedDispatcher =
+		ingestion.NewFinalizedAndExecutedDispatcher(
+			latestExecutedAndFinalizedHeight,
+			isBlockFinalized,
+			isBlockExecuted,
+			ingestion.FinalizedAndExecutedDispatcherWithLogger(exeNode.builder.Logger),
+		)
+
+	return &module.NoopReadyDoneAware{}, nil
+}
+
 func (exeNode *ExecutionNode) LoadStopControl(
 	node *NodeConfig,
 ) (
@@ -807,6 +859,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
+		exeNode.finalizedAndExecutedDispatcher,
 	)
 
 	// TODO: we should solve these mutual dependencies better

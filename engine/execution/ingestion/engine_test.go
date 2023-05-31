@@ -204,6 +204,16 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	stopControl := NewStopControl(zerolog.Nop(), false, 0)
 
+	finalizedAndExecutedDispatcher := NewFinalizedAndExecutedDispatcher(
+		0,
+		func(ctx context.Context, f *flow.Header) (bool, error) {
+			return false, nil
+		},
+		func(ctx context.Context, f *flow.Header) (bool, error) {
+			return false, nil
+		},
+	)
+
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
 	engine, err = New(
@@ -228,6 +238,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		nil,
 		uploadMgr,
 		stopControl,
+		finalizedAndExecutedDispatcher,
 	)
 	require.NoError(t, err)
 
@@ -1546,6 +1557,16 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		return stateProtocol.IsNodeAuthorizedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
+	finalizedAndExecutedDispatcher := NewFinalizedAndExecutedDispatcher(
+		0,
+		func(ctx context.Context, f *flow.Header) (bool, error) {
+			return false, nil
+		},
+		func(ctx context.Context, f *flow.Header) (bool, error) {
+			return false, nil
+		},
+	)
+
 	engine, err = New(
 		log,
 		net,
@@ -1568,6 +1589,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		nil,
 		nil,
 		NewStopControl(zerolog.Nop(), false, 0),
+		finalizedAndExecutedDispatcher,
 	)
 
 	require.NoError(t, err)
