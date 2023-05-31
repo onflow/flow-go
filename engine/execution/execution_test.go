@@ -218,7 +218,7 @@ func TestExecutionFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	// submit the child block from consensus node, which trigger the parent block
-	// to be passed to ShouldExecuteBlock
+	// to be passed to BlockProcessable
 	err = sendBlock(&exeNode, conID.NodeID, unittest.ProposalFromBlock(&child))
 	require.NoError(t, err)
 
