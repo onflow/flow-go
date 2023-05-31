@@ -68,3 +68,30 @@ func init() {
 	// fvm.AccountKeyWeightThreshold here
 	ServiceAccountPublicKey = ServiceAccountPrivateKey.PublicKey(1000)
 }
+
+// this is done by printing the state commitment in TestBootstrapLedger test with different chain ID
+func GenesisStateCommitmentByChainID(chainID flow.ChainID) flow.StateCommitment {
+	commitString := genesisCommitHexByChainID(chainID)
+	bytes, err := hex.DecodeString(commitString)
+	if err != nil {
+		panic("error while hex decoding hardcoded state commitment")
+	}
+	commit, err := flow.ToStateCommitment(bytes)
+	if err != nil {
+		panic("genesis state commitment size is invalid")
+	}
+	return commit
+}
+
+func genesisCommitHexByChainID(chainID flow.ChainID) string {
+	if chainID == flow.Mainnet {
+		return GenesisStateCommitmentHex
+	}
+	if chainID == flow.Testnet {
+		return "a7afac1d7ee4de01d5ef7accd373579ecc59595fb475903fda1cdc98d8350a8a"
+	}
+	if chainID == flow.Sandboxnet {
+		return "75e1ec7d2af323043aa9751ec2ae3fdf5ed9f445e1cb4349d14008d5edc892e2"
+	}
+	return "1b7736f113f0860f0df1ae5394ea1e926f1677c5944ca6a5a1680cd4f97420ec"
+}

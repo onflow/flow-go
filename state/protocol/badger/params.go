@@ -1,10 +1,12 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -17,7 +19,7 @@ var _ protocol.Params = (*Params)(nil)
 func (p Params) ChainID() (flow.ChainID, error) {
 
 	// retrieve root header
-	root, err := p.Root()
+	root, err := p.FinalizedRoot()
 	if err != nil {
 		return "", fmt.Errorf("could not get root: %w", err)
 	}
@@ -76,11 +78,38 @@ func (p Params) EpochFallbackTriggered() (bool, error) {
 	return triggered, nil
 }
 
-func (p Params) Root() (*flow.Header, error) {
+func (p Params) FinalizedRoot() (*flow.Header, error) {
 
 	// look up root block ID
 	var rootID flow.Identifier
-	err := p.state.db.View(operation.LookupBlockHeight(p.state.rootHeight, &rootID))
+	err := p.state.db.View(operation.LookupBlockHeight(p.state.finalizedRootHeight, &rootID))
+	if err != nil {
+		return nil, fmt.Errorf("could not look up root header: %w", err)
+	}
+
+	// retrieve root header
+	header, err := p.state.headers.ByBlockID(rootID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve root header: %w", err)
+	}
+
+	return header, nil
+}
+
+func (p Params) SealedRoot() (*flow.Header, error) {
+	// look up root block ID
+	var rootID flow.Identifier
+	err := p.state.db.View(operation.LookupBlockHeight(p.state.sealedRootHeight, &rootID))
+
+	// this method is called after a node is bootstrapped, which means the key must exist,
+	// however, if this code is running on an old execution node which was bootstrapped without this
+	// key, then this key might not exist. In order to be backward compatible, we fallback to Root().
+	// This check can be removed after a spork, where all nodes should have bootstrapped with this key
+	// saved in database
+	if errors.Is(err, storage.ErrNotFound) {
+		return p.FinalizedRoot()
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("could not look up root header: %w", err)
 	}
@@ -98,7 +127,7 @@ func (p Params) Seal() (*flow.Seal, error) {
 
 	// look up root header
 	var rootID flow.Identifier
-	err := p.state.db.View(operation.LookupBlockHeight(p.state.rootHeight, &rootID))
+	err := p.state.db.View(operation.LookupBlockHeight(p.state.finalizedRootHeight, &rootID))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up root header: %w", err)
 	}

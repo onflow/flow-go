@@ -261,12 +261,13 @@ type NodeConfig struct {
 	// root state information
 	RootSnapshot protocol.Snapshot
 	// cached properties of RootSnapshot for convenience
-	RootBlock   *flow.Block
-	RootQC      *flow.QuorumCertificate
-	RootResult  *flow.ExecutionResult
-	RootSeal    *flow.Seal
-	RootChainID flow.ChainID
-	SporkID     flow.Identifier
+	FinalizedRootBlock *flow.Block
+	SealedRootBlock    *flow.Block
+	RootQC             *flow.QuorumCertificate
+	RootResult         *flow.ExecutionResult
+	RootSeal           *flow.Seal
+	RootChainID        flow.ChainID
+	SporkID            flow.Identifier
 
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool

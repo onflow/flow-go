@@ -119,7 +119,7 @@ func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity *flow.Ide
 	metrics := metrics.NewNoopCollector()
 
 	// creates state fixture and bootstrap it.
-	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootSnapshot := unittest.RootSnapshotFixtureWithChainID(participants, chainID)
 	stateFixture := CompleteStateFixture(t, log, metrics, tracer, rootSnapshot)
 
 	require.NoError(t, err)
@@ -595,7 +595,13 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply))
 	require.NoError(t, err)
 
-	err = bootstrapper.BootstrapExecutionDatabase(node.PublicDB, commit, genesisHead)
+	rootResult, rootSeal, err := protoState.Sealed().SealedResult()
+	require.NoError(t, err)
+
+	require.Equal(t, fmt.Sprintf("%x", rootSeal.FinalState), fmt.Sprintf("%x", commit))
+	require.Equal(t, rootSeal.ResultID, rootResult.ID())
+
+	err = bootstrapper.BootstrapExecutionDatabase(node.PublicDB, rootSeal)
 	require.NoError(t, err)
 
 	execState := executionState.NewExecutionState(
@@ -679,6 +685,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Me,
 		requestEngine,
 		node.State,
+		node.Headers,
 		node.Blocks,
 		collectionsStorage,
 		eventsStorage,
@@ -777,7 +784,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 }
 
 func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.QuorumCertificate) {
-	rootHead, err := node.State.Params().Root()
+	rootHead, err := node.State.Params().FinalizedRoot()
 	require.NoError(t, err)
 
 	signers, err := node.State.AtHeight(0).Identities(filter.HasRole(flow.RoleConsensus))

@@ -357,7 +357,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				final,
 				verifier,
 				finalizationDistributor,
-				node.RootBlock.Header,
+				node.FinalizedRootBlock.Header,
 				node.RootQC,
 				finalized,
 				pending,
@@ -400,7 +400,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
-				finalizedHeader.Get(),
+				node.FinalizedRootBlock.Header,
 				core,
 				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
 			)

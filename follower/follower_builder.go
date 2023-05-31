@@ -221,7 +221,7 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 		builder.Validator = hotstuffvalidator.New(builder.Committee, verifier)
 
 		followerCore, err := consensus.NewFollower(node.Logger, builder.Committee, node.Storage.Headers, final, verifier,
-			builder.FinalizationDistributor, node.RootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
+			builder.FinalizationDistributor, node.FinalizedRootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize follower core: %w", err)
 		}
