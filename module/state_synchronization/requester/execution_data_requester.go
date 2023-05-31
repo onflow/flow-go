@@ -425,7 +425,7 @@ func (e *executionDataRequester) fetchExecutionData(signalerCtx irrecoverable.Si
 	// Get the data from the network
 	// this is a blocking call, won't be unblocked until either hitting error (including timeout) or
 	// the data is received
-	executionData, err := e.downloader.Download(ctx, executionDataID)
+	executionData, err := e.downloader.Get(ctx, executionDataID)
 
 	if err != nil {
 		return nil, err

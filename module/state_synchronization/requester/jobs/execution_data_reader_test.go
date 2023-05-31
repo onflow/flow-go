@@ -101,7 +101,7 @@ func (suite *ExecutionDataReaderSuite) reset() {
 
 func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 	setExecutionDataGet := func(executionData *execution_data.BlockExecutionData, err error) {
-		suite.downloader.On("Download", mock.Anything, suite.executionDataID).Return(
+		suite.downloader.On("Get", mock.Anything, suite.executionDataID).Return(
 			func(ctx context.Context, id flow.Identifier) *execution_data.BlockExecutionData {
 				return executionData
 			},
