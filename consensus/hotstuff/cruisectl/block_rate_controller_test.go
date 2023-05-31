@@ -114,7 +114,7 @@ func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
 
 	if bs.ctl.epochFallbackTriggered || !bs.ctl.config.Enabled.Load() {
 		// if epoch fallback is triggered or controller is disabled, use fallback timing
-		assert.Equal(bs.T(), now.Add(bs.ctl.config.FallbackProposalDuration.Load()), controllerTiming.TargetPublicationTime(7, now, unittest.IdentifierFixture()))
+		assert.Equal(bs.T(), now.Add(bs.ctl.config.FallbackProposalDelay.Load()), controllerTiming.TargetPublicationTime(7, now, unittest.IdentifierFixture()))
 	} else {
 		// otherwise should publish immediately
 		assert.Equal(bs.T(), now, controllerTiming.TargetPublicationTime(7, now, unittest.IdentifierFixture()))
@@ -309,7 +309,7 @@ func (bs *BlockRateControllerSuite) TestEnableDisable() {
 	initialControllerState := captureControllerStateDigest(bs.ctl)
 	initialProposalDelay := bs.ctl.GetProposalTiming()
 	// the initial proposal timing should use fallback timing
-	assert.Equal(bs.T(), now.Add(bs.ctl.config.FallbackProposalDuration.Load()), initialProposalDelay.TargetPublicationTime(bs.initialView+1, now, unittest.IdentifierFixture()))
+	assert.Equal(bs.T(), now.Add(bs.ctl.config.FallbackProposalDelay.Load()), initialProposalDelay.TargetPublicationTime(bs.initialView+1, now, unittest.IdentifierFixture()))
 
 	block := model.BlockFromFlow(unittest.BlockHeaderFixture(unittest.HeaderWithView(bs.initialView + 1)))
 	bs.ctl.OnBlockIncorporated(block)
