@@ -8,11 +8,10 @@ import (
 func DefaultConfig() *Config {
 	return &Config{
 		TimingConfig{
-			TargetTransition: DefaultEpochTransitionTime(),
-			// TODO confirm default values
+			TargetTransition:         DefaultEpochTransitionTime(),
 			FallbackProposalDuration: 500 * time.Millisecond,
-			MaxProposalDuration:      1000 * time.Millisecond,
 			MinProposalDuration:      250 * time.Millisecond,
+			MaxProposalDuration:      1800 * time.Millisecond,
 			Enabled:                  true,
 		},
 		ControllerParams{

@@ -156,7 +156,7 @@ func (ctl *BlockTimeController) initEpochInfo(curView uint64) error {
 		ctl.epochInfo.nextEpochFinalView = &nextEpochFinalView
 	}
 
-	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(time.Now(), ctl.epochInfo.fractionComplete(curView))
+	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(time.Now().UTC(), ctl.epochInfo.fractionComplete(curView))
 
 	epochFallbackTriggered, err := ctl.state.Params().EpochFallbackTriggered()
 	if err != nil {
