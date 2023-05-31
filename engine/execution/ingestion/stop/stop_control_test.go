@@ -1,4 +1,4 @@
-package ingestion
+package stop
 
 import (
 	"context"
@@ -26,7 +26,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 		require.Nil(t, sc.GetStopParameters())
 
 		// first update is always successful
-		stop := StopParameters{StopHeight: 21}
+		stop := StopParameters{StopBeforeHeight: 21}
 		err := sc.SetStopParameters(stop)
 		require.NoError(t, err)
 
@@ -34,18 +34,18 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		// no stopping has started yet, block below stop height
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
-		sc.BlockProcessable(header)
+		sc.ShouldExecuteBlock(header)
 
-		stop2 := StopParameters{StopHeight: 37}
+		stop2 := StopParameters{StopBeforeHeight: 37}
 		err = sc.SetStopParameters(stop2)
 		require.NoError(t, err)
 
 		// block at stop height, it should be skipped
 		header = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(37))
-		sc.BlockProcessable(header)
+		sc.ShouldExecuteBlock(header)
 
 		// cannot set new stop height after stopping has started
-		err = sc.SetStopParameters(StopParameters{StopHeight: 2137})
+		err = sc.SetStopParameters(StopParameters{StopBeforeHeight: 2137})
 		require.Error(t, err)
 
 		// state did not change
@@ -61,7 +61,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 		require.Nil(t, sc.GetStopParameters())
 
 		// first update is always successful
-		stop := StopParameters{StopHeight: 21}
+		stop := StopParameters{StopBeforeHeight: 21}
 		err := sc.SetStopParameters(stop)
 		require.NoError(t, err)
 		require.Equal(t, &stop, sc.GetStopParameters())
@@ -73,7 +73,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 		sc.BlockFinalized(context.TODO(), execState, header)
 
-		stop2 := StopParameters{StopHeight: 37}
+		stop2 := StopParameters{StopBeforeHeight: 37}
 		err = sc.SetStopParameters(stop2)
 		require.NoError(t, err)
 		require.Equal(t, &stop2, sc.GetStopParameters())
@@ -85,7 +85,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 		// since we set shouldCrash to false, execution should be stopped
 		require.True(t, sc.IsExecutionStopped())
 
-		err = sc.SetStopParameters(StopParameters{StopHeight: 2137})
+		err = sc.SetStopParameters(StopParameters{StopBeforeHeight: 2137})
 		require.Error(t, err)
 
 		execState.AssertExpectations(t)
@@ -106,7 +106,7 @@ func TestExecutionFallingBehind(t *testing.T) {
 	sc := NewStopControl(nil, StopControlWithLogger(unittest.Logger()))
 
 	// set stop at 22, so 21 is the last height which should be processed
-	stop := StopParameters{StopHeight: 22}
+	stop := StopParameters{StopBeforeHeight: 22}
 	err := sc.SetStopParameters(stop)
 	require.NoError(t, err)
 	require.Equal(t, &stop, sc.GetStopParameters())
@@ -177,7 +177,7 @@ func TestAddStopForPastBlocks(t *testing.T) {
 
 	// set stop at 22, but finalization and execution is at 23
 	// so stop right away
-	stop := StopParameters{StopHeight: 22}
+	stop := StopParameters{StopBeforeHeight: 22}
 	err := sc.SetStopParameters(stop)
 	require.NoError(t, err)
 	require.Equal(t, &stop, sc.GetStopParameters())
@@ -221,7 +221,7 @@ func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
 
 	// set stop at 22, but finalization is at 23 so 21
 	// is the last height which wil be executed
-	stop := StopParameters{StopHeight: 22}
+	stop := StopParameters{StopBeforeHeight: 22}
 	err := sc.SetStopParameters(stop)
 	require.NoError(t, err)
 	require.Equal(t, &stop, sc.GetStopParameters())
@@ -389,8 +389,8 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		sc.BlockFinalized(context.TODO(), execState, headerA)
 		require.False(t, sc.IsExecutionStopped())
 		require.Equal(t, &StopParameters{
-			StopHeight:  21,
-			ShouldCrash: false,
+			StopBeforeHeight: 21,
+			ShouldCrash:      false,
 		}, sc.GetStopParameters())
 
 		// new version beacon
@@ -466,8 +466,8 @@ func TestStopControlWithVersionControl(t *testing.T) {
 
 		// set manual stop
 		stop := StopParameters{
-			StopHeight:  22,
-			ShouldCrash: false,
+			StopBeforeHeight: 22,
+			ShouldCrash:      false,
 		}
 		err := sc.SetStopParameters(stop)
 		require.NoError(t, err)
@@ -523,8 +523,8 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		)
 
 		vbStop := StopParameters{
-			StopHeight:  22,
-			ShouldCrash: false,
+			StopBeforeHeight: 22,
+			ShouldCrash:      false,
 		}
 		versionBeacons.
 			On("Highest", testifyMock.Anything).
@@ -536,7 +536,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 							BlockHeight: 0,
 							Version:     "0.0.0",
 						}, flow.VersionBoundary{
-							BlockHeight: vbStop.StopHeight,
+							BlockHeight: vbStop.StopBeforeHeight,
 							Version:     "2.0.0",
 						}),
 				),
@@ -549,10 +549,9 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		require.Equal(t, &vbStop, sc.GetStopParameters())
 
 		// set manual stop
-
 		stop := StopParameters{
-			StopHeight:  23,
-			ShouldCrash: false,
+			StopBeforeHeight: 23,
+			ShouldCrash:      false,
 		}
 		err := sc.SetStopParameters(stop)
 		require.Error(t, err)
@@ -576,8 +575,8 @@ func TestStoppedStateRejectsAllBlocksAndChanged(t *testing.T) {
 	require.True(t, sc.IsExecutionStopped())
 
 	err := sc.SetStopParameters(StopParameters{
-		StopHeight:  2137,
-		ShouldCrash: true,
+		StopBeforeHeight: 2137,
+		ShouldCrash:      true,
 	})
 	require.Error(t, err)
 

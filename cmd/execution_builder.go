@@ -46,6 +46,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/rpc"
@@ -133,8 +134,8 @@ type ExecutionNode struct {
 	diskWAL                *wal.DiskWAL
 	blockDataUploader      *uploader.Manager
 	executionDataStore     execution_data.ExecutionDataStore
-	toTriggerCheckpoint    *atomic.Bool           // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
-	stopControl            *ingestion.StopControl // stop the node at given block height
+	toTriggerCheckpoint    *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	stopControl            *stop.StopControl // stop the node at given block height
 	executionDataDatastore *badger.Datastore
 	executionDataPruner    *pruner.Pruner
 	executionDataBlobstore blobs.Blobstore
@@ -651,17 +652,17 @@ func (exeNode *ExecutionNode) LoadStopControl(
 	module.ReadyDoneAware,
 	error,
 ) {
-	opts := []ingestion.StopControlOption{
-		ingestion.StopControlWithLogger(exeNode.builder.Logger),
+	opts := []stop.StopControlOption{
+		stop.StopControlWithLogger(exeNode.builder.Logger),
 	}
 	if exeNode.exeConf.pauseExecution {
-		opts = append(opts, ingestion.StopControlWithStopped())
+		opts = append(opts, stop.StopControlWithStopped())
 	}
 
 	ver, err := build.SemverV2()
 	if err == nil {
 		opts = append(opts,
-			ingestion.StopControlWithVersionControl(
+			stop.StopControlWithVersionControl(
 				ver,
 				node.Storage.VersionBeacons,
 				true,
@@ -673,7 +674,7 @@ func (exeNode *ExecutionNode) LoadStopControl(
 			Msg("could not set semver version for stop control")
 	}
 
-	stopControl := ingestion.NewStopControl(
+	stopControl := stop.NewStopControl(
 		node.Storage.Headers,
 		opts...)
 	exeNode.stopControl = stopControl

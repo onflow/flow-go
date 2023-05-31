@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -60,7 +61,7 @@ type Engine struct {
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	executionDataPruner    *pruner.Pruner
 	uploader               *uploader.Manager
-	stopControl            *StopControl
+	stopControl            *stop.StopControl
 }
 
 func New(
@@ -84,7 +85,7 @@ func New(
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pruner *pruner.Pruner,
 	uploader *uploader.Manager,
-	stopControl *StopControl,
+	stopControl *stop.StopControl,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -309,12 +310,12 @@ func (e *Engine) unexecutedBlocks() (
 // on nodes startup, we need to load all the unexecuted blocks to the execution queues.
 // blocks have to be loaded in the way that the parent has been loaded before loading its children
 func (e *Engine) reloadUnexecutedBlocks() error {
-	// it's possible the BlockProcessable is called during the reloading, as the follower engine
+	// it's possible the ShouldExecuteBlock is called during the reloading, as the follower engine
 	// will receive blocks before ingestion engine is ready.
 	// The problem with that is, since the reloading hasn't finished yet, enqueuing the new block from
-	// the BlockProcessable callback will fail, because its parent block might have not been reloaded
+	// the ShouldExecuteBlock callback will fail, because its parent block might have not been reloaded
 	// to the queues yet.
-	// So one solution here is to lock the execution queues during reloading, so that if BlockProcessable
+	// So one solution here is to lock the execution queues during reloading, so that if ShouldExecuteBlock
 	// is called before reloading is finished, it will be blocked, which will avoid that edge case.
 	return e.mempool.Run(func(
 		blockByCollection *stdmap.BlockByCollectionBackdata,
@@ -438,8 +439,10 @@ func (e *Engine) reloadBlock(
 // NOTE: Ready calls reloadUnexecutedBlocks during initialization, which handles dropped protocol events.
 func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 
+	// TODO: this should not be blocking: https://github.com/onflow/flow-go/issues/4400
+
 	// skip if stopControl tells to skip
-	if !e.stopControl.BlockProcessable(b) {
+	if !e.stopControl.ShouldExecuteBlock(b) {
 		return
 	}
 

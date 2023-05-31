@@ -20,6 +20,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	uploadermock "github.com/onflow/flow-go/engine/execution/ingestion/uploader/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
@@ -121,7 +122,7 @@ type testingContext struct {
 	broadcastedReceipts map[flow.Identifier]*flow.ExecutionReceipt
 	collectionRequester *module.MockRequester
 	identities          flow.IdentityList
-	stopControl         *StopControl
+	stopControl         *stop.StopControl
 	uploadMgr           *uploader.Manager
 
 	mu *sync.Mutex
@@ -150,7 +151,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	headers := storage.NewMockHeaders(ctrl)
 	blocks := storage.NewMockBlocks(ctrl)
-	headers := storage.NewMockHeaders(ctrl)
 	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
 	events := storage.NewMockEvents(ctrl)
@@ -202,7 +202,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
-	stopControl := NewStopControl(headers)
+	stopControl := stop.NewStopControl(headers)
 
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
@@ -1038,8 +1038,8 @@ func TestStopAtHeight(t *testing.T) {
 		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header, blocks["A"].StartState)
 
 		// stop at block C
-		err := ctx.stopControl.SetStopParameters(StopParameters{
-			StopHeight: blockSealed.Height + 3,
+		err := ctx.stopControl.SetStopParameters(stop.StopParameters{
+			StopBeforeHeight: blockSealed.Height + 3,
 		})
 		require.NoError(t, err)
 
@@ -1165,8 +1165,8 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["B"].Block.Header, nil)
 
 		// stop at block B, so B-1 (A) will be last executed
-		err := ctx.stopControl.SetStopParameters(StopParameters{
-			StopHeight: blocks["B"].Height(),
+		err := ctx.stopControl.SetStopParameters(stop.StopParameters{
+			StopBeforeHeight: blocks["B"].Height(),
 		})
 		require.NoError(t, err)
 
@@ -1538,7 +1538,6 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 
 	headers := storage.NewMockHeaders(ctrl)
 	blocks := storage.NewMockBlocks(ctrl)
-	headers := storage.NewMockHeaders(ctrl)
 	collections := storage.NewMockCollections(ctrl)
 	events := storage.NewMockEvents(ctrl)
 	serviceEvents := storage.NewMockServiceEvents(ctrl)
@@ -1572,7 +1571,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		checkAuthorizedAtBlock,
 		nil,
 		nil,
-		NewStopControl(headers),
+		stop.NewStopControl(headers),
 	)
 
 	require.NoError(t, err)

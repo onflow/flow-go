@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
-	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 )
 
 var _ commands.AdminCommand = (*StopAtHeightCommand)(nil)
@@ -15,11 +15,11 @@ var _ commands.AdminCommand = (*StopAtHeightCommand)(nil)
 // StopAtHeightCommand will send a signal to engine to stop/crash EN
 // at given height
 type StopAtHeightCommand struct {
-	stopControl *ingestion.StopControl
+	stopControl *stop.StopControl
 }
 
 // NewStopAtHeightCommand creates a new StopAtHeightCommand object
-func NewStopAtHeightCommand(sah *ingestion.StopControl) *StopAtHeightCommand {
+func NewStopAtHeightCommand(sah *stop.StopControl) *StopAtHeightCommand {
 	return &StopAtHeightCommand{
 		stopControl: sah,
 	}
@@ -38,9 +38,9 @@ func (s *StopAtHeightCommand) Handler(_ context.Context, req *admin.CommandReque
 
 	oldParams := s.stopControl.GetStopParameters()
 
-	err := s.stopControl.SetStopParameters(ingestion.StopParameters{
-		StopHeight:  sah.height,
-		ShouldCrash: sah.crash,
+	err := s.stopControl.SetStopParameters(stop.StopParameters{
+		StopBeforeHeight: sah.height,
+		ShouldCrash:      sah.crash,
 	})
 
 	if err != nil {

@@ -43,6 +43,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
@@ -684,21 +685,21 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	// disabled by default
 	uploader := uploader.NewManager(node.Tracer)
 
-	opts := []ingestion.StopControlOption{
-		ingestion.StopControlWithLogger(node.Log),
+	opts := []stop.StopControlOption{
+		stop.StopControlWithLogger(node.Log),
 	}
 
 	ver, err := build.SemverV2()
 	require.NoError(t, err, "failed to parse semver version from build info")
 
 	opts = append(opts,
-		ingestion.StopControlWithVersionControl(
+		stop.StopControlWithVersionControl(
 			ver,
 			versionBeacons,
 			true,
 		))
 
-	stopControl := ingestion.NewStopControl(
+	stopControl := stop.NewStopControl(
 		node.Headers,
 		opts...,
 	)

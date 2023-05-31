@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/admin"
-	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 )
 
 func TestCommandParsing(t *testing.T) {
@@ -87,7 +87,7 @@ func TestCommandParsing(t *testing.T) {
 
 func TestCommandsSetsValues(t *testing.T) {
 
-	stopControl := ingestion.NewStopControl(nil)
+	stopControl := stop.NewStopControl(nil)
 
 	cmd := NewStopAtHeightCommand(stopControl)
 
@@ -104,6 +104,6 @@ func TestCommandsSetsValues(t *testing.T) {
 	s := stopControl.GetStopParameters()
 
 	require.NotNil(t, s)
-	require.Equal(t, uint64(37), s.StopHeight)
+	require.Equal(t, uint64(37), s.StopBeforeHeight)
 	require.Equal(t, true, s.ShouldCrash)
 }

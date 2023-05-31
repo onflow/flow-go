@@ -57,12 +57,15 @@ func SemverV2() (*smv.Version, error) {
 	if !IsDefined(semver) {
 		return nil, nil
 	}
-	ver, err := smv.NewVersion(MakeSemverV2Compliant(semver))
+	ver, err := smv.NewVersion(makeSemverV2Compliant(semver))
 	return ver, err
 }
 
-// MakeSemverV2Compliant converts a non-semver version string to a semver compliant one
-func MakeSemverV2Compliant(version string) string {
+// makeSemverV2Compliant converts a non-semver version string to a semver compliant one.
+// This removes the leading 'v'.
+// In the past we sometimes omitted the patch version, e.g. v1.0.0 became v1.0 so this
+// also adds a 0 patch version if there's no patch version.
+func makeSemverV2Compliant(version string) string {
 	if !IsDefined(version) {
 		return version
 	}
