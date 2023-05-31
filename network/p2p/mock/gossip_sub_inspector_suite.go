@@ -55,6 +55,22 @@ func (_m *GossipSubInspectorSuite) InspectFunc() func(peer.ID, *pubsub.RPC) erro
 	return r0
 }
 
+// Inspectors provides a mock function with given fields:
+func (_m *GossipSubInspectorSuite) Inspectors() []p2p.GossipSubRPCInspector {
+	ret := _m.Called()
+
+	var r0 []p2p.GossipSubRPCInspector
+	if rf, ok := ret.Get(0).(func() []p2p.GossipSubRPCInspector); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]p2p.GossipSubRPCInspector)
+		}
+	}
+
+	return r0
+}
+
 // Ready provides a mock function with given fields:
 func (_m *GossipSubInspectorSuite) Ready() <-chan struct{} {
 	ret := _m.Called()

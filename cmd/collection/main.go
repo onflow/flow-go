@@ -28,6 +28,7 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
+	"github.com/onflow/flow-go/engine/collection/events"
 	"github.com/onflow/flow-go/engine/collection/ingest"
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	"github.com/onflow/flow-go/engine/collection/rpc"
@@ -46,6 +47,8 @@ import (
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -143,6 +146,7 @@ func main() {
 			"adjustment of timeout duration in case of time out event")
 		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures,
 			"number of failed rounds before first timeout increase")
+		// todo rename?
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
 		flags.Uint64Var(&clusterComplianceConfig.SkipNewProposalsThreshold,
@@ -155,6 +159,11 @@ func main() {
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
 		flags.StringToIntVar(&apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,SendTransaction=500 etc. note limits apply globally to all clients.")
 		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,SendTransaction=100 etc. note limits apply globally to all clients.")
+
+		// gossipsub rpc validation inspector cluster prefixed control messages received flags
+		flags.Uint32Var(&nodeBuilder.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.ClusterPrefixedControlMsgsReceivedCacheSize, "gossipsub-cluster-prefix-tracker-cache-size", validation.DefaultClusterPrefixedControlMsgsReceivedCacheSize, "cache size for gossipsub RPC validation inspector cluster prefix received tracker.")
+		flags.Float64Var(&nodeBuilder.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.ClusterPrefixedControlMsgsReceivedCacheDecay, "gossipsub-cluster-prefix-tracker-cache-decay", validation.DefaultClusterPrefixedControlMsgsReceivedCacheDecay, "the decay value used to decay cluster prefix received topics received cached counters.")
+		flags.Float64Var(&nodeBuilder.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.ClusterPrefixHardThreshold, "gossipsub-rpc-cluster-prefixed-hard-threshold", validation.DefaultClusterPrefixedMsgDropThreshold, "the maximum number of cluster-prefixed control messages allowed to be processed when the active cluster id is unset or a mismatch is detected, exceeding this threshold will result in node penalization by gossipsub.")
 
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
@@ -282,7 +291,7 @@ func main() {
 				node.Storage.Headers,
 				finalizer,
 				followerDistributor,
-				node.RootBlock.Header,
+				node.FinalizedRootBlock.Header,
 				node.RootQC,
 				finalized,
 				pending,
@@ -325,13 +334,14 @@ func main() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
-				node.FinalizedHeader,
+				node.FinalizedRootBlock.Header,
 				core,
-				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
+				node.ComplianceConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
+			followerDistributor.AddOnBlockFinalizedConsumer(followerEng.OnFinalizedBlock)
 
 			return followerEng, nil
 		}).
@@ -352,6 +362,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
+			followerDistributor.AddFinalizationConsumer(sync)
 
 			return sync, nil
 		}).
@@ -466,7 +477,7 @@ func main() {
 				node.Metrics.Mempool,
 				node.State,
 				node.Storage.Transactions,
-				modulecompliance.WithSkipNewProposalsThreshold(clusterComplianceConfig.SkipNewProposalsThreshold),
+				clusterComplianceConfig,
 			)
 			if err != nil {
 				return nil, err
@@ -492,7 +503,7 @@ func main() {
 			}
 
 			opts := []consensus.Option{
-				consensus.WithBlockRateDelay(blockRateDelay),
+				consensus.WithStaticProposalDuration(blockRateDelay),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
 				consensus.WithTimeoutAdjustmentFactor(hotstuffTimeoutAdjustmentFactor),
 				consensus.WithHappyPathMaxRoundFailures(hotstuffHappyPathMaxRoundFailures),
@@ -555,6 +566,8 @@ func main() {
 			heightEvents := gadgets.NewHeights()
 			node.ProtocolEvents.AddConsumer(heightEvents)
 
+			clusterEvents := events.NewDistributor()
+
 			manager, err := epochmgr.New(
 				node.Logger,
 				node.Me,
@@ -563,6 +576,7 @@ func main() {
 				rootQCVoter,
 				factory,
 				heightEvents,
+				clusterEvents,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create epoch manager: %w", err)
@@ -570,6 +584,12 @@ func main() {
 
 			// register the manager for protocol events
 			node.ProtocolEvents.AddConsumer(manager)
+
+			for _, rpcInspector := range node.GossipSubRpcInspectorSuite.Inspectors() {
+				if r, ok := rpcInspector.(p2p.GossipSubMsgValidationRpcInspector); ok {
+					clusterEvents.AddConsumer(r)
+				}
+			}
 
 			return manager, err
 		})
