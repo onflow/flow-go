@@ -59,6 +59,18 @@ func (epoch *epochInfo) fractionComplete(curView uint64) float64 {
 // BlockTimeController dynamically adjusts the ProposalTiming of this node,
 // based on the measured view rate of the consensus committee as a whole, in
 // order to achieve a desired switchover time for each epoch.
+// In a nutshell, the controller outputs the block time on the happy path, i.e.
+//   - Suppose the node is observing the parent block B0 at some time `x0`.
+//   - The controller determines the duration `d` of how much later the child block B1
+//     should be observed by the committee.
+//   - The controller internally memorizes the latest B0 it has seen and outputs
+//     the tuple `(B0, x0, d)`
+//
+// This low-level controller output `(B0, x0, d)` is wrapped into a `ProposalTiming`
+// interface, specifically `happyPathBlockTime` on the happy path. The purpose of the
+// `ProposalTiming` wrapper is to translate the raw controller output into a form
+// that is useful for the event handler. Edge cases, such as initialization or
+// EECC are implemented by other implementations of `ProposalTiming`.
 type BlockTimeController struct {
 	component.Component
 
