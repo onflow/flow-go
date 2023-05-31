@@ -96,7 +96,7 @@ func New(
 		broadcaster:     broadcaster,
 		rootBlockHeight: rootHeight,
 		rootBlockID:     rootBlockID,
-		highestHeight:   counters.NewMonotonousCounter(0),
+		highestHeight:   counters.NewMonotonousCounter(highestAvailableHeight),
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
