@@ -219,14 +219,14 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	bs.ctl.integralErr.AddObservation(20.0)
 	err := bs.ctl.measureViewDuration(makeTimedBlock(bs.initialView+1, unittest.IdentifierFixture(), time.Now()))
 	require.NoError(bs.T(), err)
-	assert.NotEqual(bs.T(), bs.config.FallbackProposalDuration, bs.ctl.GetProposalTiming())
+	assert.NotEqual(bs.T(), bs.config.FallbackProposalDelay, bs.ctl.GetProposalTiming())
 
 	// send the event
 	bs.ctl.EpochEmergencyFallbackTriggered()
 	// async: should revert to default GetProposalTiming
 	require.Eventually(bs.T(), func() bool {
 		now := time.Now().UTC()
-		return now.Add(bs.config.FallbackProposalDuration.Load()) == bs.ctl.GetProposalTiming().TargetPublicationTime(7, now, unittest.IdentifierFixture())
+		return now.Add(bs.config.FallbackProposalDelay.Load()) == bs.ctl.GetProposalTiming().TargetPublicationTime(7, now, unittest.IdentifierFixture())
 	}, time.Second, time.Millisecond)
 
 	// additional EpochEmergencyFallbackTriggered events should be no-ops
@@ -236,7 +236,7 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	}
 	// state should be unchanged
 	now := time.Now().UTC()
-	assert.Equal(bs.T(), now.Add(bs.config.FallbackProposalDuration.Load()), bs.ctl.GetProposalTiming().TargetPublicationTime(12, now, unittest.IdentifierFixture()))
+	assert.Equal(bs.T(), now.Add(bs.config.FallbackProposalDelay.Load()), bs.ctl.GetProposalTiming().TargetPublicationTime(12, now, unittest.IdentifierFixture()))
 
 	// additional OnBlockIncorporated events should be no-ops
 	for i := 0; i <= cap(bs.ctl.incorporatedBlocks); i++ {
@@ -250,7 +250,7 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	}, time.Second, time.Millisecond)
 	// state should be unchanged
 	now = time.Now().UTC()
-	assert.Equal(bs.T(), now.Add(bs.config.FallbackProposalDuration.Load()), bs.ctl.GetProposalTiming().TargetPublicationTime(17, now, unittest.IdentifierFixture()))
+	assert.Equal(bs.T(), now.Add(bs.config.FallbackProposalDelay.Load()), bs.ctl.GetProposalTiming().TargetPublicationTime(17, now, unittest.IdentifierFixture()))
 }
 
 // TestOnBlockIncorporated_UpdateProposalDelay tests that a new measurement is taken and

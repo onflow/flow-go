@@ -176,7 +176,7 @@ func (ctl *BlockTimeController) initEpochInfo(curView uint64) error {
 func (ctl *BlockTimeController) initProposalTiming(curView uint64) {
 	// When disabled, or in epoch fallback, use fallback timing (constant ProposalDuration)
 	if ctl.epochFallbackTriggered || !ctl.config.Enabled.Load() {
-		ctl.storeProposalTiming(newFallbackTiming(curView, time.Now().UTC(), ctl.config.FallbackProposalDuration.Load()))
+		ctl.storeProposalTiming(newFallbackTiming(curView, time.Now().UTC(), ctl.config.FallbackProposalDelay.Load()))
 	}
 	// Otherwise, before we observe any view changes, publish blocks immediately
 	ctl.storeProposalTiming(newPublishImmediately(curView, time.Now().UTC()))
@@ -320,10 +320,10 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	// if the controller is disabled, we don't update measurements and instead use a fallback timing
 	if !ctl.config.Enabled.Load() {
-		ctl.storeProposalTiming(newFallbackTiming(tb.Block.View, tb.TimeObserved, ctl.config.FallbackProposalDuration.Load()))
+		ctl.storeProposalTiming(newFallbackTiming(tb.Block.View, tb.TimeObserved, ctl.config.FallbackProposalDelay.Load()))
 		ctl.log.Debug().
 			Uint64("cur_view", tb.Block.View).
-			Dur("fallback_proposal_dur", ctl.config.FallbackProposalDuration.Load()).
+			Dur("fallback_proposal_dur", ctl.config.FallbackProposalDelay.Load()).
 			Msg("controller is disabled - using fallback timing")
 		return nil
 	}
@@ -406,7 +406,7 @@ func (ctl *BlockTimeController) processEpochFallbackTriggered() error {
 		return fmt.Errorf("failed to retrieve latest finalized block from protocol state %w", err)
 	}
 
-	ctl.storeProposalTiming(newFallbackTiming(latestFinalized.View, time.Now().UTC(), ctl.config.FallbackProposalDuration.Load()))
+	ctl.storeProposalTiming(newFallbackTiming(latestFinalized.View, time.Now().UTC(), ctl.config.FallbackProposalDelay.Load()))
 	return nil
 }
 

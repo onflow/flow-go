@@ -10,11 +10,11 @@ import (
 func DefaultConfig() *Config {
 	return &Config{
 		TimingConfig{
-			TargetTransition: DefaultEpochTransitionTime(),
-			FallbackProposalDuration: atomic.NewDuration(500 * time.Millisecond),
-			MinViewDuration:          atomic.NewDuration(250 * time.Millisecond),
-			MaxViewDuration:          atomic.NewDuration(1800 * time.Millisecond),
-			Enabled:                  atomic.NewBool(false),
+			TargetTransition:      DefaultEpochTransitionTime(),
+			FallbackProposalDelay: atomic.NewDuration(500 * time.Millisecond),
+			MinViewDuration:       atomic.NewDuration(250 * time.Millisecond),
+			MaxViewDuration:       atomic.NewDuration(1800 * time.Millisecond),
+			Enabled:               atomic.NewBool(false),
 		},
 		ControllerParams{
 			N_ewma: 5,
@@ -36,22 +36,29 @@ type Config struct {
 type TimingConfig struct {
 	// TargetTransition defines the target time to transition epochs each week.
 	TargetTransition EpochTransitionTime
-	// FallbackProposalDuration is the baseline GetProposalTiming value.
-	// When used, it behaves like the old --block-rate-delay flag.
+
+	// FallbackProposalDelay is the minimal block construction delay. When used, it behaves like the
+	// old command line flag `block-rate-delay`. Specifically, the primary measures the duration from
+	// starting to construct its proposal to the proposal being ready to be published. If this
+	// duration is _less_ than FallbackProposalDelay, the primary delays broadcasting its proposal
+	// by the remainder needed to reach `FallbackProposalDelay`
 	// It is used:
 	//  - when Enabled is false
 	//  - when epoch fallback has been triggered
-	FallbackProposalDuration *atomic.Duration
+	FallbackProposalDelay *atomic.Duration
+
 	// MaxViewDuration is a hard maximum on the total view time targeted by ProposalTiming.
 	// If the BlockTimeController computes a larger desired ProposalTiming value
 	// based on the observed error and tuning, this value will be used instead.
 	MaxViewDuration *atomic.Duration
+
 	// MinViewDuration  is a hard maximum on the total view time targeted by ProposalTiming.
 	// If the BlockTimeController computes a smaller desired ProposalTiming value
 	// based on the observed error and tuning, this value will be used instead.
 	MinViewDuration *atomic.Duration
+
 	// Enabled defines whether responsive control of the GetProposalTiming is enabled.
-	// When disabled, the FallbackProposalDuration is used.
+	// When disabled, the FallbackProposalDelay is used.
 	Enabled *atomic.Bool
 }
 
@@ -88,7 +95,7 @@ func (c *ControllerParams) beta() float64 {
 }
 
 func (ctl *TimingConfig) GetFallbackProposalDuration() time.Duration {
-	return ctl.FallbackProposalDuration.Load()
+	return ctl.FallbackProposalDelay.Load()
 }
 func (ctl *TimingConfig) GetMaxViewDuration() time.Duration {
 	return ctl.MaxViewDuration.Load()
@@ -101,7 +108,7 @@ func (ctl *TimingConfig) GetEnabled() bool {
 }
 
 func (ctl *TimingConfig) SetFallbackProposalDuration(dur time.Duration) error {
-	ctl.FallbackProposalDuration.Store(dur)
+	ctl.FallbackProposalDelay.Store(dur)
 	return nil
 }
 func (ctl *TimingConfig) SetMaxViewDuration(dur time.Duration) error {
