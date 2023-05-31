@@ -29,6 +29,10 @@ const (
 	// DefaultSendTimeout is the default timeout for sending a message to the client. After the timeout
 	// expires, the connection is closed.
 	DefaultSendTimeout = 30 * time.Second
+
+	// DefaultResponseLimit is default max responses per second allowed on a stream. After exceeding
+	// the limit, the stream is paused until more capacity is available.
+	DefaultResponseLimit = float64(0)
 )
 
 type GetExecutionDataFunc func(context.Context, flow.Identifier) (*execution_data.BlockExecutionDataEntity, error)
@@ -44,14 +48,16 @@ type StateStreamBackend struct {
 	ExecutionDataBackend
 	EventsBackend
 
-	log           zerolog.Logger
-	state         protocol.State
-	headers       storage.Headers
-	seals         storage.Seals
-	results       storage.ExecutionResults
-	execDataStore execution_data.ExecutionDataStore
-	execDataCache *herocache.BlockExecutionData
-	broadcaster   *engine.Broadcaster
+	log             zerolog.Logger
+	state           protocol.State
+	headers         storage.Headers
+	seals           storage.Seals
+	results         storage.ExecutionResults
+	execDataStore   execution_data.ExecutionDataStore
+	execDataCache   *herocache.BlockExecutionData
+	broadcaster     *engine.Broadcaster
+	rootBlockHeight uint64
+	rootBlockID     flow.Identifier
 }
 
 func New(
@@ -64,18 +70,27 @@ func New(
 	execDataStore execution_data.ExecutionDataStore,
 	execDataCache *herocache.BlockExecutionData,
 	broadcaster *engine.Broadcaster,
+	rootHeight uint64,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
+	// cache the root block height and ID for runtime lookups.
+	rootBlockID, err := headers.BlockIDByHeight(rootHeight)
+	if err != nil {
+		return nil, fmt.Errorf("could not get root block ID: %w", err)
+	}
+
 	b := &StateStreamBackend{
-		log:           logger,
-		state:         state,
-		headers:       headers,
-		seals:         seals,
-		results:       results,
-		execDataStore: execDataStore,
-		execDataCache: execDataCache,
-		broadcaster:   broadcaster,
+		log:             logger,
+		state:           state,
+		headers:         headers,
+		seals:           seals,
+		results:         results,
+		execDataStore:   execDataStore,
+		execDataCache:   execDataCache,
+		broadcaster:     broadcaster,
+		rootBlockHeight: rootHeight,
+		rootBlockID:     rootBlockID,
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
@@ -83,6 +98,7 @@ func New(
 		headers:          headers,
 		broadcaster:      broadcaster,
 		sendTimeout:      config.ClientSendTimeout,
+		responseLimit:    config.ResponseLimit,
 		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
 		getStartHeight:   b.getStartHeight,
@@ -93,6 +109,7 @@ func New(
 		headers:          headers,
 		broadcaster:      broadcaster,
 		sendTimeout:      config.ClientSendTimeout,
+		responseLimit:    config.ResponseLimit,
 		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
 		getStartHeight:   b.getStartHeight,
@@ -144,7 +161,13 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
 	}
 
-	// first, if a start block ID is provided, use that
+	// if the start block is the root block, there will not be an execution data. skip it and
+	// begin from the next block.
+	// Note: we can skip the block lookup since it was already done in the constructor
+	if startBlockID == b.rootBlockID || startHeight == b.rootBlockHeight {
+		return b.rootBlockHeight + 1, nil
+	}
+
 	// invalid or missing block IDs will result in an error
 	if startBlockID != flow.ZeroID {
 		header, err := b.headers.ByBlockID(startBlockID)
@@ -154,9 +177,12 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 		return header.Height, nil
 	}
 
-	// next, if the start height is provided, use that
-	// heights that are in the future or before the root block will result in an error
+	// heights that have not been indexed yet will result in an error
 	if startHeight > 0 {
+		if startHeight < b.rootBlockHeight {
+			return 0, status.Errorf(codes.InvalidArgument, "start height must be greater than or equal to the root height %d", b.rootBlockHeight)
+		}
+
 		header, err := b.headers.ByHeight(startHeight)
 		if err != nil {
 			return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for height %d: %w", startHeight, err))

@@ -36,16 +36,17 @@ import (
 //   - The only exception is calls to `ProcessFinalizedView`, which is the only concurrency-safe
 //     method of compliance.Core
 type Core struct {
-	log               zerolog.Logger // used to log relevant actions with context
-	config            compliance.Config
-	engineMetrics     module.EngineMetrics
-	mempoolMetrics    module.MempoolMetrics
-	hotstuffMetrics   module.HotstuffMetrics
-	complianceMetrics module.ComplianceMetrics
-	tracer            module.Tracer
-	headers           storage.Headers
-	payloads          storage.Payloads
-	state             protocol.ParticipantState
+	log                       zerolog.Logger // used to log relevant actions with context
+	config                    compliance.Config
+	engineMetrics             module.EngineMetrics
+	mempoolMetrics            module.MempoolMetrics
+	hotstuffMetrics           module.HotstuffMetrics
+	complianceMetrics         module.ComplianceMetrics
+	proposalViolationNotifier hotstuff.ProposalViolationConsumer
+	tracer                    module.Tracer
+	headers                   storage.Headers
+	payloads                  storage.Payloads
+	state                     protocol.ParticipantState
 	// track latest finalized view/height - used to efficiently drop outdated or too-far-ahead blocks
 	finalizedView     counters.StrictMonotonousCounter
 	finalizedHeight   counters.StrictMonotonousCounter
@@ -64,6 +65,7 @@ func NewCore(
 	mempool module.MempoolMetrics,
 	hotstuffMetrics module.HotstuffMetrics,
 	complianceMetrics module.ComplianceMetrics,
+	proposalViolationNotifier hotstuff.ProposalViolationConsumer,
 	tracer module.Tracer,
 	headers storage.Headers,
 	payloads storage.Payloads,
@@ -74,31 +76,27 @@ func NewCore(
 	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
-	opts ...compliance.Opt,
+	config compliance.Config,
 ) (*Core, error) {
 
-	config := compliance.DefaultConfig()
-	for _, apply := range opts {
-		apply(&config)
-	}
-
 	c := &Core{
-		log:               log.With().Str("compliance", "core").Logger(),
-		config:            config,
-		engineMetrics:     collector,
-		tracer:            tracer,
-		mempoolMetrics:    mempool,
-		hotstuffMetrics:   hotstuffMetrics,
-		complianceMetrics: complianceMetrics,
-		headers:           headers,
-		payloads:          payloads,
-		state:             state,
-		pending:           pending,
-		sync:              sync,
-		hotstuff:          hotstuff,
-		validator:         validator,
-		voteAggregator:    voteAggregator,
-		timeoutAggregator: timeoutAggregator,
+		log:                       log.With().Str("compliance", "core").Logger(),
+		config:                    config,
+		engineMetrics:             collector,
+		tracer:                    tracer,
+		mempoolMetrics:            mempool,
+		hotstuffMetrics:           hotstuffMetrics,
+		complianceMetrics:         complianceMetrics,
+		proposalViolationNotifier: proposalViolationNotifier,
+		headers:                   headers,
+		payloads:                  payloads,
+		state:                     state,
+		pending:                   pending,
+		sync:                      sync,
+		hotstuff:                  hotstuff,
+		validator:                 validator,
+		voteAggregator:            voteAggregator,
+		timeoutAggregator:         timeoutAggregator,
 	}
 
 	// initialize finalized boundary cache
@@ -155,12 +153,13 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 		return nil
 	}
 
+	skipNewProposalsThreshold := c.config.GetSkipNewProposalsThreshold()
 	// ignore proposals which are too far ahead of our local finalized state
 	// instead, rely on sync engine to catch up finalization more effectively, and avoid
 	// large subtree of blocks to be cached.
-	if header.View > finalView+c.config.SkipNewProposalsThreshold {
+	if header.View > finalView+skipNewProposalsThreshold {
 		log.Debug().
-			Uint64("skip_new_proposals_threshold", c.config.SkipNewProposalsThreshold).
+			Uint64("skip_new_proposals_threshold", skipNewProposalsThreshold).
 			Msg("dropping block too far ahead of locally finalized view")
 		return nil
 	}
@@ -320,7 +319,8 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 	hotstuffProposal := model.ProposalFromFlow(header)
 	err := c.validator.ValidateProposal(hotstuffProposal)
 	if err != nil {
-		if model.IsInvalidBlockError(err) {
+		if invalidBlockErr, ok := model.AsInvalidProposalError(err); ok {
+			c.proposalViolationNotifier.OnInvalidBlockDetected(*invalidBlockErr)
 			return engine.NewInvalidInputErrorf("invalid block proposal: %w", err)
 		}
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {

@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
@@ -49,6 +48,11 @@ type facadeEnvironment struct {
 
 	accounts Accounts
 	txnState storage.TransactionPreparer
+}
+
+func (env *facadeEnvironment) GenerateAccountID(address common.Address) (uint64, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func newFacadeEnvironment(
@@ -147,21 +151,13 @@ func NewScriptEnvironmentFromStorageSnapshot(
 	params EnvironmentParams,
 	storageSnapshot snapshot.StorageSnapshot,
 ) *facadeEnvironment {
-	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
-	derivedTxn := derivedBlockData.NewSnapshotReadDerivedTransactionData()
-
-	txn := storage.SerialTransaction{
-		NestedTransactionPreparer: state.NewTransactionState(
-			storageSnapshot,
-			state.DefaultParameters()),
-		DerivedTransactionData: derivedTxn,
-	}
+	blockDatabase := storage.NewBlockDatabase(storageSnapshot, 0, nil)
 
 	return NewScriptEnv(
 		context.Background(),
 		tracing.NewTracerSpan(),
 		params,
-		txn)
+		blockDatabase.NewSnapshotReadTransaction(state.DefaultParameters()))
 }
 
 func NewScriptEnv(

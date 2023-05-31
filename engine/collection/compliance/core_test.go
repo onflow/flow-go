@@ -2,9 +2,7 @@ package compliance
 
 import (
 	"errors"
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -49,25 +47,23 @@ type CommonSuite struct {
 	childrenDB map[flow.Identifier][]flow.Slashable[*cluster.Block]
 
 	// mocked dependencies
-	state             *clusterstate.MutableState
-	snapshot          *clusterstate.Snapshot
-	metrics           *metrics.NoopCollector
-	headers           *storage.Headers
-	pending           *module.PendingClusterBlockBuffer
-	hotstuff          *module.HotStuff
-	sync              *module.BlockRequester
-	validator         *hotstuff.Validator
-	voteAggregator    *hotstuff.VoteAggregator
-	timeoutAggregator *hotstuff.TimeoutAggregator
+	state                     *clusterstate.MutableState
+	snapshot                  *clusterstate.Snapshot
+	metrics                   *metrics.NoopCollector
+	proposalViolationNotifier *hotstuff.ProposalViolationConsumer
+	headers                   *storage.Headers
+	pending                   *module.PendingClusterBlockBuffer
+	hotstuff                  *module.HotStuff
+	sync                      *module.BlockRequester
+	validator                 *hotstuff.Validator
+	voteAggregator            *hotstuff.VoteAggregator
+	timeoutAggregator         *hotstuff.TimeoutAggregator
 
 	// engine under test
 	core *Core
 }
 
 func (cs *CommonSuite) SetupTest() {
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
-
 	block := unittest.ClusterBlockFixture()
 	cs.head = &block
 
@@ -173,6 +169,9 @@ func (cs *CommonSuite) SetupTest() {
 	// set up no-op metrics mock
 	cs.metrics = metrics.NewNoopCollector()
 
+	// set up notifier for reporting protocol violations
+	cs.proposalViolationNotifier = hotstuff.NewProposalViolationConsumer(cs.T())
+
 	// initialize the engine
 	core, err := NewCore(
 		unittest.Logger(),
@@ -180,6 +179,7 @@ func (cs *CommonSuite) SetupTest() {
 		cs.metrics,
 		cs.metrics,
 		cs.metrics,
+		cs.proposalViolationNotifier,
 		cs.headers,
 		cs.state,
 		cs.pending,
@@ -188,6 +188,7 @@ func (cs *CommonSuite) SetupTest() {
 		cs.hotstuff,
 		cs.voteAggregator,
 		cs.timeoutAggregator,
+		compliance.DefaultConfig(),
 	)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
@@ -279,7 +280,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	cs.Run("invalid block error", func() {
 		// the block fails HotStuff validation
 		*cs.validator = *hotstuff.NewValidator(cs.T())
-		cs.validator.On("ValidateProposal", hotstuffProposal).Return(model.InvalidBlockError{})
+		sentinelError := model.NewInvalidProposalErrorf(hotstuffProposal, "")
+		cs.validator.On("ValidateProposal", hotstuffProposal).Return(sentinelError)
+		cs.proposalViolationNotifier.On("OnInvalidBlockDetected", sentinelError).Return().Once()
 		// we should notify VoteAggregator about the invalid block
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 

@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
@@ -40,9 +41,10 @@ type ViewCommitter interface {
 }
 
 type transactionResult struct {
-	transaction
+	transactionRequest
 	*snapshot.ExecutionSnapshot
 	fvm.ProcedureOutput
+	timeSpent time.Duration
 }
 
 // TODO(ramtin): move committer and other folks to consumers layer
@@ -74,6 +76,7 @@ type resultCollector struct {
 
 	blockStartTime time.Time
 	blockStats     module.ExecutionResultStats
+	blockMeter     *meter.Meter
 
 	currentCollectionStartTime time.Time
 	currentCollectionState     *state.ExecutionState
@@ -112,6 +115,7 @@ func newResultCollector(
 		consumers:                    consumers,
 		spockSignatures:              make([]crypto.Signature, 0, numCollections),
 		blockStartTime:               now,
+		blockMeter:                   meter.NewMeter(meter.DefaultParameters()),
 		currentCollectionStartTime:   now,
 		currentCollectionState:       state.NewExecutionState(nil, state.DefaultParameters()),
 		currentCollectionStats: module.ExecutionResultStats{
@@ -193,6 +197,7 @@ func (collector *resultCollector) commitCollection(
 		collector.currentCollectionStats)
 
 	collector.blockStats.Merge(collector.currentCollectionStats)
+	collector.blockMeter.MergeMeter(collectionExecutionSnapshot.Meter)
 
 	collector.currentCollectionStartTime = time.Now()
 	collector.currentCollectionState = state.NewExecutionState(nil, state.DefaultParameters())
@@ -211,10 +216,47 @@ func (collector *resultCollector) commitCollection(
 }
 
 func (collector *resultCollector) processTransactionResult(
-	txn transaction,
+	txn transactionRequest,
 	txnExecutionSnapshot *snapshot.ExecutionSnapshot,
 	output fvm.ProcedureOutput,
+	timeSpent time.Duration,
 ) error {
+	logger := txn.ctx.Logger.With().
+		Uint64("computation_used", output.ComputationUsed).
+		Uint64("memory_used", output.MemoryEstimate).
+		Int64("time_spent_in_ms", timeSpent.Milliseconds()).
+		Logger()
+
+	if output.Err != nil {
+		logger = logger.With().
+			Str("error_message", output.Err.Error()).
+			Uint16("error_code", uint16(output.Err.Code())).
+			Logger()
+		logger.Info().Msg("transaction execution failed")
+
+		if txn.isSystemTransaction {
+			// This log is used as the data source for an alert on grafana.
+			// The system_chunk_error field must not be changed without adding
+			// the corresponding changes in grafana.
+			// https://github.com/dapperlabs/flow-internal/issues/1546
+			logger.Error().
+				Bool("system_chunk_error", true).
+				Bool("system_transaction_error", true).
+				Bool("critical_error", true).
+				Msg("error executing system chunk transaction")
+		}
+	} else {
+		logger.Info().Msg("transaction executed successfully")
+	}
+
+	collector.metrics.ExecutionTransactionExecuted(
+		timeSpent,
+		output.ComputationUsed,
+		output.MemoryEstimate,
+		len(output.Events),
+		flow.EventsList(output.Events).ByteSize(),
+		output.Err != nil,
+	)
 
 	txnResult := flow.TransactionResult{
 		TransactionID:   txn.ID,
@@ -233,10 +275,6 @@ func (collector *resultCollector) processTransactionResult(
 			output.ConvertedServiceEvents,
 			txnResult,
 		)
-
-	for computationKind, intensity := range output.ComputationIntensities {
-		collector.result.ComputationIntensities[computationKind] += intensity
-	}
 
 	err := collector.currentCollectionState.Merge(txnExecutionSnapshot)
 	if err != nil {
@@ -258,14 +296,16 @@ func (collector *resultCollector) processTransactionResult(
 }
 
 func (collector *resultCollector) AddTransactionResult(
-	txn transaction,
+	request transactionRequest,
 	snapshot *snapshot.ExecutionSnapshot,
 	output fvm.ProcedureOutput,
+	timeSpent time.Duration,
 ) {
 	result := transactionResult{
-		transaction:       txn,
-		ExecutionSnapshot: snapshot,
-		ProcedureOutput:   output,
+		transactionRequest: request,
+		ExecutionSnapshot:  snapshot,
+		ProcedureOutput:    output,
+		timeSpent:          timeSpent,
 	}
 
 	select {
@@ -281,9 +321,10 @@ func (collector *resultCollector) runResultProcessor() {
 
 	for result := range collector.processorInputChan {
 		err := collector.processTransactionResult(
-			result.transaction,
+			result.transactionRequest,
 			result.ExecutionSnapshot,
-			result.ProcedureOutput)
+			result.ProcedureOutput,
+			result.timeSpent)
 		if err != nil {
 			collector.processorError = err
 			return
@@ -340,6 +381,12 @@ func (collector *resultCollector) Finalize(
 	collector.metrics.ExecutionBlockExecuted(
 		time.Since(collector.blockStartTime),
 		collector.blockStats)
+
+	for kind, intensity := range collector.blockMeter.ComputationIntensities() {
+		collector.metrics.ExecutionBlockExecutionEffortVectorComponent(
+			kind.String(),
+			intensity)
+	}
 
 	return collector.result, nil
 }

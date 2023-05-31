@@ -89,15 +89,13 @@ var (
 )
 
 func setupProgramsTest(t *testing.T) snapshot.SnapshotTree {
-	txnState := storage.SerialTransaction{
-		NestedTransactionPreparer: state.NewTransactionState(
-			nil,
-			state.DefaultParameters()),
-	}
+	blockDatabase := storage.NewBlockDatabase(nil, 0, nil)
+	txnState, err := blockDatabase.NewTransaction(0, state.DefaultParameters())
+	require.NoError(t, err)
 
 	accounts := environment.NewAccounts(txnState)
 
-	err := accounts.Create(nil, addressA)
+	err = accounts.Create(nil, addressA)
 	require.NoError(t, err)
 
 	err = accounts.Create(nil, addressB)

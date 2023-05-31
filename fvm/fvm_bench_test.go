@@ -132,7 +132,7 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 type BasicBlockExecutor struct {
 	blockComputer         computer.BlockComputer
 	derivedChainData      *derived.DerivedChainData
-	activeSnapshot        snapshot.StorageSnapshot
+	activeSnapshot        snapshot.SnapshotTree
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
 	serviceAccount        *TestBenchAccount
@@ -208,6 +208,8 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 	)
 
 	me := new(moduleMock.Local)
+	me.On("NodeID").Return(unittest.IdentifierFixture())
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -224,7 +226,8 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		nil)
 	require.NoError(tb, err)
 
-	snapshot := exeState.NewLedgerStorageSnapshot(ledger, initialCommit)
+	activeSnapshot := snapshot.NewSnapshotTree(
+		exeState.NewLedgerStorageSnapshot(ledger, initialCommit))
 
 	derivedChainData, err := derived.NewDerivedChainData(
 		derived.DefaultDerivedDataCacheSize)
@@ -234,7 +237,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		blockComputer:         blockComputer,
 		derivedChainData:      derivedChainData,
 		activeStateCommitment: initialCommit,
-		activeSnapshot:        snapshot,
+		activeSnapshot:        activeSnapshot,
 		chain:                 chain,
 		serviceAccount:        serviceAccount,
 		onStopFunc:            onStopFunc,
@@ -266,6 +269,10 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 	require.NoError(tb, err)
 
 	b.activeStateCommitment = computationResult.CurrentEndState()
+
+	for _, snapshot := range computationResult.AllExecutionSnapshots() {
+		b.activeSnapshot = b.activeSnapshot.Append(snapshot)
+	}
 
 	return computationResult
 }
@@ -439,7 +446,9 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			computationResult := blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
 			totalInteractionUsed := uint64(0)
 			totalComputationUsed := uint64(0)
-			for _, txRes := range computationResult.AllTransactionResults() {
+			results := computationResult.AllTransactionResults()
+			// not interested in the system transaction
+			for _, txRes := range results[0 : len(results)-1] {
 				require.Empty(b, txRes.ErrorMessage)
 				totalInteractionUsed += logE.InteractionUsed[txRes.ID().String()]
 				totalComputationUsed += txRes.ComputationUsed
@@ -684,7 +693,9 @@ func BenchRunNFTBatchTransfer(b *testing.B,
 		}
 
 		computationResult = blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
-		for _, txRes := range computationResult.AllTransactionResults() {
+		results := computationResult.AllTransactionResults()
+		// not interested in the system transaction
+		for _, txRes := range results[0 : len(results)-1] {
 			require.Empty(b, txRes.ErrorMessage)
 		}
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -25,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 type ProviderEngine interface {
@@ -311,12 +311,24 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 	// sends requested chunk data pack to the requester
 	deliveryStartTime := time.Now()
 
-	response := &messages.ChunkDataResponse{
-		ChunkDataPack: *chunkDataPack,
-		Nonce:         rand.Uint64(),
+	nonce, err := rand.Uint64()
+	if err != nil {
+		// TODO: this error should be returned by deliverChunkDataResponse
+		// it is logged for now since the only error possible is related to a failure
+		// of the system entropy generation. Such error is going to cause failures in other
+		// components where it's handled properly and will lead to crashing the module.
+		lg.Error().
+			Err(err).
+			Msg("could not generate nonce for chunk data response")
+		return
 	}
 
-	err := e.chunksConduit.Unicast(response, requesterId)
+	response := &messages.ChunkDataResponse{
+		ChunkDataPack: *chunkDataPack,
+		Nonce:         nonce,
+	}
+
+	err = e.chunksConduit.Unicast(response, requesterId)
 	if err != nil {
 		lg.Warn().
 			Err(err).

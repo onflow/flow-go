@@ -5,6 +5,7 @@ package badger
 import (
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -18,6 +19,12 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
+
+// cachedHeader caches a block header and its ID.
+type cachedHeader struct {
+	id     flow.Identifier
+	header *flow.Header
+}
 
 type State struct {
 	metrics module.ComplianceMetrics
@@ -33,17 +40,28 @@ type State struct {
 		statuses storage.EpochStatuses
 	}
 	versionBeacons storage.VersionBeacons
-	// cache the root height because it cannot change over the lifecycle of a protocol state instance
+
+	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
+	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
+	// larger than the height of the root block of the spork, (also cached below as
+	// `sporkRootBlockHeight`), for instance if the node joined in an epoch after the last spork.
 	rootHeight uint64
-	// cache the spork root block height because it cannot change over the lifecycle of a protocol state instance
+	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
+	// the state, because it cannot change over the lifecycle of a protocol state instance.
+	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
+	// know the spork's root block in full (though it will always know the height).
 	sporkRootBlockHeight uint64
+	// cache the latest finalized and sealed block headers as these are common queries.
+	// It can be cached because the protocol state is solely responsible for updating these values.
+	cachedFinal  *atomic.Pointer[cachedHeader]
+	cachedSealed *atomic.Pointer[cachedHeader]
 }
 
 var _ protocol.State = (*State)(nil)
 
 type BootstrapConfig struct {
-	// SkipNetworkAddressValidation flags allows skipping all the network address related validations not needed for
-	// an unstaked node
+	// SkipNetworkAddressValidation flags allows skipping all the network address related
+	// validations not needed for an unstaked node
 	SkipNetworkAddressValidation bool
 }
 
@@ -162,6 +180,12 @@ func Bootstrap(
 		state.metrics.FinalizedHeight(highest.Header.Height)
 		for _, block := range segment.Blocks {
 			state.metrics.BlockFinalized(block)
+		}
+
+		// 7) initialize version beacon
+		err = transaction.WithTx(state.boostrapVersionBeacon(root))(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap version beacon: %w", err)
 		}
 
 		return nil
@@ -590,7 +614,11 @@ func OpenState(
 		commits,
 		statuses,
 		versionBeacons,
-	)
+	) // populate the protocol state cache
+	err = state.populateCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to populate cache: %w", err)
+	}
 
 	// report last finalized and sealed block height
 	finalSnapshot := state.Final()
@@ -611,11 +639,6 @@ func OpenState(
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
 	}
-	// populate the protocol state cache
-	err = state.populateCache()
-	if err != nil {
-		return nil, fmt.Errorf("failed to populate cache: %w", err)
-	}
 
 	return state, nil
 }
@@ -627,27 +650,21 @@ func (state *State) Params() protocol.Params {
 // Sealed returns a snapshot for the latest sealed block. A latest sealed block
 // must always exist, so this function always returns a valid snapshot.
 func (state *State) Sealed() protocol.Snapshot {
-	// retrieve the latest sealed height
-	var sealed uint64
-	err := state.db.View(operation.RetrieveSealedHeight(&sealed))
-	if err != nil {
-		// sealed height must always be set, all errors here are critical
-		return invalid.NewSnapshotf("could not retrieve sealed height: %w", err)
+	cached := state.cachedSealed.Load()
+	if cached == nil {
+		return invalid.NewSnapshotf("internal inconsistency: no cached sealed header")
 	}
-	return state.AtHeight(sealed)
+	return NewFinalizedSnapshot(state, cached.id, cached.header)
 }
 
 // Final returns a snapshot for the latest finalized block. A latest finalized
 // block must always exist, so this function always returns a valid snapshot.
 func (state *State) Final() protocol.Snapshot {
-	// retrieve the latest finalized height
-	var finalized uint64
-	err := state.db.View(operation.RetrieveFinalizedHeight(&finalized))
-	if err != nil {
-		// finalized height must always be set, so all errors here are critical
-		return invalid.NewSnapshot(fmt.Errorf("could not retrieve finalized height: %w", err))
+	cached := state.cachedFinal.Load()
+	if cached == nil {
+		return invalid.NewSnapshotf("internal inconsistency: no cached final header")
 	}
-	return state.AtHeight(finalized)
+	return NewFinalizedSnapshot(state, cached.id, cached.header)
 }
 
 // AtHeight returns a snapshot for the finalized block at the given height.
@@ -722,6 +739,8 @@ func newState(
 			statuses: statuses,
 		},
 		versionBeacons: versionBeacons,
+		cachedFinal:    new(atomic.Pointer[cachedHeader]),
+		cachedSealed:   new(atomic.Pointer[cachedHeader]),
 	}
 }
 
@@ -790,20 +809,80 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 	return nil
 }
 
-// populateCache is used after opening or bootstrapping the state to populate the cache.
-func (state *State) populateCache() error {
-	var rootHeight uint64
-	err := state.db.View(operation.RetrieveRootHeight(&rootHeight))
-	if err != nil {
-		return fmt.Errorf("could not read root block to populate cache: %w", err)
-	}
-	state.rootHeight = rootHeight
+// boostrapVersionBeacon bootstraps version beacon, by adding the latest beacon
+// to an index, if present.
+func (state *State) boostrapVersionBeacon(
+	snapshot protocol.Snapshot,
+) func(*badger.Txn) error {
+	return func(txn *badger.Txn) error {
+		versionBeacon, err := snapshot.VersionBeacon()
+		if err != nil {
+			return err
+		}
 
-	sporkRootBlockHeight, err := state.Params().SporkRootBlockHeight()
-	if err != nil {
-		return fmt.Errorf("could not read spork root block height: %w", err)
+		if versionBeacon == nil {
+			return nil
+		}
+
+		return operation.IndexVersionBeaconByHeight(versionBeacon)(txn)
 	}
-	state.sporkRootBlockHeight = sporkRootBlockHeight
+}
+
+// populateCache is used after opening or bootstrapping the state to populate the cache.
+// The cache must be populated before the State receives any queries.
+// No errors expected during normal operations.
+func (state *State) populateCache() error {
+
+	// cache the initial value for finalized block
+	err := state.db.View(func(tx *badger.Txn) error {
+		// root height
+		err := state.db.View(operation.RetrieveRootHeight(&state.rootHeight))
+		if err != nil {
+			return fmt.Errorf("could not read root block to populate cache: %w", err)
+		}
+		// spork root block height
+		err = state.db.View(operation.RetrieveSporkRootBlockHeight(&state.sporkRootBlockHeight))
+		if err != nil {
+			return fmt.Errorf("could not get spork root block height: %w", err)
+		}
+		// finalized header
+		var finalizedHeight uint64
+		err = operation.RetrieveFinalizedHeight(&finalizedHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup finalized height: %w", err)
+		}
+		var cachedFinalHeader cachedHeader
+		err = operation.LookupBlockHeight(finalizedHeight, &cachedFinalHeader.id)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup finalized id (height=%d): %w", finalizedHeight, err)
+		}
+		cachedFinalHeader.header, err = state.headers.ByBlockID(cachedFinalHeader.id)
+		if err != nil {
+			return fmt.Errorf("could not get finalized block (id=%x): %w", cachedFinalHeader.id, err)
+		}
+		state.cachedFinal.Store(&cachedFinalHeader)
+		// sealed header
+		var sealedHeight uint64
+		err = operation.RetrieveSealedHeight(&sealedHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup sealed height: %w", err)
+		}
+		var cachedSealedHeader cachedHeader
+		err = operation.LookupBlockHeight(finalizedHeight, &cachedSealedHeader.id)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup sealed id (height=%d): %w", finalizedHeight, err)
+		}
+		cachedSealedHeader.header, err = state.headers.ByBlockID(cachedSealedHeader.id)
+		if err != nil {
+			return fmt.Errorf("could not get sealed block (id=%x): %w", cachedFinalHeader.id, err)
+		}
+		state.cachedSealed.Store(&cachedSealedHeader)
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("could not cache finalized header: %w", err)
+	}
+
 	return nil
 }
 

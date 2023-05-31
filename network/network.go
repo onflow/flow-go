@@ -9,6 +9,19 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 )
 
+// NetworkingType is the type of the Flow networking layer. It is used to differentiate between the public (i.e., unstaked)
+// and private (i.e., staked) networks.
+type NetworkingType uint8
+
+const (
+	// PrivateNetwork indicates that the staked private-side of the Flow blockchain that nodes can only join and leave
+	// with a staking requirement.
+	PrivateNetwork NetworkingType = iota + 1
+	// PublicNetwork indicates that the unstaked public-side of the Flow blockchain that nodes can join and leave at will
+	// with no staking requirement.
+	PublicNetwork
+)
+
 // Network represents the network layer of the node. It allows processes that
 // work across the peer-to-peer network to register themselves as an engine with
 // a unique engine ID. The returned conduit allows the process to communicate to
