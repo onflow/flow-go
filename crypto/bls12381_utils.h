@@ -6,6 +6,7 @@
 #define _BLS12_381_UTILS_H
 
 #include <string.h>
+#include <stdint.h>
 #include "blst_include.h"
 
 typedef uint8_t byte;
