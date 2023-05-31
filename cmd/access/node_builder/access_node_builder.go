@@ -217,7 +217,7 @@ type FlowAccessNodeBuilder struct {
 	CollectionsToMarkFinalized *stdmap.Times
 	CollectionsToMarkExecuted  *stdmap.Times
 	BlocksToMarkExecuted       *stdmap.Times
-	TransactionMetrics         module.TransactionMetrics
+	TransactionMetrics         *metrics.TransactionCollector
 	AccessMetrics              module.AccessMetrics
 	PingMetrics                module.PingMetrics
 	Committee                  hotstuff.DynamicCommittee
@@ -759,21 +759,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	topology network.Topology,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
-	cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-		Logger:                  builder.Logger,
-		SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
-		SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
-		DisablePenalty:          builder.AlspConfig.DisablePenalty,
-		AlspMetrics:             builder.Metrics.Network,
-		NetworkType:             network.PublicNetwork,
-		HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize conduit factory: %w", err)
-	}
-
-	// creates network instance
-	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
 		Logger:              builder.Logger,
 		Codec:               cborcodec.NewCodec(),
 		Me:                  nodeID,
@@ -783,7 +769,17 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		Metrics:             networkMetrics,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
-		ConduitFactory:      cf,
+		ConduitFactory:      conduit.NewDefaultConduitFactory(),
+		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  builder.Logger,
+			SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
+			SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
+			DisablePenalty:          builder.AlspConfig.DisablePenalty,
+			HeartBeatInterval:       builder.AlspConfig.HearBeatInterval,
+			AlspMetrics:             builder.Metrics.Network,
+			NetworkType:             network.PublicNetwork,
+			HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -964,12 +960,20 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return err
 		}).
 		Module("transaction metrics", func(node *cmd.NodeConfig) error {
-			builder.TransactionMetrics = metrics.NewTransactionCollector(builder.TransactionTimings, node.Logger, builder.logTxTimeToFinalized,
-				builder.logTxTimeToExecuted, builder.logTxTimeToFinalizedExecuted)
+			builder.TransactionMetrics = metrics.NewTransactionCollector(
+				node.Logger,
+				builder.TransactionTimings,
+				builder.logTxTimeToFinalized,
+				builder.logTxTimeToExecuted,
+				builder.logTxTimeToFinalizedExecuted,
+			)
 			return nil
 		}).
 		Module("access metrics", func(node *cmd.NodeConfig) error {
-			builder.AccessMetrics = metrics.NewAccessCollector()
+			builder.AccessMetrics = metrics.NewAccessCollector(
+				metrics.WithTransactionMetrics(builder.TransactionMetrics),
+				metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
+			)
 			return nil
 		}).
 		Module("ping metrics", func(node *cmd.NodeConfig) error {
@@ -1000,7 +1004,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Receipts,
 				node.Storage.Results,
 				node.RootChainID,
-				builder.TransactionMetrics,
 				builder.AccessMetrics,
 				builder.collectionGRPCPort,
 				builder.executionGRPCPort,
@@ -1054,7 +1057,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Transactions,
 				node.Storage.Results,
 				node.Storage.Receipts,
-				builder.TransactionMetrics,
+				builder.AccessMetrics,
 				builder.CollectionsToMarkFinalized,
 				builder.CollectionsToMarkExecuted,
 				builder.BlocksToMarkExecuted,

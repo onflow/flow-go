@@ -13,12 +13,10 @@ import (
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
-	"collecting partner network and staking keys" +
+const rootBlockHappyPathLogs = "collecting partner network and staking keys" +
 	`read \d+ partner node configuration files` +
 	`read \d+ weights for partner nodes` +
 	"generating internal private networking and staking keys" +
@@ -42,7 +40,6 @@ const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
 var rootBlockHappyPathRegex = regexp.MustCompile(rootBlockHappyPathLogs)
 
 func TestRootBlock_HappyPath(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
 	rootHeight := uint64(12332)
@@ -60,9 +57,6 @@ func TestRootBlock_HappyPath(t *testing.T) {
 		flagRootChain = chainName
 		flagRootHeight = rootHeight
 
-		// set deterministic bootstrapping seed
-		flagBootstrapRandomSeed = deterministicSeed
-
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
 
@@ -77,7 +71,6 @@ func TestRootBlock_HappyPath(t *testing.T) {
 }
 
 func TestRootBlock_Deterministic(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
 	rootHeight := uint64(1000)
@@ -94,9 +87,6 @@ func TestRootBlock_Deterministic(t *testing.T) {
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootChain = chainName
 		flagRootHeight = rootHeight
-
-		// set deterministic bootstrapping seed
-		flagBootstrapRandomSeed = deterministicSeed
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)

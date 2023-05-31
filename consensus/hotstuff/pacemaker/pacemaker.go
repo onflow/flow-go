@@ -27,11 +27,12 @@ import (
 //
 // Not concurrency safe.
 type ActivePaceMaker struct {
-	ctx            context.Context
-	timeoutControl *timeout.Controller
-	notifier       hotstuff.Consumer
-	viewTracker    viewTracker
-	started        bool
+	ctx                      context.Context
+	timeoutControl           *timeout.Controller
+	proposalDurationProvider ProposalDurationProvider
+	notifier                 hotstuff.Consumer
+	viewTracker              viewTracker
+	started                  bool
 }
 
 var _ hotstuff.PaceMaker = (*ActivePaceMaker)(nil)
@@ -45,6 +46,7 @@ var _ hotstuff.PaceMaker = (*ActivePaceMaker)(nil)
 // * model.ConfigurationError if initial LivenessData is invalid
 func New(
 	timeoutController *timeout.Controller,
+	proposalDurationProvider ProposalDurationProvider,
 	notifier hotstuff.Consumer,
 	persist hotstuff.Persister,
 	recovery ...recoveryInformation,
@@ -55,10 +57,11 @@ func New(
 	}
 
 	pm := &ActivePaceMaker{
-		timeoutControl: timeoutController,
-		notifier:       notifier,
-		viewTracker:    vt,
-		started:        false,
+		timeoutControl:           timeoutController,
+		proposalDurationProvider: proposalDurationProvider,
+		notifier:                 notifier,
+		viewTracker:              vt,
+		started:                  false,
 	}
 	for _, recoveryAction := range recovery {
 		err = recoveryAction(pm)
@@ -86,7 +89,10 @@ func (p *ActivePaceMaker) LastViewTC() *flow.TimeoutCertificate { return p.viewT
 func (p *ActivePaceMaker) TimeoutChannel() <-chan time.Time { return p.timeoutControl.Channel() }
 
 // BlockRateDelay returns the delay for broadcasting its own proposals.
-func (p *ActivePaceMaker) BlockRateDelay() time.Duration { return p.timeoutControl.BlockRateDelay() }
+// todo rename?
+func (p *ActivePaceMaker) BlockRateDelay() time.Duration {
+	return p.proposalDurationProvider.ProposalDuration()
+}
 
 // ProcessQC notifies the pacemaker with a new QC, which might allow pacemaker to
 // fast-forward its view. In contrast to `ProcessTC`, this function does _not_ handle `nil` inputs.
@@ -220,4 +226,28 @@ func WithTCs(tcs ...*flow.TimeoutCertificate) recoveryInformation {
 		}
 		return nil
 	}
+}
+
+// ProposalDurationProvider provides the ProposalDelay to the Pacemaker.
+// The ProposalDelay is the time a leader should attempt to consume between
+// entering a view and broadcasting its proposal for that view.
+type ProposalDurationProvider interface {
+	ProposalDuration() time.Duration
+}
+
+// StaticProposalDurationProvider is a ProposalDurationProvider which provides a static ProposalDuration.
+type StaticProposalDurationProvider struct {
+	dur time.Duration
+}
+
+func NewStaticProposalDurationProvider(dur time.Duration) StaticProposalDurationProvider {
+	return StaticProposalDurationProvider{dur: dur}
+}
+
+func (p StaticProposalDurationProvider) ProposalDuration() time.Duration {
+	return p.dur
+}
+
+func NoProposalDelay() StaticProposalDurationProvider {
+	return NewStaticProposalDurationProvider(0)
 }
