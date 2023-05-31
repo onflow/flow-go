@@ -41,23 +41,46 @@ type pointE1 C.E1
 type pointE2 C.E2
 type scalar C.Fr
 
-// TODO: For now scalars are represented as field elements Fr since all scalars
-// are less than r - check if distinguishing two types in necessary
+// Note that scalars and field elements F_r are represented in Go by the same type
+// called `scalar`, which is internally represented by C type `Fr`. Scalars used by the
+// Go layer are all reduced modulo the curve order `r`.
 
-// BLS12-381 related lengths
-var frBytesLen = int(C.get_Fr_BYTES())
+const (
+	// BLS12-381 related lengths imported from the C layer
+	frBytesLen = int(C.Fr_BYTES)
+	fpBytesLen = int(C.Fp_BYTES)
+	g1BytesLen = int(C.G1_SER_BYTES)
+	g2BytesLen = int(C.G2_SER_BYTES)
 
-// get some constants from the C layer
-// (Cgo does not export C macros)
-var valid = C.get_valid()
-var invalid = C.get_invalid()
+	// error constants imported from the C layer
+	valid           = C.VALID
+	invalid         = C.INVALID
+	badEncoding     = C.BAD_ENCODING
+	badValue        = C.BAD_VALUE
+	pointNotOnCurve = C.POINT_NOT_ON_CURVE
+)
 
-// get some constants from the C layer
-// var blst_errors = C.blst_get_errors()
-var blst_valid = (int)(C.BLST_SUCCESS)
-var blst_bad_encoding = (int)(C.BLST_BAD_ENCODING)
-var blst_bad_scalar = (int)(C.BLST_BAD_SCALAR)
-var blst_point_not_on_curve = (int)(C.BLST_POINT_NOT_ON_CURVE)
+// header of the point at infinity serializations
+var g1SerHeader byte // g1
+var g2SerHeader byte // g2
+
+// `g1“ serialization
+var g1Serialization []byte
+
+// initialization of BLS12-381 curve
+func initBLS12381() {
+	if isG1Compressed() {
+		g1SerHeader = 0xC0
+	} else {
+		g1SerHeader = 0x40
+	}
+	g1Serialization = append([]byte{g1SerHeader}, make([]byte, g1BytesLen-1)...)
+	if isG2Compressed() {
+		g2SerHeader = 0xC0
+	} else {
+		g2SerHeader = 0x40
+	}
+}
 
 func (a *scalar) String() string {
 	encoding := make([]byte, frBytesLen)
@@ -66,7 +89,7 @@ func (a *scalar) String() string {
 }
 
 func (p *pointE2) String() string {
-	encoding := make([]byte, pubKeyLengthBLSBLS12381)
+	encoding := make([]byte, g2BytesLen)
 	writePointE2(encoding, p)
 	return fmt.Sprintf("%#x", encoding)
 }
@@ -89,28 +112,28 @@ func generatorScalarMultG2(res *pointE2, expo *scalar) {
 // comparison in Fr where r is the group order of G1/G2
 // (both scalars should be reduced mod r)
 func (x *scalar) equals(other *scalar) bool {
-	return C.Fr_is_equal((*C.Fr)(x), (*C.Fr)(other)) != 0
+	return bool(C.Fr_is_equal((*C.Fr)(x), (*C.Fr)(other)))
 }
 
 // comparison in E1
 func (p *pointE1) equals(other *pointE1) bool {
-	return C.E1_is_equal((*C.E1)(p), (*C.E1)(other)) != 0
+	return bool(C.E1_is_equal((*C.E1)(p), (*C.E1)(other)))
 }
 
 // comparison in E2
 func (p *pointE2) equals(other *pointE2) bool {
-	return C.E2_is_equal((*C.E2)(p), (*C.E2)(other)) != 0
+	return bool(C.E2_is_equal((*C.E2)(p), (*C.E2)(other)))
 }
 
 // Comparison to zero in Fr.
 // Scalar must be already reduced modulo r
 func (x *scalar) isZero() bool {
-	return C.Fr_is_zero((*C.Fr)(x)) != 0
+	return bool(C.Fr_is_zero((*C.Fr)(x)))
 }
 
 // Comparison to point at infinity in G2.
 func (p *pointE2) isInfinity() bool {
-	return C.E2_is_infty((*C.E2)(p)) != 0
+	return bool(C.E2_is_infty((*C.E2)(p)))
 }
 
 // generates a random element in F_r using input random source,
@@ -142,7 +165,7 @@ func mapToFr(x *scalar, src []byte) bool {
 	isZero := C.map_bytes_to_Fr((*C.Fr)(x),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
-	return isZero != (C.ulonglong)(0)
+	return bool(isZero)
 }
 
 // writeScalar writes a scalar in a slice of bytes
@@ -151,14 +174,14 @@ func writeScalar(dest []byte, x *scalar) {
 }
 
 // writePointE2 writes a G2 point in a slice of bytes
-// The slice should be of size PubKeyLenBLSBLS12381 and the serialization
+// The slice should be of size g2BytesLen and the serialization
 // follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func writePointE2(dest []byte, a *pointE2) {
 	C.E2_write_bytes((*C.uchar)(&dest[0]), (*C.E2)(a))
 }
 
 // writePointE1 writes a G1 point in a slice of bytes
-// The slice should be of size SignatureLenBLSBLS12381 and the serialization
+// The slice should be of size g1BytesLen and the serialization
 // follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func writePointE1(dest []byte, a *pointE1) {
 	C.E1_write_bytes((*C.uchar)(&dest[0]), (*C.E1)(a))
@@ -172,22 +195,21 @@ func readScalarFrStar(a *scalar, src []byte) error {
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
 
-	switch int(read) {
-	case blst_valid:
+	switch read {
+	case valid:
 		return nil
-	case blst_bad_encoding:
+	case badEncoding:
 		return invalidInputsErrorf("input length must be %d, got %d",
 			frBytesLen, len(src))
-	case blst_bad_scalar:
+	case badValue:
 		return invalidInputsErrorf("scalar is not in the correct range w.r.t the BLS12-381 curve")
 	default:
 		return invalidInputsErrorf("reading the scalar failed")
 	}
-
 }
 
 // readPointE2 reads a E2 point from a slice of bytes
-// The slice is expected to be of size PubKeyLenBLSBLS12381 and the deserialization
+// The slice is expected to be of size g2BytesLen and the deserialization
 // follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves.
 // No G2 membership check is performed.
 func readPointE2(a *pointE2, src []byte) error {
@@ -195,12 +217,12 @@ func readPointE2(a *pointE2, src []byte) error {
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
 
-	switch int(read) {
-	case blst_valid:
+	switch read {
+	case valid:
 		return nil
-	case blst_bad_encoding, blst_bad_scalar:
+	case badEncoding, badValue:
 		return invalidInputsErrorf("input could not deserialize to a E2 point")
-	case blst_point_not_on_curve:
+	case pointNotOnCurve:
 		return invalidInputsErrorf("input is not a point on curve E2")
 	default:
 		return errors.New("reading E2 point failed")
@@ -208,7 +230,7 @@ func readPointE2(a *pointE2, src []byte) error {
 }
 
 // readPointE1 reads a E1 point from a slice of bytes
-// The slice should be of size SignatureLenBLSBLS12381 and the deserialization
+// The slice should be of size g1BytesLen and the deserialization
 // follows the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves.
 // No G1 membership check is performed.
 func readPointE1(a *pointE1, src []byte) error {
@@ -216,12 +238,12 @@ func readPointE1(a *pointE1, src []byte) error {
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
 
-	switch int(read) {
-	case blst_valid:
+	switch read {
+	case valid:
 		return nil
-	case blst_bad_encoding, blst_bad_scalar:
+	case badEncoding, badValue:
 		return invalidInputsErrorf("input could not deserialize to a E1 point")
-	case blst_point_not_on_curve:
+	case pointNotOnCurve:
 		return invalidInputsErrorf("input is not a point on curve E1")
 	default:
 		return errors.New("reading E1 point failed")
@@ -231,13 +253,13 @@ func readPointE1(a *pointE1, src []byte) error {
 // checkMembershipG1 wraps a call to a subgroup check in G1 since cgo can't be used
 // in go test files.
 func checkMembershipG1(pt *pointE1) bool {
-	return C.E1_in_G1((*C.E1)(pt)) != (C.ulonglong)(0)
+	return bool(C.E1_in_G1((*C.E1)(pt)))
 }
 
 // checkMembershipG2 wraps a call to a subgroup check in G2 since cgo can't be used
 // in go test files.
 func checkMembershipG2(pt *pointE2) bool {
-	return C.E2_in_G2((*C.E2)(pt)) != (C.ulonglong)(0)
+	return bool(C.E2_in_G2((*C.E2)(pt)))
 }
 
 // This is only a TEST/DEBUG/BENCH function.
@@ -260,9 +282,8 @@ func unsafeMapToG1(pt *pointE1, seed []byte) {
 
 // unsafeMapToG1Complement is a test function, it wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in E2\G2 and stores it in input point.
-func unsafeMapToG1Complement(pt *pointE1, seed []byte) bool {
-	res := C.unsafe_map_bytes_to_G1complement((*C.E1)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
-	return int(res) == blst_valid
+func unsafeMapToG1Complement(pt *pointE1, seed []byte) {
+	C.unsafe_map_bytes_to_G1complement((*C.E1)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
 }
 
 // unsafeMapToG2 is a test function, it wraps a call to C since cgo can't be used in go test files.
@@ -274,9 +295,8 @@ func unsafeMapToG2(pt *pointE2, seed []byte) {
 
 // unsafeMapToG2Complement is a test function, it wraps a call to C since cgo can't be used in go test files.
 // It generates a random point in E2\G2 and stores it in input point.
-func unsafeMapToG2Complement(pt *pointE2, seed []byte) bool {
-	res := C.unsafe_map_bytes_to_G2complement((*C.E2)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
-	return int(res) == blst_valid
+func unsafeMapToG2Complement(pt *pointE2, seed []byte) {
+	C.unsafe_map_bytes_to_G2complement((*C.E2)(pt), (*C.uchar)(&seed[0]), (C.int)(len(seed)))
 }
 
 // This is only a TEST function.
@@ -303,7 +323,15 @@ func hashToG1Bytes(data, dst []byte) []byte {
 	}
 
 	// serialize the point
-	pointBytes := make([]byte, signatureLengthBLSBLS12381)
+	pointBytes := make([]byte, g1BytesLen)
 	writePointE1(pointBytes, &point)
 	return pointBytes
+}
+
+func isG1Compressed() bool {
+	return g1BytesLen == fpBytesLen
+}
+
+func isG2Compressed() bool {
+	return g2BytesLen == 2*fpBytesLen
 }

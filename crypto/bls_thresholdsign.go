@@ -399,10 +399,10 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 		return nil, notEnoughSharesErrorf("number of signature shares %d is not enough, %d are required",
 			len(s.shares), s.threshold+1)
 	}
-	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
+	thresholdSignature := make([]byte, SignatureLenBLSBLS12381)
 
 	// prepare the C layer inputs
-	shares := make([]byte, 0, len(s.shares)*signatureLengthBLSBLS12381)
+	shares := make([]byte, 0, len(s.shares)*SignatureLenBLSBLS12381)
 	signers := make([]index, 0, len(s.shares))
 	for index, share := range s.shares {
 		shares = append(shares, share...)
@@ -437,10 +437,14 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 //
 // size is the number of participants, it must be in the range [ThresholdSignMinSize..ThresholdSignMaxSize].
 // threshold is the threshold value, it must be in the range [MinimumThreshold..size-1].
-// The function does not check the validity of the shares, and does not check
-// the validity of the resulting signature.
+// The function does not accept any input public key. Therefore, it does not check the validity of the
+// shares against individual public keys, and does not check the validity of the resulting signature
+// against the group public key.
 // BLSReconstructThresholdSignature returns:
-//   - (nil, error) if the inputs are not in the correct range, if the threshold is not reached
+//   - (nil, invalidInputsError) if :
+//     -- numbers of shares does not match the number of signers
+//     -- the inputs are not in the correct range.
+//   - (nil, notEnoughSharesError) if the threshold is not reached.
 //   - (nil, duplicatedSignerError) if input signers are not distinct.
 //   - (nil, invalidSignatureError) if at least one of the first (threshold+1) signatures.
 //     does not serialize to a valid E1 point.
@@ -470,15 +474,15 @@ func BLSReconstructThresholdSignature(size int, threshold int,
 	}
 
 	if len(shares) < threshold+1 {
-		return nil, invalidInputsErrorf(
-			"the number of signatures does not reach the threshold")
+		return nil, notEnoughSharesErrorf(
+			"the number of signatures %d is less than the minimum %d", len(shares), threshold+1)
 	}
 
 	// map to check signers are distinct
 	m := make(map[index]bool)
 
 	// flatten the shares (required by the C layer)
-	flatShares := make([]byte, 0, signatureLengthBLSBLS12381*(threshold+1))
+	flatShares := make([]byte, 0, SignatureLenBLSBLS12381*(threshold+1))
 	indexSigners := make([]index, 0, threshold+1)
 	for i, share := range shares {
 		flatShares = append(flatShares, share...)
@@ -496,7 +500,7 @@ func BLSReconstructThresholdSignature(size int, threshold int,
 		indexSigners = append(indexSigners, index(signers[i])+1)
 	}
 
-	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
+	thresholdSignature := make([]byte, SignatureLenBLSBLS12381)
 	// Lagrange Interpolate at point 0
 	if C.E1_lagrange_interpolate_at_zero_write(
 		(*C.uchar)(&thresholdSignature[0]),

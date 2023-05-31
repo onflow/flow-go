@@ -9,25 +9,6 @@
 // compile all blst C src along with this file
 #include "blst_src.c"
 
-// The functions are tested for ALLOC=AUTO (not for ALLOC=DYNAMIC)
-
-// return macro values to the upper Go Layer
-int get_valid() {
-    return VALID;
-}
-
-int get_invalid() {
-    return INVALID;
-}
-
-int get_Fr_BYTES() {
-    return Fr_BYTES;
-}
-
-int get_mapToG1_input_len() {
-    return MAP_TO_G1_INPUT_LEN;
-}
-
 // ------------------- Fr utilities
 
 // Montgomery constant R related to the curve order r
@@ -35,15 +16,15 @@ int get_mapToG1_input_len() {
 const Fr BLS12_381_rR = {{  \
     TO_LIMB_T(0x1824b159acc5056f), TO_LIMB_T(0x998c4fefecbc4ff5), \
     TO_LIMB_T(0x5884b7fa00034802), TO_LIMB_T(0x00000001fffffffe), \
-    }};
+}};
 
 // returns true if a == 0 and false otherwise
-bool_t Fr_is_zero(const Fr* a) {
+bool Fr_is_zero(const Fr* a) {
     return bytes_are_zero((const byte*)a, sizeof(Fr));
 }
 
 // returns true if a == b and false otherwise
-bool_t Fr_is_equal(const Fr* a, const Fr* b) {
+bool Fr_is_equal(const Fr* a, const Fr* b) {
     return vec_is_equal(a, b, sizeof(Fr));
 }
 
@@ -191,40 +172,40 @@ static void pow256_from_Fr(pow256 ret, const Fr* in) {
 // reads a scalar in `a` and checks it is a valid Fr element (a < r).
 // input is bytes-big-endian.
 // returns:
-//    - BLST_BAD_ENCODING if the length is invalid
-//    - BLST_BAD_SCALAR if the scalar isn't in Fr
-//    - BLST_SUCCESS if the scalar is valid 
-BLST_ERROR Fr_read_bytes(Fr* a, const byte *bin, int len) {
+//    - BAD_ENCODING if the length is invalid
+//    - BAD_VALUE if the scalar isn't in Fr
+//    - VALID if the scalar is valid 
+ERROR Fr_read_bytes(Fr* a, const byte *bin, int len) {
     if (len != Fr_BYTES) {
-        return BLST_BAD_ENCODING;
+        return BAD_ENCODING;
     }
     pow256 tmp;
     // compare to r using the provided tool from BLST 
     pow256_from_be_bytes(tmp, bin);  // TODO: check endianness!!
     if (!check_mod_256(tmp, BLS12_381_r)) {  // check_mod_256 compares pow256 against a vec256!
-        return BLST_BAD_SCALAR;
+        return BAD_VALUE;
     }
     vec_zero(tmp, sizeof(tmp));
     limbs_from_be_bytes((limb_t*)a, bin, Fr_BYTES); // TODO: check endianness!!
-    return BLST_SUCCESS;
+    return VALID;
 }
 
 // reads a scalar in `a` and checks it is a valid Fr_star element (0 < a < r).
 // input bytes are big endian.
 // returns:
-//    - BLST_BAD_ENCODING if the length is invalid
-//    - BLST_BAD_SCALAR if the scalar isn't in Fr_star
-//    - BLST_SUCCESS if the scalar is valid 
-BLST_ERROR Fr_star_read_bytes(Fr* a, const byte *bin, int len) {
+//    - BAD_ENCODING if the length is invalid
+//    - BAD_VALUE if the scalar isn't in Fr_star
+//    - VALID if the scalar is valid 
+ERROR Fr_star_read_bytes(Fr* a, const byte *bin, int len) {
     int ret = Fr_read_bytes(a, bin, len);
-    if (ret != BLST_SUCCESS) {
+    if (ret != VALID) {
         return ret;
     }
     // check if a=0
     if (Fr_is_zero(a)) {
-        return BLST_BAD_SCALAR;
+        return BAD_VALUE;
     }
-    return BLST_SUCCESS;
+    return VALID;
 }
 
 // write Fr element `a` in big endian bytes.
@@ -265,7 +246,7 @@ static void Fr_from_be_bytes(Fr* out, const byte *bytes, size_t n)
 // Reads a scalar from an array and maps it to Fr using modular reduction.
 // Input is byte-big-endian as used by the external APIs.
 // It returns true if scalar is zero and false otherwise.
-bool_t map_bytes_to_Fr(Fr* a, const byte* bin, int len) {
+bool map_bytes_to_Fr(Fr* a, const byte* bin, int len) {
     Fr_from_be_bytes(a, bin, len);
     return Fr_is_zero(a);
 }
@@ -311,7 +292,7 @@ static void Fp_neg(Fp *res, const Fp *a) {
 // The boolean output is valid whether `a` is in Montgomery form or not,
 // since montgomery constant `R` is a quadratic residue.
 // However, the square root is valid only if `a` is in montgomery form.
-static bool_t Fp_sqrt_montg(Fp *res, const Fp* a) {
+static bool Fp_sqrt_montg(Fp *res, const Fp* a) {
    return sqrt_fp((limb_t*)res, (limb_t*)a);
 }
 
@@ -348,19 +329,19 @@ void Fp_from_montg(Fp *res, const Fp *a) {
 // reads a scalar in `a` and checks it is a valid Fp element (a < p).
 // input is bytes-big-endian.
 // returns:
-//    - BLST_BAD_ENCODING if the length is invalid
-//    - BLST_BAD_SCALAR if the scalar isn't in Fp
-//    - BLST_SUCCESS if the scalar is valid 
-BLST_ERROR Fp_read_bytes(Fp* a, const byte *bin, int len) {
+//    - BAD_ENCODING if the length is invalid
+//    - BAD_VALUE if the scalar isn't in Fp
+//    - VALID if the scalar is valid 
+ERROR Fp_read_bytes(Fp* a, const byte *bin, int len) {
     if (len != Fp_BYTES) {
-        return BLST_BAD_ENCODING;
+        return BAD_ENCODING;
     }
     limbs_from_be_bytes((limb_t*)a, bin, Fp_BYTES);
     // compare read scalar to p
     if (!Fp_check(a)) {
-        return BLST_BAD_ENCODING;
+        return BAD_VALUE;
     }       
-    return BLST_SUCCESS;
+    return VALID;
 }
 
 
@@ -415,7 +396,7 @@ static void Fp2_squ_montg(Fp2 *res, const Fp2 *a) {
 // The boolean output is valid whether `a` is in Montgomery form or not,
 // since montgomery constant `R` is a quadratic residue.
 // However, the square root is valid only if `a` is in montgomery form.
-static bool_t Fp2_sqrt_montg(Fp2 *res, const Fp2* a) {
+static bool Fp2_sqrt_montg(Fp2 *res, const Fp2* a) {
    return sqrt_fp2((vec384*)res, (vec384*)a);
 }
 
@@ -432,22 +413,22 @@ static byte Fp2_get_sign(Fp2* y) {
 // input is a serialization of real(a) concatenated to serializetion of imag(a).
 // a[i] are both Fp elements.
 // returns:
-//    - BLST_BAD_ENCODING if the length is invalid
-//    - BLST_BAD_SCALAR if the scalar isn't in Fp
-//    - BLST_SUCCESS if the scalar is valid 
-static BLST_ERROR Fp2_read_bytes(Fp2* a, const byte *bin, int len) {
+//    - BAD_ENCODING if the length is invalid
+//    - BAD_VALUE if the scalar isn't in Fp
+//    - VALID if the scalar is valid 
+static ERROR Fp2_read_bytes(Fp2* a, const byte *bin, int len) {
     if (len != Fp2_BYTES) {
-        return BLST_BAD_ENCODING;
+        return BAD_ENCODING;
     }
-    BLST_ERROR ret = Fp_read_bytes(&real(a), bin, Fp_BYTES);
-    if (ret != BLST_SUCCESS) {
+    ERROR ret = Fp_read_bytes(&real(a), bin, Fp_BYTES);
+    if (ret != VALID) {
         return ret;
     }
     ret = Fp_read_bytes(&imag(a), bin + Fp_BYTES, Fp_BYTES);
-    if ( ret != BLST_SUCCESS) {
+    if ( ret != VALID) {
         return ret;
     }
-    return BLST_SUCCESS;
+    return VALID;
 }
 
 // write Fp2 element to bin and assume `bin` has `Fp2_BYTES` allocated bytes.  
@@ -466,13 +447,13 @@ void E1_copy(E1* res, const E1* p) {
 }
 
 // checks p1 == p2
-bool_t E1_is_equal(const E1* p1, const E1* p2) {
+bool E1_is_equal(const E1* p1, const E1* p2) {
     // `POINTonE1_is_equal` includes the infinity case
     return POINTonE1_is_equal((const POINTonE1*)p1, (const POINTonE1*)p2);
 }
 
 // compare p to infinity
-bool_t E1_is_infty(const E1* p) {
+bool E1_is_infty(const E1* p) {
     // BLST infinity points are defined by Z=0
     return vec_is_zero(p->z, sizeof(p->z));  
 }
@@ -495,14 +476,14 @@ void E1_to_affine(E1* res, const E1* p) {
 }
 
 // checks affine point `p` is in E1
-bool_t E1_affine_on_curve(const E1* p) {
+bool E1_affine_on_curve(const E1* p) {
     // BLST's `POINTonE1_affine_on_curve` does not include the inifity case!
     return POINTonE1_affine_on_curve((POINTonE1_affine*)p) | E1_is_infty(p);
 }
 
 // checks if input E1 point is on the subgroup G1.
 // It assumes input `p` is on E1.
-bool_t E1_in_G1(const E1* p){
+bool E1_in_G1(const E1* p){
     // currently uses Scott method
     return POINTonE1_in_G1((const POINTonE1*)p);
 }
@@ -513,23 +494,23 @@ bool_t E1_in_G1(const E1* p){
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
 //
 // returns:
-//    - BLST_BAD_ENCODING if the length is invalid or serialization header bits are invalid
-//    - BLST_BAD_SCALAR if Fp coordinates couldn't deserialize
-//    - BLST_POINT_NOT_ON_CURVE if deserialized point isn't on E1
-//    - BLST_SUCCESS if deserialization is valid 
+//    - BAD_ENCODING if the length is invalid or serialization header bits are invalid
+//    - BAD_VALUE if Fp coordinates couldn't deserialize
+//    - POINT_NOT_ON_CURVE if deserialized point isn't on E1
+//    - VALID if deserialization is valid 
 
 // TODO: replace with POINTonE1_Deserialize_BE and POINTonE1_Uncompress_Z, 
 //       and update logic with G2 subgroup check?
-BLST_ERROR E1_read_bytes(E1* a, const byte *bin, const int len) {
+ERROR E1_read_bytes(E1* a, const byte *bin, const int len) {
     // check the length
     if (len != G1_SER_BYTES) {
-        return BLST_BAD_ENCODING;
+        return BAD_ENCODING;
     }
 
     // check the compression bit
     int compressed = bin[0] >> 7;
     if ((compressed == 1) != (G1_SERIALIZATION == COMPRESSED)) {
-        return BLST_BAD_ENCODING;
+        return BAD_ENCODING;
     } 
 
     // check if the point in infinity
@@ -537,60 +518,62 @@ BLST_ERROR E1_read_bytes(E1* a, const byte *bin, const int len) {
     if (is_infinity) {
         // the remaining bits need to be cleared
         if (bin[0] & 0x3F) {
-            return BLST_BAD_ENCODING;
+            return BAD_ENCODING;
         }
         for (int i=1; i<G1_SER_BYTES-1; i++) {
             if (bin[i]) {
-                return BLST_BAD_ENCODING;
+                return BAD_ENCODING;
             } 
         }
 		E1_set_infty(a);
-		return BLST_SUCCESS;
+		return VALID;
 	} 
 
     // read the sign bit and check for consistency
     int y_sign = (bin[0] >> 5) & 1;
     if (y_sign && (!compressed)) {
-        return BLST_BAD_ENCODING;
+        return BAD_ENCODING;
     } 
     
     // use a temporary buffer to mask the header bits and read a.x
     byte temp[Fp_BYTES];
     memcpy(temp, bin, Fp_BYTES);
     temp[0] &= 0x1F;        // clear the header bits
-    BLST_ERROR ret = Fp_read_bytes(&a->x, temp, sizeof(temp));
-    if (ret != BLST_SUCCESS) {
+    ERROR ret = Fp_read_bytes(&a->x, temp, sizeof(temp));
+    if (ret != VALID) {
         return ret;
     }
+    Fp_to_montg(&a->x, &a->x);
 
     // set a.z to 1
     Fp_copy(&a->z, &BLS12_381_pR);
 
     if (G1_SERIALIZATION == UNCOMPRESSED) {
         ret = Fp_read_bytes(&a->y, bin + Fp_BYTES, sizeof(a->y));
-        if (ret != BLST_SUCCESS){ 
+        if (ret != VALID){ 
             return ret;
         }
+        Fp_to_montg(&a->y, &a->y);
         // check read point is on curve
         if (!E1_affine_on_curve(a)) { 
-            return BLST_POINT_NOT_ON_CURVE;
+            return POINT_NOT_ON_CURVE;
         }
-        return BLST_SUCCESS;
+        return VALID;
     }
     
     // compute the possible square root
-    Fp_to_montg(&a->x, &a->x);
     Fp_squ_montg(&a->y, &a->x);
     Fp_mul_montg(&a->y, &a->y, &a->x);    // x^3
     Fp_add(&a->y, &a->y, &B_E1);          // B_E1 is already in Montg form             
-    if (!Fp_sqrt_montg(&a->y, &a->y))     // check whether x^3+b is a quadratic residue
-        return BLST_POINT_NOT_ON_CURVE; 
+    if (!Fp_sqrt_montg(&a->y, &a->y)) {    // check whether x^3+b is a quadratic residue
+        return POINT_NOT_ON_CURVE; 
+    }
 
     // resulting (x,y) is guaranteed to be on curve (y is already in Montg form)
     if (Fp_get_sign(&a->y) != y_sign) {
         Fp_neg(&a->y, &a->y); // flip y sign if needed
     }
-    return BLST_SUCCESS;
+    return VALID;
 }
 
 // E1_write_bytes exports a point in E1(Fp) to a buffer in a compressed or uncompressed form.
@@ -668,7 +651,7 @@ int E1_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int sigs_len) {
     // import the points from the array
     for (int i=0; i < n; i++) {
         // deserialize each point from the input array
-        if  (E1_read_bytes(&sigs[i], &sigs_bytes[G1_SER_BYTES*i], G1_SER_BYTES) != BLST_SUCCESS) {
+        if  (E1_read_bytes(&sigs[i], &sigs_bytes[G1_SER_BYTES*i], G1_SER_BYTES) != VALID) {
             error = INVALID; 
             goto out;
         }
@@ -725,9 +708,34 @@ int map_to_G1(E1* h, const byte* hash, const int len) {
     return VALID;
 }
 
+// maps the bytes to a point in G1.
+// `len` should be at least Fr_BYTES.
+// this is a testing file only, should not be used in any protocol!
+void unsafe_map_bytes_to_G1(E1* p, const byte* bytes, int len) {
+    assert(len >= Fr_BYTES);
+    // map to Fr
+    Fr log;
+    map_bytes_to_Fr(&log, bytes, len);
+    // multiplies G1 generator by a random scalar
+    G1_mult_gen(p, &log);
+}
+
+// maps bytes to a point in E1\G1. 
+// `len` must be at least 96 bytes.
+// this is a testing file only, should not be used in any protocol!
+void unsafe_map_bytes_to_G1complement(E1* p, const byte* bytes, int len) {
+    assert(len >= 96);
+    Fp u;
+    map_96_bytes_to_Fp(&u, bytes, 96);
+    // map to E1's isogenous and then to E1
+    map_to_isogenous_E1((POINTonE1 *)p, u);
+    isogeny_map_to_E1((POINTonE1 *)p, (POINTonE1 *)p);
+    // clear G1 order
+    E1_mult(p, p, (Fr*)&BLS12_381_r);
+}
+
 // ------------------- E2 utilities
 
-const E1* BLS12_381_g1 = (const E1*)&BLS12_381_G1; /// TODO:delete
 const E2* BLS12_381_g2 = (const E2*)&BLS12_381_G2;
 const E2* BLS12_381_minus_g2 = (const E2*)&BLS12_381_NEG_G2;
 
@@ -735,23 +743,23 @@ const E2* BLS12_381_minus_g2 = (const E2*)&BLS12_381_NEG_G2;
 // The resulting point is guaranteed to be on curve E2 (no G2 check is included).
 //
 // returns:
-//    - BLST_BAD_ENCODING if the length is invalid or serialization header bits are invalid
-//    - BLST_BAD_SCALAR if Fp^2 coordinates couldn't deserialize
-//    - BLST_POINT_NOT_ON_CURVE if deserialized point isn't on E2
-//    - BLST_SUCCESS if deserialization is valid 
+//    - BAD_ENCODING if the length is invalid or serialization header bits are invalid
+//    - BAD_VALUE if Fp^2 coordinates couldn't deserialize
+//    - POINT_NOT_ON_CURVE if deserialized point isn't on E2
+//    - VALID if deserialization is valid 
 
 // TODO: replace with POINTonE2_Deserialize_BE and POINTonE2_Uncompress_Z, 
 //       and update logic with G2 subgroup check?
-BLST_ERROR E2_read_bytes(E2* a, const byte *bin, const int len) {
+ERROR E2_read_bytes(E2* a, const byte *bin, const int len) {
     // check the length
     if (len != G2_SER_BYTES) {
-        return BLST_BAD_ENCODING;
+        return BAD_ENCODING;
     }
 
     // check the compression bit
     int compressed = bin[0] >> 7;
     if ((compressed == 1) != (G2_SERIALIZATION == COMPRESSED)) {
-        return BLST_BAD_ENCODING;
+        return BAD_ENCODING;
     } 
 
     // check if the point in infinity
@@ -759,66 +767,67 @@ BLST_ERROR E2_read_bytes(E2* a, const byte *bin, const int len) {
     if (is_infinity) {
         // the remaining bits need to be cleared
         if (bin[0] & 0x3F) {
-            return BLST_BAD_ENCODING;
+            return BAD_ENCODING;
         }
         for (int i=1; i<G2_SER_BYTES-1; i++) {
             if (bin[i]) {
-                return BLST_BAD_ENCODING;
+                return BAD_ENCODING;
             } 
         }
 		E2_set_infty(a);
-		return BLST_SUCCESS;
+		return VALID;
 	} 
 
     // read the sign bit and check for consistency
     int y_sign = (bin[0] >> 5) & 1;
     if (y_sign && (!compressed)) {
-        return BLST_BAD_ENCODING;
+        return BAD_ENCODING;
     } 
     
     // use a temporary buffer to mask the header bits and read a.x
     byte temp[Fp2_BYTES];
     memcpy(temp, bin, Fp2_BYTES);
     temp[0] &= 0x1F;        // clear the header bits
-    BLST_ERROR ret = Fp2_read_bytes(&a->x, temp, sizeof(temp));
-    if (ret != BLST_SUCCESS) {
+    ERROR ret = Fp2_read_bytes(&a->x, temp, sizeof(temp));
+    if (ret != VALID) {
         return ret;
     }
+    Fp2* a_x = &(a->x);
+    Fp_to_montg(&real(a_x), &real(a_x));
+    Fp_to_montg(&imag(a_x), &imag(a_x));
 
     // set a.z to 1
     Fp2* a_z = &(a->z);
     Fp_copy(&real(a_z), &BLS12_381_pR);
     Fp_set_zero(&imag(a_z));   
 
+    Fp2* a_y = &(a->y);
     if (G2_SERIALIZATION == UNCOMPRESSED) {
-        ret = Fp2_read_bytes(&(a->y), bin + Fp2_BYTES, sizeof(a->y));
-        if (ret != BLST_SUCCESS){ 
+        ret = Fp2_read_bytes(a_y, bin + Fp2_BYTES, sizeof(a->y));
+        if (ret != VALID){ 
             return ret;
         }
+        Fp_to_montg(&real(a_y), &real(a_y));
+        Fp_to_montg(&imag(a_y), &imag(a_y));
         // check read point is on curve
         if (!E2_affine_on_curve(a)) { 
-            return BLST_POINT_NOT_ON_CURVE;
+            return POINT_NOT_ON_CURVE;
         }
-        return BLST_SUCCESS;
+        return VALID;
     }
     
     // compute the possible square root
-    Fp2* a_x = &(a->x);
-    Fp_to_montg(&real(a_x), &real(a_x));
-    Fp_to_montg(&imag(a_x), &imag(a_x));
-
-    Fp2* a_y = &(a->y);
     Fp2_squ_montg(a_y, a_x);
-    Fp2_mul_montg(a_y, a_y, a_x);
-    Fp2_add(a_y, a_y, &B_E2);          // B_E2 is already in Montg form             
+    Fp2_mul_montg(a_y, a_y, a_x);     // x^3
+    Fp2_add(a_y, a_y, &B_E2);         // B_E2 is already in Montg form             
     if (!Fp2_sqrt_montg(a_y, a_y))    // check whether x^3+b is a quadratic residue
-        return BLST_POINT_NOT_ON_CURVE; 
+        return POINT_NOT_ON_CURVE; 
 
     // resulting (x,y) is guaranteed to be on curve (y is already in Montg form)
     if (Fp2_get_sign(a_y) != y_sign) {
         Fp2_neg(a_y, a_y); // flip y sign if needed
     }
-    return BLST_SUCCESS;
+    return VALID;
 }
 
 // E2_write_bytes exports a point in E2(Fp^2) to a buffer in a compressed or uncompressed form.
@@ -859,19 +868,19 @@ void E2_set_infty(E2* p) {
 }
 
 // check if `p` is infinity
-bool_t E2_is_infty(const E2* p) {
+bool E2_is_infty(const E2* p) {
     // BLST infinity points are defined by Z=0
     return vec_is_zero(p->z, sizeof(p->z));
 }
 
 // checks affine point `p` is in E2
-bool_t E2_affine_on_curve(const E2* p) {
+bool E2_affine_on_curve(const E2* p) {
     // BLST's `POINTonE2_affine_on_curve` does not include the infinity case!
     return POINTonE2_affine_on_curve((POINTonE2_affine*)p) | E2_is_infty(p);
 }
 
 // checks p1 == p2
-bool_t E2_is_equal(const E2* p1, const E2* p2) {
+bool E2_is_equal(const E2* p1, const E2* p2) {
     // `POINTonE2_is_equal` includes the infinity case
     return POINTonE2_is_equal((const POINTonE2*)p1, (const POINTonE2*)p2);
 }
@@ -935,7 +944,7 @@ void G2_mult_gen(E2* res, const Fr* expo) {
 
 // checks if input E2 point is on the subgroup G2.
 // It assumes input `p` is on E2.
-bool_t E2_in_G2(const E2* p){
+bool E2_in_G2(const E2* p){
     // currently uses Scott method
     return POINTonE2_in_G2((const POINTonE2*)p);
 }
@@ -948,97 +957,12 @@ void E2_sum_vector(E2* sum, const E2* y, const int len){
     }
 }
 
-// ------------------- other
-
-
-// Verifies the validity of 2 SPoCK proofs and 2 public keys.
-// Membership check in G1 of both proofs is verified in this function.
-// Membership check in G2 of both keys is not verified in this function.
-// the membership check in G2 is separated to allow optimizing multiple verifications 
-// using the same public keys.
-int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte* sig2) {  
-    E1 elemsG1[2];
-    E2 elemsG2[2];
-
-    // elemsG1[0] = s1
-    if (E1_read_bytes(&elemsG1[0], sig1, G1_SER_BYTES) != BLST_SUCCESS) {
-        return INVALID;
-    };
-    // check s1 is in G1
-    if (!E1_in_G1(&elemsG1[0]))  {
-        return INVALID;
-    }
-
-    // elemsG1[1] = s2
-    if (E1_read_bytes(&elemsG1[1], sig2, G1_SER_BYTES) != BLST_SUCCESS) {
-        return INVALID;
-    };
-    // check s2 is in G1
-    if (!E1_in_G1(&elemsG1[1]))  {
-        return INVALID;
-    }
-
-    // elemsG2[1] = pk1
-    E2_copy(&elemsG2[1], pk1);
-
-    // elemsG2[0] = -pk2
-    E2_neg(&elemsG2[0], pk2);
-
-    // double pairing
-    Fp12 e;
-    multi_pairing(&e, elemsG1 , elemsG2, 2);
-
-    if (Fp12_is_one(&e)) {
-        return VALID; 
-    } 
-    return INVALID; 
-}
-
 // Subtracts all G2 array elements `y` from an element `x` and writes the 
 // result in res
 void E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len){
     E2_sum_vector(res, y, len);
     E2_neg(res, res);
     E2_add(res, x, res);
-}
-
-
-// maps the bytes to a point in G1.
-// `len` should be at least Fr_BYTES.
-// this is a testing file only, should not be used in any protocol!
-void unsafe_map_bytes_to_G1(E1* p, const byte* bytes, int len) {
-    assert(len >= Fr_BYTES);
-    // map to Fr
-    Fr log;
-    map_bytes_to_Fr(&log, bytes, len);
-    // multiplies G1 generator by a random scalar
-    G1_mult_gen(p, &log);
-}
-
-// generates a point in E1\G1 and stores it in p
-// this is a testing file only, should not be used in any protocol!
-BLST_ERROR unsafe_map_bytes_to_G1complement(E1* p, const byte* bytes, int len) {
-    assert(G1_SERIALIZATION == COMPRESSED);
-    assert(len >= G1_SER_BYTES);
-
-    // attempt to deserilize a compressed E1 point from input bytes
-    // after fixing the header 2 bits
-    byte copy[G1_SER_BYTES];
-    memcpy(copy, bytes, sizeof(copy));
-    copy[0] |= 1<<7;        // set compression bit
-    copy[0] &= ~(1<<6);     // clear infinity bit - point is not infinity
-
-    BLST_ERROR ser = E1_read_bytes(p, copy, G1_SER_BYTES);
-    if (ser != BLST_SUCCESS) {
-        return ser;
-    }
-
-    // map the point to E2\G2 by clearing G2 order
-    E1_mult(p, p, (const Fr*)BLS12_381_r);
-    E1_to_affine(p, p);
-
-    assert(E1_affine_on_curve(p));  // sanity check to make sure p is in E2
-    return BLST_SUCCESS;
 }
 
 // maps the bytes to a point in G2.
@@ -1053,38 +977,24 @@ void unsafe_map_bytes_to_G2(E2* p, const byte* bytes, int len) {
     G2_mult_gen(p, &log);
 }
 
-// attempts to map `bytes` to a point in E2\G2 and stores it in p.
-// `len` should be at least G2_SER_BYTES. It returns BLST_SUCCESS only if mapping 
-// succeeds.
-// For now, function only works when E2 serialization is compressed.
+// maps `bytes` to a point in E2\G2 and stores it in p.
+// `len` should be at least 192. 
 // this is a testing tool only, it should not be used in any protocol!
-BLST_ERROR unsafe_map_bytes_to_G2complement(E2* p, const byte* bytes, int len) {
-    assert(G2_SERIALIZATION == COMPRESSED);
-    assert(len >= G2_SER_BYTES);
-
-    // attempt to deserilize a compressed E2 point from input bytes
-    // after fixing the header 2 bits
-    byte copy[G2_SER_BYTES];
-    memcpy(copy, bytes, sizeof(copy));
-    copy[0] |= 1<<7;        // set compression bit
-    copy[0] &= ~(1<<6);     // clear infinity bit - point is not infinity
-
-    BLST_ERROR ser = E2_read_bytes(p, copy, G2_SER_BYTES);
-    if (ser != BLST_SUCCESS) {
-        return ser;
-    }
-
-    // map the point to E2\G2 by clearing G2 order
-    E2_mult(p, p, (const Fr*)BLS12_381_r);
-    E2_to_affine(p, p);
-
-    assert(E2_affine_on_curve(p));  // sanity check to make sure p is in E2
-    return BLST_SUCCESS;
+void unsafe_map_bytes_to_G2complement(E2* p, const byte* bytes, int len) {
+    assert(len >= 192);
+    Fp2 u;
+    map_96_bytes_to_Fp(&real(&u), bytes, 96);
+    map_96_bytes_to_Fp(&imag(&u), bytes+96, 96);
+    // map to E2's isogenous and then to E2
+    map_to_isogenous_E2((POINTonE2 *)p, u);
+    isogeny_map_to_E2((POINTonE2 *)p, (POINTonE2 *)p);
+    // clear G2 order
+    E2_mult(p, p, (Fr*)&BLS12_381_r);
 }
 
 // ------------------- Pairing utilities 
 
-bool_t Fp12_is_one(Fp12 *a) {
+bool Fp12_is_one(Fp12 *a) {
     return vec_is_equal(a, BLS12_381_Rx.p12, sizeof(Fp12));
 }
 
@@ -1098,7 +1008,7 @@ void Fp12_set_one(Fp12 *a) {
 // It assumes `p` and `q` are correctly initialized and all 
 // p[i] and q[i] are respectively on G1 and G2 (it does not
 // check their memberships).
-void multi_pairing(Fp12* res, const E1 *p, const E2 *q, const int len) {
+void Fp12_multi_pairing(Fp12* res, const E1 *p, const E2 *q, const int len) {
     // easier access pointer
     vec384fp6* res_vec = (vec384fp6*)res;
     // N_MAX is defined within BLST. It should represent a good tradeoff of the max number

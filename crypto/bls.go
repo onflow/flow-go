@@ -40,22 +40,12 @@ import (
 )
 
 const (
-	// BLS12-381
-	// p size in bytes, where G1 is defined over the field Zp
-	fieldSize = 48
-	//
-	// 1 for compressed, 0 for uncompressed - values should not be changed
-	uncompressed = 0 //nolint
-	compressed   = 1
-	// Points compression when serialized
-	serializationG1 = compressed
-	serializationG2 = compressed
-	//
-	// SignatureLenBLSBLS12381 is the size of G1 elements
-	SignatureLenBLSBLS12381 = fieldSize * (2 - serializationG1) // the length is divided by 2 if compression is on
-	PrKeyLenBLSBLS12381     = 32                                // equal to frBytesLen
-	// PubKeyLenBLSBLS12381 is the size of G2 elements
-	PubKeyLenBLSBLS12381 = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
+	// SignatureLenBLSBLS12381 is the size of a `G_1` element.
+	SignatureLenBLSBLS12381 = g1BytesLen
+	// PubKeyLenBLSBLS12381 is the size of a `G_2` element.
+	PubKeyLenBLSBLS12381 = g2BytesLen
+	// PrKeyLenBLSBLS12381 is the size of a `F_r` element, where `r` is the order of `G_1` and `G_2`.
+	PrKeyLenBLSBLS12381 = frBytesLen
 
 	// Hash to curve params
 	// hash to curve suite ID of the form : CurveID_ || HashID_ || MapID_ || encodingVariant_
@@ -67,13 +57,10 @@ const (
 	// Cipher suite used for BLS PoP of the form : BLS_POP_ || h2cSuiteID || SchemeTag_
 	// The PoP cipher suite is guaranteed to be different than all signature ciphersuites
 	blsPOPCipherSuite = "BLS_POP_" + h2cSuiteID + schemeTag
+	// expandMsgOutput is the output length of the expand_message step as required by the
+	// hash_to_curve algorithm (and the map to G1 step).
+	expandMsgOutput = int(C.MAP_TO_G1_INPUT_LEN)
 )
-
-// expandMsgOutput is the output length of the expand_message step as required by the
-// hash_to_curve algorithm (and the map to G1 step)
-//
-// (Cgo does not export C macros)
-var expandMsgOutput = int(C.get_mapToG1_input_len())
 
 // blsBLS12381Algo, embeds SignAlgo
 type blsBLS12381Algo struct {
@@ -193,7 +180,7 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 		return false, err
 	}
 
-	if len(s) != signatureLengthBLSBLS12381 {
+	if len(s) != SignatureLenBLSBLS12381 {
 		return false, nil
 	}
 
@@ -220,11 +207,6 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	}
 }
 
-// 0xC0 is the header of the point at infinity serialization (either in G1 or G2)
-const infinityPointHeader = byte(0xC0)
-
-var identityBLSSignature = append([]byte{infinityPointHeader}, make([]byte, signatureLengthBLSBLS12381-1)...)
-
 // IsBLSSignatureIdentity checks whether the input signature is
 // the identity signature (point at infinity in G1).
 //
@@ -234,7 +216,7 @@ var identityBLSSignature = append([]byte{infinityPointHeader}, make([]byte, sign
 // suspected to be equal to identity, which avoids failing the aggregated
 // signature verification.
 func IsBLSSignatureIdentity(s Signature) bool {
-	return bytes.Equal(s, identityBLSSignature)
+	return bytes.Equal(s, g1Serialization)
 }
 
 // generatePrivateKey deterministically generates a private key for BLS on BLS12-381 curve.
@@ -304,7 +286,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
 const invalidBLSSignatureHeader = byte(0xE0)
 
 // BLSInvalidSignature returns an invalid signature that fails when verified
-// with any message and public key.
+// with any message and public key, which can be used for testing.
 //
 // The signature bytes represent an invalid serialization of a point which
 // makes the verification fail early. The verification would return (false, nil).
@@ -336,9 +318,9 @@ func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, 
 // a faster check during signature verifications. Any verification against an identity
 // public key outputs `false`.
 func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
-	if len(publicKeyBytes) != pubKeyLengthBLSBLS12381 {
+	if len(publicKeyBytes) != PubKeyLenBLSBLS12381 {
 		return nil, invalidInputsErrorf("input length must be %d, got %d",
-			pubKeyLengthBLSBLS12381, len(publicKeyBytes))
+			PubKeyLenBLSBLS12381, len(publicKeyBytes))
 	}
 	var pk pubKeyBLSBLS12381
 	err := readPointE2(&pk.point, publicKeyBytes)
@@ -347,7 +329,7 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 	}
 
 	// membership check in G2
-	if C.E2_in_G2((*C.E2)(&pk.point)) == (C.ulonglong)(0) {
+	if !bool(C.E2_in_G2((*C.E2)(&pk.point))) {
 		return nil, invalidInputsErrorf("input key is infinity or does not encode a BLS12-381 point in the valid group")
 	}
 
@@ -360,7 +342,7 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 // decodePublicKeyCompressed decodes a slice of bytes into a public key.
 // since we use the compressed representation by default, this checks the default and delegates to decodePublicKeyCompressed
 func (a *blsBLS12381Algo) decodePublicKeyCompressed(publicKeyBytes []byte) (PublicKey, error) {
-	if serializationG2 != compressed {
+	if !isG2Compressed() {
 		panic("library is not configured to use compressed public key serialization")
 	}
 	return a.decodePublicKey(publicKeyBytes)
@@ -423,7 +405,7 @@ func (sk *prKeyBLSBLS12381) PublicKey() PublicKey {
 // Encode returns a byte encoding of the private key.
 // The encoding is a raw encoding in big endian padded to the group order
 func (a *prKeyBLSBLS12381) Encode() []byte {
-	dest := make([]byte, prKeyLengthBLSBLS12381)
+	dest := make([]byte, frBytesLen)
 	writeScalar(dest, &a.scalar)
 	return dest
 }
@@ -490,18 +472,20 @@ func (pk *pubKeyBLSBLS12381) Size() int {
 // The encoding is a compressed encoding of the point
 // [zcash] https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-
 func (a *pubKeyBLSBLS12381) EncodeCompressed() []byte {
-	if serializationG2 != compressed {
+	if !isG2Compressed() {
 		panic("library is not configured to use compressed public key serialization")
 	}
-	dest := make([]byte, pubKeyLengthBLSBLS12381)
-	writePointE2(dest, &a.point)
-	return dest
+	return a.Encode()
 }
 
-// Encode returns a byte encoding of the public key.
-// Since we use a compressed encoding by default, this delegates to EncodeCompressed
+// Encode returns a byte encoding of the public key (a G2 point).
+// The current encoding is a compressed serialization of G2 following [zcash] https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-
+//
+// The function should evolve in the future to support uncompressed compresion too.
 func (a *pubKeyBLSBLS12381) Encode() []byte {
-	return a.EncodeCompressed()
+	dest := make([]byte, g2BytesLen)
+	writePointE2(dest, &a.point)
+	return dest
 }
 
 // Equals checks is two public keys are equal
@@ -517,11 +501,6 @@ func (pk *pubKeyBLSBLS12381) Equals(other PublicKey) bool {
 func (pk *pubKeyBLSBLS12381) String() string {
 	return pk.point.String()
 }
-
-// Get Macro definitions from the C layer as Cgo does not export macros
-var signatureLengthBLSBLS12381 = int(C.get_signature_len())
-var pubKeyLengthBLSBLS12381 = int(C.get_pk_len())
-var prKeyLengthBLSBLS12381 = int(C.get_sk_len())
 
 // This is only a TEST function.
 // signWithXMDSHA256 signs a message using XMD_SHA256 as a hash to field.

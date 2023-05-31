@@ -29,6 +29,9 @@ func TestBLSMainMethods(t *testing.T) {
 	//  - signature decoding only accepts reduced x-coordinates to avoid signature malleability
 
 	t.Run("invalid x coordinate larger than p", func(t *testing.T) {
+		if !isG1Compressed() || !isG2Compressed() {
+			t.Skip()
+		}
 		msg, err := hex.DecodeString("7f26ba692dc2da7ff828ef4675ff1cd6ab855fca0637b6dab295f1df8e51bc8bb1b8f0c6610aabd486cf1f098f2ddbc6691d94e10f928816f890a3d366ce46249836a595c7ea1828af52e899ba2ab627ab667113bb563918c5d5a787c414399487b4e3a7")
 		require.NoError(t, err)
 		validSig, err := hex.DecodeString("80b0cac2a0f4f8881913edf2b29065675dfed6f6f4e17e9b5d860a845d4e7d476b277d06a493b81482e63d8131f9f2fa")
@@ -190,7 +193,7 @@ func TestBLSEncodeDecode(t *testing.T) {
 	t.Run("infinity public key", func(t *testing.T) {
 		//  decode an identity public key
 		pkBytes := make([]byte, PubKeyLenBLSBLS12381)
-		pkBytes[0] = infinityPointHeader
+		pkBytes[0] = g2SerHeader
 		pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
 		require.NoError(t, err, "decoding identity public key should succeed")
 		assert.True(t, pk.Equals(IdentityBLSPublicKey()))
@@ -218,6 +221,9 @@ func TestBLSEncodeDecode(t *testing.T) {
 	// may implicitely rely on the property.
 
 	t.Run("public key with non-reduced coordinates", func(t *testing.T) {
+		if !isG2Compressed() {
+			t.Skip()
+		}
 		// valid pk with x[0] < p and x[1] < p
 		validPk, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b8038360809700d36d761cb266af6babe9a069dc7364d3502e84536bd893d5f09ec2dd4f07cae1f8a178ffacc450f9b9a2")
 		require.NoError(t, err)
@@ -411,7 +417,7 @@ func TestBLSAggregateSignatures(t *testing.T) {
 		assert.False(t, result)
 
 		// test with a signature of a wrong length
-		shortSig := sigs[0][:signatureLengthBLSBLS12381-1]
+		shortSig := sigs[0][:SignatureLenBLSBLS12381-1]
 		aggSig, err = AggregateBLSSignatures([]Signature{shortSig})
 		assert.Error(t, err)
 		assert.True(t, IsInvalidSignatureError(err))
@@ -543,12 +549,15 @@ func TestBLSAggregatePublicKeys(t *testing.T) {
 		assert.True(t, blsKey.isIdentity)
 		// check of encoding header
 		pkBytes := aggPK.Encode()
-		assert.Equal(t, infinityPointHeader, pkBytes[0])
+		assert.Equal(t, g2SerHeader, pkBytes[0])
 	})
 
 	t.Run("Identity public key from opposite points", func(t *testing.T) {
+		if !isG2Compressed() {
+			t.Skip()
+		}
 		pkBytes := pks[0].Encode()
-		negatePoint(pkBytes)
+		negateCompressedPoint(pkBytes)
 		minusPk, err := DecodePublicKey(BLSBLS12381, pkBytes)
 		require.NoError(t, err)
 		// aggregated public keys
@@ -561,7 +570,7 @@ func TestBLSAggregatePublicKeys(t *testing.T) {
 		assert.True(t, blsKey.isIdentity)
 		// check of encoding header
 		pkBytes = aggPK.Encode()
-		assert.Equal(t, infinityPointHeader, pkBytes[0])
+		assert.Equal(t, g2SerHeader, pkBytes[0])
 	})
 }
 
@@ -822,9 +831,9 @@ func TestBLSBatchVerify(t *testing.T) {
 }
 
 // Utility function that flips a point sign bit to negate the point
-// this is shortcut which works only for zcash BLS12-381 compressed serialization
-// Applicable to both signatures and public keys
-func negatePoint(pointbytes []byte) {
+// this is shortcut which works only for zcash BLS12-381 compressed serialization.
+// Applicable to both signatures and public keys.
+func negateCompressedPoint(pointbytes []byte) {
 	pointbytes[0] ^= 0x20
 }
 
@@ -1190,18 +1199,22 @@ func TestBLSIdentity(t *testing.T) {
 	hasher := NewExpandMsgXOFKMAC128("")
 
 	t.Run("identity signature comparison", func(t *testing.T) {
+		if !isG1Compressed() {
+			t.Skip()
+		}
 		// verify that constructed identity signatures are recognized as such by IsBLSSignatureIdentity.
 		// construct identity signature by summing (aggregating) a random signature and its inverse.
 
-		assert.True(t, IsBLSSignatureIdentity(identityBLSSignature))
+		// sanity check to start
+		assert.True(t, IsBLSSignatureIdentity(g1Serialization))
 
 		// sum up a random signature and its inverse to get identity
 		sk := randomSK(t, rand)
 		sig, err := sk.Sign(msg, hasher)
 		require.NoError(t, err)
-		oppositeSig := make([]byte, signatureLengthBLSBLS12381)
+		oppositeSig := make([]byte, SignatureLenBLSBLS12381)
 		copy(oppositeSig, sig)
-		negatePoint(oppositeSig)
+		negateCompressedPoint(oppositeSig)
 		aggSig, err := AggregateBLSSignatures([]Signature{sig, oppositeSig})
 		require.NoError(t, err)
 		assert.True(t, IsBLSSignatureIdentity(aggSig))

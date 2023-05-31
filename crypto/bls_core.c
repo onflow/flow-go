@@ -4,19 +4,6 @@
 
 // The functions are tested for ALLOC=AUTO (not for ALLOC=DYNAMIC)
 
-// functions to export macros to the Go layer (because cgo does not import macros)
-int get_signature_len() {
-    return SIGNATURE_LEN;
-}
-
-int get_pk_len() {
-    return PK_LEN;
-}
-
-int get_sk_len() {
-    return SK_LEN;
-}
-
 // Computes a BLS signature from a G1 point and writes it in `out`.
 // `out` must be allocated properly with `G1_SER_BYTES` bytes.
 static void bls_sign_E1(byte* out, const Fr* sk, const E1* h) {
@@ -60,7 +47,7 @@ static int bls_verify_E1(const E2* pk, const E1* s, const E1* h) {
 
     // double pairing
     Fp12 e;
-    multi_pairing(&e, elemsG1, elemsG2, 2);
+    Fp12_multi_pairing(&e, elemsG1, elemsG2, 2);
     if (Fp12_is_one(&e)) {
         return VALID;
     }
@@ -93,7 +80,7 @@ int bls_verifyPerDistinctMessage(const byte* sig,
     if (!elemsG2) goto outG2;
 
     // elemsG1[0] = sig
-    if (E1_read_bytes(&elemsG1[0], sig, SIGNATURE_LEN) != BLST_SUCCESS) {
+    if (E1_read_bytes(&elemsG1[0], sig, G1_SER_BYTES) != VALID) {
         ret = INVALID;
         goto out;
     }
@@ -126,7 +113,7 @@ int bls_verifyPerDistinctMessage(const byte* sig,
 
     // multi pairing
     Fp12 e;
-    multi_pairing(&e, elemsG1 , elemsG2, nb_hashes+1);
+    Fp12_multi_pairing(&e, elemsG1 , elemsG2, nb_hashes+1);
     if (Fp12_is_one(&e)) {
         ret = VALID;
     } else {
@@ -167,7 +154,7 @@ int bls_verifyPerDistinctKey(const byte* sig,
     if (!elemsG2) goto outG2;
 
     // elemsG1[0] = s
-    if (E1_read_bytes(&elemsG1[0], sig, SIGNATURE_LEN) != BLST_SUCCESS) {
+    if (E1_read_bytes(&elemsG1[0], sig, G1_SER_BYTES) != VALID) {
         ret = INVALID;
         goto out;
     }
@@ -219,7 +206,7 @@ int bls_verifyPerDistinctKey(const byte* sig,
 
     // multi pairing
     Fp12 e;
-    multi_pairing(&e, elemsG1, elemsG2, nb_pks+1);
+    Fp12_multi_pairing(&e, elemsG1, elemsG2, nb_pks+1);
     
     if (Fp12_is_one(&e)) {
         ret = VALID;
@@ -243,7 +230,7 @@ outG1:
 int bls_verify(const E2* pk, const byte* sig, const byte* hash, const int hash_len) {  
     E1 s, h;
     // deserialize the signature into a curve point
-    if (E1_read_bytes(&s, sig, SIGNATURE_LEN) != BLST_SUCCESS) {
+    if (E1_read_bytes(&s, sig, G1_SER_BYTES) != VALID) {
         return INVALID;
     }
 
@@ -393,8 +380,8 @@ void bls_batch_verify(const int sigs_len, byte* results, const E2* pks_input,
         // the tree aggregations remain valid.
         // - valid points are multiplied by a random scalar (same for public keys at same index)
         // to make sure a signature at index (i) is verified against the public key at the same index.
-        int read_ret = E1_read_bytes(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
-        if (read_ret != BLST_SUCCESS || !E1_in_G1(&sigs[i])) {
+        int read_ret = E1_read_bytes(&sigs[i], &sigs_bytes[G1_SER_BYTES*i], G1_SER_BYTES);
+        if (read_ret != VALID || !E1_in_G1(&sigs[i])) {
             // set signature and key to infinity (no effect on the aggregation tree)
             // and set result to invalid (result won't be overwritten)
             E2_set_infty(&pks[i]);
@@ -433,3 +420,47 @@ out:
 out_sigs:
     free(pks);
 }
+
+// Verifies the validity of 2 SPoCK proofs and 2 public keys.
+// Membership check in G1 of both proofs is verified in this function.
+// Membership check in G2 of both keys is not verified in this function.
+// the membership check in G2 is separated to allow optimizing multiple verifications 
+// using the same public keys.
+int bls_spock_verify(const E2* pk1, const byte* sig1, const E2* pk2, const byte* sig2) {  
+    E1 elemsG1[2];
+    E2 elemsG2[2];
+
+    // elemsG1[0] = s1
+    if (E1_read_bytes(&elemsG1[0], sig1, G1_SER_BYTES) != VALID) {
+        return INVALID;
+    };
+    // check s1 is in G1
+    if (!E1_in_G1(&elemsG1[0]))  {
+        return INVALID;
+    }
+
+    // elemsG1[1] = s2
+    if (E1_read_bytes(&elemsG1[1], sig2, G1_SER_BYTES) != VALID) {
+        return INVALID;
+    };
+    // check s2 is in G1
+    if (!E1_in_G1(&elemsG1[1]))  {
+        return INVALID;
+    }
+
+    // elemsG2[1] = pk1
+    E2_copy(&elemsG2[1], pk1);
+
+    // elemsG2[0] = -pk2
+    E2_neg(&elemsG2[0], pk2);
+
+    // double pairing
+    Fp12 e;
+    Fp12_multi_pairing(&e, elemsG1 , elemsG2, 2);
+
+    if (Fp12_is_one(&e)) {
+        return VALID; 
+    } 
+    return INVALID; 
+}
+

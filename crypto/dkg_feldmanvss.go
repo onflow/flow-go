@@ -151,11 +151,11 @@ func (s *feldmanVSSstate) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	return x, Y, y, nil
 }
 
-const (
-	shareSize = PrKeyLenBLSBLS12381
+var (
+	shareSize = frBytesLen
 	// the actual verifVectorSize depends on the state and is:
-	// PubKeyLenBLSBLS12381*(t+1)
-	verifVectorSize = PubKeyLenBLSBLS12381
+	// g2BytesLen*(t+1)
+	verifVectorSize = g2BytesLen
 )
 
 // HandleBroadcastMsg processes a new broadcasted message received by the current participant.
@@ -464,7 +464,7 @@ func readVerifVector(A []pointE2, src []byte) error {
 		(*C.E2)(&A[0]),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(A)))
-	if int(read) == blst_valid {
+	if read == valid {
 		return nil
 	}
 	// invalid A vector
@@ -473,9 +473,9 @@ func readVerifVector(A []pointE2, src []byte) error {
 
 func (s *feldmanVSSstate) verifyShare() bool {
 	// check y[current] == x.G2
-	return C.G2_check_log(
+	return bool(C.G2_check_log(
 		(*C.Fr)(&s.x),
-		(*C.E2)(&s.y[s.myIndex])) != 0
+		(*C.E2)(&s.y[s.myIndex])))
 }
 
 // computePublicKeys extracts the participants public keys from the verification vector

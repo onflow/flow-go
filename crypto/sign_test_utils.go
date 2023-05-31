@@ -5,7 +5,6 @@ import (
 	"fmt"
 	mrand "math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,7 +13,7 @@ import (
 )
 
 func getPRG(t *testing.T) *mrand.Rand {
-	random := time.Now().UnixNano()
+	random := int64(1685491239186156000) //time.Now().UnixNano()
 	t.Logf("rng seed is %d", random)
 	rng := mrand.New(mrand.NewSource(random))
 	return rng
@@ -186,13 +185,13 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 				skCheckBytes := skCheck.Encode()
 				assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
 				distinctSkBytes := distinctSk.Encode()
-				assert.NotEqual(t, skBytes, distinctSkBytes, "keys should be different")
+				assert.NotEqual(t, skBytes, distinctSkBytes)
 
 				// check public key encoding
 				pk := sk.PublicKey()
 				pkBytes := pk.Encode()
 				pkCheck, err := DecodePublicKey(salg, pkBytes)
-				require.Nil(t, err, "the key decoding failed")
+				require.Nil(t, err)
 				assert.True(t, pk.Equals(pkCheck), "key equality check failed")
 				pkCheckBytes := pkCheck.Encode()
 				assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
@@ -200,14 +199,17 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 				assert.NotEqual(t, pkBytes, distinctPkBytes, "keys should be different")
 
 				// same for the compressed encoding
-				pkComprBytes := pk.EncodeCompressed()
-				pkComprCheck, err := DecodePublicKeyCompressed(salg, pkComprBytes)
-				require.Nil(t, err, "the key decoding failed")
-				assert.True(t, pk.Equals(pkComprCheck), "key equality check failed")
-				pkCheckComprBytes := pkComprCheck.EncodeCompressed()
-				assert.Equal(t, pkComprBytes, pkCheckComprBytes, "keys should be equal")
-				distinctPkComprBytes := distinctSk.PublicKey().EncodeCompressed()
-				assert.NotEqual(t, pkComprBytes, distinctPkComprBytes, "keys should be different")
+				// skip is BLS is used and compression isn't supported
+				if !(salg == BLSBLS12381 && !isG2Compressed()) {
+					pkComprBytes := pk.EncodeCompressed()
+					pkComprCheck, err := DecodePublicKeyCompressed(salg, pkComprBytes)
+					require.Nil(t, err, "the key decoding failed")
+					assert.True(t, pk.Equals(pkComprCheck), "key equality check failed")
+					pkCheckComprBytes := pkComprCheck.EncodeCompressed()
+					assert.Equal(t, pkComprBytes, pkCheckComprBytes, "keys should be equal")
+					distinctPkComprBytes := distinctSk.PublicKey().EncodeCompressed()
+					assert.NotEqual(t, pkComprBytes, distinctPkComprBytes, "keys should be different")
+				}
 			}
 		})
 
