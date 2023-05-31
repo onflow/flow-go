@@ -88,7 +88,7 @@ func newHappyPathBlockTime(timedBlock TimedBlock, unconstrainedBlockTime time.Du
 		TimingConfig:           timingConfig,
 		TimedBlock:             timedBlock,
 		unconstrainedBlockTime: unconstrainedBlockTime,
-		constrainedBlockTime:   min(max(unconstrainedBlockTime, timingConfig.MinViewDuration), timingConfig.MaxViewDuration),
+		constrainedBlockTime:   min(max(unconstrainedBlockTime, timingConfig.MinViewDuration.Load()), timingConfig.MaxViewDuration.Load()),
 	}
 }
 

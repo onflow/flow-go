@@ -62,14 +62,14 @@ func (epoch *epochInfo) fractionComplete(curView uint64) float64 {
 type BlockTimeController struct {
 	component.Component
 
-	config  *Config
+	config *Config
+
 	state   protocol.State
 	log     zerolog.Logger
 	metrics module.CruiseCtlMetrics
 
 	epochInfo              // scheduled transition view for current/next epoch
 	epochFallbackTriggered bool
-	// TODO enabled flag
 
 	incorporatedBlocks chan TimedBlock   // OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
 	epochSetups        chan *flow.Header // EpochSetupPhaseStarted events (block header within setup phase)
@@ -175,8 +175,8 @@ func (ctl *BlockTimeController) initEpochInfo(curView uint64) error {
 // CAUTION: Must be called after initEpochInfo.
 func (ctl *BlockTimeController) initProposalTiming(curView uint64) {
 	// When disabled, or in epoch fallback, use fallback timing (constant ProposalDuration)
-	if ctl.epochFallbackTriggered || !ctl.config.Enabled {
-		ctl.storeProposalTiming(newFallbackTiming(curView, time.Now().UTC(), ctl.config.FallbackProposalDuration))
+	if ctl.epochFallbackTriggered || !ctl.config.Enabled.Load() {
+		ctl.storeProposalTiming(newFallbackTiming(curView, time.Now().UTC(), ctl.config.FallbackProposalDuration.Load()))
 	}
 	// Otherwise, before we observe any view changes, publish blocks immediately
 	ctl.storeProposalTiming(newPublishImmediately(curView, time.Now().UTC()))
@@ -271,6 +271,7 @@ func (ctl *BlockTimeController) processIncorporatedBlock(tb TimedBlock) error {
 	if ctl.epochFallbackTriggered {
 		return nil
 	}
+
 	latest := ctl.GetProposalTiming()
 	if tb.Block.View <= latest.ObservationView() { // we don't care about older blocks that are incorporated into the protocol state
 		return nil
@@ -318,11 +319,11 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	// if the controller is disabled, we don't update measurements and instead use a fallback timing
-	if !ctl.config.Enabled {
-		ctl.storeProposalTiming(newFallbackTiming(tb.Block.View, tb.TimeObserved, ctl.config.FallbackProposalDuration))
+	if !ctl.config.Enabled.Load() {
+		ctl.storeProposalTiming(newFallbackTiming(tb.Block.View, tb.TimeObserved, ctl.config.FallbackProposalDuration.Load()))
 		ctl.log.Debug().
 			Uint64("cur_view", tb.Block.View).
-			Dur("fallback_proposal_dur", ctl.config.FallbackProposalDuration).
+			Dur("fallback_proposal_dur", ctl.config.FallbackProposalDuration.Load()).
 			Msg("controller is disabled - using fallback timing")
 		return nil
 	}
@@ -405,7 +406,7 @@ func (ctl *BlockTimeController) processEpochFallbackTriggered() error {
 		return fmt.Errorf("failed to retrieve latest finalized block from protocol state %w", err)
 	}
 
-	ctl.storeProposalTiming(newFallbackTiming(latestFinalized.View, time.Now().UTC(), ctl.config.FallbackProposalDuration))
+	ctl.storeProposalTiming(newFallbackTiming(latestFinalized.View, time.Now().UTC(), ctl.config.FallbackProposalDuration.Load()))
 	return nil
 }
 
@@ -429,4 +430,37 @@ func (ctl *BlockTimeController) EpochSetupPhaseStarted(_ uint64, first *flow.Hea
 // EpochEmergencyFallbackTriggered responds to epoch fallback mode being triggered.
 func (ctl *BlockTimeController) EpochEmergencyFallbackTriggered() {
 	ctl.epochFallbacks <- struct{}{}
+}
+
+/* =================== DYNAMIC CONFIG UPDATES =================== */
+
+func (ctl *BlockTimeController) GetFallbackProposalDuration() time.Duration {
+	return ctl.config.FallbackProposalDuration.Load()
+}
+func (ctl *BlockTimeController) GetMaxViewDuration() time.Duration {
+	return ctl.config.MaxViewDuration.Load()
+}
+func (ctl *BlockTimeController) GetMinViewDuration() time.Duration {
+	return ctl.config.MinViewDuration.Load()
+}
+func (ctl *BlockTimeController) GetEnabled() bool {
+	return ctl.config.Enabled.Load()
+}
+
+func (ctl *BlockTimeController) SetFallbackProposalDuration(dur time.Duration) error {
+	ctl.config.FallbackProposalDuration.Store(dur)
+	return nil
+}
+func (ctl *BlockTimeController) SetMaxViewDuration(dur time.Duration) error {
+	ctl.config.MaxViewDuration.Store(dur)
+	return nil
+}
+func (ctl *BlockTimeController) SetMinViewDuration(dur time.Duration) error {
+	ctl.config.MinViewDuration.Store(dur)
+	return nil
+
+}
+func (ctl *BlockTimeController) SetEnabled(enabled bool) error {
+	ctl.config.Enabled.Store(enabled)
+	return nil
 }

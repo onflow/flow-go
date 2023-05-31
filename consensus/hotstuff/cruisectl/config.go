@@ -2,6 +2,8 @@ package cruisectl
 
 import (
 	"time"
+
+	"go.uber.org/atomic"
 )
 
 // DefaultConfig returns the default config for the BlockTimeController.
@@ -10,10 +12,10 @@ func DefaultConfig() *Config {
 		TimingConfig{
 			TargetTransition: DefaultEpochTransitionTime(),
 			// TODO confirm default values
-			FallbackProposalDuration: 500 * time.Millisecond,
-			MaxViewDuration:          1000 * time.Millisecond,
-			MinViewDuration:          250 * time.Millisecond,
-			Enabled:                  false,
+			FallbackProposalDuration: atomic.NewDuration(500 * time.Millisecond),
+			MaxViewDuration:          atomic.NewDuration(1000 * time.Millisecond),
+			MinViewDuration:          atomic.NewDuration(250 * time.Millisecond),
+			Enabled:                  atomic.NewBool(false),
 		},
 		ControllerParams{
 			N_ewma: 5,
@@ -40,18 +42,18 @@ type TimingConfig struct {
 	// It is used:
 	//  - when Enabled is false
 	//  - when epoch fallback has been triggered
-	FallbackProposalDuration time.Duration
+	FallbackProposalDuration *atomic.Duration
 	// MaxViewDuration is a hard maximum on the total view time targeted by ProposalTiming.
 	// If the BlockTimeController computes a larger desired ProposalTiming value
 	// based on the observed error and tuning, this value will be used instead.
-	MaxViewDuration time.Duration
+	MaxViewDuration *atomic.Duration
 	// MinViewDuration  is a hard maximum on the total view time targeted by ProposalTiming.
 	// If the BlockTimeController computes a smaller desired ProposalTiming value
 	// based on the observed error and tuning, this value will be used instead.
-	MinViewDuration time.Duration
+	MinViewDuration *atomic.Duration
 	// Enabled defines whether responsive control of the GetProposalTiming is enabled.
 	// When disabled, the FallbackProposalDuration is used.
-	Enabled bool
+	Enabled *atomic.Bool
 }
 
 // ControllerParams specifies the BlockTimeController's internal parameters.

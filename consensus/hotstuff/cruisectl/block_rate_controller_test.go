@@ -50,7 +50,7 @@ func TestBlockRateController(t *testing.T) {
 // SetupTest initializes mocks and default values.
 func (bs *BlockRateControllerSuite) SetupTest() {
 	bs.config = DefaultConfig()
-	bs.config.Enabled = true
+	bs.config.Enabled.Store(true)
 	bs.initialView = 0
 	bs.epochCounter = uint64(0)
 	bs.curEpochFirstView = uint64(0)
@@ -223,7 +223,7 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	// async: should revert to default GetProposalTiming
 	require.Eventually(bs.T(), func() bool {
 		now := time.Now().UTC()
-		return now.Add(bs.config.FallbackProposalDuration) == bs.ctl.GetProposalTiming().TargetPublicationTime(7, now, unittest.IdentifierFixture())
+		return now.Add(bs.config.FallbackProposalDuration.Load()) == bs.ctl.GetProposalTiming().TargetPublicationTime(7, now, unittest.IdentifierFixture())
 	}, time.Second, time.Millisecond)
 
 	// additional EpochEmergencyFallbackTriggered events should be no-ops
@@ -233,7 +233,7 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	}
 	// state should be unchanged
 	now := time.Now().UTC()
-	assert.Equal(bs.T(), now.Add(bs.config.FallbackProposalDuration), bs.ctl.GetProposalTiming().TargetPublicationTime(12, now, unittest.IdentifierFixture()))
+	assert.Equal(bs.T(), now.Add(bs.config.FallbackProposalDuration.Load()), bs.ctl.GetProposalTiming().TargetPublicationTime(12, now, unittest.IdentifierFixture()))
 
 	// additional OnBlockIncorporated events should be no-ops
 	for i := 0; i <= cap(bs.ctl.incorporatedBlocks); i++ {
@@ -247,7 +247,7 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 	}, time.Second, time.Millisecond)
 	// state should be unchanged
 	now = time.Now().UTC()
-	assert.Equal(bs.T(), now.Add(bs.config.FallbackProposalDuration), bs.ctl.GetProposalTiming().TargetPublicationTime(17, now, unittest.IdentifierFixture()))
+	assert.Equal(bs.T(), now.Add(bs.config.FallbackProposalDuration.Load()), bs.ctl.GetProposalTiming().TargetPublicationTime(17, now, unittest.IdentifierFixture()))
 }
 
 // TestOnBlockIncorporated_UpdateProposalDelay tests that a new measurement is taken and
