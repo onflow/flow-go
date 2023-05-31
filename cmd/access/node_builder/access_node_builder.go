@@ -50,6 +50,7 @@ import (
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -238,6 +239,10 @@ type FlowAccessNodeBuilder struct {
 	FollowerEng    *followereng.ComplianceEngine
 	SyncEng        *synceng.Engine
 	StateStreamEng *state_stream.Engine
+
+	// grpc server builders
+	secureGrpcServer   *grpcserver.GrpcServerBuilder
+	unsecureGrpcServer *grpcserver.GrpcServerBuilder
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -579,9 +584,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				node.Storage.Results,
 				node.RootChainID,
 				builder.executionDataConfig.InitialBlockHeight,
-				builder.apiRatelimits,
-				builder.apiBurstlimits,
 				heroCacheCollector,
+				builder.unsecureGrpcServer,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
@@ -950,6 +954,30 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
 			return nil
 		}).
+		Module("creating grpc servers", func(node *cmd.NodeConfig) error {
+			secureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
+				builder.rpcConf.SecureGRPCListenAddr,
+				builder.rpcConf.MaxMsgSize, grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials))
+
+			builder.secureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
+				secureGrpcServerConfig,
+				builder.rpcMetricsEnabled,
+				builder.apiRatelimits,
+				builder.apiBurstlimits)
+
+			unsecureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
+				builder.rpcConf.UnsecureGRPCListenAddr,
+				builder.rpcConf.MaxMsgSize,
+			)
+
+			builder.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
+				unsecureGrpcServerConfig,
+				builder.rpcMetricsEnabled,
+				builder.apiRatelimits,
+				builder.apiBurstlimits)
+
+			return nil
+		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			engineBuilder, err := rpc.NewBuilder(
 				node.Logger,
@@ -970,9 +998,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.executionGRPCPort,
 				builder.retryEnabled,
 				builder.rpcMetricsEnabled,
-				builder.apiRatelimits,
-				builder.apiBurstlimits,
 				builder.Me,
+				builder.secureGrpcServer,
+				builder.unsecureGrpcServer,
 			)
 			if err != nil {
 				return nil, err
@@ -1061,6 +1089,24 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionDataRequester()
 	}
+
+	builder.Component("secure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		secureGrpcServer, err := builder.secureGrpcServer.Build()
+		if err != nil {
+			return nil, err
+		}
+
+		return secureGrpcServer, nil
+	})
+
+	builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		unsecureGrpcServer, err := builder.unsecureGrpcServer.Build()
+		if err != nil {
+			return nil, err
+		}
+
+		return unsecureGrpcServer, nil
+	})
 
 	builder.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		ping, err := pingeng.New(
