@@ -1,6 +1,8 @@
 package alsp
 
 import (
+	"time"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/alsp/model"
 )
@@ -17,6 +19,12 @@ const (
 	// node after 100 spam reports are received (if no penalty value are amplified). Therefore, the queue size should
 	// be at least 100 * number of nodes in the network.
 	DefaultSpamReportQueueSize = 100 * 1000 // considering max 1000 authorized (staked) nodes in the network.
+
+	// DefaultHeartBeatInterval is the default heartbeat interval for the misbehavior report manager.
+	// The heartbeat interval is the interval between two consecutive heartbeats. The heartbeat is used to
+	// perform the periodic tasks, such as decaying the penalty of the misbehaving nodes.
+	// It is always recommended to use this default value as it is part of the ALSP protocol invariants.
+	DefaultHeartBeatInterval = 1 * time.Second
 )
 
 // SpamRecordCache is a cache of spam records for the ALSP module.

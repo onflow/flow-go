@@ -222,6 +222,10 @@ type AlspConfig struct {
 	// This is useful for managing production incidents.
 	// Note: under normal circumstances, the ALSP module should not be disabled.
 	DisablePenalty bool
+
+	// HeartBeatInterval is the interval between heartbeats sent by the ALSP module. The heartbeats are recurring
+	// events that are used to perform critical ALSP tasks, such as updating the spam records cache.
+	HearBeatInterval time.Duration
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
@@ -337,6 +341,7 @@ func DefaultBaseConfig() *BaseConfig {
 			AlspConfig: &AlspConfig{
 				SpamRecordCacheSize: alsp.DefaultSpamRecordCacheSize,
 				SpamReportQueueSize: alsp.DefaultSpamReportQueueSize,
+				HearBeatInterval:    alsp.DefaultHeartBeatInterval,
 				DisablePenalty:      false, // by default, apply the penalty
 			},
 		},
