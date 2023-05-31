@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"io"
 	"os"
 	"testing"
@@ -55,6 +56,10 @@ type SecureGRPCTestSuite struct {
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
+
+	// grpc servers
+	secureGrpcServer   *grpcserver.GrpcServer
+	unsecureGrpcServer *grpcserver.GrpcServer
 }
 
 func (suite *SecureGRPCTestSuite) SetupTest() {
@@ -105,15 +110,50 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	// save the public key to use later in tests later
 	suite.publicKey = networkingKey.PublicKey()
 
+	secureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
+		config.SecureGRPCListenAddr,
+		grpcutils.DefaultMaxMsgSize,
+		grpcserver.WithTransportCredentials(config.TransportCredentials))
+
+	secureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
+		secureGrpcServerConfig,
+		false,
+		nil,
+		nil)
+
+	unsecureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
+		config.UnsecureGRPCListenAddr,
+		grpcutils.DefaultMaxMsgSize,
+	)
+
+	unsecureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
+		unsecureGrpcServerConfig,
+		false,
+		nil,
+		nil)
+
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
 	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,
-		nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, nil, nil, suite.me)
+		nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, suite.me, secureGrpcServer, unsecureGrpcServer)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)
 	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
+	suite.secureGrpcServer, err = secureGrpcServer.Build()
+	assert.NoError(suite.T(), err)
+
+	suite.unsecureGrpcServer, err = unsecureGrpcServer.Build()
+	assert.NoError(suite.T(), err)
+
+	suite.secureGrpcServer.Start(suite.ctx)
+	suite.unsecureGrpcServer.Start(suite.ctx)
+
+	// wait for the servers to startup
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Ready(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Ready(), 2*time.Second)
+
 	suite.rpcEng.Start(suite.ctx)
 	// wait for the server to startup
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
@@ -121,6 +161,8 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 
 func (suite *SecureGRPCTestSuite) TearDownTest() {
 	suite.cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
 }
 
@@ -160,7 +202,7 @@ func (suite *SecureGRPCTestSuite) secureGRPCClient(publicKey crypto.PublicKey) (
 	assert.NoError(suite.T(), err)
 
 	conn, err := grpc.Dial(
-		suite.rpcEng.SecureGRPCAddress().String(),
+		suite.secureGrpcServer.GRPCAddress().String(),
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
 	assert.NoError(suite.T(), err)
 
