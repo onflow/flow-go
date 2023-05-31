@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/events"
 )
 
 // TimedBlock represents a block, with a timestamp recording when the BlockTimeController received the block
@@ -73,6 +74,7 @@ func (epoch *epochInfo) fractionComplete(curView uint64) float64 {
 // EECC are implemented by other implementations of `ProposalTiming`.
 type BlockTimeController struct {
 	component.Component
+	protocol.Consumer // consumes protocol state events
 
 	config *Config
 
@@ -95,6 +97,8 @@ type BlockTimeController struct {
 }
 
 var _ hotstuff.ProposalDurationProvider = (*BlockTimeController)(nil)
+var _ protocol.Consumer = (*BlockTimeController)(nil)
+var _ component.Component = (*BlockTimeController)(nil)
 
 // NewBlockTimeController returns a new BlockTimeController.
 func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics, config *Config, state protocol.State, curView uint64) (*BlockTimeController, error) {
@@ -110,6 +114,7 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 	}
 
 	ctl := &BlockTimeController{
+		Consumer:             events.NewNoop(),
 		config:               config,
 		log:                  log.With().Str("hotstuff", "cruise_ctl").Logger(),
 		metrics:              metrics,
