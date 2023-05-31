@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -92,39 +91,10 @@ func extractExecutionState(
 			// mig.MigrateAccountUsage,
 		}
 	}
-	// generating reports at the end, so that the checkpoint file can be used
-	// for sporking as soon as it's generated.
-	if report {
-		log.Info().Msgf("preparing reporter files")
-		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
-
-		preCheckpointReporters = []ledger.Reporter{
-			// report epoch counter which is needed for finalizing root block
-			reporters.NewExportReporter(log,
-				chain,
-				func() flow.StateCommitment { return targetHash },
-			),
-		}
-
-		postCheckpointReporters = []ledger.Reporter{
-			&reporters.AccountReporter{
-				Log:   log,
-				Chain: chain,
-				RWF:   reportFileWriterFactory,
-			},
-			reporters.NewFungibleTokenTracker(log, reportFileWriterFactory, chain, []string{reporters.FlowTokenTypeID(chain)}),
-			&reporters.AtreeReporter{
-				Log: log,
-				RWF: reportFileWriterFactory,
-			},
-		}
-	}
 
 	migratedState, err := led.ExportCheckpointAt(
 		newState,
 		migrations,
-		preCheckpointReporters,
-		postCheckpointReporters,
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,
