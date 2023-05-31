@@ -8,13 +8,12 @@ import (
 
 // ensureUniformNodeWeightsPerRole verifies that the following condition is satisfied for each role R:
 // * all node with role R must have the same weight
+// The function assumes there is at least one node for each role.
 func ensureUniformNodeWeightsPerRole(allNodes flow.IdentityList) {
 	// ensure all nodes of the same role have equal weight
 	for _, role := range flow.Roles() {
 		withRole := allNodes.Filter(filter.HasRole(role))
-		if len(withRole) == 0 {
-			continue
-		}
+		// each role has at least one node so it's safe to access withRole[0]
 		expectedWeight := withRole[0].Weight
 		for _, node := range withRole {
 			if node.Weight != expectedWeight {
