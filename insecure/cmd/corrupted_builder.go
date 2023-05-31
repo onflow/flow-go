@@ -64,9 +64,6 @@ func (cnb *CorruptedNodeBuilder) Initialize() error {
 }
 
 func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
-	// will be used in 2 components so need a central reference to corrupt libp2p node
-	var corruptLibp2pNodeRef *p2p.LibP2PNode
-
 	cnb.FlowNodeBuilder.OverrideComponent(cmd.LibP2PNodeComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := cnb.FlowNodeBuilder.NodeConfig.Me.Address()
 		if cnb.FlowNodeBuilder.BaseConfig.BindAddr != cmd.NotSet {
@@ -112,10 +109,6 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			return nil, fmt.Errorf("failed to create libp2p node: %w", err)
 		}
 
-		// assign the address of corruptLibp2pNode to the pointer variable so can be referenced in the next section
-		// when building a corrupt network
-		corruptLibp2pNodeRef = &corruptLibp2pNode
-
 		cnb.LibP2PNode = corruptLibp2pNode
 		cnb.Logger.Info().
 			Hex("node_id", logging.ID(cnb.NodeID)).
@@ -155,7 +148,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			cnb.Me,
 			cnb.CodecFactory(),
 			flowNetwork,
-			corruptLibp2pNodeRef,
+			&cnb.LibP2PNode,
 			ccf)
 		if err != nil {
 			return nil, fmt.Errorf("could not create corruptible network: %w", err)
