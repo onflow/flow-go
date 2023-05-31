@@ -22,12 +22,13 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/events"
 )
 
-// TimedBlock represents a block, with a time stamp recording when the BlockTimeController received the block
+// TimedBlock represents a block, with a timestamp recording when the BlockTimeController received the block
 type TimedBlock struct {
 	Block        *model.Block
-	TimeObserved time.Time // time stamp when BlockTimeController received the block, per convention in UTC
+	TimeObserved time.Time // timestamp when BlockTimeController received the block, per convention in UTC
 }
 
 // epochInfo stores data about the current and next epoch. It is updated when we enter
@@ -37,11 +38,6 @@ type epochInfo struct {
 	curEpochFinalView     uint64    // F[v] - the final view of the epoch
 	curEpochTargetEndTime time.Time // T[v] - the target end time of the current epoch
 	nextEpochFinalView    *uint64
-}
-
-// proposalTimingContainer wraps an instance of ProposalTiming for storing it in atomic.Pointer
-type proposalTimingContainer struct {
-	ProposalTiming
 }
 
 // targetViewTime returns τ[v], the ideal, steady-state view time for the current epoch.
@@ -59,8 +55,21 @@ func (epoch *epochInfo) fractionComplete(curView uint64) float64 {
 // BlockTimeController dynamically adjusts the ProposalTiming of this node,
 // based on the measured view rate of the consensus committee as a whole, in
 // order to achieve a desired switchover time for each epoch.
+// In a nutshell, the controller outputs the block time on the happy path, i.e.
+//   - Suppose the node is observing the parent block B0 at some time `x0`.
+//   - The controller determines the duration `d` of how much later the child block B1
+//     should be observed by the committee.
+//   - The controller internally memorizes the latest B0 it has seen and outputs
+//     the tuple `(B0, x0, d)`
+//
+// This low-level controller output `(B0, x0, d)` is wrapped into a `ProposalTiming`
+// interface, specifically `happyPathBlockTime` on the happy path. The purpose of the
+// `ProposalTiming` wrapper is to translate the raw controller output into a form
+// that is useful for the event handler. Edge cases, such as initialization or
+// EECC are implemented by other implementations of `ProposalTiming`.
 type BlockTimeController struct {
 	component.Component
+	protocol.Consumer // consumes protocol state events
 
 	config *Config
 
@@ -79,10 +88,12 @@ type BlockTimeController struct {
 	integralErr     LeakyIntegrator
 
 	// latestProposalTiming holds the ProposalTiming that the controller generated in response to processing the latest observation
-	latestProposalTiming *atomic.Pointer[proposalTimingContainer]
+	latestProposalTiming *atomic.Pointer[ProposalTiming]
 }
 
 var _ hotstuff.ProposalDurationProvider = (*BlockTimeController)(nil)
+var _ protocol.Consumer = (*BlockTimeController)(nil)
+var _ component.Component = (*BlockTimeController)(nil)
 
 // NewBlockTimeController returns a new BlockTimeController.
 func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics, config *Config, state protocol.State, curView uint64) (*BlockTimeController, error) {
@@ -98,6 +109,7 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 	}
 
 	ctl := &BlockTimeController{
+		Consumer:             events.NewNoop(),
 		config:               config,
 		log:                  log.With().Str("hotstuff", "cruise_ctl").Logger(),
 		metrics:              metrics,
@@ -107,7 +119,7 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 		epochFallbacks:       make(chan struct{}, 5),
 		proportionalErr:      proportionalErr,
 		integralErr:          integralErr,
-		latestProposalTiming: atomic.NewPointer[proposalTimingContainer](nil), // set in initProposalTiming
+		latestProposalTiming: atomic.NewPointer[ProposalTiming](nil), // set in initProposalTiming
 	}
 	ctl.Component = component.NewComponentManagerBuilder().
 		AddWorker(ctl.processEventsWorkerLogic).
@@ -177,6 +189,7 @@ func (ctl *BlockTimeController) initProposalTiming(curView uint64) {
 	// When disabled, or in epoch fallback, use fallback timing (constant ProposalDuration)
 	if ctl.epochFallbackTriggered || !ctl.config.Enabled.Load() {
 		ctl.storeProposalTiming(newFallbackTiming(curView, time.Now().UTC(), ctl.config.FallbackProposalDelay.Load()))
+		return
 	}
 	// Otherwise, before we observe any view changes, publish blocks immediately
 	ctl.storeProposalTiming(newPublishImmediately(curView, time.Now().UTC()))
@@ -185,12 +198,16 @@ func (ctl *BlockTimeController) initProposalTiming(curView uint64) {
 // storeProposalTiming stores the latest ProposalTiming
 // Concurrency safe.
 func (ctl *BlockTimeController) storeProposalTiming(proposalTiming ProposalTiming) {
-	ctl.latestProposalTiming.Store(&proposalTimingContainer{proposalTiming})
+	ctl.latestProposalTiming.Store(&proposalTiming)
 }
 
 // GetProposalTiming returns the controller's latest ProposalTiming. Concurrency safe.
 func (ctl *BlockTimeController) GetProposalTiming() ProposalTiming {
-	return ctl.latestProposalTiming.Load().ProposalTiming
+	pt := ctl.latestProposalTiming.Load()
+	if pt == nil { // should never happen, as we always store non-nil instances of ProposalTiming. Though, this extra check makes `GetProposalTiming` universal.
+		return nil
+	}
+	return *pt
 }
 
 func (ctl *BlockTimeController) TargetPublicationTime(proposalView uint64, timeViewEntered time.Time, parentBlockId flow.Identifier) time.Time {

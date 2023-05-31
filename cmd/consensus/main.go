@@ -698,6 +698,8 @@ func main() {
 				return nil, err
 			}
 			proposalDurProvider = ctl
+			hotstuffModules.Notifier.AddOnBlockIncorporatedConsumer(ctl.OnBlockIncorporated)
+			node.ProtocolEvents.AddConsumer(ctl)
 
 			// set up admin commands for dynamically updating configs
 			err = node.ConfigManager.RegisterBoolConfig("cruise-ctl-enabled", cruiseCtlConfig.GetEnabled, cruiseCtlConfig.SetEnabled)
