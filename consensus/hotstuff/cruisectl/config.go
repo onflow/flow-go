@@ -11,10 +11,9 @@ func DefaultConfig() *Config {
 	return &Config{
 		TimingConfig{
 			TargetTransition: DefaultEpochTransitionTime(),
-			// TODO confirm default values
 			FallbackProposalDuration: atomic.NewDuration(500 * time.Millisecond),
-			MaxViewDuration:          atomic.NewDuration(1000 * time.Millisecond),
 			MinViewDuration:          atomic.NewDuration(250 * time.Millisecond),
+			MaxViewDuration:          atomic.NewDuration(1800 * time.Millisecond),
 			Enabled:                  atomic.NewBool(false),
 		},
 		ControllerParams{
