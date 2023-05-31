@@ -47,6 +47,10 @@ func (s *orchestrator) sendOneEgressMessage(t *testing.T) {
 	s.Logger.Info().Str("event_id", event.FlowProtocolEventID.String()).Msg("egress event sent")
 }
 
+func (s *orchestrator) sendOneGossipSubMessage(t *testing.T) {
+
+}
+
 // trackOneIngressEvent callback that will track any egress messages that are expected to be received by a victim node
 func (s *orchestrator) trackOneIngressEvent(event *insecure.IngressEvent) error {
 	s.Logger.Info().Str("event_id", event.FlowProtocolEventID.String()).Msg("ingress event received")
