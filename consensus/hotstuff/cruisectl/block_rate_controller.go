@@ -24,10 +24,10 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// TimedBlock represents a block, with a time stamp recording when the BlockTimeController received the block
+// TimedBlock represents a block, with a timestamp recording when the BlockTimeController received the block
 type TimedBlock struct {
 	Block        *model.Block
-	TimeObserved time.Time // time stamp when BlockTimeController received the block, per convention in UTC
+	TimeObserved time.Time // timestamp when BlockTimeController received the block, per convention in UTC
 }
 
 // epochInfo stores data about the current and next epoch. It is updated when we enter

@@ -338,11 +338,11 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		if b.ProposerID == e.committee.Self() {
 			log.Debug().Msg("already proposed for current view")
 			return nil
-		}
+		} else {
 		// sanity check: the following code should never be reached, as this node is the current leader, i.e.
 		// we should _not_ consider a proposal for this view from any other as valid and store it in forks.
-		//nolint:staticcheck
 		return fmt.Errorf("this node (%v) is leader for the current view %d, but have a proposal from node %v for this view", currentLeader, curView, b.ProposerID)
+		}
 	}
 
 	// attempt to generate proposal:

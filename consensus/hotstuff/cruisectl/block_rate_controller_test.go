@@ -455,7 +455,6 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_BehindSchedule() {
 	// 1s behind of schedule
 	receivedParentBlockAt := idealEnteredViewTime.Add(time.Second)
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
-		fmt.Println(view)
 		// hold the instantaneous error constant for each view
 		receivedParentBlockAt = receivedParentBlockAt.Add(bs.ctl.targetViewTime())
 		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), receivedParentBlockAt)

@@ -142,7 +142,7 @@ func Test_LI_AddingRepeatedObservations(t *testing.T) {
 }
 
 // Test_AddingRepeatedObservations_selfConsistency applies a self-consistency check
-// for  repeated observations.
+// for repeated observations.
 func Test_LI_AddingRepeatedObservations_selfConsistency(t *testing.T) {
 	beta := math.Pi / 7.0
 	initialValue := 17.0
