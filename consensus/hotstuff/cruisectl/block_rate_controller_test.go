@@ -465,7 +465,7 @@ func (bs *BlockRateControllerSuite) TestMetrics() {
 		assert.Greater(bs.T(), d, float64(0))
 	}).Once()
 	// should immediately use min proposal duration
-	bs.metrics.On("TargetProposalDuration", bs.config.MinViewDuration).Once()
+	bs.metrics.On("TargetProposalDuration", bs.config.MinViewDuration.Load()).Once()
 	// should have a large negative controller output
 	bs.metrics.On("ControllerOutput", mock.Anything).Run(func(args mock.Arguments) {
 		output := args[0].(time.Duration)
