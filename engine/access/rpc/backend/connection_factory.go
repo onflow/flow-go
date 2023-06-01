@@ -67,9 +67,9 @@ type ConnectionFactoryImpl struct {
 
 // TODO: describe
 type CircuitBreakerConfig struct {
-	CircuitBreakerEnabled bool
-	RestoreTimeout        time.Duration
-	MaxRequestToBreak     uint32
+	Enabled           bool
+	RestoreTimeout    time.Duration
+	MaxRequestToBreak uint32
 }
 
 type CachedClient struct {
@@ -102,7 +102,7 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(cf.MaxMsgSize))),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithKeepaliveParams(keepaliveParams),
-		WithClientUnaryInterceptor(timeout))
+		WithClientUnaryInterceptor(timeout, cf.CircuitBreakerConfig))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to address %s: %w", address, err)
 	}
@@ -258,8 +258,18 @@ func getGRPCAddress(address string, grpcPort uint) (string, error) {
 	return grpcAddress, nil
 }
 
-func WithClientUnaryInterceptor(timeout time.Duration) grpc.DialOption {
-	circuitBreaker := gobreaker.NewCircuitBreaker(gobreaker.Settings{})
+func WithClientUnaryInterceptor(timeout time.Duration, circuitBreakerConfig CircuitBreakerConfig) grpc.DialOption {
+	var circuitBreaker *gobreaker.CircuitBreaker
+
+	if circuitBreakerConfig.Enabled {
+		circuitBreaker = gobreaker.NewCircuitBreaker(gobreaker.Settings{
+			Timeout: circuitBreakerConfig.RestoreTimeout,
+			ReadyToTrip: func(counts gobreaker.Counts) bool {
+				return counts.ConsecutiveFailures > circuitBreakerConfig.MaxRequestToBreak
+			},
+		})
+	}
+
 	clientTimeoutInterceptor := func(
 		ctx context.Context,
 		method string,
@@ -269,17 +279,26 @@ func WithClientUnaryInterceptor(timeout time.Duration) grpc.DialOption {
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
+		exec := func() (interface{}, error) {
+			// create a context that expires after timeout
+			ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 
-		// create a context that expires after timeout
-		ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
+			defer cancel()
 
-		defer cancel()
-		_, err := circuitBreaker.Execute(func() (interface{}, error) {
 			// call the remote GRPC using the short context
 			err := invoker(ctxWithTimeout, method, req, reply, cc, opts...)
 
+			//TODO: As invoker do not return any results, for now nil returned
 			return nil, err
-		})
+		}
+
+		var err error
+
+		if circuitBreakerConfig.Enabled {
+			_, err = circuitBreaker.Execute(exec)
+		} else {
+			_, err = exec()
+		}
 
 		return err
 	}
