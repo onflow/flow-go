@@ -81,7 +81,6 @@ func extractExecutionState(
 	}()
 
 	var migrations []ledger.Migration
-	var preCheckpointReporters, postCheckpointReporters []ledger.Reporter
 	newState := ledger.State(targetHash)
 
 	if migrate {
