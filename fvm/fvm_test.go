@@ -2473,14 +2473,14 @@ func TestCapabilityControllers(t *testing.T) {
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(`
 						transaction {
-                          prepare(signer: AuthAccount) {
+						  prepare(signer: AuthAccount) {
 							let cap = signer.capabilities.storage.issue<&Int>(/storage/foo)
-                            assert(cap.id == 1)
+							assert(cap.id == 1)
 
-                            let cap2 = signer.capabilities.storage.issue<&String>(/storage/bar)
-                            assert(cap2.id == 2)
-                          }
-                        }
+							let cap2 = signer.capabilities.storage.issue<&String>(/storage/bar)
+							assert(cap2.id == 2)
+						  }
+						}
 					`)).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
 					AddAuthorizer(chain.ServiceAddress()).
