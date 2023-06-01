@@ -154,7 +154,6 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/lucas-clemente/quic-go v0.31.1 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
-	github.com/m4ksio/wal v1.0.1-0.20221209164835-154a17396e4c // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/marten-seemann/qtls-go1-18 v0.1.3 // indirect
 	github.com/marten-seemann/qtls-go1-19 v0.1.1 // indirect
@@ -189,6 +188,7 @@ require (
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230428213521-89bcc9e8517e // indirect
 	github.com/onflow/go-bitswap v0.0.0-20221017184039-808c5791a8a8 // indirect
 	github.com/onflow/sdks v0.5.0 // indirect
+	github.com/onflow/wal v0.0.0-20230529184820-bc9f8244608d // indirect
 	github.com/onsi/ginkgo/v2 v2.6.1 // indirect
 	github.com/opencontainers/runtime-spec v1.0.2 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
