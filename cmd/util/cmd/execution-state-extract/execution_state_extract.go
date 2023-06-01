@@ -26,9 +26,7 @@ func extractExecutionState(
 	targetHash flow.StateCommitment,
 	outputDir string,
 	log zerolog.Logger,
-	chain flow.Chain,
 	migrate bool,
-	report bool,
 	nWorker int, // number of concurrent worker to migation payloads
 ) error {
 
