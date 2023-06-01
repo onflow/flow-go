@@ -145,6 +145,7 @@ func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corru
 		testutil.LocalFixture(t, corruptedIdentity),
 		codec,
 		flowNetwork,
+		nil,
 		ccf)
 	require.NoError(t, err)
 

@@ -38,6 +38,7 @@ func TestHandleOutgoingEvent_AttackerRegistered(t *testing.T) {
 		testutil.LocalFixture(t, corruptedIdentity),
 		codec,
 		flowNetwork,
+		nil,
 		ccf)
 	require.NoError(t, err)
 
