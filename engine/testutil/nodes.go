@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
+	mockcollection "github.com/onflow/flow-go/engine/collection/mock"
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	"github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
@@ -64,6 +65,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
@@ -119,7 +121,7 @@ func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity *flow.Ide
 	metrics := metrics.NewNoopCollector()
 
 	// creates state fixture and bootstrap it.
-	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootSnapshot := unittest.RootSnapshotFixtureWithChainID(participants, chainID)
 	stateFixture := CompleteStateFixture(t, log, metrics, tracer, rootSnapshot)
 
 	require.NoError(t, err)
@@ -340,6 +342,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		node.Metrics, node.Metrics, node.Metrics,
 		node.State,
 		transactions,
+		compliance.DefaultConfig(),
 	)
 	require.NoError(t, err)
 
@@ -391,6 +394,8 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	rootQCVoter := new(mockmodule.ClusterRootQCVoter)
 	rootQCVoter.On("Vote", mock.Anything, mock.Anything).Return(nil)
 
+	engineEventsDistributor := mockcollection.NewEngineEvents(t)
+	engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Maybe()
 	heights := gadgets.NewHeights()
 	node.ProtocolEvents.AddConsumer(heights)
 
@@ -402,6 +407,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		rootQCVoter,
 		factory,
 		heights,
+		engineEventsDistributor,
 	)
 	require.NoError(t, err)
 	node.ProtocolEvents.AddConsumer(epochManager)
@@ -595,7 +601,13 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply))
 	require.NoError(t, err)
 
-	err = bootstrapper.BootstrapExecutionDatabase(node.PublicDB, commit, genesisHead)
+	rootResult, rootSeal, err := protoState.Sealed().SealedResult()
+	require.NoError(t, err)
+
+	require.Equal(t, fmt.Sprintf("%x", rootSeal.FinalState), fmt.Sprintf("%x", commit))
+	require.Equal(t, rootSeal.ResultID, rootResult.ID())
+
+	err = bootstrapper.BootstrapExecutionDatabase(node.PublicDB, rootSeal)
 	require.NoError(t, err)
 
 	execState := executionState.NewExecutionState(
@@ -679,6 +691,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Me,
 		requestEngine,
 		node.State,
+		node.Headers,
 		node.Blocks,
 		collectionsStorage,
 		eventsStorage,
@@ -728,6 +741,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Headers,
 		finalizedHeader,
 		core,
+		compliance.DefaultConfig(),
 	)
 	require.NoError(t, err)
 
@@ -752,6 +766,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
+	followerDistributor.AddFinalizationConsumer(syncEngine)
 
 	return testmock.ExecutionNode{
 		GenericNode:         node,
@@ -776,7 +791,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 }
 
 func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.QuorumCertificate) {
-	rootHead, err := node.State.Params().Root()
+	rootHead, err := node.State.Params().FinalizedRoot()
 	require.NoError(t, err)
 
 	signers, err := node.State.AtHeight(0).Identities(filter.HasRole(flow.RoleConsensus))

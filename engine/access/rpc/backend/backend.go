@@ -89,7 +89,7 @@ func New(
 	executionReceipts storage.ExecutionReceipts,
 	executionResults storage.ExecutionResults,
 	chainID flow.ChainID,
-	transactionMetrics module.TransactionMetrics,
+	accessMetrics module.AccessMetrics,
 	connFactory ConnectionFactory,
 	retryEnabled bool,
 	maxHeightRange uint,
@@ -118,7 +118,7 @@ func New(
 			connFactory:        connFactory,
 			state:              state,
 			log:                log,
-			metrics:            transactionMetrics,
+			metrics:            accessMetrics,
 			loggedScripts:      loggedScripts,
 			archiveAddressList: archiveAddressList,
 		},
@@ -131,7 +131,7 @@ func New(
 			transactions:         transactions,
 			executionReceipts:    executionReceipts,
 			transactionValidator: configureTransactionValidator(state, chainID),
-			transactionMetrics:   transactionMetrics,
+			transactionMetrics:   accessMetrics,
 			retry:                retry,
 			connFactory:          connFactory,
 			previousAccessNodes:  historicalAccessNodes,
@@ -300,7 +300,7 @@ func executionNodesForBlockID(
 
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
-	rootBlock, err := state.Params().Root()
+	rootBlock, err := state.Params().FinalizedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}

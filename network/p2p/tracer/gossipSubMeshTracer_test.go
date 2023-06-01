@@ -66,6 +66,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithGossipSubTracer(meshTracer),
 		p2ptest.WithRole(flow.RoleConsensus))
 
@@ -75,6 +76,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus))
 	idProvider.On("ByPeerID", otherNode1.Host().ID()).Return(&otherId1, true).Maybe()
 
@@ -82,6 +84,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus))
 	idProvider.On("ByPeerID", otherNode2.Host().ID()).Return(&otherId2, true).Maybe()
 
@@ -90,6 +93,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus))
 	idProvider.On("ByPeerID", unknownNode.Host().ID()).Return(nil, false).Maybe()
 

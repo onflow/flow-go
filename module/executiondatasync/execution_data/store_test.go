@@ -104,9 +104,9 @@ func TestHappyPath(t *testing.T) {
 
 	test := func(numChunks int, minSerializedSizePerChunk uint64) {
 		expected := generateBlockExecutionData(t, numChunks, minSerializedSizePerChunk)
-		rootId, err := eds.AddExecutionData(context.Background(), expected)
+		rootId, err := eds.Add(context.Background(), expected)
 		require.NoError(t, err)
-		actual, err := eds.GetExecutionData(context.Background(), rootId)
+		actual, err := eds.Get(context.Background(), rootId)
 		require.NoError(t, err)
 		deepEqual(t, expected, actual)
 	}
@@ -172,9 +172,9 @@ func TestMalformedData(t *testing.T) {
 		blobstore := getBlobstore()
 		defaultEds := getExecutionDataStore(blobstore, execution_data.DefaultSerializer)
 		malformedEds := getExecutionDataStore(blobstore, serializer)
-		rootID, err := malformedEds.AddExecutionData(context.Background(), bed)
+		rootID, err := malformedEds.Add(context.Background(), bed)
 		require.NoError(t, err)
-		_, err = defaultEds.GetExecutionData(context.Background(), rootID)
+		_, err = defaultEds.Get(context.Background(), rootID)
 		assert.True(t, execution_data.IsMalformedDataError(err))
 	}
 
@@ -192,7 +192,7 @@ func TestGetIncompleteData(t *testing.T) {
 	eds := getExecutionDataStore(blobstore, execution_data.DefaultSerializer)
 
 	bed := generateBlockExecutionData(t, 5, 10*execution_data.DefaultMaxBlobSize)
-	rootID, err := eds.AddExecutionData(context.Background(), bed)
+	rootID, err := eds.Add(context.Background(), bed)
 	require.NoError(t, err)
 
 	cids := getAllKeys(t, blobstore)
@@ -201,7 +201,7 @@ func TestGetIncompleteData(t *testing.T) {
 	cidToDelete := cids[mrand.Intn(len(cids))]
 	require.NoError(t, blobstore.DeleteBlob(context.Background(), cidToDelete))
 
-	_, err = eds.GetExecutionData(context.Background(), rootID)
+	_, err = eds.Get(context.Background(), rootID)
 	var blobNotFoundError *execution_data.BlobNotFoundError
 	assert.ErrorAs(t, err, &blobNotFoundError)
 }

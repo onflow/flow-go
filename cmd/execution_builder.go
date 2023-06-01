@@ -62,7 +62,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
-	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
@@ -792,6 +791,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		node.Me,
 		exeNode.collectionRequester,
 		node.State,
+		node.Storage.Headers,
 		node.Storage.Blocks,
 		node.Storage.Collections,
 		exeNode.events,
@@ -861,7 +861,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 		node.Storage.Headers,
 		final,
 		exeNode.followerDistributor,
-		node.RootBlock.Header,
+		node.FinalizedRootBlock.Header,
 		node.RootQC,
 		finalized,
 		pending,
@@ -910,13 +910,14 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		node.Me,
 		node.Metrics.Engine,
 		node.Storage.Headers,
-		exeNode.builder.FinalizedHeader,
+		exeNode.builder.FinalizedRootBlock.Header,
 		core,
-		followereng.WithComplianceConfigOpt(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
+		node.ComplianceConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower engine: %w", err)
 	}
+	exeNode.followerDistributor.AddOnBlockFinalizedConsumer(exeNode.followerEng.OnFinalizedBlock)
 
 	return exeNode.followerEng, nil
 }
@@ -989,6 +990,7 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 	}
+	exeNode.followerDistributor.AddFinalizationConsumer(exeNode.syncEngine)
 
 	return exeNode.syncEngine, nil
 }
@@ -1037,7 +1039,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 		// TODO: check that the checkpoint file contains the root block's statecommit hash
 
-		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
+		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution database: %w", err)
 		}

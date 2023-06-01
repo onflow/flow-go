@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	utils "github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -91,4 +93,49 @@ func TestFinalize_HappyPath(t *testing.T) {
 		snapshotPath := filepath.Join(bootDir, model.PathRootProtocolStateSnapshot)
 		assert.FileExists(t, snapshotPath)
 	})
+}
+
+func TestClusterAssignment(t *testing.T) {
+	tmp := flagCollectionClusters
+	flagCollectionClusters = 5
+	// Happy path (limit set-up, can't have one less internal node)
+	partnersLen := 7
+	internalLen := 22
+	partners := unittest.NodeInfosFixture(partnersLen, unittest.WithRole(flow.RoleCollection))
+	internals := unittest.NodeInfosFixture(internalLen, unittest.WithRole(flow.RoleCollection))
+
+	// should not error
+	_, clusters, err := constructClusterAssignment(partners, internals)
+	require.NoError(t, err)
+	require.True(t, checkClusterConstraint(clusters, partners, internals))
+
+	// unhappy Path
+	internals = internals[:21] // reduce one internal node
+	// should error
+	_, _, err = constructClusterAssignment(partners, internals)
+	require.Error(t, err)
+	// revert the flag value
+	flagCollectionClusters = tmp
+}
+
+// Check about the number of internal/partner nodes in each cluster. The identites
+// in each cluster do not matter for this check.
+func checkClusterConstraint(clusters flow.ClusterList, partnersInfo []model.NodeInfo, internalsInfo []model.NodeInfo) bool {
+	partners := model.ToIdentityList(partnersInfo)
+	internals := model.ToIdentityList(internalsInfo)
+	for _, cluster := range clusters {
+		var clusterPartnerCount, clusterInternalCount int
+		for _, node := range cluster {
+			if _, exists := partners.ByNodeID(node.NodeID); exists {
+				clusterPartnerCount++
+			}
+			if _, exists := internals.ByNodeID(node.NodeID); exists {
+				clusterInternalCount++
+			}
+		}
+		if clusterInternalCount <= clusterPartnerCount*2 {
+			return false
+		}
+	}
+	return true
 }

@@ -183,7 +183,10 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("computing collection node clusters")
-	assignments, clusters := constructClusterAssignment(partnerNodes, internalNodes)
+	assignments, clusters, err := constructClusterAssignment(partnerNodes, internalNodes)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
+	}
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root blocks for collection node clusters")

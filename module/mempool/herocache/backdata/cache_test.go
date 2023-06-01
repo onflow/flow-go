@@ -17,7 +17,7 @@ import (
 // TestArrayBackData_SingleBucket evaluates health of state transition for storing 10 entities in a Cache with only
 // a single bucket (of 16). It also evaluates all stored items are retrievable.
 func TestArrayBackData_SingleBucket(t *testing.T) {
-	limit := 10
+	limit := 16
 
 	bd := NewCache(uint32(limit),
 		1,
