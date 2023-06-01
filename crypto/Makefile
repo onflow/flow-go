@@ -22,11 +22,12 @@ endif
 # the crypto package uses BLST source files underneath which may use ADX insructions.
 ifeq ($(ADX_SUPPORT), 1)
 # if ADX insructions are supported, default is to use a fast ADX BLST implementation 
-	CGO_FLAG :=
+	CRYPTO_FLAG := ""
 else
 # if ADX insructions aren't supported, this CGO flags uses a slower non-ADX BLST implementation 
-	CGO_FLAG := CGO_CFLAGS="-O -D__BLST_PORTABLE__"
+	CRYPTO_FLAG := "-O -D__BLST_PORTABLE__"
 endif
+CGO_FLAG := CGO_CFLAGS=$(CRYPTO_FLAG)
 
 # test all packages
 .PHONY: test
