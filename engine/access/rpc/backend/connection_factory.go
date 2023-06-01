@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
+	"github.com/sony/gobreaker"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
@@ -61,6 +62,14 @@ type ConnectionFactoryImpl struct {
 	AccessMetrics             module.AccessMetrics
 	Log                       zerolog.Logger
 	mutex                     sync.Mutex
+	CircuitBreakerConfig      CircuitBreakerConfig
+}
+
+// TODO: describe
+type CircuitBreakerConfig struct {
+	CircuitBreakerEnabled bool
+	RestoreTimeout        time.Duration
+	MaxRequestToBreak     uint32
 }
 
 type CachedClient struct {
@@ -250,7 +259,7 @@ func getGRPCAddress(address string, grpcPort uint) (string, error) {
 }
 
 func WithClientUnaryInterceptor(timeout time.Duration) grpc.DialOption {
-
+	circuitBreaker := gobreaker.NewCircuitBreaker(gobreaker.Settings{})
 	clientTimeoutInterceptor := func(
 		ctx context.Context,
 		method string,
@@ -265,9 +274,12 @@ func WithClientUnaryInterceptor(timeout time.Duration) grpc.DialOption {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 
 		defer cancel()
+		_, err := circuitBreaker.Execute(func() (interface{}, error) {
+			// call the remote GRPC using the short context
+			err := invoker(ctxWithTimeout, method, req, reply, cc, opts...)
 
-		// call the remote GRPC using the short context
-		err := invoker(ctxWithTimeout, method, req, reply, cc, opts...)
+			return nil, err
+		})
 
 		return err
 	}

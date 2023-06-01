@@ -158,6 +158,11 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			FixedExecutionNodeIDs:     nil,
 			ArchiveAddressList:        nil,
 			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
+			CircuitBreakerConfig: backend.CircuitBreakerConfig{
+				CircuitBreakerEnabled: false,
+				RestoreTimeout:        time.Duration(60) * time.Second,
+				MaxRequestToBreak:     5,
+			},
 		},
 		stateStreamConf: state_stream.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -644,6 +649,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&builder.supportsObserver, "supports-observer", defaultConfig.supportsObserver, "true if this staked access node supports observer or follower connections")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
+		flags.BoolVar(&builder.rpcConf.CircuitBreakerConfig.CircuitBreakerEnabled, "circuit-breaker-enabled", defaultConfig.rpcConf.CircuitBreakerConfig.CircuitBreakerEnabled, "whether to enable the circuit breaker for collection and execution node connections")
+		flags.DurationVar(&builder.rpcConf.CircuitBreakerConfig.RestoreTimeout, "circuit-breaker-restore-timeout", defaultConfig.rpcConf.CircuitBreakerConfig.RestoreTimeout, "initial timeout for circuit breaker to try connect again. Default value is 60s")
+		flags.Uint32Var(&builder.rpcConf.CircuitBreakerConfig.MaxRequestToBreak, "circuit-breaker-max-request-to-break", defaultConfig.rpcConf.CircuitBreakerConfig.MaxRequestToBreak, "number of consecutive failures to break connection. Default value is 5")
 
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
@@ -702,6 +710,11 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 				default:
 					return errors.New("state-stream-event-filter-limits may only contain the keys EventTypes, Addresses, Contracts")
 				}
+			}
+		}
+		if builder.rpcConf.CircuitBreakerConfig.CircuitBreakerEnabled {
+			if builder.rpcConf.CircuitBreakerConfig.MaxRequestToBreak == 0 {
+				return errors.New("circuit-breaker-max-request-to-break must be greater than 0")
 			}
 		}
 
