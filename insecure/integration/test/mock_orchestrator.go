@@ -32,11 +32,11 @@ func (m *mockOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) erro
 	return m.orchestratorNetwork.SendIngress(event)
 }
 
-func (m *mockOrchestrator) HandleGSEgressEvent(event *insecure.GossipSubEgressEvent) error {
+func (m *mockOrchestrator) HandleGossipSubEgressEvent(event *insecure.GossipSubEgressEvent) error {
 	return nil
 }
 
-func (m *mockOrchestrator) HandleGSIngressEvent(event *insecure.GossipSubIngressEvent) error {
+func (m *mockOrchestrator) HandleGossipSubIngressEvent(event *insecure.GossipSubIngressEvent) error {
 	return nil
 }
 

@@ -29,9 +29,12 @@ type BaseOrchestrator struct {
 	OnEgressEvent []OnEgressEvent
 	// OnIngressEvent callbacks invoked on each ingress event received.
 	OnIngressEvent []OnIngressEvent
+
+	OnGSEgressEvent  []OnGSEgressEvent
+	OnGSIngressEvent []OnGSIngressEvent
 }
 
-var _ insecure.AttackOrchestrator = &BaseOrchestrator{}
+var _ insecure.AttackOrchestrator = (*BaseOrchestrator)(nil)
 
 // HandleEgressEvent implements logic of processing the outgoing (egress) events received from a corrupted node.
 func (b *BaseOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
@@ -92,10 +95,16 @@ func (b *BaseOrchestrator) Register(orchestratorNetwork insecure.OrchestratorNet
 	b.OrchestratorNetwork = orchestratorNetwork
 }
 
-func (b *BaseOrchestrator) HandleGSEgressEvent(event *insecure.GossipSubEgressEvent) error {
+func (b *BaseOrchestrator) HandleGossipSubEgressEvent(event *insecure.GossipSubEgressEvent) error {
+	for _, f := range b.OnGSEgressEvent {
+		err := f(event)
+		if err != nil {
+			b.Logger.Error().Err(err).Msg("could not pass through gossipsub egress event")
+		}
+	}
 	return nil
 }
 
-func (b *BaseOrchestrator) HandleGSIngressEvent(event *insecure.GossipSubIngressEvent) error {
+func (b *BaseOrchestrator) HandleGossipSubIngressEvent(event *insecure.GossipSubIngressEvent) error {
 	return nil
 }

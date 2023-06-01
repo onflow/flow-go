@@ -14,11 +14,11 @@ type AttackOrchestrator interface {
 	// events to corrupt nodes. Hence, no extra concurrency-safe consideration is needed.
 	HandleIngressEvent(*IngressEvent) error
 
-	// HandleGSEgressEvent implements the logic of processing an outgoing libp2p network event from a corrupt node.
-	HandleGSEgressEvent(event *GossipSubEgressEvent) error
+	// HandleGossipSubEgressEvent implements the logic of processing an outgoing libp2p network event from a corrupt node.
+	HandleGossipSubEgressEvent(event *GossipSubEgressEvent) error
 
-	// HandleGSIngressEvent implements the logic of processing an incoming libp2p network event to a corrupt node.
-	HandleGSIngressEvent(event *GossipSubIngressEvent) error
+	// HandleGossipSubIngressEvent implements the logic of processing an incoming libp2p network event to a corrupt node.
+	HandleGossipSubIngressEvent(event *GossipSubIngressEvent) error
 
 	Register(OrchestratorNetwork)
 }

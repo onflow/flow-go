@@ -133,11 +133,11 @@ func (o *Orchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
 	return nil
 }
 
-func (o *Orchestrator) HandleGSEgressEvent(event *insecure.GossipSubEgressEvent) error {
+func (o *Orchestrator) HandleGossipSubEgressEvent(event *insecure.GossipSubEgressEvent) error {
 	return nil
 }
 
-func (o *Orchestrator) HandleGSIngressEvent(event *insecure.GossipSubIngressEvent) error {
+func (o *Orchestrator) HandleGossipSubIngressEvent(event *insecure.GossipSubIngressEvent) error {
 	return nil
 }
 
