@@ -3,8 +3,6 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/module/grpcserver"
-	"google.golang.org/grpc/credentials"
 	"io"
 	"os"
 	"testing"
@@ -18,11 +16,13 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"

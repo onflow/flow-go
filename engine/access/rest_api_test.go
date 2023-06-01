@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc/credentials"
+
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/utils/grpcutils"
-	"google.golang.org/grpc/credentials"
 
 	"github.com/antihax/optional"
 	restclient "github.com/onflow/flow/openapi/go-client-generated"

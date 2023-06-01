@@ -2,7 +2,7 @@ package access
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/grpcserver"
+
 	"io"
 	"os"
 	"testing"
@@ -20,6 +20,7 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
