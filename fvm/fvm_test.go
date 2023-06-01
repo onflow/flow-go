@@ -2475,11 +2475,11 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				ctx fvm.Context,
 				snapshotTree snapshot.SnapshotTree,
 			) {
-				// Create two private keys
+				// Create a private key
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 				require.NoError(t, err)
 
-				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				// Bootstrap a ledger, creating an account with the provided private key and the root account.
 				snapshotTree, accounts, err := testutil.CreateAccounts(
 					vm,
 					snapshotTree,
