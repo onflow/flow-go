@@ -59,6 +59,12 @@ var resultsCmd = &cobra.Command{
 			}
 
 			common.PrettyPrintEntity(result)
+
+			log.Info().Msgf("total %v chunks", len(result.Chunks))
+			for i, chunk := range result.Chunks {
+				log.Info().Msgf("%-th chunk id: %v", i, chunk.ID())
+			}
+
 			return
 		}
 
