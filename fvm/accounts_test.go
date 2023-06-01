@@ -1605,7 +1605,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				_, output, err = vm.Run(ctx, script, snapshotTree)
 				assert.NoError(t, err)
 				assert.NoError(t, output.Err)
-				assert.Equal(t, cadence.UFix64(9999_3120), output.Value)
+				assert.Equal(t, cadence.UFix64(99_993_040), output.Value)
 			}),
 	)
 
