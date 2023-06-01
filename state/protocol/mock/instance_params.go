@@ -36,8 +36,8 @@ func (_m *InstanceParams) EpochFallbackTriggered() (bool, error) {
 	return r0, r1
 }
 
-// Root provides a mock function with given fields:
-func (_m *InstanceParams) Root() (*flow.Header, error) {
+// FinalizedRoot provides a mock function with given fields:
+func (_m *InstanceParams) FinalizedRoot() (*flow.Header, error) {
 	ret := _m.Called()
 
 	var r0 *flow.Header
@@ -76,6 +76,32 @@ func (_m *InstanceParams) Seal() (*flow.Seal, error) {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Seal)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SealedRoot provides a mock function with given fields:
+func (_m *InstanceParams) SealedRoot() (*flow.Header, error) {
+	ret := _m.Called()
+
+	var r0 *flow.Header
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (*flow.Header, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Header)
 		}
 	}
 

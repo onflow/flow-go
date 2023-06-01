@@ -234,6 +234,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.BoolVar(&fnb.BaseConfig.AlspConfig.DisablePenalty, "alsp-disable", defaultConfig.AlspConfig.DisablePenalty, "disable the penalty mechanism of the alsp protocol. default value (recommended) is false")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.AlspConfig.SpamRecordCacheSize, "alsp-spam-record-cache-size", defaultConfig.AlspConfig.SpamRecordCacheSize, "size of spam record cache, recommended to be 10x the number of authorized nodes")
 	fnb.flags.Uint32Var(&fnb.BaseConfig.AlspConfig.SpamReportQueueSize, "alsp-spam-report-queue-size", defaultConfig.AlspConfig.SpamReportQueueSize, "size of spam report queue, recommended to be 100x the number of authorized nodes")
+	fnb.flags.DurationVar(&fnb.BaseConfig.AlspConfig.HearBeatInterval, "alsp-heartbeat-interval", defaultConfig.AlspConfig.HearBeatInterval, "interval between two consecutive heartbeat events at alsp, recommended to leave it as default unless you know what you are doing.")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -427,20 +428,12 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		return libp2pNode, nil
 	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-			Logger:                  fnb.Logger,
-			SpamRecordCacheSize:     fnb.AlspConfig.SpamRecordCacheSize,
-			SpamReportQueueSize:     fnb.AlspConfig.SpamReportQueueSize,
-			DisablePenalty:          fnb.AlspConfig.DisablePenalty,
-			AlspMetrics:             fnb.Metrics.Network,
-			HeroCacheMetricsFactory: fnb.HeroCacheMetricsFactory(),
-			NetworkType:             network.PrivateNetwork,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create default conduit factory: %w", err)
-		}
 		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
-		return fnb.InitFlowNetworkWithConduitFactory(node, cf, unicastRateLimiters, peerManagerFilters)
+		return fnb.InitFlowNetworkWithConduitFactory(
+			node,
+			conduit.NewDefaultConduitFactory(),
+			unicastRateLimiters,
+			peerManagerFilters)
 	})
 
 	fnb.Module("middleware dependency", func(node *NodeConfig) error {
@@ -511,7 +504,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	}
 
 	// creates network instance
-	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
 		Logger:              fnb.Logger,
 		Codec:               fnb.CodecFactory(),
 		Me:                  fnb.Me,
@@ -522,6 +515,16 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		IdentityProvider:    fnb.IdentityProvider,
 		ReceiveCache:        receiveCache,
 		ConduitFactory:      cf,
+		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  fnb.Logger,
+			SpamRecordCacheSize:     fnb.AlspConfig.SpamRecordCacheSize,
+			SpamReportQueueSize:     fnb.AlspConfig.SpamReportQueueSize,
+			DisablePenalty:          fnb.AlspConfig.DisablePenalty,
+			HeartBeatInterval:       fnb.AlspConfig.HearBeatInterval,
+			AlspMetrics:             fnb.Metrics.Network,
+			HeroCacheMetricsFactory: fnb.HeroCacheMetricsFactory(),
+			NetworkType:             network.PrivateNetwork,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -1106,7 +1109,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.State = state
 
 		// set root snapshot field
-		rootBlock, err := state.Params().Root()
+		rootBlock, err := state.Params().FinalizedRoot()
 		if err != nil {
 			return fmt.Errorf("could not get root block from protocol state: %w", err)
 		}
@@ -1161,8 +1164,10 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.Logger.Info().
 			Hex("root_result_id", logging.Entity(fnb.RootResult)).
 			Hex("root_state_commitment", fnb.RootSeal.FinalState[:]).
-			Hex("root_block_id", logging.Entity(fnb.RootBlock)).
-			Uint64("root_block_height", fnb.RootBlock.Header.Height).
+			Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
+			Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
+			Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
+			Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
 			Msg("protocol state bootstrapped")
 	}
 
@@ -1173,17 +1178,11 @@ func (fnb *FlowNodeBuilder) initState() error {
 		}
 	}
 
-	lastFinalized, err := fnb.State.Final().Head()
-	if err != nil {
-		return fmt.Errorf("could not get last finalized block header: %w", err)
-	}
-	fnb.NodeConfig.FinalizedHeader = lastFinalized
-
 	fnb.Logger.Info().
-		Hex("root_block_id", logging.Entity(fnb.RootBlock)).
-		Uint64("root_block_height", fnb.RootBlock.Header.Height).
-		Hex("finalized_block_id", logging.Entity(lastFinalized)).
-		Uint64("finalized_block_height", lastFinalized.Height).
+		Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
+		Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
+		Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
+		Uint64("sealed_root_block_height", fnb.SealedRootBlock.Header.Height).
 		Msg("successfully opened protocol state")
 
 	return nil
@@ -1219,13 +1218,14 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 		return fmt.Errorf("failed to read root sealing segment: %w", err)
 	}
 
-	fnb.RootBlock = sealingSegment.Highest()
+	fnb.FinalizedRootBlock = sealingSegment.Highest()
+	fnb.SealedRootBlock = sealingSegment.Sealed()
 	fnb.RootQC, err = fnb.RootSnapshot.QuorumCertificate()
 	if err != nil {
 		return fmt.Errorf("failed to read root QC: %w", err)
 	}
 
-	fnb.RootChainID = fnb.RootBlock.Header.ChainID
+	fnb.RootChainID = fnb.FinalizedRootBlock.Header.ChainID
 	fnb.SporkID, err = fnb.RootSnapshot.Params().SporkID()
 	if err != nil {
 		return fmt.Errorf("failed to read spork ID: %w", err)
@@ -1253,7 +1253,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
 	// are lenient, to allow ghost node to run as any role.
 	if self.Role.String() != fnb.BaseConfig.NodeRole {
-		rootBlockHeader, err := fnb.State.Params().Root()
+		rootBlockHeader, err := fnb.State.Params().FinalizedRoot()
 		if err != nil {
 			return fmt.Errorf("could not get root block from protocol state: %w", err)
 		}

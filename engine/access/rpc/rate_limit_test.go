@@ -118,7 +118,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.snapshot.On("Head").Return(block, nil)
 
 	rpcEngBuilder, err := NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,
-		nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt, suite.me)
+		nil, suite.chainID, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt, suite.me)
 	require.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	require.NoError(suite.T(), err)
