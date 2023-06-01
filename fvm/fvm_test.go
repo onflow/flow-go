@@ -2463,33 +2463,48 @@ func TestCapabilityControllers(t *testing.T) {
 					),
 				),
 			).
-			run(
-				func(
-					t *testing.T,
-					vm fvm.VM,
-					chain flow.Chain,
-					ctx fvm.Context,
-					snapshotTree snapshot.SnapshotTree,
-				) {
-					script := fvm.Script([]byte(`
-						pub fun main() {
-							getAccount(0x1).capabilities
-						}
-					`))
+			run(func(
+				t *testing.T,
+				vm fvm.VM,
+				chain flow.Chain,
+				ctx fvm.Context,
+				snapshotTree snapshot.SnapshotTree,
+			) {
+				txBody := flow.NewTransactionBody().
+					SetScript([]byte(`
+						transaction {
+                          prepare(signer: AuthAccount) {
+							let cap = signer.capabilities.storage.issue<&Int>(/storage/foo)
+                            assert(cap.id == 1)
 
-					_, output, err := vm.Run(ctx, script, snapshotTree)
-					require.NoError(t, err)
+                            let cap2 = signer.capabilities.storage.issue<&String>(/storage/bar)
+                            assert(cap2.id == 2)
+                          }
+                        }
+					`)).
+					SetProposalKey(chain.ServiceAddress(), 0, 0).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress())
 
-					if capabilityControllersEnabled {
-						require.NoError(t, output.Err)
-					} else {
-						require.Error(t, output.Err)
-						require.ErrorContains(
-							t,
-							output.Err,
-							"`PublicAccount` has no member `capabilities`")
-					}
-				},
+				err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+				require.NoError(t, err)
+
+				_, output, err := vm.Run(
+					ctx,
+					fvm.Transaction(txBody, 0),
+					snapshotTree)
+				require.NoError(t, err)
+
+				if capabilityControllersEnabled {
+					require.NoError(t, output.Err)
+				} else {
+					require.Error(t, output.Err)
+					require.ErrorContains(
+						t,
+						output.Err,
+						"`AuthAccount` has no member `capabilities`")
+				}
+			},
 			)(t)
 	}
 
