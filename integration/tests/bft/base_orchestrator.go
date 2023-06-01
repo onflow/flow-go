@@ -13,6 +13,9 @@ import (
 type OnEgressEvent func(event *insecure.EgressEvent) error
 type OnIngressEvent func(event *insecure.IngressEvent) error
 
+type OnGSIngressEvent func(event *insecure.GossipSubIngressEvent) error
+type OnGSEgressEvent func(event *insecure.GossipSubEgressEvent) error
+
 // BaseOrchestrator represents a simple `insecure.AttackOrchestrator` that tracks messages. This attack orchestrator
 // simply passes through messages without changes to the orchestrator network. This orchestrator reduces boilerplate
 // of BFT tests by implementing common logic. Boilerplate can further be reduced by using the OnEgressEvent and OnIngressEvent
@@ -87,4 +90,12 @@ func (b *BaseOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) erro
 
 func (b *BaseOrchestrator) Register(orchestratorNetwork insecure.OrchestratorNetwork) {
 	b.OrchestratorNetwork = orchestratorNetwork
+}
+
+func (b *BaseOrchestrator) HandleGSEgressEvent(event *insecure.GossipSubEgressEvent) error {
+	return nil
+}
+
+func (b *BaseOrchestrator) HandleGSIngressEvent(event *insecure.GossipSubIngressEvent) error {
+	return nil
 }

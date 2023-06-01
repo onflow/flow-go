@@ -133,6 +133,14 @@ func (o *Orchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
 	return nil
 }
 
+func (o *Orchestrator) HandleGSEgressEvent(event *insecure.GossipSubEgressEvent) error {
+	return nil
+}
+
+func (o *Orchestrator) HandleGSIngressEvent(event *insecure.GossipSubIngressEvent) error {
+	return nil
+}
+
 // corruptExecutionResult creates a corrupted version of the input receipt by tampering its content so that
 // the resulted corrupted version would not pass verification.
 func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *flow.ExecutionResult {
