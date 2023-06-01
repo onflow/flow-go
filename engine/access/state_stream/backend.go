@@ -12,11 +12,11 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -35,7 +35,7 @@ const (
 	DefaultResponseLimit = float64(0)
 )
 
-type GetExecutionDataFunc func(context.Context, flow.Identifier) (*execution_data.BlockExecutionDataEntity, error)
+type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
 type GetStartHeightFunc func(flow.Identifier, uint64) (uint64, error)
 
 type API interface {
@@ -54,10 +54,14 @@ type StateStreamBackend struct {
 	seals           storage.Seals
 	results         storage.ExecutionResults
 	execDataStore   execution_data.ExecutionDataStore
-	execDataCache   *herocache.BlockExecutionData
+	execDataCache   *cache.ExecutionDataCache
 	broadcaster     *engine.Broadcaster
 	rootBlockHeight uint64
 	rootBlockID     flow.Identifier
+
+	// highestHeight contains the highest consecutive block height for which we have received a
+	// new Execution Data notification.
+	highestHeight counters.StrictMonotonousCounter
 }
 
 func New(
@@ -68,9 +72,10 @@ func New(
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	execDataStore execution_data.ExecutionDataStore,
-	execDataCache *herocache.BlockExecutionData,
+	execDataCache *cache.ExecutionDataCache,
 	broadcaster *engine.Broadcaster,
 	rootHeight uint64,
+	highestAvailableHeight uint64,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
@@ -91,6 +96,7 @@ func New(
 		broadcaster:     broadcaster,
 		rootBlockHeight: rootHeight,
 		rootBlockID:     rootBlockID,
+		highestHeight:   counters.NewMonotonousCounter(highestAvailableHeight),
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
@@ -106,7 +112,6 @@ func New(
 
 	b.EventsBackend = EventsBackend{
 		log:              logger,
-		headers:          headers,
 		broadcaster:      broadcaster,
 		sendTimeout:      config.ClientSendTimeout,
 		responseLimit:    config.ResponseLimit,
@@ -118,37 +123,23 @@ func New(
 	return b, nil
 }
 
-func (b *StateStreamBackend) getExecutionData(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionDataEntity, error) {
-	if cached, ok := b.execDataCache.ByID(blockID); ok {
-		b.log.Trace().
-			Hex("block_id", logging.ID(blockID)).
-			Msg("execution data cache hit")
-		return cached, nil
+// getExecutionData returns the execution data for the given block height.
+// Expected errors during normal operation:
+// - storage.ErrNotFound or execution_data.BlobNotFoundError: execution data for the given block height is not available.
+func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
+	// fail early if no notification has been received for the given block height.
+	// note: it's possible for the data to exist in the data store before the notification is
+	// received. this ensures a consistent view is available to all streams.
+	if height > b.highestHeight.Value() {
+		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, storage.ErrNotFound)
 	}
-	b.log.Trace().
-		Hex("block_id", logging.ID(blockID)).
-		Msg("execution data cache miss")
 
-	seal, err := b.seals.FinalizedSealForBlock(blockID)
+	execData, err := b.execDataCache.ByHeight(ctx, height)
 	if err != nil {
-		return nil, fmt.Errorf("could not get finalized seal for block: %w", err)
+		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 	}
 
-	result, err := b.results.ByID(seal.ResultID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get execution result (id: %s): %w", seal.ResultID, err)
-	}
-
-	execData, err := b.execDataStore.Get(ctx, result.ExecutionDataID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get execution data (id: %s): %w", result.ExecutionDataID, err)
-	}
-
-	blockExecData := execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
-
-	b.execDataCache.Add(blockExecData)
-
-	return blockExecData, nil
+	return execData, nil
 }
 
 // getStartHeight returns the start height to use when searching.
@@ -196,4 +187,9 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 		return 0, status.Errorf(codes.Internal, "could not get latest sealed block: %v", err)
 	}
 	return header.Height, nil
+}
+
+// SetHighestHeight sets the highest height for which execution data is available.
+func (b *StateStreamBackend) setHighestHeight(height uint64) bool {
+	return b.highestHeight.Set(height)
 }
