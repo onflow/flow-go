@@ -13,11 +13,10 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -68,7 +67,8 @@ type Engine struct {
 	handler *Handler
 
 	execDataBroadcaster *engine.Broadcaster
-	execDataCache       *herocache.BlockExecutionData
+	execDataCache       *cache.ExecutionDataCache
+	headers             storage.Headers
 
 	stateStreamGrpcAddress net.Addr
 }
@@ -78,15 +78,16 @@ func NewEng(
 	log zerolog.Logger,
 	config Config,
 	execDataStore execution_data.ExecutionDataStore,
+	execDataCache *cache.ExecutionDataCache,
 	state protocol.State,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	chainID flow.ChainID,
 	initialBlockHeight uint64,
+	highestBlockHeight uint64,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, GetExecutionDataByBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, GetExecutionDataByBlockID->10
-	heroCacheMetrics module.HeroCacheMetrics,
 ) (*Engine, error) {
 	logger := log.With().Str("engine", "state_stream_rpc").Logger()
 
@@ -118,11 +119,21 @@ func NewEng(
 
 	server := grpc.NewServer(grpcOpts...)
 
-	execDataCache := herocache.NewBlockExecutionData(config.ExecutionDataCacheSize, logger, heroCacheMetrics)
-
 	broadcaster := engine.NewBroadcaster()
 
-	backend, err := New(logger, config, state, headers, seals, results, execDataStore, execDataCache, broadcaster, initialBlockHeight)
+	backend, err := New(
+		logger,
+		config,
+		state,
+		headers,
+		seals,
+		results,
+		execDataStore,
+		execDataCache,
+		broadcaster,
+		initialBlockHeight,
+		highestBlockHeight,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create state stream backend: %w", err)
 	}
@@ -131,6 +142,7 @@ func NewEng(
 		log:                 logger,
 		backend:             backend,
 		server:              server,
+		headers:             headers,
 		chain:               chainID.Chain(),
 		config:              config,
 		handler:             NewHandler(backend, chainID.Chain(), config.EventFilterConfig, config.MaxGlobalStreams),
@@ -148,13 +160,27 @@ func NewEng(
 }
 
 // OnExecutionData is called to notify the engine when a new execution data is received.
+// The caller must guarantee that execution data is locally available for all blocks with
+// heights between the initialBlockHeight provided during startup and the block height of
+// the execution data provided.
 func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDataEntity) {
 	lg := e.log.With().Hex("block_id", logging.ID(executionData.BlockID)).Logger()
 
 	lg.Trace().Msg("received execution data")
 
-	if ok := e.execDataCache.Add(executionData); !ok {
-		lg.Warn().Msg("failed to add execution data to cache")
+	header, err := e.headers.ByBlockID(executionData.BlockID)
+	if err != nil {
+		// if the execution data is available, the block must be locally finalized
+		lg.Fatal().Err(err).Msg("failed to get header for execution data")
+		return
+	}
+
+	if ok := e.backend.setHighestHeight(header.Height); !ok {
+		// this means that the height was lower than the current highest height
+		// OnExecutionData is guaranteed by the requester to be called in order, but may be called
+		// multiple times for the same block.
+		lg.Debug().Msg("execution data for block already received")
+		return
 	}
 
 	e.execDataBroadcaster.Publish()
