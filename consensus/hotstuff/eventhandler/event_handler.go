@@ -386,6 +386,8 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 	}
 	proposedBlock := model.BlockFromFlow(flowProposal) // turn the signed flow header into a proposal
+	// determine target publication time (CAUTION: must happen before AddValidatedBlock)
+	targetPublicationTime := e.paceMaker.TargetPublicationTime(flowProposal.View, start, flowProposal.ParentID)
 
 	// we want to store created proposal in forks to make sure that we don't create more proposals for
 	// current view. Due to asynchronous nature of our design it's possible that after creating proposal
@@ -394,8 +396,10 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	if err != nil {
 		return fmt.Errorf("could not add newly created proposal (%v): %w", proposedBlock.BlockID, err)
 	}
+
 	log.Debug().
 		Uint64("block_view", proposedBlock.View).
+		Time("target_publication", targetPublicationTime).
 		Hex("block_id", proposedBlock.BlockID[:]).
 		Uint64("parent_view", newestQC.View).
 		Hex("parent_id", newestQC.BlockID[:]).
@@ -403,7 +407,6 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		Msg("forwarding proposal to communicator for broadcasting")
 
 	// raise a notification with proposal (also triggers broadcast)
-	targetPublicationTime := e.paceMaker.TargetPublicationTime(flowProposal.View, start, flowProposal.ParentID)
 	e.notifier.OnOwnProposal(flowProposal, targetPublicationTime)
 	return nil
 }
