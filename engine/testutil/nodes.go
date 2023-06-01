@@ -685,23 +685,16 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	// disabled by default
 	uploader := uploader.NewManager(node.Tracer)
 
-	opts := []stop.StopControlOption{
-		stop.StopControlWithLogger(node.Log),
-	}
-
 	ver, err := build.SemverV2()
 	require.NoError(t, err, "failed to parse semver version from build info")
 
-	opts = append(opts,
-		stop.StopControlWithVersionControl(
-			ver,
-			versionBeacons,
-			true,
-		))
-
 	stopControl := stop.NewStopControl(
+		node.Log,
 		node.Headers,
-		opts...,
+		versionBeacons,
+		ver,
+		false,
+		true,
 	)
 
 	rootHead, rootQC := getRoot(t, &node)

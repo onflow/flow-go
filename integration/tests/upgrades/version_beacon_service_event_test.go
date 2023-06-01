@@ -22,11 +22,14 @@ type TestServiceEventVersionControl struct {
 }
 
 func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent() {
-	// This should not be too short, otherwise we might execute to many blocks
-	// before the version beacon takes effect.
-	// If the test is flaky try increasing this value.
-	// If the test is too slow try decreasing this value.
-	freezePeriodForTheseTests := uint64(300)
+	// freezePeriodForTheseTests controls the version beacon freeze period. The longer the
+	// freeze period the more blocks we need to wait for the version beacon to take effect,
+	// making the test slower. But if the freeze period is too short
+	// we might execute to many blocks, before the version beacon takes effect.
+	//
+	// - If the test is flaky try increasing this value.
+	// - If the test is too slow try decreasing this value.
+	freezePeriodForTheseTests := uint64(25)
 
 	ctx := context.Background()
 

@@ -2,6 +2,7 @@ package stop
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -38,15 +39,18 @@ type StopControl struct {
 	sync.RWMutex
 	log zerolog.Logger
 
+	// stopped is true if node should no longer be executing blocs.
 	stopped      bool
 	stopBoundary *stopBoundary
 
 	headers StopControlHeaders
 
+	// nodeVersion could be nil right now. See NewStopControl.
 	nodeVersion    *semver.Version
 	versionBeacons storage.VersionBeacons
 	versionBeacon  *flow.SealedVersionBeacon
 
+	// if the node should crash on version boundary from a version beacon is reached
 	crashOnVersionBoundaryReached bool
 }
 
@@ -104,59 +108,37 @@ func (s *stopBoundary) String() string {
 	return sb.String()
 }
 
-type StopControlOption func(*StopControl)
-
-// StopControlWithLogger sets logger for the StopControl
-// and adds a "component" field to it
-func StopControlWithLogger(log zerolog.Logger) StopControlOption {
-	return func(s *StopControl) {
-		s.log = log.With().Str("component", "stop_control").Logger()
-	}
-}
-
-func StopControlWithStopped() StopControlOption {
-	return func(s *StopControl) {
-		s.stopped = true
-	}
-}
-
-func StopControlWithVersionControl(
-	nodeVersion *semver.Version,
-	versionBeacons storage.VersionBeacons,
-	crashOnVersionBoundaryReached bool,
-) StopControlOption {
-	return func(s *StopControl) {
-		s.nodeVersion = nodeVersion
-		s.versionBeacons = versionBeacons
-		s.crashOnVersionBoundaryReached = crashOnVersionBoundaryReached
-	}
-}
-
 // StopControlHeaders is an interface for fetching headers
 // Its jut a small subset of storage.Headers for comments see storage.Headers
 type StopControlHeaders interface {
 	ByHeight(height uint64) (*flow.Header, error)
 }
 
-// NewStopControl creates new empty NewStopControl
+// NewStopControl creates new StopControl.
+//
+// We currently have no strong guarantee that the node version is a valid semver.
+// See build.SemverV2 for more details. That is why nil is a valid input for node version
+// without a node version, the stop control can still be used for manual stopping.
 func NewStopControl(
+	log zerolog.Logger,
 	headers StopControlHeaders,
-	options ...StopControlOption,
+	versionBeacons storage.VersionBeacons,
+	nodeVersion *semver.Version,
+	withStoppedExecution bool,
+	crashOnVersionBoundaryReached bool,
 ) *StopControl {
 
 	sc := &StopControl{
-		log:     zerolog.Nop(),
-		headers: headers,
-	}
+		log: log.With().
+			Str("component", "stop_control").
+			Logger(),
 
-	for _, option := range options {
-		option(sc)
+		headers:                       headers,
+		nodeVersion:                   nodeVersion,
+		versionBeacons:                versionBeacons,
+		stopped:                       withStoppedExecution,
+		crashOnVersionBoundaryReached: crashOnVersionBoundaryReached,
 	}
-
-	log := sc.log.With().
-		Bool("node_will_react_to_version_beacon",
-			sc.nodeVersion != nil).
-		Logger()
 
 	if sc.nodeVersion != nil {
 		log = log.With().
@@ -170,7 +152,7 @@ func NewStopControl(
 
 	// TODO: handle version beacon already indicating a stop
 	// right now the stop will happen on first BlockFinalized
-	// which is fine, but ideally we would stop right away
+	// which is fine, but ideally we would stop right away.
 
 	return sc
 }
@@ -184,7 +166,12 @@ func (s *StopControl) IsExecutionStopped() bool {
 }
 
 // SetStopParameters sets new stop parameters.
-// Returns error if the stopping process has already commenced, or if already stopped.
+//
+// Expected error returns during normal operations:
+//   - ErrCannotChangeStop: this indicates that new stop parameters cannot be set.
+//     See stop.canChangeStop.
+//
+// Caller must acquire the lock.
 func (s *StopControl) SetStopParameters(
 	stop StopParameters,
 ) error {
@@ -198,10 +185,14 @@ func (s *StopControl) SetStopParameters(
 	return s.unsafeSetStopParameters(stopBoundary, false)
 }
 
+var ErrCannotChangeStop = errors.New("cannot change stop control stopping parameters")
+
 // unsafeSetStopParameters sets new stop parameters.
 // stopBoundary is the new stop parameters. If nil, the stop is removed.
 //
-// The error returned indicates that the stop parameters cannot be set. See canChangeStop.
+// Expected error returns during normal operations:
+//   - ErrCannotChangeStop: this indicates that new stop parameters cannot be set.
+//     See stop.canChangeStop.
 //
 // Caller must acquire the lock.
 func (s *StopControl) unsafeSetStopParameters(
@@ -222,7 +213,7 @@ func (s *StopControl) unsafeSetStopParameters(
 		fromVersionBeacon,
 	)
 	if !canChange {
-		err := fmt.Errorf(reason)
+		err := fmt.Errorf("%s: %w", reason, ErrCannotChangeStop)
 
 		log.Warn().Err(err).Msg("cannot set stopHeight")
 		return err
@@ -504,11 +495,6 @@ func (s *StopControl) handleVersionBeacon(
 		return nil
 	}
 
-	if s.versionBeacon != nil && s.versionBeacon.SealHeight >= height {
-		// we already processed this or a higher version beacon
-		return nil
-	}
-
 	vb, err := s.versionBeacons.Highest(height)
 	if err != nil {
 		return fmt.Errorf("failed to get highest version beacon for stop control: %w", err)
@@ -522,6 +508,11 @@ func (s *StopControl) handleVersionBeacon(
 		s.log.Info().
 			Uint64("height", height).
 			Msg("No version beacon found for stop control")
+		return nil
+	}
+
+	if s.versionBeacon != nil && s.versionBeacon.SealHeight >= vb.SealHeight {
+		// we already processed this or a higher version beacon
 		return nil
 	}
 

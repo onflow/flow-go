@@ -21,7 +21,14 @@ import (
 func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 	t.Run("when processing block at stop height", func(t *testing.T) {
-		sc := NewStopControl(nil, StopControlWithLogger(unittest.Logger()))
+		sc := NewStopControl(
+			unittest.Logger(),
+			nil,
+			nil,
+			nil,
+			false,
+			false,
+		)
 
 		require.Nil(t, sc.GetStopParameters())
 
@@ -56,7 +63,14 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		execState := new(mock.ReadOnlyExecutionState)
 
-		sc := NewStopControl(nil, StopControlWithLogger(unittest.Logger()))
+		sc := NewStopControl(
+			unittest.Logger(),
+			nil,
+			nil,
+			nil,
+			false,
+			false,
+		)
 
 		require.Nil(t, sc.GetStopParameters())
 
@@ -103,7 +117,14 @@ func TestExecutionFallingBehind(t *testing.T) {
 	headerC := unittest.BlockHeaderWithParentFixture(headerB) // 22
 	headerD := unittest.BlockHeaderWithParentFixture(headerC) // 23
 
-	sc := NewStopControl(nil, StopControlWithLogger(unittest.Logger()))
+	sc := NewStopControl(
+		unittest.Logger(),
+		nil,
+		nil,
+		nil,
+		false,
+		false,
+	)
 
 	// set stop at 22, so 21 is the last height which should be processed
 	stop := StopParameters{StopBeforeHeight: 22}
@@ -158,7 +179,14 @@ func TestAddStopForPastBlocks(t *testing.T) {
 		},
 	}
 
-	sc := NewStopControl(headers, StopControlWithLogger(unittest.Logger()))
+	sc := NewStopControl(
+		unittest.Logger(),
+		headers,
+		nil,
+		nil,
+		false,
+		false,
+	)
 
 	// finalize blocks first
 	sc.BlockFinalized(context.TODO(), execState, headerA)
@@ -208,7 +236,14 @@ func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
 		},
 	}
 
-	sc := NewStopControl(headers, StopControlWithLogger(unittest.Logger()))
+	sc := NewStopControl(
+		unittest.Logger(),
+		headers,
+		nil,
+		nil,
+		false,
+		false,
+	)
 
 	execState.
 		On("StateCommitmentByBlockID", testifyMock.Anything, headerD.ParentID).
@@ -255,13 +290,12 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		}
 
 		sc := NewStopControl(
+			unittest.Logger(),
 			headers,
-			StopControlWithLogger(unittest.Logger()),
-			StopControlWithVersionControl(
-				semver.New("1.0.0"),
-				versionBeacons,
-				false,
-			),
+			versionBeacons,
+			semver.New("1.0.0"),
+			false,
+			false,
 		)
 
 		// setting this means all finalized blocks are considered already executed
@@ -359,13 +393,12 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		}
 
 		sc := NewStopControl(
+			unittest.Logger(),
 			headers,
-			StopControlWithLogger(unittest.Logger()),
-			StopControlWithVersionControl(
-				semver.New("1.0.0"),
-				versionBeacons,
-				false,
-			),
+			versionBeacons,
+			semver.New("1.0.0"),
+			false,
+			false,
 		)
 
 		versionBeacons.
@@ -436,13 +469,12 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		}
 
 		sc := NewStopControl(
+			unittest.Logger(),
 			headers,
-			StopControlWithLogger(unittest.Logger()),
-			StopControlWithVersionControl(
-				semver.New("1.0.0"),
-				versionBeacons,
-				false,
-			),
+			versionBeacons,
+			semver.New("1.0.0"),
+			false,
+			false,
 		)
 
 		versionBeacons.
@@ -513,13 +545,12 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		}
 
 		sc := NewStopControl(
+			unittest.Logger(),
 			headers,
-			StopControlWithLogger(unittest.Logger()),
-			StopControlWithVersionControl(
-				semver.New("1.0.0"),
-				versionBeacons,
-				false,
-			),
+			versionBeacons,
+			semver.New("1.0.0"),
+			false,
+			false,
 		)
 
 		vbStop := StopParameters{
@@ -565,13 +596,27 @@ func TestStopControlWithVersionControl(t *testing.T) {
 // StopControl created as stopped will keep the state
 func TestStartingStopped(t *testing.T) {
 
-	sc := NewStopControl(nil, StopControlWithLogger(unittest.Logger()), StopControlWithStopped())
+	sc := NewStopControl(
+		unittest.Logger(),
+		nil,
+		nil,
+		nil,
+		true,
+		false,
+	)
 	require.True(t, sc.IsExecutionStopped())
 }
 
 func TestStoppedStateRejectsAllBlocksAndChanged(t *testing.T) {
 
-	sc := NewStopControl(nil, StopControlWithLogger(unittest.Logger()), StopControlWithStopped())
+	sc := NewStopControl(
+		unittest.Logger(),
+		nil,
+		nil,
+		nil,
+		true,
+		false,
+	)
 	require.True(t, sc.IsExecutionStopped())
 
 	err := sc.SetStopParameters(StopParameters{

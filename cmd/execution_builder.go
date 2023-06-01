@@ -652,31 +652,26 @@ func (exeNode *ExecutionNode) LoadStopControl(
 	module.ReadyDoneAware,
 	error,
 ) {
-	opts := []stop.StopControlOption{
-		stop.StopControlWithLogger(exeNode.builder.Logger),
-	}
-	if exeNode.exeConf.pauseExecution {
-		opts = append(opts, stop.StopControlWithStopped())
-	}
-
 	ver, err := build.SemverV2()
-	if err == nil {
-		opts = append(opts,
-			stop.StopControlWithVersionControl(
-				ver,
-				node.Storage.VersionBeacons,
-				true,
-			))
-	} else {
-		// In the future we might want to error here, but for now we just log a warning
+	if err != nil {
+		ver = nil
+		// TODO: In the future we want to error here, but for now we just log a warning.
+		// This is because we currently have no strong guarantee that then node version
+		// tag is semver compliant.
 		exeNode.builder.Logger.Warn().
 			Err(err).
 			Msg("could not set semver version for stop control")
 	}
 
 	stopControl := stop.NewStopControl(
+		exeNode.builder.Logger,
 		node.Storage.Headers,
-		opts...)
+		node.Storage.VersionBeacons,
+		ver,
+		// TODO: rename to exeNode.exeConf.executionStopped to make it more consistent
+		exeNode.exeConf.pauseExecution,
+		true,
+	)
 	exeNode.stopControl = stopControl
 
 	return &module.NoopReadyDoneAware{}, nil
