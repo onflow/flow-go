@@ -136,8 +136,28 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,
-		nil, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, suite.me, secureGrpcServer, unsecureGrpcServer)
+	rpcEngBuilder, err := rpc.NewBuilder(
+		suite.log,
+		suite.state,
+		config,
+		suite.collClient,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		nil,
+		nil,
+		suite.chainID,
+		suite.metrics,
+		0,
+		0,
+		false,
+		false,
+		suite.me,
+		secureGrpcServer,
+		unsecureGrpcServer,
+	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)

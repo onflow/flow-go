@@ -24,7 +24,7 @@ type ReadExecutionDataCommand struct {
 func (r *ReadExecutionDataCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*requestData)
 
-	ed, err := r.executionDataStore.GetExecutionData(ctx, data.rootID)
+	ed, err := r.executionDataStore.Get(ctx, data.rootID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get execution data: %w", err)
