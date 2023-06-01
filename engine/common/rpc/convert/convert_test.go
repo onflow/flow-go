@@ -69,6 +69,18 @@ func TestConvertEvents(t *testing.T) {
 		require.Equal(t, event.TransactionID[:], message.TransactionId)
 		require.Equal(t, string(event.Type), message.Type)
 	})
+
+	t.Run("convert event from ccf format", func(t *testing.T) {
+		event := unittest.EventFixture()
+	})
+
+	t.Run("convert event from jsoncdc format", func(t *testing.T) {
+
+	})
+
+	t.Run("convert payload from ccf to jsoncdc", func(t *testing.T) {
+
+	})
 }
 
 // TestConvertBlockExecutionData checks if conversions between BlockExecutionData and it's fields are consistent.
