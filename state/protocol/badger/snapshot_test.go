@@ -1043,7 +1043,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 		require.True(t, ok)
 
 		t.Run("should be able to query at root block", func(t *testing.T) {
-			root, err := state.Params().Root()
+			root, err := state.Params().FinalizedRoot()
 			require.NoError(t, err)
 			snapshot := state.AtHeight(root.Height)
 			identities, err := snapshot.Identities(filter.Any)

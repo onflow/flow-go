@@ -366,7 +366,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		}
 	}
 
-	rootBlock, err := b.state.Params().Root()
+	rootBlock, err := b.state.Params().FinalizedRoot()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to retrieve root block: %v", err)
 	}

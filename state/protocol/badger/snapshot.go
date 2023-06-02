@@ -52,7 +52,7 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 
 	// CASE 1: for the root block, return the root QC
-	root, err := s.state.Params().Root()
+	root, err := s.state.Params().FinalizedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("could not get root: %w", err)
 	}
@@ -270,7 +270,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get snapshot's reference block: %w", err)
 	}
-	if head.Header.Height < s.state.rootHeight {
+	if head.Header.Height < s.state.finalizedRootHeight {
 		return nil, protocol.ErrSealingSegmentBelowRootBlock
 	}
 
@@ -402,7 +402,7 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 func (s *Snapshot) RandomSource() ([]byte, error) {
 
 	// CASE 1: for the root block, generate the seed from the root qc
-	root, err := s.state.Params().Root()
+	root, err := s.state.Params().FinalizedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("could not get root: %w", err)
 	}

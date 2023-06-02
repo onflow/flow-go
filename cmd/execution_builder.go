@@ -790,6 +790,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		node.Me,
 		exeNode.collectionRequester,
 		node.State,
+		node.Storage.Headers,
 		node.Storage.Blocks,
 		node.Storage.Collections,
 		exeNode.events,
@@ -870,7 +871,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 		final,
 		verifier,
 		exeNode.finalizationDistributor,
-		node.RootBlock.Header,
+		node.FinalizedRootBlock.Header,
 		node.RootQC,
 		finalized,
 		pending,
@@ -1049,7 +1050,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 		// TODO: check that the checkpoint file contains the root block's statecommit hash
 
-		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
+		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution database: %w", err)
 		}
