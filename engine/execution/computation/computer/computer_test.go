@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -540,7 +540,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
 			require.NoError(t, err)
 
-			payload, err := json.Decode(nil, []byte(unittest.EpochSetupFixtureJSON))
+			payload, err := ccf.Decode(nil, unittest.EpochSetupFixtureCCF)
 			require.NoError(t, err)
 
 			serviceEventA, ok := payload.(cadence.Event)
@@ -551,7 +551,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 			serviceEventA.EventType.QualifiedIdentifier = serviceEvents.EpochSetup.QualifiedIdentifier()
 
-			payload, err = json.Decode(nil, []byte(unittest.EpochCommitFixtureJSON))
+			payload, err = ccf.Decode(nil, unittest.EpochCommitFixtureCCF)
 			require.NoError(t, err)
 
 			serviceEventB, ok := payload.(cadence.Event)
@@ -562,7 +562,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 			serviceEventB.EventType.QualifiedIdentifier = serviceEvents.EpochCommit.QualifiedIdentifier()
 
-			payload, err = json.Decode(nil, []byte(unittest.VersionBeaconFixtureJSON))
+			payload, err = ccf.Decode(nil, unittest.VersionBeaconFixtureCCF)
 			require.NoError(t, err)
 
 			serviceEventC, ok := payload.(cadence.Event)

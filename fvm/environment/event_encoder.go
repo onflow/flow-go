@@ -2,7 +2,7 @@ package environment
 
 import (
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding/ccf"
 )
 
 type EventEncoder interface {
@@ -16,5 +16,5 @@ func NewCadenceEventEncoder() *CadenceEventEncoder {
 }
 
 func (e *CadenceEventEncoder) Encode(event cadence.Event) ([]byte, error) {
-	return jsoncdc.Encode(event)
+	return ccf.Encode(event)
 }
