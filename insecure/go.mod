@@ -10,7 +10,7 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.8.2
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/flow-go v0.29.8
-	github.com/onflow/flow-go/crypto v0.24.7
+	github.com/onflow/flow-go/crypto v0.24.8
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.2
@@ -257,6 +257,7 @@ require (
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
 	golang.org/x/tools v0.6.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
+	gonum.org/v1/gonum v0.8.2 // indirect
 	google.golang.org/api v0.114.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4 // indirect

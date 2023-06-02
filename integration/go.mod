@@ -23,7 +23,7 @@ require (
 	github.com/onflow/flow-emulator v0.48.1-0.20230502171545-1c91ebbf6870
 	github.com/onflow/flow-go v0.30.1-0.20230501182206-6a911be58b92
 	github.com/onflow/flow-go-sdk v0.40.0
-	github.com/onflow/flow-go/crypto v0.24.7
+	github.com/onflow/flow-go/crypto v0.24.8
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230428213521-89bcc9e8517e
 	github.com/plus3it/gorecurcopy v0.0.1
@@ -307,6 +307,7 @@ require (
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
 	golang.org/x/tools v0.6.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
+	gonum.org/v1/gonum v0.11.0 // indirect
 	google.golang.org/api v0.114.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4 // indirect
