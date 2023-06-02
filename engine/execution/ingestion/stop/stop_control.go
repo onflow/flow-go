@@ -48,7 +48,7 @@ type StopControl struct {
 
 	// stopped is true if node should no longer be executing blocs.
 	stopped      bool
-	stopBoundary *stopBoundary
+	stopBoundary stopBoundary
 
 	headers  StopControlHeaders
 	exeState state.ReadOnlyExecutionState
@@ -62,6 +62,8 @@ type StopControl struct {
 	crashOnVersionBoundaryReached bool
 }
 
+var NoStopHeight = uint64(math.MaxUint64)
+
 type StopParameters struct {
 	// desired StopBeforeHeight, the first value new version should be used,
 	// so this height WON'T be executed
@@ -69,6 +71,10 @@ type StopParameters struct {
 
 	// if the node should crash or just pause after reaching StopBeforeHeight
 	ShouldCrash bool
+}
+
+func (p StopParameters) Set() bool {
+	return p.StopBeforeHeight != NoStopHeight
 }
 
 type stopBoundary struct {
@@ -89,8 +95,8 @@ type stopBoundary struct {
 // block ID is only present if stopAfterExecuting is set
 // the ID is from the block that should be executed last and has height one
 // less than StopBeforeHeight
-func (s *stopBoundary) String() string {
-	if s == nil {
+func (s stopBoundary) String() string {
+	if !s.Set() {
 		return "none"
 	}
 
@@ -148,6 +154,12 @@ func NewStopControl(
 		versionBeacons:                versionBeacons,
 		stopped:                       withStoppedExecution,
 		crashOnVersionBoundaryReached: crashOnVersionBoundaryReached,
+		// the default is to never stop
+		stopBoundary: stopBoundary{
+			StopParameters: StopParameters{
+				StopBeforeHeight: NoStopHeight,
+			},
+		},
 	}
 
 	if sc.nodeVersion != nil {
@@ -203,7 +215,7 @@ func (s *StopControl) IsExecutionStopped() bool {
 //
 // Expected error returns during normal operations:
 //   - ErrCannotChangeStop: this indicates that new stop parameters cannot be set.
-//     See stop.canChangeStop.
+//     See stop.validateStopChange.
 //
 // Caller must acquire the lock.
 func (s *StopControl) SetStopParameters(
@@ -212,11 +224,11 @@ func (s *StopControl) SetStopParameters(
 	s.Lock()
 	defer s.Unlock()
 
-	stopBoundary := &stopBoundary{
+	stopBoundary := stopBoundary{
 		StopParameters: stop,
 	}
 
-	return s.unsafeSetStopParameters(stopBoundary, false)
+	return s.unsafeSetStopParameters(stopBoundary)
 }
 
 // unsafeSetStopParameters sets new stop parameters.
@@ -224,29 +236,19 @@ func (s *StopControl) SetStopParameters(
 //
 // Expected error returns during normal operations:
 //   - ErrCannotChangeStop: this indicates that new stop parameters cannot be set.
-//     See stop.canChangeStop.
+//     See stop.validateStopChange.
 //
 // Caller must acquire the lock.
 func (s *StopControl) unsafeSetStopParameters(
-	stopBoundary *stopBoundary,
-	fromVersionBeacon bool,
+	stopBoundary stopBoundary,
 ) error {
 	log := s.log.With().
 		Stringer("old_stop", s.stopBoundary).
 		Stringer("new_stop", stopBoundary).
 		Logger()
 
-	stopHeight := uint64(math.MaxUint64)
-	if stopBoundary != nil {
-		stopHeight = stopBoundary.StopBeforeHeight
-	}
-	canChange, reason := s.canChangeStop(
-		stopHeight,
-		fromVersionBeacon,
-	)
-	if !canChange {
-		err := fmt.Errorf("%s: %w", reason, ErrCannotChangeStop)
-
+	err := s.validateStopChange(stopBoundary)
+	if err != nil {
 		log.Warn().Err(err).Msg("cannot set stopHeight")
 		return err
 	}
@@ -257,68 +259,69 @@ func (s *StopControl) unsafeSetStopParameters(
 	return nil
 }
 
-// canChangeStop verifies if the stop parameters can be changed
-// returns false and the reason if the parameters cannot be changed.
-// setting newHeight == math.MaxUint64 basically means that the stop is being removed
+// validateStopChange verifies if the stop parameters can be changed
+// returns the error with the reason if the parameters cannot be changed.
 //
 // Stop parameters cannot be changed if:
 //   - node is already stopped
 //   - stop parameters are immutable (due to them already affecting execution see
 //     ShouldExecuteBlock)
-//   - stop parameters are already set by a different source and the new stop is later then
+//   - stop parameters are already set by a different source and the new stop is later than
 //     the existing one
 //
+// Expected error returns during normal operations:
+//   - ErrCannotChangeStop: this indicates that new stop parameters cannot be set.
+//
 // Caller must acquire the lock.
-func (s *StopControl) canChangeStop(
-	newHeight uint64,
-	fromVersionBeacon bool,
-) (
-	bool,
-	string,
-) {
+func (s *StopControl) validateStopChange(
+	newStopBoundary stopBoundary,
+) error {
 
-	if s.stopped {
-		return false, "cannot update stop parameters, already stopped"
+	ferr := func(reason string) error {
+		return fmt.Errorf("%s: %w", reason, ErrCannotChangeStop)
 	}
 
-	if s.stopBoundary == nil {
-		// if there is no stop boundary set, we can set it to anything
-		return true, ""
+	if s.stopped {
+		return ferr("cannot update stop parameters, already stopped")
 	}
 
 	if s.stopBoundary.immutable {
-		return false, fmt.Sprintf(
-			"cannot update stopHeight, stopping commenced for %s",
-			s.stopBoundary,
+		return ferr(
+			fmt.Sprintf(
+				"cannot update stopHeight, stopping commenced for %s",
+				s.stopBoundary),
 		)
 	}
 
-	if s.stopBoundary.fromVersionBeacon != fromVersionBeacon &&
-		newHeight > s.stopBoundary.StopBeforeHeight {
-		// if one stop was set by the version beacon and the other one was manual
-		// we can only update if the new stop is earlier
-
-		// this prevents users moving the stopHeight forward when a version boundary
-		// is earlier, and prevents version beacons from moving the stopHeight forward
-		// when a manual stop is earlier.
-		return false, "cannot update stopHeight, new stop height is later than the " +
-			"current one (or removing a stop)"
-	}
-
-	return true, ""
-}
-
-// GetStopParameters returns the upcoming stop parameters or nil if no stop is set.
-func (s *StopControl) GetStopParameters() *StopParameters {
-	s.RLock()
-	defer s.RUnlock()
-
-	if s.stopBoundary == nil {
+	if !s.stopBoundary.Set() {
+		// if the current stop is no stop, we can always update
 		return nil
 	}
 
-	p := s.stopBoundary.StopParameters
-	return &p
+	if s.stopBoundary.fromVersionBeacon == newStopBoundary.fromVersionBeacon {
+		// if the stop was set by the same source, we can always update
+		return nil
+	}
+
+	// if one stop was set by the version beacon and the other one was manual
+	// we can only update if the new stop is strictly earlier
+	if newStopBoundary.StopBeforeHeight < s.stopBoundary.StopBeforeHeight {
+		return nil
+
+	}
+	// this prevents users moving the stopHeight forward when a version newStopBoundary
+	// is earlier, and prevents version beacons from moving the stopHeight forward
+	// when a manual stop is earlier.
+	return ferr("cannot update stopHeight, " +
+		"new stop height is later than the current one")
+}
+
+// GetStopParameters returns the upcoming stop parameters or nil if no stop is set.
+func (s *StopControl) GetStopParameters() StopParameters {
+	s.RLock()
+	defer s.RUnlock()
+
+	return s.stopBoundary.StopParameters
 }
 
 // ShouldExecuteBlock should be called when new block can be executed.
@@ -333,11 +336,6 @@ func (s *StopControl) ShouldExecuteBlock(b *flow.Header) bool {
 	// don't process anymore blocks if stopped
 	if s.stopped {
 		return false
-	}
-
-	// if no stop is set process all blocks
-	if s.stopBoundary == nil {
-		return true
 	}
 
 	// Skips blocks at or above requested stopHeight
@@ -378,8 +376,7 @@ func (s *StopControl) BlockFinalized(
 
 	// we already know the ID of the block that should be executed last nothing to do
 	// node is stopping
-	if s.stopBoundary != nil &&
-		s.stopBoundary.stopAfterExecuting != flow.ZeroID {
+	if s.stopBoundary.stopAfterExecuting != flow.ZeroID {
 		return
 	}
 
@@ -404,11 +401,6 @@ func (s *StopControl) BlockFinalized(
 	err := s.handleVersionBeacon(h.Height)
 	if err != nil {
 		handleErr(fmt.Errorf("failed to process version beacons: %w", err))
-		return
-	}
-
-	// no stop is set, nothing to do
-	if s.stopBoundary == nil {
 		return
 	}
 
@@ -468,7 +460,7 @@ func (s *StopControl) OnBlockExecuted(h *flow.Header) {
 	s.Lock()
 	defer s.Unlock()
 
-	if s.stopBoundary == nil || s.stopped {
+	if s.stopped {
 		return
 	}
 
@@ -505,7 +497,7 @@ func (s *StopControl) stopExecution() {
 	s.stopped = true
 	log.Warn().Msg("Stopping as finalization reached requested stop")
 
-	if s.stopBoundary != nil && s.stopBoundary.ShouldCrash {
+	if s.stopBoundary.ShouldCrash {
 		// TODO: crash more gracefully or at least in a more explicit way
 		log.Fatal().Msg("Crashing as finalization reached requested stop")
 		return
@@ -558,34 +550,23 @@ func (s *StopControl) handleVersionBeacon(
 	s.versionBeacon = vb
 
 	// this is a new version beacon check what boundary it sets
-	stopHeight, shouldBeSet, err := s.getVersionBeaconStopHeight(vb)
+	stopHeight, err := s.getVersionBeaconStopHeight(vb)
 	if err != nil {
 		return err
 	}
 
-	set := s.stopBoundary != nil
-
-	if !set && !shouldBeSet {
-		// all good, no stop boundary set
-		return nil
+	var newStop = stopBoundary{
+		StopParameters: StopParameters{
+			StopBeforeHeight: stopHeight,
+			ShouldCrash:      s.crashOnVersionBoundaryReached,
+		},
+		fromVersionBeacon: true,
 	}
 
-	// newStop of nil means the stop will be removed.
-	var newStop *stopBoundary
-	if shouldBeSet {
-		newStop = &stopBoundary{
-			StopParameters: StopParameters{
-				StopBeforeHeight: stopHeight,
-				ShouldCrash:      s.crashOnVersionBoundaryReached,
-			},
-			fromVersionBeacon: true,
-		}
-	}
-
-	err = s.unsafeSetStopParameters(newStop, true)
+	err = s.unsafeSetStopParameters(newStop)
 	if err != nil {
 		// This is just informational and is expected to sometimes happen during
-		// normal operation. The causes for this are described here: canChangeStop.
+		// normal operation. The causes for this are described here: validateStopChange.
 		s.log.Info().
 			Err(err).
 			Msg("Cannot change stop boundary when detecting new version beacon")
@@ -596,7 +577,8 @@ func (s *StopControl) handleVersionBeacon(
 
 // getVersionBeaconStopHeight returns the stop height that should be set
 // based on the version beacon
-// error is not expected during normal operation since the version beacon
+//
+// No error is expected during normal operation since the version beacon
 // should have been validated when indexing
 //
 // Caller must acquire the lock.
@@ -604,7 +586,6 @@ func (s *StopControl) getVersionBeaconStopHeight(
 	vb *flow.SealedVersionBeacon,
 ) (
 	uint64,
-	bool,
 	error,
 ) {
 	// version boundaries are sorted by version
@@ -613,7 +594,7 @@ func (s *StopControl) getVersionBeaconStopHeight(
 		if err != nil || ver == nil {
 			// this should never happen as we already validated the version beacon
 			// when indexing it
-			return 0, false, fmt.Errorf("failed to parse semver: %w", err)
+			return 0, fmt.Errorf("failed to parse semver: %w", err)
 		}
 
 		// This condition can be tweaked in the future. For example if we guarantee that
@@ -621,8 +602,10 @@ func (s *StopControl) getVersionBeaconStopHeight(
 		// we can stop only on major version change.
 		if s.nodeVersion.LessThan(*ver) {
 			// we need to stop here
-			return boundary.BlockHeight, true, nil
+			return boundary.BlockHeight, nil
 		}
 	}
-	return 0, false, nil
+
+	// no stop boundary should be set
+	return NoStopHeight, nil
 }

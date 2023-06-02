@@ -1029,7 +1029,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 
 		// make sure no stopping has been engaged, as it was not set
 		require.False(t, ctx.stopControl.IsExecutionStopped())
-		require.Nil(t, ctx.stopControl.GetStopParameters())
+		require.False(t, ctx.stopControl.GetStopParameters().Set())
 	})
 }
 
