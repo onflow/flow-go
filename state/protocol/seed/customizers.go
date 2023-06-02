@@ -7,35 +7,24 @@ import "encoding/binary"
 // same source of randomness.
 
 var (
-	// ProtocolConsensusLeaderSelection is the customizer for consensus leader selection
-	ProtocolConsensusLeaderSelection = customizerFromIndices([]uint16{0, 1, 1})
-	// ProtocolVerificationChunkAssignment is the customizer for verification nodes determines chunk assignment
-	ProtocolVerificationChunkAssignment = customizerFromIndices([]uint16{0, 2, 0})
-	// collectorClusterLeaderSelectionPrefix is the prefix of the customizer for the leader selection of collector clusters
-	collectorClusterLeaderSelectionPrefix = []uint16{0, 0}
-	// executionChunkPrefix is the prefix of the customizer for executing chunks
-	executionChunkPrefix = []uint16{1}
+	// ConsensusLeaderSelection is the customizer for consensus leader selection
+	ConsensusLeaderSelection = customizerFromIndices(0, 1, 1)
+	// VerificationChunkAssignment is the customizer for verification chunk assignment
+	VerificationChunkAssignment = customizerFromIndices(0, 2, 0)
+	// ExecutionEnvironment is the customizer for executing blocks
+	ExecutionEnvironment = customizerFromIndices(1)
 )
 
-// ProtocolCollectorClusterLeaderSelection returns the indices for the leader selection for the i-th collector cluster
-func ProtocolCollectorClusterLeaderSelection(clusterIndex uint) []byte {
-	indices := append(collectorClusterLeaderSelectionPrefix, uint16(clusterIndex))
-	return customizerFromIndices(indices)
+// CollectorClusterLeaderSelection returns the indices for the leader selection for the i-th collector cluster
+func CollectorClusterLeaderSelection(clusterIndex uint) []byte {
+	return customizerFromIndices(0, 0, uint16(clusterIndex))
 }
 
-// ExecutionChunk returns the indices for i-th chunk
-func ExecutionChunk(chunkIndex uint16) []byte {
-	indices := append(executionChunkPrefix, chunkIndex)
-	return customizerFromIndices(indices)
-}
-
-// customizerFromIndices maps the input indices into a slice of bytes.
-// The implementation ensures there are no collisions of mapping of different indices.
+// customizerFromIndices converts the input indices into a slice of bytes.
+// The implementation ensures there are no output collisions.
 //
-// The output is built as a concatenation of indices, each index encoded over 2 bytes.
-// (the implementation could be updated to map the indices differently depending on the
-// constraints over the output length)
-func customizerFromIndices(indices []uint16) []byte {
+// The output is built as a concatenation of indices, each index is encoded over 2 bytes.
+func customizerFromIndices(indices ...uint16) []byte {
 	customizerLen := 2 * len(indices)
 	customizer := make([]byte, customizerLen)
 	// concatenate the indices

@@ -98,7 +98,7 @@ func (p *ChunkAssigner) rngByBlockID(stateSnapshot protocol.Snapshot) (random.Ra
 		return nil, fmt.Errorf("failed to retrieve source of randomness: %w", err)
 	}
 
-	rng, err := seed.PRGFromRandomSource(randomSource, seed.ProtocolVerificationChunkAssignment)
+	rng, err := seed.PRGFromRandomSource(randomSource, seed.VerificationChunkAssignment)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate random number generator: %w", err)
 	}

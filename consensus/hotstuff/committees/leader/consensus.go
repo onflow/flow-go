@@ -26,7 +26,7 @@ func SelectionForConsensus(epoch protocol.Epoch) (*LeaderSelection, error) {
 		return nil, fmt.Errorf("could not get epoch seed: %w", err)
 	}
 	// create random number generator from the seed and customizer
-	rng, err := seed.PRGFromRandomSource(randomSeed, seed.ProtocolConsensusLeaderSelection)
+	rng, err := seed.PRGFromRandomSource(randomSeed, seed.ConsensusLeaderSelection)
 	if err != nil {
 		return nil, fmt.Errorf("could not create rng: %w", err)
 	}
