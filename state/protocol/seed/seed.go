@@ -3,7 +3,6 @@ package seed
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/crypto/random"
@@ -29,15 +28,3 @@ func PRGFromRandomSource(randomSource []byte, customizer []byte) (random.Rand, e
 }
 
 const RandomSourceLength = crypto.SignatureLenBLSBLS12381
-
-// FromParentQCSignature extracts the source of randomness from the given QC sigData.
-// The sigData is an RLP encoded structure that is part of QuorumCertificate.
-func FromParentQCSignature(sigData []byte) ([]byte, error) {
-	// unpack sig data to extract random beacon sig
-	randomBeaconSig, err := model.UnpackRandomBeaconSig(sigData)
-	if err != nil {
-		return nil, fmt.Errorf("could not unpack block signature: %w", err)
-	}
-
-	return randomBeaconSig, nil
-}
