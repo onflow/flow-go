@@ -56,7 +56,7 @@ require (
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.3
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
-	github.com/onflow/flow-go-sdk v0.40.0
+	github.com/onflow/flow-go-sdk v0.41.0
 	github.com/onflow/flow-go/crypto v0.24.7
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230428213521-89bcc9e8517e
 	github.com/onflow/go-bitswap v0.0.0-20221017184039-808c5791a8a8
@@ -76,10 +76,10 @@ require (
 	github.com/stretchr/testify v1.8.3
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
-	go.opentelemetry.io/otel v1.16.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.16.0
-	go.opentelemetry.io/otel/sdk v1.16.0
-	go.opentelemetry.io/otel/trace v1.16.0
+	go.opentelemetry.io/otel v1.14.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.14.0
+	go.opentelemetry.io/otel/sdk v1.14.0
+	go.opentelemetry.io/otel/trace v1.14.0
 	go.uber.org/atomic v1.10.0
 	go.uber.org/multierr v1.9.0
 	golang.org/x/crypto v0.7.0
@@ -125,7 +125,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.5.0 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
-	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
+	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/containerd/cgroups v1.0.4 // indirect
@@ -260,9 +260,8 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.16.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.16.0 // indirect
-	go.opentelemetry.io/otel/metric v1.16.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.14.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.14.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.uber.org/dig v1.15.0 // indirect
 	go.uber.org/fx v1.18.2 // indirect
