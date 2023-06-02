@@ -85,7 +85,7 @@ func run(*cobra.Command, []string) {
 		events,
 		serviceEvents,
 		flagHeight+1,
-		flagWorkers)
+		int(flagWorkers))
 
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not remove result from height %v", flagHeight)
