@@ -3,9 +3,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
@@ -131,26 +133,44 @@ func removeExecutionResultsFromHeight(
 		return fmt.Errorf("could not remove results for unfinalized height: %v, finalized height: %v", fromHeight, final.Height)
 	}
 
-	finalRemoved := 0
+	finalRemoved := atomic.NewInt32(0)
 	total := int(final.Height-fromHeight) + 1
 
-	// removing for finalized blocks
+	jobs := make(chan uint64, total)
 	for height := fromHeight; height <= final.Height; height++ {
-		head, err := protoState.AtHeight(height).Head()
-		if err != nil {
-			return fmt.Errorf("could not get header at height: %w", err)
-		}
-
-		blockID := head.ID()
-
-		err = removeForBlockID(headers, commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, blockID)
-		if err != nil {
-			return fmt.Errorf("could not remove result for finalized block: %v, %w", blockID, err)
-		}
-
-		finalRemoved++
-		log.Info().Msgf("result at height %v has been removed. progress (%v/%v)", height, finalRemoved, total)
+		jobs <- height
 	}
+	close(jobs)
+
+	numWorkers := 20
+	var wg sync.WaitGroup
+	wg.Add(numWorkers)
+	// Start the workers
+	for i := 0; i < numWorkers; i++ {
+		go func() {
+			defer wg.Done()
+			for height := range jobs {
+				head, err := protoState.AtHeight(height).Head()
+				if err != nil {
+					log.Error().Msgf("could not get header at height: %w", err)
+					return
+				}
+
+				blockID := head.ID()
+
+				err = removeForBlockID(headers, commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, blockID)
+				if err != nil {
+					log.Error().Msgf("could not remove result for finalized block: %v, %w", blockID, err)
+					return
+				}
+
+				newRemoved := finalRemoved.Inc()
+				log.Info().Msgf("removing progress: %v / %v", newRemoved, total)
+			}
+		}()
+	}
+
+	wg.Wait()
 
 	// removing for pending blocks
 	pendings, err := protoState.Final().Descendants()
@@ -174,6 +194,33 @@ func removeExecutionResultsFromHeight(
 
 	log.Info().Msgf("removed height from %v. removed for %v finalized blocks, and %v pending blocks",
 		fromHeight, finalRemoved, pendingRemoved)
+
+	return nil
+}
+
+func work(
+	protoState protocol.State,
+	headers *badger.Headers,
+	transactionResults *badger.TransactionResults,
+	commits *badger.Commits,
+	chunkDataPacks *badger.ChunkDataPacks,
+	results *badger.ExecutionResults,
+	myReceipts *badger.MyExecutionReceipts,
+	events *badger.Events,
+	serviceEvents *badger.ServiceEvents,
+	height uint64,
+) error {
+	head, err := protoState.AtHeight(height).Head()
+	if err != nil {
+		return fmt.Errorf("could not get header at height: %w", err)
+	}
+
+	blockID := head.ID()
+
+	err = removeForBlockID(headers, commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, blockID)
+	if err != nil {
+		return fmt.Errorf("could not remove result for finalized block: %v, %w", blockID, err)
+	}
 
 	return nil
 }
