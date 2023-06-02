@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
+	psEvents "github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -42,6 +43,10 @@ type StopControl struct {
 	//cm *component.ComponentManager
 	//
 	//blockExecutedChan chan *flow.Header
+
+	// Stop control needs to consume BlockFinalized events.
+	// adding psEvents.Noop makes it a protocol.Consumer
+	psEvents.Noop
 
 	sync.RWMutex
 	log zerolog.Logger

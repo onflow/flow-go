@@ -1111,14 +1111,14 @@ func TestStopAtHeight(t *testing.T) {
 		// we don't pause until a block has been finalized
 		assert.False(t, ctx.stopControl.IsExecutionStopped())
 
-		ctx.engine.BlockFinalized(blocks["A"].Block.Header)
-		ctx.engine.BlockFinalized(blocks["B"].Block.Header)
+		ctx.stopControl.BlockFinalized(blocks["A"].Block.Header)
+		ctx.stopControl.BlockFinalized(blocks["B"].Block.Header)
 
 		assert.False(t, ctx.stopControl.IsExecutionStopped())
-		ctx.engine.BlockFinalized(blocks["C"].Block.Header)
+		ctx.stopControl.BlockFinalized(blocks["C"].Block.Header)
 		assert.True(t, ctx.stopControl.IsExecutionStopped())
 
-		ctx.engine.BlockFinalized(blocks["D"].Block.Header)
+		ctx.stopControl.BlockFinalized(blocks["D"].Block.Header)
 
 		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		assert.False(t, more)
@@ -1235,7 +1235,7 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		assert.False(t, ctx.stopControl.IsExecutionStopped())
 
 		finalizationWg.Add(1)
-		ctx.engine.BlockFinalized(blocks["B"].Block.Header)
+		ctx.stopControl.BlockFinalized(blocks["B"].Block.Header)
 
 		finalizationWg.Wait()
 		executionWg.Wait()

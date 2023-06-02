@@ -673,6 +673,9 @@ func (exeNode *ExecutionNode) LoadStopControl(
 		exeNode.exeConf.pauseExecution,
 		true,
 	)
+	// stopControl needs to consume BlockFinalized events.
+	node.ProtocolEvents.AddConsumer(stopControl)
+
 	exeNode.stopControl = stopControl
 
 	return &module.NoopReadyDoneAware{}, nil
