@@ -77,7 +77,7 @@ func newFacadeEnvironment(
 		UnsafeRandomGenerator: NewUnsafeRandomGenerator(
 			tracer,
 			params.BlockHeader,
-			params.TxIndex,
+			params.TxId,
 		),
 		CryptoLibrary: NewCryptoLibrary(tracer, meter),
 

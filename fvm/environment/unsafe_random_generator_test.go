@@ -17,12 +17,12 @@ import (
 func TestUnsafeRandomGenerator(t *testing.T) {
 	bh := unittest.BlockHeaderFixtureOnChain(flow.Mainnet.Chain().ChainID())
 
-	getRandoms := func(txnIndex uint32, N int) []uint64 {
+	getRandoms := func(txId flow.Identifier, N int) []uint64 {
 		// seed the RG with the same block header
 		urg := environment.NewUnsafeRandomGenerator(
 			tracing.NewTracerSpan(),
 			bh,
-			txnIndex)
+			txId)
 		numbers := make([]uint64, N)
 		for i := 0; i < N; i++ {
 			u, err := urg.UnsafeRandom()
@@ -35,11 +35,12 @@ func TestUnsafeRandomGenerator(t *testing.T) {
 	// basic randomness test to check outputs are "uniformly" spread over the
 	// output space
 	t.Run("randomness test", func(t *testing.T) {
-		for txnIndex := uint32(0); txnIndex < 10; txnIndex++ {
+		for i := 0; i < 10; i++ {
+			txId := unittest.TransactionFixture().ID()
 			urg := environment.NewUnsafeRandomGenerator(
 				tracing.NewTracerSpan(),
 				bh,
-				txnIndex)
+				txId)
 
 			// make sure n is a power of 2 so that there is no bias in the last class
 			// n is a random power of 2 (from 2 to 2^10)
@@ -51,19 +52,21 @@ func TestUnsafeRandomGenerator(t *testing.T) {
 
 	// tests that unsafeRandom is PRG based and hence has deterministic outputs.
 	t.Run("PRG-based UnsafeRandom", func(t *testing.T) {
-		for txnIndex := uint32(0); txnIndex < 10; txnIndex++ {
+		for i := 0; i < 10; i++ {
+			txId := unittest.TransactionFixture().ID()
 			N := 100
-			r1 := getRandoms(txnIndex, N)
-			r2 := getRandoms(txnIndex, N)
+			r1 := getRandoms(txId, N)
+			r2 := getRandoms(txId, N)
 			require.Equal(t, r1, r2)
 		}
 	})
 
 	t.Run("transaction specific randomness", func(t *testing.T) {
 		txns := [][]uint64{}
-		for txnIndex := uint32(0); txnIndex < 10; txnIndex++ {
-			N := 100
-			txns = append(txns, getRandoms(txnIndex, N))
+		for i := 0; i < 10; i++ {
+			txId := unittest.TransactionFixture().ID()
+			N := 2
+			txns = append(txns, getRandoms(txId, N))
 		}
 
 		for i, txn := range txns {

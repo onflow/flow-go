@@ -27,7 +27,7 @@ type unsafeRandomGenerator struct {
 	tracer tracing.TracerSpan
 
 	blockHeader *flow.Header
-	txnIndex    uint32
+	txId        flow.Identifier
 
 	prg        random.Rand
 	createOnce sync.Once
@@ -62,12 +62,12 @@ func (gen ParseRestrictedUnsafeRandomGenerator) UnsafeRandom() (
 func NewUnsafeRandomGenerator(
 	tracer tracing.TracerSpan,
 	blockHeader *flow.Header,
-	txnIndex uint32,
+	txId flow.Identifier,
 ) UnsafeRandomGenerator {
 	gen := &unsafeRandomGenerator{
 		tracer:      tracer,
 		blockHeader: blockHeader,
-		txnIndex:    txnIndex,
+		txId:        txId,
 	}
 
 	return gen
@@ -86,9 +86,8 @@ func (gen *unsafeRandomGenerator) createRandomGenerator() (
 	// source than the block ID)
 	source := gen.blockHeader.ID()
 
-	// Provide additional randomness for each transaction.
-	salt := make([]byte, 4)
-	binary.LittleEndian.PutUint32(salt, gen.txnIndex)
+	// Diversify the seed per transaction ID
+	salt := gen.txId[:]
 
 	// Extract the entropy from the source and expand it into the required
 	// seed length.  Note that we can use any implementation which provide
