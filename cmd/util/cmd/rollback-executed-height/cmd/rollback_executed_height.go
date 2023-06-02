@@ -257,7 +257,7 @@ func removeForBlockID(
 		// remove chunk data pack
 		err := chunks.Remove(chunkID)
 		if errors.Is(err, storage.ErrNotFound) {
-			log.Warn().Msgf("chunk %v not found for block %v", chunkID, blockID)
+			log.Debug().Msgf("chunk %v not found for block %v", chunkID, blockID)
 			continue
 		}
 
