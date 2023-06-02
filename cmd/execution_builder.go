@@ -678,7 +678,7 @@ func (exeNode *ExecutionNode) LoadStopControl(
 
 	exeNode.stopControl = stopControl
 
-	return &module.NoopReadyDoneAware{}, nil
+	return stopControl, nil
 }
 
 func (exeNode *ExecutionNode) LoadExecutionStateLedger(
