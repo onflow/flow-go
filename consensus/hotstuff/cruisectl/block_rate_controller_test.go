@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -554,26 +555,93 @@ func (bs *BlockRateControllerSuite) TestMetrics() {
 // and compare the outputs to the pre-generated outputs from the python controller implementation.
 func (bs *BlockRateControllerSuite) Test_vs_PythonSimulation() {
 	// PART 1: setup system to mirror python simulation
+	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	totalEpochViews := 483000
 	bs.initialView = 0
-	bs.curEpochFirstView = uint64(0)
-	bs.curEpochFinalView = uint64(483000)
+	bs.curEpochFirstView, bs.curEpochFinalView = uint64(0), uint64(totalEpochViews-1) // views [0, .., totalEpochViews-1]
 	bs.epochFallbackTriggered = false
 
 	refT := time.Now().UTC()
 	refT = time.Date(refT.Year(), refT.Month(), refT.Day(), refT.Hour(), refT.Minute(), 0, 0, time.UTC) // truncate to past minute
-	epochStwitchoverTarget := refT.Add(604800 * time.Second)                                            // 1 week
 	bs.config = &Config{
 		TimingConfig: TimingConfig{
 			TargetTransition:      EpochTransitionTime{day: refT.Weekday(), hour: uint8(refT.Hour()), minute: uint8(refT.Minute())},
-			FallbackProposalDelay: 500 * time.Millisecond, // irrelevant for this test, as controller should never enter fallback mode
-			MinProposalDuration:   470 * time.Millisecond,
-			MaxProposalDuration:   2010 * time.Millisecond,
-			Enabled:               true,
+			FallbackProposalDelay: atomic.NewDuration(500 * time.Millisecond), // irrelevant for this test, as controller should never enter fallback mode
+			MinViewDuration:       atomic.NewDuration(470 * time.Millisecond),
+			MaxViewDuration:       atomic.NewDuration(2010 * time.Millisecond),
+			Enabled:               atomic.NewBool(true),
 		},
 		ControllerParams: ControllerParams{KP: 2.0, KI: 0.06, KD: 3.0, N_ewma: 5, N_itg: 50},
 	}
 
 	setupMocks(bs)
+	bs.CreateAndStartController()
+	defer bs.StopController()
+
+	// PART 2: timing generated from python simulation and corresponding controller response
+	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	ref := struct {
+		// targetViewTime is the idealized view duration of a perfect system.
+		// In Python simulation, this is the array `EpochSimulation.ideal_view_time`
+		targetViewTime float64 // units: seconds
+
+		// observedMinViewTimes[i] is the minimal time required time to execute the protocol for view i
+		//  - Duration from the primary observing the parent block (indexed by i) to having its child proposal (block for view i+1) ready for publication.
+		//  - This is the minimal time required to execute the protocol. Nodes can only delay their proposal but not progress any faster.
+		//  - in Python simulation, this is the array `EpochSimulation.min_view_times + EpochSimulation.observation_noise`
+		//    with is returned by function `EpochSimulation.current_view_observation()`
+		// Note that this is generally different than the time it takes the committee as a whole to transition
+		// through views. This is because the primary changes from view to view, and nodes observe blocks at slightly
+		// different times (small noise term). The real world (as well as the simulation) depend on collective swarm
+		// behaviour of the consensus committee, which is not observable by nodes individually.
+		// In contrast, our `observedMinViewTimes` here contains an additional noise term, to emulate
+		// the observations of a node in the real world.
+		observedMinViewTimes []float64 // units: seconds
+
+		// controllerTargetedViewDuration[i] is the duration targeted by the Python controller :
+		// - measured from observing the parent until publishing the child block for view i+1
+		controllerTargetedViewDuration []float64 // units: seconds
+
+		// realWorldViewDuration[i] is the duration of the ith view for the entire committee.
+		// This value occurs in response to the controller output and is not observable by nodes individually.
+		//  - in Python simulation, this is the array `EpochSimulation.real_world_view_duration`
+		//    with is recorded by the environment upon the call of `EpochSimulation.delay()`
+		realWorldViewDuration []float64 // units: seconds
+	}{
+		targetViewTime:                 1.2521739130434784,
+		observedMinViewTimes:           []float64{0.813911590736, 0.709385160859, 0.737005791341, 0.837805030561, 0.822187668544, 0.812909728953, 0.783581085421, 0.741921910413, 0.712233113961, 0.726364518340, 1.248139948411, 0.874190610541, 0.708212792956, 0.817596927201, 0.804068704889, 0.816333694093, 0.635439001868, 1.056889701512, 0.828365399550, 0.864982673883, 0.724916386430, 0.657269487910, 0.879699411727, 0.825153337009, 0.838359933382, 0.756176509107, 1.423953270626, 2.384840427116, 0.699779210474, 0.678315506502, 0.739714699940, 0.756860414442, 0.822439930995, 0.863509145860, 0.629256465669, 0.639977555985, 0.755185429454, 0.749303151321, 0.791698985094, 0.858487537677, 0.573302766541, 0.819061027162, 0.666408812358, 0.685689964194, 0.823590513610, 0.767398446433, 0.751476866817, 0.714594551857, 0.807687985979, 0.689084438887, 0.778230763867, 1.003159717190, 0.805687478957, 1.189467855468, 0.775150433563, 0.659834215924, 0.719878391611, 0.723118445283, 0.729128777217, 0.894115006528, 0.821659798706, 0.707477543689, 0.788637584400, 0.802871483919, 0.647385138470, 0.824723072863, 0.826836727024, 0.777618186343, 1.287034125297, 0.902203608710, 0.860847662156, 0.744839240209, 0.703066498578, 0.734337287980, 0.850177664684, 0.794996949347, 0.703085302264, 0.850633984420, 0.852003819504, 1.215923240337, 0.950100961928, 0.706303284366, 0.767606634563, 0.805098284495, 0.746037389780, 0.753114712715, 0.827655267273, 0.677763970869, 0.775983354906, 0.886163648660, 0.827260670102, 0.674219428445, 0.827001240891, 1.079979351239, 0.834371194195, 0.642493824065, 0.831472105803, 0.868759159974, 0.768113213916, 0.799327054954},
+		realWorldViewDuration:          []float64{1.302444400800, 1.346129371535, 1.294863072697, 1.247327922614, 1.286795200594, 1.306740497700, 1.287569802153, 1.255674603370, 1.221066792868, 1.274421011086, 1.310455137252, 1.490561324031, 1.253388579993, 1.308204927322, 1.303354847496, 1.258878368832, 1.252442671947, 1.300931483899, 1.292864087733, 1.285202085499, 1.275787031401, 1.272867925078, 1.313112319334, 1.250448493684, 1.280932583567, 1.275154657095, 1.982478033877, 2.950000000000, 1.303987777503, 1.197058075247, 1.271351165257, 1.218997388610, 1.289408440486, 1.314624688597, 1.248543715838, 1.257252635970, 1.313520669301, 1.289733925464, 1.255731709280, 1.329280312510, 1.250944692406, 1.244618792038, 1.270799583742, 1.297864616235, 1.281392864743, 1.274370759435, 1.267866315564, 1.269626634709, 1.235201824673, 1.249630200456, 1.252256124260, 1.308797727248, 1.299471761557, 1.718929617405, 1.264606560958, 1.241614892746, 1.274645939739, 1.267738287029, 1.264086142881, 1.317338331667, 1.243233554137, 1.242636788130, 1.222948278859, 1.278447973385, 1.301907713623, 1.315027977476, 1.299297388065, 1.297119789433, 1.794676934418, 1.325065836105, 1.345177262841, 1.263644019312, 1.256720313054, 1.345587001430, 1.312697068641, 1.272879075749, 1.297816332013, 1.296976261782, 1.287733046449, 1.833154481870, 1.462021182671, 1.255799473395, 1.246753462604, 1.311201917909, 1.248542983295, 1.289491847469, 1.283822179928, 1.275478845872, 1.276979232592, 1.333513139323, 1.279939105944, 1.252640151610, 1.304614041834, 1.538352621208, 1.318414654543, 1.258316752763, 1.278344123076, 1.323632996025, 1.295038772886, 1.249799751997},
+		controllerTargetedViewDuration: []float64{1.283911590736, 1.198887195866, 1.207005791341, 1.307805030561, 1.292187668544, 1.282909728953, 1.253581085421, 1.211921910413, 1.182233113961, 1.196364518340, 1.718139948411, 1.344190610541, 1.178212792956, 1.287596927201, 1.274068704889, 1.286333694093, 1.105439001868, 1.526889701512, 1.298365399550, 1.334982673883, 1.194916386430, 1.127269487910, 1.349699411727, 1.295153337009, 1.308359933382, 1.226176509107, 1.893953270626, 2.854840427116, 1.169779210474, 1.148315506502, 1.209714699940, 1.226860414442, 1.292439930995, 1.333509145860, 1.099256465669, 1.109977555985, 1.225185429454, 1.219303151321, 1.261698985094, 1.328487537677, 1.043302766541, 1.289061027162, 1.136408812358, 1.155689964194, 1.293590513610, 1.237398446433, 1.221476866817, 1.184594551857, 1.277687985979, 1.159084438887, 1.248230763867, 1.473159717190, 1.275687478957, 1.659467855468, 1.245150433563, 1.129834215924, 1.189878391611, 1.193118445283, 1.199128777217, 1.364115006528, 1.291659798706, 1.177477543689, 1.258637584400, 1.272871483919, 1.117385138470, 1.294723072863, 1.296836727024, 1.247618186343, 1.757034125297, 1.372203608710, 1.330847662156, 1.214839240209, 1.173066498578, 1.204337287980, 1.320177664684, 1.264996949347, 1.173085302264, 1.320633984420, 1.322003819504, 1.685923240337, 1.420100961928, 1.176303284366, 1.237606634563, 1.275098284495, 1.216037389780, 1.223114712715, 1.297655267273, 1.147763970869, 1.245983354906, 1.356163648660, 1.297260670102, 1.144219428445, 1.297001240891, 1.549979351239, 1.304371194195, 1.112493824065, 1.301472105803, 1.338759159974, 1.238113213916, 1.269327054954},
+	}
+
+	// PART 3: run controller and ensure output matches pre-generated controller response from python ref implementation
+	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	// sanity checks:
+	require.Equal(bs.T(), 604800.0, bs.ctl.curEpochTargetEndTime.UTC().Sub(refT).Seconds(), "Epoch should end 1 week from now, i.e. 604800s")
+	require.InEpsilon(bs.T(), ref.targetViewTime, bs.ctl.targetViewTime().Seconds(), 1e-10) // ideal view time
+	require.Equal(bs.T(), len(ref.observedMinViewTimes), len(ref.realWorldViewDuration))
+
+	// Notes:
+	// - We specifically make the first observation at when the full time of the epoch is left.
+	//   The python simulation we compare with proceed exactly the same way.
+	// - we first make an observation, before requesting the controller output. Thereby, we
+	//   avoid artifacts of recalling a controller that was just initialized with fallback values.
+	// - we call `measureViewDuration(..)` (_not_ `processIncorporatedBlock(..)`) to
+	//   interfering with the deduplication logic. Here we want to test correct numerics.
+	//   Correctness of the deduplication logic is verified in the different test.
+	observationTime := refT
+
+	for v := 0; v < len(ref.observedMinViewTimes); v++ {
+		observedBlock := makeTimedBlock(uint64(v), unittest.IdentifierFixture(), observationTime)
+		err := bs.ctl.measureViewDuration(observedBlock)
+		require.NoError(bs.T(), err)
+		proposalTiming := bs.ctl.GetProposalTiming()
+		tpt := proposalTiming.TargetPublicationTime(uint64(v+1), time.Now(), observedBlock.Block.BlockID) // value for `timeViewEntered` should be irrelevant here
+		controllerTargetedViewDuration := tpt.Sub(observedBlock.TimeObserved).Seconds()
+		require.InEpsilon(bs.T(), ref.controllerTargetedViewDuration[v], controllerTargetedViewDuration, 1e-5, "implementations deviate for view %d", v) // ideal view time
+
+		observationTime = observationTime.Add(time.Duration(int64(ref.realWorldViewDuration[v] * float64(time.Second))))
+	}
 
 }
 

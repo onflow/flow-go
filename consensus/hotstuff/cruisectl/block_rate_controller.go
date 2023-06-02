@@ -337,10 +337,11 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	// if the controller is disabled, we don't update measurements and instead use a fallback timing
 	if !ctl.config.Enabled.Load() {
-		ctl.storeProposalTiming(newFallbackTiming(tb.Block.View, tb.TimeObserved, ctl.config.FallbackProposalDelay.Load()))
+		fallbackDelay := ctl.config.FallbackProposalDelay.Load()
+		ctl.storeProposalTiming(newFallbackTiming(tb.Block.View, tb.TimeObserved, fallbackDelay))
 		ctl.log.Debug().
 			Uint64("cur_view", tb.Block.View).
-			Dur("fallback_proposal_dur", ctl.config.FallbackProposalDelay.Load()).
+			Dur("fallback_proposal_delay", fallbackDelay).
 			Msg("controller is disabled - using fallback timing")
 		return nil
 	}
@@ -351,8 +352,8 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	// compute the projected time still needed for the remaining views, assuming that we progress through the remaining views
 	// idealized target view time:
 	view := tb.Block.View
-	tau := ctl.targetViewTime().Seconds()          // τ - idealized target view time in units of seconds
-	viewsRemaining := ctl.curEpochFinalView - view // k[v] - views remaining in current epoch
+	tau := ctl.targetViewTime().Seconds()              // τ - idealized target view time in units of seconds
+	viewsRemaining := ctl.curEpochFinalView + 1 - view // k[v] - views remaining in current epoch
 	durationRemaining := ctl.curEpochTargetEndTime.Sub(tb.TimeObserved)
 
 	// Compute instantaneous error term: e[v] = k[v]·τ - T[v] i.e. the projected difference from target switchover
