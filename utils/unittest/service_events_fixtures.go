@@ -1,6 +1,8 @@
 package unittest
 
 import (
+	"github.com/onflow/cadence/encoding/ccf"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
@@ -18,7 +20,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 	}
 
 	event := EventFixture(events.EpochSetup.EventType(), 1, 1, IdentifierFixture(), 0)
-	event.Payload = []byte(EpochSetupFixtureJSON)
+	event.Payload = EpochSetupFixtureCCF
 
 	// randomSource is [0,0,...,1,2,3,4]
 	randomSource := make([]uint8, flow.EpochSetupRandomSourceLength)
@@ -117,7 +119,7 @@ func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCom
 	}
 
 	event := EventFixture(events.EpochCommit.EventType(), 1, 1, IdentifierFixture(), 0)
-	event.Payload = []byte(EpochCommitFixtureJSON)
+	event.Payload = EpochCommitFixtureCCF
 
 	expected := &flow.EpochCommit{
 		Counter: 1,
@@ -156,7 +158,7 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 	}
 
 	event := EventFixture(events.VersionBeacon.EventType(), 1, 1, IdentifierFixture(), 0)
-	event.Payload = []byte(VersionBeaconFixtureJSON)
+	event.Payload = VersionBeaconFixtureCCF
 
 	expected := &flow.VersionBeacon{
 		VersionBoundaries: []flow.VersionBoundary{
@@ -171,7 +173,7 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 	return event, expected
 }
 
-var EpochSetupFixtureJSON = `
+var epochSetupFixtureJSON = `
 {
   "type": "Event",
   "value": {
@@ -1103,7 +1105,7 @@ var EpochSetupFixtureJSON = `
 }
 `
 
-var EpochCommitFixtureJSON = `
+var epochCommitFixtureJSON = `
 {
     "type": "Event",
     "value": {
@@ -1252,7 +1254,7 @@ var EpochCommitFixtureJSON = `
     }
 }`
 
-var VersionBeaconFixtureJSON = `{
+var versionBeaconFixtureJSON = `{
   "type": "Event",
   "value": {
     "id": "A.01cf0e2f2f715450.NodeVersionBeacon.VersionBeacon",
@@ -1337,3 +1339,36 @@ var VersionBeaconFixtureJSON = `{
   },
   "type": "Event"
 }`
+
+var EpochSetupFixtureCCF = func() []byte {
+	b, err := convertJSONCDCToCCF([]byte(epochSetupFixtureJSON))
+	if err != nil {
+		panic(err)
+	}
+	return b
+}()
+
+var EpochCommitFixtureCCF = func() []byte {
+	b, err := convertJSONCDCToCCF([]byte(epochCommitFixtureJSON))
+	if err != nil {
+		panic(err)
+	}
+	return b
+}()
+
+var VersionBeaconFixtureCCF = func() []byte {
+	b, err := convertJSONCDCToCCF([]byte(versionBeaconFixtureJSON))
+	if err != nil {
+		panic(err)
+	}
+	return b
+}()
+
+// convertJSONCDCToCCF converts JSON-CDC encoded data to CCF encoded data.
+func convertJSONCDCToCCF(encodedInJSONCDC []byte) ([]byte, error) {
+	v, err := jsoncdc.Decode(nil, encodedInJSONCDC)
+	if err != nil {
+		return nil, err
+	}
+	return ccf.Encode(v)
+}

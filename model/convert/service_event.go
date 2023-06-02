@@ -7,7 +7,7 @@ import (
 	"github.com/coreos/go-semver/semver"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding/ccf"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -43,8 +43,8 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 // flow.Event type to a ServiceEvent type for an EpochSetup event
 func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error) {
 
-	// decode bytes using jsoncdc
-	payload, err := json.Decode(nil, event.Payload)
+	// decode bytes using ccf
+	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
 	}
@@ -186,8 +186,8 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 // flow.Event type to a ServiceEvent type for an EpochCommit event
 func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error) {
 
-	// decode bytes using jsoncdc
-	payload, err := json.Decode(nil, event.Payload)
+	// decode bytes using ccf
+	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
 	}
@@ -651,7 +651,7 @@ func invalidCadenceTypeError(
 }
 
 func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, error) {
-	payload, err := json.Decode(nil, event.Payload)
+	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
 	}
