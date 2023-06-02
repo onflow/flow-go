@@ -36,6 +36,7 @@ type facadeEnvironment struct {
 	*SystemContracts
 
 	UUIDGenerator
+	AccountLocalIDGenerator
 
 	AccountCreator
 
@@ -48,11 +49,6 @@ type facadeEnvironment struct {
 
 	accounts Accounts
 	txnState storage.TransactionPreparer
-}
-
-func (env *facadeEnvironment) GenerateAccountID(address common.Address) (uint64, error) {
-	//TODO implement me
-	panic("implement me")
 }
 
 func newFacadeEnvironment(
@@ -113,6 +109,11 @@ func newFacadeEnvironment(
 			tracer,
 			meter,
 			txnState),
+		AccountLocalIDGenerator: NewAccountLocalIDGenerator(
+			tracer,
+			meter,
+			accounts,
+		),
 
 		AccountCreator: NoAccountCreator{},
 
@@ -274,6 +275,9 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.UUIDGenerator = NewParseRestrictedUUIDGenerator(
 		env.txnState,
 		env.UUIDGenerator)
+	env.AccountLocalIDGenerator = NewParseRestrictedAccountLocalIDGenerator(
+		env.txnState,
+		env.AccountLocalIDGenerator)
 	env.ValueStore = NewParseRestrictedValueStore(
 		env.txnState,
 		env.ValueStore)

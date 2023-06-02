@@ -8,13 +8,11 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network/channels"
 )
 
 // ConduitFactory is an interface type that is utilized by the Network to create conduits for the channels.
 type ConduitFactory interface {
-	component.Component
 	// RegisterAdapter sets the Adapter component of the factory.
 	// The Adapter is a wrapper around the Network layer that only exposes the set of methods
 	// that are needed by a conduit.

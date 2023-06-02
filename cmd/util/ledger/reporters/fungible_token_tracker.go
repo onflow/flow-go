@@ -165,7 +165,8 @@ func (r *FungibleTokenTracker) worker(
 			itr := storageMap.Iterator(inter)
 			key, value := itr.Next()
 			for value != nil {
-				r.iterateChildren(append([]string{domain}, key), j.owner, value)
+				identifier := string(key.(interpreter.StringAtreeValue))
+				r.iterateChildren(append([]string{domain}, identifier), j.owner, value)
 				key, value = itr.Next()
 			}
 		}

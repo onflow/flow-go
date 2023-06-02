@@ -5,7 +5,9 @@ package mock
 import (
 	context "context"
 
+	flow "github.com/onflow/flow-go/model/flow"
 	metrics "github.com/slok/go-http-metrics/metrics"
+
 	mock "github.com/stretchr/testify/mock"
 
 	time "time"
@@ -66,9 +68,54 @@ func (_m *AccessMetrics) ObserveHTTPResponseSize(ctx context.Context, props metr
 	_m.Called(ctx, props, sizeBytes)
 }
 
+// ScriptExecuted provides a mock function with given fields: dur, size
+func (_m *AccessMetrics) ScriptExecuted(dur time.Duration, size int) {
+	_m.Called(dur, size)
+}
+
 // TotalConnectionsInPool provides a mock function with given fields: connectionCount, connectionPoolSize
 func (_m *AccessMetrics) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {
 	_m.Called(connectionCount, connectionPoolSize)
+}
+
+// TransactionExecuted provides a mock function with given fields: txID, when
+func (_m *AccessMetrics) TransactionExecuted(txID flow.Identifier, when time.Time) {
+	_m.Called(txID, when)
+}
+
+// TransactionExpired provides a mock function with given fields: txID
+func (_m *AccessMetrics) TransactionExpired(txID flow.Identifier) {
+	_m.Called(txID)
+}
+
+// TransactionFinalized provides a mock function with given fields: txID, when
+func (_m *AccessMetrics) TransactionFinalized(txID flow.Identifier, when time.Time) {
+	_m.Called(txID, when)
+}
+
+// TransactionReceived provides a mock function with given fields: txID, when
+func (_m *AccessMetrics) TransactionReceived(txID flow.Identifier, when time.Time) {
+	_m.Called(txID, when)
+}
+
+// TransactionResultFetched provides a mock function with given fields: dur, size
+func (_m *AccessMetrics) TransactionResultFetched(dur time.Duration, size int) {
+	_m.Called(dur, size)
+}
+
+// TransactionSubmissionFailed provides a mock function with given fields:
+func (_m *AccessMetrics) TransactionSubmissionFailed() {
+	_m.Called()
+}
+
+// UpdateExecutionReceiptMaxHeight provides a mock function with given fields: height
+func (_m *AccessMetrics) UpdateExecutionReceiptMaxHeight(height uint64) {
+	_m.Called(height)
+}
+
+// UpdateLastFullBlockHeight provides a mock function with given fields: height
+func (_m *AccessMetrics) UpdateLastFullBlockHeight(height uint64) {
+	_m.Called(height)
 }
 
 type mockConstructorTestingTNewAccessMetrics interface {
