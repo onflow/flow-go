@@ -20,6 +20,7 @@ import (
 var (
 	flagHeight  uint64
 	flagDataDir string
+	flagWorkers uint
 )
 
 var Cmd = &cobra.Command{
@@ -34,6 +35,9 @@ func init() {
 	Cmd.Flags().Uint64Var(&flagHeight, "height", 0,
 		"the height of the block to update the highest executed height")
 	_ = Cmd.MarkFlagRequired("height")
+
+	Cmd.Flags().UintVar(&flagWorkers, "workers", 20,
+		"the number of workers to remove heights concurrently")
 
 	Cmd.Flags().StringVar(&flagDataDir, "datadir", "",
 		"directory that stores the protocol state")
@@ -80,7 +84,8 @@ func run(*cobra.Command, []string) {
 		myReceipts,
 		events,
 		serviceEvents,
-		flagHeight+1)
+		flagHeight+1,
+		flagWorkers)
 
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not remove result from height %v", flagHeight)
@@ -112,7 +117,8 @@ func removeExecutionResultsFromHeight(
 	myReceipts *badger.MyExecutionReceipts,
 	events *badger.Events,
 	serviceEvents *badger.ServiceEvents,
-	fromHeight uint64) error {
+	fromHeight uint64,
+	numWorkers int) error {
 	log.Info().Msgf("removing results for blocks from height: %v", fromHeight)
 
 	root, err := protoState.Params().Root()
@@ -142,7 +148,6 @@ func removeExecutionResultsFromHeight(
 	}
 	close(jobs)
 
-	numWorkers := 20
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
 	// Start the workers
