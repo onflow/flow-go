@@ -1,7 +1,6 @@
 package stop
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -23,6 +22,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 	t.Run("when processing block at stop height", func(t *testing.T) {
 		sc := NewStopControl(
 			unittest.Logger(),
+			nil,
 			nil,
 			nil,
 			nil,
@@ -65,6 +65,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		sc := NewStopControl(
 			unittest.Logger(),
+			execState,
 			nil,
 			nil,
 			nil,
@@ -85,7 +86,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		// no stopping has started yet, block below stop height
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
-		sc.BlockFinalized(context.TODO(), execState, header)
+		sc.BlockFinalized(header)
 
 		stop2 := StopParameters{StopBeforeHeight: 37}
 		err = sc.SetStopParameters(stop2)
@@ -94,7 +95,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		// block at stop height, it should be triggered stop
 		header = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(37))
-		sc.BlockFinalized(context.TODO(), execState, header)
+		sc.BlockFinalized(header)
 
 		// since we set shouldCrash to false, execution should be stopped
 		require.True(t, sc.IsExecutionStopped())
@@ -119,6 +120,7 @@ func TestExecutionFallingBehind(t *testing.T) {
 
 	sc := NewStopControl(
 		unittest.Logger(),
+		execState,
 		nil,
 		nil,
 		nil,
@@ -137,10 +139,10 @@ func TestExecutionFallingBehind(t *testing.T) {
 		Return(nil, storage.ErrNotFound)
 
 	// finalize blocks first
-	sc.BlockFinalized(context.TODO(), execState, headerA)
-	sc.BlockFinalized(context.TODO(), execState, headerB)
-	sc.BlockFinalized(context.TODO(), execState, headerC)
-	sc.BlockFinalized(context.TODO(), execState, headerD)
+	sc.BlockFinalized(headerA)
+	sc.BlockFinalized(headerB)
+	sc.BlockFinalized(headerC)
+	sc.BlockFinalized(headerD)
 
 	// simulate execution
 	sc.OnBlockExecuted(headerA)
@@ -181,6 +183,7 @@ func TestAddStopForPastBlocks(t *testing.T) {
 
 	sc := NewStopControl(
 		unittest.Logger(),
+		execState,
 		headers,
 		nil,
 		nil,
@@ -189,9 +192,9 @@ func TestAddStopForPastBlocks(t *testing.T) {
 	)
 
 	// finalize blocks first
-	sc.BlockFinalized(context.TODO(), execState, headerA)
-	sc.BlockFinalized(context.TODO(), execState, headerB)
-	sc.BlockFinalized(context.TODO(), execState, headerC)
+	sc.BlockFinalized(headerA)
+	sc.BlockFinalized(headerB)
+	sc.BlockFinalized(headerC)
 
 	// simulate execution
 	sc.OnBlockExecuted(headerA)
@@ -211,7 +214,7 @@ func TestAddStopForPastBlocks(t *testing.T) {
 	require.Equal(t, &stop, sc.GetStopParameters())
 
 	// finalize one more block after stop is set
-	sc.BlockFinalized(context.TODO(), execState, headerD)
+	sc.BlockFinalized(headerD)
 
 	require.True(t, sc.IsExecutionStopped())
 
@@ -238,6 +241,7 @@ func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
 
 	sc := NewStopControl(
 		unittest.Logger(),
+		execState,
 		headers,
 		nil,
 		nil,
@@ -250,9 +254,9 @@ func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
 		Return(nil, storage.ErrNotFound)
 
 	// finalize blocks first
-	sc.BlockFinalized(context.TODO(), execState, headerA)
-	sc.BlockFinalized(context.TODO(), execState, headerB)
-	sc.BlockFinalized(context.TODO(), execState, headerC)
+	sc.BlockFinalized(headerA)
+	sc.BlockFinalized(headerB)
+	sc.BlockFinalized(headerC)
 
 	// set stop at 22, but finalization is at 23 so 21
 	// is the last height which wil be executed
@@ -262,7 +266,7 @@ func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
 	require.Equal(t, &stop, sc.GetStopParameters())
 
 	// finalize one more block after stop is set
-	sc.BlockFinalized(context.TODO(), execState, headerD)
+	sc.BlockFinalized(headerD)
 
 	// simulate execution
 	sc.OnBlockExecuted(headerA)
@@ -291,6 +295,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 
 		sc := NewStopControl(
 			unittest.Logger(),
+			execState,
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
@@ -319,7 +324,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			}, nil).Once()
 
 		// finalize first block
-		sc.BlockFinalized(context.TODO(), execState, headerA)
+		sc.BlockFinalized(headerA)
 		require.False(t, sc.IsExecutionStopped())
 		require.Nil(t, sc.GetStopParameters())
 
@@ -344,7 +349,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 
 		// finalize second block. we are still ok as the node version
 		// is the same as the version beacon one
-		sc.BlockFinalized(context.TODO(), execState, headerB)
+		sc.BlockFinalized(headerB)
 		require.False(t, sc.IsExecutionStopped())
 		require.Nil(t, sc.GetStopParameters())
 
@@ -365,7 +370,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 				),
 				SealHeight: headerC.Height,
 			}, nil).Once()
-		sc.BlockFinalized(context.TODO(), execState, headerC)
+		sc.BlockFinalized(headerC)
 		// should be stopped as this is height 22 and height 21 is already considered executed
 		require.True(t, sc.IsExecutionStopped())
 
@@ -394,6 +399,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 
 		sc := NewStopControl(
 			unittest.Logger(),
+			execState,
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
@@ -419,7 +425,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			}, nil).Once()
 
 		// finalize first block
-		sc.BlockFinalized(context.TODO(), execState, headerA)
+		sc.BlockFinalized(headerA)
 		require.False(t, sc.IsExecutionStopped())
 		require.Equal(t, &StopParameters{
 			StopBeforeHeight: 21,
@@ -443,7 +449,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 
 		// finalize second block. we are still ok as the node version
 		// is the same as the version beacon one
-		sc.BlockFinalized(context.TODO(), execState, headerB)
+		sc.BlockFinalized(headerB)
 		require.False(t, sc.IsExecutionStopped())
 		require.Nil(t, sc.GetStopParameters())
 
@@ -470,6 +476,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 
 		sc := NewStopControl(
 			unittest.Logger(),
+			execState,
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
@@ -492,7 +499,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			}, nil).Once()
 
 		// finalize first block
-		sc.BlockFinalized(context.TODO(), execState, headerA)
+		sc.BlockFinalized(headerA)
 		require.False(t, sc.IsExecutionStopped())
 		require.Nil(t, sc.GetStopParameters())
 
@@ -520,7 +527,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 				SealHeight: headerB.Height,
 			}, nil).Once()
 
-		sc.BlockFinalized(context.TODO(), execState, headerB)
+		sc.BlockFinalized(headerB)
 		require.False(t, sc.IsExecutionStopped())
 		// stop is not cleared due to being set manually
 		require.Equal(t, &stop, sc.GetStopParameters())
@@ -546,6 +553,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 
 		sc := NewStopControl(
 			unittest.Logger(),
+			execState,
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
@@ -575,7 +583,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			}, nil).Once()
 
 		// finalize first block
-		sc.BlockFinalized(context.TODO(), execState, headerA)
+		sc.BlockFinalized(headerA)
 		require.False(t, sc.IsExecutionStopped())
 		require.Equal(t, &vbStop, sc.GetStopParameters())
 
@@ -601,6 +609,7 @@ func TestStartingStopped(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		nil,
 		true,
 		false,
 	)
@@ -609,8 +618,13 @@ func TestStartingStopped(t *testing.T) {
 
 func TestStoppedStateRejectsAllBlocksAndChanged(t *testing.T) {
 
+	// make sure we don't even query executed status if stopped
+	// mock should fail test on any method call
+	execState := new(mock.ReadOnlyExecutionState)
+
 	sc := NewStopControl(
 		unittest.Logger(),
+		execState,
 		nil,
 		nil,
 		nil,
@@ -625,13 +639,9 @@ func TestStoppedStateRejectsAllBlocksAndChanged(t *testing.T) {
 	})
 	require.Error(t, err)
 
-	// make sure we don't even query executed status if stopped
-	// mock should fail test on any method call
-	execState := new(mock.ReadOnlyExecutionState)
-
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 
-	sc.BlockFinalized(context.TODO(), execState, header)
+	sc.BlockFinalized(header)
 	require.True(t, sc.IsExecutionStopped())
 
 	execState.AssertExpectations(t)

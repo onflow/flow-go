@@ -465,7 +465,7 @@ func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 // BlockFinalized implements part of state.protocol.Consumer interface.
 // Method gets called for every finalized block
 func (e *Engine) BlockFinalized(h *flow.Header) {
-	e.stopControl.BlockFinalized(e.unit.Ctx(), e.execState, h)
+	e.stopControl.BlockFinalized(h)
 }
 
 // Main handling

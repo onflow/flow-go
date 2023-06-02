@@ -690,6 +690,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	stopControl := stop.NewStopControl(
 		node.Log,
+		execState,
 		node.Headers,
 		versionBeacons,
 		ver,

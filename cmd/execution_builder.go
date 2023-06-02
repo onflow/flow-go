@@ -665,6 +665,7 @@ func (exeNode *ExecutionNode) LoadStopControl(
 
 	stopControl := stop.NewStopControl(
 		exeNode.builder.Logger,
+		exeNode.executionState,
 		node.Storage.Headers,
 		node.Storage.VersionBeacons,
 		ver,

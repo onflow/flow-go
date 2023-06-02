@@ -205,6 +205,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	stopControl := stop.NewStopControl(
 		zerolog.Nop(),
+		executionState,
 		headers,
 		nil,
 		nil,
@@ -1581,6 +1582,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		nil,
 		stop.NewStopControl(
 			zerolog.Nop(),
+			nil,
 			headers,
 			nil,
 			nil,

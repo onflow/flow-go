@@ -93,6 +93,7 @@ func TestCommandsSetsValues(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		nil,
 		false,
 		false,
 	)

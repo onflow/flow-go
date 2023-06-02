@@ -16,6 +16,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+var ErrCannotChangeStop = errors.New("cannot change stop control stopping parameters")
+
 // StopControl is a specialized component used by ingestion.Engine to encapsulate
 // control of stopping blocks execution.
 // It is intended to work tightly with the Engine, not as a general mechanism or interface.
@@ -36,6 +38,11 @@ import (
 //     This means version boundaries were edited. The resulting stop
 //     height is the new one.
 type StopControl struct {
+	//component.Component
+	//cm *component.ComponentManager
+	//
+	//blockExecutedChan chan *flow.Header
+
 	sync.RWMutex
 	log zerolog.Logger
 
@@ -43,7 +50,8 @@ type StopControl struct {
 	stopped      bool
 	stopBoundary *stopBoundary
 
-	headers StopControlHeaders
+	headers  StopControlHeaders
+	exeState state.ReadOnlyExecutionState
 
 	// nodeVersion could be nil right now. See NewStopControl.
 	nodeVersion    *semver.Version
@@ -121,6 +129,7 @@ type StopControlHeaders interface {
 // without a node version, the stop control can still be used for manual stopping.
 func NewStopControl(
 	log zerolog.Logger,
+	exeState state.ReadOnlyExecutionState,
 	headers StopControlHeaders,
 	versionBeacons storage.VersionBeacons,
 	nodeVersion *semver.Version,
@@ -133,6 +142,7 @@ func NewStopControl(
 			Str("component", "stop_control").
 			Logger(),
 
+		exeState:                      exeState,
 		headers:                       headers,
 		nodeVersion:                   nodeVersion,
 		versionBeacons:                versionBeacons,
@@ -149,6 +159,13 @@ func NewStopControl(
 	}
 
 	log.Info().Msgf("Created")
+	//
+	//cm := component.NewComponentManagerBuilder()
+	//cm.AddWorker(sc.processBlockFinalized)
+	//cm.AddWorker(sc.processBlockExecuted)
+	//
+	//sc.cm = cm.Build()
+	//sc.Component = sc.cm
 
 	// TODO: handle version beacon already indicating a stop
 	// right now the stop will happen on first BlockFinalized
@@ -156,6 +173,23 @@ func NewStopControl(
 
 	return sc
 }
+
+//func (s *StopControl) processBlockFinalized(
+//	ctx irrecoverable.SignalerContext,
+//	ready component.ReadyFunc,
+//) {
+//
+//
+//}
+//
+//func (s *StopControl) processBlockExecuted(
+//	ctx irrecoverable.SignalerContext,
+//	ready component.ReadyFunc,
+//) {
+//	for executed := range s.blockExecutedChan {
+//
+//	}
+//}
 
 // IsExecutionStopped returns true is block execution has been stopped
 func (s *StopControl) IsExecutionStopped() bool {
@@ -184,8 +218,6 @@ func (s *StopControl) SetStopParameters(
 
 	return s.unsafeSetStopParameters(stopBoundary, false)
 }
-
-var ErrCannotChangeStop = errors.New("cannot change stop control stopping parameters")
 
 // unsafeSetStopParameters sets new stop parameters.
 // stopBoundary is the new stop parameters. If nil, the stop is removed.
@@ -336,10 +368,11 @@ func (s *StopControl) ShouldExecuteBlock(b *flow.Header) bool {
 // progress can fall behind. In this case, we want to crash only after the execution
 // reached the stopHeight.
 func (s *StopControl) BlockFinalized(
-	ctx context.Context,
-	execState state.ReadOnlyExecutionState,
 	h *flow.Header,
 ) {
+	// TODO: fix
+	ctx := context.Background()
+
 	s.Lock()
 	defer s.Unlock()
 
@@ -414,7 +447,7 @@ func (s *StopControl) BlockFinalized(
 		Msgf("Found ID of the block that should be executed last")
 
 	// check if the parent block has been executed then stop right away
-	executed, err := state.IsBlockExecuted(ctx, execState, h.ParentID)
+	executed, err := state.IsBlockExecuted(ctx, s.exeState, h.ParentID)
 	if err != nil {
 		handleErr(fmt.Errorf(
 			"failed to check if the block has been executed: %w",
