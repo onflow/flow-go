@@ -13,15 +13,19 @@ var (
 	VerificationChunkAssignment = customizerFromIndices(0, 2, 0)
 	// ExecutionEnvironment is the customizer for executing blocks
 	ExecutionEnvironment = customizerFromIndices(1)
+	//
+	// clusterLeaderSelectionPrefix is the prefix used for CollectorClusterLeaderSelection
+	clusterLeaderSelectionPrefix = []uint16{0, 0}
 )
 
 // CollectorClusterLeaderSelection returns the indices for the leader selection for the i-th collector cluster
 func CollectorClusterLeaderSelection(clusterIndex uint) []byte {
-	return customizerFromIndices(0, 0, uint16(clusterIndex))
+	indices := append(clusterLeaderSelectionPrefix, uint16(clusterIndex))
+	return customizerFromIndices(indices...)
 }
 
 // customizerFromIndices converts the input indices into a slice of bytes.
-// The implementation ensures there are no output collisions.
+// The function has to be injective (no different indices map to the same customizer)
 //
 // The output is built as a concatenation of indices, each index is encoded over 2 bytes.
 func customizerFromIndices(indices ...uint16) []byte {
