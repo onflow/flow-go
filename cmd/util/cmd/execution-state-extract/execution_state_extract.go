@@ -26,7 +26,6 @@ func extractExecutionState(
 	targetHash flow.StateCommitment,
 	outputDir string,
 	log zerolog.Logger,
-	migrate bool,
 	nWorker int, // number of concurrent worker to migation payloads
 ) error {
 
@@ -80,14 +79,6 @@ func extractExecutionState(
 
 	var migrations []ledger.Migration
 	newState := ledger.State(targetHash)
-
-	if migrate {
-		// add migration here
-		migrations = []ledger.Migration{
-			// the following migration calculate the storage usage and update the storage for each account
-			// mig.MigrateAccountUsage,
-		}
-	}
 
 	migratedState, err := led.ExportCheckpointAt(
 		newState,

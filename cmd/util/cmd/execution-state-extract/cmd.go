@@ -132,12 +132,15 @@ func run(*cobra.Command, []string) {
 		log.Warn().Msgf("--no-report flag is deprecated")
 	}
 
+	if flagNoMigration {
+		log.Warn().Msgf("--no-migration flag is deprecated")
+	}
+
 	err := extractExecutionState(
 		flagExecutionStateDir,
 		stateCommitment,
 		flagOutputDir,
 		log.Logger,
-		!flagNoMigration,
 		flagNWorker,
 	)
 
