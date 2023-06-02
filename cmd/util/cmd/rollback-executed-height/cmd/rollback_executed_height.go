@@ -103,6 +103,13 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("executed height rolled back to %v", flagHeight)
 
+	log.Info().Msgf("triggering RunValueLogGC to reclaim dispaces")
+	err = db.RunValueLogGC(0.25)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("fail to run RunValueLogGC")
+	}
+
+	log.Info().Msgf("finished RunValueLogGC")
 }
 
 // use badger instances directly instead of stroage interfaces so that the interface don't
@@ -199,33 +206,6 @@ func removeExecutionResultsFromHeight(
 
 	log.Info().Msgf("removed height from %v. removed for %v finalized blocks, and %v pending blocks",
 		fromHeight, finalRemoved, pendingRemoved)
-
-	return nil
-}
-
-func work(
-	protoState protocol.State,
-	headers *badger.Headers,
-	transactionResults *badger.TransactionResults,
-	commits *badger.Commits,
-	chunkDataPacks *badger.ChunkDataPacks,
-	results *badger.ExecutionResults,
-	myReceipts *badger.MyExecutionReceipts,
-	events *badger.Events,
-	serviceEvents *badger.ServiceEvents,
-	height uint64,
-) error {
-	head, err := protoState.AtHeight(height).Head()
-	if err != nil {
-		return fmt.Errorf("could not get header at height: %w", err)
-	}
-
-	blockID := head.ID()
-
-	err = removeForBlockID(headers, commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, blockID)
-	if err != nil {
-		return fmt.Errorf("could not remove result for finalized block: %v, %w", blockID, err)
-	}
 
 	return nil
 }
