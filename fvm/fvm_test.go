@@ -2624,11 +2624,11 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 						prepare(signer: AuthAccount) {
 							signer.save("Hello, World!", to: /storage/first)
 							signer.save(["one", "two", "three"], to: /storage/second)
-                            signer.save(B.Bar(), to: /storage/third)
+							signer.save(B.Bar(), to: /storage/third)
 
-                            signer.link<&String>(/private/a, target:/storage/first)
-                            signer.link<&[String]>(/private/b, target:/storage/second)
-                            signer.link<&B.Bar>(/private/c, target:/storage/third)
+							signer.link<&String>(/private/a, target:/storage/first)
+							signer.link<&[String]>(/private/b, target:/storage/second)
+							signer.link<&B.Bar>(/private/c, target:/storage/third)
 						}
 					}`,
 					accounts[0].HexWithPrefix(),
@@ -2641,7 +2641,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				))
 
 				// Iterate stored values
-				runTransaction([]byte(fmt.Sprintf(
+				runTransaction([]byte(
 					`
 					transaction {
 						prepare(account: AuthAccount) {
@@ -2655,7 +2655,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 							assert(total == 2, message:"found ".concat(total.toString()))
 						}
 					}`,
-				)))
+				))
 			},
 		)(t)
 }
