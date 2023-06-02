@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -19,12 +20,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-)
-
-// todo: remove this once https://github.com/onflow/flow/pull/1343 is merged
-const (
-	JSON_CDC_V0 = iota
-	CCF_V0
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")
@@ -663,22 +658,22 @@ func MessagesToEvents(l []*entities.Event) []flow.Event {
 	return events
 }
 
-func MessagesToEventsFromFormat(l []*entities.Event, format int) ([]flow.Event, error) {
+func MessagesToEventsFromVersion(l []*entities.Event, version execproto.EventEncodingVersion) ([]flow.Event, error) {
 	events := make([]flow.Event, len(l))
 	for i, m := range l {
-		event, err := MessageToEventFromFormat(m, format)
+		event, err := MessageToEventFromVersion(m, version)
 		if err != nil {
 			return nil, fmt.Errorf("could not convert event at index %d from format %d: %w",
-				m.EventIndex, format, err)
+				m.EventIndex, version, err)
 		}
 		events[i] = *event
 	}
 	return events, nil
 }
 
-func MessageToEventFromFormat(m *entities.Event, format int) (*flow.Event, error) {
+func MessageToEventFromVersion(m *entities.Event, version execproto.EventEncodingVersion) (*flow.Event, error) {
 	// CCF
-	if format == CCF_V0 {
+	if version == execproto.EventEncodingVersion_CCF_V0 {
 		convertedPayload, err := CcfPayloadToJsonPayload(m.Payload)
 		if err != nil {
 			return nil, fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
@@ -692,11 +687,11 @@ func MessageToEventFromFormat(m *entities.Event, format int) (*flow.Event, error
 		}, nil
 	}
 	// cadence JSON
-	if format == JSON_CDC_V0 {
+	if version == execproto.EventEncodingVersion_JSON_CDC_V0 {
 		je := MessageToEvent(m)
 		return &je, nil
 	}
-	return nil, fmt.Errorf("invalid encoding format %d", format)
+	return nil, fmt.Errorf("invalid encoding format %d", version)
 }
 
 func CcfPayloadToJsonPayload(p []byte) ([]byte, error) {

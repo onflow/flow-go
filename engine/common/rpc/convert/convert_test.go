@@ -5,6 +5,9 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -71,15 +74,33 @@ func TestConvertEvents(t *testing.T) {
 	})
 
 	t.Run("convert event from ccf format", func(t *testing.T) {
-		event := unittest.EventFixture()
+		cadenceValue, err := cadence.NewValue(2)
 	})
 
 	t.Run("convert event from jsoncdc format", func(t *testing.T) {
-
+		cadenceValue, err := cadence.NewValue(2)
 	})
 
 	t.Run("convert payload from ccf to jsoncdc", func(t *testing.T) {
+		// Round trip conversion check
+		cadenceValue, err := cadence.NewValue(2)
+		require.NoError(t, err)
+		ccfPayload, err := ccf.Encode(cadenceValue)
+		require.NoError(t, err)
+		txID := unittest.IdentifierFixture()
+		ccfEvent := unittest.EventFixture(
+			flow.EventAccountCreated, 2, 3, txID, 0)
+		ccfEvent.Payload = ccfPayload
 
+		jsonEvent := unittest.EventFixture(
+			flow.EventAccountCreated, 2, 3, txID, 0)
+		jsonPayload, err := jsoncdc.Encode(cadenceValue)
+		require.NoError(t, err)
+		jsonEvent.Payload = jsonPayload
+
+		res, err := convert.CcfEventToJsonEvent(ccfEvent)
+		require.NoError(t, err)
+		require.Equal(t, jsonEvent, res)
 	})
 }
 

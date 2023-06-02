@@ -410,10 +410,15 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 				return nil, rpc.ConvertStorageError(err)
 			}
 
+			events, err := convert.MessagesToEventsFromVersion(txResult.GetEvents(), execproto.EventEncodingVersion_CCF_V0)
+			if err != nil {
+				return nil, rpc.ConvertError(err, "failed to convert events to message", codes.Internal)
+			}
+
 			results = append(results, &access.TransactionResult{
 				Status:        txStatus,
 				StatusCode:    uint(txResult.GetStatusCode()),
-				Events:        convert.MessagesToEvents(txResult.GetEvents()),
+				Events:        events,
 				ErrorMessage:  txResult.GetErrorMessage(),
 				BlockID:       blockID,
 				TransactionID: txID,
@@ -459,10 +464,15 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			return nil, rpc.ConvertStorageError(err)
 		}
 
+		events, err := convert.MessagesToEventsFromVersion(systemTxResult.GetEvents(), execproto.EventEncodingVersion_CCF_V0)
+		if err != nil {
+			return nil, rpc.ConvertError(err, "failed to convert events to message", codes.Internal)
+		}
+
 		results = append(results, &access.TransactionResult{
 			Status:        systemTxStatus,
 			StatusCode:    uint(systemTxResult.GetStatusCode()),
-			Events:        convert.MessagesToEvents(systemTxResult.GetEvents()),
+			Events:        events,
 			ErrorMessage:  systemTxResult.GetErrorMessage(),
 			BlockID:       blockID,
 			TransactionID: systemTx.ID(),
@@ -510,11 +520,16 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
+	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), execproto.EventEncodingVersion_CCF_V0)
+	if err != nil {
+		return nil, rpc.ConvertError(err, "failed to convert events to message", codes.Internal)
+	}
+
 	// convert to response, cache and return
 	return &access.TransactionResult{
 		Status:       txStatus,
 		StatusCode:   uint(resp.GetStatusCode()),
-		Events:       convert.MessagesToEvents(resp.GetEvents()),
+		Events:       events,
 		ErrorMessage: resp.GetErrorMessage(),
 		BlockID:      blockID,
 		BlockHeight:  block.Header.Height,
@@ -729,7 +744,10 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		return nil, 0, "", err
 	}
 
-	events := convert.MessagesToEvents(resp.GetEvents())
+	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), execproto.EventEncodingVersion_CCF_V0)
+	if err != nil {
+		return nil, 0, "", err
+	}
 
 	return events, resp.GetStatusCode(), resp.GetErrorMessage(), nil
 }
