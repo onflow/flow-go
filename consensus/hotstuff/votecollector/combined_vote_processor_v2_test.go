@@ -944,10 +944,10 @@ func TestReadRandomSourceFromPackedQCV2(t *testing.T) {
 	qc, err := buildQCWithPackerAndSigData(packer, block, blockSigData)
 	require.NoError(t, err)
 
-	randomSource, err := qc.BeaconSignature()
+	randomSource, err := model.BeaconSignature(qc)
 	require.NoError(t, err)
 
-	randomSourceAgain, err := qc.BeaconSignature()
+	randomSourceAgain, err := model.BeaconSignature(qc)
 	require.NoError(t, err)
 
 	// verify the random source is deterministic

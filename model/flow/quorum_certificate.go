@@ -1,11 +1,5 @@
 package flow
 
-import (
-	"fmt"
-
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
-)
-
 // QuorumCertificate represents a quorum certificate for a block proposal as defined in the HotStuff algorithm.
 // A quorum certificate is a collection of votes for a particular block proposal. Valid quorum certificates contain
 // signatures from a super-majority of consensus committee members.
@@ -34,18 +28,6 @@ func (qc *QuorumCertificate) ID() Identifier {
 		return ZeroID
 	}
 	return MakeID(qc)
-}
-
-// BeaconSignature extracts the source of randomness from the QC sigData.
-//
-// The sigData is an RLP encoded structure that is part of QuorumCertificate.
-func (qc *QuorumCertificate) BeaconSignature() ([]byte, error) {
-	// unpack sig data to extract random beacon signature
-	randomBeaconSig, err := model.UnpackRandomBeaconSig(qc.SigData)
-	if err != nil {
-		return nil, fmt.Errorf("could not unpack block signature: %w", err)
-	}
-	return randomBeaconSig, nil
 }
 
 // QuorumCertificateWithSignerIDs is a QuorumCertificate, where the signing nodes are

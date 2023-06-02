@@ -1,6 +1,7 @@
 package inmem
 
 import (
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -56,7 +57,7 @@ func (s Snapshot) Phase() (flow.EpochPhase, error) {
 }
 
 func (s Snapshot) RandomSource() ([]byte, error) {
-	return s.enc.QuorumCertificate.BeaconSignature()
+	return model.BeaconSignature(s.enc.QuorumCertificate)
 }
 
 func (s Snapshot) Epochs() protocol.EpochQuery {
