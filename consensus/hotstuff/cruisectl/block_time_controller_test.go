@@ -638,13 +638,7 @@ func (bs *BlockTimeControllerSuite) Test_vs_PythonSimulation() {
 		proposalTiming := bs.ctl.GetProposalTiming()
 		tpt := proposalTiming.TargetPublicationTime(uint64(v+1), time.Now(), observedBlock.Block.BlockID) // value for `timeViewEntered` should be irrelevant here
 
-		// The python controller implementation has an additional limitation build in, which we implement here in the EventHandler:
-		//  - If the python controller computes a target view duration that is _earlier_ than the block is ready
-		//    (see `ref.observedMinViewTimes`), the python controller returns `observedMinViewTimes[v]`
-		//  - In contrast, our go implementation actually returns a target publication time in the past.
-		//    The necessary adjustment of broadcasting as early as possible is therefor done
 		controllerTargetedViewDuration := tpt.Sub(observedBlock.TimeObserved).Seconds()
-
 		require.InEpsilon(bs.T(), ref.controllerTargetedViewDuration[v], controllerTargetedViewDuration, 1e-5, "implementations deviate for view %d", v) // ideal view time
 
 		observationTime = observationTime.Add(time.Duration(int64(ref.realWorldViewDuration[v] * float64(time.Second))))
