@@ -67,9 +67,14 @@ After a disturbance, we want the controller to drive the system back to a state,
 
 - Simulations have shown that this approach produces *very* stable controller with the intended behaviour.
     
-    **Controller driving  $e := \gamma - \Gamma \,\rightarrow 0$**
+    **Controller driving  $e := \gamma - \Gamma \, \rightarrow 0$**
+    - setting the differential term $K_d=0$, the controller responds as expected with damped oscillatory behaviour
+      to a singular strong disturbance. Setting $K_d=3$ suppresses oscillations and the controller's performance improves as it responds more effectively.  
+
+      ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_029.png)
+      ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_030.png)
     
-    - controller very quickly compensates for minor disturbances and observational noise in a well-behaved system:
+    - controller very quickly compensates for moderate disturbances and observational noise in a well-behaved system:
 
       ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_028.png)
         
@@ -131,7 +136,7 @@ In accordance with this convention, observing the proposal for the last view of 
 The goal of the controller is to drive the system towards an error of zero, i.e. $e[v] \rightarrow 0$. For a [PID controller](https://en.wikipedia.org/wiki/PID_controller), the output $u$ for view $v$ has the form: 
 
 ```math
-u[v] = K_P \cdot e[v]+K_I \cdot \mathcal{I}[v] + K_D \cdot \Delta[v]
+u[v] = K_p \cdot e[v]+K_i \cdot \mathcal{I}[v] + K_d \cdot \Delta[v]
 ```
 
 With error terms (computed from observations)
@@ -145,9 +150,9 @@ With error terms (computed from observations)
 
 and controller parameters (values derived from controller tuning): 
 
-- $K_P$ be the proportional coefficient
-- $K_I$ be the integral coefficient
-- $K_D$ be the derivative coefficient
+- $K_p$ be the proportional coefficient
+- $K_i$ be the integral coefficient
+- $K_d$ be the derivative coefficient
 
 ## Measuring view duration
 
@@ -237,14 +242,14 @@ The following parameters have proven to generate stable controller behaviour ove
 👉 The controller is given by
 
 ```math
-u[v] = K_P \cdot \bar{e}[v]+K_I \cdot \bar{\mathcal{I}}[v] + K_D \cdot \bar{\Delta}[v]
+u[v] = K_p \cdot \bar{e}[v]+K_i \cdot \bar{\mathcal{I}}[v] + K_d \cdot \bar{\Delta}[v]
 ```
 
 with parameters:
 
-- $K_P = 2.0$
-- $K_I = 0.6$
-- $K_D = 3.0$
+- $K_p = 2.0$
+- $K_i = 0.6$
+- $K_d = 3.0$
 - $N_\textnormal{ewma} = 5$, i.e. $\alpha = \frac{1}{N_\textnormal{ewma}} = 0.2$
 - $N_\textnormal{itg} = 50$, i.e.  $\beta = \frac{1}{N_\textnormal{itg}} = 0.02$
     
