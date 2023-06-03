@@ -548,7 +548,7 @@ func (bs *BlockRateControllerSuite) TestMetrics() {
 	require.NoError(bs.T(), err)
 }
 
-// Test_vs_PythonSimulation implements a regression test. We implemented the controller in python
+// Test_vs_PythonSimulation performs a regression test. We implemented the controller in python
 // together with a statistical model for the view duration. We used the python implementation to tune
 // the PID controller parameters which we are using here.
 // In this test, we feed values pre-generated with the python simulation into the Go implementation

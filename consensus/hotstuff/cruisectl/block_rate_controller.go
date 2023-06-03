@@ -337,12 +337,13 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 // It updates the latest ProposalTiming based on the new error.
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
+	view := tb.Block.View
 	// if the controller is disabled, we don't update measurements and instead use a fallback timing
 	if !ctl.config.Enabled.Load() {
 		fallbackDelay := ctl.config.FallbackProposalDelay.Load()
-		ctl.storeProposalTiming(newFallbackTiming(tb.Block.View, tb.TimeObserved, fallbackDelay))
+		ctl.storeProposalTiming(newFallbackTiming(view, tb.TimeObserved, fallbackDelay))
 		ctl.log.Debug().
-			Uint64("cur_view", tb.Block.View).
+			Uint64("cur_view", view).
 			Dur("fallback_proposal_delay", fallbackDelay).
 			Msg("controller is disabled - using fallback timing")
 		return nil
@@ -351,16 +352,23 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	previousProposalTiming := ctl.GetProposalTiming()
 	previousPropErr := ctl.proportionalErr.Value()
 
-	// compute the projected time still needed for the remaining views, assuming that we progress through the remaining views
-	// idealized target view time:
-	view := tb.Block.View
-	tau := ctl.targetViewTime()                        // τ - idealized target view time in units of seconds
-	viewsRemaining := ctl.curEpochFinalView + 1 - view // k[v] - views remaining in current epoch
+	// Compute the projected time still needed for the remaining views, assuming that we progress through the remaining views with
+	// the idealized target view time.
+	// Note the '+1' term in the computation of `viewDurationsRemaining`. This is related to our convention that the epoch begins
+	// (happy path) when observing the first block of the epoch. Only by observing this block, the nodes transition to the first
+	// view of the epoch. Up to that point, the consensus replicas remain in the last view of the previous epoch, in the state of
+	// "having processed the last block of the old epoch and voted for it" (happy path). Replicas remain in this state until they
+	// see a confirmation of the view (either QC or TC for the last view of the previous epoch).
+	// In accordance with this convention, observing the proposal for the last view of an epoch, marks the start of the last view.
+	// By observing the proposal, nodes enter the last view, verify the block, vote for it, the primary aggregates the votes,
+	// constructs the child (for first view of new epoch). The last view of the epoch ends, when the child proposal is published.
+	tau := ctl.targetViewTime()                                // τ - idealized target view time in units of seconds
+	viewDurationsRemaining := ctl.curEpochFinalView + 1 - view // k[v] - views remaining in current epoch
 	durationRemaining := ctl.curEpochTargetEndTime.Sub(tb.TimeObserved)
 
 	// Compute instantaneous error term: e[v] = k[v]·τ - T[v] i.e. the projected difference from target switchover
 	// and update PID controller's error terms. All UNITS in SECOND.
-	instErr := float64(viewsRemaining)*tau - durationRemaining.Seconds()
+	instErr := float64(viewDurationsRemaining)*tau - durationRemaining.Seconds()
 	propErr := ctl.proportionalErr.AddObservation(instErr)
 	itgErr := ctl.integralErr.AddObservation(instErr)
 	drivErr := propErr - previousPropErr
@@ -377,7 +385,7 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 		Uint64("last_observation", previousProposalTiming.ObservationView()).
 		Dur("duration_since_last_observation", tb.TimeObserved.Sub(previousProposalTiming.ObservationTime())).
 		Dur("projected_time_remaining", durationRemaining).
-		Uint64("views_remaining", viewsRemaining).
+		Uint64("view_durations_remaining", viewDurationsRemaining).
 		Float64("inst_err", instErr).
 		Float64("proportional_err", propErr).
 		Float64("integral_err", itgErr).
