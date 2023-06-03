@@ -4,13 +4,14 @@
 
 ## Context
 
-Epochs have a fixed length, measured in views. The actual view rate of the network varies depending on network conditions (eg. load, # of available replicas, etc), which requires periodic manual oversight and adjustment of view rate to maintain consistent epoch timing.
-
-We would like for consensus nodes to observe the actual view rate of the committee, and adjust their proposal speed (by adjusting `block-rate-delay`) accordingly, to target a desired weekly epoch switchover time.
+Epochs have a fixed length, measured in views.
+The actual view rate of the network varies depending on network conditions, e.g. load, number of offline replicas, etc.
+We would like for consensus nodes to observe the actual view rate of the committee, and adjust how quickly they proceed
+through views accordingly, to target a desired weekly epoch switchover time.
 
 ## High-Level Design
 
-Introduce a new component `BlockRateController`. It observes the current view rate and adjusts the actual `block-rate-delay` it introduces when proposing blocks.
+The `BlockTimeController` It observes the current view rate and adjusts the actual `block-rate-delay` it introduces when proposing blocks.
 
 In practice, we are observing the past and present output of a system (view rate), updating a compensation factor (block rate delay) to influence the future output of the system in order to achieve a target system output value.  
 
@@ -35,7 +36,7 @@ The process variable is the variable which:
 - is successively measured by the controller to compute the error $e$
 
 ---
-👉 The `BlockRateController` controls the progression through views, such that the epoch switchover happens at the intended point in time. We define:
+👉 The `BlockTimeController` controls the progression through views, such that the epoch switchover happens at the intended point in time. We define:
 
 - $\gamma = k\cdot \tau_0$ is the remaining epoch duration of a hypothetical ideal system, where *all* remaining $k$ views of the epoch progress with the ideal view time  $\tau_0$.
 - The parameter $\tau_0$ is computed solely based on the Epoch configuration as
@@ -299,7 +300,7 @@ To the extent the delay function is not responsive, this would cause the block r
 
 ### A node has a misconfigured clock
 
-Cap the maximum deviation from the default delay (limits the general impact of error introduced by the `BlockRateController`). The node with misconfigured clock will contribute to the error in a limited way, but as long as the majority of nodes have an accurate clock, they will offset this error. 
+Cap the maximum deviation from the default delay (limits the general impact of error introduced by the `BlockTimeController`). The node with misconfigured clock will contribute to the error in a limited way, but as long as the majority of nodes have an accurate clock, they will offset this error. 
 
 **Assumption:** few enough nodes will have a misconfigured clock, that the effect will be small enough to be easily compensated for by the supermajority of correct nodes.
 

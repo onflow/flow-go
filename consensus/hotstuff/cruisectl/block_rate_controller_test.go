@@ -21,8 +21,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-// BlockRateControllerSuite encapsulates tests for the BlockTimeController.
-type BlockRateControllerSuite struct {
+// BlockTimeControllerSuite encapsulates tests for the BlockTimeController.
+type BlockTimeControllerSuite struct {
 	suite.Suite
 
 	initialView            uint64
@@ -44,12 +44,12 @@ type BlockRateControllerSuite struct {
 	ctl    *BlockTimeController
 }
 
-func TestBlockRateController(t *testing.T) {
-	suite.Run(t, new(BlockRateControllerSuite))
+func TestBlockTimeController(t *testing.T) {
+	suite.Run(t, new(BlockTimeControllerSuite))
 }
 
 // SetupTest initializes mocks and default values.
-func (bs *BlockRateControllerSuite) SetupTest() {
+func (bs *BlockTimeControllerSuite) SetupTest() {
 	bs.config = DefaultConfig()
 	bs.config.Enabled.Store(true)
 	bs.initialView = 0
@@ -60,7 +60,7 @@ func (bs *BlockRateControllerSuite) SetupTest() {
 	setupMocks(bs)
 }
 
-func setupMocks(bs *BlockRateControllerSuite) {
+func setupMocks(bs *BlockTimeControllerSuite) {
 	bs.metrics = *mockmodule.NewCruiseCtlMetrics(bs.T())
 	bs.metrics.On("PIDError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 	bs.metrics.On("TargetProposalDuration", mock.Anything).Maybe()
@@ -93,7 +93,7 @@ func setupMocks(bs *BlockRateControllerSuite) {
 
 // CreateAndStartController creates and starts the BlockTimeController.
 // Should be called only once per test case.
-func (bs *BlockRateControllerSuite) CreateAndStartController() {
+func (bs *BlockTimeControllerSuite) CreateAndStartController() {
 	ctl, err := NewBlockTimeController(unittest.Logger(), &bs.metrics, bs.config, &bs.state, bs.initialView)
 	require.NoError(bs.T(), err)
 	bs.ctl = ctl
@@ -102,13 +102,13 @@ func (bs *BlockRateControllerSuite) CreateAndStartController() {
 }
 
 // StopController stops the BlockTimeController.
-func (bs *BlockRateControllerSuite) StopController() {
+func (bs *BlockTimeControllerSuite) StopController() {
 	bs.cancel()
 	unittest.RequireCloseBefore(bs.T(), bs.ctl.Done(), time.Second, "component did not stop")
 }
 
 // AssertCorrectInitialization checks that the controller is configured as expected after construction.
-func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
+func (bs *BlockTimeControllerSuite) AssertCorrectInitialization() {
 	// at initialization, controller should be set up to release blocks without delay
 	controllerTiming := bs.ctl.GetProposalTiming()
 	now := time.Now().UTC()
@@ -150,7 +150,7 @@ func (bs *BlockRateControllerSuite) AssertCorrectInitialization() {
 
 // SanityCheckSubsequentMeasurements checks that two consecutive states of the BlockTimeController are different or equal and
 // broadly reasonable. It does not assert exact values, because part of the measurements depend on timing in the worker.
-func (bs *BlockRateControllerSuite) SanityCheckSubsequentMeasurements(d1, d2 *controllerStateDigest, expectedEqual bool) {
+func (bs *BlockTimeControllerSuite) SanityCheckSubsequentMeasurements(d1, d2 *controllerStateDigest, expectedEqual bool) {
 	if expectedEqual {
 		// later input should have left state invariant, including the Observation
 		assert.Equal(bs.T(), d1.latestProposalTiming.ObservationTime(), d2.latestProposalTiming.ObservationTime())
@@ -168,7 +168,7 @@ func (bs *BlockRateControllerSuite) SanityCheckSubsequentMeasurements(d1, d2 *co
 }
 
 // PrintMeasurement prints the current state of the controller and the last measurement.
-func (bs *BlockRateControllerSuite) PrintMeasurement(parentBlockId flow.Identifier) {
+func (bs *BlockTimeControllerSuite) PrintMeasurement(parentBlockId flow.Identifier) {
 	ctl := bs.ctl
 	m := ctl.GetProposalTiming()
 	tpt := m.TargetPublicationTime(m.ObservationView()+1, m.ObservationTime(), parentBlockId)
@@ -178,14 +178,14 @@ func (bs *BlockRateControllerSuite) PrintMeasurement(parentBlockId flow.Identifi
 }
 
 // TestStartStop tests that the component can be started and stopped gracefully.
-func (bs *BlockRateControllerSuite) TestStartStop() {
+func (bs *BlockTimeControllerSuite) TestStartStop() {
 	bs.CreateAndStartController()
 	bs.StopController()
 }
 
 // TestInit_EpochStakingPhase tests initializing the component in the EpochStaking phase.
 // Measurement and epoch info should be initialized, next epoch final view should be nil.
-func (bs *BlockRateControllerSuite) TestInit_EpochStakingPhase() {
+func (bs *BlockTimeControllerSuite) TestInit_EpochStakingPhase() {
 	bs.CreateAndStartController()
 	defer bs.StopController()
 	bs.AssertCorrectInitialization()
@@ -193,7 +193,7 @@ func (bs *BlockRateControllerSuite) TestInit_EpochStakingPhase() {
 
 // TestInit_EpochStakingPhase tests initializing the component in the EpochSetup phase.
 // Measurement and epoch info should be initialized, next epoch final view should be set.
-func (bs *BlockRateControllerSuite) TestInit_EpochSetupPhase() {
+func (bs *BlockTimeControllerSuite) TestInit_EpochSetupPhase() {
 	nextEpoch := mockprotocol.NewEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView+100_000, nil)
@@ -206,7 +206,7 @@ func (bs *BlockRateControllerSuite) TestInit_EpochSetupPhase() {
 
 // TestInit_EpochFallbackTriggered tests initializing the component when epoch fallback is triggered.
 // Default GetProposalTiming should be set.
-func (bs *BlockRateControllerSuite) TestInit_EpochFallbackTriggered() {
+func (bs *BlockTimeControllerSuite) TestInit_EpochFallbackTriggered() {
 	bs.epochFallbackTriggered = true
 	bs.CreateAndStartController()
 	defer bs.StopController()
@@ -216,7 +216,7 @@ func (bs *BlockRateControllerSuite) TestInit_EpochFallbackTriggered() {
 // TestEpochFallbackTriggered tests epoch fallback:
 //   - the GetProposalTiming should revert to default
 //   - duplicate events should be no-ops
-func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
+func (bs *BlockTimeControllerSuite) TestEpochFallbackTriggered() {
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
@@ -261,7 +261,7 @@ func (bs *BlockRateControllerSuite) TestEpochFallbackTriggered() {
 
 // TestOnBlockIncorporated_UpdateProposalDelay tests that a new measurement is taken and
 // GetProposalTiming updated upon receiving an OnBlockIncorporated event.
-func (bs *BlockRateControllerSuite) TestOnBlockIncorporated_UpdateProposalDelay() {
+func (bs *BlockTimeControllerSuite) TestOnBlockIncorporated_UpdateProposalDelay() {
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
@@ -298,7 +298,7 @@ func (bs *BlockRateControllerSuite) TestOnBlockIncorporated_UpdateProposalDelay(
 }
 
 // TestEnableDisable tests that the controller responds to enabling and disabling.
-func (bs *BlockRateControllerSuite) TestEnableDisable() {
+func (bs *BlockTimeControllerSuite) TestEnableDisable() {
 	// start in a disabled state
 	err := bs.config.SetEnabled(false)
 	require.NoError(bs.T(), err)
@@ -347,14 +347,14 @@ func (bs *BlockRateControllerSuite) TestEnableDisable() {
 }
 
 // TestOnBlockIncorporated_EpochTransition_Enabled tests epoch transition with controller enabled.
-func (bs *BlockRateControllerSuite) TestOnBlockIncorporated_EpochTransition_Enabled() {
+func (bs *BlockTimeControllerSuite) TestOnBlockIncorporated_EpochTransition_Enabled() {
 	err := bs.ctl.config.SetEnabled(true)
 	require.NoError(bs.T(), err)
 	bs.testOnBlockIncorporated_EpochTransition()
 }
 
 // TestOnBlockIncorporated_EpochTransition_Disabled tests epoch transition with controller disabled.
-func (bs *BlockRateControllerSuite) TestOnBlockIncorporated_EpochTransition_Disabled() {
+func (bs *BlockTimeControllerSuite) TestOnBlockIncorporated_EpochTransition_Disabled() {
 	err := bs.ctl.config.SetEnabled(false)
 	require.NoError(bs.T(), err)
 	bs.testOnBlockIncorporated_EpochTransition()
@@ -362,7 +362,7 @@ func (bs *BlockRateControllerSuite) TestOnBlockIncorporated_EpochTransition_Disa
 
 // testOnBlockIncorporated_EpochTransition tests that a view change into the next epoch
 // updates the local state to reflect the new epoch.
-func (bs *BlockRateControllerSuite) testOnBlockIncorporated_EpochTransition() {
+func (bs *BlockTimeControllerSuite) testOnBlockIncorporated_EpochTransition() {
 	nextEpoch := mockprotocol.NewEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView+100_000, nil)
@@ -386,7 +386,7 @@ func (bs *BlockRateControllerSuite) testOnBlockIncorporated_EpochTransition() {
 }
 
 // TestOnEpochSetupPhaseStarted ensures that the epoch info is updated when the next epoch is set up.
-func (bs *BlockRateControllerSuite) TestOnEpochSetupPhaseStarted() {
+func (bs *BlockTimeControllerSuite) TestOnEpochSetupPhaseStarted() {
 	nextEpoch := mockprotocol.NewEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView+100_000, nil)
@@ -412,7 +412,7 @@ func (bs *BlockRateControllerSuite) TestOnEpochSetupPhaseStarted() {
 // TestProposalDelay_AfterTargetTransitionTime tests the behaviour of the controller
 // when we have passed the target end time for the current epoch.
 // We should approach the min GetProposalTiming (increase view rate as much as possible)
-func (bs *BlockRateControllerSuite) TestProposalDelay_AfterTargetTransitionTime() {
+func (bs *BlockTimeControllerSuite) TestProposalDelay_AfterTargetTransitionTime() {
 	// we are near the end of the epoch in view terms
 	bs.initialView = uint64(float64(bs.curEpochFinalView) * .95)
 	bs.CreateAndStartController()
@@ -444,7 +444,7 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_AfterTargetTransitionTime(
 // projected epoch switchover is LATER than the target switchover time, i.e.
 // we are behind schedule.
 // We should respond by lowering the GetProposalTiming (increasing view rate)
-func (bs *BlockRateControllerSuite) TestProposalDelay_BehindSchedule() {
+func (bs *BlockTimeControllerSuite) TestProposalDelay_BehindSchedule() {
 	// we are 50% of the way through the epoch in view terms
 	bs.initialView = uint64(float64(bs.curEpochFinalView) * .5)
 	bs.CreateAndStartController()
@@ -480,7 +480,7 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_BehindSchedule() {
 // projected epoch switchover is EARLIER than the target switchover time, i.e.
 // we are ahead of schedule.
 // We should respond by increasing the GetProposalTiming (lowering view rate)
-func (bs *BlockRateControllerSuite) TestProposalDelay_AheadOfSchedule() {
+func (bs *BlockTimeControllerSuite) TestProposalDelay_AheadOfSchedule() {
 	// we are 50% of the way through the epoch in view terms
 	bs.initialView = uint64(float64(bs.curEpochFinalView) * .5)
 	bs.CreateAndStartController()
@@ -513,7 +513,7 @@ func (bs *BlockRateControllerSuite) TestProposalDelay_AheadOfSchedule() {
 }
 
 // TestMetrics tests that correct metrics are tracked when expected.
-func (bs *BlockRateControllerSuite) TestMetrics() {
+func (bs *BlockTimeControllerSuite) TestMetrics() {
 	bs.metrics = *mockmodule.NewCruiseCtlMetrics(bs.T())
 	// should set metrics upon initialization
 	bs.metrics.On("PIDError", float64(0), float64(0), float64(0)).Once()
@@ -553,7 +553,7 @@ func (bs *BlockRateControllerSuite) TestMetrics() {
 // the PID controller parameters which we are using here.
 // In this test, we feed values pre-generated with the python simulation into the Go implementation
 // and compare the outputs to the pre-generated outputs from the python controller implementation.
-func (bs *BlockRateControllerSuite) Test_vs_PythonSimulation() {
+func (bs *BlockTimeControllerSuite) Test_vs_PythonSimulation() {
 	// PART 1: setup system to mirror python simulation
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	totalEpochViews := 483000
