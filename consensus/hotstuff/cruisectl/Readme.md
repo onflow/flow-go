@@ -37,7 +37,9 @@ The process variable is the variable which:
 ---
 👉 The `BlockTimeController` controls the progression through views, such that the epoch switchover happens at the intended point in time. We define:
 
-Test: $a \mathrm{<total\,epoch\,time>} b$
+Test: $a \mathrm{<total epoch time>} b$
+Test: $a {\rm total} \, {\rm epoch} \, \rm{time} b$
+Test: $a {\rm total\ epoch\ time} b$
 
 - $\gamma = k\cdot \tau_0$ is the remaining epoch duration of a hypothetical ideal system, where *all* remaining $k$ views of the epoch progress with the ideal view time  $\tau_0$.
 - The parameter $\tau_0$ is computed solely based on the Epoch configuration as
