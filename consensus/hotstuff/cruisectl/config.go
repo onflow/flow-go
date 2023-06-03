@@ -11,7 +11,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		TimingConfig{
 			TargetTransition:      DefaultEpochTransitionTime(),
-			FallbackProposalDelay: atomic.NewDuration(500 * time.Millisecond),
+			FallbackProposalDelay: atomic.NewDuration(250 * time.Millisecond),
 			MinViewDuration:       atomic.NewDuration(600 * time.Millisecond),
 			MaxViewDuration:       atomic.NewDuration(1600 * time.Millisecond),
 			Enabled:               atomic.NewBool(false),
