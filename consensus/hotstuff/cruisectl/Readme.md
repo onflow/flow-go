@@ -240,12 +240,16 @@ For further details about
 In general, there is no bound on the output of the controller output $u$. However, it is important to limit the controller’s influence to keep $u$ within a sensible range.
 
 - upper bound on view duration $\widehat{\tau}[v]$ that we allow the controller to set:
-    
-    The current timeout threshold is set to 2.5s. Therefore, the largest view duration we want to allow the  controller to set is 2.0s. Thereby, approx. 500ms remain for message propagation, voting and constructing the child block, which is already quite short.
+  
+  The current timeout threshold is set to 2.5s. Therefore, the largest view duration we want to allow the  controller to set is 1.6s.
+  Thereby, approx. 900ms remain for message propagation, voting and constructing the child block, which will prevent the controller to drive the node into timeout with high probability. 
     
 - lower bound on the view duration:
     
-    Let $t_\textnormal{p}[v]$ denote the time when the primary for view $v$ has constructed its block proposal. The time difference $t_\textnormal{p}[v] - t[v]$ between the primary entering the view and having its proposal ready is the minimally required time to execute the protocol. The controller can only *delay* broadcasting the block, but it cannot release the block before  $t_\textnormal{p}[v]$ simply because the proposal isn’t ready any earlier. 
+  Let $t_\textnormal{p}[v]$ denote the time when the primary for view $v$ has constructed its block proposal. 
+  The time difference $t_\textnormal{p}[v] - t[v]$ between the primary entering the view and having its proposal
+  ready is the minimally required time to execute the protocol. The controller can only *delay* broadcasting the block,
+  but it cannot release the block before  $t_\textnormal{p}[v]$ simply because the proposal isn’t ready any earlier. 
     
 
 
