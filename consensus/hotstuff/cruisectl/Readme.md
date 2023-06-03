@@ -44,9 +44,9 @@ $\tau_0 := \frac{\mathrm{<total\,epoch\,time>}}{\mathrm{<total\,views\,in\,epoch
 
 The error, which the controller should drive towards zero, is defined as:
 
-$$
+```math
 e := \gamma - \Gamma
-$$
+```
 ---
 
 
@@ -130,9 +130,9 @@ In accordance with this convention, observing the proposal for the last view of 
 
 The goal of the controller is to drive the system towards an error of zero, i.e. $e[v] \rightarrow 0$. For a [PID controller](https://en.wikipedia.org/wiki/PID_controller), the output $u$ for view $v$ has the form: 
 
-$$
+```math
 u[v] = K_P \cdot e[v]+K_I \cdot \mathcal{I}[v] + K_D \cdot \Delta[v]
-$$
+```
 
 With error terms (computed from observations)
 
@@ -167,10 +167,10 @@ Noisy values for $e[v]$ also impact the derivative term $\Delta[v]$ and integral
 
 An established approach for managing noise in observables is to use [exponentially weighted moving average [EWMA]](https://en.wikipedia.org/wiki/Moving_average) instead of the instantaneous values.  Specifically, let $\bar{e}[v]$ denote the EWMA of the instantaneous error, which is computed as follows:
 
-$$
+```math
 \textnormal{initialization: }\quad \bar{e} := 0 \\
 \textnormal{update with instantaneous error\,} e[v]:\quad \bar{e}[v] = \alpha \cdot e[v] + (1-\alpha)\cdot \bar{e}[v-1]
-$$
+```
 
 The parameter $\alpha$ relates to the averaging time window. Let $\alpha \equiv \frac{1}{N_\textnormal{ewma}}$ and consider that the input changes from $x_\textnormal{old}$ to $x_\textnormal{new}$ as a step function. Then $N_\textnormal{ewma}$ is the number of samples required to move the output average about 2/3 of the way from  $x_\textnormal{old}$ to $x_\textnormal{new}$.
 
@@ -180,12 +180,10 @@ see also [Python `Ewma` implementation](https://github.com/dapperlabs/flow-inter
 
 In particular systematic observation bias are a problem, as it leads to a diverging integral term. The commonly adopted approach is to use a ‘leaky integrator’ [[1](https://www.music.mcgill.ca/~gary/307/week2/node4.html), [2](https://engineering.stackexchange.com/questions/29833/limiting-the-integral-to-a-time-window-in-pid-controller)], which we denote as $\bar{\mathcal{I}}[v]$. 
 
-$$
-
+```math
 \textnormal{initialization: }\quad \bar{\mathcal{I}} := 0 \\
 \textnormal{update with instantaneous error\,} e[v]:\quad \bar{\mathcal{I}}[v] = e[v] + (1-\beta)\cdot\bar{\mathcal{I}}[v-1]
-  
-$$
+```
 
 Intuitively, the loss factor $\beta$ relates to the time window of the integrator. A factor of 0 means an infinite time horizon, while $\beta =1$  makes the integrator only memorize the last input. Let  $\beta \equiv \frac{1}{N_\textnormal{itg}}$ and consider a constant input value $x$. Then $N_\textnormal{itg}$ relates to the number of past samples that the integrator remembers: 
 
@@ -198,10 +196,10 @@ see also [Python `LeakyIntegrator` implementation](https://github.com/dapperlabs
 
 Similarly to the proportional term, we apply an EWMA to the differential term and denote the averaged value as $\bar{\Delta}[v]$:
 
-$$
+```math
 \textnormal{initialization: }\quad \bar{\Delta} := 0 \\
 \textnormal{update with instantaneous error\,} e[v]:\quad \bar{\Delta}[v] = \bar{e}[v] - \bar{e}[v-1]
-$$
+```
 
 - derivation of update formula for $\bar{\Delta}[v]$
     
@@ -218,7 +216,7 @@ $$
     
     For the induction step, we assume $\bar{\Delta}[v] = \bar{e}[v] - \bar{e}[v-1]$ holds up to value $v$ and we show validity for $v+1$. Per definition of the EWMA, we can write
     
-    $$
+    ```math
     \begin{aligned}
     \bar{\Delta}[v+1] &= \alpha\underbrace{\Delta[v+1]}_{= e[v+1] - e[v]} + (1-\alpha)\underbrace{\bar{\Delta}[v]}_{\bar{e}[v] - \bar{e}[v-1]}
     \\
@@ -226,7 +224,7 @@ $$
     \\
     &\hspace{250pt}\square
     \end{aligned}
-    $$
+    ```
     
 
 ## Final formula for PID controller
@@ -238,9 +236,9 @@ The following parameters have proven to generate stable controller behaviour ove
 ---
 👉 The controller is given by
 
-$$
+```math
 u[v] = K_P \cdot \bar{e}[v]+K_I \cdot \bar{\mathcal{I}}[v] + K_D \cdot \bar{\Delta}[v]
-$$
+```
 
 with parameters:
 
@@ -252,9 +250,9 @@ with parameters:
     
     The controller output $u[v]$ represents the amount of time by which the controller wishes to deviate from the ideal view duration $\tau_0$. In other words, the duration of view $v$ that the controller wants to set is
     
-    $$
+    ```math
     \widehat{\tau}[v] = \tau_0 - u[v]
-    $$
+    ```
 ---    
 
 
@@ -279,9 +277,9 @@ In general, there is no bound on the output of the controller output $u$. Howeve
 
 👉 Let $\hat{t}[v]$ denote the time when the primary for view $v$ *broadcasts* its proposal. We assign:
 
-$$
+```math
 \hat{t}[v] := \max\big(t[v] +\min(\widehat{\tau}[v],\,2\textnormal{s}),\, t_\textnormal{p}[v]\big) 
-$$
+```
 
 
 
