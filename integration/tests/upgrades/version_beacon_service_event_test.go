@@ -110,7 +110,7 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 		// make sure target height is correct
 		// the height at which the version change will take effect should be after
 		// the current height + the freeze period
-		height := latestFinalized.Height + freezePeriod + 100
+		height := latestFinalized.Height + freezePeriod + 20
 
 		// version 0.0.1
 		// low version to not interfere with other tests

@@ -181,7 +181,7 @@ func NewStopControl(
 	log.Info().Msgf("Created")
 
 	cm := component.NewComponentManagerBuilder()
-	cm.AddWorker(sc.processBlockFinalized)
+	cm.AddWorker(sc.processEvents)
 
 	sc.cm = cm.Build()
 	sc.Component = sc.cm
@@ -200,15 +200,20 @@ func (s *StopControl) BlockFinalized(h *flow.Header) {
 	s.blockFinalizedChan <- h
 }
 
-// processBlockFinalized is a worker that processes block finalized events.
-func (s *StopControl) processBlockFinalized(
+// processEvents is a worker that processes block finalized events.
+func (s *StopControl) processEvents(
 	ctx irrecoverable.SignalerContext,
 	ready component.ReadyFunc,
 ) {
 	ready()
 
-	for h := range s.blockFinalizedChan {
-		s.blockFinalized(ctx, h)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case h := <-s.blockFinalizedChan:
+			s.blockFinalized(ctx, h)
+		}
 	}
 }
 

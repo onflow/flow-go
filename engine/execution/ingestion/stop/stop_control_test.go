@@ -41,7 +41,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		// no stopping has started yet, block below stop height
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
-		sc.ShouldExecuteBlock(header)
+		require.True(t, sc.ShouldExecuteBlock(header))
 
 		stop2 := StopParameters{StopBeforeHeight: 37}
 		err = sc.SetStopParameters(stop2)
@@ -49,11 +49,11 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		// block at stop height, it should be skipped
 		header = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(37))
-		sc.ShouldExecuteBlock(header)
+		require.False(t, sc.ShouldExecuteBlock(header))
 
 		// cannot set new stop height after stopping has started
 		err = sc.SetStopParameters(StopParameters{StopBeforeHeight: 2137})
-		require.Error(t, err)
+		require.ErrorIs(t, err, ErrCannotChangeStop)
 
 		// state did not change
 		require.Equal(t, stop2, sc.GetStopParameters())
@@ -61,7 +61,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 	t.Run("when processing finalized blocks", func(t *testing.T) {
 
-		execState := new(mock.ReadOnlyExecutionState)
+		execState := mock.NewExecutionState(t)
 
 		sc := NewStopControl(
 			unittest.Logger(),
@@ -101,9 +101,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 		require.True(t, sc.IsExecutionStopped())
 
 		err = sc.SetStopParameters(StopParameters{StopBeforeHeight: 2137})
-		require.Error(t, err)
-
-		execState.AssertExpectations(t)
+		require.ErrorIs(t, err, ErrCannotChangeStop)
 	})
 }
 
@@ -111,7 +109,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 // and blocks are finalized before they are executed
 func TestExecutionFallingBehind(t *testing.T) {
 
-	execState := new(mock.ReadOnlyExecutionState)
+	execState := mock.NewExecutionState(t)
 
 	headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 	headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
@@ -148,8 +146,6 @@ func TestExecutionFallingBehind(t *testing.T) {
 	sc.OnBlockExecuted(headerA)
 	sc.OnBlockExecuted(headerB)
 	require.True(t, sc.IsExecutionStopped())
-
-	execState.AssertExpectations(t)
 }
 
 type stopControlMockHeaders struct {
@@ -165,7 +161,7 @@ func (m *stopControlMockHeaders) ByHeight(height uint64) (*flow.Header, error) {
 }
 
 func TestAddStopForPastBlocks(t *testing.T) {
-	execState := new(mock.ReadOnlyExecutionState)
+	execState := mock.NewExecutionState(t)
 
 	headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 	headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
@@ -217,13 +213,10 @@ func TestAddStopForPastBlocks(t *testing.T) {
 	sc.BlockFinalizedForTesting(headerD)
 
 	require.True(t, sc.IsExecutionStopped())
-
-	execState.AssertExpectations(t)
 }
 
 func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
-
-	execState := new(mock.ReadOnlyExecutionState)
+	execState := mock.NewExecutionState(t)
 
 	headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 	headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
@@ -272,13 +265,11 @@ func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
 	sc.OnBlockExecuted(headerA)
 	sc.OnBlockExecuted(headerB)
 	require.True(t, sc.IsExecutionStopped())
-
-	execState.AssertExpectations(t)
 }
 
 func TestStopControlWithVersionControl(t *testing.T) {
 	t.Run("normal case", func(t *testing.T) {
-		execState := new(mock.ReadOnlyExecutionState)
+		execState := mock.NewExecutionState(t)
 		versionBeacons := new(storageMock.VersionBeacons)
 
 		headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
@@ -373,17 +364,14 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		sc.BlockFinalizedForTesting(headerC)
 		// should be stopped as this is height 22 and height 21 is already considered executed
 		require.True(t, sc.IsExecutionStopped())
-
-		execState.AssertExpectations(t)
-		versionBeacons.AssertExpectations(t)
 	})
 
 	t.Run("version boundary removed", func(t *testing.T) {
 
 		// future version boundaries can be removed
 		// in which case they will be missing from the version beacon
-		execState := new(mock.ReadOnlyExecutionState)
-		versionBeacons := new(storageMock.VersionBeacons)
+		execState := mock.NewExecutionState(t)
+		versionBeacons := storageMock.NewVersionBeacons(t)
 
 		headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 		headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
@@ -452,15 +440,13 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		sc.BlockFinalizedForTesting(headerB)
 		require.False(t, sc.IsExecutionStopped())
 		require.False(t, sc.GetStopParameters().Set())
-
-		versionBeacons.AssertExpectations(t)
 	})
 
 	t.Run("manual not cleared by version beacon", func(t *testing.T) {
 		// future version boundaries can be removed
 		// in which case they will be missing from the version beacon
-		execState := new(mock.ReadOnlyExecutionState)
-		versionBeacons := new(storageMock.VersionBeacons)
+		execState := mock.NewExecutionState(t)
+		versionBeacons := storageMock.NewVersionBeacons(t)
 
 		headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 		headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
@@ -531,15 +517,13 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		require.False(t, sc.IsExecutionStopped())
 		// stop is not cleared due to being set manually
 		require.Equal(t, stop, sc.GetStopParameters())
-
-		versionBeacons.AssertExpectations(t)
 	})
 
 	t.Run("version beacon not cleared by manual", func(t *testing.T) {
 		// future version boundaries can be removed
 		// in which case they will be missing from the version beacon
-		execState := new(mock.ReadOnlyExecutionState)
-		versionBeacons := new(storageMock.VersionBeacons)
+		execState := mock.NewExecutionState(t)
+		versionBeacons := storageMock.NewVersionBeacons(t)
 
 		headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 		headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
@@ -593,11 +577,9 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			ShouldCrash:      false,
 		}
 		err := sc.SetStopParameters(stop)
-		require.Error(t, err)
+		require.ErrorIs(t, err, ErrCannotChangeStop)
 		// stop is not cleared due to being set earlier by a version beacon
 		require.Equal(t, vbStop, sc.GetStopParameters())
-
-		versionBeacons.AssertExpectations(t)
 	})
 }
 
@@ -620,7 +602,7 @@ func TestStoppedStateRejectsAllBlocksAndChanged(t *testing.T) {
 
 	// make sure we don't even query executed status if stopped
 	// mock should fail test on any method call
-	execState := new(mock.ReadOnlyExecutionState)
+	execState := mock.NewExecutionState(t)
 
 	sc := NewStopControl(
 		unittest.Logger(),
@@ -637,12 +619,10 @@ func TestStoppedStateRejectsAllBlocksAndChanged(t *testing.T) {
 		StopBeforeHeight: 2137,
 		ShouldCrash:      true,
 	})
-	require.Error(t, err)
+	require.ErrorIs(t, err, ErrCannotChangeStop)
 
 	header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 
 	sc.BlockFinalizedForTesting(header)
 	require.True(t, sc.IsExecutionStopped())
-
-	execState.AssertExpectations(t)
 }
