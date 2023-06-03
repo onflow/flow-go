@@ -37,13 +37,10 @@ The process variable is the variable which:
 ---
 👉 The `BlockTimeController` controls the progression through views, such that the epoch switchover happens at the intended point in time. We define:
 
-Test: $a \mathrm{<total epoch time>} b$
-Test: $a {\rm total} \, {\rm epoch} \, \rm{time} b$
-Test: $a {\rm total\ epoch\ time} b$
-
+- $\gamma = k\cdot \tau_0$ is the remaining epoch duration of a hypothetical ideal system, where *all* remaining $k$ views of the epoch progress with the ideal view time  $\tau_0$.
 - $\gamma = k\cdot \tau_0$ is the remaining epoch duration of a hypothetical ideal system, where *all* remaining $k$ views of the epoch progress with the ideal view time  $\tau_0$.
 - The parameter $\tau_0$ is computed solely based on the Epoch configuration as
-$\tau_0 := \frac{\mathrm{<total\,epoch\,time>}}{\mathrm{<total\,views\,in\,epoch>}}$ (for mainnet 22, Epoch 75, we have $\tau_0 \simeq$  1250ms).
+  $\tau_0 := \frac{<{\rm total\ epoch\ time}>}{<{\rm total\ views\ in\ epoch}>}$ (for mainnet 22, Epoch 75, we have $\tau_0 \simeq$  1250ms).
 - $\Gamma$ is the *actual* time remaining until the desired epoch switchover.
 
 The error, which the controller should drive towards zero, is defined as:
@@ -105,7 +102,7 @@ Each consensus participant runs a local instance of the controller described bel
 
 - $v$ is the node’s current view
 - ideal view time $\tau_0$ is computed solely based on the Epoch configuration:
-$\tau_0 := \frac{\mathrm{<total\,epoch\,time>}}{\mathrm{<total\,views\,in\,epoch>}}$  (for mainnet 22, Epoch 75, we have $\tau_0 \simeq$  1250ms).
+$\tau_0 := \frac{<{\rm total\ epoch\ time}>}{<{\rm total\ views\ in\ epoch}>}$  (for mainnet 22, Epoch 75, we have $\tau_0 \simeq$  1250ms).
 - $t[v]$ is the time the node entered view $v$
 - $F[v]$  is the final view of the current epoch
 - $T[v]$ is the target end time of the current epoch
@@ -123,8 +120,6 @@ Upon observing block `B` with view $v$, the controller updates its internal stat
 Note the '+1' term in the computation of the remaining views $k[v] := F[v] +1 - v$  . This is related to our convention that the epoch begins (happy path) when observing the first block of the epoch. Only by observing this block, the nodes transition to the first view of the epoch. Up to that point, the consensus replicas remain in the last view of the previous epoch, in the state of `having processed the last block of the old epoch and voted for it` (happy path). Replicas remain in this state until they see a confirmation of the view (either QC or TC for the last view of the previous epoch). 
 
 ![](/docs/CruiseControl_BlockTimeController/ViewDurationConvention.png)
-
-[figure source](https://drive.google.com/file/d/1InYpvvle5StJ1_cspOVeJhNPb4CLVTM4/view?usp=share_link)
 
 In accordance with this convention, observing the proposal for the last view of an epoch, marks the start of the last view. By observing the proposal, nodes enter the last view, verify the block, vote for it, the primary aggregates the votes, constructs the child (for first view of new epoch). The last view of the epoch ends, when the child proposal is published.
 
@@ -155,9 +150,7 @@ and controller parameters (values derived from controller tuning):
 
 Each consensus participant observes the error $e[v]$ based on its local view evolution. As the following figure illustrates, the view duration is highly variable on small time scales.
 
-![View rate averaged over last minute, 10 minutes, and 6 hours](Cruise%20Control%20Automated%20Block%20Rate%20&%20Epoch%20Timing%204dbcb0dab1394fc7b91966d7d84ad48d/Untitled.png)
-
-View rate averaged over last minute, 10 minutes, and 6 hours
+![](/docs/CruiseControl_BlockTimeController/ViewRate.png)
 
 Therefore, we expect $e[v]$ to be very variable. Furthermore, note that a node uses its local view transition times as an estimator for the collective behaviour of the entire committee. Therefore, there is also observational noise obfuscating the underlying collective behaviour. Hence, we expect notable noise. 
 
@@ -170,8 +163,10 @@ Noisy values for $e[v]$ also impact the derivative term $\Delta[v]$ and integral
 An established approach for managing noise in observables is to use [exponentially weighted moving average [EWMA]](https://en.wikipedia.org/wiki/Moving_average) instead of the instantaneous values.  Specifically, let $\bar{e}[v]$ denote the EWMA of the instantaneous error, which is computed as follows:
 
 ```math
-\textnormal{initialization: }\quad \bar{e} := 0 \\
-\textnormal{update with instantaneous error\,} e[v]:\quad \bar{e}[v] = \alpha \cdot e[v] + (1-\alpha)\cdot \bar{e}[v-1]
+\eqalign{
+\textnormal{initialization: }\quad \bar{e} :&= 0 \\
+\textnormal{update with instantaneous error\ } e[v]:\quad \bar{e}[v] &= \alpha \cdot e[v] + (1-\alpha)\cdot \bar{e}[v-1]
+}
 ```
 
 The parameter $\alpha$ relates to the averaging time window. Let $\alpha \equiv \frac{1}{N_\textnormal{ewma}}$ and consider that the input changes from $x_\textnormal{old}$ to $x_\textnormal{new}$ as a step function. Then $N_\textnormal{ewma}$ is the number of samples required to move the output average about 2/3 of the way from  $x_\textnormal{old}$ to $x_\textnormal{new}$.
@@ -183,8 +178,10 @@ see also [Python `Ewma` implementation](https://github.com/dapperlabs/flow-inter
 In particular systematic observation bias are a problem, as it leads to a diverging integral term. The commonly adopted approach is to use a ‘leaky integrator’ [[1](https://www.music.mcgill.ca/~gary/307/week2/node4.html), [2](https://engineering.stackexchange.com/questions/29833/limiting-the-integral-to-a-time-window-in-pid-controller)], which we denote as $\bar{\mathcal{I}}[v]$. 
 
 ```math
-\textnormal{initialization: }\quad \bar{\mathcal{I}} := 0 \\
-\textnormal{update with instantaneous error\,} e[v]:\quad \bar{\mathcal{I}}[v] = e[v] + (1-\beta)\cdot\bar{\mathcal{I}}[v-1]
+\eqalign{
+\textnormal{initialization: }\quad \bar{\mathcal{I}} :&= 0 \\
+\textnormal{update with instantaneous error\ } e[v]:\quad \bar{\mathcal{I}}[v] &= e[v] + (1-\beta)\cdot\bar{\mathcal{I}}[v-1]
+}
 ```
 
 Intuitively, the loss factor $\beta$ relates to the time window of the integrator. A factor of 0 means an infinite time horizon, while $\beta =1$  makes the integrator only memorize the last input. Let  $\beta \equiv \frac{1}{N_\textnormal{itg}}$ and consider a constant input value $x$. Then $N_\textnormal{itg}$ relates to the number of past samples that the integrator remembers: 
@@ -199,35 +196,11 @@ see also [Python `LeakyIntegrator` implementation](https://github.com/dapperlabs
 Similarly to the proportional term, we apply an EWMA to the differential term and denote the averaged value as $\bar{\Delta}[v]$:
 
 ```math
-\textnormal{initialization: }\quad \bar{\Delta} := 0 \\
-\textnormal{update with instantaneous error\,} e[v]:\quad \bar{\Delta}[v] = \bar{e}[v] - \bar{e}[v-1]
+\eqalign{
+\textnormal{initialization: }\quad \bar{\Delta} :&= 0 \\
+\textnormal{update with instantaneous error\ } e[v]:\quad \bar{\Delta}[v] &= \bar{e}[v] - \bar{e}[v-1]
+}
 ```
-
-- derivation of update formula for $\bar{\Delta}[v]$
-    
-    We prove this relation by induction. At initialization, we have:
-    
-    - $\bar{\Delta}[0] = \Delta[0] = \bar{e}[0] = e[0] = 0.$
-    
-    Adding the first observation $e[1]$, we obtain
-    
-    - $\bar{e}[1] = \alpha \cdot e[1] + (1-\alpha)\cdot \bar{e}[0] = \alpha \cdot e[1]$
-    - $\bar{\Delta}[1] = \alpha \cdot \underbrace{\Delta[1]}_{=e[1]-e[0] = e[1]} + (1-\alpha)\cdot \bar{\Delta}[0] = \alpha \cdot e[1]$
-    
-    Hence, we can write: $\bar{\Delta}[1] = \bar{e}[1] - \underbrace{\bar{e}[0]}_{=0}$ , which proves the base case. 
-    
-    For the induction step, we assume $\bar{\Delta}[v] = \bar{e}[v] - \bar{e}[v-1]$ holds up to value $v$ and we show validity for $v+1$. Per definition of the EWMA, we can write
-    
-    ```math
-    \begin{aligned}
-    \bar{\Delta}[v+1] &= \alpha\underbrace{\Delta[v+1]}_{= e[v+1] - e[v]} + (1-\alpha)\underbrace{\bar{\Delta}[v]}_{\bar{e}[v] - \bar{e}[v-1]}
-    \\
-    &= \underbrace{\alpha\cdot e[v+1] + (1-\alpha) \bar{e}[v]}_{\bar{e}[v+1]} - \big(\underbrace{\alpha\cdot e[v]  + (1-\alpha) \bar{e}[v-1]}_{\bar{e}[v]}\big)
-    \\
-    &\hspace{250pt}\square
-    \end{aligned}
-    ```
-    
 
 ## Final formula for PID controller
 
@@ -250,11 +223,10 @@ with parameters:
 - $N_\textnormal{ewma} = 5$, i.e. $\alpha = \frac{1}{N_\textnormal{ewma}} = 0.2$
 - $N_\textnormal{itg} = 50$, i.e.  $\beta = \frac{1}{N_\textnormal{itg}} = 0.02$
     
-    The controller output $u[v]$ represents the amount of time by which the controller wishes to deviate from the ideal view duration $\tau_0$. In other words, the duration of view $v$ that the controller wants to set is
-    
-    ```math
-    \widehat{\tau}[v] = \tau_0 - u[v]
-    ```
+The controller output $u[v]$ represents the amount of time by which the controller wishes to deviate from the ideal view duration $\tau_0$. In other words, the duration of view $v$ that the controller wants to set is
+```math
+\widehat{\tau}[v] = \tau_0 - u[v]
+```
 ---    
 
 
@@ -280,7 +252,7 @@ In general, there is no bound on the output of the controller output $u$. Howeve
 👉 Let $\hat{t}[v]$ denote the time when the primary for view $v$ *broadcasts* its proposal. We assign:
 
 ```math
-\hat{t}[v] := \max\big(t[v] +\min(\widehat{\tau}[v],\,2\textnormal{s}),\, t_\textnormal{p}[v]\big) 
+\hat{t}[v] := \max\big(t[v] +\min(\widehat{\tau}[v],\ 2\textnormal{s}),\  t_\textnormal{p}[v]\big) 
 ```
 
 
