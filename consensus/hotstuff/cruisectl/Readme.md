@@ -1,4 +1,4 @@
-# Cruise Control: Automated Block Rate & Epoch Timing
+# Cruise Control: Automated Block Time Adjustment for Precise Epoch Switchover Timing
 
 # Overview
 
@@ -11,11 +11,10 @@ through views accordingly, to target a desired weekly epoch switchover time.
 
 ## High-Level Design
 
-The `BlockTimeController` It observes the current view rate and adjusts the actual `block-rate-delay` it introduces when proposing blocks.
-
-In practice, we are observing the past and present output of a system (view rate), updating a compensation factor (block rate delay) to influence the future output of the system in order to achieve a target system output value.  
-
-A common tool for solving this class of problem is a [PID controller](https://en.wikipedia.org/wiki/PID_controller). The essential idea is to take into account the current error, the rate of change of the error, and the cumulative error, when determining how much compensation to apply. The compensation function $u[v]$ has three terms:
+The `BlockTimeController` observes the current view rate and adjusts the timing when the proposal should be released.
+It is a [PID controller](https://en.wikipedia.org/wiki/PID_controller). The essential idea is to take into account the
+current error, the rate of change of the error, and the cumulative error, when determining how much compensation to apply.
+The compensation function $u[v]$ has three terms:
 
 - $P[v]$ compensates proportionally to the magnitude of the instantaneous error
 - $I[v]$ compensates proportionally to the magnitude of the error and how long it has persisted
@@ -40,7 +39,7 @@ The process variable is the variable which:
 
 - $\gamma = k\cdot \tau_0$ is the remaining epoch duration of a hypothetical ideal system, where *all* remaining $k$ views of the epoch progress with the ideal view time  $\tau_0$.
 - The parameter $\tau_0$ is computed solely based on the Epoch configuration as
-$\tau_0 := \frac{\mathrm{<total~epoch~time>}}{\mathrm{<total~views~in~epoch>}}$ (for mainnet 22, Epoch 75, we have $\tau_0 \simeq$  1250ms).
+$\tau_0 := \frac{\mathrm{<total\,epoch\,time>}}{\mathrm{<total\,views\,in\,epoch>}}$ (for mainnet 22, Epoch 75, we have $\tau_0 \simeq$  1250ms).
 - $\Gamma$ is the *actual* time remaining until the desired epoch switchover.
 
 The error, which the controller should drive towards zero, is defined as:
@@ -68,7 +67,7 @@ After a disturbance, we want the controller to drive the system back to a state,
 
 - Simulations have shown that this approach produces *very* stable controller with the intended behaviour.
     
-    **Controller driving  $e := \gamma - \Gamma ~~\rightarrow 0$**
+    **Controller driving  $e := \gamma - \Gamma \,\rightarrow 0$**
     
     - controller very quickly compensates for minor disturbances and observational noise in a well-behaved system:
 
@@ -104,7 +103,7 @@ Each consensus participant runs a local instance of the controller described bel
 
 - $v$ is the node’s current view
 - ideal view time $\tau_0$ is computed solely based on the Epoch configuration:
-$\tau_0 := \frac{\mathrm{<total~epoch~time>}}{\mathrm{<total~views~in~epoch>}}$  (for mainnet 22, Epoch 75, we have $\tau_0 \simeq$  1250ms).
+$\tau_0 := \frac{\mathrm{<total\,epoch\,time>}}{\mathrm{<total\,views\,in\,epoch>}}$  (for mainnet 22, Epoch 75, we have $\tau_0 \simeq$  1250ms).
 - $t[v]$ is the time the node entered view $v$
 - $F[v]$  is the final view of the current epoch
 - $T[v]$ is the target end time of the current epoch
@@ -170,7 +169,7 @@ An established approach for managing noise in observables is to use [exponential
 
 $$
 \textnormal{initialization: }\quad \bar{e} := 0 \\
-\textnormal{update with instantaneous error~} e[v]:\quad \bar{e}[v] = \alpha \cdot e[v] + (1-\alpha)\cdot \bar{e}[v-1]
+\textnormal{update with instantaneous error\,} e[v]:\quad \bar{e}[v] = \alpha \cdot e[v] + (1-\alpha)\cdot \bar{e}[v-1]
 $$
 
 The parameter $\alpha$ relates to the averaging time window. Let $\alpha \equiv \frac{1}{N_\textnormal{ewma}}$ and consider that the input changes from $x_\textnormal{old}$ to $x_\textnormal{new}$ as a step function. Then $N_\textnormal{ewma}$ is the number of samples required to move the output average about 2/3 of the way from  $x_\textnormal{old}$ to $x_\textnormal{new}$.
@@ -184,7 +183,7 @@ In particular systematic observation bias are a problem, as it leads to a diverg
 $$
 
 \textnormal{initialization: }\quad \bar{\mathcal{I}} := 0 \\
-\textnormal{update with instantaneous error~} e[v]:\quad \bar{\mathcal{I}}[v] = e[v] + (1-\beta)\cdot\bar{\mathcal{I}}[v-1]
+\textnormal{update with instantaneous error\,} e[v]:\quad \bar{\mathcal{I}}[v] = e[v] + (1-\beta)\cdot\bar{\mathcal{I}}[v-1]
   
 $$
 
@@ -201,7 +200,7 @@ Similarly to the proportional term, we apply an EWMA to the differential term an
 
 $$
 \textnormal{initialization: }\quad \bar{\Delta} := 0 \\
-\textnormal{update with instantaneous error~} e[v]:\quad \bar{\Delta}[v] = \bar{e}[v] - \bar{e}[v-1]
+\textnormal{update with instantaneous error\,} e[v]:\quad \bar{\Delta}[v] = \bar{e}[v] - \bar{e}[v-1]
 $$
 
 - derivation of update formula for $\bar{\Delta}[v]$
@@ -281,7 +280,7 @@ In general, there is no bound on the output of the controller output $u$. Howeve
 👉 Let $\hat{t}[v]$ denote the time when the primary for view $v$ *broadcasts* its proposal. We assign:
 
 $$
-\hat{t}[v] := \max\big(t[v] +\min(\widehat{\tau}[v],\,2\textnormal{s}),~ t_\textnormal{p}[v]\big) 
+\hat{t}[v] := \max\big(t[v] +\min(\widehat{\tau}[v],\,2\textnormal{s}),\, t_\textnormal{p}[v]\big) 
 $$
 
 
