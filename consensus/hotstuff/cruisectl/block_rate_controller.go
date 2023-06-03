@@ -41,8 +41,10 @@ type epochInfo struct {
 }
 
 // targetViewTime returns τ[v], the ideal, steady-state view time for the current epoch.
-func (epoch *epochInfo) targetViewTime() time.Duration {
-	return time.Duration(float64(epochLength) / float64(epoch.curEpochFinalView-epoch.curEpochFirstView+1))
+// For numerical stability, we avoid repetitive conversions between seconds and time.Duration.
+// Instead, internally within the controller, we work with float64 in units of seconds.
+func (epoch *epochInfo) targetViewTime() float64 {
+	return epochLength.Seconds() / float64(epoch.curEpochFinalView-epoch.curEpochFirstView+1)
 }
 
 // fractionComplete returns the percentage of views completed of the epoch for the given curView.
@@ -352,7 +354,7 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	// compute the projected time still needed for the remaining views, assuming that we progress through the remaining views
 	// idealized target view time:
 	view := tb.Block.View
-	tau := ctl.targetViewTime().Seconds()              // τ - idealized target view time in units of seconds
+	tau := ctl.targetViewTime()                        // τ - idealized target view time in units of seconds
 	viewsRemaining := ctl.curEpochFinalView + 1 - view // k[v] - views remaining in current epoch
 	durationRemaining := ctl.curEpochTargetEndTime.Sub(tb.TimeObserved)
 
@@ -369,6 +371,7 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	// compute the controller output for this observation
 	unconstrainedBlockTime := time.Duration((tau - u) * float64(time.Second)) // desired time between parent and child block, in units of seconds
 	proposalTiming := newHappyPathBlockTime(tb, unconstrainedBlockTime, ctl.config.TimingConfig)
+	constrainedBlockTime := proposalTiming.ConstrainedBlockTime()
 
 	ctl.log.Debug().
 		Uint64("last_observation", previousProposalTiming.ObservationView()).
@@ -381,7 +384,7 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 		Float64("derivative_err", drivErr).
 		Dur("controller_output", time.Duration(u*float64(time.Second))).
 		Dur("unconstrained_block_time", unconstrainedBlockTime).
-		Dur("constrained_block_time", proposalTiming.ConstrainedBlockTime()).
+		Dur("constrained_block_time", constrainedBlockTime).
 		Msg("measured error upon view change")
 
 	ctl.metrics.PIDError(propErr, itgErr, drivErr)
