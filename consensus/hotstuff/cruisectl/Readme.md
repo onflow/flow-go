@@ -37,6 +37,8 @@ The process variable is the variable which:
 ---
 👉 The `BlockTimeController` controls the progression through views, such that the epoch switchover happens at the intended point in time. We define:
 
+Test: $a \mathrm{<total\,epoch\,time>} b$
+
 - $\gamma = k\cdot \tau_0$ is the remaining epoch duration of a hypothetical ideal system, where *all* remaining $k$ views of the epoch progress with the ideal view time  $\tau_0$.
 - The parameter $\tau_0$ is computed solely based on the Epoch configuration as
 $\tau_0 := \frac{\mathrm{<total\,epoch\,time>}}{\mathrm{<total\,views\,in\,epoch>}}$ (for mainnet 22, Epoch 75, we have $\tau_0 \simeq$  1250ms).
@@ -67,7 +69,7 @@ After a disturbance, we want the controller to drive the system back to a state,
 
 - Simulations have shown that this approach produces *very* stable controller with the intended behaviour.
     
-    **Controller driving  $e := \gamma - \Gamma \, \rightarrow 0$**
+    **Controller driving  $e := \gamma - \Gamma \rightarrow 0$**
     - setting the differential term $K_d=0$, the controller responds as expected with damped oscillatory behaviour
       to a singular strong disturbance. Setting $K_d=3$ suppresses oscillations and the controller's performance improves as it responds more effectively.  
 
@@ -85,14 +87,7 @@ After a disturbance, we want the controller to drive the system back to a state,
     - controller effectively stabilizes system with continued larger disturbances (20% of offline consensus participants) and notable observational noise:
 
       ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_005-0.png)
-        
-    
-    For comparison: **Controller attempting to compensate for disruptions linearly over the course of the remaining epoch**
-    
-    This yields a [bang-bang controller behaviour](https://en.wikipedia.org/wiki/Bang%E2%80%93bang_control), switching abruptly between the two extremes of maximum slowdown and maximum speedup.  
-    
-    ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_005-1.png)
-    
+         
     **References:**
     
     - statistical model for happy-path view durations: [ID controller for ``block-rate-delay``](https://www.notion.so/ID-controller-for-block-rate-delay-cc9c2d9785ac4708a37bb952557b5ef4?pvs=21)
