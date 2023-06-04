@@ -115,6 +115,8 @@ func New(
 					AccountLinkingEnabled: true,
 					// Attachments are enabled everywhere except for Mainnet
 					AttachmentsEnabled: chainID != flow.Mainnet,
+					// Capability Controllers are enabled everywhere except for Mainnet
+					CapabilityControllersEnabled: chainID != flow.Mainnet,
 				},
 			),
 		),

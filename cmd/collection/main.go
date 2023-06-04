@@ -146,6 +146,7 @@ func main() {
 			"adjustment of timeout duration in case of time out event")
 		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures,
 			"number of failed rounds before first timeout increase")
+		// todo rename?
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
 		flags.Uint64Var(&clusterComplianceConfig.SkipNewProposalsThreshold,
@@ -290,7 +291,7 @@ func main() {
 				node.Storage.Headers,
 				finalizer,
 				followerDistributor,
-				node.RootBlock.Header,
+				node.FinalizedRootBlock.Header,
 				node.RootQC,
 				finalized,
 				pending,
@@ -333,13 +334,14 @@ func main() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
-				node.FinalizedHeader,
+				node.FinalizedRootBlock.Header,
 				core,
-				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
+				node.ComplianceConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
+			followerDistributor.AddOnBlockFinalizedConsumer(followerEng.OnFinalizedBlock)
 
 			return followerEng, nil
 		}).
@@ -475,7 +477,7 @@ func main() {
 				node.Metrics.Mempool,
 				node.State,
 				node.Storage.Transactions,
-				modulecompliance.WithSkipNewProposalsThreshold(clusterComplianceConfig.SkipNewProposalsThreshold),
+				clusterComplianceConfig,
 			)
 			if err != nil {
 				return nil, err
@@ -501,7 +503,7 @@ func main() {
 			}
 
 			opts := []consensus.Option{
-				consensus.WithBlockRateDelay(blockRateDelay),
+				consensus.WithStaticProposalDuration(blockRateDelay),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
 				consensus.WithTimeoutAdjustmentFactor(hotstuffTimeoutAdjustmentFactor),
 				consensus.WithHappyPathMaxRoundFailures(hotstuffHappyPathMaxRoundFailures),

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/grpc/status"
 )
 
 // DefaultSendBufferSize is the default buffer size for the subscription's send channel.
@@ -27,12 +28,14 @@ type Subscription interface {
 	// ID returns the unique identifier for this subscription used for logging
 	ID() string
 
-	// Channel returns the channel from which subscriptino data can be read
+	// Channel returns the channel from which subscription data can be read
 	Channel() <-chan interface{}
 
 	// Err returns the error that caused the subscription to fail
 	Err() error
 }
+
+var _ Subscription = (*SubscriptionImpl)(nil)
 
 type SubscriptionImpl struct {
 	id string
@@ -63,7 +66,7 @@ func (sub *SubscriptionImpl) ID() string {
 	return sub.id
 }
 
-// Channel returns the channel from which subscriptino data can be read
+// Channel returns the channel from which subscription data can be read
 func (sub *SubscriptionImpl) Channel() <-chan interface{} {
 	return sub.ch
 }
@@ -105,6 +108,22 @@ func (sub *SubscriptionImpl) Send(ctx context.Context, v interface{}, timeout ti
 	case sub.ch <- v:
 		return nil
 	}
+}
+
+// NewFailedSubscription returns a new subscription that has already failed with the given error and
+// message. This is useful to return an error that occurred during subscription setup.
+func NewFailedSubscription(err error, msg string) *SubscriptionImpl {
+	sub := NewSubscription(0)
+
+	// if error is a grpc error, wrap it to preserve the error code
+	if st, ok := status.FromError(err); ok {
+		sub.Fail(status.Errorf(st.Code(), "%s: %s", msg, st.Message()))
+		return sub
+	}
+
+	// otherwise, return wrap the message normally
+	sub.Fail(fmt.Errorf("%s: %w", msg, err))
+	return sub
 }
 
 var _ Subscription = (*HeightBasedSubscription)(nil)

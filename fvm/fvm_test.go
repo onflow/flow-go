@@ -12,6 +12,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/tests/utils"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -2447,4 +2448,214 @@ func TestAttachments(t *testing.T) {
 	t.Run("attachments disabled", func(t *testing.T) {
 		test(t, false)
 	})
+}
+
+func TestCapabilityControllers(t *testing.T) {
+	test := func(t *testing.T, capabilityControllersEnabled bool) {
+		newVMTest().
+			withBootstrapProcedureOptions().
+			withContextOptions(
+				fvm.WithReusableCadenceRuntimePool(
+					reusableRuntime.NewReusableCadenceRuntimePool(
+						1,
+						runtime.Config{
+							CapabilityControllersEnabled: capabilityControllersEnabled,
+						},
+					),
+				),
+			).
+			run(func(
+				t *testing.T,
+				vm fvm.VM,
+				chain flow.Chain,
+				ctx fvm.Context,
+				snapshotTree snapshot.SnapshotTree,
+			) {
+				txBody := flow.NewTransactionBody().
+					SetScript([]byte(`
+						transaction {
+						  prepare(signer: AuthAccount) {
+							let cap = signer.capabilities.storage.issue<&Int>(/storage/foo)
+							assert(cap.id == 1)
+
+							let cap2 = signer.capabilities.storage.issue<&String>(/storage/bar)
+							assert(cap2.id == 2)
+						  }
+						}
+					`)).
+					SetProposalKey(chain.ServiceAddress(), 0, 0).
+					AddAuthorizer(chain.ServiceAddress()).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+				require.NoError(t, err)
+
+				_, output, err := vm.Run(
+					ctx,
+					fvm.Transaction(txBody, 0),
+					snapshotTree)
+				require.NoError(t, err)
+
+				if capabilityControllersEnabled {
+					require.NoError(t, output.Err)
+				} else {
+					require.Error(t, output.Err)
+					require.ErrorContains(
+						t,
+						output.Err,
+						"`AuthAccount` has no member `capabilities`")
+				}
+			},
+			)(t)
+	}
+
+	t.Run("enabled", func(t *testing.T) {
+		test(t, true)
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		test(t, false)
+	})
+}
+
+func TestStorageIterationWithBrokenValues(t *testing.T) {
+
+	t.Parallel()
+
+	newVMTest().
+		withBootstrapProcedureOptions().
+		withContextOptions(
+			fvm.WithReusableCadenceRuntimePool(
+				reusableRuntime.NewReusableCadenceRuntimePool(
+					1,
+					runtime.Config{
+						AccountLinkingEnabled: true,
+					},
+				),
+			),
+			fvm.WithContractDeploymentRestricted(false),
+		).
+		run(
+			func(
+				t *testing.T,
+				vm fvm.VM,
+				chain flow.Chain,
+				ctx fvm.Context,
+				snapshotTree snapshot.SnapshotTree,
+			) {
+				// Create a private key
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating an account with the provided private key and the root account.
+				snapshotTree, accounts, err := testutil.CreateAccounts(
+					vm,
+					snapshotTree,
+					privateKeys,
+					chain,
+				)
+				require.NoError(t, err)
+
+				contractA := `
+				    pub contract A {
+						pub struct interface Foo{}
+					}
+				`
+
+				updatedContractA := `
+				    pub contract A {
+						pub struct interface Foo{
+							pub fun hello()
+						}
+					}
+				`
+
+				contractB := fmt.Sprintf(`
+				    import A from %s
+				    pub contract B {
+						pub struct Bar : A.Foo {}
+					}`,
+					accounts[0].HexWithPrefix(),
+				)
+
+				var sequenceNumber uint64 = 0
+
+				runTransaction := func(code []byte) {
+					txBody := flow.NewTransactionBody().
+						SetScript(code).
+						SetPayer(chain.ServiceAddress()).
+						SetProposalKey(chain.ServiceAddress(), 0, sequenceNumber).
+						AddAuthorizer(accounts[0])
+
+					_ = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+					_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+
+					executionSnapshot, output, err := vm.Run(
+						ctx,
+						fvm.Transaction(txBody, 0),
+						snapshotTree,
+					)
+					require.NoError(t, err)
+					require.NoError(t, output.Err)
+
+					snapshotTree = snapshotTree.Append(executionSnapshot)
+
+					// increment sequence number
+					sequenceNumber++
+				}
+
+				// Deploy `A`
+				runTransaction(utils.DeploymentTransaction(
+					"A",
+					[]byte(contractA),
+				))
+
+				// Deploy `B`
+				runTransaction(utils.DeploymentTransaction(
+					"B",
+					[]byte(contractB),
+				))
+
+				// Store values, including `B.Bar()`
+				runTransaction([]byte(fmt.Sprintf(
+					`
+					import B from %s
+					transaction {
+						prepare(signer: AuthAccount) {
+							signer.save("Hello, World!", to: /storage/first)
+							signer.save(["one", "two", "three"], to: /storage/second)
+							signer.save(B.Bar(), to: /storage/third)
+
+							signer.link<&String>(/private/a, target:/storage/first)
+							signer.link<&[String]>(/private/b, target:/storage/second)
+							signer.link<&B.Bar>(/private/c, target:/storage/third)
+						}
+					}`,
+					accounts[0].HexWithPrefix(),
+				)))
+
+				// Update `A`, so that `B` is now broken.
+				runTransaction(utils.UpdateTransaction(
+					"A",
+					[]byte(updatedContractA),
+				))
+
+				// Iterate stored values
+				runTransaction([]byte(
+					`
+					transaction {
+						prepare(account: AuthAccount) {
+							var total = 0
+							account.forEachPrivate(fun (path: PrivatePath, type: Type): Bool {
+								account.getCapability<&AnyStruct>(path).borrow()!
+								total = total + 1
+                                return true
+							})
+
+							assert(total == 2, message:"found ".concat(total.toString()))
+						}
+					}`,
+				))
+			},
+		)(t)
 }
