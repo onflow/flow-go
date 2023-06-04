@@ -1,8 +1,10 @@
 package stop
 
 import (
+	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/coreos/go-semver/semver"
 	testifyMock "github.com/stretchr/testify/mock"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 	storageMock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -26,6 +29,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 			nil,
 			nil,
 			nil,
+			&flow.Header{Height: 1},
 			false,
 			false,
 		)
@@ -69,6 +73,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 			nil,
 			nil,
 			nil,
+			&flow.Header{Height: 1},
 			false,
 			false,
 		)
@@ -122,6 +127,7 @@ func TestExecutionFallingBehind(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		&flow.Header{Height: 1},
 		false,
 		false,
 	)
@@ -183,6 +189,7 @@ func TestAddStopForPastBlocks(t *testing.T) {
 		headers,
 		nil,
 		nil,
+		&flow.Header{Height: 1},
 		false,
 		false,
 	)
@@ -238,6 +245,7 @@ func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
 		headers,
 		nil,
 		nil,
+		&flow.Header{Height: 1},
 		false,
 		false,
 	)
@@ -290,6 +298,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
+			&flow.Header{Height: 1},
 			false,
 			false,
 		)
@@ -391,6 +400,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
+			&flow.Header{Height: 1},
 			false,
 			false,
 		)
@@ -466,6 +476,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
+			&flow.Header{Height: 1},
 			false,
 			false,
 		)
@@ -541,6 +552,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 			headers,
 			versionBeacons,
 			semver.New("1.0.0"),
+			&flow.Header{Height: 1},
 			false,
 			false,
 		)
@@ -592,6 +604,7 @@ func TestStartingStopped(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		&flow.Header{Height: 1},
 		true,
 		false,
 	)
@@ -610,6 +623,7 @@ func TestStoppedStateRejectsAllBlocksAndChanged(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		&flow.Header{Height: 1},
 		true,
 		false,
 	)
@@ -625,4 +639,212 @@ func TestStoppedStateRejectsAllBlocksAndChanged(t *testing.T) {
 
 	sc.BlockFinalizedForTesting(header)
 	require.True(t, sc.IsExecutionStopped())
+}
+
+func Test_StopControlWorkers(t *testing.T) {
+
+	t.Run("start and stop, stopped = true", func(t *testing.T) {
+
+		sc := NewStopControl(
+			unittest.Logger(),
+			nil,
+			nil,
+			nil,
+			nil,
+			&flow.Header{Height: 1},
+			true,
+			false,
+		)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		ictx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+		sc.Start(ictx)
+
+		unittest.AssertClosesBefore(t, sc.Ready(), 10*time.Second)
+
+		cancel()
+
+		unittest.AssertClosesBefore(t, sc.Done(), 10*time.Second)
+	})
+
+	t.Run("start and stop, stopped = false", func(t *testing.T) {
+
+		sc := NewStopControl(
+			unittest.Logger(),
+			nil,
+			nil,
+			nil,
+			nil,
+			&flow.Header{Height: 1},
+			false,
+			false,
+		)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		ictx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+		sc.Start(ictx)
+
+		unittest.AssertClosesBefore(t, sc.Ready(), 10*time.Second)
+
+		cancel()
+
+		unittest.AssertClosesBefore(t, sc.Done(), 10*time.Second)
+	})
+
+	t.Run("start as stopped if execution is at version boundary", func(t *testing.T) {
+
+		headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
+		headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
+
+		versionBeacons := storageMock.NewVersionBeacons(t)
+		versionBeacons.On("Highest", headerB.Height).
+			Return(&flow.SealedVersionBeacon{
+				VersionBeacon: unittest.VersionBeaconFixture(
+					unittest.WithBoundaries(
+						flow.VersionBoundary{
+							BlockHeight: headerB.Height,
+							Version:     "2.0.0",
+						},
+					),
+				),
+				SealHeight: 1, // sealed in the past
+			}, nil).
+			Once()
+
+		execState := mock.NewExecutionState(t)
+		execState.On(
+			"StateCommitmentByBlockID",
+			testifyMock.Anything,
+			headerA.ID(),
+		).Return(flow.StateCommitment{}, nil).
+			Once()
+
+		headers := &stopControlMockHeaders{
+			headers: map[uint64]*flow.Header{
+				headerA.Height: headerA,
+				headerB.Height: headerB,
+			},
+		}
+
+		// This is a likely scenario where the node stopped because of a version
+		// boundary but was restarted without being upgraded to the new version.
+		// In this case, the node should start as stopped.
+		sc := NewStopControl(
+			unittest.Logger(),
+			execState,
+			headers,
+			versionBeacons,
+			semver.New("1.0.0"),
+			headerB,
+			false,
+			false,
+		)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		ictx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+		sc.Start(ictx)
+
+		unittest.AssertClosesBefore(t, sc.Ready(), 10*time.Second)
+
+		// should start as stopped
+		require.True(t, sc.IsExecutionStopped())
+		require.Equal(t, StopParameters{
+			StopBeforeHeight: headerB.Height,
+			ShouldCrash:      false,
+		}, sc.GetStopParameters())
+
+		cancel()
+
+		unittest.AssertClosesBefore(t, sc.Done(), 10*time.Second)
+	})
+
+	t.Run("test stopping with block finalized events", func(t *testing.T) {
+
+		headerA := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
+		headerB := unittest.BlockHeaderWithParentFixture(headerA) // 21
+		headerC := unittest.BlockHeaderWithParentFixture(headerB) // 22
+
+		vb := &flow.SealedVersionBeacon{
+			VersionBeacon: unittest.VersionBeaconFixture(
+				unittest.WithBoundaries(
+					flow.VersionBoundary{
+						BlockHeight: headerC.Height,
+						Version:     "2.0.0",
+					},
+				),
+			),
+			SealHeight: 1, // sealed in the past
+		}
+
+		versionBeacons := storageMock.NewVersionBeacons(t)
+		versionBeacons.On("Highest", headerB.Height).
+			Return(vb, nil).
+			Once()
+		versionBeacons.On("Highest", headerC.Height).
+			Return(vb, nil).
+			Once()
+
+		execState := mock.NewExecutionState(t)
+		execState.On(
+			"StateCommitmentByBlockID",
+			testifyMock.Anything,
+			headerB.ID(),
+		).Return(flow.StateCommitment{}, nil).
+			Once()
+
+		headers := &stopControlMockHeaders{
+			headers: map[uint64]*flow.Header{
+				headerA.Height: headerA,
+				headerB.Height: headerB,
+				headerC.Height: headerC,
+			},
+		}
+
+		// The stop is set by a previous version beacon and is in one blocks time.
+		sc := NewStopControl(
+			unittest.Logger(),
+			execState,
+			headers,
+			versionBeacons,
+			semver.New("1.0.0"),
+			headerB,
+			false,
+			false,
+		)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		ictx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+		sc.Start(ictx)
+
+		unittest.AssertClosesBefore(t, sc.Ready(), 10*time.Second)
+
+		require.False(t, sc.IsExecutionStopped())
+		require.Equal(t, StopParameters{
+			StopBeforeHeight: headerC.Height,
+			ShouldCrash:      false,
+		}, sc.GetStopParameters())
+
+		sc.BlockFinalized(headerC)
+
+		done := make(chan struct{})
+		go func() {
+			for !sc.IsExecutionStopped() {
+				<-time.After(100 * time.Millisecond)
+			}
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for stop control to stop execution")
+		}
+
+		cancel()
+		unittest.AssertClosesBefore(t, sc.Done(), 10*time.Second)
+	})
 }

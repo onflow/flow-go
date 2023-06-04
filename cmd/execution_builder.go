@@ -663,12 +663,18 @@ func (exeNode *ExecutionNode) LoadStopControl(
 			Msg("could not set semver version for stop control")
 	}
 
+	latestFinalizedBlock, err := node.State.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest finalized block: %w", err)
+	}
+
 	stopControl := stop.NewStopControl(
 		exeNode.builder.Logger,
 		exeNode.executionState,
 		node.Storage.Headers,
 		node.Storage.VersionBeacons,
 		ver,
+		latestFinalizedBlock,
 		// TODO: rename to exeNode.exeConf.executionStopped to make it more consistent
 		exeNode.exeConf.pauseExecution,
 		true,

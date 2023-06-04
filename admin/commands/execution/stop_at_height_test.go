@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestCommandParsing(t *testing.T) {
@@ -94,6 +95,7 @@ func TestCommandsSetsValues(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		&flow.Header{Height: 1},
 		false,
 		false,
 	)

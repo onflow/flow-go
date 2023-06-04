@@ -209,6 +209,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		headers,
 		nil,
 		nil,
+		&flow.Header{Height: 1},
 		false,
 		false,
 	)
@@ -1586,6 +1587,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 			headers,
 			nil,
 			nil,
+			&flow.Header{Height: 1},
 			false,
 			false,
 		),

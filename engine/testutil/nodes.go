@@ -688,12 +688,16 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	ver, err := build.SemverV2()
 	require.NoError(t, err, "failed to parse semver version from build info")
 
+	latestFinalizedBlock, err := node.State.Final().Head()
+	require.NoError(t, err)
+
 	stopControl := stop.NewStopControl(
 		node.Log,
 		execState,
 		node.Headers,
 		versionBeacons,
 		ver,
+		latestFinalizedBlock,
 		false,
 		true,
 	)

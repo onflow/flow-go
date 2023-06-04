@@ -142,6 +142,7 @@ func NewStopControl(
 	headers StopControlHeaders,
 	versionBeacons storage.VersionBeacons,
 	nodeVersion *semver.Version,
+	latestFinalizedBlock *flow.Header,
 	withStoppedExecution bool,
 	crashOnVersionBoundaryReached bool,
 ) *StopControl {
@@ -182,6 +183,9 @@ func NewStopControl(
 
 	cm := component.NewComponentManagerBuilder()
 	cm.AddWorker(sc.processEvents)
+	cm.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		sc.checkInitialVersionBeacon(ctx, ready, latestFinalizedBlock)
+	})
 
 	sc.cm = cm.Build()
 	sc.Component = sc.cm
@@ -220,6 +224,20 @@ func (s *StopControl) processEvents(
 // BlockFinalizedForTesting is used for testing	only.
 func (s *StopControl) BlockFinalizedForTesting(h *flow.Header) {
 	s.blockFinalized(irrecoverable.MockSignalerContext{}, h)
+}
+
+func (s *StopControl) checkInitialVersionBeacon(
+	ctx irrecoverable.SignalerContext,
+	ready component.ReadyFunc,
+	latestFinalizedBlock *flow.Header,
+) {
+	// component is not ready until we checked the initial version beacon
+	defer ready()
+
+	// the most straightforward way to check it is to simply pretend we just finalized the
+	// last finalized block
+	s.blockFinalized(ctx, latestFinalizedBlock)
+
 }
 
 // IsExecutionStopped returns true is block execution has been stopped
