@@ -701,11 +701,25 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 				event := payload.(cadence.Event)
 
-				require.Equal(t, txFees, event.Fields[0].ToGoValue())
+				var actualTXFees any
+				var actualInclusionEffort any
+				var actualExecutionEffort any
+				for i, f := range event.EventType.Fields {
+					switch f.Identifier {
+					case "amount":
+						actualTXFees = event.Fields[i].ToGoValue()
+					case "executionEffort":
+						actualExecutionEffort = event.Fields[i].ToGoValue()
+					case "inclusionEffort":
+						actualInclusionEffort = event.Fields[i].ToGoValue()
+					}
+				}
+
+				require.Equal(t, txFees, actualTXFees)
 				// Inclusion effort should be equivalent to 1.0 UFix64
-				require.Equal(t, uint64(100_000_000), event.Fields[1].ToGoValue())
+				require.Equal(t, uint64(100_000_000), actualInclusionEffort)
 				// Execution effort should be non-0
-				require.Greater(t, event.Fields[2].ToGoValue(), uint64(0))
+				require.Greater(t, actualExecutionEffort, uint64(0))
 
 			},
 		},
@@ -1433,12 +1447,21 @@ func TestSettingExecutionWeights(t *testing.T) {
 			for _, event := range output.Events {
 				// the fee deduction event should only contain the max gas worth of execution effort.
 				if strings.Contains(string(event.Type), "FlowFees.FeesDeducted") {
-					ev, err := ccf.Decode(nil, event.Payload)
+					v, err := ccf.Decode(nil, event.Payload)
 					require.NoError(t, err)
+
+					ev := v.(cadence.Event)
+					var actualExecutionEffort any
+					for i, f := range ev.Type().(*cadence.EventType).Fields {
+						if f.Identifier == "executionEffort" {
+							actualExecutionEffort = ev.Fields[i].ToGoValue()
+						}
+					}
+
 					require.Equal(
 						t,
 						maxExecutionEffort,
-						ev.(cadence.Event).Fields[2].ToGoValue().(uint64))
+						actualExecutionEffort)
 				}
 			}
 			unittest.EnsureEventsIndexSeq(t, output.Events, chain.ChainID())
