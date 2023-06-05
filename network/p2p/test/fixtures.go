@@ -256,7 +256,7 @@ func WithDHTOptions(opts ...dht.Option) NodeFixtureParameterOption {
 	}
 }
 
-func WithConnectionGater(connGater connmgr.ConnectionGater) NodeFixtureParameterOption {
+func WithConnectionGater(connGater p2p.ConnectionGater) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.ConnGater = connGater
 	}
