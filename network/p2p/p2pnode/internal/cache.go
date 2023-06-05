@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 )
 
 var (
@@ -24,8 +23,6 @@ var (
 type DisallowListCache struct {
 	c *stdmap.Backend
 }
-
-var _ p2pnode.DisallowListCache = (*DisallowListCache)(nil)
 
 // NewDisallowListCache creates a new disallow-list cache. The cache is backed by a stdmap.Backend.
 // Args:
