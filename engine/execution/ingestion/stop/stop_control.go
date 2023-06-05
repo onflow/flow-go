@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/state/protocol"
 	psEvents "github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 )
@@ -43,7 +44,6 @@ type StopControl struct {
 	psEvents.Noop
 	sync.RWMutex
 	component.Component
-	cm *component.ComponentManager
 
 	blockFinalizedChan chan *flow.Header
 
@@ -51,7 +51,7 @@ type StopControl struct {
 	exeState       state.ReadOnlyExecutionState
 	versionBeacons storage.VersionBeacons
 
-	// stopped is true if node should no longer be executing blocs.
+	// stopped is true if node should no longer be executing blocks.
 	stopped bool
 	// stopBoundary is when the node should stop.
 	stopBoundary stopBoundary
@@ -64,6 +64,8 @@ type StopControl struct {
 
 	log zerolog.Logger
 }
+
+var _ protocol.Consumer = (*StopControl)(nil)
 
 var NoStopHeight = uint64(math.MaxUint64)
 
@@ -187,8 +189,7 @@ func NewStopControl(
 		sc.checkInitialVersionBeacon(ctx, ready, latestFinalizedBlock)
 	})
 
-	sc.cm = cm.Build()
-	sc.Component = sc.cm
+	sc.Component = cm.Build()
 
 	// TODO: handle version beacon already indicating a stop
 	// right now the stop will happen on first BlockFinalized
