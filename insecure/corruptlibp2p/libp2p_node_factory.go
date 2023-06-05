@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
 )
 
 // InitCorruptLibp2pNode initializes and returns a corrupt libp2p node that should only be used for BFT testing in
@@ -59,6 +60,7 @@ func InitCorruptLibp2pNode(
 	peerManagerCfg *p2pconfig.PeerManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig,
 	gossipSubCfg *p2pbuilder.GossipSubConfig,
+	disallowListCacheCfg *p2pnode.DisallowListCacheConfig,
 	topicValidatorDisabled,
 	withMessageSigning,
 	withStrictSignatureVerification bool,
@@ -94,7 +96,8 @@ func InitCorruptLibp2pNode(
 		gossipSubCfg,
 		rpcInspectorSuite,
 		p2pbuilder.DefaultResourceManagerConfig(),
-		uniCfg)
+		uniCfg,
+		disallowListCacheCfg)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)

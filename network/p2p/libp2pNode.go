@@ -34,7 +34,7 @@ type LibP2PNode interface {
 	PeerScore
 	// DisallowListNotificationConsumer exposes the disallow list notification consumer API for the node so that
 	// it will be notified when a new disallow list update is distributed.
-	network.DisallowListNotificationConsumer
+	DisallowListNotificationConsumer
 	// Start the libp2p node.
 	Start(ctx irrecoverable.SignalerContext)
 	// Stop terminates the libp2p node.
@@ -112,4 +112,17 @@ type PeerConnections interface {
 	//  * network.ErrIllegalConnectionState if the underlying libp2p host reports connectedness as NotConnected but the connections list
 	// 	  to the peer is not empty. This indicates a bug within libp2p.
 	IsConnected(peerID peer.ID) (bool, error)
+}
+
+// DisallowListNotificationConsumer is an interface for consuming disallow/allow list update notifications.
+type DisallowListNotificationConsumer interface {
+	// OnDisallowListNotification is called when a new disallow list update notification is distributed.
+	// Any error on consuming event must handle internally.
+	// The implementation must be concurrency safe.
+	OnDisallowListNotification(id peer.ID, cause network.DisallowListedCause)
+
+	// OnAllowListNotification is called when a new allow list update notification is distributed.
+	// Any error on consuming event must handle internally.
+	// The implementation must be concurrency safe.
+	OnAllowListNotification(id peer.ID, cause network.DisallowListedCause)
 }

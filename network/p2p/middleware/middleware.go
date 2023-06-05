@@ -107,9 +107,6 @@ type Middleware struct {
 	slashingViolationsConsumer slashing.ViolationsConsumer
 	unicastRateLimiters        *ratelimit.RateLimiters
 	authorizedSenderValidator  *validator.AuthorizedSenderValidator
-	// Cache of temporary disallow-listed peers, when a peer is disallow-listed, the connections to that peer
-	// are closed and further connections are not allowed till the peer is removed from the disallow-list.
-	disallowListedCache DisallowListCache
 }
 
 type OptionFn func(*Middleware)
@@ -141,18 +138,6 @@ func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) OptionFn {
 	}
 }
 
-// DisallowListCacheConfig is the configuration for the disallow-list cache.
-// The disallow-list cache is used to temporarily disallow-list peers.
-type DisallowListCacheConfig struct {
-	// MaxSize is the maximum number of peers that can be disallow-listed at any given time.
-	// When the cache is full, no further new peers can be disallow-listed.
-	// Recommended size is 100 * number of staked nodes.
-	MaxSize uint32
-
-	// Metrics is the HeroCache metrics collector to be used for the disallow-list cache.
-	Metrics module.HeroCacheMetrics
-}
-
 // Config is the configuration for the middleware.
 type Config struct {
 	Logger                     zerolog.Logger
@@ -164,17 +149,12 @@ type Config struct {
 	IdTranslator               p2p.IDTranslator
 	Codec                      network.Codec
 	SlashingViolationsConsumer slashing.ViolationsConsumer
-	DisallowListCacheConfig    *DisallowListCacheConfig
 }
 
 // Validate validates the configuration, and sets default values for any missing fields.
 func (cfg *Config) Validate() {
 	if cfg.UnicastMessageTimeout <= 0 {
 		cfg.UnicastMessageTimeout = DefaultUnicastTimeout
-	}
-
-	if cfg.DisallowListCacheConfig.MaxSize == uint32(0) {
-		cfg.DisallowListCacheConfig.MaxSize = DisallowListCacheSize
 	}
 }
 
@@ -360,11 +340,15 @@ func (m *Middleware) authorizedPeers() peer.IDSlice {
 }
 
 func (m *Middleware) OnDisallowListNotification(notification *network.DisallowListingUpdate) {
-	m.libP2PNode.OnDisallowListNotification(notification)
+	for _, pid := range m.peerIDs(notification.FlowIds) {
+		m.libP2PNode.OnDisallowListNotification(pid, notification.Cause)
+	}
 }
 
 func (m *Middleware) OnAllowListNotification(notification *network.AllowListingUpdate) {
-	m.libP2PNode.OnAllowListNotification(notification)
+	for _, pid := range m.peerIDs(notification.FlowIds) {
+		m.libP2PNode.OnAllowListNotification(pid, notification.Cause)
+	}
 }
 
 // SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous

@@ -16,10 +16,11 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
 )
 
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSubAdapterConfig) (PubSubAdapter, error)
-type CreateNodeFunc func(zerolog.Logger, host.Host, ProtocolPeerCache, PeerManager) LibP2PNode
+type CreateNodeFunc func(zerolog.Logger, host.Host, ProtocolPeerCache, PeerManager, *p2pnode.DisallowListCacheConfig) LibP2PNode
 type GossipSubAdapterConfigFunc func(*BasePubSubAdapterConfig) PubSubAdapterConfig
 
 // GossipSubBuilder provides a builder pattern for creating a GossipSub pubsub system.

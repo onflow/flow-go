@@ -18,12 +18,14 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2pnode/internal"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -62,6 +64,21 @@ type Node struct {
 	pCache           p2p.ProtocolPeerCache
 	peerManager      p2p.PeerManager
 	peerScoreExposer p2p.PeerScoreExposer
+	// Cache of temporary disallow-listed peers, when a peer is disallow-listed, the connections to that peer
+	// are closed and further connections are not allowed till the peer is removed from the disallow-list.
+	disallowListedCache DisallowListCache
+}
+
+// DisallowListCacheConfig is the configuration for the disallow-list cache.
+// The disallow-list cache is used to temporarily disallow-list peers.
+type DisallowListCacheConfig struct {
+	// MaxSize is the maximum number of peers that can be disallow-listed at any given time.
+	// When the cache is full, no further new peers can be disallow-listed.
+	// Recommended size is 100 * number of staked nodes.
+	MaxSize uint32
+
+	// Metrics is the HeroCache metrics collector to be used for the disallow-list cache.
+	Metrics module.HeroCacheMetrics
 }
 
 // NewNode creates a new libp2p node and sets its parameters.
@@ -70,14 +87,20 @@ func NewNode(
 	host host.Host,
 	pCache p2p.ProtocolPeerCache,
 	peerManager p2p.PeerManager,
+	disallowLstCacheCfg *DisallowListCacheConfig,
 ) *Node {
+	lg := logger.With().Str("component", "libp2p-node").Logger()
 	return &Node{
 		host:        host,
-		logger:      logger.With().Str("component", "libp2p-node").Logger(),
+		logger:      lg,
 		topics:      make(map[channels.Topic]p2p.Topic),
 		subs:        make(map[channels.Topic]p2p.Subscription),
 		pCache:      pCache,
 		peerManager: peerManager,
+		disallowListedCache: internal.NewDisallowListCache(
+			disallowLstCacheCfg.MaxSize,
+			logger.With().Str("module", "disallow-list-cache").Logger(),
+			disallowLstCacheCfg.Metrics),
 	}
 }
 
@@ -447,37 +470,34 @@ func (n *Node) SetUnicastManager(uniMgr p2p.UnicastManager) {
 	n.uniMgr = uniMgr
 }
 
-func (n *Node) OnDisallowListNotification(update *flownet.DisallowListingUpdate) {
-	for _, pid := range m.peerIDs(update.FlowIds) {
-		causes, err := m.disallowListedCache.DisallowFor(pid, update.Cause)
-		if err != nil {
-			// returned error is fatal.
-			n.logger.Fatal().Err(err).Str("peer_id", pid.String()).Msg("failed to add peer to disallow list")
-		}
-
-		// TODO: this code should further be refactored to also log the Flow id.
-		n.logger.Warn().
-			Str("peer_id", pid.String()).
-			Str("notification_cause", notification.Cause.String()).
-			Str("causes", fmt.Sprintf("%v", causes)).
-			Msg("peer added to disallow list cache")
-
-		// TODO: technically, adding a peer to the disallow list should also remove its connection (through the peer manager)
-		// hence, this code part can be removed.
-		err = n.RemovePeer(pid)
-		if err != nil {
-			n.logger.Error().Err(err).Str("peer_id", pid.String()).Msg("failed to disconnect from blocklisted peer")
-		}
+func (n *Node) OnDisallowListNotification(peerId peer.ID, cause flownet.DisallowListedCause) {
+	causes, err := n.disallowListedCache.DisallowFor(peerId, cause)
+	if err != nil {
+		// returned error is fatal.
+		n.logger.Fatal().Err(err).Str("peer_id", peerId.String()).Msg("failed to add peer to disallow list")
 	}
+
+	// TODO: this code should further be refactored to also log the Flow id.
+	n.logger.Warn().
+		Str("peer_id", peerId.String()).
+		Str("notification_cause", cause.String()).
+		Str("causes", fmt.Sprintf("%v", causes)).
+		Msg("peer added to disallow list cache")
+
+	// TODO: technically, adding a peer to the disallow list should also remove its connection (through the peer manager)
+	// hence, this code part can be removed.
+	err = n.RemovePeer(peerId)
+	if err != nil {
+		n.logger.Error().Err(err).Str("peer_id", peerId.String()).Msg("failed to disconnect from blocklisted peer")
+	}
+
 }
 
-func (n *Node) OnAllowListNotification(update *flownet.AllowListingUpdate) {
-	for _, pid := range m.peerIDs(notification.FlowIds) {
-		m.disallowListedCache.AllowFor(pid, notification.Cause)
+func (n *Node) OnAllowListNotification(peerId peer.ID, cause flownet.DisallowListedCause) {
+	n.disallowListedCache.AllowFor(peerId, cause)
 
-		m.log.Debug().
-			Str("peer_id", pid.String()).
-			Str("causes", fmt.Sprintf("%v", notification.Cause)).
-			Msg("peer added to disallow list cache")
-	}
+	n.logger.Debug().
+		Str("peer_id", peerId.String()).
+		Str("causes", fmt.Sprintf("%v", cause)).
+		Msg("peer added to disallow list cache")
 }
