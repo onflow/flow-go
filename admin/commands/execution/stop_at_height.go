@@ -37,17 +37,17 @@ func (s *StopAtHeightCommand) Handler(_ context.Context, req *admin.CommandReque
 	sah := req.ValidatorData.(StopAtHeightReq)
 
 	oldParams := s.stopControl.GetStopParameters()
-
-	err := s.stopControl.SetStopParameters(stop.StopParameters{
+	newParams := stop.StopParameters{
 		StopBeforeHeight: sah.height,
 		ShouldCrash:      sah.crash,
-	})
+	}
+
+	err := s.stopControl.SetStopParameters(newParams)
 
 	if err != nil {
 		return nil, err
 	}
 
-	newParams := s.stopControl.GetStopParameters()
 	log.Info().
 		Interface("newParams", newParams).
 		Interface("oldParams", oldParams).
