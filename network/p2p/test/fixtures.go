@@ -181,7 +181,7 @@ type NodeFixtureParameters struct {
 	ConnectionPruning                bool              // peer manager parameter
 	UpdateInterval                   time.Duration     // peer manager parameter
 	PeerProvider                     p2p.PeersProvider // peer manager parameter
-	ConnGater                        connmgr.ConnectionGater
+	ConnGater                        p2p.ConnectionGater
 	ConnManager                      connmgr.ConnManager
 	GossipSubFactory                 p2p.GossipSubFactoryFunc
 	GossipSubConfig                  p2p.GossipSubAdapterConfigFunc

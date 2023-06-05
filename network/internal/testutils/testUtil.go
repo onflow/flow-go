@@ -472,7 +472,7 @@ func withRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) n
 	}
 }
 
-func withConnectionGater(connectionGater connmgr.ConnectionGater) nodeBuilderOption {
+func withConnectionGater(connectionGater p2p.ConnectionGater) nodeBuilderOption {
 	return func(nb p2p.NodeBuilder) {
 		nb.SetConnectionGater(connectionGater)
 	}
