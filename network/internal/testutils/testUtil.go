@@ -220,10 +220,6 @@ func GenerateMiddlewares(t *testing.T,
 			IdTranslator:               translator.NewIdentityProviderIDTranslator(idProviders[i]),
 			Codec:                      codec,
 			SlashingViolationsConsumer: consumer,
-			DisallowListCacheConfig: &middleware.DisallowListCacheConfig{
-				MaxSize: uint32(1000),
-				Metrics: metrics.NewNoopCollector(),
-			},
 		},
 			middleware.WithUnicastRateLimiters(o.unicastRateLimiters),
 			middleware.WithPeerManagerFilters(o.peerManagerFilters))
@@ -506,7 +502,11 @@ func generateLibP2PNode(t *testing.T, logger zerolog.Logger, key crypto.PrivateK
 		unittest.DefaultAddress,
 		key,
 		sporkID,
-		p2pbuilder.DefaultResourceManagerConfig()).
+		p2pbuilder.DefaultResourceManagerConfig(),
+		&p2p.DisallowListCacheConfig{
+			MaxSize: uint32(1000),
+			Metrics: metrics.NewNoopCollector(),
+		}).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t)).
 		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
