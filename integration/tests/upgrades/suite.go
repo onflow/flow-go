@@ -80,7 +80,7 @@ func (s *Suite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(
 			flow.RoleExecution,
-			testnet.WithLogLevel(zerolog.InfoLevel),
+			testnet.WithLogLevel(zerolog.WarnLevel),
 			testnet.WithID(s.exe1ID),
 			testnet.WithAdditionalFlag("--extensive-logging=true"),
 		),
