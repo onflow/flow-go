@@ -9,6 +9,9 @@ package heropool
 
 // TBH I woould decouple lists and poolEntity.
 import (
+	"fmt"
+	"math/rand"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -150,10 +153,10 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 			p.used.tail.setPoolIndex(entityIndex)
 		}
 		/*
-			if !p.used.tail.isUndefined() {
-				// links new entity to the tail
-				p.connect(p.used.tail, entityIndex)
-			}*/
+		   if !p.used.tail.isUndefined() {
+		       // links new entity to the tail
+		       p.connect(p.used.tail, entityIndex)
+		   }*/
 
 		// not sure why here it is incremented as  p.sliceIndexForEntity() couldve evict one element
 		// may be check for ejectedEntity ?
@@ -245,11 +248,12 @@ func (p *Pool) Size() uint32 {
 // getHeads returns entities corresponding to the used and free heads.
 func (p *Pool) getHeads() (*poolEntity, *poolEntity) {
 	var usedHead, freeHead *poolEntity
-	if !p.used.head.isUndefined() {
+
+	if p.used.size != 0 {
 		usedHead = &p.poolEntities[p.used.head.getSliceIndex()]
 	}
 
-	if !p.free.head.isUndefined() {
+	if p.free.size != 0 {
 		freeHead = &p.poolEntities[p.free.head.getSliceIndex()]
 	}
 
@@ -259,11 +263,11 @@ func (p *Pool) getHeads() (*poolEntity, *poolEntity) {
 // getTails returns entities corresponding to the used and free tails.
 func (p *Pool) getTails() (*poolEntity, *poolEntity) {
 	var usedTail, freeTail *poolEntity
-	if !p.used.tail.isUndefined() {
+	if p.used.size != 0 {
 		usedTail = &p.poolEntities[p.used.tail.getSliceIndex()]
 	}
 
-	if !p.free.tail.isUndefined() {
+	if p.free.size != 0 {
 		freeTail = &p.poolEntities[p.free.tail.getSliceIndex()]
 	}
 
@@ -288,14 +292,14 @@ func (p *Pool) invalidateUsedHead() flow.Entity {
 // claimFreeHead moves the free head forward, and returns the slice index of the
 // old free head to host a new entity.
 // TODO update size here
-func (p *Pool) claimFreeHead() EIndex {
+func (p *Pool) claimFreeHead2() EIndex {
 	oldFreeHeadIndex := p.free.head.getSliceIndex()
 	// moves head forward
 	p.free.head = p.poolEntities[oldFreeHeadIndex].node.next
 	// new head should point to an undefined prev,
 	// but we first check if list is not empty, i.e.,
 	// head itself is not undefined.
-	if !p.free.head.isUndefined() {
+	if p.free.size != 0 {
 		p.poolEntities[p.free.head.getSliceIndex()].node.prev.setUndefined()
 	}
 
@@ -309,6 +313,45 @@ func (p *Pool) claimFreeHead() EIndex {
 	// clears pointers of claimed head
 	p.poolEntities[oldFreeHeadIndex].node.next.setUndefined()
 	p.poolEntities[oldFreeHeadIndex].node.prev.setUndefined()
+
+	return oldFreeHeadIndex
+}
+func (p *Pool) claimFreeHead() EIndex {
+	oldFreeHeadIndex := p.free.head.getSliceIndex()
+	// moves head forward
+
+	if p.free.size == 0 {
+		fmt.Println("debug shouldnt happen")
+	}
+
+	if p.free.size == 1 {
+		p.free.size = 0
+	}
+
+	if p.free.size > 1 {
+		p.free.head = p.poolEntities[oldFreeHeadIndex].node.next
+
+	}
+
+	// new head should point to an undefined prev,
+	// but we first check if list is not empty, i.e.,
+	// head itself is not undefined.
+	// irrelevant a heads prev is undefined by convention
+	//if p.free.size != 0 {
+	//  p.poolEntities[p.free.head.getSliceIndex()].node.prev.setUndefined()
+	//}
+
+	// also, we check if the old head and tail are aligned and, if so, update the
+	// tail as well. This happens when we claim the only existing
+	// node of the free list.
+	//same not needed as size set to 0
+	//if p.free.tail.getSliceIndex() == oldFreeHeadIndex {
+	//  p.free.tail.setUndefined()
+	//}
+
+	// clears pointers of claimed head
+	//p.poolEntities[oldFreeHeadIndex].node.next.setUndefined()
+	//p.poolEntities[oldFreeHeadIndex].node.prev.setUndefined()
 
 	return oldFreeHeadIndex
 }
@@ -379,7 +422,7 @@ func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 
 // appendToFreeList appends linked-list node represented by getSliceIndex to tail of free list.
 func (p *Pool) appendToFreeList(sliceIndex EIndex) {
-	if p.free.head.isUndefined() {
+	if p.free.size == 0 {
 		// free list is empty
 		p.free.head.setPoolIndex(sliceIndex)
 		p.free.tail.setPoolIndex(sliceIndex)
@@ -389,6 +432,8 @@ func (p *Pool) appendToFreeList(sliceIndex EIndex) {
 	// appends to the tail, and updates the tail
 	p.connect(p.free.tail, sliceIndex)
 	p.free.tail.setPoolIndex(sliceIndex)
+	// it's gonna be reupdated but its a good practice to maintain size in sync
+	p.free.size++
 }
 
 // isInvalidated returns true if linked-list node represented by getSliceIndex does not contain
