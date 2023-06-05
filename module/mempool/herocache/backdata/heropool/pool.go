@@ -134,8 +134,8 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 		p.poolEntities[entityIndex].id = entityId
 		p.poolEntities[entityIndex].owner = owner
 		//
-		p.poolEntities[entityIndex].node.next.setUndefined()
-		p.poolEntities[entityIndex].node.prev.setUndefined()
+		//p.poolEntities[entityIndex].node.next.setUndefined()
+		//p.poolEntities[entityIndex].node.prev.setUndefined()
 
 		if p.used.size == 0 {
 			// used list is empty, hence setting head of used list to current entityIndex.
@@ -410,8 +410,8 @@ func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 	// invalidates entity and adds it to free entities.
 	p.poolEntities[sliceIndex].id = flow.ZeroID
 	p.poolEntities[sliceIndex].entity = nil
-	p.poolEntities[sliceIndex].node.next.setUndefined()
-	p.poolEntities[sliceIndex].node.prev.setUndefined()
+	//p.poolEntities[sliceIndex].node.next.setUndefined()
+	//p.poolEntities[sliceIndex].node.prev.setUndefined()
 
 	p.appendToFreeList(sliceIndex)
 
