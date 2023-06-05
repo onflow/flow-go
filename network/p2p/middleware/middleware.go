@@ -359,16 +359,6 @@ func (m *Middleware) authorizedPeers() peer.IDSlice {
 	return peerIDs
 }
 
-// GetAllDisallowedListCausesFor returns the list of causes for which the given peer is disallow-listed.
-// Args:
-// - peerID: the peer to check.
-// Returns:
-// - the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
-// an empty list is returned.
-func (m *Middleware) GetAllDisallowedListCausesFor(pid peer.ID) []network.DisallowListedCause {
-	return m.disallowListedCache.GetAllDisallowedListCausesFor(pid)
-}
-
 func (m *Middleware) OnDisallowListNotification(notification *network.DisallowListingUpdate) {
 	for _, pid := range m.peerIDs(notification.FlowIds) {
 		causes, err := m.disallowListedCache.DisallowFor(pid, notification.Cause)

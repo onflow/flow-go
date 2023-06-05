@@ -17,7 +17,6 @@ import (
 // connections, as well as reading & writing to/from the connections.
 type Middleware interface {
 	component.Component
-	DisallowListOracle
 	DisallowListNotificationConsumer
 
 	// SetOverlay sets the overlay used by the middleware. This must be called before the middleware can be Started.
@@ -57,20 +56,6 @@ type Middleware interface {
 	NewPingService(pingProtocol protocol.ID, provider PingInfoProvider) PingService
 
 	IsConnected(nodeID flow.Identifier) (bool, error)
-}
-
-// DisallowListOracle represents the interface that is exposed to the lower-level networking primitives (e.g. libp2p),
-// which allows them to check if a given peer ID is disallowed (by Flow protocol) from connecting to this node.
-// Disallow-listing is considered a temporary measure to prevent malicious nodes from connecting to the network. Hence,
-// the disallow-list status of a peer ID should not be treated as a permanent state.
-type DisallowListOracle interface {
-	// GetAllDisallowedListCausesFor returns the list of causes for which the given peer is disallow-listed.
-	// Args:
-	// - peerID: the peer to check.
-	// Returns:
-	// - the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
-	// an empty list is returned.
-	GetAllDisallowedListCausesFor(peer.ID) []DisallowListedCause
 }
 
 // Overlay represents the interface that middleware uses to interact with the
