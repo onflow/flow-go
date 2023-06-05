@@ -11,7 +11,6 @@ import (
 	"time"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	p2pNetwork "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -312,7 +311,7 @@ type optsConfig struct {
 	networkMetrics                module.NetworkMetrics
 	peerManagerFilters            []p2p.PeerFilter
 	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
-	connectionGater               connmgr.ConnectionGater
+	connectionGater               p2p.ConnectionGater
 	createStreamRetryInterval     time.Duration
 }
 
@@ -359,7 +358,7 @@ func WithUnicastRateLimiters(limiters *ratelimit.RateLimiters) func(*optsConfig)
 	}
 }
 
-func WithConnectionGater(connectionGater connmgr.ConnectionGater) func(*optsConfig) {
+func WithConnectionGater(connectionGater p2p.ConnectionGater) func(*optsConfig) {
 	return func(o *optsConfig) {
 		o.connectionGater = connectionGater
 	}
@@ -591,7 +590,7 @@ func NewResourceManager(t *testing.T) p2pNetwork.ResourceManager {
 }
 
 // NewConnectionGater creates a new connection gater for testing with given allow listing filter.
-func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.PeerFilter) connmgr.ConnectionGater {
+func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.PeerFilter) p2p.ConnectionGater {
 	filters := []p2p.PeerFilter{allowListFilter}
 	return connection.NewConnGater(unittest.Logger(),
 		idProvider,
