@@ -21,6 +21,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
+	"github.com/onflow/flow-go/engine/execution/ingestion/finalized_and_executed"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	uploadermock "github.com/onflow/flow-go/engine/execution/ingestion/uploader/mock"
@@ -32,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mocks"
@@ -107,24 +109,25 @@ func (es *mockExecutionState) ExecuteBlock(t *testing.T, block *flow.Block) {
 }
 
 type testingContext struct {
-	t                   *testing.T
-	engine              *Engine
-	headers             *storage.MockHeaders
-	blocks              *storage.MockBlocks
-	collections         *storage.MockCollections
-	state               *protocol.State
-	conduit             *mocknetwork.Conduit
-	collectionConduit   *mocknetwork.Conduit
-	computationManager  *computation.ComputationManager
-	providerEngine      *provider.ProviderEngine
-	executionState      *stateMock.ExecutionState
-	snapshot            *protocol.Snapshot
-	identity            *flow.Identity
-	broadcastedReceipts map[flow.Identifier]*flow.ExecutionReceipt
-	collectionRequester *module.MockRequester
-	identities          flow.IdentityList
-	stopControl         *stop.StopControl
-	uploadMgr           *uploader.Manager
+	t                    *testing.T
+	engine               *Engine
+	headers              *storage.MockHeaders
+	blocks               *storage.MockBlocks
+	collections          *storage.MockCollections
+	state                *protocol.State
+	conduit              *mocknetwork.Conduit
+	collectionConduit    *mocknetwork.Conduit
+	computationManager   *computation.ComputationManager
+	providerEngine       *provider.ProviderEngine
+	executionState       *stateMock.ExecutionState
+	snapshot             *protocol.Snapshot
+	identity             *flow.Identity
+	broadcastedReceipts  map[flow.Identifier]*flow.ExecutionReceipt
+	collectionRequester  *module.MockRequester
+	identities           flow.IdentityList
+	stopControl          *stop.StopControl
+	finalizedAndExecuted *finalized_and_executed.Distributor
+	uploadMgr            *uploader.Manager
 
 	mu *sync.Mutex
 }
@@ -203,16 +206,26 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
-	stopControl := stop.NewStopControl(
-		zerolog.Nop(),
+	faeDistributor := finalized_and_executed.NewDistributor(
+		log,
+		&flow.Header{},
 		executionState,
 		headers,
+		finalized_and_executed.DefaultDistributorConfig,
+	)
+	faeDistributor.Start(irrecoverable.NewMockSignalerContext(t, context.Background()))
+
+	stopControl := stop.NewStopControl(
+		zerolog.Nop(),
 		nil,
 		nil,
-		&flow.Header{Height: 1},
+		&flow.Header{},
 		false,
 		false,
 	)
+	stopControl.Start(irrecoverable.NewMockSignalerContext(t, context.Background()))
+
+	faeDistributor.AddConsumer(stopControl)
 
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
@@ -238,28 +251,30 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		nil,
 		uploadMgr,
 		stopControl,
+		faeDistributor,
 	)
 	require.NoError(t, err)
 
 	f(testingContext{
-		t:                   t,
-		engine:              engine,
-		headers:             headers,
-		blocks:              blocks,
-		collections:         collections,
-		state:               protocolState,
-		collectionRequester: request,
-		conduit:             conduit,
-		collectionConduit:   collectionConduit,
-		computationManager:  computationManager,
-		providerEngine:      providerEngine,
-		executionState:      executionState,
-		snapshot:            snapshot,
-		identity:            myIdentity,
-		broadcastedReceipts: make(map[flow.Identifier]*flow.ExecutionReceipt),
-		identities:          identityList,
-		uploadMgr:           uploadMgr,
-		stopControl:         stopControl,
+		t:                    t,
+		engine:               engine,
+		headers:              headers,
+		blocks:               blocks,
+		collections:          collections,
+		state:                protocolState,
+		collectionRequester:  request,
+		conduit:              conduit,
+		collectionConduit:    collectionConduit,
+		computationManager:   computationManager,
+		providerEngine:       providerEngine,
+		executionState:       executionState,
+		snapshot:             snapshot,
+		identity:             myIdentity,
+		broadcastedReceipts:  make(map[flow.Identifier]*flow.ExecutionReceipt),
+		identities:           identityList,
+		uploadMgr:            uploadMgr,
+		stopControl:          stopControl,
+		finalizedAndExecuted: faeDistributor,
 
 		mu: &sync.Mutex{},
 	})
@@ -1038,6 +1053,7 @@ func TestStopAtHeight(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
 		blockSealed := unittest.BlockHeaderFixture()
+		ctx.finalizedAndExecuted.SetHighestFinalizedAndExecutedBlockForTestingOnly(blockSealed)
 
 		blocks := make(map[string]*entity.ExecutableBlock)
 		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, blockSealed, unittest.StateCommitmentPointerFixture())
@@ -1047,7 +1063,7 @@ func TestStopAtHeight(t *testing.T) {
 		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["B"].Block.Header, blocks["A"].StartState)
 		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header, blocks["A"].StartState)
 
-		// stop at block C
+		// stop at block B
 		err := ctx.stopControl.SetStopParameters(stop.StopParameters{
 			StopBeforeHeight: blockSealed.Height + 3,
 		})
@@ -1071,6 +1087,7 @@ func TestStopAtHeight(t *testing.T) {
 
 		wg := sync.WaitGroup{}
 		onPersisted := func(blockID flow.Identifier, commit flow.StateCommitment) {
+
 			wg.Done()
 		}
 
@@ -1099,6 +1116,9 @@ func TestStopAtHeight(t *testing.T) {
 		assert.False(t, ctx.stopControl.IsExecutionStopped())
 
 		wg.Add(1)
+		// finalizedAndExecutedDistributor will use this to check if A was already
+		// finalized. It was not at this point.
+		ctx.headers.EXPECT().ByHeight(blocks["A"].Block.Header.Height).Return(nil, storageerr.ErrNotFound)
 		ctx.engine.BlockProcessable(blocks["A"].Block.Header, nil)
 		wg.Add(1)
 		ctx.engine.BlockProcessable(blocks["B"].Block.Header, nil)
@@ -1112,14 +1132,27 @@ func TestStopAtHeight(t *testing.T) {
 		// we don't pause until a block has been finalized
 		assert.False(t, ctx.stopControl.IsExecutionStopped())
 
-		ctx.stopControl.BlockFinalizedForTesting(blocks["A"].Block.Header)
-		ctx.stopControl.BlockFinalizedForTesting(blocks["B"].Block.Header)
+		ctx.finalizedAndExecuted.BlockFinalized(blocks["A"].Block.Header)
+		ctx.finalizedAndExecuted.BlockFinalized(blocks["B"].Block.Header)
 
 		assert.False(t, ctx.stopControl.IsExecutionStopped())
-		ctx.stopControl.BlockFinalizedForTesting(blocks["C"].Block.Header)
-		assert.True(t, ctx.stopControl.IsExecutionStopped())
+		ctx.finalizedAndExecuted.BlockFinalized(blocks["C"].Block.Header)
 
-		ctx.stopControl.BlockFinalizedForTesting(blocks["D"].Block.Header)
+		done := make(chan struct{})
+		go func() {
+			for !ctx.stopControl.IsExecutionStopped() {
+				time.Sleep(10 * time.Millisecond)
+			}
+			close(done)
+		}()
+
+		select {
+		case <-time.After(1 * time.Second):
+			t.Fatal("timed out waiting for stop")
+		case <-done:
+		}
+
+		ctx.finalizedAndExecuted.BlockFinalized(blocks["D"].Block.Header)
 
 		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		assert.False(t, more)
@@ -1155,124 +1188,6 @@ func TestStopAtHeight(t *testing.T) {
 			mock.Anything,
 			mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
 				return eb.ID() == blocks["D"].ID()
-			}),
-			mock.Anything)
-	})
-}
-
-// TestStopAtHeightRaceFinalization test a possible race condition which happens
-// when block at stop height N is finalized while N-1 is being executed.
-// If execution finishes exactly between finalization checking execution state and
-// setting block ID to crash, it's possible to miss and never actually stop the EN
-func TestStopAtHeightRaceFinalization(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
-
-		blockSealed := unittest.BlockHeaderFixture()
-
-		blocks := make(map[string]*entity.ExecutableBlock)
-		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, blockSealed, unittest.StateCommitmentPointerFixture())
-		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header, nil)
-		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["B"].Block.Header, nil)
-
-		// stop at block B, so B-1 (A) will be last executed
-		err := ctx.stopControl.SetStopParameters(stop.StopParameters{
-			StopBeforeHeight: blocks["B"].Height(),
-		})
-		require.NoError(t, err)
-
-		// log the blocks, so that we can link the block ID in the log with the blocks in tests
-		logBlocks(blocks)
-
-		commits := make(map[flow.Identifier]flow.StateCommitment)
-
-		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blocks["A"].Block.Header.ParentID).Return(
-			*blocks["A"].StartState, nil,
-		)
-
-		// make sure the seal height won't trigger state syncing, so that all blocks
-		// will be executed.
-		ctx.mockHasWeightAtBlockID(blocks["A"].ID(), true)
-		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(blockSealed, nil)
-		ctx.mockSnapshot(blocks["A"].Block.Header, unittest.IdentityListFixture(1))
-
-		executionWg := sync.WaitGroup{}
-		onPersisted := func(blockID flow.Identifier, commit flow.StateCommitment) {
-			executionWg.Done()
-		}
-
-		ctx.blocks.EXPECT().ByID(blocks["A"].ID()).Return(blocks["A"].Block, nil)
-
-		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blocks["A"].ID()).Return(nil, storageerr.ErrNotFound).Once()
-
-		// second call should come from finalization handler, which should wait for execution to finish before returning.
-		// This way we simulate possible race condition when block execution finishes exactly in the middle of finalization handler
-		// setting stopping blockID
-		finalizationWg := sync.WaitGroup{}
-		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blocks["A"].ID()).Run(func(args mock.Arguments) {
-			executionWg.Wait()
-			finalizationWg.Done()
-		}).Return(nil, storageerr.ErrNotFound).Once()
-
-		// second call from finalization handler, third overall
-		ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blocks["A"].ID()).
-			Return(flow.StateCommitment{}, nil).Maybe()
-
-		ctx.assertSuccessfulBlockComputation(
-			commits,
-			onPersisted,
-			blocks["A"],
-			unittest.IdentifierFixture(),
-			true,
-			*blocks["A"].StartState,
-			nil)
-
-		assert.False(t, ctx.stopControl.IsExecutionStopped())
-
-		executionWg.Add(1)
-		ctx.engine.BlockProcessable(blocks["A"].Block.Header, nil)
-		ctx.engine.BlockProcessable(blocks["B"].Block.Header, nil)
-
-		assert.False(t, ctx.stopControl.IsExecutionStopped())
-
-		finalizationWg.Add(1)
-		ctx.stopControl.BlockFinalizedForTesting(blocks["B"].Block.Header)
-
-		finalizationWg.Wait()
-		executionWg.Wait()
-
-		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
-		assert.False(t, more)
-
-		assert.True(t, ctx.stopControl.IsExecutionStopped())
-
-		var ok bool
-
-		// make sure B and C were not executed
-		_, ok = commits[blocks["A"].ID()]
-		require.True(t, ok)
-		_, ok = commits[blocks["B"].ID()]
-		require.False(t, ok)
-		_, ok = commits[blocks["C"].ID()]
-		require.False(t, ok)
-
-		ctx.computationManager.AssertNotCalled(
-			t,
-			"ComputeBlock",
-			mock.Anything,
-			mock.Anything,
-			mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
-				return eb.ID() == blocks["B"].ID()
-			}),
-			mock.Anything)
-
-		ctx.computationManager.AssertNotCalled(
-			t,
-			"ComputeBlock",
-			mock.Anything,
-			mock.Anything,
-			mock.MatchedBy(func(eb *entity.ExecutableBlock) bool {
-				return eb.ID() == blocks["C"].ID()
 			}),
 			mock.Anything)
 	})
@@ -1584,12 +1499,17 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		stop.NewStopControl(
 			zerolog.Nop(),
 			nil,
-			headers,
 			nil,
-			nil,
-			&flow.Header{Height: 1},
+			&flow.Header{},
 			false,
 			false,
+		),
+		finalized_and_executed.NewDistributor(
+			zerolog.Nop(),
+			nil,
+			nil,
+			nil,
+			finalized_and_executed.DefaultDistributorConfig,
 		),
 	)
 

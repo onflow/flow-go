@@ -46,6 +46,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/ingestion/finalized_and_executed"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -110,38 +111,39 @@ type ExecutionNode struct {
 	builder *FlowNodeBuilder // This is needed for accessing the ShutdownFunc
 	exeConf *ExecutionConfig
 
-	collector              module.ExecutionMetrics
-	executionState         state.ExecutionState
-	followerState          protocol.FollowerState
-	committee              hotstuff.DynamicCommittee
-	ledgerStorage          *ledger.Ledger
-	events                 *storage.Events
-	serviceEvents          *storage.ServiceEvents
-	txResults              *storage.TransactionResults
-	results                *storage.ExecutionResults
-	myReceipts             *storage.MyExecutionReceipts
-	providerEngine         *exeprovider.Engine
-	checkerEng             *checker.Engine
-	syncCore               *chainsync.Core
-	syncEngine             *synchronization.Engine
-	followerCore           *hotstuff.FollowerLoop        // follower hotstuff logic
-	followerEng            *followereng.ComplianceEngine // to sync blocks from consensus nodes
-	computationManager     *computation.Manager
-	collectionRequester    *requester.Engine
-	ingestionEng           *ingestion.Engine
-	followerDistributor    *pubsub.FollowerDistributor
-	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
-	diskWAL                *wal.DiskWAL
-	blockDataUploader      *uploader.Manager
-	executionDataStore     execution_data.ExecutionDataStore
-	toTriggerCheckpoint    *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
-	stopControl            *stop.StopControl // stop the node at given block height
-	executionDataDatastore *badger.Datastore
-	executionDataPruner    *pruner.Pruner
-	executionDataBlobstore blobs.Blobstore
-	executionDataTracker   tracker.Storage
-	blobService            network.BlobService
-	blobserviceDependable  *module.ProxiedReadyDoneAware
+	collector                       module.ExecutionMetrics
+	executionState                  state.ExecutionState
+	followerState                   protocol.FollowerState
+	committee                       hotstuff.DynamicCommittee
+	ledgerStorage                   *ledger.Ledger
+	events                          *storage.Events
+	serviceEvents                   *storage.ServiceEvents
+	txResults                       *storage.TransactionResults
+	results                         *storage.ExecutionResults
+	myReceipts                      *storage.MyExecutionReceipts
+	providerEngine                  *exeprovider.Engine
+	checkerEng                      *checker.Engine
+	syncCore                        *chainsync.Core
+	syncEngine                      *synchronization.Engine
+	followerCore                    *hotstuff.FollowerLoop        // follower hotstuff logic
+	followerEng                     *followereng.ComplianceEngine // to sync blocks from consensus nodes
+	computationManager              *computation.Manager
+	collectionRequester             *requester.Engine
+	ingestionEng                    *ingestion.Engine
+	followerDistributor             *pubsub.FollowerDistributor
+	checkAuthorizedAtBlock          func(blockID flow.Identifier) (bool, error)
+	diskWAL                         *wal.DiskWAL
+	blockDataUploader               *uploader.Manager
+	executionDataStore              execution_data.ExecutionDataStore
+	toTriggerCheckpoint             *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	stopControl                     *stop.StopControl // stop the node at given block height
+	finalizedAndExecutedDistributor *finalized_and_executed.Distributor
+	executionDataDatastore          *badger.Datastore
+	executionDataPruner             *pruner.Pruner
+	executionDataBlobstore          blobs.Blobstore
+	executionDataTracker            tracker.Storage
+	blobService                     network.BlobService
+	blobserviceDependable           *module.ProxiedReadyDoneAware
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
@@ -188,6 +190,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		// I prefer to use dummy component now and keep the bootstrapping steps properly separated,
 		// so it will be easier to follow and refactor later
 		Component("execution state", exeNode.LoadExecutionState).
+		Component("finalized and executed distributor", exeNode.LoadFinalizedAndExecutedDistributor).
 		Component("stop control", exeNode.LoadStopControl).
 		Component("execution state ledger WAL compactor", exeNode.LoadExecutionStateLedgerWALCompactor).
 		Component("execution data pruner", exeNode.LoadExecutionDataPruner).
@@ -646,6 +649,60 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	return &module.NoopReadyDoneAware{}, nil
 }
 
+func (exeNode *ExecutionNode) LoadFinalizedAndExecutedDistributor(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	finalizedHeader, err := node.State.Final().Head()
+	if err != nil {
+		err = fmt.Errorf("failed to retrieve finalized header: %w", err)
+		return nil, err
+	}
+
+	lastExecuted := finalizedHeader
+
+	rootBlock, err := node.State.Params().SealedRoot()
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
+	}
+
+	// TODO: this is similar logic to ingestion.finalizedUnexecutedBlocks
+	// refactor to avoid code duplication
+	ctx := context.Background()
+	for {
+		if lastExecuted.Height <= rootBlock.Height {
+			break
+		}
+		lastExecuted, err = node.Storage.Headers.ByHeight(lastExecuted.Height - 1)
+		if err != nil {
+			return nil, fmt.Errorf("could not get header at height: %v, %w", lastExecuted, err)
+		}
+
+		executed, err := state.IsBlockExecuted(ctx, exeNode.executionState, lastExecuted.ID())
+		if err != nil {
+			return nil, fmt.Errorf("could not check whether block is executed: %w", err)
+		}
+
+		if executed {
+			break
+		}
+	}
+
+	d := finalized_and_executed.NewDistributor(
+		exeNode.builder.Logger,
+		lastExecuted,
+		exeNode.executionState,
+		node.Storage.Headers,
+		finalized_and_executed.DefaultDistributorConfig,
+	)
+	node.ProtocolEvents.AddConsumer(d)
+
+	exeNode.finalizedAndExecutedDistributor = d
+	return d, nil
+}
+
 func (exeNode *ExecutionNode) LoadStopControl(
 	node *NodeConfig,
 ) (
@@ -663,24 +720,17 @@ func (exeNode *ExecutionNode) LoadStopControl(
 			Msg("could not set semver version for stop control")
 	}
 
-	latestFinalizedBlock, err := node.State.Final().Head()
-	if err != nil {
-		return nil, fmt.Errorf("could not get latest finalized block: %w", err)
-	}
-
 	stopControl := stop.NewStopControl(
 		exeNode.builder.Logger,
-		exeNode.executionState,
-		node.Storage.Headers,
 		node.Storage.VersionBeacons,
 		ver,
-		latestFinalizedBlock,
+		exeNode.finalizedAndExecutedDistributor.GetHighestFinalizedAndExecutedBlock(),
 		// TODO: rename to exeNode.exeConf.executionStopped to make it more consistent
 		exeNode.exeConf.pauseExecution,
 		true,
 	)
-	// stopControl needs to consume BlockFinalized events.
-	node.ProtocolEvents.AddConsumer(stopControl)
+	// stopControl needs to consume BlockFinalizedAndExecuted events.
+	exeNode.finalizedAndExecutedDistributor.AddConsumer(stopControl)
 
 	exeNode.stopControl = stopControl
 
@@ -831,6 +881,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
+		exeNode.finalizedAndExecutedDistributor,
 	)
 
 	// TODO: we should solve these mutual dependencies better

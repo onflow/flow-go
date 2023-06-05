@@ -10,21 +10,18 @@ import (
 	"github.com/coreos/go-semver/semver"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	psEvents "github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 )
 
 // StopControl is a specialized component used by ingestion.Engine to encapsulate
 // control of stopping blocks execution.
-// It is intended to work tightly with the Engine, not as a general mechanism or interface.
 //
-// StopControl can stop execution or crash the node at a specific block height. The stop
-// height can be set manually or by the version beacon service event. This leads to some
-// edge cases that are handled by the StopControl:
+// StopControl can stop execution or crash the node before a specific block height. The
+// stop height can be set manually or by the version beacon service event. This leads to
+// some edge cases that are handled by the StopControl:
 //
 //  1. stop is already set manually and is set again manually.
 //     This is considered as an attempt to move the stop height. The resulting stop
@@ -37,18 +34,17 @@ import (
 //  4. stop is already set by the version beacon and is set by the version beacon.
 //     This means version boundaries were edited. The resulting stop
 //     height is the new one.
+//
+// The stop control uses the finalized and executed distributor to get the latest
+// finalized and executed block. The distributor is used to avoid the need to subscribe
+// and handle the finalized and executed events.'
 type StopControl struct {
-	// Stop control needs to consume BlockFinalized events.
-	// adding psEvents.Noop makes it a protocol.Consumer
-	psEvents.Noop
 	sync.RWMutex
 	component.Component
 	cm *component.ComponentManager
 
-	blockFinalizedChan chan *flow.Header
+	blockFinalizedAndExecutedChan chan *flow.Header
 
-	headers        StopControlHeaders
-	exeState       state.ReadOnlyExecutionState
 	versionBeacons storage.VersionBeacons
 
 	// stopped is true if node should no longer be executing blocs.
@@ -86,15 +82,12 @@ type stopBoundary struct {
 	// once the StopParameters are reached they cannot be changed
 	immutable bool
 
-	// This is the block ID of the block that should be executed last.
-	stopAfterExecuting flow.Identifier
-
 	// if the stop parameters were set by the version beacon
 	fromVersionBeacon bool
 }
 
 // String returns string in the format "crash@20023[versionBeacon]" or
-// "stop@20023@blockID[manual]"
+// "stop@20023[manual]"
 // block ID is only present if stopAfterExecuting is set
 // the ID is from the block that should be executed last and has height one
 // less than StopBeforeHeight
@@ -112,10 +105,6 @@ func (s stopBoundary) String() string {
 	sb.WriteString("@")
 	sb.WriteString(fmt.Sprintf("%d", s.StopBeforeHeight))
 
-	if s.stopAfterExecuting != flow.ZeroID {
-		sb.WriteString("@")
-		sb.WriteString(s.stopAfterExecuting.String())
-	}
 	if s.fromVersionBeacon {
 		sb.WriteString("[versionBeacon]")
 	} else {
@@ -125,12 +114,6 @@ func (s stopBoundary) String() string {
 	return sb.String()
 }
 
-// StopControlHeaders is an interface for fetching headers
-// Its jut a small subset of storage.Headers for comments see storage.Headers
-type StopControlHeaders interface {
-	ByHeight(height uint64) (*flow.Header, error)
-}
-
 // NewStopControl creates new StopControl.
 //
 // We currently have no strong guarantee that the node version is a valid semver.
@@ -138,27 +121,23 @@ type StopControlHeaders interface {
 // without a node version, the stop control can still be used for manual stopping.
 func NewStopControl(
 	log zerolog.Logger,
-	exeState state.ReadOnlyExecutionState,
-	headers StopControlHeaders,
 	versionBeacons storage.VersionBeacons,
 	nodeVersion *semver.Version,
 	latestFinalizedBlock *flow.Header,
 	withStoppedExecution bool,
 	crashOnVersionBoundaryReached bool,
 ) *StopControl {
-	// We should not miss block finalized events, and we should be able to handle them
-	// faster than they are produced anyway.
-	blockFinalizedChan := make(chan *flow.Header, 1000)
+	// We should not miss block finalized or executed events,
+	// and we should be able to handle them faster than they are produced anyway.
+	blockFinalizedChan := make(chan *flow.Header, 100)
 
 	sc := &StopControl{
 		log: log.With().
 			Str("component", "stop_control").
 			Logger(),
 
-		blockFinalizedChan: blockFinalizedChan,
+		blockFinalizedAndExecutedChan: blockFinalizedChan,
 
-		exeState:                      exeState,
-		headers:                       headers,
 		nodeVersion:                   nodeVersion,
 		versionBeacons:                versionBeacons,
 		stopped:                       withStoppedExecution,
@@ -190,21 +169,15 @@ func NewStopControl(
 	sc.cm = cm.Build()
 	sc.Component = sc.cm
 
-	// TODO: handle version beacon already indicating a stop
-	// right now the stop will happen on first BlockFinalized
-	// which is fine, but ideally we would stop right away.
-
 	return sc
 }
 
-// BlockFinalized is called when a block is finalized.
-//
-// This is a protocol event consumer. See protocol.Consumer.
-func (s *StopControl) BlockFinalized(h *flow.Header) {
-	s.blockFinalizedChan <- h
+// FinalizedAndExecuted is called when a block is finalized and executed.
+func (s *StopControl) FinalizedAndExecuted(h *flow.Header) {
+	s.blockFinalizedAndExecutedChan <- h
 }
 
-// processEvents is a worker that processes block finalized events.
+// processEvents is a worker that processes block finalized and executed events.
 func (s *StopControl) processEvents(
 	ctx irrecoverable.SignalerContext,
 	ready component.ReadyFunc,
@@ -215,17 +188,19 @@ func (s *StopControl) processEvents(
 		select {
 		case <-ctx.Done():
 			return
-		case h := <-s.blockFinalizedChan:
-			s.blockFinalized(ctx, h)
+		case h := <-s.blockFinalizedAndExecutedChan:
+			s.blockFinalizedAndExecuted(ctx, h)
 		}
 	}
 }
 
-// BlockFinalizedForTesting is used for testing	only.
-func (s *StopControl) BlockFinalizedForTesting(h *flow.Header) {
-	s.blockFinalized(irrecoverable.MockSignalerContext{}, h)
+// BlockFinalizedAndExecutedForTesting is used for testing	only.
+func (s *StopControl) BlockFinalizedAndExecutedForTesting(h *flow.Header) {
+	s.blockFinalizedAndExecuted(irrecoverable.MockSignalerContext{}, h)
 }
 
+// checkInitialVersionBeacon is a worker that checks the initial version beacon.
+// It does not signal ready until the initial version beacon is checked.
 func (s *StopControl) checkInitialVersionBeacon(
 	ctx irrecoverable.SignalerContext,
 	ready component.ReadyFunc,
@@ -234,10 +209,9 @@ func (s *StopControl) checkInitialVersionBeacon(
 	// component is not ready until we checked the initial version beacon
 	defer ready()
 
-	// the most straightforward way to check it is to simply pretend we just finalized the
-	// last finalized block
-	s.blockFinalized(ctx, latestFinalizedBlock)
-
+	// the most straightforward way to check it is to simply pretend we just finalized and
+	// executed the last finalized and executed block
+	s.blockFinalizedAndExecuted(ctx, latestFinalizedBlock)
 }
 
 // IsExecutionStopped returns true is block execution has been stopped
@@ -394,7 +368,7 @@ func (s *StopControl) ShouldExecuteBlock(b *flow.Header) bool {
 	return false
 }
 
-// blockFinalized is called when a block is marked as finalized
+// blockFinalizedAndExecuted is called when a block is marked as finalized and executed.
 //
 // Once finalization reached stopHeight we can be sure no other fork will be valid at
 // this height, if this block's parent has been executed, we are safe to stop.
@@ -402,7 +376,7 @@ func (s *StopControl) ShouldExecuteBlock(b *flow.Header) bool {
 // before they are finalized. However, it is possible that EN block computation
 // progress can fall behind. In this case, we want to crash only after the execution
 // reached the stopHeight.
-func (s *StopControl) blockFinalized(
+func (s *StopControl) blockFinalizedAndExecuted(
 	ctx irrecoverable.SignalerContext,
 	h *flow.Header,
 ) {
@@ -414,100 +388,21 @@ func (s *StopControl) blockFinalized(
 		return
 	}
 
-	// We already know the ID of the block that should be executed last nothing to do.
-	// Node is stopping.
-	if s.stopBoundary.stopAfterExecuting != flow.ZeroID {
-		return
-	}
-
-	handleErr := func(err error) {
-		s.log.Err(err).
-			Stringer("block_id", h.ID()).
-			Stringer("stop", s.stopBoundary).
-			Msg("Error in stop control BlockFinalized")
-
-		ctx.Throw(err)
-	}
-
 	s.processNewVersionBeacons(ctx, h.Height)
 
 	// we are not at the stop yet, nothing to do
-	if h.Height < s.stopBoundary.StopBeforeHeight {
+	if h.Height+1 < s.stopBoundary.StopBeforeHeight {
 		return
 	}
 
-	parentID := h.ParentID
-
-	if h.Height != s.stopBoundary.StopBeforeHeight {
-		// we are past the stop. This can happen if stop was set before
-		// last finalized block
+	if h.Height+1 != s.stopBoundary.StopBeforeHeight {
+		// we are past the stop. This can happen if stop was set for a past height
+		// this is unusual, but better to sto then to ignore the stop.
 		s.log.Warn().
-			Uint64("finalization_height", h.Height).
+			Uint64("finalization_and_execution_height", h.Height).
 			Stringer("block_id", h.ID()).
 			Stringer("stop", s.stopBoundary).
-			Msg("Block finalization already beyond stop.")
-
-		// Let's find the ID of the block that should be executed last
-		// which is the parent of the block at the stopHeight
-		header, err := s.headers.ByHeight(s.stopBoundary.StopBeforeHeight - 1)
-		if err != nil {
-			handleErr(fmt.Errorf("failed to get header by height: %w", err))
-			return
-		}
-		parentID = header.ID()
-	}
-
-	s.stopBoundary.stopAfterExecuting = parentID
-
-	s.log.Info().
-		Stringer("block_id", h.ID()).
-		Stringer("stop", s.stopBoundary).
-		Stringer("stop_after_executing", s.stopBoundary.stopAfterExecuting).
-		Msgf("Found ID of the block that should be executed last")
-
-	// check if the parent block has been executed then stop right away
-	executed, err := state.IsBlockExecuted(ctx, s.exeState, h.ParentID)
-	if err != nil {
-		handleErr(fmt.Errorf(
-			"failed to check if the block has been executed: %w",
-			err,
-		))
-		return
-	}
-
-	if executed {
-		// we already reached the point where we should stop
-		s.stopExecution()
-		return
-	}
-}
-
-// OnBlockExecuted should be called after a block has finished execution
-func (s *StopControl) OnBlockExecuted(h *flow.Header) {
-	s.Lock()
-	defer s.Unlock()
-
-	if s.stopped {
-		return
-	}
-
-	if s.stopBoundary.stopAfterExecuting != h.ID() {
-		return
-	}
-
-	// double check. Even if requested stopHeight has been changed multiple times,
-	// as long as it matches this block we are safe to terminate
-	if h.Height != s.stopBoundary.StopBeforeHeight-1 {
-		s.log.Warn().
-			Msgf(
-				"Inconsistent stopping state. "+
-					"Scheduled to stop after executing block ID %s and height %d, "+
-					"but this block has a height %d. ",
-				h.ID().String(),
-				s.stopBoundary.StopBeforeHeight-1,
-				h.Height,
-			)
-		return
+			Msg("Block finalization and execution already beyond stop.")
 	}
 
 	s.stopExecution()
@@ -518,16 +413,15 @@ func (s *StopControl) OnBlockExecuted(h *flow.Header) {
 func (s *StopControl) stopExecution() {
 	log := s.log.With().
 		Stringer("requested_stop", s.stopBoundary).
-		Uint64("last_executed_height", s.stopBoundary.StopBeforeHeight).
-		Stringer("last_executed_id", s.stopBoundary.stopAfterExecuting).
+		Uint64("last_finalized_and_executed_height", s.stopBoundary.StopBeforeHeight-1).
 		Logger()
 
 	s.stopped = true
-	log.Warn().Msg("Stopping as finalization reached requested stop")
+	log.Warn().Msg("Stopping as finalization and execution reached requested stop")
 
 	if s.stopBoundary.ShouldCrash {
 		// TODO: crash more gracefully or at least in a more explicit way
-		log.Fatal().Msg("Crashing as finalization reached requested stop")
+		log.Fatal().Msg("Crashing as finalization and execution reached requested stop")
 		return
 	}
 }

@@ -8,11 +8,11 @@ import (
 	"github.com/hashicorp/golang-lru/simplelru"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	psEvents "github.com/onflow/flow-go/state/protocol/events"
 	storageerr "github.com/onflow/flow-go/storage"
 )
 
@@ -20,28 +20,41 @@ type Consumer interface {
 	FinalizedAndExecuted(h *flow.Header)
 }
 
+// StopControlHeaders is an interface for fetching headers
+// Its jut a small subset of storage.Headers for comments see storage.Headers
+type StopControlHeaders interface {
+	ByHeight(height uint64) (*flow.Header, error)
+}
+
 type Distributor struct {
+	// adding psEvents.Noop makes this a protocol.Consumer
+	psEvents.Noop
 	DistributorConfig
 
 	component.Component
 	cm *component.ComponentManager
 
-	subscribers   []Consumer
-	subscribersMU sync.RWMutex
+	// mu protects subscribers and highestFinalizedAndExecutedBlock
+	// everything else is expected to be accessed only from one goroutine
+	mu                               sync.RWMutex
+	subscribers                      []Consumer
+	highestFinalizedAndExecutedBlock *flow.Header
 
 	blockFinalizedChan chan *flow.Header
 	blockExecutedChan  chan *flow.Header
 
+	// The amount of db calls that are expected per height is
+	// 1 (to check if the block is executed) + N (to check if the block is finalized)
+	// where N is the number of execution forks (N >= 1).
+	// The caches reduce the number of db calls by ~1 per height as long as the execution
+	// and finalization are not to far apart (see DistributorConfig.LRUCacheSize).
 	executedLru  simplelru.LRUCache
 	finalizedLru simplelru.LRUCache
-
-	highestFinalizedAndExecutedBlock *flow.Header
 
 	// exeState is used to check if a block is executed
 	exeState state.ReadOnlyExecutionState
 	// headers are used to check if a block is finalized
-	// TODO: move this interface here
-	headers stop.StopControlHeaders
+	headers StopControlHeaders
 
 	log zerolog.Logger
 }
@@ -63,7 +76,7 @@ func NewDistributor(
 	log zerolog.Logger,
 	highestFinalizedAndExecutedBlock *flow.Header,
 	exeState state.ReadOnlyExecutionState,
-	headers stop.StopControlHeaders,
+	headers StopControlHeaders,
 	config DistributorConfig,
 ) *Distributor {
 
@@ -99,9 +112,18 @@ func NewDistributor(
 }
 
 func (d *Distributor) AddConsumer(consumer Consumer) {
-	d.subscribersMU.Lock()
-	defer d.subscribersMU.Unlock()
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.subscribers = append(d.subscribers, consumer)
+}
+
+// GetHighestFinalizedAndExecutedBlock returns the highest block that has been
+// finalized and executed
+func (d *Distributor) GetHighestFinalizedAndExecutedBlock() *flow.Header {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+
+	return d.highestFinalizedAndExecutedBlock
 }
 
 func (d *Distributor) BlockFinalized(h *flow.Header) {
@@ -119,6 +141,7 @@ const (
 	executed  blockEvent = 1
 )
 
+// processEvents is a worker that processes the finalized or executed events
 func (d *Distributor) processEvents(
 	ctx irrecoverable.SignalerContext,
 	ready component.ReadyFunc,
@@ -159,6 +182,7 @@ func (d *Distributor) processEvents(
 	}
 }
 
+// onBlockEvent is called when a block is finalized or executed.
 func (d *Distributor) onBlockEvent(
 	ctx irrecoverable.SignalerContext,
 	h *flow.Header,
@@ -195,19 +219,26 @@ func (d *Distributor) onBlockEvent(
 	d.finalizedLru.Remove(h)
 	d.executedLru.Remove(h)
 
-	d.highestFinalizedAndExecutedBlock = h
-	d.signalConsumers(h)
+	d.updateHeightAndSignalConsumers(h)
 }
 
-func (d *Distributor) signalConsumers(h *flow.Header) {
-	d.subscribersMU.RLock()
-	defer d.subscribersMU.RUnlock()
+// updateHeightAndSignalConsumers updates the highestFinalizedAndExecutedBlock
+// and signals all the consumers.
+func (d *Distributor) updateHeightAndSignalConsumers(h *flow.Header) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.highestFinalizedAndExecutedBlock = h
 
 	for _, sub := range d.subscribers {
 		sub.FinalizedAndExecuted(h)
 	}
 }
 
+// isBlockExecuted checks if the block is executed.
+// db call can cause a ctx.Throw.
+//
+// no lock is needed since this is called from the processEvents goroutine.
 func (d *Distributor) isBlockExecuted(
 	ctx irrecoverable.SignalerContext,
 	h *flow.Header,
@@ -228,6 +259,10 @@ func (d *Distributor) isBlockExecuted(
 	return executed
 }
 
+// isBlockFinalized checks if the block is finalized.
+// db call can cause a ctx.Throw.
+//
+// no lock is needed since this is called from the processEvents goroutine.
 func (d *Distributor) isBlockFinalized(
 	ctx irrecoverable.SignalerContext,
 	h *flow.Header,
@@ -254,4 +289,10 @@ func (d *Distributor) isBlockFinalized(
 	finalized := finalizedHeader.View == h.View
 
 	return finalized
+}
+
+// SetHighestFinalizedAndExecutedBlockForTestingOnly sets the highest finalized and
+// executed block. Only use for testing.
+func (d *Distributor) SetHighestFinalizedAndExecutedBlockForTestingOnly(h *flow.Header) {
+	d.highestFinalizedAndExecutedBlock = h
 }

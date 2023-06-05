@@ -47,27 +47,33 @@ func TestFinalizedAndExecutedDistributor_AddConsumer(t *testing.T) {
 		headerC2 := unittest.BlockHeaderWithParentFixture(headerB2) // 22
 		headerC3 := unittest.BlockHeaderWithParentFixture(headerB2) // 22
 
+		// make sure the views are different
+		// we are making the assumption that when checking for finalization the block has
+		// been executed. For executed block, it must have a QC, which means its view is
+		// unique
+		headerB2.View = headerB1.View + 1
+		headerC2.View = headerC1.View + 1
+		headerC3.View = headerC2.View + 1
+
 		execState := exeMock.NewExecutionState(t)
-		expectIsExecutedCall := func(h *flow.Header, isExecuted bool) {
+		isExecutedCall := func(h *flow.Header, isExecuted bool) *mock.Call {
 			var returnErr error
 			if !isExecuted {
 				returnErr = storage.ErrNotFound
 			}
-			execState.
+			return execState.
 				On("StateCommitmentByBlockID", mock.Anything, h.ID()).
-				Return(flow.StateCommitment{}, returnErr).
-				Once()
+				Return(flow.StateCommitment{}, returnErr)
 		}
 		headers := storageMock.NewHeaders(t)
-		expectIsFinalizedCall := func(height uint64, returnFinalizedHeader *flow.Header) {
+		isFinalizedCall := func(height uint64, returnFinalizedHeader *flow.Header) *mock.Call {
 			var returnErr error
 			if returnFinalizedHeader == nil {
 				returnErr = storage.ErrNotFound
 			}
-			headers.
+			return headers.
 				On("ByHeight", height).
-				Return(returnFinalizedHeader, returnErr).
-				Once()
+				Return(returnFinalizedHeader, returnErr)
 		}
 
 		dist := fae.NewDistributor(
@@ -99,14 +105,14 @@ func TestFinalizedAndExecutedDistributor_AddConsumer(t *testing.T) {
 
 		dist.AddConsumer(mockConsumer)
 
+		isExecutedCall(headerB1, false).Once()
 		// finalize correct branch first
-		expectIsExecutedCall(headerB1, false)
 		dist.BlockFinalized(headerB1)
 		// no is executed call for headerC1 because the f&e block is 2 lower than this one
 		dist.BlockFinalized(headerC1)
 
+		isFinalizedCall(headerB1.Height, headerB1).Once()
 		// execute wrong branch first
-		expectIsFinalizedCall(headerB2.Height, headerB1)
 		dist.BlockExecuted(headerB2)
 		dist.BlockExecuted(headerC2)
 		dist.BlockExecuted(headerC3)
@@ -163,7 +169,7 @@ func TestFinalizedAndExecutedDistributor_AddConsumer(t *testing.T) {
 
 		testLen := 1000
 		expectedMU := sync.Mutex{}
-		expected := []*flow.Header{}
+		var expected []*flow.Header
 		wg := sync.WaitGroup{}
 		wg.Add(testLen)
 		mockConsumer := mockConsumer{
@@ -192,7 +198,14 @@ func TestFinalizedAndExecutedDistributor_AddConsumer(t *testing.T) {
 		go func() {
 			parent := header
 			for i := 0; i < testLen; i++ {
+
 				newHeader := unittest.BlockHeaderWithParentFixture(parent)
+				// make the views unique
+				newHeader.View = uint64((i + 1) * testLen)
+
+				expectIsExecutedCall(newHeader, false)
+				expectIsFinalizedCall(newHeader.Height, nil)
+
 				finalChan <- newHeader
 
 				addExpectedFAE(newHeader)
@@ -201,7 +214,11 @@ func TestFinalizedAndExecutedDistributor_AddConsumer(t *testing.T) {
 				// simulate some branching
 				parentExec := parent
 				for j := 0; j < j%10; j++ {
+					// make the views unique
+					newHeader.View = uint64((i+1)*testLen + j + 1)
 					newExec := unittest.BlockHeaderWithParentFixture(parentExec)
+
+					expectIsExecutedCall(newHeader, false)
 
 					// add some more headers that will be executed, but not finalized
 					execChan <- newExec

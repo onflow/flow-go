@@ -93,9 +93,7 @@ func TestCommandsSetsValues(t *testing.T) {
 		zerolog.Nop(),
 		nil,
 		nil,
-		nil,
-		nil,
-		&flow.Header{Height: 1},
+		&flow.Header{},
 		false,
 		false,
 	)

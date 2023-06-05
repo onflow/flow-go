@@ -43,6 +43,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/ingestion/finalized_and_executed"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -691,16 +692,24 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	latestFinalizedBlock, err := node.State.Final().Head()
 	require.NoError(t, err)
 
-	stopControl := stop.NewStopControl(
+	feaDistributor := finalized_and_executed.NewDistributor(
 		node.Log,
+		latestFinalizedBlock,
 		execState,
 		node.Headers,
+		finalized_and_executed.DefaultDistributorConfig,
+	)
+
+	stopControl := stop.NewStopControl(
+		node.Log,
 		versionBeacons,
 		ver,
 		latestFinalizedBlock,
 		false,
 		true,
 	)
+
+	feaDistributor.AddConsumer(stopControl)
 
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
@@ -725,6 +734,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		nil,
 		uploader,
 		stopControl,
+		feaDistributor,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
