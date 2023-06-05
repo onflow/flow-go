@@ -13,9 +13,9 @@ type poolIndex struct {
 
 // isUndefined returns true if this poolIndex is set to zero. An undefined
 // poolIndex is equivalent to a nil address-based one.
-func (p poolIndex) isUndefined() bool {
-	return p.index == uint32(0)
-}
+//func (p poolIndex) isUndefined() bool {
+//	return p.index == uint32(0)
+//}
 
 // setUndefined sets poolIndex to its undefined (i.e., nil equivalent) value.
 func (p *poolIndex) setUndefined() {
