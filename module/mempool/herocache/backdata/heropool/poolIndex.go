@@ -18,9 +18,9 @@ type poolIndex struct {
 //}
 
 // setUndefined sets poolIndex to its undefined (i.e., nil equivalent) value.
-func (p *poolIndex) setUndefined() {
-	p.index = uint32(0)
-}
+//func (p *poolIndex) setUndefined() {
+//	p.index = uint32(0)
+//}
 
 // getSliceIndex returns the slice-index equivalent of the poolIndex.
 func (p poolIndex) getSliceIndex() EIndex {
