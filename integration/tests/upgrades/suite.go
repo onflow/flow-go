@@ -45,12 +45,12 @@ func (s *Suite) SetupTest() {
 	}()
 
 	collectionConfigs := []func(*testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--block-rate-delay=10ms"),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=10ms"),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--block-rate-delay=10ms"),
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=10ms"),
 		testnet.WithAdditionalFlag(
 			fmt.Sprintf(
 				"--required-verification-seal-approvals=%d",
