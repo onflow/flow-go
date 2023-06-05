@@ -82,7 +82,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	}
 	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.WithAdditionalFlag("--block-rate-delay=1ms"),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"),
 	)
 
 	suite.nClusters = nClusters
