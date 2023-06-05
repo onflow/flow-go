@@ -13,8 +13,6 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
-
 	"github.com/stretchr/testify/suite"
 )
 
@@ -23,8 +21,6 @@ type TestServiceEventVersionControl struct {
 }
 
 func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent() {
-	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY,
-		"flaky in CI but works 100% of the time locally")
 
 	// freezePeriodForTheseTests controls the version beacon freeze period. The longer the
 	// freeze period the more blocks we need to wait for the version beacon to take effect,
@@ -33,7 +29,7 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 	//
 	// - If the test is flaky try increasing this value.
 	// - If the test is too slow try decreasing this value.
-	freezePeriodForTheseTests := uint64(100)
+	freezePeriodForTheseTests := uint64(20)
 
 	ctx := context.Background()
 
@@ -114,7 +110,7 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 		// make sure target height is correct
 		// the height at which the version change will take effect should be after
 		// the current height + the freeze period
-		height := latestFinalized.Height + freezePeriod + 100
+		height := latestFinalized.Height + freezePeriod + 25
 
 		// version 0.0.1
 		// low version to not interfere with other tests
