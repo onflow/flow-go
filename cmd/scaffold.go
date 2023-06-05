@@ -55,7 +55,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -414,7 +413,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.GossipSubRpcInspectorSuite,
 			fnb.LibP2PResourceManagerConfig,
 			uniCfg,
-			&p2pnode.DisallowListCacheConfig{
+			&p2p.DisallowListCacheConfig{
 				MaxSize: fnb.BaseConfig.NetworkConfig.DisallowListCacheSize,
 				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
 			},

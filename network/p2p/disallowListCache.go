@@ -1,8 +1,9 @@
-package p2pnode
+package p2p
 
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -34,4 +35,16 @@ type DisallowListCache interface {
 	// - the list of causes for which the peer is disallow-listed. If the peer is not disallow-listed for any reason,
 	// an empty list is returned.
 	AllowFor(peerID peer.ID, cause network.DisallowListedCause) []network.DisallowListedCause
+}
+
+// DisallowListCacheConfig is the configuration for the disallow-list cache.
+// The disallow-list cache is used to temporarily disallow-list peers.
+type DisallowListCacheConfig struct {
+	// MaxSize is the maximum number of peers that can be disallow-listed at any given time.
+	// When the cache is full, no further new peers can be disallow-listed.
+	// Recommended size is 100 * number of staked nodes.
+	MaxSize uint32
+
+	// Metrics is the HeroCache metrics collector to be used for the disallow-list cache.
+	Metrics module.HeroCacheMetrics
 }

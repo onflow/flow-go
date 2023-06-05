@@ -18,7 +18,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	flownet "github.com/onflow/flow-go/network"
@@ -66,19 +65,7 @@ type Node struct {
 	peerScoreExposer p2p.PeerScoreExposer
 	// Cache of temporary disallow-listed peers, when a peer is disallow-listed, the connections to that peer
 	// are closed and further connections are not allowed till the peer is removed from the disallow-list.
-	disallowListedCache DisallowListCache
-}
-
-// DisallowListCacheConfig is the configuration for the disallow-list cache.
-// The disallow-list cache is used to temporarily disallow-list peers.
-type DisallowListCacheConfig struct {
-	// MaxSize is the maximum number of peers that can be disallow-listed at any given time.
-	// When the cache is full, no further new peers can be disallow-listed.
-	// Recommended size is 100 * number of staked nodes.
-	MaxSize uint32
-
-	// Metrics is the HeroCache metrics collector to be used for the disallow-list cache.
-	Metrics module.HeroCacheMetrics
+	disallowListedCache p2p.DisallowListCache
 }
 
 // NewNode creates a new libp2p node and sets its parameters.
@@ -87,7 +74,7 @@ func NewNode(
 	host host.Host,
 	pCache p2p.ProtocolPeerCache,
 	peerManager p2p.PeerManager,
-	disallowLstCacheCfg *DisallowListCacheConfig,
+	disallowLstCacheCfg *p2p.DisallowListCacheConfig,
 ) *Node {
 	lg := logger.With().Str("component", "libp2p-node").Logger()
 	return &Node{

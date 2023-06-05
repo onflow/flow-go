@@ -136,7 +136,7 @@ type LibP2PNodeBuilder struct {
 	createStreamRetryInterval time.Duration
 	rateLimiterDistributor    p2p.UnicastRateLimiterDistributor
 	gossipSubTracer           p2p.PubSubTracer
-	disallowListCacheCfg      *p2pnode.DisallowListCacheConfig
+	disallowListCacheCfg      *p2p.DisallowListCacheConfig
 }
 
 func NewNodeBuilder(logger zerolog.Logger,
@@ -145,7 +145,7 @@ func NewNodeBuilder(logger zerolog.Logger,
 	networkKey fcrypto.PrivateKey,
 	sporkID flow.Identifier,
 	rCfg *ResourceManagerConfig,
-	disallowListCacheCfg *p2pnode.DisallowListCacheConfig) *LibP2PNodeBuilder {
+	disallowListCacheCfg *p2p.DisallowListCacheConfig) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:               logger,
 		sporkID:              sporkID,
@@ -486,7 +486,7 @@ func DefaultCreateNodeFunc(logger zerolog.Logger,
 	host host.Host,
 	pCache p2p.ProtocolPeerCache,
 	peerManager p2p.PeerManager,
-	disallowListCacheCfg *p2pnode.DisallowListCacheConfig) p2p.LibP2PNode {
+	disallowListCacheCfg *p2p.DisallowListCacheConfig) p2p.LibP2PNode {
 	return p2pnode.NewNode(logger, host, pCache, peerManager, disallowListCacheCfg)
 }
 
@@ -505,7 +505,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	rpcInspectorSuite p2p.GossipSubInspectorSuite,
 	rCfg *ResourceManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig,
-	disallowListCacheCfg *p2pnode.DisallowListCacheConfig) (p2p.NodeBuilder, error) {
+	disallowListCacheCfg *p2p.DisallowListCacheConfig) (p2p.NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(log, metricsCfg.Metrics, connection.DefaultConnManagerConfig())
 	if err != nil {

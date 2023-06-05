@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -104,7 +103,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			peerManagerCfg,
 			uniCfg,
 			cnb.GossipSubConfig,
-			&p2pnode.DisallowListCacheConfig{
+			&p2p.DisallowListCacheConfig{
 				MaxSize: cnb.BaseConfig.NetworkConfig.DisallowListCacheSize,
 				Metrics: metrics.DisallowListCacheMetricsFactory(cnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
 			},
