@@ -475,6 +475,17 @@ func (n *Node) SetUnicastManager(uniMgr p2p.UnicastManager) {
 	n.uniMgr = uniMgr
 }
 
+// OnDisallowListNotification is called when a new disallow list update notification is distributed.
+// Any error on consuming event must handle internally.
+// The implementation must be concurrency safe.
+// Args:
+//
+//	id: peer ID of the peer being disallow-listed.
+//	cause: cause of the peer being disallow-listed (only this cause is added to the peer's disallow-listed causes).
+//
+// Returns:
+//
+//	none
 func (n *Node) OnDisallowListNotification(peerId peer.ID, cause flownet.DisallowListedCause) {
 	causes, err := n.disallowListedCache.DisallowFor(peerId, cause)
 	if err != nil {
@@ -497,6 +508,17 @@ func (n *Node) OnDisallowListNotification(peerId peer.ID, cause flownet.Disallow
 	}
 }
 
+// OnAllowListNotification is called when a new allow list update notification is distributed.
+// Any error on consuming event must handle internally.
+// The implementation must be concurrency safe.
+// Args:
+//
+//	id: peer ID of the peer being allow-listed.
+//	cause: cause of the peer being allow-listed (only this cause is removed from the peer's disallow-listed causes).
+//
+// Returns:
+//
+//	none
 func (n *Node) OnAllowListNotification(peerId peer.ID, cause flownet.DisallowListedCause) {
 	n.disallowListedCache.AllowFor(peerId, cause)
 
@@ -504,4 +526,18 @@ func (n *Node) OnAllowListNotification(peerId peer.ID, cause flownet.DisallowLis
 		Str("peer_id", peerId.String()).
 		Str("causes", fmt.Sprintf("%v", cause)).
 		Msg("peer added to disallow list cache")
+}
+
+// GetAllDisallowListedCauses for a disallow-listed peer returns all disallow-listed causes.
+// If the peer is not disallow-listed, returns an empty slice (not nil).
+// The implementation must be concurrency safe.
+// Args:
+//
+//	none
+//
+// Returns:
+//
+//	[]network.DisallowListedCause: list of disallow-listed causes for the peer or empty slice if the peer is not disallow-listed.
+func (n *Node) GetAllDisallowListedCauses(peerId peer.ID) []flownet.DisallowListedCause {
+	return n.disallowListedCache.GetAllDisallowedListCausesFor(peerId)
 }

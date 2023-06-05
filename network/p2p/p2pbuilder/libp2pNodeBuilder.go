@@ -128,7 +128,7 @@ type LibP2PNodeBuilder struct {
 	resourceManager           network.ResourceManager
 	resourceManagerCfg        *ResourceManagerConfig
 	connManager               connmgr.ConnManager
-	connGater                 connmgr.ConnectionGater
+	connGater                 p2p.ConnectionGater
 	routingFactory            func(context.Context, host.Host) (routing.Routing, error)
 	peerManagerEnablePruning  bool
 	peerManagerUpdateInterval time.Duration
@@ -184,7 +184,7 @@ func (builder *LibP2PNodeBuilder) SetConnectionManager(manager connmgr.ConnManag
 }
 
 // SetConnectionGater sets the connection gater for the node.
-func (builder *LibP2PNodeBuilder) SetConnectionGater(gater connmgr.ConnectionGater) p2p.NodeBuilder {
+func (builder *LibP2PNodeBuilder) SetConnectionGater(gater p2p.ConnectionGater) p2p.NodeBuilder {
 	builder.connGater = gater
 	return builder
 }
@@ -372,6 +372,10 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	}
 
 	node := builder.createNode(builder.logger, h, pCache, peerManager, builder.disallowListCacheCfg)
+
+	if builder.connGater != nil {
+		builder.connGater.SetDisallowListOracle(node)
+	}
 
 	unicastManager := unicast.NewUnicastManager(builder.logger,
 		stream.NewLibP2PStreamFactory(h),

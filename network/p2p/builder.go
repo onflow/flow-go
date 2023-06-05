@@ -96,7 +96,7 @@ type NodeBuilder interface {
 	SetSubscriptionFilter(pubsub.SubscriptionFilter) NodeBuilder
 	SetResourceManager(network.ResourceManager) NodeBuilder
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
-	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
+	SetConnectionGater(ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
 	SetPeerManagerOptions(bool, time.Duration) NodeBuilder
 

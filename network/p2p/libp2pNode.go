@@ -121,11 +121,21 @@ type DisallowListNotificationConsumer interface {
 	// OnDisallowListNotification is called when a new disallow list update notification is distributed.
 	// Any error on consuming event must handle internally.
 	// The implementation must be concurrency safe.
+	// Args:
+	// 	id: peer ID of the peer being disallow-listed.
+	// 	cause: cause of the peer being disallow-listed (only this cause is added to the peer's disallow-listed causes).
+	// Returns:
+	// 	none
 	OnDisallowListNotification(id peer.ID, cause network.DisallowListedCause)
 
 	// OnAllowListNotification is called when a new allow list update notification is distributed.
 	// Any error on consuming event must handle internally.
 	// The implementation must be concurrency safe.
+	// Args:
+	// 	id: peer ID of the peer being allow-listed.
+	// 	cause: cause of the peer being allow-listed (only this cause is removed from the peer's disallow-listed causes).
+	// Returns:
+	// 	none
 	OnAllowListNotification(id peer.ID, cause network.DisallowListedCause)
 }
 
