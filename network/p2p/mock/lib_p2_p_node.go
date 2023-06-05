@@ -8,6 +8,8 @@ import (
 
 	context "context"
 
+	flow_gonetwork "github.com/onflow/flow-go/network"
+
 	host "github.com/libp2p/go-libp2p/core/host"
 
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
@@ -84,6 +86,22 @@ func (_m *LibP2PNode) Done() <-chan struct{} {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
+// GetAllDisallowListedCauses provides a mock function with given fields: peerId
+func (_m *LibP2PNode) GetAllDisallowListedCauses(peerId peer.ID) []flow_gonetwork.DisallowListedCause {
+	ret := _m.Called(peerId)
+
+	var r0 []flow_gonetwork.DisallowListedCause
+	if rf, ok := ret.Get(0).(func(peer.ID) []flow_gonetwork.DisallowListedCause); ok {
+		r0 = rf(peerId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow_gonetwork.DisallowListedCause)
 		}
 	}
 
@@ -205,6 +223,16 @@ func (_m *LibP2PNode) ListPeers(topic string) []peer.ID {
 	}
 
 	return r0
+}
+
+// OnAllowListNotification provides a mock function with given fields: id, cause
+func (_m *LibP2PNode) OnAllowListNotification(id peer.ID, cause flow_gonetwork.DisallowListedCause) {
+	_m.Called(id, cause)
+}
+
+// OnDisallowListNotification provides a mock function with given fields: id, cause
+func (_m *LibP2PNode) OnDisallowListNotification(id peer.ID, cause flow_gonetwork.DisallowListedCause) {
+	_m.Called(id, cause)
 }
 
 // PeerManagerComponent provides a mock function with given fields:

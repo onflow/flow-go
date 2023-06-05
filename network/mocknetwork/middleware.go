@@ -14,8 +14,6 @@ import (
 
 	network "github.com/onflow/flow-go/network"
 
-	peer "github.com/libp2p/go-libp2p/core/peer"
-
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
 )
 
@@ -34,22 +32,6 @@ func (_m *Middleware) Done() <-chan struct{} {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(<-chan struct{})
-		}
-	}
-
-	return r0
-}
-
-// GetAllDisallowedListCausesFor provides a mock function with given fields: _a0
-func (_m *Middleware) GetAllDisallowedListCausesFor(_a0 peer.ID) []network.DisallowListedCause {
-	ret := _m.Called(_a0)
-
-	var r0 []network.DisallowListedCause
-	if rf, ok := ret.Get(0).(func(peer.ID) []network.DisallowListedCause); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]network.DisallowListedCause)
 		}
 	}
 
