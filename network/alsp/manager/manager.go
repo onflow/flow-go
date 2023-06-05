@@ -75,6 +75,11 @@ type MisbehaviorReportManager struct {
 	// Note: under normal circumstances, the ALSP module should not be disabled.
 	disablePenalty bool
 
+	// disallowListingConsumer is the consumer for the disallow-listing notifications.
+	// It is notified when a node is disallow-listed by this manager.
+	// Exactly one consumer must be set. The code should panic if the consumer is not set or set more than once.
+	disallowListingConsumer network.DisallowListNotificationConsumer
+
 	// workerPool is the worker pool for handling the misbehavior reports in a thread-safe and non-blocking manner.
 	workerPool *worker.Pool[internal.ReportedMisbehaviorWork]
 }
@@ -152,26 +157,29 @@ func WithSpamRecordsCacheFactory(f SpamRecordCacheFactory) MisbehaviorReportMana
 
 // NewMisbehaviorReportManager creates a new instance of the MisbehaviorReportManager.
 // Args:
-//
-//	logger: the logger instance.
-//	metrics: the metrics instance.
-//	cache: the spam record cache instance.
+// cfg: the configuration for the MisbehaviorReportManager.
+// consumer: the consumer for the disallow-listing notifications. When the manager decides to disallow-list a node, it notifies the consumer to
+// perform the lower-level disallow-listing action at the networking layer.
+// All connections to the disallow-listed node are closed and the node is removed from the overlay, and
+// no further connections are established to the disallow-listed node, either inbound or outbound.
+// Note: A consumer must be set before the manager is started. The manager panics if the consumer is not set.
 //
 // Returns:
 //
 //		A new instance of the MisbehaviorReportManager.
 //	 An error if the config is invalid. The error is considered irrecoverable.
-func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig) (*MisbehaviorReportManager, error) {
+func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, consumer network.DisallowListNotificationConsumer) (*MisbehaviorReportManager, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration for MisbehaviorReportManager: %w", err)
 	}
 
 	lg := cfg.Logger.With().Str("module", "misbehavior_report_manager").Logger()
 	m := &MisbehaviorReportManager{
-		logger:         lg,
-		metrics:        cfg.AlspMetrics,
-		disablePenalty: cfg.DisablePenalty,
-		cacheFactory:   defaultSpamRecordCacheFactory(),
+		logger:                  lg,
+		metrics:                 cfg.AlspMetrics,
+		disablePenalty:          cfg.DisablePenalty,
+		disallowListingConsumer: consumer,
+		cacheFactory:            defaultSpamRecordCacheFactory(),
 	}
 
 	store := queue.NewHeroStore(
