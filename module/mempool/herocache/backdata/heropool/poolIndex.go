@@ -24,11 +24,11 @@ type poolIndex struct {
 
 // getSliceIndex returns the slice-index equivalent of the poolIndex.
 func (p poolIndex) getSliceIndex() EIndex {
-	return EIndex(p.index) - 1
+	return EIndex(p.index)
 }
 
 // setPoolIndex converts the input slice-based index into a pool index and
 // sets the underlying poolIndex.
 func (p *poolIndex) setPoolIndex(sliceIndex EIndex) {
-	p.index = uint32(sliceIndex + 1)
+	p.index = uint32(sliceIndex)
 }
