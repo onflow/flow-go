@@ -29,7 +29,7 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 	//
 	// - If the test is flaky try increasing this value.
 	// - If the test is too slow try decreasing this value.
-	freezePeriodForTheseTests := uint64(50)
+	freezePeriodForTheseTests := uint64(100)
 
 	ctx := context.Background()
 
