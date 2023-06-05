@@ -358,8 +358,26 @@ func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler
 // WithPeersProvider sets the PeersProvider for the peer manager.
 // If a peer manager factory is set, this method will set the peer manager's PeersProvider.
 func (n *Node) WithPeersProvider(peersProvider p2p.PeersProvider) {
+	// TODO: chore: we should not allow overriding the peers provider if one is already set.
 	if n.peerManager != nil {
-		n.peerManager.SetPeersProvider(peersProvider)
+		n.peerManager.SetPeersProvider(func() peer.IDSlice {
+			authorizedPeersIds := peersProvider()
+			for i, id := range authorizedPeersIds {
+				// exclude the disallowed peers from the authorized peers list
+				causes := n.disallowListedCache.GetAllDisallowedListCausesFor(id)
+				if len(causes) > 0 {
+					n.logger.Warn().
+						Str("peer_id", id.String()).
+						Str("causes", fmt.Sprintf("%v", causes)).
+						Msg("peer is disallowed for a cause, removing from authorized peers of peer manager")
+
+					// exclude the peer from the authorized peers list
+					authorizedPeersIds = append(authorizedPeersIds[:i], authorizedPeersIds[i+1:]...)
+				}
+			}
+
+			return authorizedPeersIds
+		})
 	}
 }
 
@@ -477,7 +495,6 @@ func (n *Node) OnDisallowListNotification(peerId peer.ID, cause flownet.Disallow
 	if err != nil {
 		n.logger.Error().Err(err).Str("peer_id", peerId.String()).Msg("failed to disconnect from blocklisted peer")
 	}
-
 }
 
 func (n *Node) OnAllowListNotification(peerId peer.ID, cause flownet.DisallowListedCause) {
