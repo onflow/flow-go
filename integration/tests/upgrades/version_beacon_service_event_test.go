@@ -29,7 +29,7 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 	//
 	// - If the test is flaky try increasing this value.
 	// - If the test is too slow try decreasing this value.
-	freezePeriodForTheseTests := uint64(25)
+	freezePeriodForTheseTests := uint64(50)
 
 	ctx := context.Background()
 
@@ -110,7 +110,7 @@ func (s *TestServiceEventVersionControl) TestEmittingVersionBeaconServiceEvent()
 		// make sure target height is correct
 		// the height at which the version change will take effect should be after
 		// the current height + the freeze period
-		height := latestFinalized.Height + freezePeriod + 20
+		height := latestFinalized.Height + freezePeriod + 100
 
 		// version 0.0.1
 		// low version to not interfere with other tests
