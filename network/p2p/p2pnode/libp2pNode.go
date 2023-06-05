@@ -448,11 +448,36 @@ func (n *Node) SetUnicastManager(uniMgr p2p.UnicastManager) {
 }
 
 func (n *Node) OnDisallowListNotification(update *flownet.DisallowListingUpdate) {
-	//TODO implement me
-	panic("implement me")
+	for _, pid := range m.peerIDs(update.FlowIds) {
+		causes, err := m.disallowListedCache.DisallowFor(pid, update.Cause)
+		if err != nil {
+			// returned error is fatal.
+			n.logger.Fatal().Err(err).Str("peer_id", pid.String()).Msg("failed to add peer to disallow list")
+		}
+
+		// TODO: this code should further be refactored to also log the Flow id.
+		n.logger.Warn().
+			Str("peer_id", pid.String()).
+			Str("notification_cause", notification.Cause.String()).
+			Str("causes", fmt.Sprintf("%v", causes)).
+			Msg("peer added to disallow list cache")
+
+		// TODO: technically, adding a peer to the disallow list should also remove its connection (through the peer manager)
+		// hence, this code part can be removed.
+		err = n.RemovePeer(pid)
+		if err != nil {
+			n.logger.Error().Err(err).Str("peer_id", pid.String()).Msg("failed to disconnect from blocklisted peer")
+		}
+	}
 }
 
 func (n *Node) OnAllowListNotification(update *flownet.AllowListingUpdate) {
-	//TODO implement me
-	panic("implement me")
+	for _, pid := range m.peerIDs(notification.FlowIds) {
+		m.disallowListedCache.AllowFor(pid, notification.Cause)
+
+		m.log.Debug().
+			Str("peer_id", pid.String()).
+			Str("causes", fmt.Sprintf("%v", notification.Cause)).
+			Msg("peer added to disallow list cache")
+	}
 }

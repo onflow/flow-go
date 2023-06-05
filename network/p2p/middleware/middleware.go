@@ -360,38 +360,11 @@ func (m *Middleware) authorizedPeers() peer.IDSlice {
 }
 
 func (m *Middleware) OnDisallowListNotification(notification *network.DisallowListingUpdate) {
-	for _, pid := range m.peerIDs(notification.FlowIds) {
-		causes, err := m.disallowListedCache.DisallowFor(pid, notification.Cause)
-		if err != nil {
-			// returned error is fatal.
-			m.log.Fatal().Err(err).Str("peer_id", pid.String()).Msg("failed to add peer to disallow list")
-		}
-
-		// TODO: this code should further be refactored to also log the Flow id.
-		m.log.Warn().
-			Str("peer_id", pid.String()).
-			Str("notification_cause", notification.Cause.String()).
-			Str("causes", fmt.Sprintf("%v", causes)).
-			Msg("peer added to disallow list cache")
-
-		// TODO: technically, adding a peer to the disallow list should also remove its connection (through the peer manager)
-		// hence, this code part can be removed.
-		err = m.libP2PNode.RemovePeer(pid)
-		if err != nil {
-			m.log.Error().Err(err).Str("peer_id", pid.String()).Msg("failed to disconnect from blocklisted peer")
-		}
-	}
+	m.libP2PNode.OnDisallowListNotification(notification)
 }
 
 func (m *Middleware) OnAllowListNotification(notification *network.AllowListingUpdate) {
-	for _, pid := range m.peerIDs(notification.FlowIds) {
-		m.disallowListedCache.AllowFor(pid, notification.Cause)
-
-		m.log.Debug().
-			Str("peer_id", pid.String()).
-			Str("causes", fmt.Sprintf("%v", notification.Cause)).
-			Msg("peer added to disallow list cache")
-	}
+	m.libP2PNode.OnAllowListNotification(notification)
 }
 
 // SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
