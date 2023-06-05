@@ -412,7 +412,8 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 
 			events, err := convert.MessagesToEventsFromVersion(txResult.GetEvents(), txResult.GetEventEncodingVersion())
 			if err != nil {
-				return nil, rpc.ConvertError(err, "failed to convert events to message", codes.Internal)
+				return nil, status.Errorf(codes.Internal,
+					"failed to convert events to message in txID %x: %v", txID, err)
 			}
 
 			results = append(results, &access.TransactionResult{
@@ -466,7 +467,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 
 		events, err := convert.MessagesToEventsFromVersion(systemTxResult.GetEvents(), systemTxResult.GetEventEncodingVersion())
 		if err != nil {
-			return nil, rpc.ConvertError(err, "failed to convert events to message", codes.Internal)
+			return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
 		}
 
 		results = append(results, &access.TransactionResult{
@@ -522,7 +523,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 
 	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), resp.GetEventEncodingVersion())
 	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to convert events to message", codes.Internal)
+		return nil, status.Errorf(codes.Internal, "failed to convert events in blockID %x: %v", blockID, err)
 	}
 
 	// convert to response, cache and return

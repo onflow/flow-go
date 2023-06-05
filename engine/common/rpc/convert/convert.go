@@ -672,8 +672,8 @@ func MessagesToEventsFromVersion(l []*entities.Event, version execproto.EventEnc
 }
 
 func MessageToEventFromVersion(m *entities.Event, version execproto.EventEncodingVersion) (*flow.Event, error) {
-	// CCF
-	if version == execproto.EventEncodingVersion_CCF_V0 {
+	switch version {
+	case execproto.EventEncodingVersion_CCF_V0:
 		convertedPayload, err := CcfPayloadToJsonPayload(m.Payload)
 		if err != nil {
 			return nil, fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
@@ -685,13 +685,12 @@ func MessageToEventFromVersion(m *entities.Event, version execproto.EventEncodin
 			EventIndex:       m.GetEventIndex(),
 			Payload:          convertedPayload,
 		}, nil
-	}
-	// cadence JSON
-	if version == execproto.EventEncodingVersion_JSON_CDC_V0 {
+	case execproto.EventEncodingVersion_JSON_CDC_V0:
 		je := MessageToEvent(m)
 		return &je, nil
+	default:
+		return nil, fmt.Errorf("invalid encoding format %d", version)
 	}
-	return nil, fmt.Errorf("invalid encoding format %d", version)
 }
 
 func CcfPayloadToJsonPayload(p []byte) ([]byte, error) {

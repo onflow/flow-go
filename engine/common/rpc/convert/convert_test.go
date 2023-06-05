@@ -79,14 +79,19 @@ func TestConvertEvents(t *testing.T) {
 		require.NoError(t, err)
 		ccfPayload, err := ccf.Encode(cadenceValue)
 		require.NoError(t, err)
+		jsonPayload, err := jsoncdc.Encode(cadenceValue)
+		require.NoError(t, err)
 		txID := unittest.IdentifierFixture()
 		ccfEvent := unittest.EventFixture(
 			flow.EventAccountCreated, 2, 3, txID, 0)
 		ccfEvent.Payload = ccfPayload
+		jsonEvent := unittest.EventFixture(
+			flow.EventAccountCreated, 2, 3, txID, 0)
+		jsonEvent.Payload = jsonPayload
 		message := convert.EventToMessage(ccfEvent)
 		convertedEvent, err := convert.MessageToEventFromVersion(message, execproto.EventEncodingVersion_CCF_V0)
 		assert.NoError(t, err)
-		assert.Equal(t, ccfEvent, convertedEvent)
+		assert.Equal(t, jsonEvent, *convertedEvent)
 	})
 
 	t.Run("convert event from json cdc format", func(t *testing.T) {
@@ -101,7 +106,7 @@ func TestConvertEvents(t *testing.T) {
 		message := convert.EventToMessage(jsonEvent)
 		convertedEvent, err := convert.MessageToEventFromVersion(message, execproto.EventEncodingVersion_JSON_CDC_V0)
 		assert.NoError(t, err)
-		assert.Equal(t, jsonEvent, convertedEvent)
+		assert.Equal(t, jsonEvent, *convertedEvent)
 	})
 
 	t.Run("convert payload from ccf to jsoncdc", func(t *testing.T) {
@@ -123,7 +128,7 @@ func TestConvertEvents(t *testing.T) {
 
 		res, err := convert.CcfEventToJsonEvent(ccfEvent)
 		require.NoError(t, err)
-		require.Equal(t, jsonEvent, res)
+		require.Equal(t, jsonEvent, *res)
 	})
 }
 
