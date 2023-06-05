@@ -35,6 +35,8 @@ type LibP2PNode interface {
 	// DisallowListNotificationConsumer exposes the disallow list notification consumer API for the node so that
 	// it will be notified when a new disallow list update is distributed.
 	DisallowListNotificationConsumer
+	// DisallowListOracle exposes the disallow list oracle API for external consumers to query about the disallow list.
+	DisallowListOracle
 	// Start the libp2p node.
 	Start(ctx irrecoverable.SignalerContext)
 	// Stop terminates the libp2p node.
@@ -136,5 +138,5 @@ type DisallowListOracle interface {
 	// 	none
 	// Returns:
 	// 	[]network.DisallowListedCause: list of disallow-listed causes for the peer or empty slice if the peer is not disallow-listed.
-	GetAllDisallowListedCauses() []network.DisallowListedCause
+	GetAllDisallowListedCauses(peerId peer.ID) []network.DisallowListedCause
 }
