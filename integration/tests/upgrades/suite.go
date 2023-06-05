@@ -86,7 +86,7 @@ func (s *Suite) SetupTest() {
 		),
 		testnet.NewNodeConfig(
 			flow.RoleExecution,
-			testnet.WithLogLevel(zerolog.InfoLevel),
+			testnet.WithLogLevel(zerolog.WarnLevel),
 		),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
