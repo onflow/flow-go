@@ -7,15 +7,17 @@ import (
 	"time"
 
 	"github.com/coreos/go-semver/semver"
-	"github.com/onflow/cadence"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/cadence"
+
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	"github.com/stretchr/testify/suite"
 )
 
 type TestServiceEventVersionControl struct {
