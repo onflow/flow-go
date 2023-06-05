@@ -1,5 +1,13 @@
 package heropool
 
+//TODO
+// 1. introduce size into linked list struct  and make sure that it is correcly maintained
+// by adding checks to existing unit tests. The are several options to do that , bt for now lets maintain size in  basic interf method
+// like Add, Remove, init
+// 2. start replacing checks for undifined with checks for size , run tests
+// 3. finally remove the consept of 0 index as being undefined null ptr index
+
+// TBH I woould decouple lists and poolEntity.
 import (
 	"github.com/rs/zerolog"
 
@@ -48,7 +56,9 @@ func (p PoolEntity) Entity() flow.Entity {
 }
 
 type Pool struct {
-	logger       zerolog.Logger
+	logger zerolog.Logger
+	// This size is a size of used linked list. As we will have it now as a part of
+	// linked list it can be removed
 	size         uint32
 	free         state // keeps track of free slots.
 	used         state // keeps track of allocated slots to cachedEntities.
@@ -61,10 +71,16 @@ func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode, logger zerolog.Log
 		free: state{
 			head: poolIndex{index: 0},
 			tail: poolIndex{index: 0},
+			// It's a bit redundant to have a size of free as it can be deduced by
+			// len(poolEntities) - used.size. However in task it is specified
+			// "Adding a size attribute to track the number of items in the linked list."
+			// As there are 2 linked list looks like they suggested to have a size per list.
+			size: 0,
 		},
 		used: state{
 			head: poolIndex{index: 0},
 			tail: poolIndex{index: 0},
+			size: 0,
 		},
 		poolEntities: make([]poolEntity, sizeLimit),
 		ejectionMode: ejectionMode,
@@ -76,8 +92,16 @@ func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode, logger zerolog.Log
 	return l
 }
 
+// can be negative
+func (p *Pool) modifyUsedBy(incrementBy int) {
+	p.used.size += incrementBy
+	p.free.size = len(p.poolEntities) - p.used.size
+}
+
+// DONE size updated
 // initFreeEntities initializes the free double linked-list with the indices of all cached entity poolEntities.
 func (p *Pool) initFreeEntities() {
+
 	p.free.head.setPoolIndex(0)
 	p.free.tail.setPoolIndex(0)
 
@@ -87,6 +111,7 @@ func (p *Pool) initFreeEntities() {
 		// and updates its tail
 		p.free.tail.setPoolIndex(EIndex(i))
 	}
+	p.free.size = len(p.poolEntities)
 }
 
 // Add writes given entity into a poolEntity on the underlying entities linked-list.
@@ -96,6 +121,8 @@ func (p *Pool) initFreeEntities() {
 //
 // If the pool has no available slots and an ejection is set, ejection occurs when adding a new entity.
 // If an ejection occurred, ejectedEntity holds the ejected entity.
+
+// done
 func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 	entityIndex EIndex, slotAvailable bool, ejectedEntity flow.Entity) {
 	entityIndex, slotAvailable, ejectedEntity = p.sliceIndexForEntity()
@@ -103,24 +130,35 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 		p.poolEntities[entityIndex].entity = entity
 		p.poolEntities[entityIndex].id = entityId
 		p.poolEntities[entityIndex].owner = owner
+		//
 		p.poolEntities[entityIndex].node.next.setUndefined()
 		p.poolEntities[entityIndex].node.prev.setUndefined()
 
-		if p.used.head.isUndefined() {
+		if p.used.size == 0 {
 			// used list is empty, hence setting head of used list to current entityIndex.
 			p.used.head.setPoolIndex(entityIndex)
-			p.poolEntities[p.used.head.getSliceIndex()].node.prev.setUndefined()
-		}
-
-		if !p.used.tail.isUndefined() {
-			// links new entity to the tail
+			// as size gonna be non zero tail has to point somewhere and it cant point to 0 anylonger as 0 now
+			// is legitim. Lets then make tail and head concide.
+			p.used.tail.setPoolIndex(entityIndex)
+			// we treat both as undefined prev and next if this node is tail and head so nothing to do
+			//p.poolEntities[p.used.head.getSliceIndex()].node.prev.setUndefined()
+		} else {
+			// if used is non empty then connect to its tail, we expect that eviction conserved valid list
 			p.connect(p.used.tail, entityIndex)
+			// TODO will it work for corner cases like when capasity of pool is 1 or 2 etc ...
+			// since we are appending to the used list, entityIndex also acts as tail of the list.
+			p.used.tail.setPoolIndex(entityIndex)
 		}
+		/*
+			if !p.used.tail.isUndefined() {
+				// links new entity to the tail
+				p.connect(p.used.tail, entityIndex)
+			}*/
 
-		// since we are appending to the used list, entityIndex also acts as tail of the list.
-		p.used.tail.setPoolIndex(entityIndex)
-
+		// not sure why here it is incremented as  p.sliceIndexForEntity() couldve evict one element
+		// may be check for ejectedEntity ?
 		p.size++
+		p.modifyUsedBy(1)
 	}
 
 	return entityIndex, slotAvailable, ejectedEntity
@@ -147,8 +185,8 @@ func (p *Pool) All() []PoolEntity {
 
 // Head returns the head of used items. Assuming no ejection happened and pool never goes beyond limit, Head returns
 // the first inserted element.
-func (p *Pool) Head() (flow.Entity, bool) {
-	if p.used.head.isUndefined() {
+func (p Pool) Head() (flow.Entity, bool) {
+	if p.used.size == 0 {
 		return nil, false
 	}
 	e := p.poolEntities[p.used.head.getSliceIndex()]
@@ -162,6 +200,7 @@ func (p *Pool) Head() (flow.Entity, bool) {
 //
 // Ejection happens if there is no available slot, and there is an ejection mode set.
 // If an ejection occurred, ejectedEntity holds the ejected entity.
+// TODO update size here
 func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedEntity flow.Entity) {
 	lruEject := func() (EIndex, bool, flow.Entity) {
 		// LRU ejection
@@ -240,6 +279,7 @@ func (p *Pool) connect(prev poolIndex, next EIndex) {
 // invalidateUsedHead moves current used head forward by one node. It
 // also removes the entity the invalidated head is presenting and appends the
 // node represented by the used head to the tail of the free list.
+// TODO update size here
 func (p *Pool) invalidateUsedHead() flow.Entity {
 	headSliceIndex := p.used.head.getSliceIndex()
 	return p.invalidateEntityAtIndex(headSliceIndex)
@@ -247,6 +287,7 @@ func (p *Pool) invalidateUsedHead() flow.Entity {
 
 // claimFreeHead moves the free head forward, and returns the slice index of the
 // old free head to host a new entity.
+// TODO update size here
 func (p *Pool) claimFreeHead() EIndex {
 	oldFreeHeadIndex := p.free.head.getSliceIndex()
 	// moves head forward
@@ -273,6 +314,7 @@ func (p *Pool) claimFreeHead() EIndex {
 }
 
 // Remove removes entity corresponding to given getSliceIndex from the list.
+// TODO update size here
 func (p *Pool) Remove(sliceIndex EIndex) flow.Entity {
 	return p.invalidateEntityAtIndex(sliceIndex)
 }
@@ -280,6 +322,7 @@ func (p *Pool) Remove(sliceIndex EIndex) flow.Entity {
 // invalidateEntityAtIndex invalidates the given getSliceIndex in the linked list by
 // removing its corresponding linked-list node from the used linked list, and appending
 // it to the tail of the free list. It also removes the entity that the invalidated node is presenting.
+// TODO update size here
 func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 	poolEntity := p.poolEntities[sliceIndex]
 	prev := poolEntity.node.prev
@@ -329,6 +372,7 @@ func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 
 	// decrements Size
 	p.size--
+	p.modifyUsedBy(-1)
 
 	return invalidatedEntity
 }

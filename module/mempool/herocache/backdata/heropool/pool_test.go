@@ -446,6 +446,10 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 		// adding each element must be successful.
 		entityIndex, slotAvailable, ejectedEntity := pool.Add(e.ID(), e, uint64(i))
 
+		if pool.Size() > 30 {
+			fmt.Println("may be opver limit debug")
+		}
+
 		if i < len(pool.poolEntities) {
 			// in case of no over limit, size of entities linked list should be incremented by each addition.
 			require.Equal(t, pool.Size(), uint32(i+1))
