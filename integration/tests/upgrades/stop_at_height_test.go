@@ -33,58 +33,58 @@ type StopAtHeightRequest struct {
 }
 
 func (s *TestStopAtHeightSuite) TestStopAtHeight() {
-	s.Run("stop at height", func() {
+	enContainer := s.net.ContainerByID(s.exe1ID)
 
-		enContainer := s.net.ContainerByID(s.exe1ID)
+	serverAddr := fmt.Sprintf("localhost:%s", enContainer.Port(testnet.AdminPort))
+	admin := adminClient.NewAdminClient(serverAddr)
 
-		serverAddr := fmt.Sprintf("localhost:%s", enContainer.Port(testnet.AdminPort))
-		admin := adminClient.NewAdminClient(serverAddr)
+	// make sure stop at height admin command is available
+	resp, err := admin.RunCommand(context.Background(), "list-commands", struct{}{})
+	require.NoError(s.T(), err)
+	commandsList, ok := resp.Output.([]interface{})
+	s.True(ok)
+	s.Contains(commandsList, "stop-at-height")
 
-		// make sure stop at height admin command is available
-		resp, err := admin.RunCommand(context.Background(), "list-commands", struct{}{})
-		require.NoError(s.T(), err)
-		commandsList, ok := resp.Output.([]interface{})
-		s.True(ok)
-		s.Contains(commandsList, "stop-at-height")
+	// wait for some blocks being finalized
+	s.BlockState.WaitForHighestFinalizedProgress(s.T(), 2)
 
-		// wait for some blocks being finalized
-		s.BlockState.WaitForHighestFinalizedProgress(s.T(), 2)
+	currentFinalized := s.BlockState.HighestFinalizedHeight()
 
-		currentFinalized := s.BlockState.HighestFinalizedHeight()
+	// stop in 5 blocks
+	stopHeight := currentFinalized + 5
 
-		// stop in 5 blocks
-		stopHeight := currentFinalized + 5
+	stopAtHeightRequest := StopAtHeightRequest{
+		Height: stopHeight,
+		Crash:  true,
+	}
 
-		stopAtHeightRequest := StopAtHeightRequest{
-			Height: stopHeight,
-			Crash:  true,
-		}
+	resp, err = admin.RunCommand(
+		context.Background(),
+		"stop-at-height",
+		stopAtHeightRequest,
+	)
+	s.NoError(err)
+	commandResponse, ok := resp.Output.(string)
+	s.True(ok)
+	s.Equal("ok", commandResponse)
 
-		resp, err = admin.RunCommand(
-			context.Background(),
-			"stop-at-height",
-			stopAtHeightRequest,
-		)
-		s.NoError(err)
-		commandResponse, ok := resp.Output.(string)
-		s.True(ok)
-		s.Equal("ok", commandResponse)
+	shouldExecute := s.BlockState.WaitForBlocksByHeight(s.T(), stopHeight-1)
+	shouldNotExecute := s.BlockState.WaitForBlocksByHeight(s.T(), stopHeight)
 
-		shouldExecute := s.BlockState.WaitForBlocksByHeight(s.T(), stopHeight-1)
-		shouldNotExecute := s.BlockState.WaitForBlocksByHeight(s.T(), stopHeight)
+	s.ReceiptState.WaitForReceiptFrom(s.T(), shouldExecute[0].Header.ID(), s.exe1ID)
+	s.ReceiptState.WaitForNoReceiptFrom(
+		s.T(),
+		5*time.Second,
+		shouldNotExecute[0].Header.ID(),
+		s.exe1ID,
+	)
 
-		s.ReceiptState.WaitForReceiptFrom(s.T(), shouldExecute[0].Header.ID(), s.exe1ID)
-		s.ReceiptState.WaitForNoReceiptFrom(
-			s.T(),
-			5*time.Second,
-			shouldNotExecute[0].Header.ID(),
-			s.exe1ID,
-		)
+	err = enContainer.WaitForContainerStopped(10 * time.Second)
+	s.NoError(err)
 
-		err = enContainer.WaitForContainerStopped(10 * time.Second)
-		s.NoError(err)
-	})
+}
 
+func (s *TestStopAtHeightSuite) TestEmittingVersionBeaconServiceEvent() {
 	// freezePeriodForTheseTests controls the version beacon freeze period. The longer the
 	// freeze period the more blocks we need to wait for the version beacon to take effect,
 	// making the test slower. But if the freeze period is too short
