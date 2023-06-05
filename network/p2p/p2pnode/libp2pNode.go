@@ -46,6 +46,8 @@ const (
 	findPeerQueryTimeout = 10 * time.Second
 )
 
+var _ p2p.LibP2PNode = (*Node)(nil)
+
 // Node is a wrapper around the LibP2P host.
 type Node struct {
 	component.Component
@@ -443,4 +445,14 @@ func (n *Node) SetUnicastManager(uniMgr p2p.UnicastManager) {
 		n.logger.Fatal().Msg("unicast manager already set")
 	}
 	n.uniMgr = uniMgr
+}
+
+func (n *Node) OnDisallowListNotification(update *flownet.DisallowListingUpdate) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (n *Node) OnAllowListNotification(update *flownet.AllowListingUpdate) {
+	//TODO implement me
+	panic("implement me")
 }

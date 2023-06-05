@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
@@ -31,6 +32,9 @@ type LibP2PNode interface {
 	PeerConnections
 	// PeerScore exposes the peer score API.
 	PeerScore
+	// DisallowListNotificationConsumer exposes the disallow list notification consumer API for the node so that
+	// it will be notified when a new disallow list update is distributed.
+	network.DisallowListNotificationConsumer
 	// Start the libp2p node.
 	Start(ctx irrecoverable.SignalerContext)
 	// Stop terminates the libp2p node.
