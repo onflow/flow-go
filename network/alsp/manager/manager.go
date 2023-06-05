@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/common/worker"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -320,6 +321,27 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			// is a positive number. So the penalty is getting closer to zero.
 			// We use math.Min() to make sure the penalty is never positive.
 			record.Penalty = math.Min(record.Penalty+record.Decay, 0)
+
+			// TODO: this can be done in batch but at this stage let's send individual notifications.
+			if record.Penalty == float64(0) {
+				m.disallowListingConsumer.OnAllowListNotification(&network.AllowListingUpdate{
+					FlowIds: flow.IdentifierList{id},
+					Cause:   network.DisallowListedCauseAlsp, // clears the ALSP disallow listing cause from node
+				})
+			}
+
+			// TODO: this can be done in batch but at this stage let's send individual notifications.
+			if record.Penalty < model.DisallowListingThreshold {
+				m.logger.Warn().
+					Str("key", logging.KeySuspicious).
+					Hex("identifier", logging.ID(id)).
+					Msg("node penalty is below threshold, disallow listing")
+				m.disallowListingConsumer.OnDisallowListNotification(&network.DisallowListingUpdate{
+					FlowIds: flow.IdentifierList{id},
+					Cause:   network.DisallowListedCauseAlsp, // sets the ALSP disallow listing cause on node
+				})
+			}
+
 			return record, nil
 		})
 
