@@ -26,7 +26,6 @@ import (
 const (
 	// defaultMisbehaviorReportManagerWorkers is the default number of workers in the worker pool.
 	defaultMisbehaviorReportManagerWorkers = 2
-	FatalMsgNegativePositivePenalty        = "penalty value is positive, expected negative %f"
 )
 
 var (
@@ -106,6 +105,7 @@ type MisbehaviorReportManagerConfig struct {
 	// HeartBeatInterval is the interval between the heartbeats. Heartbeat is a recurring event that is used to
 	// apply recurring actions, e.g., decay the penalty of the misbehaving nodes.
 	HeartBeatInterval time.Duration
+	Opts              []MisbehaviorReportManagerOption
 }
 
 // validate validates the MisbehaviorReportManagerConfig instance. It returns an error if the config is invalid.
@@ -161,7 +161,7 @@ func WithSpamRecordsCacheFactory(f SpamRecordCacheFactory) MisbehaviorReportMana
 //
 //		A new instance of the MisbehaviorReportManager.
 //	 An error if the config is invalid. The error is considered irrecoverable.
-func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...MisbehaviorReportManagerOption) (*MisbehaviorReportManager, error) {
+func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig) (*MisbehaviorReportManager, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration for MisbehaviorReportManager: %w", err)
 	}
@@ -184,12 +184,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 		store,
 		m.processMisbehaviorReport).Build()
 
-	m.workerPool = worker.NewWorkerPoolBuilder[internal.ReportedMisbehaviorWork](
-		cfg.Logger,
-		store,
-		m.processMisbehaviorReport).Build()
-
-	for _, opt := range opts {
+	for _, opt := range cfg.Opts {
 		opt(m)
 	}
 
@@ -201,7 +196,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 	builder := component.NewComponentManagerBuilder()
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		ready()
-		m.startHeartbeatTicks(ctx, cfg.HeartBeatInterval) // blocking call
+		m.heartbeatLoop(ctx, cfg.HeartBeatInterval) // blocking call
 	})
 	for i := 0; i < defaultMisbehaviorReportManagerWorkers; i++ {
 		builder.AddWorker(m.workerPool.WorkerLogic())
@@ -259,7 +254,7 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 	lg.Debug().Msg("misbehavior report submitted")
 }
 
-// startHeartbeatTicks starts the heartbeat ticks ticker to tick at the given intervals. It is a blocking function, and
+// heartbeatLoop starts the heartbeat ticks ticker to tick at the given intervals. It is a blocking function, and
 // should be called in a separate goroutine. It returns when the context is canceled. Hearbeats are recurring events that
 // are used to perform periodic tasks.
 // Args:
@@ -270,7 +265,7 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 // Returns:
 //
 //	none.
-func (m *MisbehaviorReportManager) startHeartbeatTicks(ctx irrecoverable.SignalerContext, interval time.Duration) {
+func (m *MisbehaviorReportManager) heartbeatLoop(ctx irrecoverable.SignalerContext, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	m.logger.Info().Dur("interval", interval).Msg("starting heartbeat ticks")
 	defer ticker.Stop()
@@ -281,21 +276,25 @@ func (m *MisbehaviorReportManager) startHeartbeatTicks(ctx irrecoverable.Signale
 			return
 		case <-ticker.C:
 			m.logger.Trace().Msg("new heartbeat ticked")
-			m.onHeartbeat(ctx)
+			if err := m.onHeartbeat(); err != nil {
+				// any error returned from onHeartbeat is considered irrecoverable.
+				ctx.Throw(fmt.Errorf("failed to perform heartbeat: %w", err))
+			}
 		}
 	}
 }
 
-// onHeartbeat is called upon a startHeartbeatTicks. It encapsulates the recurring tasks that should be performed
+// onHeartbeat is called upon a heartbeatLoop. It encapsulates the recurring tasks that should be performed
 // during a heartbeat, which currently includes decay of the spam records.
 // Args:
 //
-//	ctx: the context.
+//	none.
 //
 // Returns:
 //
-//	none.
-func (m *MisbehaviorReportManager) onHeartbeat(ctx irrecoverable.SignalerContext) {
+//		error: if an error occurs, it is returned. No error is expected during normal operation. Any returned error must
+//	 be considered as irrecoverable.
+func (m *MisbehaviorReportManager) onHeartbeat() error {
 	allIds := m.cache.Identities()
 
 	for _, id := range allIds {
@@ -319,8 +318,7 @@ func (m *MisbehaviorReportManager) onHeartbeat(ctx irrecoverable.SignalerContext
 		// any error here is fatal because it indicates a bug in the cache. All ids being iterated over are in the cache,
 		// and adjust function above should not return an error unless there is a bug.
 		if err != nil {
-			ctx.Throw(fmt.Errorf("failed to decay spam record %x: %w", id, err))
-			return // should be no-op because Throw() is fatal. But just in case to avoid continuing on an invalid state.
+			return fmt.Errorf("failed to decay spam record %x: %w", id, err)
 		}
 
 		m.logger.Trace().
@@ -328,6 +326,8 @@ func (m *MisbehaviorReportManager) onHeartbeat(ctx irrecoverable.SignalerContext
 			Float64("updated_penalty", penalty).
 			Msg("spam record decayed")
 	}
+
+	return nil
 }
 
 // processMisbehaviorReport is the worker function that processes the misbehavior reports.

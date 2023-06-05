@@ -168,6 +168,7 @@ const (
 	FVMEnvProgramLog                 SpanName = "fvm.env.programLog"
 	FVMEnvEmitEvent                  SpanName = "fvm.env.emitEvent"
 	FVMEnvGenerateUUID               SpanName = "fvm.env.generateUUID"
+	FVMEnvGenerateAccountLocalID     SpanName = "fvm.env.generateAccountLocalID"
 	FVMEnvDecodeArgument             SpanName = "fvm.env.decodeArgument"
 	FVMEnvHash                       SpanName = "fvm.env.Hash"
 	FVMEnvVerifySignature            SpanName = "fvm.env.verifySignature"

@@ -399,7 +399,7 @@ func (c *balanceProcessor) ReadStored(address flow.Address, domain common.PathDo
 	receiver, err := rt.ReadStored(
 		addr,
 		cadence.Path{
-			Domain:     domain.Identifier(),
+			Domain:     domain,
 			Identifier: id,
 		},
 	)

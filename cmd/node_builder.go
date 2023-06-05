@@ -222,7 +222,7 @@ type AlspConfig struct {
 	// Note: under normal circumstances, the ALSP module should not be disabled.
 	DisablePenalty bool
 
-	// HearBeatInterval is the interval between heartbeats sent by the ALSP module. The heartbeats are recurring
+	// HeartBeatInterval is the interval between heartbeats sent by the ALSP module. The heartbeats are recurring
 	// events that are used to perform critical ALSP tasks, such as updating the spam records cache.
 	HearBeatInterval time.Duration
 }
@@ -295,14 +295,17 @@ type NodeConfig struct {
 // StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.
 type StateExcerptAtBoot struct {
 	// properties of RootSnapshot for convenience
-	RootBlock   *flow.Block
-	RootQC      *flow.QuorumCertificate
-	RootResult  *flow.ExecutionResult
-	RootSeal    *flow.Seal
-	RootChainID flow.ChainID
-	SporkID     flow.Identifier
-	// finalized block for use in bootstrapping
-	FinalizedHeader *flow.Header
+	// For node bootstrapped with a root snapshot for the first block of a spork,
+	// 		FinalizedRootBlock and SealedRootBlock are the same block (special case of self-sealing block)
+	// For node bootstrapped with a root snapshot for a block above the first block of a spork (dynamically bootstrapped),
+	// 		FinalizedRootBlock.Height > SealedRootBlock.Height
+	FinalizedRootBlock *flow.Block             // The last finalized block when bootstrapped.
+	SealedRootBlock    *flow.Block             // The last sealed block when bootstrapped.
+	RootQC             *flow.QuorumCertificate // QC for Finalized Root Block
+	RootResult         *flow.ExecutionResult   // Result for SealedRootBlock
+	RootSeal           *flow.Seal              //Seal for RootResult
+	RootChainID        flow.ChainID
+	SporkID            flow.Identifier
 }
 
 func DefaultBaseConfig() *BaseConfig {

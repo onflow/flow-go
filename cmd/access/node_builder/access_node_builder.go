@@ -49,8 +49,10 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
@@ -215,7 +217,7 @@ type FlowAccessNodeBuilder struct {
 	CollectionsToMarkFinalized *stdmap.Times
 	CollectionsToMarkExecuted  *stdmap.Times
 	BlocksToMarkExecuted       *stdmap.Times
-	TransactionMetrics         module.TransactionMetrics
+	TransactionMetrics         *metrics.TransactionCollector
 	AccessMetrics              module.AccessMetrics
 	PingMetrics                module.PingMetrics
 	Committee                  hotstuff.DynamicCommittee
@@ -226,6 +228,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataDownloader    execution_data.Downloader
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
 	ExecutionDataStore         execution_data.ExecutionDataStore
+	ExecutionDataCache         *execdatacache.ExecutionDataCache
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -319,7 +322,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 			node.Storage.Headers,
 			final,
 			builder.FollowerDistributor,
-			node.RootBlock.Header,
+			node.FinalizedRootBlock.Header,
 			node.RootQC,
 			builder.Finalized,
 			builder.Pending,
@@ -423,6 +426,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
+	var execDataCacheBackend *herocache.BlockExecutionData
 
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -501,10 +505,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Validation of the start block height needs to be done after loading state
 			if builder.executionDataStartHeight > 0 {
-				if builder.executionDataStartHeight <= builder.RootBlock.Header.Height {
+				if builder.executionDataStartHeight <= builder.FinalizedRootBlock.Header.Height {
 					return nil, fmt.Errorf(
 						"execution data start block height (%d) must be greater than the root block height (%d)",
-						builder.executionDataStartHeight, builder.RootBlock.Header.Height)
+						builder.executionDataStartHeight, builder.FinalizedRootBlock.Header.Height)
 				}
 
 				latestSeal, err := builder.State.Sealed().Head()
@@ -526,21 +530,36 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				// requester expects the initial last processed height, which is the first height - 1
 				builder.executionDataConfig.InitialBlockHeight = builder.executionDataStartHeight - 1
 			} else {
-				builder.executionDataConfig.InitialBlockHeight = builder.RootBlock.Header.Height
+				builder.executionDataConfig.InitialBlockHeight = builder.FinalizedRootBlock.Header.Height
 			}
 
 			execDataDistributor = edrequester.NewExecutionDataDistributor()
+
+			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if builder.HeroCacheMetricsEnable {
+				heroCacheCollector = metrics.AccessNodeExecutionDataCacheMetrics(builder.MetricsRegisterer)
+			}
+
+			execDataCacheBackend = herocache.NewBlockExecutionData(builder.stateStreamConf.ExecutionDataCacheSize, builder.Logger, heroCacheCollector)
+			// Execution Data cache with a downloader as the backend. This is used by the requester
+			// to download and cache execution data for each block.
+			executionDataCache := execdatacache.NewExecutionDataCache(
+				builder.ExecutionDataDownloader,
+				builder.Storage.Headers,
+				builder.Storage.Seals,
+				builder.Storage.Results,
+				execDataCacheBackend,
+			)
 
 			builder.ExecutionDataRequester = edrequester.New(
 				builder.Logger,
 				metrics.NewExecutionDataRequesterCollector(),
 				builder.ExecutionDataDownloader,
+				executionDataCache,
 				processedBlockHeight,
 				processedNotifications,
 				builder.State,
 				builder.Storage.Headers,
-				builder.Storage.Results,
-				builder.Storage.Seals,
 				builder.executionDataConfig,
 			)
 
@@ -564,24 +583,37 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			}
 			builder.stateStreamConf.RpcMetricsEnabled = builder.rpcMetricsEnabled
 
-			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-			if builder.HeroCacheMetricsEnable {
-				heroCacheCollector = metrics.AccessNodeExecutionDataCacheMetrics(builder.MetricsRegisterer)
+			// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
+			// This ensures that it simply returns a not found error if the blob doesn't exist
+			// instead of attempting to download it from the network. It shares a cache backend instance
+			// with the requester's implementation.
+			executionDataCache := execdatacache.NewExecutionDataCache(
+				builder.ExecutionDataStore,
+				builder.Storage.Headers,
+				builder.Storage.Seals,
+				builder.Storage.Results,
+				execDataCacheBackend,
+			)
+
+			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
+			if err != nil {
+				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
 			}
 
 			stateStreamEng, err := state_stream.NewEng(
 				node.Logger,
 				builder.stateStreamConf,
 				builder.ExecutionDataStore,
+				executionDataCache,
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Results,
 				node.RootChainID,
 				builder.executionDataConfig.InitialBlockHeight,
+				highestAvailableHeight,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
-				heroCacheCollector,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
@@ -727,22 +759,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	topology network.Topology,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
-	cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-		Logger:                  builder.Logger,
-		SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
-		SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
-		DisablePenalty:          builder.AlspConfig.DisablePenalty,
-		HeartBeatInterval:       builder.AlspConfig.HearBeatInterval,
-		AlspMetrics:             builder.Metrics.Network,
-		NetworkType:             network.PublicNetwork,
-		HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize conduit factory: %w", err)
-	}
-
-	// creates network instance
-	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
 		Logger:              builder.Logger,
 		Codec:               cborcodec.NewCodec(),
 		Me:                  nodeID,
@@ -752,7 +769,17 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		Metrics:             networkMetrics,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
-		ConduitFactory:      cf,
+		ConduitFactory:      conduit.NewDefaultConduitFactory(),
+		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  builder.Logger,
+			SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
+			SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
+			DisablePenalty:          builder.AlspConfig.DisablePenalty,
+			HeartBeatInterval:       builder.AlspConfig.HearBeatInterval,
+			AlspMetrics:             builder.Metrics.Network,
+			NetworkType:             network.PublicNetwork,
+			HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -926,12 +953,20 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return err
 		}).
 		Module("transaction metrics", func(node *cmd.NodeConfig) error {
-			builder.TransactionMetrics = metrics.NewTransactionCollector(builder.TransactionTimings, node.Logger, builder.logTxTimeToFinalized,
-				builder.logTxTimeToExecuted, builder.logTxTimeToFinalizedExecuted)
+			builder.TransactionMetrics = metrics.NewTransactionCollector(
+				node.Logger,
+				builder.TransactionTimings,
+				builder.logTxTimeToFinalized,
+				builder.logTxTimeToExecuted,
+				builder.logTxTimeToFinalizedExecuted,
+			)
 			return nil
 		}).
 		Module("access metrics", func(node *cmd.NodeConfig) error {
-			builder.AccessMetrics = metrics.NewAccessCollector()
+			builder.AccessMetrics = metrics.NewAccessCollector(
+				metrics.WithTransactionMetrics(builder.TransactionMetrics),
+				metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
+			)
 			return nil
 		}).
 		Module("ping metrics", func(node *cmd.NodeConfig) error {
@@ -962,7 +997,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Receipts,
 				node.Storage.Results,
 				node.RootChainID,
-				builder.TransactionMetrics,
 				builder.AccessMetrics,
 				builder.collectionGRPCPort,
 				builder.executionGRPCPort,
@@ -1016,7 +1050,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Transactions,
 				node.Storage.Results,
 				node.Storage.Receipts,
-				builder.TransactionMetrics,
+				builder.AccessMetrics,
 				builder.CollectionsToMarkFinalized,
 				builder.CollectionsToMarkExecuted,
 				builder.BlocksToMarkExecuted,
