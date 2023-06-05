@@ -27,6 +27,7 @@ import (
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -530,8 +531,11 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		SetGossipSubRpcInspectorSuite(rpcInspectorSuite)
 
 	if gossipCfg.PeerScoring {
+		peerScoreCfg := &p2p.PeerScoringConfig{
+			TopicScoreParams: scoring.DefaultTopicScoreParams(sporkId),
+		}
 		// currently, we only enable peer scoring with default parameters. So, we set the score parameters to nil.
-		builder.EnableGossipSubPeerScoring(idProvider, nil)
+		builder.EnableGossipSubPeerScoring(idProvider, peerScoreCfg)
 	}
 
 	meshTracer := tracer.NewGossipSubMeshTracer(log, metricsCfg.Metrics, idProvider, gossipCfg.LocalMeshLogInterval)

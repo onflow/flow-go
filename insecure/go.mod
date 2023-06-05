@@ -269,3 +269,4 @@ require (
 )
 
 replace github.com/onflow/flow-go => ../
+replace github.com/yhassanzadeh13/go-libp2p-pubsub => ../../go-libp2p-pubsub
