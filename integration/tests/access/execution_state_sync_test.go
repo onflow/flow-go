@@ -92,7 +92,7 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 		testnet.AsGhost())
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		testnet.WithLogLevel(zerolog.FatalLevel),

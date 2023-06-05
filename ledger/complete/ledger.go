@@ -332,8 +332,6 @@ func (l *Ledger) Checkpointer() (*realWAL.Checkpointer, error) {
 func (l *Ledger) ExportCheckpointAt(
 	state ledger.State,
 	migrations []ledger.Migration,
-	preCheckpointReporters []ledger.Reporter,
-	postCheckpointReporters []ledger.Reporter,
 	targetPathFinderVersion uint8,
 	outputDir, outputFile string,
 ) (ledger.State, error) {
@@ -370,9 +368,6 @@ func (l *Ledger) ExportCheckpointAt(
 	if noMigration {
 		// when there is no migration, reuse the trie without rebuilding it
 		newTrie = t
-		// when there is no migration, we don't generate the payloads here until later running the
-		// postCheckpointReporters, because the ExportReporter is currently the only
-		// preCheckpointReporters, which doesn't use the payloads.
 	} else {
 		// get all payloads
 		payloads = t.AllPayloads()
@@ -428,20 +423,6 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
 
-	l.logger.Info().Msgf("running pre-checkpoint reporters")
-	// run post migration reporters
-	for i, reporter := range preCheckpointReporters {
-		l.logger.Info().Msgf("running a pre-checkpoint generation reporter: %s, (%v/%v)", reporter.Name(), i, len(preCheckpointReporters))
-		err := runReport(reporter, payloads, statecommitment, l.logger)
-		if err != nil {
-			return ledger.State(hash.DummyHash), err
-		}
-	}
-
-	l.logger.Info().Msgf("finished running pre-checkpoint reporters")
-
-	l.logger.Info().Msg("creating a checkpoint for the new trie, storing the checkpoint to the file")
-
 	err = os.MkdirAll(outputDir, os.ModePerm)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("could not create output dir %s: %w", outputDir, err)
@@ -461,25 +442,6 @@ func (l *Ledger) ExportCheckpointAt(
 	}
 
 	l.logger.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
-
-	l.logger.Info().Msgf("start running post-checkpoint reporters")
-
-	if noMigration {
-		// when there is no mgiration, we generate the payloads now before
-		// running the postCheckpointReporters
-		payloads = newTrie.AllPayloads()
-	}
-
-	// running post checkpoint reporters
-	for i, reporter := range postCheckpointReporters {
-		l.logger.Info().Msgf("running a post-checkpoint generation reporter: %s, (%v/%v)", reporter.Name(), i, len(postCheckpointReporters))
-		err := runReport(reporter, payloads, statecommitment, l.logger)
-		if err != nil {
-			return ledger.State(hash.DummyHash), err
-		}
-	}
-
-	l.logger.Info().Msgf("ran all post-checkpoint reporters")
 
 	return statecommitment, nil
 }
@@ -511,25 +473,6 @@ func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
 	l.wal.PauseRecord()
 	defer l.wal.UnpauseRecord()
 	return l.forest.PurgeCacheExcept(ledger.RootHash(state))
-}
-
-func runReport(r ledger.Reporter, p []ledger.Payload, commit ledger.State, l zerolog.Logger) error {
-	l.Info().
-		Str("name", r.Name()).
-		Msg("starting reporter")
-
-	start := time.Now()
-	err := r.Report(p, commit)
-	elapsed := time.Since(start)
-
-	l.Info().
-		Str("timeTaken", elapsed.String()).
-		Str("name", r.Name()).
-		Msg("reporter done")
-	if err != nil {
-		return fmt.Errorf("error running reporter (%s): %w", r.Name(), err)
-	}
-	return nil
 }
 
 func writeStatusFile(fileName string, e error) error {

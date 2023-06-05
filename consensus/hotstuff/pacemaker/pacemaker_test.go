@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
@@ -46,7 +47,7 @@ type ActivePaceMakerTestSuite struct {
 	initialTC   *flow.TimeoutCertificate
 
 	notifier                 *mocks.Consumer
-	proposalDurationProvider ProposalDurationProvider
+	proposalDurationProvider hotstuff.ProposalDurationProvider
 	persist                  *mocks.Persister
 	paceMaker                *ActivePaceMaker
 	stop                     context.CancelFunc
@@ -422,23 +423,16 @@ func (s *ActivePaceMakerTestSuite) Test_Initialization() {
 
 }
 
-type dynamicProposalDurationProvider struct {
-	dur time.Duration
-}
-
-func (p *dynamicProposalDurationProvider) ProposalDuration() time.Duration {
-	return p.dur
-}
-
 // TestProposalDuration tests that the active pacemaker forwards proposal duration values from the provider.
 func (s *ActivePaceMakerTestSuite) TestProposalDuration() {
-	proposalDurationProvider := &dynamicProposalDurationProvider{dur: time.Millisecond * 500}
-	pm, err := New(timeout.NewController(s.timeoutConf), proposalDurationProvider, s.notifier, s.persist)
+	proposalDurationProvider := NewStaticProposalDurationProvider(time.Millisecond * 500)
+	pm, err := New(timeout.NewController(s.timeoutConf), &proposalDurationProvider, s.notifier, s.persist)
 	require.NoError(s.T(), err)
 
-	assert.Equal(s.T(), time.Millisecond*500, pm.BlockRateDelay())
+	now := time.Now().UTC()
+	assert.Equal(s.T(), now.Add(time.Millisecond*500), pm.TargetPublicationTime(117, now, unittest.IdentifierFixture()))
 	proposalDurationProvider.dur = time.Second
-	assert.Equal(s.T(), time.Second, pm.BlockRateDelay())
+	assert.Equal(s.T(), now.Add(time.Second), pm.TargetPublicationTime(117, now, unittest.IdentifierFixture()))
 }
 
 func max(a uint64, values ...uint64) uint64 {

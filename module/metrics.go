@@ -349,12 +349,12 @@ type CruiseCtlMetrics interface {
 	// and derivative terms of the PID controller.
 	PIDError(p, i, d float64)
 
-	// TargetProposalDuration measures the current value of the Block Rate Controller output:
-	// the target duration for a proposal, from entering the view to broadcasting.
+	// TargetProposalDuration measures the current value of the Block Time Controller output:
+	// the target duration from parent to child proposal.
 	TargetProposalDuration(duration time.Duration)
 
 	// ControllerOutput measures the output of the cruise control PID controller.
-	// Concretely, this is the quantity to subtract from the baseline proposal duration.
+	// Concretely, this is the quantity to subtract from the baseline view duration.
 	ControllerOutput(duration time.Duration)
 }
 
