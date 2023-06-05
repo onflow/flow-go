@@ -282,6 +282,7 @@ func TestReportCreation(t *testing.T) {
 // In other words, variation of input values do not cause a nil ALSP manager to be created or a panic.
 func TestNewMisbehaviorReportManager(t *testing.T) {
 	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
 		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
@@ -291,25 +292,25 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 	}
 
 	t.Run("with default values", func(t *testing.T) {
-		m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+		m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 		require.NoError(t, err)
 		assert.NotNil(t, m)
 	})
 
 	t.Run("with a custom spam record cache", func(t *testing.T) {
-		m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+		m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 		require.NoError(t, err)
 		assert.NotNil(t, m)
 	})
 
 	t.Run("with ALSP module enabled", func(t *testing.T) {
-		m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+		m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 		require.NoError(t, err)
 		assert.NotNil(t, m)
 	})
 
 	t.Run("with ALSP module disabled", func(t *testing.T) {
-		m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+		m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 		require.NoError(t, err)
 		assert.NotNil(t, m)
 	})
@@ -319,10 +320,11 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 // It is a minimum viable test that ensures that a nil ALSP manager is created with invalid set of inputs.
 func TestMisbehaviorReportManager_InitializationError(t *testing.T) {
 	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	t.Run("missing spam report queue size", func(t *testing.T) {
 		cfg.SpamReportQueueSize = 0
-		m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+		m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 		require.Error(t, err)
 		require.ErrorIs(t, err, alspmgr.ErrSpamReportQueueSizeNotSet)
 		assert.Nil(t, m)
@@ -330,7 +332,7 @@ func TestMisbehaviorReportManager_InitializationError(t *testing.T) {
 
 	t.Run("missing spam record cache size", func(t *testing.T) {
 		cfg.SpamRecordCacheSize = 0
-		m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+		m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 		require.Error(t, err)
 		require.ErrorIs(t, err, alspmgr.ErrSpamRecordCacheSizeNotSet)
 		assert.Nil(t, m)
@@ -338,7 +340,7 @@ func TestMisbehaviorReportManager_InitializationError(t *testing.T) {
 
 	t.Run("missing heartbeat intervals", func(t *testing.T) {
 		cfg.HeartBeatInterval = 0
-		m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+		m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 		require.Error(t, err)
 		require.ErrorIs(t, err, alspmgr.ErrSpamRecordCacheSizeNotSet)
 		assert.Nil(t, m)
@@ -349,6 +351,8 @@ func TestMisbehaviorReportManager_InitializationError(t *testing.T) {
 // The test ensures that the misbehavior report is handled correctly and the penalty is applied to the peer in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
+
 	// create a new MisbehaviorReportManager
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
@@ -358,7 +362,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 		}),
 	}
 
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -402,6 +406,8 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 // The test ensures that the misbehavior is reported on metrics but the penalty is not applied to the peer in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReport_PenaltyDisable(t *testing.T) {
 	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
+
 	cfg.DisablePenalty = true // disable penalty for misbehavior reports
 	alspMetrics := mockmodule.NewAlspMetrics(t)
 	cfg.AlspMetrics = alspMetrics
@@ -414,7 +420,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport_PenaltyDisable(t *testing.T
 			return cache
 		}),
 	}
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -459,6 +465,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport_PenaltyDisable(t *testing.T
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the peer in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentially(t *testing.T) {
 	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	// create a new MisbehaviorReportManager
 	var cache alsp.SpamRecordCache
@@ -468,7 +475,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentiall
 			return cache
 		}),
 	}
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -520,6 +527,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentiall
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the peer in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrently(t *testing.T) {
 	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
@@ -528,7 +536,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 			return cache
 		}),
 	}
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -589,6 +597,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 // The test ensures that each misbehavior report is handled correctly and the penalties are applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequentially(t *testing.T) {
 	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
@@ -597,7 +606,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequential
 			return cache
 		}),
 	}
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -648,6 +657,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequential
 // The test ensures that each misbehavior report is handled correctly and the penalties are applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrently(t *testing.T) {
 	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
@@ -656,7 +666,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 			return cache
 		}),
 	}
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -717,6 +727,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequentially(t *testing.T) {
 	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
@@ -725,7 +736,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 			return cache
 		}),
 	}
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -798,6 +809,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 // The test ensures that each misbehavior report is handled correctly and the penalties are cumulatively applied to the corresponding peers in the cache.
 func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurrently(t *testing.T) {
 	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
@@ -806,7 +818,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurre
 			return cache
 		}),
 	}
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -872,6 +884,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurre
 // is uniquely identifying a traffic violation, even though the description of the violation is the same.
 func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *testing.T) {
 	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
@@ -880,7 +893,7 @@ func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *t
 			return cache
 		}),
 	}
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -938,6 +951,7 @@ func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *t
 // is decayed after a single heartbeat. The test guarantees waiting for at least one heartbeat by waiting for the first decay to happen.
 func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
@@ -946,7 +960,7 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 			return cache
 		}),
 	}
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -1026,6 +1040,7 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 // The test ensures that the misbehavior penalty is decayed with a linear progression within multiple heartbeats.
 func TestDecayMisbehaviorPenalty_MultipleHeartbeats(t *testing.T) {
 	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
@@ -1034,7 +1049,7 @@ func TestDecayMisbehaviorPenalty_MultipleHeartbeats(t *testing.T) {
 			return cache
 		}),
 	}
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -1114,6 +1129,7 @@ func TestDecayMisbehaviorPenalty_MultipleHeartbeats(t *testing.T) {
 // The test ensures that the misbehavior penalty is decayed with a linear progression within multiple heartbeats.
 func TestDecayMisbehaviorPenalty_DecayToZero(t *testing.T) {
 	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
@@ -1122,7 +1138,7 @@ func TestDecayMisbehaviorPenalty_DecayToZero(t *testing.T) {
 			return cache
 		}),
 	}
-	m, err := alspmgr.NewMisbehaviorReportManager(cfg)
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
 	require.NoError(t, err)
 
 	// start the ALSP manager
@@ -1177,6 +1193,12 @@ func TestDecayMisbehaviorPenalty_DecayToZero(t *testing.T) {
 
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
+
+	// eventually, we expect the ALSP manager to emit an allow list notification to the network layer when the penalty is decayed to zero.
+	consumer.On("OnAllowListNotification", &network.AllowListingUpdate{
+		FlowIds: flow.IdentifierList{report.OriginId()},
+		Cause:   network.DisallowListedCauseAlsp,
+	}).Return(nil).Once()
 
 	// phase-2: default decay speed is 1000 and with 10 penalties in range of [-1, -10], the penalty should be decayed to zero in
 	// a single heartbeat.
