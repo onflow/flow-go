@@ -233,8 +233,15 @@ func getDeductedFees(tb testing.TB, tctx transactionTypeContext, results fuzzRes
 	if feesDeductedEvent.Type() == nil {
 		return 0, false
 	}
-	fees, ok = feesDeductedEvent.Fields[0].(cadence.UFix64)
-	require.True(tb, ok, "FeesDeducted[0] event should be of type cadence.UFix64.")
+
+	for i, f := range feesDeductedEvent.Type().(*cadence.EventType).Fields {
+		if f.Identifier == "amount" {
+			fees, ok = feesDeductedEvent.Fields[i].(cadence.UFix64)
+			require.True(tb, ok, "FeesDeducted event amount field should be of type cadence.UFix64.")
+			break
+		}
+	}
+
 	return fees, true
 }
 
