@@ -41,7 +41,6 @@ import (
 // The test ensures that the MisbehaviorReportManager receives and handles all reported misbehavior
 // without any duplicate reports and within a specified time.
 func TestNetworkPassesReportedMisbehavior(t *testing.T) {
-	cfg := managerCfgFixture()
 	misbehaviorReportManger := mocknetwork.NewMisbehaviorReportManager(t)
 	misbehaviorReportManger.On("Start", mock.Anything).Return().Once()
 
