@@ -317,6 +317,23 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 				return record, fmt.Errorf("illegal state: spam record %x has non-positive decay %f", id, record.Decay)
 			}
 
+			// TODO: this can be done in batch but at this stage let's send individual notifications.
+			if record.Penalty < model.DisallowListingThreshold {
+				// cutoff counter keeps track of how many times the penalty has been below the threshold.
+				record.CutoffCounter++
+
+				m.logger.Warn().
+					Str("key", logging.KeySuspicious).
+					Hex("identifier", logging.ID(id)).
+					Uint64("cutoff_counter", record.CutoffCounter).
+					Msg("node penalty is below threshold, disallow listing")
+				m.disallowListingConsumer.OnDisallowListNotification(&network.DisallowListingUpdate{
+					FlowIds: flow.IdentifierList{id},
+					Cause:   network.DisallowListedCauseAlsp, // sets the ALSP disallow listing cause on node
+				})
+
+			}
+
 			// each time we decay the penalty by the decay speed, the penalty is a negative number, and the decay speed
 			// is a positive number. So the penalty is getting closer to zero.
 			// We use math.Min() to make sure the penalty is never positive.
@@ -327,18 +344,6 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 				m.disallowListingConsumer.OnAllowListNotification(&network.AllowListingUpdate{
 					FlowIds: flow.IdentifierList{id},
 					Cause:   network.DisallowListedCauseAlsp, // clears the ALSP disallow listing cause from node
-				})
-			}
-
-			// TODO: this can be done in batch but at this stage let's send individual notifications.
-			if record.Penalty < model.DisallowListingThreshold {
-				m.logger.Warn().
-					Str("key", logging.KeySuspicious).
-					Hex("identifier", logging.ID(id)).
-					Msg("node penalty is below threshold, disallow listing")
-				m.disallowListingConsumer.OnDisallowListNotification(&network.DisallowListingUpdate{
-					FlowIds: flow.IdentifierList{id},
-					Cause:   network.DisallowListedCauseAlsp, // sets the ALSP disallow listing cause on node
 				})
 			}
 

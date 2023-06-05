@@ -1215,6 +1215,88 @@ func TestDecayMisbehaviorPenalty_DecayToZero(t *testing.T) {
 	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
 }
 
+// TestDisallowListNotification tests the emission of the allow list notification to the network layer when the misbehavior
+// penalty of a node is dropped below the disallow-listing threshold. The test ensures that the disallow list notification is
+// emitted to the network layer when the misbehavior penalty is dropped below the disallow-listing threshold and that the
+// cutoff counter of the spam record for the misbehaving node is incremented indicating that the node is disallow-listed once.
+func TestDisallowListNotification(t *testing.T) {
+	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
+
+	var cache alsp.SpamRecordCache
+	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return cache
+		}),
+	}
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
+	require.NoError(t, err)
+
+	// start the ALSP manager
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
+	}()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	m.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
+
+	// creates a single misbehavior report
+	originId := unittest.IdentifierFixture()
+	report := misbehaviorReportFixtureWithDefaultPenalty(t, originId)
+	require.Less(t, report.Penalty(), float64(0)) // ensure the penalty is negative
+
+	channel := channels.Channel("test-channel")
+
+	// reporting the same misbehavior 120 times, should result in a single disallow list notification, since each
+	// misbehavior report is reported with the same penalty 0.01 * diallowlisting-threshold. We go over the threshold
+	// to ensure that the disallow list notification is emitted only once.
+	times := 120
+	wg := sync.WaitGroup{}
+	wg.Add(times)
+
+	// concurrently reports the same misbehavior report twice
+	for i := 0; i < times; i++ {
+		go func() {
+			defer wg.Done()
+
+			m.HandleMisbehaviorReport(channel, report)
+		}()
+	}
+
+	// at this point, we expect a single disallow list notification to be emitted to the network layer when all the misbehavior
+	// reports are processed by the ALSP manager (the notification is emitted when at the next heartbeat).
+	consumer.On("OnDisallowListNotification", &network.DisallowListingUpdate{
+		FlowIds: flow.IdentifierList{report.OriginId()},
+		Cause:   network.DisallowListedCauseAlsp,
+	}).Return().Once()
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
+
+	require.Eventually(t, func() bool {
+		// check if the misbehavior reports have been processed by verifying that the Adjust method was called on the cache
+		record, ok := cache.Get(originId)
+		if !ok {
+			return false
+		}
+		require.NotNil(t, record)
+
+		// eventually, the penalty should be the accumulated penalty of all the duplicate misbehavior reports (with the default decay).
+		// the decay is added to the penalty as we allow for a single heartbeat before the disallow list notification is emitted.
+		if record.Penalty != report.Penalty()*float64(times)+record.Decay {
+			return false
+		}
+		// cuttoff counter should be incremented since the penalty is above the disallowlisting threshold.
+		require.Equal(t, uint64(1), record.CutoffCounter)
+		// the decay should be the default decay value.
+		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+
+		return true
+	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
+}
+
 // misbehaviorReportFixture creates a mock misbehavior report for a single origin id.
 // Args:
 // - t: the testing.T instance
