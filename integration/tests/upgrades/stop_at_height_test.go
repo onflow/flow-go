@@ -27,8 +27,6 @@ type StopAtHeightRequest struct {
 }
 
 func (s *TestStopAtHeightSuite) TestStopAtHeight() {
-	// TODO: fix
-	s.T().Skip("This tests interacts with TestServiceEventVersionControl")
 
 	enContainer := s.net.ContainerByID(s.exe1ID)
 
