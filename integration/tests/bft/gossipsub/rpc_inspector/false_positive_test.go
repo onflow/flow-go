@@ -31,7 +31,7 @@ func (s *GossipsubRPCInstpectorFalePostiveNotificationsTestSuite) TestGossipsubR
 	// We wait for each of these transactions to be sealed ensuring we generate
 	// some artificial network activity.
 	go s.loaderLoop(ctx, numOfTestAccounts, loaderLoopInterval)
-	// wait for 25 finalized heights to ensure simulated load on network
+	// wait 5 state commitment changes, this ensures we simulated load on network as expected.
 	s.waitForStateCommitments(s.Ctx, 5, 30*time.Second, 500*time.Millisecond)
 
 	// ensure no node in the network has disseminated an invalid control message notification
