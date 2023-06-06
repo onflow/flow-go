@@ -8,7 +8,7 @@ import (
 
 const numOfTestAccounts = 5
 
-type GossipsubRPCInstpectorFalePostiveNotificationsTestSuite struct {
+type GossipSubRpcInspectorFalsePositiveNotificationsTestSuite struct {
 	Suite
 }
 
