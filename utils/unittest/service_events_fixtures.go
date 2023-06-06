@@ -554,8 +554,11 @@ func createEpochCollectors() cadence.Array {
 		// totalWeight
 		cadence.NewUInt64(100),
 
-		// votes
-		cadence.NewArray(nil).WithType(cadence.NewVariableSizedArrayType(voteType)),
+		// generatedVotes
+		cadence.NewDictionary(nil).WithType(cadence.NewDictionaryType(cadence.StringType{}, voteType)),
+
+		// uniqueVoteMessageTotalWeights
+		cadence.NewDictionary(nil).WithType(cadence.NewDictionaryType(cadence.StringType{}, cadence.UInt64Type{})),
 	}).WithType(clusterType)
 
 	cluster2 := cadence.NewStruct([]cadence.Value{
@@ -577,8 +580,11 @@ func createEpochCollectors() cadence.Array {
 		// totalWeight
 		cadence.NewUInt64(0),
 
-		// votes
-		cadence.NewArray(nil).WithType(cadence.NewVariableSizedArrayType(voteType)),
+		// generatedVotes
+		cadence.NewDictionary(nil).WithType(cadence.NewDictionaryType(cadence.StringType{}, voteType)),
+
+		// uniqueVoteMessageTotalWeights
+		cadence.NewDictionary(nil).WithType(cadence.NewDictionaryType(cadence.StringType{}, cadence.UInt64Type{})),
 	}).WithType(clusterType)
 
 	return cadence.NewArray([]cadence.Value{
@@ -746,8 +752,12 @@ func newFlowClusterQCClusterStructType() *cadence.StructType {
 				Type:       cadence.UInt64Type{},
 			},
 			{
-				Identifier: "votes",
-				Type:       cadence.NewVariableSizedArrayType(newFlowClusterQCVoteStructType()),
+				Identifier: "generatedVotes",
+				Type:       cadence.NewDictionaryType(cadence.StringType{}, newFlowClusterQCVoteStructType()),
+			},
+			{
+				Identifier: "uniqueVoteMessageTotalWeights",
+				Type:       cadence.NewDictionaryType(cadence.StringType{}, cadence.UInt64Type{}),
 			},
 		},
 	}
