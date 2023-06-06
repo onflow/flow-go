@@ -1,7 +1,9 @@
 package rpc_inspector
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -21,12 +23,18 @@ func TestGossipSubRpcInspectorFalsePositiveNotifications(t *testing.T) {
 // control message notification is disseminated. Using this fact, this tests sets up a full flow network and submits some transactions to generate network
 // activity. After some time we ensure that no invalid control message notifications are disseminated.
 func (s *GossipsubRPCInstpectorFalePostiveNotificationsTestSuite) TestGossipsubRPCInstpectorFalePostiveNotifications() {
+	loaderLoopDuration := 5 * time.Second
+	loaderLoopInterval := 500 * time.Millisecond
+	ctx, cancel := context.WithTimeout(s.Ctx, loaderLoopDuration)
+	defer cancel()
 	// the network has started submit some transactions to create flow accounts.
 	// We wait for each of these transactions to be sealed ensuring we generate
-	// some artificial network activity
-	for i := 0; i < numOfTestAccounts; i++ {
-		s.submitSmokeTestTransaction(s.Ctx)
-	}
+	// some artificial network activity.
+	go s.loaderLoop(ctx, numOfTestAccounts, loaderLoopInterval)
+	time.Sleep(loaderLoopDuration)
+	// wait for 25 finalized heights to ensure simulated load on network
+	s.waitForHeights(s.Ctx, 25, 10*time.Second, 500*time.Millisecond)
+
 	// ensure no node in the network has disseminated an invalid control message notification
 	metricName := s.inspectorNotifQSizeMetricName()
 	metricsByContainer := s.Net.GetMetricFromContainers(s.T(), metricName, s.metricsUrls())

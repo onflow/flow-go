@@ -3,6 +3,7 @@ package rpc_inspector
 import (
 	"context"
 	"fmt"
+	"time"
 
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
@@ -79,4 +80,43 @@ func (s *Suite) metricsUrls() map[string]string {
 		urls[containerName] = fmt.Sprintf("http://0.0.0.0:%s/metrics", port)
 	}
 	return urls
+}
+
+// loaderLoop submits load to the network in the form of account creation on the provided interval simulating some network traffic.
+func (s *Suite) loaderLoop(ctx context.Context, numOfTestAccounts int, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				for i := 0; i < numOfTestAccounts; i++ {
+					s.submitSmokeTestTransaction(s.Ctx)
+				}
+			}
+		}
+	}()
+}
+
+// waitForHeights waits for n number of finalized heights.
+func (s *Suite) waitForHeights(ctx context.Context, n uint64, waitFor, tick time.Duration) {
+	startHeight := s.getCurrentFinalizedHeight(ctx)
+	require.Eventually(s.T(), func() bool {
+		currHeight := s.getCurrentFinalizedHeight(ctx)
+		if currHeight-startHeight == n {
+			return true
+		}
+		return false
+	}, waitFor, tick)
+}
+
+// getCurrentFinalizedHeight returns the current finalized height.
+func (s *Suite) getCurrentFinalizedHeight(ctx context.Context) uint64 {
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	finalized, err := snapshot.Head()
+	require.NoError(s.T(), err)
+	return finalized.Height
 }
