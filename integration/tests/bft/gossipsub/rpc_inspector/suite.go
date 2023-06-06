@@ -100,23 +100,28 @@ func (s *Suite) loaderLoop(ctx context.Context, numOfTestAccounts int, interval 
 	}()
 }
 
-// waitForHeights waits for n number of finalized heights.
-func (s *Suite) waitForHeights(ctx context.Context, n uint64, waitFor, tick time.Duration) {
-	startHeight := s.getCurrentFinalizedHeight(ctx)
+// waitStateCommitments waits for n number of state commitment changes.
+func (s *Suite) waitForStateCommitments(ctx context.Context, n int, waitFor, tick time.Duration) {
+	startStateComm := s.getCurrERFinalStateCommitment(ctx)
+	numOfStateCommChanges := 0
 	require.Eventually(s.T(), func() bool {
-		currHeight := s.getCurrentFinalizedHeight(ctx)
-		if currHeight-startHeight == n {
-			return true
+		currStateComm := s.getCurrERFinalStateCommitment(ctx)
+		if string(startStateComm) != string(currStateComm) {
+			numOfStateCommChanges++
 		}
-		return false
+		return numOfStateCommChanges == n
 	}, waitFor, tick)
 }
 
 // getCurrentFinalizedHeight returns the current finalized height.
-func (s *Suite) getCurrentFinalizedHeight(ctx context.Context) uint64 {
+func (s *Suite) getCurrERFinalStateCommitment(ctx context.Context) []byte {
 	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
-	finalized, err := snapshot.Head()
+	executionResult, _, err := snapshot.SealedResult()
 	require.NoError(s.T(), err)
-	return finalized.Height
+	sc, err := executionResult.FinalStateCommitment()
+	require.NoError(s.T(), err)
+	bz, err := sc.MarshalJSON()
+	require.NoError(s.T(), err)
+	return bz
 }
