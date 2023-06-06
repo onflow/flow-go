@@ -320,8 +320,8 @@ func (net *FlowNetwork) ContainerByName(name string) *Container {
 func (net *FlowNetwork) PrintPorts() {
 	var builder strings.Builder
 	builder.WriteString("endpoints by container name:\n")
-	for containerName, c := range net.Containers {
-		builder.WriteString(fmt.Sprintf("\t%s\n", containerName))
+	for cName, c := range net.Containers {
+		builder.WriteString(fmt.Sprintf("\t%s\n", cName))
 		for portName, port := range c.Ports {
 			switch portName {
 			case MetricsPort:
