@@ -60,8 +60,8 @@ func (s *Suite) submitSmokeTestTransaction(ctx context.Context) {
 
 // ensureNoNotificationsDisseminated ensures the metrics result for the rpc inspector notification queue cache size metric for each container is 0
 // indicating no notifications have been disseminated.
-func (s *Suite) ensureNoNotificationsDisseminated(mets map[string][]*io_prometheus_client.Metric) {
-	for containerName, metric := range mets {
+func (s *Suite) ensureNoNotificationsDisseminated(metricEndpoints map[string][]*io_prometheus_client.Metric) {
+	for containerName, metric := range metricEndpoints {
 		val := metric[0].GetGauge().GetValue()
 		require.Zerof(s.T(), val, fmt.Sprintf("expected inspector notification queue cache size for container %s to be 0 got %v", containerName, val))
 	}
