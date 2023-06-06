@@ -52,7 +52,7 @@ func NewInvalidLimitConfigErr(controlMsg p2p.ControlMessageType, limitStr string
 	return ErrInvalidLimitConfig{controlMsg: controlMsg, limit: limit, limitStr: limitStr}
 }
 
-// IsErrInvalidLimitConfig returns whether an error is ErrInvalidLimitConfig
+// IsErrInvalidLimitConfig returns whether an error is ErrInvalidLimitConfig.
 func IsErrInvalidLimitConfig(err error) bool {
 	var e ErrInvalidLimitConfig
 	return errors.As(err, &e)
@@ -72,37 +72,9 @@ func NewRateLimitedControlMsgErr(controlMsg p2p.ControlMessageType) ErrRateLimit
 	return ErrRateLimitedControlMsg{controlMsg: controlMsg}
 }
 
-// IsErrRateLimitedControlMsg returns whether an error is ErrRateLimitedControlMsg
+// IsErrRateLimitedControlMsg returns whether an error is ErrRateLimitedControlMsg.
 func IsErrRateLimitedControlMsg(err error) bool {
 	var e ErrRateLimitedControlMsg
-	return errors.As(err, &e)
-}
-
-// ErrInvalidTopic error wrapper that indicates an error when checking if a Topic is a valid Flow Topic.
-type ErrInvalidTopic struct {
-	// topic the invalid topic.
-	topic channels.Topic
-	// sampleSize the total amount of topics to be inspected before error is encountered.
-	sampleSize uint
-	// err the validation error
-	err error
-}
-
-func (e ErrInvalidTopic) Error() string {
-	if e.sampleSize > 0 {
-		return fmt.Errorf("invalid topic %s out of %d total topics sampled: %w", e.topic, e.sampleSize, e.err).Error()
-	}
-	return fmt.Errorf("invalid topic %s: %w", e.topic, e.err).Error()
-}
-
-// NewInvalidTopicErr returns a new ErrMalformedTopic
-func NewInvalidTopicErr(topic channels.Topic, sampleSize uint, err error) ErrInvalidTopic {
-	return ErrInvalidTopic{topic: topic, sampleSize: sampleSize, err: err}
-}
-
-// IsErrInvalidTopic returns true if an error is ErrInvalidTopic
-func IsErrInvalidTopic(err error) bool {
-	var e ErrInvalidTopic
 	return errors.As(err, &e)
 }
 
@@ -115,13 +87,53 @@ func (e ErrDuplicateTopic) Error() string {
 	return fmt.Errorf("duplicate topic %s", e.topic).Error()
 }
 
-// NewIDuplicateTopicErr returns a new ErrDuplicateTopic
-func NewIDuplicateTopicErr(topic channels.Topic) ErrDuplicateTopic {
+// NewDuplicateTopicErr returns a new ErrDuplicateTopic.
+func NewDuplicateTopicErr(topic channels.Topic) ErrDuplicateTopic {
 	return ErrDuplicateTopic{topic: topic}
 }
 
-// IsErrDuplicateTopic returns true if an error is ErrDuplicateTopic
+// IsErrDuplicateTopic returns true if an error is ErrDuplicateTopic.
 func IsErrDuplicateTopic(err error) bool {
 	var e ErrDuplicateTopic
+	return errors.As(err, &e)
+}
+
+// ErrActiveClusterIdsNotSet error that indicates a cluster prefixed control message has been received but the cluster IDs have not been set yet.
+type ErrActiveClusterIdsNotSet struct {
+	topic channels.Topic
+}
+
+func (e ErrActiveClusterIdsNotSet) Error() string {
+	return fmt.Errorf("failed to validate cluster prefixed topic %s no active cluster IDs set", e.topic).Error()
+}
+
+// NewActiveClusterIdsNotSetErr returns a new ErrActiveClusterIdsNotSet.
+func NewActiveClusterIdsNotSetErr(topic channels.Topic) ErrActiveClusterIdsNotSet {
+	return ErrActiveClusterIdsNotSet{topic: topic}
+}
+
+// IsErrActiveClusterIDsNotSet returns true if an error is ErrActiveClusterIdsNotSet.
+func IsErrActiveClusterIDsNotSet(err error) bool {
+	var e ErrActiveClusterIdsNotSet
+	return errors.As(err, &e)
+}
+
+// ErrUnstakedPeer error that indicates a cluster prefixed control message has been from an unstaked peer.
+type ErrUnstakedPeer struct {
+	err error
+}
+
+func (e ErrUnstakedPeer) Error() string {
+	return e.err.Error()
+}
+
+// NewUnstakedPeerErr returns a new ErrUnstakedPeer.
+func NewUnstakedPeerErr(err error) ErrUnstakedPeer {
+	return ErrUnstakedPeer{err: err}
+}
+
+// IsErrUnstakedPeer returns true if an error is ErrUnstakedPeer.
+func IsErrUnstakedPeer(err error) bool {
+	var e ErrUnstakedPeer
 	return errors.As(err, &e)
 }

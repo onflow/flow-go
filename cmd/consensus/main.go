@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/cruisectl"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
@@ -48,7 +49,6 @@ import (
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	"github.com/onflow/flow-go/module/chainsync"
 	chmodule "github.com/onflow/flow-go/module/chunks"
-	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -73,27 +73,32 @@ import (
 func main() {
 
 	var (
-		guaranteeLimit                       uint
-		resultLimit                          uint
-		approvalLimit                        uint
-		sealLimit                            uint
-		pendingReceiptsLimit                 uint
-		minInterval                          time.Duration
-		maxInterval                          time.Duration
-		maxSealPerBlock                      uint
-		maxGuaranteePerBlock                 uint
-		hotstuffMinTimeout                   time.Duration
-		hotstuffTimeoutAdjustmentFactor      float64
-		hotstuffHappyPathMaxRoundFailures    uint64
-		blockRateDelay                       time.Duration
-		chunkAlpha                           uint
-		requiredApprovalsForSealVerification uint
-		requiredApprovalsForSealConstruction uint
-		emergencySealing                     bool
-		dkgControllerConfig                  dkgmodule.ControllerConfig
-		dkgMessagingEngineConfig             = dkgeng.DefaultMessagingEngineConfig()
-		startupTimeString                    string
-		startupTime                          time.Time
+		guaranteeLimit                        uint
+		resultLimit                           uint
+		approvalLimit                         uint
+		sealLimit                             uint
+		pendingReceiptsLimit                  uint
+		minInterval                           time.Duration
+		maxInterval                           time.Duration
+		maxSealPerBlock                       uint
+		maxGuaranteePerBlock                  uint
+		hotstuffMinTimeout                    time.Duration
+		hotstuffTimeoutAdjustmentFactor       float64
+		hotstuffHappyPathMaxRoundFailures     uint64
+		chunkAlpha                            uint
+		requiredApprovalsForSealVerification  uint
+		requiredApprovalsForSealConstruction  uint
+		emergencySealing                      bool
+		dkgControllerConfig                   dkgmodule.ControllerConfig
+		dkgMessagingEngineConfig              = dkgeng.DefaultMessagingEngineConfig()
+		cruiseCtlConfig                       = cruisectl.DefaultConfig()
+		cruiseCtlTargetTransitionTimeFlag     = cruiseCtlConfig.TargetTransition.String()
+		cruiseCtlFallbackProposalDurationFlag time.Duration
+		cruiseCtlMinViewDurationFlag          time.Duration
+		cruiseCtlMaxViewDurationFlag          time.Duration
+		cruiseCtlEnabledFlag                  bool
+		startupTimeString                     string
+		startupTime                           time.Time
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
@@ -119,6 +124,7 @@ func main() {
 		followerDistributor *pubsub.FollowerDistributor
 		dkgBrokerTunnel     *dkgmodule.BrokerTunnel
 		blockTimer          protocol.BlockTimer
+		proposalDurProvider hotstuff.ProposalDurationProvider
 		committee           *committees.Consensus
 		epochLookup         *epochs.EpochLookup
 		hotstuffModules     *consensus.HotstuffModules
@@ -126,6 +132,7 @@ func main() {
 		safeBeaconKeys      *bstorage.SafeBeaconPrivateKeys
 		getSealingConfigs   module.SealingConfigsGetter
 	)
+	var deprecatedFlagBlockRateDelay time.Duration
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
 	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
@@ -143,7 +150,11 @@ func main() {
 		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
 		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor, "adjustment of timeout duration in case of time out event")
 		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures, "number of failed rounds before first timeout increase")
-		flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
+		flags.StringVar(&cruiseCtlTargetTransitionTimeFlag, "cruise-ctl-target-epoch-transition-time", cruiseCtlTargetTransitionTimeFlag, "the target epoch switchover schedule")
+		flags.DurationVar(&cruiseCtlFallbackProposalDurationFlag, "cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.FallbackProposalDelay.Load(), "the proposal duration value to use when the controller is disabled, or in epoch fallback mode. In those modes, this value has the same as the old `--block-rate-delay`")
+		flags.DurationVar(&cruiseCtlMinViewDurationFlag, "cruise-ctl-min-view-duration", cruiseCtlConfig.MinViewDuration.Load(), "the lower bound of authority for the controller, when active. This is the smallest amount of time a view is allowed to take.")
+		flags.DurationVar(&cruiseCtlMaxViewDurationFlag, "cruise-ctl-max-view-duration", cruiseCtlConfig.MaxViewDuration.Load(), "the upper bound of authority for the controller when active. This is the largest amount of time a view is allowed to take.")
+		flags.BoolVar(&cruiseCtlEnabledFlag, "cruise-ctl-enabled", cruiseCtlConfig.Enabled.Load(), "whether the block time controller is enabled; when disabled, the FallbackProposalDelay is used")
 		flags.UintVar(&chunkAlpha, "chunk-alpha", flow.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", flow.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
 		flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", flow.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
@@ -157,6 +168,7 @@ func main() {
 		flags.Uint64Var(&dkgMessagingEngineConfig.RetryMax, "dkg-messaging-engine-retry-max", dkgMessagingEngineConfig.RetryMax, "the maximum number of retry attempts for an outbound DKG message")
 		flags.Uint64Var(&dkgMessagingEngineConfig.RetryJitterPercent, "dkg-messaging-engine-retry-jitter-percent", dkgMessagingEngineConfig.RetryJitterPercent, "the percentage of jitter to apply to each inter-attempt wait time")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 1996-04-24T15:04:05-07:00)")
+		flags.DurationVar(&deprecatedFlagBlockRateDelay, "block-rate-delay", 0, "[deprecated in v0.30; Jun 2023] Use `cruise-ctl-*` flags instead, this flag has no effect and will eventually be removed")
 	}).ValidateFlags(func() error {
 		nodeBuilder.Logger.Info().Str("startup_time_str", startupTimeString).Msg("got startup_time_str")
 		if startupTimeString != cmd.NotSet {
@@ -166,6 +178,31 @@ func main() {
 			}
 			startupTime = t
 			nodeBuilder.Logger.Info().Time("startup_time", startupTime).Msg("got startup_time")
+		}
+		// parse target transition time string, if set
+		if cruiseCtlTargetTransitionTimeFlag != cruiseCtlConfig.TargetTransition.String() {
+			transitionTime, err := cruisectl.ParseTransition(cruiseCtlTargetTransitionTimeFlag)
+			if err != nil {
+				return fmt.Errorf("invalid epoch transition time string: %w", err)
+			}
+			cruiseCtlConfig.TargetTransition = *transitionTime
+		}
+		// convert local flag variables to atomic config variables, for dynamically updatable fields
+		if cruiseCtlEnabledFlag != cruiseCtlConfig.Enabled.Load() {
+			cruiseCtlConfig.Enabled.Store(cruiseCtlEnabledFlag)
+		}
+		if cruiseCtlFallbackProposalDurationFlag != cruiseCtlConfig.FallbackProposalDelay.Load() {
+			cruiseCtlConfig.FallbackProposalDelay.Store(cruiseCtlFallbackProposalDurationFlag)
+		}
+		if cruiseCtlMinViewDurationFlag != cruiseCtlConfig.MinViewDuration.Load() {
+			cruiseCtlConfig.MinViewDuration.Store(cruiseCtlMinViewDurationFlag)
+		}
+		if cruiseCtlMaxViewDurationFlag != cruiseCtlConfig.MaxViewDuration.Load() {
+			cruiseCtlConfig.MaxViewDuration.Store(cruiseCtlMaxViewDurationFlag)
+		}
+		// log a warning about deprecated flags
+		if deprecatedFlagBlockRateDelay > 0 {
+			nodeBuilder.Logger.Warn().Msg("A deprecated flag was specified (--block-rate-delay). This flag is deprecated as of v0.30 (Jun 2023), has no effect, and will eventually be removed.")
 		}
 		return nil
 	})
@@ -270,7 +307,7 @@ func main() {
 			// their first beacon private key through the DKG in the EpochSetup phase
 			// prior to their first epoch as network participant).
 
-			rootSnapshot := node.State.AtBlockID(node.RootBlock.ID())
+			rootSnapshot := node.State.AtBlockID(node.FinalizedRootBlock.ID())
 			isSporkRoot, err := protocol.IsSporkRootSnapshot(rootSnapshot)
 			if err != nil {
 				return fmt.Errorf("could not check whether root snapshot is spork root: %w", err)
@@ -290,7 +327,7 @@ func main() {
 				return fmt.Errorf("could not load beacon key file: %w", err)
 			}
 
-			rootEpoch := node.State.AtBlockID(node.RootBlock.ID()).Epochs().Current()
+			rootEpoch := node.State.AtBlockID(node.FinalizedRootBlock.ID()).Epochs().Current()
 			epochCounter, err := rootEpoch.Counter()
 			if err != nil {
 				return fmt.Errorf("could not get root epoch counter: %w", err)
@@ -582,7 +619,7 @@ func main() {
 				node.Storage.Headers,
 				finalize,
 				notifier,
-				node.RootBlock.Header,
+				node.FinalizedRootBlock.Header,
 				node.RootQC,
 			)
 			if err != nil {
@@ -651,6 +688,39 @@ func main() {
 
 			return util.MergeReadyDone(voteAggregator, timeoutAggregator), nil
 		}).
+		Component("block rate cruise control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			livenessData, err := hotstuffModules.Persist.GetLivenessData()
+			if err != nil {
+				return nil, err
+			}
+			ctl, err := cruisectl.NewBlockTimeController(node.Logger, metrics.NewCruiseCtlMetrics(), cruiseCtlConfig, node.State, livenessData.CurrentView)
+			if err != nil {
+				return nil, err
+			}
+			proposalDurProvider = ctl
+			hotstuffModules.Notifier.AddOnBlockIncorporatedConsumer(ctl.OnBlockIncorporated)
+			node.ProtocolEvents.AddConsumer(ctl)
+
+			// set up admin commands for dynamically updating configs
+			err = node.ConfigManager.RegisterBoolConfig("cruise-ctl-enabled", cruiseCtlConfig.GetEnabled, cruiseCtlConfig.SetEnabled)
+			if err != nil {
+				return nil, err
+			}
+			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.GetFallbackProposalDuration, cruiseCtlConfig.SetFallbackProposalDuration)
+			if err != nil {
+				return nil, err
+			}
+			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-min-view-duration", cruiseCtlConfig.GetMinViewDuration, cruiseCtlConfig.SetMinViewDuration)
+			if err != nil {
+				return nil, err
+			}
+			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-max-view-duration", cruiseCtlConfig.GetMaxViewDuration, cruiseCtlConfig.SetMaxViewDuration)
+			if err != nil {
+				return nil, err
+			}
+
+			return ctl, nil
+		}).
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block builder
 			var build module.Builder
@@ -681,8 +751,7 @@ func main() {
 				consensus.WithMinTimeout(hotstuffMinTimeout),
 				consensus.WithTimeoutAdjustmentFactor(hotstuffTimeoutAdjustmentFactor),
 				consensus.WithHappyPathMaxRoundFailures(hotstuffHappyPathMaxRoundFailures),
-				consensus.WithBlockRateDelay(blockRateDelay),
-				consensus.WithConfigRegistrar(node.ConfigManager),
+				consensus.WithProposalDurationProvider(proposalDurProvider),
 			}
 
 			if !startupTime.IsZero() {
@@ -730,7 +799,7 @@ func main() {
 				hot,
 				hotstuffModules.VoteAggregator,
 				hotstuffModules.TimeoutAggregator,
-				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+				node.ComplianceConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance core: %w", err)

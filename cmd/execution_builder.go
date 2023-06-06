@@ -28,6 +28,7 @@ import (
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -45,6 +46,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/rpc"
@@ -62,7 +64,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
-	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
@@ -133,8 +134,8 @@ type ExecutionNode struct {
 	diskWAL                *wal.DiskWAL
 	blockDataUploader      *uploader.Manager
 	executionDataStore     execution_data.ExecutionDataStore
-	toTriggerCheckpoint    *atomic.Bool           // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
-	stopControl            *ingestion.StopControl // stop the node at given block height
+	toTriggerCheckpoint    *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
+	stopControl            *stop.StopControl // stop the node at given block height
 	executionDataDatastore *badger.Datastore
 	executionDataPruner    *pruner.Pruner
 	executionDataBlobstore blobs.Blobstore
@@ -651,17 +652,39 @@ func (exeNode *ExecutionNode) LoadStopControl(
 	module.ReadyDoneAware,
 	error,
 ) {
-	lastExecutedHeight, _, err := exeNode.executionState.GetHighestExecutedBlockID(context.TODO())
+	ver, err := build.SemverV2()
 	if err != nil {
-		return nil, fmt.Errorf("cannot get the latest executed block height for stop control: %w", err)
+		ver = nil
+		// TODO: In the future we want to error here, but for now we just log a warning.
+		// This is because we currently have no strong guarantee that then node version
+		// tag is semver compliant.
+		exeNode.builder.Logger.Warn().
+			Err(err).
+			Msg("could not set semver version for stop control")
 	}
 
-	exeNode.stopControl = ingestion.NewStopControl(
-		exeNode.builder.Logger.With().Str("compontent", "stop_control").Logger(),
-		exeNode.exeConf.pauseExecution,
-		lastExecutedHeight)
+	latestFinalizedBlock, err := node.State.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest finalized block: %w", err)
+	}
 
-	return &module.NoopReadyDoneAware{}, nil
+	stopControl := stop.NewStopControl(
+		exeNode.builder.Logger,
+		exeNode.executionState,
+		node.Storage.Headers,
+		node.Storage.VersionBeacons,
+		ver,
+		latestFinalizedBlock,
+		// TODO: rename to exeNode.exeConf.executionStopped to make it more consistent
+		exeNode.exeConf.pauseExecution,
+		true,
+	)
+	// stopControl needs to consume BlockFinalized events.
+	node.ProtocolEvents.AddConsumer(stopControl)
+
+	exeNode.stopControl = stopControl
+
+	return stopControl, nil
 }
 
 func (exeNode *ExecutionNode) LoadExecutionStateLedger(
@@ -792,6 +815,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		node.Me,
 		exeNode.collectionRequester,
 		node.State,
+		node.Storage.Headers,
 		node.Storage.Blocks,
 		node.Storage.Collections,
 		exeNode.events,
@@ -861,7 +885,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 		node.Storage.Headers,
 		final,
 		exeNode.followerDistributor,
-		node.RootBlock.Header,
+		node.FinalizedRootBlock.Header,
 		node.RootQC,
 		finalized,
 		pending,
@@ -910,13 +934,14 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		node.Me,
 		node.Metrics.Engine,
 		node.Storage.Headers,
-		exeNode.builder.FinalizedHeader,
+		exeNode.builder.FinalizedRootBlock.Header,
 		core,
-		followereng.WithComplianceConfigOpt(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
+		node.ComplianceConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower engine: %w", err)
 	}
+	exeNode.followerDistributor.AddOnBlockFinalizedConsumer(exeNode.followerEng.OnFinalizedBlock)
 
 	return exeNode.followerEng, nil
 }
@@ -1038,7 +1063,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 		// TODO: check that the checkpoint file contains the root block's statecommit hash
 
-		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
+		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution database: %w", err)
 		}

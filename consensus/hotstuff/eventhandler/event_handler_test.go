@@ -38,11 +38,13 @@ type TestPaceMaker struct {
 
 var _ hotstuff.PaceMaker = (*TestPaceMaker)(nil)
 
-func NewTestPaceMaker(timeoutController *timeout.Controller,
+func NewTestPaceMaker(
+	timeoutController *timeout.Controller,
+	proposalDelayProvider hotstuff.ProposalDurationProvider,
 	notifier hotstuff.Consumer,
 	persist hotstuff.Persister,
 ) *TestPaceMaker {
-	p, err := pacemaker.New(timeoutController, notifier, persist)
+	p, err := pacemaker.New(timeoutController, proposalDelayProvider, notifier, persist)
 	if err != nil {
 		panic(err)
 	}
@@ -74,18 +76,12 @@ func (p *TestPaceMaker) LastViewTC() *flow.TimeoutCertificate {
 // using a real pacemaker for testing event handler
 func initPaceMaker(t require.TestingT, ctx context.Context, livenessData *hotstuff.LivenessData) hotstuff.PaceMaker {
 	notifier := &mocks.Consumer{}
-	tc, err := timeout.NewConfig(
-		time.Duration(minRepTimeout*1e6),
-		time.Duration(maxRepTimeout*1e6),
-		multiplicativeIncrease,
-		happyPathMaxRoundFailures,
-		0,
-		time.Duration(maxRepTimeout*1e6))
+	tc, err := timeout.NewConfig(time.Duration(minRepTimeout*1e6), time.Duration(maxRepTimeout*1e6), multiplicativeIncrease, happyPathMaxRoundFailures, time.Duration(maxRepTimeout*1e6))
 	require.NoError(t, err)
 	persist := &mocks.Persister{}
 	persist.On("PutLivenessData", mock.Anything).Return(nil).Maybe()
 	persist.On("GetLivenessData").Return(livenessData, nil).Once()
-	pm := NewTestPaceMaker(timeout.NewController(tc), notifier, persist)
+	pm := NewTestPaceMaker(timeout.NewController(tc), pacemaker.NoProposalDelay(), notifier, persist)
 	notifier.On("OnStartingTimeout", mock.Anything).Return()
 	notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything, mock.Anything).Return()
 	notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything, mock.Anything).Return()

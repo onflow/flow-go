@@ -563,7 +563,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		// simulate the absence of the full block height index
 		lastFullBlockHeight = 0
 		rtnErr = storerr.ErrNotFound
-		suite.proto.params.On("Root").Return(rootBlk.Header, nil)
+		suite.proto.params.On("FinalizedRoot").Return(rootBlk.Header, nil)
 		suite.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
 
 		suite.eng.updateLastFullBlockReceivedIndex()

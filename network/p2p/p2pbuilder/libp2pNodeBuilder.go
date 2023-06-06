@@ -498,6 +498,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	connGaterCfg *p2pconfig.ConnectionGaterConfig,
 	peerManagerCfg *p2pconfig.PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
+	rpcInspectorSuite p2p.GossipSubInspectorSuite,
 	rCfg *ResourceManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig) (p2p.NodeBuilder, error) {
 
@@ -514,14 +515,6 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		idProvider,
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
-
-	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, gossipCfg.RpcInspector).
-		SetPublicNetwork(p2p.PrivateNetwork).
-		SetMetrics(metricsCfg).
-		Build()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for default libp2p node: %w", err)
-	}
 
 	builder := NewNodeBuilder(log, metricsCfg.Metrics, address, flowKey, sporkId, rCfg).
 		SetBasicResolver(resolver).
