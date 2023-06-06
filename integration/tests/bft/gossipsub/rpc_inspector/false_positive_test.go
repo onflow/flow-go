@@ -20,7 +20,7 @@ func TestGossipSubRpcInspectorFalsePositiveNotifications(t *testing.T) {
 // does not result in any of the gossip sub rpc control message inspector validation rules being broken. Anytime a validation rule is broken an invalid
 // control message notification is disseminated. Using this fact, this tests sets up a full flow network and submits some transactions to generate network
 // activity. After some time we ensure that no invalid control message notifications are disseminated.
-func (s *GossipsubRPCInstpectorFalePostiveNotificationsTestSuite) TestGossipsubRPCInstpectorFalePostiveNotifications() {
+func (s *GossipsubRPCInstpectorFalePostiveNotificationsTestSuite) TestGossipSubRpcInspectorFalsePositiveNotifications() {
 	// the network has started submit some transactions to create flow accounts.
 	// We wait for each of these transactions to be sealed ensuring we generate
 	// some artificial network activity
