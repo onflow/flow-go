@@ -22,6 +22,7 @@ type backendAccounts struct {
 	headers           storage.Headers
 	executionReceipts storage.ExecutionReceipts
 	connFactory       ConnectionFactory
+	connSelector      ConnectionSelector
 	log               zerolog.Logger
 }
 
@@ -82,7 +83,7 @@ func (b *backendAccounts) getAccountAtBlockID(
 		BlockId: blockID[:],
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := b.connSelector.GetExecutionNodesForBlockID(ctx, blockID)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to get account from the execution node", codes.Internal)
 	}

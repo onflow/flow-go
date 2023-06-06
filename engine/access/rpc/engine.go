@@ -175,6 +175,8 @@ func NewBuilder(log zerolog.Logger,
 		CircuitBreakerConfig:      config.CircuitBreakerConfig,
 	}
 
+	connectionSelector := backend.NewConnectionSelector(state, executionReceipts, log, config.CircuitBreakerConfig.Enabled)
+
 	backend := backend.New(state,
 		collectionRPC,
 		historicalAccessNodes,
@@ -187,6 +189,7 @@ func NewBuilder(log zerolog.Logger,
 		chainID,
 		transactionMetrics,
 		connectionFactory,
+		connectionSelector,
 		retryEnabled,
 		config.MaxHeightRange,
 		config.PreferredExecutionNodeIDs,
