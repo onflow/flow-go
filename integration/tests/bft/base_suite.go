@@ -102,6 +102,7 @@ func (b *BaseSuite) SetupSuite() {
 func (b *BaseSuite) TearDownSuite() {
 	b.Net.Remove()
 	b.Cancel()
+	// check if orchestrator network is set on the base suite, not all tests use the corrupted network. 
 	if b.OrchestratorNetwork != nil {
 		unittest.RequireCloseBefore(b.T(), b.OrchestratorNetwork.Done(), 1*time.Second, "could not stop orchestrator network on time")
 	}
