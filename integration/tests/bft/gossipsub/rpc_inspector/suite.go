@@ -106,7 +106,7 @@ func (s *Suite) waitForStateCommitments(ctx context.Context, n int, waitFor, tic
 	numOfStateCommChanges := 0
 	require.Eventually(s.T(), func() bool {
 		currStateComm := s.getCurrERFinalStateCommitment(ctx)
-		if string(startStateComm) != string(currStateComm) {
+		if startStateComm != currStateComm {
 			numOfStateCommChanges++
 		}
 		return numOfStateCommChanges == n
@@ -114,7 +114,7 @@ func (s *Suite) waitForStateCommitments(ctx context.Context, n int, waitFor, tic
 }
 
 // getCurrentFinalizedHeight returns the current finalized height.
-func (s *Suite) getCurrERFinalStateCommitment(ctx context.Context) []byte {
+func (s *Suite) getCurrERFinalStateCommitment(ctx context.Context) string {
 	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
 	executionResult, _, err := snapshot.SealedResult()
@@ -123,5 +123,5 @@ func (s *Suite) getCurrERFinalStateCommitment(ctx context.Context) []byte {
 	require.NoError(s.T(), err)
 	bz, err := sc.MarshalJSON()
 	require.NoError(s.T(), err)
-	return bz
+	return string(bz)
 }
