@@ -12,7 +12,7 @@ type GossipsubRPCInstpectorFalePostiveNotificationsTestSuite struct {
 	Suite
 }
 
-func TestGossipsubRPCInstpectorFalePostiveNotifications(t *testing.T) {
+func TestGossipSubRpcInspectorFalsePositiveNotifications(t *testing.T) {
 	suite.Run(t, new(GossipsubRPCInstpectorFalePostiveNotificationsTestSuite))
 }
 
