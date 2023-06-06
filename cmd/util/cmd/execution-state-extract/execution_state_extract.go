@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -27,9 +26,6 @@ func extractExecutionState(
 	targetHash flow.StateCommitment,
 	outputDir string,
 	log zerolog.Logger,
-	chain flow.Chain,
-	migrate bool,
-	report bool,
 	nWorker int, // number of concurrent worker to migation payloads
 ) error {
 
@@ -82,49 +78,11 @@ func extractExecutionState(
 	}()
 
 	var migrations []ledger.Migration
-	var preCheckpointReporters, postCheckpointReporters []ledger.Reporter
 	newState := ledger.State(targetHash)
-
-	if migrate {
-		// add migration here
-		migrations = []ledger.Migration{
-			// the following migration calculate the storage usage and update the storage for each account
-			// mig.MigrateAccountUsage,
-		}
-	}
-	// generating reports at the end, so that the checkpoint file can be used
-	// for sporking as soon as it's generated.
-	if report {
-		log.Info().Msgf("preparing reporter files")
-		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
-
-		preCheckpointReporters = []ledger.Reporter{
-			// report epoch counter which is needed for finalizing root block
-			reporters.NewExportReporter(log,
-				chain,
-				func() flow.StateCommitment { return targetHash },
-			),
-		}
-
-		postCheckpointReporters = []ledger.Reporter{
-			&reporters.AccountReporter{
-				Log:   log,
-				Chain: chain,
-				RWF:   reportFileWriterFactory,
-			},
-			reporters.NewFungibleTokenTracker(log, reportFileWriterFactory, chain, []string{reporters.FlowTokenTypeID(chain)}),
-			&reporters.AtreeReporter{
-				Log: log,
-				RWF: reportFileWriterFactory,
-			},
-		}
-	}
 
 	migratedState, err := led.ExportCheckpointAt(
 		newState,
 		migrations,
-		preCheckpointReporters,
-		postCheckpointReporters,
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,

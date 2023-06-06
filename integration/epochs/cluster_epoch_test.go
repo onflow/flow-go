@@ -7,7 +7,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	emulator "github.com/onflow/flow-emulator"
+	emulator "github.com/onflow/flow-emulator/emulator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -43,7 +43,7 @@ func (s *Suite) SetupTest() {
 
 	// create a new instance of the emulated blockchain
 	var err error
-	s.blockchain, err = emulator.NewBlockchain(emulator.WithStorageLimitEnabled(false))
+	s.blockchain, err = emulator.New(emulator.WithStorageLimitEnabled(false))
 	s.Require().NoError(err)
 	s.emulatorClient = utils.NewEmulatorClient(s.blockchain)
 
@@ -60,7 +60,7 @@ func (s *Suite) deployEpochQCContract() {
 	QCCode := contracts.FlowQC()
 
 	// deploy the contract to the emulator
-	QCAddress, err := s.blockchain.CreateAccount([]*sdk.AccountKey{QCAccountKey}, []sdktemplates.Contract{
+	QCAddress, err := s.emulatorClient.CreateAccount([]*sdk.AccountKey{QCAccountKey}, []sdktemplates.Contract{
 		{
 			Name:   "FlowClusterQC",
 			Source: string(QCCode),
