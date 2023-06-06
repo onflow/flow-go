@@ -360,24 +360,25 @@ func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler
 func (n *Node) WithPeersProvider(peersProvider p2p.PeersProvider) {
 	// TODO: chore: we should not allow overriding the peers provider if one is already set.
 	if n.peerManager != nil {
-		n.peerManager.SetPeersProvider(func() peer.IDSlice {
-			authorizedPeersIds := peersProvider()
-			for i, id := range authorizedPeersIds {
-				// exclude the disallowed peers from the authorized peers list
-				causes := n.disallowListedCache.GetAllDisallowedListCausesFor(id)
-				if len(causes) > 0 {
-					n.logger.Warn().
-						Str("peer_id", id.String()).
-						Str("causes", fmt.Sprintf("%v", causes)).
-						Msg("peer is disallowed for a cause, removing from authorized peers of peer manager")
+		n.peerManager.SetPeersProvider(
+			func() peer.IDSlice {
+				authorizedPeersIds := peersProvider()
+				for i, id := range authorizedPeersIds {
+					// exclude the disallowed peers from the authorized peers list
+					causes := n.disallowListedCache.GetAllDisallowedListCausesFor(id)
+					if len(causes) > 0 {
+						n.logger.Warn().
+							Str("peer_id", id.String()).
+							Str("causes", fmt.Sprintf("%v", causes)).
+							Msg("peer is disallowed for a cause, removing from authorized peers of peer manager")
 
-					// exclude the peer from the authorized peers list
-					authorizedPeersIds = append(authorizedPeersIds[:i], authorizedPeersIds[i+1:]...)
+						// exclude the peer from the authorized peers list
+						authorizedPeersIds = append(authorizedPeersIds[:i], authorizedPeersIds[i+1:]...)
+					}
 				}
-			}
 
-			return authorizedPeersIds
-		})
+				return authorizedPeersIds
+			})
 	}
 }
 
@@ -499,13 +500,6 @@ func (n *Node) OnDisallowListNotification(peerId peer.ID, cause flownet.Disallow
 		Str("notification_cause", cause.String()).
 		Str("causes", fmt.Sprintf("%v", causes)).
 		Msg("peer added to disallow list cache")
-
-	// TODO: technically, adding a peer to the disallow list should also remove its connection (through the peer manager)
-	// hence, this code part can be removed.
-	err = n.RemovePeer(peerId)
-	if err != nil {
-		n.logger.Error().Err(err).Str("peer_id", peerId.String()).Msg("failed to disconnect from blocklisted peer")
-	}
 }
 
 // OnAllowListNotification is called when a new allow list update notification is distributed.
@@ -520,12 +514,13 @@ func (n *Node) OnDisallowListNotification(peerId peer.ID, cause flownet.Disallow
 //
 //	none
 func (n *Node) OnAllowListNotification(peerId peer.ID, cause flownet.DisallowListedCause) {
-	n.disallowListedCache.AllowFor(peerId, cause)
+	remainingCauses := n.disallowListedCache.AllowFor(peerId, cause)
 
-	n.logger.Debug().
+	n.logger.Warn().
 		Str("peer_id", peerId.String()).
 		Str("causes", fmt.Sprintf("%v", cause)).
-		Msg("peer added to disallow list cache")
+		Str("remaining_causes", fmt.Sprintf("%v", remainingCauses)).
+		Msg("peer is allow-listed for cause")
 }
 
 // GetAllDisallowListedCauses for a disallow-listed peer returns all disallow-listed causes.
