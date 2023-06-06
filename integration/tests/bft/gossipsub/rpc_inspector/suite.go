@@ -69,7 +69,7 @@ func (s *Suite) ensureNoNotificationsDisseminated(metricEndpoints map[string][]*
 }
 
 // inspectorNotifQSizeMetricName returns the metric name for the rpc inspector notification queue cache size.
-func (s *Suite) inspectorNotifQSizeMetricName() string {
+func (s *Suite) inspectorNotificationQSizeMetricName() string {
 	return fmt.Sprintf("network_hero_cache_%s_successful_write_count_total", metrics.ResourceNetworkingRpcInspectorNotificationQueue)
 }
 
