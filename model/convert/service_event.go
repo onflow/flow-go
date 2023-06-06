@@ -55,7 +55,7 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
 	}
 
-	expectedFieldCount := 9
+	const expectedFieldCount = 9
 	if len(cdcEvent.Fields) < expectedFieldCount {
 		return nil, fmt.Errorf(
 			"insufficient fields in EpochSetup event (%d < %d)",
@@ -68,7 +68,7 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		return nil, fmt.Errorf("EpochSetup event doesn't have type")
 	}
 
-	// parse cadence types to required fields
+	// parse EpochSetup event
 
 	var counter cadence.UInt64
 	var firstView cadence.UInt64
@@ -194,13 +194,14 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		)
 	}
 
-	setup := new(flow.EpochSetup)
-
-	setup.Counter = uint64(counter)
-
-	setup.FirstView = uint64(firstView)
-
-	setup.FinalView = uint64(finalView)
+	setup := &flow.EpochSetup{
+		Counter:            uint64(counter),
+		FirstView:          uint64(firstView),
+		FinalView:          uint64(finalView),
+		DKGPhase1FinalView: uint64(dkgPhase1FinalView),
+		DKGPhase2FinalView: uint64(dkgPhase2FinalView),
+		DKGPhase3FinalView: uint64(dkgPhase3FinalView),
+	}
 
 	// Cadence's unsafeRandom().toString() produces a string of variable length.
 	// Here we pad it with enough 0s to meet the required length.
@@ -217,12 +218,6 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 			err,
 		)
 	}
-
-	setup.DKGPhase1FinalView = uint64(dkgPhase1FinalView)
-
-	setup.DKGPhase2FinalView = uint64(dkgPhase2FinalView)
-
-	setup.DKGPhase3FinalView = uint64(dkgPhase3FinalView)
 
 	// parse cluster assignments
 	setup.Assignments, err = convertClusterAssignments(cdcClusters.Values)
@@ -260,7 +255,7 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
 	}
 
-	expectedFieldCount := 3
+	const expectedFieldCount = 3
 	if len(cdcEvent.Fields) < expectedFieldCount {
 		return nil, fmt.Errorf(
 			"insufficient fields in EpochCommit event (%d < %d)",
@@ -326,9 +321,9 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 		)
 	}
 
-	commit := new(flow.EpochCommit)
-
-	commit.Counter = uint64(counter)
+	commit := &flow.EpochCommit{
+		Counter: uint64(counter),
+	}
 
 	// parse cluster qc votes
 	commit.ClusterQCs, err = convertClusterQCVotes(cdcClusterQCVotes.Values)
@@ -343,9 +338,7 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 	if err != nil {
 		return nil, fmt.Errorf("could not convert DKG keys: %w", err)
 	}
-
 	commit.DKGGroupKey = dkgGroupKey
-
 	commit.DKGParticipantKeys = dkgParticipantKeys
 
 	// create the service event
@@ -374,7 +367,7 @@ func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList
 			return nil, invalidCadenceTypeError("cluster", cdcCluster, cadence.Struct{})
 		}
 
-		expectedFieldCount := 2
+		const expectedFieldCount = 2
 		if len(cdcCluster.Fields) < expectedFieldCount {
 			return nil, fmt.Errorf(
 				"insufficient fields (%d < %d)",
@@ -488,7 +481,7 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 			)
 		}
 
-		expectedFieldCount := 14
+		const expectedFieldCount = 14
 		if len(cdcNodeInfoStruct.Fields) < expectedFieldCount {
 			return nil, fmt.Errorf(
 				"insufficient fields (%d < %d)",
@@ -503,13 +496,15 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 
 		cdcNodeInfoStructType := cdcNodeInfoStruct.Type().(*cadence.StructType)
 
+		const requiredFieldCount = 6
+		var foundFieldCount int
+
 		var nodeIDHex cadence.String
 		var role cadence.UInt8
 		var address cadence.String
 		var networkKeyHex cadence.String
 		var stakingKeyHex cadence.String
 		var initialWeight cadence.UInt64
-		var foundFieldCount int
 
 		for i, f := range cdcNodeInfoStructType.Fields {
 			switch f.Identifier {
@@ -568,30 +563,6 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 					)
 				}
 
-			case "tokensStaked":
-				foundFieldCount++
-
-			case "tokensCommitted":
-				foundFieldCount++
-
-			case "tokensUnstaking":
-				foundFieldCount++
-
-			case "tokensUnstaked":
-				foundFieldCount++
-
-			case "tokensRewarded":
-				foundFieldCount++
-
-			case "delegators":
-				foundFieldCount++
-
-			case "delegatorIDCounter":
-				foundFieldCount++
-
-			case "tokensRequestedToUnstake":
-				foundFieldCount++
-
 			case "initialWeight":
 				foundFieldCount++
 				initialWeight, ok = cdcNodeInfoStruct.Fields[i].(cadence.UInt64)
@@ -605,24 +576,23 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 			}
 		}
 
-		if foundFieldCount != expectedFieldCount {
+		if foundFieldCount != requiredFieldCount {
 			return nil, fmt.Errorf(
 				"NodeInfo struct required fields not found (%d != %d)",
 				foundFieldCount,
-				expectedFieldCount,
+				requiredFieldCount,
 			)
 		}
 
-		identity := new(flow.Identity)
-
-		identity.Role = flow.Role(role)
-		if !identity.Role.Valid() {
+		if !flow.Role(role).Valid() {
 			return nil, fmt.Errorf("invalid role %d", role)
 		}
 
-		identity.Address = string(address)
-
-		identity.Weight = uint64(initialWeight)
+		identity := &flow.Identity{
+			Address: string(address),
+			Weight:  uint64(initialWeight),
+			Role:    flow.Role(role),
+		}
 
 		// convert nodeID string into identifier
 		identity.NodeID, err = flow.HexStringToIdentifier(string(nodeIDHex))
@@ -695,7 +665,7 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) (
 			)
 		}
 
-		expectedFieldCount := 4
+		const expectedFieldCount = 4
 		if len(cdcClusterQCStruct.Fields) < expectedFieldCount {
 			return nil, fmt.Errorf(
 				"insufficient fields (%d < %d)",
@@ -710,10 +680,12 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) (
 
 		cdcClusterQCStructType := cdcClusterQCStruct.Type().(*cadence.StructType)
 
+		const requiredFieldCount = 3
+		var foundFieldCount int
+
 		var index cadence.UInt16
 		var cdcVoterIDs cadence.Array
 		var cdcRawVotes cadence.Array
-		var foundFieldCount int
 
 		for i, f := range cdcClusterQCStructType.Fields {
 			switch f.Identifier {
@@ -739,9 +711,6 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) (
 					)
 				}
 
-			case "voteMessage":
-				foundFieldCount++
-
 			case "voterIDs":
 				foundFieldCount++
 				cdcVoterIDs, ok = cdcClusterQCStruct.Fields[i].(cadence.Array)
@@ -755,11 +724,11 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) (
 			}
 		}
 
-		if foundFieldCount != expectedFieldCount {
+		if foundFieldCount != requiredFieldCount {
 			return nil, fmt.Errorf(
 				"clusterQC struct required fields not found (%d != %d)",
 				foundFieldCount,
-				expectedFieldCount,
+				requiredFieldCount,
 			)
 		}
 
@@ -929,7 +898,7 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 			flow.VersionBeacon,
 			error,
 		) {
-			expectedFieldCount := 2
+			const expectedFieldCount = 2
 			if len(cdcEvent.Fields) != expectedFieldCount {
 				return flow.VersionBeacon{}, fmt.Errorf(
 					"unexpected number of fields in VersionBeacon event (%d != %d)",
@@ -1019,7 +988,7 @@ func convertVersionBoundaries(array cadence.Array) (
 				flow.VersionBoundary,
 				error,
 			) {
-				expectedFieldCount := 2
+				const expectedFieldCount = 2
 				if len(structVal.Fields) < expectedFieldCount {
 					return flow.VersionBoundary{}, fmt.Errorf(
 						"incorrect number of fields (%d != %d)",
@@ -1099,7 +1068,7 @@ func convertSemverVersion(structVal cadence.Struct) (
 	string,
 	error,
 ) {
-	expectedFieldCount := 4
+	const expectedFieldCount = 4
 	if len(structVal.Fields) < expectedFieldCount {
 		return "", fmt.Errorf(
 			"incorrect number of fields (%d != %d)",
