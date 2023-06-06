@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-const numOfTestAccounts = 5
+const numOfTestAccounts = 1000
 
 type GossipsubRPCInspectorFalsePositiveNotificationsTestSuite struct {
 	Suite
@@ -31,8 +31,8 @@ func (s *GossipsubRPCInspectorFalsePositiveNotificationsTestSuite) TestGossipsub
 	// We wait for each of these transactions to be sealed ensuring we generate
 	// some artificial network activity.
 	go s.loaderLoop(ctx, numOfTestAccounts, loaderLoopInterval)
-	// wait 5 state commitment changes, this ensures we simulated load on network as expected.
-	s.waitForStateCommitments(s.Ctx, 5, 30*time.Second, 500*time.Millisecond)
+	// wait 20 state commitment changes, this ensures we simulated load on network as expected.
+	s.waitForStateCommitments(s.Ctx, 20, 15*time.Second, 500*time.Millisecond)
 
 	// ensure no node in the network has disseminated an invalid control message notification
 	metricName := s.inspectorNotificationQSizeMetricName()
