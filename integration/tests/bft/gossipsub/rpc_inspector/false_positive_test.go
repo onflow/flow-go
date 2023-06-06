@@ -10,19 +10,19 @@ import (
 
 const numOfTestAccounts = 5
 
-type GossipsubRPCInstpectorFalePostiveNotificationsTestSuite struct {
+type GossipsubRPCInspectorFalsePositiveNotificationsTestSuite struct {
 	Suite
 }
 
 func TestGossipSubRpcInspectorFalsePositiveNotifications(t *testing.T) {
-	suite.Run(t, new(GossipsubRPCInstpectorFalePostiveNotificationsTestSuite))
+	suite.Run(t, new(GossipsubRPCInspectorFalsePositiveNotificationsTestSuite))
 }
 
-// TestGossipsubRPCInstpectorFalePostiveNotifications this test ensures that any underlying changes or updates to any of the underlying libp2p libraries
+// TestGossipsubRPCInspectorFalsePositiveNotifications this test ensures that any underlying changes or updates to any of the underlying libp2p libraries
 // does not result in any of the gossip sub rpc control message inspector validation rules being broken. Anytime a validation rule is broken an invalid
 // control message notification is disseminated. Using this fact, this tests sets up a full flow network and submits some transactions to generate network
 // activity. After some time we ensure that no invalid control message notifications are disseminated.
-func (s *GossipsubRPCInstpectorFalePostiveNotificationsTestSuite) TestGossipsubRPCInstpectorFalePostiveNotifications() {
+func (s *GossipsubRPCInspectorFalsePositiveNotificationsTestSuite) TestGossipsubRPCInspectorFalsePositiveNotifications() {
 	loaderLoopDuration := 5 * time.Second
 	loaderLoopInterval := 500 * time.Millisecond
 	ctx, cancel := context.WithTimeout(s.Ctx, loaderLoopDuration)
