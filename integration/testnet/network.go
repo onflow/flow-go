@@ -19,15 +19,14 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
-	"github.com/onflow/cadence"
 	"github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go-sdk/crypto"
-
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
