@@ -57,7 +57,7 @@ func NodeFixture(
 	opts ...NodeFixtureParameterOption,
 ) (p2p.LibP2PNode, flow.Identity) {
 
-	logger := unittest.Logger().Level(zerolog.ErrorLevel)
+	logger := unittest.Logger().Level(zerolog.WarnLevel)
 
 	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), idProvider, metrics.NewNoopCollector()).
 		Build()
@@ -390,18 +390,69 @@ func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []p2p.Li
 	}
 }
 
-// EnsureConnected ensures that the given nodes are connected to each other.
+// TryConnectionAndEnsureConnected tries connecting nodes to each other and ensures that the given nodes are connected to each other.
 // It fails the test if any of the nodes is not connected to any other node.
-func EnsureConnected(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) {
+func TryConnectionAndEnsureConnected(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode) {
 	for _, node := range nodes {
 		for _, other := range nodes {
 			if node == other {
 				continue
 			}
 			require.NoError(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID())))
+			// the other node should be connected to this node
 			require.Equal(t, node.Host().Network().Connectedness(other.Host().ID()), network.Connected)
+			// at least one connection should be established
+			require.True(t, len(node.Host().Network().ConnsToPeer(other.Host().ID())) > 0)
 		}
 	}
+}
+
+// RequireConnectedEventually ensures eventually that the given nodes are already connected to each other.
+// It fails the test if any of the nodes is not connected to any other node.
+// Args:
+// - nodes: the nodes to check
+// - tick: the tick duration
+// - timeout: the timeout duration
+func RequireConnectedEventually(t *testing.T, nodes []p2p.LibP2PNode, tick time.Duration, timeout time.Duration) {
+	require.Eventually(t, func() bool {
+		for _, node := range nodes {
+			for _, other := range nodes {
+				if node == other {
+					continue
+				}
+				if node.Host().Network().Connectedness(other.Host().ID()) != network.Connected {
+					return false
+				}
+				if len(node.Host().Network().ConnsToPeer(other.Host().ID())) == 0 {
+					return false
+				}
+			}
+		}
+		return true
+	}, timeout, tick)
+}
+
+// RequireEventuallyNotConnected ensures eventually that the given groups of nodes are not connected to each other.
+// It fails the test if any of the nodes from groupA is connected to any of the nodes from groupB.
+// Args:
+// - groupA: the first group of nodes
+// - groupB: the second group of nodes
+// - tick: the tick duration
+// - timeout: the timeout duration
+func RequireEventuallyNotConnected(t *testing.T, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode, tick time.Duration, timeout time.Duration) {
+	require.Eventually(t, func() bool {
+		for _, node := range groupA {
+			for _, other := range groupB {
+				if node.Host().Network().Connectedness(other.Host().ID()) == network.Connected {
+					return false
+				}
+				if len(node.Host().Network().ConnsToPeer(other.Host().ID())) > 0 {
+					return false
+				}
+			}
+		}
+		return true
+	}, timeout, tick)
 }
 
 // EnsureStreamCreationInBothDirections ensure that between each pair of nodes in the given list, a stream is created in both directions.
@@ -420,7 +471,7 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 }
 
 // EnsurePubsubMessageExchange ensures that the given connected nodes exchange the given message on the given channel through pubsub.
-// Note: EnsureConnected() must be called to connect all nodes before calling this function.
+// Note: TryConnectionAndEnsureConnected() must be called to connect all nodes before calling this function.
 func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
 	_, topic := messageFactory()
 
