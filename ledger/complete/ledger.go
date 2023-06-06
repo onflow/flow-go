@@ -1,7 +1,6 @@
 package complete
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -335,7 +334,36 @@ func (l *Ledger) ExportCheckpointAt(
 	targetPathFinderVersion uint8,
 	outputDir, outputFile string,
 ) (ledger.State, error) {
+	newTrie, err := l.MigrateAt(state, migrations, targetPathFinderVersion)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("fail to migrate: %w", err)
+	}
 
+	statecommitment := ledger.State(newTrie.RootHash())
+
+	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
+
+	err = os.MkdirAll(outputDir, os.ModePerm)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("could not create output dir %s: %w", outputDir, err)
+	}
+
+	err = realWAL.StoreCheckpointV6Concurrently([]*trie.MTrie{newTrie}, outputDir, outputFile, &l.logger)
+
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
+	}
+
+	l.logger.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
+
+	return statecommitment, nil
+}
+
+func (l *Ledger) MigrateAt(
+	state ledger.State,
+	migrations []ledger.Migration,
+	targetPathFinderVersion uint8,
+) (*trie.MTrie, error) {
 	l.logger.Info().Msgf(
 		"Ledger is loaded, checkpoint export has started for state %s, and %d migrations have been planed",
 		state.String(),
@@ -349,14 +377,14 @@ func (l *Ledger) ExportCheckpointAt(
 		l.logger.Info().
 			Str("hash", rh.String()).
 			Msgf("Most recently touched root hash.")
-		return ledger.State(hash.DummyHash),
+		return nil,
 			fmt.Errorf("cannot get trie at the given state commitment: %w", err)
 	}
 
 	// clean up tries to release memory
 	err = l.keepOnlyOneTrie(state)
 	if err != nil {
-		return ledger.State(hash.DummyHash),
+		return nil,
 			fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
 	}
 
@@ -382,7 +410,7 @@ func (l *Ledger) ExportCheckpointAt(
 			elapsed := time.Since(start)
 
 			if err != nil {
-				return ledger.State(hash.DummyHash), fmt.Errorf("error applying migration (%d): %w", i, err)
+				return nil, fmt.Errorf("error applying migration (%d): %w", i, err)
 			}
 
 			newPayloadSize := len(payloads)
@@ -404,7 +432,7 @@ func (l *Ledger) ExportCheckpointAt(
 		// get paths
 		paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
 		if err != nil {
-			return ledger.State(hash.DummyHash), fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
+			return nil, fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
 		}
 
 		l.logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))
@@ -415,35 +443,11 @@ func (l *Ledger) ExportCheckpointAt(
 		applyPruning := false
 		newTrie, _, err = trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
 		if err != nil {
-			return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
+			return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 		}
 	}
 
-	statecommitment := ledger.State(newTrie.RootHash())
-
-	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
-
-	err = os.MkdirAll(outputDir, os.ModePerm)
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("could not create output dir %s: %w", outputDir, err)
-	}
-
-	err = realWAL.StoreCheckpointV6Concurrently([]*trie.MTrie{newTrie}, outputDir, outputFile, &l.logger)
-
-	// Writing the checkpoint takes time to write and copy.
-	// Without relying on an exit code or stdout, we need to know when the copy is complete.
-	writeStatusFileErr := writeStatusFile("checkpoint_status.json", err)
-	if writeStatusFileErr != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("failed to write checkpoint status file: %w", writeStatusFileErr)
-	}
-
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
-	}
-
-	l.logger.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
-
-	return statecommitment, nil
+	return newTrie, nil
 }
 
 // MostRecentTouchedState returns a state which is most recently touched.
@@ -473,11 +477,4 @@ func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
 	l.wal.PauseRecord()
 	defer l.wal.UnpauseRecord()
 	return l.forest.PurgeCacheExcept(ledger.RootHash(state))
-}
-
-func writeStatusFile(fileName string, e error) error {
-	checkpointStatus := map[string]bool{"succeeded": e == nil}
-	checkpointStatusJson, _ := json.MarshalIndent(checkpointStatus, "", " ")
-	err := os.WriteFile(fileName, checkpointStatusJson, 0644)
-	return err
 }
