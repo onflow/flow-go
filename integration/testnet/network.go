@@ -341,7 +341,7 @@ func (net *FlowNetwork) PrintPorts() {
 //
 // Returns:
 //   - map[string]string: a map of container name to the specified port on the host machine.
-func (net *FlowNetwork) PortsByContainerName(port string, withGhost bool) map[string]string {
+func (net *FlowNetwork) PortsByContainerName(portName string, withGhost bool) map[string]string {
 	portsByContainer := make(map[string]string)
 	for containerName, c := range net.Containers {
 		if !withGhost && c.Config.Ghost {
