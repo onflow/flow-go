@@ -336,7 +336,7 @@ func (net *FlowNetwork) PrintPorts() {
 
 // PortsByContainerName returns the specified port for each container in the network.
 // Args:
-//   - port: name of the port.
+//   - portName: name of the port.
 //   - withGhost: when set to true will include urls's for ghost containers, otherwise ghost containers will be filtered.
 //
 // Returns:
