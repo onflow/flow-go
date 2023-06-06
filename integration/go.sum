@@ -1361,8 +1361,8 @@ github.com/onflow/flow-emulator v0.50.2/go.mod h1:ioJhKJiu92G4713TS9BoRit+/KUZV7
 github.com/onflow/flow-ft/lib/go/contracts v0.7.0 h1:XEKE6qJUw3luhsYmIOteXP53gtxNxrwTohgxJXCYqBE=
 github.com/onflow/flow-ft/lib/go/contracts v0.7.0/go.mod h1:kTMFIySzEJJeupk+7EmXs0EJ6CBWY/MV9fv9iYQk+RU=
 github.com/onflow/flow-go-sdk v0.24.0/go.mod h1:IoptMLPyFXWvyd9yYA6/4EmSeeozl6nJoIv4FaEMg74=
-github.com/onflow/flow-go-sdk v0.41.0 h1:wYIlw5wa1G7/Gtc/DnNMgcTiWwgETEvo416iB5bXTKc=
-github.com/onflow/flow-go-sdk v0.41.0/go.mod h1:rxVy5gA4pUEoRYiSrXMzHRyfjQ/4Zqoz4cjEWT24j5c=
+github.com/onflow/flow-go-sdk v0.41.1 h1:VXT5TvA+WmpedOcbkXu+65wq+N+j5Yu3VvxCDqLoc3U=
+github.com/onflow/flow-go-sdk v0.41.1/go.mod h1:tiGY/eGgk3/aeeJ5DBu2AeaJfoqI9o1S614dLrIl4Js=
 github.com/onflow/flow-go/crypto v0.21.3/go.mod h1:vI6V4CY3R6c4JKBxdcRiR/AnjBfL8OSD97bJc60cLuQ=
 github.com/onflow/flow-go/crypto v0.24.7 h1:RCLuB83At4z5wkAyUCF7MYEnPoIIOHghJaODuJyEoW0=
 github.com/onflow/flow-go/crypto v0.24.7/go.mod h1:fqCzkIBBMRRkciVrvW21rECKq1oD7Q6u+bCI78lfNX0=

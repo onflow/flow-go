@@ -22,7 +22,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
 	github.com/onflow/flow-emulator v0.50.2
 	github.com/onflow/flow-go v0.30.1-0.20230606183951-596485936163
-	github.com/onflow/flow-go-sdk v0.41.0
+	github.com/onflow/flow-go-sdk v0.41.1
 	github.com/onflow/flow-go/crypto v0.24.7
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230602212908-08fc6536d391
