@@ -35,7 +35,7 @@ func (s *GossipsubRPCInspectorFalsePositiveNotificationsTestSuite) TestGossipsub
 	s.waitForStateCommitments(s.Ctx, 5, 30*time.Second, 500*time.Millisecond)
 
 	// ensure no node in the network has disseminated an invalid control message notification
-	metricName := s.inspectorNotifQSizeMetricName()
+	metricName := s.inspectorNotificationQSizeMetricName()
 	metricsByContainer := s.Net.GetMetricFromContainers(s.T(), metricName, s.metricsUrls())
 	s.ensureNoNotificationsDisseminated(metricsByContainer)
 }
