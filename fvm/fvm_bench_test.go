@@ -446,7 +446,9 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			computationResult := blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
 			totalInteractionUsed := uint64(0)
 			totalComputationUsed := uint64(0)
-			for _, txRes := range computationResult.AllTransactionResults() {
+			results := computationResult.AllTransactionResults()
+			// not interested in the system transaction
+			for _, txRes := range results[0 : len(results)-1] {
 				require.Empty(b, txRes.ErrorMessage)
 				totalInteractionUsed += logE.InteractionUsed[txRes.ID().String()]
 				totalComputationUsed += txRes.ComputationUsed
@@ -691,7 +693,9 @@ func BenchRunNFTBatchTransfer(b *testing.B,
 		}
 
 		computationResult = blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
-		for _, txRes := range computationResult.AllTransactionResults() {
+		results := computationResult.AllTransactionResults()
+		// not interested in the system transaction
+		for _, txRes := range results[0 : len(results)-1] {
 			require.Empty(b, txRes.ErrorMessage)
 		}
 	}

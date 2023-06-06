@@ -27,6 +27,7 @@ type ExecutionDataBackend struct {
 	headers        storage.Headers
 	broadcaster    *engine.Broadcaster
 	sendTimeout    time.Duration
+	responseLimit  float64
 	sendBufferSize int
 
 	getExecutionData GetExecutionDataFunc
@@ -34,7 +35,12 @@ type ExecutionDataBackend struct {
 }
 
 func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
-	executionData, err := b.getExecutionData(ctx, blockID)
+	header, err := b.headers.ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get block header for %s: %w", blockID, err)
+	}
+
+	executionData, err := b.getExecutionData(ctx, header.Height)
 
 	if err != nil {
 		// need custom not found handler due to blob not found error
@@ -51,36 +57,24 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, bl
 func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) Subscription {
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
 	if err != nil {
-		sub := NewSubscription(b.sendBufferSize)
-		if st, ok := status.FromError(err); ok {
-			sub.Fail(status.Errorf(st.Code(), "could not get start height: %s", st.Message()))
-			return sub
-		}
-
-		sub.Fail(fmt.Errorf("could not get start height: %w", err))
-		return sub
+		return NewFailedSubscription(err, "could not get start height")
 	}
 
 	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponse)
 
-	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, sub).Stream(ctx)
+	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
 	return sub
 }
 
 func (b *ExecutionDataBackend) getResponse(ctx context.Context, height uint64) (interface{}, error) {
-	header, err := b.headers.ByHeight(height)
+	executionData, err := b.getExecutionData(ctx, height)
 	if err != nil {
-		return nil, fmt.Errorf("could not get block header for height %d: %w", height, err)
-	}
-
-	executionData, err := b.getExecutionData(ctx, header.ID())
-	if err != nil {
-		return nil, fmt.Errorf("could not get execution data for block %s: %w", header.ID(), err)
+		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 	}
 
 	return &ExecutionDataResponse{
-		Height:        header.Height,
+		Height:        height,
 		ExecutionData: executionData.BlockExecutionData,
 	}, nil
 }

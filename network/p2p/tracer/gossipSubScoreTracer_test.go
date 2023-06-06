@@ -76,6 +76,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithMetricsCollector(&mockPeerScoreMetrics{
 			NoopCollector: metrics.NoopCollector{},
 			c:             scoreMetrics,
@@ -130,6 +131,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus))
 	idProvider.On("ByPeerID", consensusNode.Host().ID()).Return(&consensusId, true).Maybe()
 
@@ -137,6 +139,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleAccess))
 	idProvider.On("ByPeerID", accessNode.Host().ID()).Return(&accessId, true).Maybe()
 

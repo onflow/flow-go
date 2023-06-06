@@ -58,6 +58,7 @@ const (
 const (
 	subsystemCompliance  = "compliance"
 	subsystemHotstuff    = "hotstuff"
+	subsystemCruiseCtl   = "cruisectl"
 	subsystemMatchEngine = "match"
 )
 

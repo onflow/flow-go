@@ -33,7 +33,7 @@ func NewClusterPrefixedMessagesReceivedTracker(logger zerolog.Logger, sizeLimit 
 }
 
 // Inc increments the cluster prefixed control messages received Gauge for the peer.
-// All errors returned from this callback are unexpected and irrecoverable.
+// All errors returned from this func are unexpected and irrecoverable.
 func (c *ClusterPrefixedMessagesReceivedTracker) Inc(nodeID flow.Identifier) (float64, error) {
 	count, err := c.cache.ReceivedClusterPrefixedMessage(nodeID)
 	if err != nil {
@@ -43,7 +43,7 @@ func (c *ClusterPrefixedMessagesReceivedTracker) Inc(nodeID flow.Identifier) (fl
 }
 
 // Load loads the current number of cluster prefixed control messages received by a peer.
-// All errors returned from this callback are unexpected and irrecoverable.
+// All errors returned from this func are unexpected and irrecoverable.
 func (c *ClusterPrefixedMessagesReceivedTracker) Load(nodeID flow.Identifier) (float64, error) {
 	count, _, err := c.cache.Get(nodeID)
 	if err != nil {

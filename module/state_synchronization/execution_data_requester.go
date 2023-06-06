@@ -18,5 +18,10 @@ type ExecutionDataRequester interface {
 	OnBlockFinalized(*model.Block)
 
 	// AddOnExecutionDataReceivedConsumer adds a callback to be called when a new ExecutionData is received
-	AddOnExecutionDataReceivedConsumer(fn OnExecutionDataReceivedConsumer)
+	AddOnExecutionDataReceivedConsumer(OnExecutionDataReceivedConsumer)
+
+	// HighestConsecutiveHeight returns the highest consecutive block height for which ExecutionData
+	// has been received.
+	// This method must only be called after the component is Ready. If it is called early, an error is returned.
+	HighestConsecutiveHeight() (uint64, error)
 }
