@@ -41,7 +41,7 @@ type ViewCommitter interface {
 }
 
 type transactionResult struct {
-	transactionRequest
+	TransactionRequest
 	*snapshot.ExecutionSnapshot
 	fvm.ProcedureOutput
 	timeSpent time.Duration
@@ -216,7 +216,7 @@ func (collector *resultCollector) commitCollection(
 }
 
 func (collector *resultCollector) processTransactionResult(
-	txn transactionRequest,
+	txn TransactionRequest,
 	txnExecutionSnapshot *snapshot.ExecutionSnapshot,
 	output fvm.ProcedureOutput,
 	timeSpent time.Duration,
@@ -296,13 +296,13 @@ func (collector *resultCollector) processTransactionResult(
 }
 
 func (collector *resultCollector) AddTransactionResult(
-	request transactionRequest,
+	request TransactionRequest,
 	snapshot *snapshot.ExecutionSnapshot,
 	output fvm.ProcedureOutput,
 	timeSpent time.Duration,
 ) {
 	result := transactionResult{
-		transactionRequest: request,
+		TransactionRequest: request,
 		ExecutionSnapshot:  snapshot,
 		ProcedureOutput:    output,
 		timeSpent:          timeSpent,
@@ -321,7 +321,7 @@ func (collector *resultCollector) runResultProcessor() {
 
 	for result := range collector.processorInputChan {
 		err := collector.processTransactionResult(
-			result.transactionRequest,
+			result.TransactionRequest,
 			result.ExecutionSnapshot,
 			result.ProcedureOutput,
 			result.timeSpent)
