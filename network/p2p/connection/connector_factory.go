@@ -11,7 +11,10 @@ import (
 
 const (
 	// minBackoff is the minimum backoff duration for the backoff connector.
-	minBackoff = time.Second * 10
+	// We set it to 1 second as we want to let the LibP2PNode be in charge of connection establishment and can disconnect
+	// and reconnect to peers as soon as it needs. This is essential to ensure that the allow-listing and disallow-listing
+	// time intervals are working as expected.
+	minBackoff = 1 * time.Second
 	// maxBackoff is the maximum backoff duration for the backoff connector. When the backoff duration reaches this value,
 	// it will not increase any further.
 	maxBackoff = time.Hour
