@@ -326,28 +326,6 @@ func (l *Ledger) Checkpointer() (*realWAL.Checkpointer, error) {
 	return checkpointer, nil
 }
 
-// ExportCheckpointAt exports a checkpoint at specific state commitment after applying migrations and returns the new state (after migration) and any errors
-// deprecated
-func (l *Ledger) ExportCheckpointAt(
-	state ledger.State,
-	migrations []ledger.Migration,
-	targetPathFinderVersion uint8,
-	outputDir, outputFile string,
-) (ledger.State, error) {
-	newTrie, err := l.MigrateAt(state, migrations, targetPathFinderVersion)
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("fail to migrate: %w", err)
-	}
-
-	err = realWAL.StoreCheckpointV6Concurrently([]*trie.MTrie{newTrie}, outputDir, outputFile, &l.logger)
-
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
-	}
-
-	return ledger.State(newTrie.RootHash()), nil
-}
-
 func (l *Ledger) MigrateAt(
 	state ledger.State,
 	migrations []ledger.Migration,
