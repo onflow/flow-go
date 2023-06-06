@@ -3,7 +3,6 @@ package complete
 import (
 	"fmt"
 	"io"
-	"os"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -328,6 +327,7 @@ func (l *Ledger) Checkpointer() (*realWAL.Checkpointer, error) {
 }
 
 // ExportCheckpointAt exports a checkpoint at specific state commitment after applying migrations and returns the new state (after migration) and any errors
+// deprecated
 func (l *Ledger) ExportCheckpointAt(
 	state ledger.State,
 	migrations []ledger.Migration,
@@ -339,24 +339,13 @@ func (l *Ledger) ExportCheckpointAt(
 		return ledger.State(hash.DummyHash), fmt.Errorf("fail to migrate: %w", err)
 	}
 
-	statecommitment := ledger.State(newTrie.RootHash())
-
-	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
-
-	err = os.MkdirAll(outputDir, os.ModePerm)
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("could not create output dir %s: %w", outputDir, err)
-	}
-
 	err = realWAL.StoreCheckpointV6Concurrently([]*trie.MTrie{newTrie}, outputDir, outputFile, &l.logger)
 
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
 	}
 
-	l.logger.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
-
-	return statecommitment, nil
+	return ledger.State(newTrie.RootHash()), nil
 }
 
 func (l *Ledger) MigrateAt(
@@ -446,6 +435,10 @@ func (l *Ledger) MigrateAt(
 			return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 		}
 	}
+
+	statecommitment := ledger.State(newTrie.RootHash())
+
+	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
 
 	return newTrie, nil
 }
