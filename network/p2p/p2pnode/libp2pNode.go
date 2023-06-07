@@ -363,21 +363,23 @@ func (n *Node) WithPeersProvider(peersProvider p2p.PeersProvider) {
 		n.peerManager.SetPeersProvider(
 			func() peer.IDSlice {
 				authorizedPeersIds := peersProvider()
-				for i, id := range authorizedPeersIds {
+				allowListedPeerIds := peer.IDSlice{} // subset of authorizedPeersIds that are not disallowed
+				for _, peerId := range authorizedPeersIds {
 					// exclude the disallowed peers from the authorized peers list
-					causes := n.disallowListedCache.GetAllDisallowedListCausesFor(id)
+					causes := n.disallowListedCache.GetAllDisallowedListCausesFor(peerId)
 					if len(causes) > 0 {
 						n.logger.Warn().
-							Str("peer_id", id.String()).
+							Str("peer_id", peerId.String()).
 							Str("causes", fmt.Sprintf("%v", causes)).
 							Msg("peer is disallowed for a cause, removing from authorized peers of peer manager")
 
 						// exclude the peer from the authorized peers list
-						authorizedPeersIds = append(authorizedPeersIds[:i], authorizedPeersIds[i+1:]...)
+						continue
 					}
+					allowListedPeerIds = append(allowListedPeerIds, peerId)
 				}
 
-				return authorizedPeersIds
+				return allowListedPeerIds
 			})
 	}
 }
