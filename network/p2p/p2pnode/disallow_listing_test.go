@@ -18,9 +18,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestDisconnectingFromDisallowListedNode ensures that the node disconnects from a disallow listed node while the node is
-// connected to other (allow listed) nodes. It also ensures that when a disallow-listed node is allow-listed again, the
-// node reconnects to it.
+// TestDisconnectingFromDisallowListedNode ensures that (1) the node disconnects from a disallow listed node while the node is
+// connected to other (allow listed) nodes. (2) new inbound or outbound connections to and from disallow-listed nodes are rejected.
+// (3) When a disallow-listed node is allow-listed again, the node reconnects to it.
 func TestDisconnectingFromDisallowListedNode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -92,8 +92,4 @@ func TestDisconnectingFromDisallowListedNode(t *testing.T) {
 	// we choose a timeout of 5 seconds because peer manager updates peers every 1 second and we need to wait for
 	// any potential random backoffs to expire (min 1 second).
 	p2ptest.RequireConnectedEventually(t, nodes, 100*time.Millisecond, 5*time.Second)
-}
-
-func TestConnectionGatingDisallowListingNodes(t *testing.T) {
-
 }
