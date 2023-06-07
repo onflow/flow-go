@@ -320,7 +320,7 @@ docker-build-verification:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/verification:latest" -t "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/verification: .
+		-t "$(CONTAINER_REGISTRY)/verification:latest" -t "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-verification-without-netgo
 docker-build-verification-without-netgo:
