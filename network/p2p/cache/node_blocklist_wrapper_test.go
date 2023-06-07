@@ -26,7 +26,7 @@ type NodeBlocklistWrapperTestSuite struct {
 	DB       *badger.DB
 	provider *mocks.IdentityProvider
 
-	wrapper        *cache.NodeBlocklistWrapper
+	wrapper        *cache.NodeDisallowListingWrapper
 	updateConsumer *mocknetwork.DisallowListNotificationConsumer
 }
 
@@ -45,7 +45,7 @@ func TestNodeBlocklistWrapperTestSuite(t *testing.T) {
 }
 
 // TestHonestNode verifies:
-// For nodes _not_ on the disallowList, the `cache.NodeBlocklistWrapper` should forward
+// For nodes _not_ on the disallowList, the `cache.NodeDisallowListingWrapper` should forward
 // the identities from the wrapped `IdentityProvider` without modification.
 func (s *NodeBlocklistWrapperTestSuite) TestHonestNode() {
 	s.Run("ByNodeID", func() {
@@ -281,7 +281,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestBlocklistAddRemove() {
 // Note:
 // conceptually, the disallowList is a set, i.e. not order dependent.
 // The wrapper internally converts the list to a set and vice versa. Therefore
-// the order is not preserved by `GetBlocklist`. Consequently, we compare
+// the order is not preserved by `GetDisallowList`. Consequently, we compare
 // map-based representations here.
 func (s *NodeBlocklistWrapperTestSuite) TestUpdate() {
 	blocklist1 := unittest.IdentifierListFixture(8)
@@ -294,7 +294,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestUpdate() {
 	}).Return().Once()
 	err := s.wrapper.Update(blocklist1)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocklist1.Lookup(), s.wrapper.GetBlocklist().Lookup())
+	require.Equal(s.T(), blocklist1.Lookup(), s.wrapper.GetDisallowList().Lookup())
 
 	s.updateConsumer.On("OnDisallowListNotification", &network.DisallowListingUpdate{
 		FlowIds: blocklist2,
@@ -302,15 +302,15 @@ func (s *NodeBlocklistWrapperTestSuite) TestUpdate() {
 	}).Return().Once()
 	err = s.wrapper.Update(blocklist2)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocklist2.Lookup(), s.wrapper.GetBlocklist().Lookup())
+	require.Equal(s.T(), blocklist2.Lookup(), s.wrapper.GetDisallowList().Lookup())
 
 	s.updateConsumer.On("OnDisallowListNotification", &network.DisallowListingUpdate{
 		FlowIds: nil,
 		Cause:   network.DisallowListedCauseAdmin,
 	}).Return().Once()
-	err = s.wrapper.ClearBlocklist()
+	err = s.wrapper.ClearDisallowList()
 	require.NoError(s.T(), err)
-	require.Empty(s.T(), s.wrapper.GetBlocklist())
+	require.Empty(s.T(), s.wrapper.GetDisallowList())
 
 	s.updateConsumer.On("OnDisallowListNotification", &network.DisallowListingUpdate{
 		FlowIds: blocklist3,
@@ -318,26 +318,26 @@ func (s *NodeBlocklistWrapperTestSuite) TestUpdate() {
 	}).Return().Once()
 	err = s.wrapper.Update(blocklist3)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), blocklist3.Lookup(), s.wrapper.GetBlocklist().Lookup())
+	require.Equal(s.T(), blocklist3.Lookup(), s.wrapper.GetDisallowList().Lookup())
 }
 
 // TestDataBasePersist verifies database interactions of the wrapper with the data base.
 // This test verifies that the disallowList updates are persisted across restarts.
 // To decouple this test from the lower-level data base design, we proceed as follows:
-//   - We do data-base operation through the exported methods from `NodeBlocklistWrapper`
-//   - Then, we create a new `NodeBlocklistWrapper` backed by the same data base. Since it is a
+//   - We do data-base operation through the exported methods from `NodeDisallowListingWrapper`
+//   - Then, we create a new `NodeDisallowListingWrapper` backed by the same data base. Since it is a
 //     new wrapper, it must read its state from the data base. Hence, if the new wrapper returns
 //     the correct data, we have strong evidence that data-base interactions are correct.
 //
 // Note: The wrapper internally converts the list to a set and vice versa. Therefore
-// the order is not preserved by `GetBlocklist`. Consequently, we compare
+// the order is not preserved by `GetDisallowList`. Consequently, we compare
 // map-based representations here.
 func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 	blocklist := unittest.IdentifierListFixture(8)
 	blocklist2 := unittest.IdentifierListFixture(8)
 
 	s.Run("Get disallowList from empty database", func() {
-		require.Empty(s.T(), s.wrapper.GetBlocklist())
+		require.Empty(s.T(), s.wrapper.GetDisallowList())
 	})
 
 	s.Run("Clear disallowList on empty database", func() {
@@ -345,14 +345,14 @@ func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 			FlowIds: nil,
 			Cause:   network.DisallowListedCauseAdmin,
 		}).Return().Once()
-		err := s.wrapper.ClearBlocklist() // No-op as data base does not contain any block list
+		err := s.wrapper.ClearDisallowList() // No-op as data base does not contain any block list
 		require.NoError(s.T(), err)
-		require.Empty(s.T(), s.wrapper.GetBlocklist())
+		require.Empty(s.T(), s.wrapper.GetDisallowList())
 
 		// newly created wrapper should read `disallowList` from data base during initialization
 		w, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.updateConsumer)
 		require.NoError(s.T(), err)
-		require.Empty(s.T(), w.GetBlocklist())
+		require.Empty(s.T(), w.GetDisallowList())
 	})
 
 	s.Run("Update disallowList and init new wrapper from database", func() {
@@ -366,7 +366,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 		// newly created wrapper should read `disallowList` from data base during initialization
 		w, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.updateConsumer)
 		require.NoError(s.T(), err)
-		require.Equal(s.T(), blocklist.Lookup(), w.GetBlocklist().Lookup())
+		require.Equal(s.T(), blocklist.Lookup(), w.GetDisallowList().Lookup())
 	})
 
 	s.Run("Update and overwrite disallowList and then init new wrapper from database", func() {
@@ -387,7 +387,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 		// newly created wrapper should read initial state from data base
 		w, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.updateConsumer)
 		require.NoError(s.T(), err)
-		require.Equal(s.T(), blocklist2.Lookup(), w.GetBlocklist().Lookup())
+		require.Equal(s.T(), blocklist2.Lookup(), w.GetDisallowList().Lookup())
 	})
 
 	s.Run("Update & clear & update and then init new wrapper from database", func() {
@@ -402,7 +402,7 @@ func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 
 		w0, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.updateConsumer)
 		require.NoError(s.T(), err)
-		require.Equal(s.T(), blocklist.Lookup(), w0.GetBlocklist().Lookup())
+		require.Equal(s.T(), blocklist.Lookup(), w0.GetDisallowList().Lookup())
 
 		// clear disallowList ->
 		// newly created wrapper should now read empty disallowList from data base during initialization
@@ -410,12 +410,12 @@ func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 			FlowIds: nil,
 			Cause:   network.DisallowListedCauseAdmin,
 		}).Return().Once()
-		err = s.wrapper.ClearBlocklist()
+		err = s.wrapper.ClearDisallowList()
 		require.NoError(s.T(), err)
 
 		w1, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.updateConsumer)
 		require.NoError(s.T(), err)
-		require.Empty(s.T(), w1.GetBlocklist())
+		require.Empty(s.T(), w1.GetDisallowList())
 
 		// set blocklist2 ->
 		// newly created wrapper should now read this list from data base during initialization
@@ -428,6 +428,6 @@ func (s *NodeBlocklistWrapperTestSuite) TestDataBasePersist() {
 
 		w2, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.updateConsumer)
 		require.NoError(s.T(), err)
-		require.Equal(s.T(), blocklist2.Lookup(), w2.GetBlocklist().Lookup())
+		require.Equal(s.T(), blocklist2.Lookup(), w2.GetDisallowList().Lookup())
 	})
 }

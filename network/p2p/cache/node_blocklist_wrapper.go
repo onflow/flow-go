@@ -24,17 +24,19 @@ func (s IdentifierSet) Contains(id flow.Identifier) bool {
 	return found
 }
 
-// NodeBlocklistWrapper is a wrapper for an `module.IdentityProvider` instance, where the
+// NodeDisallowListingWrapper is a wrapper for an `module.IdentityProvider` instance, where the
 // wrapper overrides the `Ejected` flag to true for all NodeIDs in a `disallowList`.
 // To avoid modifying the source of the identities, the wrapper creates shallow copies
 // of the identities (whenever necessary) and modifies the `Ejected` flag only in
 // the copy.
-// The `NodeBlocklistWrapper` internally represents the `disallowList` as a map, to enable
+// The `NodeDisallowListingWrapper` internally represents the `disallowList` as a map, to enable
 // performant lookup. However, the exported API works with `flow.IdentifierList` for
 // disallowList, as this is a broadly supported data structure which lends itself better
 // to config or command-line inputs.
+// When a node is disallow-listed, the networking layer connection to that node is closed and no
+// incoming or outgoing connections are established with that node.
 // TODO: terminology change - rename `blocklist` to `disallowList` everywhere to be consistent with the code.
-type NodeBlocklistWrapper struct {
+type NodeDisallowListingWrapper struct {
 	m  sync.RWMutex
 	db *badger.DB
 
@@ -45,21 +47,21 @@ type NodeBlocklistWrapper struct {
 	updateConsumer network.DisallowListNotificationConsumer
 }
 
-var _ module.IdentityProvider = (*NodeBlocklistWrapper)(nil)
+var _ module.IdentityProvider = (*NodeDisallowListingWrapper)(nil)
 
 // NewNodeDisallowListWrapper wraps the given `IdentityProvider`. The disallow-list is
 // loaded from the database (or assumed to be empty if no database entry is present).
 func NewNodeDisallowListWrapper(
 	identityProvider module.IdentityProvider,
 	db *badger.DB,
-	updateConsumer network.DisallowListNotificationConsumer) (*NodeBlocklistWrapper, error) {
+	updateConsumer network.DisallowListNotificationConsumer) (*NodeDisallowListingWrapper, error) {
 
-	disallowList, err := retrieveBlocklist(db)
+	disallowList, err := retrieveDisallowList(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read set of disallowed node IDs from data base: %w", err)
 	}
 
-	return &NodeBlocklistWrapper{
+	return &NodeDisallowListingWrapper{
 		db:               db,
 		identityProvider: identityProvider,
 		disallowList:     disallowList,
@@ -68,37 +70,45 @@ func NewNodeDisallowListWrapper(
 }
 
 // Update sets the wrapper's internal set of blocked nodes to `disallowList`. Empty list and `nil`
-// (equivalent to empty list) are accepted inputs. To avoid legacy entries in the data base, this
+// (equivalent to empty list) are accepted inputs. To avoid legacy entries in the database, this
 // function purges the entire data base entry if `disallowList` is empty.
-// This implementation is _eventually consistent_, where changes are written to the data base first
+// This implementation is _eventually consistent_, where changes are written to the database first
 // and then (non-atomically!) the in-memory set of blocked nodes is updated. This strongly
 // benefits performance and modularity. No errors are expected during normal operations.
-func (w *NodeBlocklistWrapper) Update(blocklist flow.IdentifierList) error {
-	b := blocklist.Lookup() // converts slice to map
+//
+// Args:
+// - disallowList: list of node IDs to be disallow-listed from the networking layer, i.e., the existing connections
+// to these nodes will be closed and no new connections will be established (neither incoming nor outgoing).
+//
+// Returns:
+// - error: if the update fails, e.g., due to a database error. Any returned error is irrecoverable and the caller
+// should abort the process.
+func (w *NodeDisallowListingWrapper) Update(disallowList flow.IdentifierList) error {
+	b := disallowList.Lookup() // converts slice to map
 
 	w.m.Lock()
 	defer w.m.Unlock()
-	err := persistBlocklist(b, w.db)
+	err := persistDisallowList(b, w.db)
 	if err != nil {
 		return fmt.Errorf("failed to persist set of blocked nodes to the data base: %w", err)
 	}
 	w.disallowList = b
 	w.updateConsumer.OnDisallowListNotification(&network.DisallowListingUpdate{
-		FlowIds: blocklist,
+		FlowIds: disallowList,
 		Cause:   network.DisallowListedCauseAdmin,
 	})
 
 	return nil
 }
 
-// ClearBlocklist purges the set of blocked node IDs. Convenience function
+// ClearDisallowList purges the set of blocked node IDs. Convenience function
 // equivalent to w.Update(nil). No errors are expected during normal operations.
-func (w *NodeBlocklistWrapper) ClearBlocklist() error {
+func (w *NodeDisallowListingWrapper) ClearDisallowList() error {
 	return w.Update(nil)
 }
 
-// GetBlocklist returns the set of blocked node IDs.
-func (w *NodeBlocklistWrapper) GetBlocklist() flow.IdentifierList {
+// GetDisallowList returns the set of blocked node IDs.
+func (w *NodeDisallowListingWrapper) GetDisallowList() flow.IdentifierList {
 	w.m.RLock()
 	defer w.m.RUnlock()
 
@@ -113,7 +123,7 @@ func (w *NodeBlocklistWrapper) GetBlocklist() flow.IdentifierList {
 // protocol that pass the provided filter. Caution, this includes ejected nodes.
 // Please check the `Ejected` flag in the returned identities (or provide a
 // filter for removing ejected nodes).
-func (w *NodeBlocklistWrapper) Identities(filter flow.IdentityFilter) flow.IdentityList {
+func (w *NodeDisallowListingWrapper) Identities(filter flow.IdentityFilter) flow.IdentityList {
 	identities := w.identityProvider.Identities(filter)
 	if len(identities) == 0 {
 		return identities
@@ -145,7 +155,7 @@ func (w *NodeBlocklistWrapper) Identities(filter flow.IdentityFilter) flow.Ident
 // true if and only if Identity has been found, i.e. `Identity` is not nil.
 // Caution: function returns include ejected nodes. Please check the `Ejected`
 // flag in the identity.
-func (w *NodeBlocklistWrapper) ByNodeID(identifier flow.Identifier) (*flow.Identity, bool) {
+func (w *NodeDisallowListingWrapper) ByNodeID(identifier flow.Identifier) (*flow.Identity, bool) {
 	identity, b := w.identityProvider.ByNodeID(identifier)
 	return w.setEjectedIfBlocked(identity), b
 }
@@ -154,7 +164,7 @@ func (w *NodeBlocklistWrapper) ByNodeID(identifier flow.Identifier) (*flow.Ident
 // Shortcuts:
 //   - If the node's identity is nil, there is nothing to do because we don't generate identities here.
 //   - If the node is already ejected, we don't have to check the disallowList.
-func (w *NodeBlocklistWrapper) setEjectedIfBlocked(identity *flow.Identity) *flow.Identity {
+func (w *NodeDisallowListingWrapper) setEjectedIfBlocked(identity *flow.Identity) *flow.Identity {
 	if identity == nil || identity.Ejected {
 		return identity
 	}
@@ -180,25 +190,25 @@ func (w *NodeBlocklistWrapper) setEjectedIfBlocked(identity *flow.Identity) *flo
 // true if and only if Identity has been found, i.e. `Identity` is not nil.
 // Caution: function returns include ejected nodes. Please check the `Ejected`
 // flag in the identity.
-func (w *NodeBlocklistWrapper) ByPeerID(p peer.ID) (*flow.Identity, bool) {
+func (w *NodeDisallowListingWrapper) ByPeerID(p peer.ID) (*flow.Identity, bool) {
 	identity, b := w.identityProvider.ByPeerID(p)
 	return w.setEjectedIfBlocked(identity), b
 }
 
-// persistBlocklist writes the given disallowList to the database. To avoid legacy
+// persistDisallowList writes the given disallowList to the database. To avoid legacy
 // entries in the database, we prune the entire data base entry if `disallowList` is
 // empty. No errors are expected during normal operations.
-func persistBlocklist(blocklist IdentifierSet, db *badger.DB) error {
-	if len(blocklist) == 0 {
+func persistDisallowList(disallowList IdentifierSet, db *badger.DB) error {
+	if len(disallowList) == 0 {
 		return db.Update(operation.PurgeBlocklist())
 	}
-	return db.Update(operation.PersistBlocklist(blocklist))
+	return db.Update(operation.PersistBlocklist(disallowList))
 }
 
-// retrieveBlocklist reads the set of blocked nodes from the data base.
+// retrieveDisallowList reads the set of blocked nodes from the data base.
 // In case no database entry exists, an empty set (nil map) is returned.
 // No errors are expected during normal operations.
-func retrieveBlocklist(db *badger.DB) (IdentifierSet, error) {
+func retrieveDisallowList(db *badger.DB) (IdentifierSet, error) {
 	var blocklist map[flow.Identifier]struct{}
 	err := db.View(operation.RetrieveBlocklist(&blocklist))
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
