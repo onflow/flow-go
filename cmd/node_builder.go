@@ -197,6 +197,9 @@ type NetworkConfig struct {
 	// UnicastCreateStreamRetryDelay initial delay used in the exponential backoff for create stream retries
 	UnicastCreateStreamRetryDelay time.Duration
 	// size of the cache keeping the status of disallow-listed peers. Recommended to be 100 * number of authorized nodes.
+	// Note: this cache is meant to only keep the authorized (i.e., staked) but disallow-listed peers. There is no sybil
+	// vulnerability for this cache. However, the cache must be large enough to ensure it never runs out of space even if
+	// the node has not been re-configured for a long time.
 	DisallowListCacheSize uint32
 	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
 	UnicastRateLimitersConfig *UnicastRateLimitersConfig
