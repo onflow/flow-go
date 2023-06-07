@@ -278,5 +278,3 @@ require (
 	lukechampine.com/blake3 v1.1.7 // indirect
 	nhooyr.io/websocket v1.8.6 // indirect
 )
-
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.39.2-patch.1
