@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -102,7 +103,7 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 // It prepares a set of misbehavior reports and reports them to the conduit on the test channel.
 // The test ensures that the MisbehaviorReportManager receives and handles all reported misbehavior
 // without any duplicate reports and within a specified time.
-func TestHandleReportedMisbehavior_Integration(t *testing.T) {
+func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 	cfg := managerCfgFixture()
 
 	// create a new MisbehaviorReportManager
@@ -126,7 +127,6 @@ func TestHandleReportedMisbehavior_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{net}, 100*time.Millisecond)
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
@@ -186,6 +186,94 @@ func TestHandleReportedMisbehavior_Integration(t *testing.T) {
 
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
+}
+
+// TestHandleReportedMisbehavior_And_DisallowListing_Integration implements an end-to-end integration test for the
+// handling of reported misbehavior and disallow listing.
+//
+// The test sets up 3 nodes, one victim, one honest, and one (alledged) spammer.
+// Initially, the test ensures that all nodes are connected to each other.
+// Then, test imitates that victim node reports the spammer node for spamming.
+// The test generates enough spam reports to trigger the disallow listing of the victim node.
+// The test ensures that the victim node is disconnected from the spammer node.
+// The test ensures that despite attempting on connections, no inbound or outbound connections between the victim and
+// the disallow-listed spammer node are established.
+func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T) {
+	cfg := managerCfgFixture()
+
+	// create a new MisbehaviorReportManager
+	var victimSpamRecordCacheCache alsp.SpamRecordCache
+	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			victimSpamRecordCacheCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return victimSpamRecordCacheCache
+		}),
+	}
+
+	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
+		t,
+		3,
+		unittest.Logger(),
+		unittest.NetworkCodec(),
+		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+	sms := testutils.GenerateSubscriptionManagers(t, mws)
+	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0], p2p.WithAlspConfig(cfg))
+	victimNetwork, err := p2p.NewNetwork(networkCfg)
+	require.NoError(t, err)
+
+	// index of the victim node in the nodes slice.
+	victimIndex := 0
+	// index of the spammer node in the nodes slice (the node that will be reported for misbehavior and disallow-listed by victim).
+	spammerIndex := 1
+	// other node (not victim and not spammer) that we have to ensure is not affected by the disallow-listing of the spammer.
+	honestIndex := 2
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{victimNetwork}, 100*time.Millisecond)
+	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
+	defer cancel()
+
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+	// initially victim and spammer should be able to connect to each other.
+	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
+
+	e := mocknetwork.NewEngine(t)
+	con, err := victimNetwork.Register(channels.TestNetworkChannel, e)
+	require.NoError(t, err)
+
+	// creates a misbehavior report for the spammer
+	report := misbehaviorReportFixtureWithPenalty(t, ids[spammerIndex].NodeID, model.DefaultPenaltyValue)
+
+	// imitates that the victim has detected the spammer on 120 times of violations and reports the misbehavior
+	// to the network. As each report has the default penalty, ideally the spammer should be disallow-listed after
+	// 100 reports (each having 0.01 * disallow-listing penalty). But we take 120 as a safe number to ensure that
+	// the spammer is disallow-listed definitely.
+	reportCount := 120
+	wg := sync.WaitGroup{}
+	for i := 0; i < reportCount; i++ {
+		wg.Add(1)
+		// reports the misbehavior
+		report := report // capture range variable
+		go func() {
+			defer wg.Done()
+
+			con.ReportMisbehavior(report)
+		}()
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
+
+	// ensures that the spammer is disallow-listed by the victim
+	p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]}, 100*time.Millisecond, 2*time.Second)
+
+	// despite disallow-listing spammer, it ensures that (victim and spammer) and (honest and spammer) are still connected.
+	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[honestIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+
+	// while node 2 is disallow-listed, it cannot connect to node 1. Also, node 1 cannot directly dial and connect to node 2, unless
+	// it is allow-listed again.
+	p2ptest.EnsureNotConnectedBetweenGroups(t, ctx, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]})
 }
 
 // TestMisbehaviorReportMetrics tests the recording of misbehavior report metrics.

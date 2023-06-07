@@ -321,7 +321,6 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			if record.Penalty < model.DisallowListingThreshold {
 				// cutoff counter keeps track of how many times the penalty has been below the threshold.
 				record.CutoffCounter++
-
 				m.logger.Warn().
 					Str("key", logging.KeySuspicious).
 					Hex("identifier", logging.ID(id)).
@@ -331,7 +330,6 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 					FlowIds: flow.IdentifierList{id},
 					Cause:   network.DisallowListedCauseAlsp, // sets the ALSP disallow listing cause on node
 				})
-
 			}
 
 			// each time we decay the penalty by the decay speed, the penalty is a negative number, and the decay speed
