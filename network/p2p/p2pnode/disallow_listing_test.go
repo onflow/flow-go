@@ -18,8 +18,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestDisconnectingFromDisallowListedNode ensures that (1) the node disconnects from a disallow listed node while the node is
-// connected to other (allow listed) nodes. (2) new inbound or outbound connections to and from disallow-listed nodes are rejected.
+// TestDisconnectingFromDisallowListedNode ensures that:
+// (1) the node disconnects from a disallow listed node while the node is connected to other (allow listed) nodes.
+// (2) new inbound or outbound connections to and from disallow-listed nodes are rejected.
 // (3) When a disallow-listed node is allow-listed again, the node reconnects to it.
 func TestDisconnectingFromDisallowListedNode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
