@@ -1268,10 +1268,6 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		IdTranslator:               builder.IDTranslator,
 		Codec:                      builder.CodecFactory(),
 		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(logger, networkMetrics),
-		DisallowListCacheConfig: &middleware.DisallowListCacheConfig{
-			MaxSize: builder.BaseConfig.NetworkConfig.DisallowListCacheSize,
-			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
-		},
 	},
 		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)

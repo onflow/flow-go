@@ -918,10 +918,6 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		IdTranslator:               builder.IDTranslator,
 		Codec:                      builder.CodecFactory(),
 		SlashingViolationsConsumer: slashingViolationsConsumer,
-		DisallowListCacheConfig: &middleware.DisallowListCacheConfig{
-			MaxSize: builder.BaseConfig.NetworkConfig.DisallowListCacheSize,
-			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
-		},
 	},
 		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)

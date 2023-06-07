@@ -746,10 +746,6 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		IdTranslator:               builder.IDTranslator,
 		Codec:                      builder.CodecFactory(),
 		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network),
-		DisallowListCacheConfig: &middleware.DisallowListCacheConfig{
-			MaxSize: builder.BaseConfig.NetworkConfig.DisallowListCacheSize,
-			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PrivateNetwork),
-		},
 	},
 		middleware.WithMessageValidators(validators...),
 	)
