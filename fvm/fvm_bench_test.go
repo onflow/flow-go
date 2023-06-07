@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 
@@ -308,7 +309,7 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 
 		for _, event := range computationResult.AllEvents() {
 			if event.Type == flow.EventAccountCreated {
-				data, err := jsoncdc.Decode(nil, event.Payload)
+				data, err := ccf.Decode(nil, event.Payload)
 				if err != nil {
 					tb.Fatal("setup account failed, error decoding events")
 				}
