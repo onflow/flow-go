@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -29,15 +30,26 @@ func TestDisconnectingFromDisallowListedNode(t *testing.T) {
 
 	peerIDSlice := peer.IDSlice{}
 	// node 1 is the node that will be disallow-listing another node (node 2).
-	node1, identity1 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithPeerManagerEnabled(true, connection.DefaultPeerUpdateInterval, func() peer.IDSlice {
-		return peerIDSlice
-	}))
+	node1, identity1 := p2ptest.NodeFixture(t,
+		sporkID,
+		t.Name(),
+		idProvider,
+		p2ptest.WithPeerManagerEnabled(true, connection.DefaultPeerUpdateInterval,
+			func() peer.IDSlice {
+				return peerIDSlice
+			}),
+		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(p peer.ID) error {
+			// allow all the connections, except for the ones that are disallow-listed, which are determined when
+			// this connection gater object queries the disallow listing oracle that will be provided to it by
+			// the libp2p node. So, here, we don't need to do anything except just enabling the connection gater.
+			return nil
+		})))
 	idProvider.On("ByPeerID", node1.Host().ID()).Return(&identity1, true).Maybe()
 	peerIDSlice = append(peerIDSlice, node1.Host().ID())
 
 	// node 2 is the node that will be disallow-listed by node 1.
 	node2, identity2 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider)
-	idProvider.On("ByPeerID", node1.Host().ID()).Return(&identity2, true).Maybe()
+	idProvider.On("ByPeerID", node2.Host().ID()).Return(&identity2, true).Maybe()
 	peerIDSlice = append(peerIDSlice, node2.Host().ID())
 
 	// node 3 is the node that will be connected to node 1 (to ensure that node 1 is still able to connect to other nodes
@@ -66,13 +78,22 @@ func TestDisconnectingFromDisallowListedNode(t *testing.T) {
 
 	// but nodes 1 and 3 should remain connected as well as nodes 2 and 3.
 	// we choose a short timeout because we expect the nodes to remain connected.
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{node1, node3}, 1*time.Millisecond, 100*time.Second)
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{node2, node3}, 1*time.Millisecond, 100*time.Second)
+	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{node1, node3}, 1*time.Millisecond, 100*time.Millisecond)
+	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{node2, node3}, 1*time.Millisecond, 100*time.Millisecond)
+
+	// while node 2 is disallow-listed, it cannot connect to node 1. Also, node 1 cannot directly dial and connect to node 2, unless
+	// it is allow-listed again.
+	p2ptest.EnsureNotConnectedBetweenGroups(t, ctx, []p2p.LibP2PNode{node1}, []p2p.LibP2PNode{node2})
 
 	// phase-2: now we allow-list node 1 back
 	node1.OnAllowListNotification(node2.Host().ID(), network.DisallowListedCauseAlsp)
 
 	// eventually node 1 should be connected to node 2 again, hence all nodes should be connected to each other.
-	// we choose a timeout of 2 seconds because peer manager updates peers every 1 second.
-	p2ptest.RequireConnectedEventually(t, nodes, 100*time.Millisecond, 2*time.Second)
+	// we choose a timeout of 5 seconds because peer manager updates peers every 1 second and we need to wait for
+	// any potential random backoffs to expire (min 1 second).
+	p2ptest.RequireConnectedEventually(t, nodes, 100*time.Millisecond, 5*time.Second)
+}
+
+func TestConnectionGatingDisallowListingNodes(t *testing.T) {
+
 }
