@@ -137,9 +137,11 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 	o := &optsConfig{
 		peerUpdateInterval:            connection.DefaultPeerUpdateInterval,
 		unicastRateLimiterDistributor: ratelimit.NewUnicastRateLimiterDistributor(),
-		connectionGater: NewConnectionGater(idProvider, func(p peer.ID) error {
-			return nil
-		}),
+		connectionGaterFactory: func() p2p.ConnectionGater {
+			return NewConnectionGater(idProvider, func(p peer.ID) error {
+				return nil
+			})
+		},
 		createStreamRetryInterval: unicast.DefaultRetryDelay,
 	}
 	for _, opt := range opts {
@@ -163,7 +165,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
 		opts = append(opts, withPeerManagerOptions(connection.PruningEnabled, o.peerUpdateInterval))
 		opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
-		opts = append(opts, withConnectionGater(o.connectionGater))
+		opts = append(opts, withConnectionGater(o.connectionGaterFactory()))
 		opts = append(opts, withUnicastManagerOpts(o.createStreamRetryInterval))
 
 		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, idProvider, opts...)
@@ -311,7 +313,7 @@ type optsConfig struct {
 	networkMetrics                module.NetworkMetrics
 	peerManagerFilters            []p2p.PeerFilter
 	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
-	connectionGater               p2p.ConnectionGater
+	connectionGaterFactory        func() p2p.ConnectionGater
 	createStreamRetryInterval     time.Duration
 }
 
@@ -358,9 +360,9 @@ func WithUnicastRateLimiters(limiters *ratelimit.RateLimiters) func(*optsConfig)
 	}
 }
 
-func WithConnectionGater(connectionGater p2p.ConnectionGater) func(*optsConfig) {
+func WithConnectionGaterFactory(connectionGaterFactory func() p2p.ConnectionGater) func(*optsConfig) {
 	return func(o *optsConfig) {
-		o.connectionGater = connectionGater
+		o.connectionGaterFactory = connectionGaterFactory
 	}
 }
 

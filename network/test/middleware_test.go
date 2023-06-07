@@ -250,17 +250,20 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 
 	idProvider := testutils.NewUpdatableIDProvider(m.ids)
 	// create a new staked identity
-	connGater := testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
-		if messageRateLimiter.IsRateLimited(pid) {
-			return fmt.Errorf("rate-limited peer")
-		}
-		return nil
-	})
+	connGaterFactory := func() p2p.ConnectionGater {
+		return testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+			if messageRateLimiter.IsRateLimited(pid) {
+				return fmt.Errorf("rate-limited peer")
+			}
+			return nil
+		})
+	}
+
 	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(),
 		m.logger,
 		1,
 		testutils.WithUnicastRateLimiterDistributor(distributor),
-		testutils.WithConnectionGater(connGater))
+		testutils.WithConnectionGaterFactory(connGaterFactory))
 	idProvider.SetIdentities(append(m.ids, ids...))
 
 	// create middleware
@@ -405,19 +408,21 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	idProvider := testutils.NewUpdatableIDProvider(m.ids)
 	// create connection gater, connection gater will refuse connections from rate limited nodes
-	connGater := testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
-		if bandwidthRateLimiter.IsRateLimited(pid) {
-			return fmt.Errorf("rate-limited peer")
-		}
+	connGaterFactory := func() p2p.ConnectionGater {
+		return testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+			if bandwidthRateLimiter.IsRateLimited(pid) {
+				return fmt.Errorf("rate-limited peer")
+			}
 
-		return nil
-	})
+			return nil
+		})
+	}
 	// create a new staked identity
 	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(),
 		m.logger,
 		1,
 		testutils.WithUnicastRateLimiterDistributor(distributor),
-		testutils.WithConnectionGater(connGater))
+		testutils.WithConnectionGaterFactory(connGaterFactory))
 	idProvider.SetIdentities(append(m.ids, ids...))
 
 	// create middleware
