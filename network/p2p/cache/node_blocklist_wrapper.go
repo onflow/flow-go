@@ -43,8 +43,13 @@ type NodeDisallowListingWrapper struct {
 	identityProvider module.IdentityProvider
 	disallowList     IdentifierSet // `IdentifierSet` is a map, hence efficient O(1) lookup
 
-	// updateConsumer is called whenever the disallow-list is updated.
-	updateConsumer network.DisallowListNotificationConsumer
+	// updateConsumerOracle is called whenever the disallow-list is updated.
+	// Note that we do not use the `updateConsumer` directly due to the circular dependency between the
+	// middleware (i.e., updateConsumer), and the wrapper (i.e., NodeDisallowListingWrapper).
+	// Middleware needs identity provider to be initialized, and identity provider needs this wrapper to be initialized.
+	// Hence, if we pass the updateConsumer by the interface value, it will be nil at the time of initialization.
+	// Instead, we use the oracle function to get the updateConsumer whenever we need it.
+	updateConsumerOracle func() network.DisallowListNotificationConsumer
 }
 
 var _ module.IdentityProvider = (*NodeDisallowListingWrapper)(nil)
@@ -54,7 +59,7 @@ var _ module.IdentityProvider = (*NodeDisallowListingWrapper)(nil)
 func NewNodeDisallowListWrapper(
 	identityProvider module.IdentityProvider,
 	db *badger.DB,
-	updateConsumer network.DisallowListNotificationConsumer) (*NodeDisallowListingWrapper, error) {
+	updateConsumerOracle func() network.DisallowListNotificationConsumer) (*NodeDisallowListingWrapper, error) {
 
 	disallowList, err := retrieveDisallowList(db)
 	if err != nil {
@@ -62,10 +67,10 @@ func NewNodeDisallowListWrapper(
 	}
 
 	return &NodeDisallowListingWrapper{
-		db:               db,
-		identityProvider: identityProvider,
-		disallowList:     disallowList,
-		updateConsumer:   updateConsumer,
+		db:                   db,
+		identityProvider:     identityProvider,
+		disallowList:         disallowList,
+		updateConsumerOracle: updateConsumerOracle,
 	}, nil
 }
 
@@ -93,7 +98,7 @@ func (w *NodeDisallowListingWrapper) Update(disallowList flow.IdentifierList) er
 		return fmt.Errorf("failed to persist set of blocked nodes to the data base: %w", err)
 	}
 	w.disallowList = b
-	w.updateConsumer.OnDisallowListNotification(&network.DisallowListingUpdate{
+	w.updateConsumerOracle().OnDisallowListNotification(&network.DisallowListingUpdate{
 		FlowIds: disallowList,
 		Cause:   network.DisallowListedCauseAdmin,
 	})

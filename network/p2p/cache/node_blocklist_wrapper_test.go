@@ -36,7 +36,9 @@ func (s *NodeDisallowListWrapperTestSuite) SetupTest() {
 
 	var err error
 	s.updateConsumer = mocknetwork.NewDisallowListNotificationConsumer(s.T())
-	s.wrapper, err = cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.updateConsumer)
+	s.wrapper, err = cache.NewNodeDisallowListWrapper(s.provider, s.DB, func() network.DisallowListNotificationConsumer {
+		return s.updateConsumer
+	})
 	require.NoError(s.T(), err)
 }
 
@@ -350,7 +352,9 @@ func (s *NodeDisallowListWrapperTestSuite) TestDataBasePersist() {
 		require.Empty(s.T(), s.wrapper.GetDisallowList())
 
 		// newly created wrapper should read `disallowList` from data base during initialization
-		w, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.updateConsumer)
+		w, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, func() network.DisallowListNotificationConsumer {
+			return s.updateConsumer
+		})
 		require.NoError(s.T(), err)
 		require.Empty(s.T(), w.GetDisallowList())
 	})
@@ -364,7 +368,9 @@ func (s *NodeDisallowListWrapperTestSuite) TestDataBasePersist() {
 		require.NoError(s.T(), err)
 
 		// newly created wrapper should read `disallowList` from data base during initialization
-		w, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.updateConsumer)
+		w, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, func() network.DisallowListNotificationConsumer {
+			return s.updateConsumer
+		})
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), disallowList1.Lookup(), w.GetDisallowList().Lookup())
 	})
@@ -385,7 +391,9 @@ func (s *NodeDisallowListWrapperTestSuite) TestDataBasePersist() {
 		require.NoError(s.T(), err)
 
 		// newly created wrapper should read initial state from data base
-		w, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.updateConsumer)
+		w, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, func() network.DisallowListNotificationConsumer {
+			return s.updateConsumer
+		})
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), disallowList2.Lookup(), w.GetDisallowList().Lookup())
 	})
@@ -400,7 +408,9 @@ func (s *NodeDisallowListWrapperTestSuite) TestDataBasePersist() {
 		err := s.wrapper.Update(disallowList1)
 		require.NoError(s.T(), err)
 
-		w0, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.updateConsumer)
+		w0, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, func() network.DisallowListNotificationConsumer {
+			return s.updateConsumer
+		})
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), disallowList1.Lookup(), w0.GetDisallowList().Lookup())
 
@@ -413,7 +423,9 @@ func (s *NodeDisallowListWrapperTestSuite) TestDataBasePersist() {
 		err = s.wrapper.ClearDisallowList()
 		require.NoError(s.T(), err)
 
-		w1, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.updateConsumer)
+		w1, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, func() network.DisallowListNotificationConsumer {
+			return s.updateConsumer
+		})
 		require.NoError(s.T(), err)
 		require.Empty(s.T(), w1.GetDisallowList())
 
@@ -426,7 +438,9 @@ func (s *NodeDisallowListWrapperTestSuite) TestDataBasePersist() {
 		err = s.wrapper.Update(disallowList2)
 		require.NoError(s.T(), err)
 
-		w2, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, s.updateConsumer)
+		w2, err := cache.NewNodeDisallowListWrapper(s.provider, s.DB, func() network.DisallowListNotificationConsumer {
+			return s.updateConsumer
+		})
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), disallowList2.Lookup(), w2.GetDisallowList().Lookup())
 	})
