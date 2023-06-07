@@ -318,6 +318,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			}
 
 			// TODO: this can be done in batch but at this stage let's send individual notifications.
+			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
 			if record.Penalty < model.DisallowListingThreshold {
 				// cutoff counter keeps track of how many times the penalty has been below the threshold.
 				record.CutoffCounter++
@@ -338,6 +339,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			record.Penalty = math.Min(record.Penalty+record.Decay, 0)
 
 			// TODO: this can be done in batch but at this stage let's send individual notifications.
+			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
 			if record.Penalty == float64(0) {
 				m.disallowListingConsumer.OnAllowListNotification(&network.AllowListingUpdate{
 					FlowIds: flow.IdentifierList{id},
