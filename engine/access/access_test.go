@@ -107,7 +107,7 @@ func (suite *Suite) SetupTest() {
 	).Maybe()
 
 	suite.params = new(protocol.Params)
-	suite.params.On("Root").Return(suite.rootBlock, nil)
+	suite.params.On("FinalizedRoot").Return(suite.rootBlock, nil)
 	suite.params.On("SporkRootBlockHeight").Return(suite.rootBlock.Height, nil)
 	suite.state.On("Params").Return(suite.params).Maybe()
 	suite.collClient = new(accessmock.AccessAPIClient)

@@ -2,7 +2,6 @@ package extract
 
 import (
 	"encoding/hex"
-	"fmt"
 	"path"
 
 	"github.com/rs/zerolog/log"
@@ -26,16 +25,6 @@ var (
 	flagNoReport          bool
 	flagNWorker           int
 )
-
-func getChain(chainName string) (chain flow.Chain, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("invalid chain: %s", r)
-		}
-	}()
-	chain = flow.ChainID(chainName).Chain()
-	return
-}
 
 var Cmd = &cobra.Command{
 	Use:   "execution-state-extract",
@@ -135,19 +124,23 @@ func run(*cobra.Command, []string) {
 	// 	log.Fatal().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
 	// }
 
-	chain, err := getChain(flagChain)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("invalid chain name")
+	if len(flagChain) > 0 {
+		log.Warn().Msgf("--chain flag is deprecated")
 	}
 
-	err = extractExecutionState(
+	if flagNoReport {
+		log.Warn().Msgf("--no-report flag is deprecated")
+	}
+
+	if flagNoMigration {
+		log.Warn().Msgf("--no-migration flag is deprecated")
+	}
+
+	err := extractExecutionState(
 		flagExecutionStateDir,
 		stateCommitment,
 		flagOutputDir,
 		log.Logger,
-		chain,
-		!flagNoMigration,
-		!flagNoReport,
 		flagNWorker,
 	)
 

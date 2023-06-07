@@ -26,7 +26,7 @@ var resultsCmd = &cobra.Command{
 		results := storages.Results
 		blocks := storages.Blocks
 
-		root, err := state.Params().Root()
+		root, err := state.Params().FinalizedRoot()
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not get root header from protocol state")
 		}

@@ -1,10 +1,12 @@
 package module
 
 import (
+	"context"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	httpmetrics "github.com/slok/go-http-metrics/metrics"
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
@@ -341,6 +343,21 @@ type HotstuffMetrics interface {
 	PayloadProductionDuration(duration time.Duration)
 }
 
+type CruiseCtlMetrics interface {
+
+	// PIDError measures the current error values for the proportional, integration,
+	// and derivative terms of the PID controller.
+	PIDError(p, i, d float64)
+
+	// TargetProposalDuration measures the current value of the Block Time Controller output:
+	// the target duration from parent to child proposal.
+	TargetProposalDuration(duration time.Duration)
+
+	// ControllerOutput measures the output of the cruise control PID controller.
+	// Concretely, this is the quantity to subtract from the baseline view duration.
+	ControllerOutput(duration time.Duration)
+}
+
 type CollectionMetrics interface {
 	// TransactionIngested is called when a new transaction is ingested by the
 	// node. It increments the total count of ingested transactions and starts
@@ -584,7 +601,14 @@ type ExecutionDataPrunerMetrics interface {
 	Pruned(height uint64, duration time.Duration)
 }
 
-type AccessMetrics interface {
+type RestMetrics interface {
+	// Example recorder taken from:
+	// https://github.com/slok/go-http-metrics/blob/master/metrics/prometheus/prometheus.go
+	httpmetrics.Recorder
+	AddTotalRequests(ctx context.Context, service string, id string)
+}
+
+type GRPCConnectionPoolMetrics interface {
 	// TotalConnectionsInPool updates the number connections to collection/execution nodes stored in the pool, and the size of the pool
 	TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint)
 
@@ -605,6 +629,19 @@ type AccessMetrics interface {
 
 	// ConnectionFromPoolEvicted tracks the number of times a cached connection is evicted from the cache
 	ConnectionFromPoolEvicted()
+}
+
+type AccessMetrics interface {
+	RestMetrics
+	GRPCConnectionPoolMetrics
+	TransactionMetrics
+	BackendScriptsMetrics
+
+	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
+	UpdateExecutionReceiptMaxHeight(height uint64)
+
+	// UpdateLastFullBlockHeight tracks the height of the last block for which all collections were received
+	UpdateLastFullBlockHeight(height uint64)
 }
 
 type ExecutionResultStats struct {
@@ -697,8 +734,6 @@ type BackendScriptsMetrics interface {
 }
 
 type TransactionMetrics interface {
-	BackendScriptsMetrics
-
 	// Record the round trip time while getting a transaction result
 	TransactionResultFetched(dur time.Duration, size int)
 
@@ -718,9 +753,6 @@ type TransactionMetrics interface {
 
 	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
 	TransactionSubmissionFailed()
-
-	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
-	UpdateExecutionReceiptMaxHeight(height uint64)
 }
 
 type PingMetrics interface {

@@ -181,7 +181,7 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 	executionDataID := executionResult.ExecutionDataID
 
 	// retrieving BlockExecutionData from EDS
-	executionData, err := b.execDataDownloader.Download(b.unit.Ctx(), executionDataID)
+	executionData, err := b.execDataDownloader.Get(b.unit.Ctx(), executionDataID)
 	if executionData == nil || err != nil {
 		log.Error().Err(err).Msgf(
 			"failed to retrieve BlockExecutionData from EDS with ID %s", executionDataID.String())

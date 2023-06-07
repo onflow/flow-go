@@ -61,7 +61,7 @@ func (suite *Suite) SetupTest() {
 	suite.snapshot = new(protocol.Snapshot)
 	header := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
-	params.On("Root").Return(header, nil)
+	params.On("FinalizedRoot").Return(header, nil)
 	params.On("SporkRootBlockHeight").Return(header.Height, nil)
 	suite.state.On("Params").Return(params).Maybe()
 	suite.blocks = new(storagemock.Blocks)
@@ -1631,7 +1631,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 	rootHeader := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
-	params.On("Root").Return(rootHeader, nil)
+	params.On("FinalizedRoot").Return(rootHeader, nil)
 	state.On("Params").Return(params).Maybe()
 
 	// mock snapshot to return head backend

@@ -381,10 +381,16 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 				return nil, rpc.ConvertStorageError(err)
 			}
 
+			events, err := convert.MessagesToEventsFromVersion(txResult.GetEvents(), txResult.GetEventEncodingVersion())
+			if err != nil {
+				return nil, status.Errorf(codes.Internal,
+					"failed to convert events to message in txID %x: %v", txID, err)
+			}
+
 			results = append(results, &access.TransactionResult{
 				Status:        txStatus,
 				StatusCode:    uint(txResult.GetStatusCode()),
-				Events:        convert.MessagesToEvents(txResult.GetEvents()),
+				Events:        events,
 				ErrorMessage:  txResult.GetErrorMessage(),
 				BlockID:       blockID,
 				TransactionID: txID,
@@ -430,10 +436,15 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			return nil, rpc.ConvertStorageError(err)
 		}
 
+		events, err := convert.MessagesToEventsFromVersion(systemTxResult.GetEvents(), systemTxResult.GetEventEncodingVersion())
+		if err != nil {
+			return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
+		}
+
 		results = append(results, &access.TransactionResult{
 			Status:        systemTxStatus,
 			StatusCode:    uint(systemTxResult.GetStatusCode()),
-			Events:        convert.MessagesToEvents(systemTxResult.GetEvents()),
+			Events:        events,
 			ErrorMessage:  systemTxResult.GetErrorMessage(),
 			BlockID:       blockID,
 			TransactionID: systemTx.ID(),
@@ -481,11 +492,16 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
+	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), resp.GetEventEncodingVersion())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to convert events in blockID %x: %v", blockID, err)
+	}
+
 	// convert to response, cache and return
 	return &access.TransactionResult{
 		Status:       txStatus,
 		StatusCode:   uint(resp.GetStatusCode()),
-		Events:       convert.MessagesToEvents(resp.GetEvents()),
+		Events:       events,
 		ErrorMessage: resp.GetErrorMessage(),
 		BlockID:      blockID,
 		BlockHeight:  block.Header.Height,
@@ -700,7 +716,10 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		return nil, 0, "", err
 	}
 
-	events := convert.MessagesToEvents(resp.GetEvents())
+	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), resp.GetEventEncodingVersion())
+	if err != nil {
+		return nil, 0, "", rpc.ConvertError(err, "failed to convert events to message", codes.Internal)
+	}
 
 	return events, resp.GetStatusCode(), resp.GetErrorMessage(), nil
 }

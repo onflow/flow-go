@@ -45,7 +45,9 @@ type State struct {
 	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
 	// larger than the height of the root block of the spork, (also cached below as
 	// `sporkRootBlockHeight`), for instance if the node joined in an epoch after the last spork.
-	rootHeight uint64
+	finalizedRootHeight uint64
+	// sealedRootHeight returns the root block that is sealed.
+	sealedRootHeight uint64
 	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
 	// the state, because it cannot change over the lifecycle of a protocol state instance.
 	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
@@ -129,15 +131,22 @@ func Bootstrap(
 		return nil, fmt.Errorf("could not get sealing segment: %w", err)
 	}
 
+	_, rootSeal, err := root.SealedResult()
+	if err != nil {
+		return nil, fmt.Errorf("could not get sealed result for sealing segment: %w", err)
+	}
+
 	err = operation.RetryOnConflictTx(db, transaction.Update, func(tx *transaction.Tx) error {
 		// sealing segment is in ascending height order, so the tail is the
 		// oldest ancestor and head is the newest child in the segment
 		// TAIL <- ... <- HEAD
-		highest := segment.Highest() // reference block of the snapshot
-		lowest := segment.Sealed()   // last sealed block
+		lastFinalized := segment.Finalized() // the highest block in sealing segment is the last finalized block
+		lastSealed := segment.Sealed()       // the lowest block in sealing segment is the last sealed block
 
 		// 1) bootstrap the sealing segment
-		err = state.bootstrapSealingSegment(segment, highest)(tx)
+		// creating sealed root block with the rootResult
+		// creating finalized root block with lastFinalized
+		err = state.bootstrapSealingSegment(segment, lastFinalized, rootSeal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
 		}
@@ -175,11 +184,17 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not update epoch metrics: %w", err)
 		}
-		state.metrics.BlockSealed(lowest)
-		state.metrics.SealedHeight(lowest.Header.Height)
-		state.metrics.FinalizedHeight(highest.Header.Height)
+		state.metrics.BlockSealed(lastSealed)
+		state.metrics.SealedHeight(lastSealed.Header.Height)
+		state.metrics.FinalizedHeight(lastFinalized.Header.Height)
 		for _, block := range segment.Blocks {
 			state.metrics.BlockFinalized(block)
+		}
+
+		// 7) initialize version beacon
+		err = transaction.WithTx(state.boostrapVersionBeacon(root))(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap version beacon: %w", err)
 		}
 
 		return nil
@@ -199,7 +214,7 @@ func Bootstrap(
 
 // bootstrapSealingSegment inserts all blocks and associated metadata for the
 // protocol state root snapshot to disk.
-func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block) func(tx *transaction.Tx) error {
+func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block, rootSeal *flow.Seal) func(tx *transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 
 		for _, result := range segment.ExecutionResults {
@@ -219,6 +234,15 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			if err != nil {
 				return fmt.Errorf("could not insert first seal: %w", err)
 			}
+		}
+
+		// root seal contains the result ID for the sealed root block. If the sealed root block is
+		// different from the finalized root block, then it means the node dynamically bootstrapped.
+		// In that case, we should index the result of the sealed root block so that the EN is able
+		// to execute the next block.
+		err := transaction.WithTx(operation.SkipDuplicates(operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID)))(tx)
+		if err != nil {
+			return fmt.Errorf("could not index root result: %w", err)
 		}
 
 		for _, block := range segment.ExtraBlocks {
@@ -281,7 +305,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 		}
 
 		// insert an empty child index for the final block in the segment
-		err := transaction.WithTx(operation.InsertBlockChildren(head.ID(), nil))(tx)
+		err = transaction.WithTx(operation.InsertBlockChildren(head.ID(), nil))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
@@ -298,7 +322,7 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
 		}
-		highest := segment.Highest()
+		highest := segment.Finalized()
 		lowest := segment.Sealed()
 		// find the finalized seal that seals the lowest block, meaning seal.BlockID == lowest.ID()
 		seal, err := segment.FinalizedSeal()
@@ -350,7 +374,12 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		// insert height pointers
 		err = operation.InsertRootHeight(highest.Header.Height)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert root height: %w", err)
+			return fmt.Errorf("could not insert finalized root height: %w", err)
+		}
+		// the sealed root height is the lowest block in sealing segment
+		err = operation.InsertSealedRootHeight(lowest.Header.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert sealed root height: %w", err)
 		}
 		err = operation.InsertFinalizedHeight(highest.Header.Height)(tx)
 		if err != nil {
@@ -803,6 +832,25 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 	return nil
 }
 
+// boostrapVersionBeacon bootstraps version beacon, by adding the latest beacon
+// to an index, if present.
+func (state *State) boostrapVersionBeacon(
+	snapshot protocol.Snapshot,
+) func(*badger.Txn) error {
+	return func(txn *badger.Txn) error {
+		versionBeacon, err := snapshot.VersionBeacon()
+		if err != nil {
+			return err
+		}
+
+		if versionBeacon == nil {
+			return nil
+		}
+
+		return operation.IndexVersionBeaconByHeight(versionBeacon)(txn)
+	}
+}
+
 // populateCache is used after opening or bootstrapping the state to populate the cache.
 // The cache must be populated before the State receives any queries.
 // No errors expected during normal operations.
@@ -811,9 +859,14 @@ func (state *State) populateCache() error {
 	// cache the initial value for finalized block
 	err := state.db.View(func(tx *badger.Txn) error {
 		// root height
-		err := state.db.View(operation.RetrieveRootHeight(&state.rootHeight))
+		err := state.db.View(operation.RetrieveRootHeight(&state.finalizedRootHeight))
 		if err != nil {
 			return fmt.Errorf("could not read root block to populate cache: %w", err)
+		}
+		// sealed root height
+		err = state.db.View(operation.RetrieveSealedRootHeight(&state.sealedRootHeight))
+		if err != nil {
+			return fmt.Errorf("could not read sealed root block to populate cache: %w", err)
 		}
 		// spork root block height
 		err = state.db.View(operation.RetrieveSporkRootBlockHeight(&state.sporkRootBlockHeight))
