@@ -726,7 +726,7 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		builder.LibP2PResourceManagerConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.BaseConfig.NetworkConfig.DisallowListCacheSize,
-			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PrivateNetwork),
+			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		}).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
