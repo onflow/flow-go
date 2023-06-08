@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -49,7 +50,7 @@ func (c *ReadRangeClusterBlocksCommand) Handler(ctx context.Context, req *admin.
 
 	lights, err := read.ReadClusterBlockLightByHeightRange(clusterBlocks, data.startHeight, data.endHeight)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get with chainID id %v: %w", chainID, err)
 	}
 	return commands.ConvertToInterfaceList(lights)
 }
