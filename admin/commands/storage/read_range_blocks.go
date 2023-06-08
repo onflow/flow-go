@@ -31,7 +31,7 @@ func (c *ReadRangeBlocksCommand) Handler(ctx context.Context, req *admin.Command
 	if err != nil {
 		return nil, err
 	}
-	return lights, nil
+	return commands.ConvertToInterfaceList(lights)
 }
 
 func (c *ReadRangeBlocksCommand) Validator(req *admin.CommandRequest) error {

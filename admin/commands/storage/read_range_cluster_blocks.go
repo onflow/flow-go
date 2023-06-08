@@ -51,7 +51,7 @@ func (c *ReadRangeClusterBlocksCommand) Handler(ctx context.Context, req *admin.
 	if err != nil {
 		return nil, err
 	}
-	return lights, nil
+	return commands.ConvertToInterfaceList(lights)
 }
 
 func (c *ReadRangeClusterBlocksCommand) Validator(req *admin.CommandRequest) error {
