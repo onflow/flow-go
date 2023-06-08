@@ -21,9 +21,9 @@ func (_m *RestMetrics) AddInflightRequests(ctx context.Context, props metrics.HT
 	_m.Called(ctx, props, quantity)
 }
 
-// AddTotalRequests provides a mock function with given fields: ctx, service, id
-func (_m *RestMetrics) AddTotalRequests(ctx context.Context, service string, id string) {
-	_m.Called(ctx, service, id)
+// AddTotalRequests provides a mock function with given fields: ctx, serviceID, method
+func (_m *RestMetrics) AddTotalRequests(ctx context.Context, serviceID string, method string) {
+	_m.Called(ctx, serviceID, method)
 }
 
 // ObserveHTTPRequestDuration provides a mock function with given fields: ctx, props, duration
