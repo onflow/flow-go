@@ -260,7 +260,7 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 			node.Me,
 			node.Metrics.Engine,
 			node.Storage.Headers,
-			builder.Finalized,
+			node.LastFinalizedHeader,
 			core,
 			node.ComplianceConfig,
 			follower.WithChannel(channels.PublicReceiveBlocks),

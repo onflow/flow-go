@@ -302,13 +302,14 @@ type StateExcerptAtBoot struct {
 	// 		FinalizedRootBlock and SealedRootBlock are the same block (special case of self-sealing block)
 	// For node bootstrapped with a root snapshot for a block above the first block of a spork (dynamically bootstrapped),
 	// 		FinalizedRootBlock.Height > SealedRootBlock.Height
-	FinalizedRootBlock *flow.Block             // The last finalized block when bootstrapped.
-	SealedRootBlock    *flow.Block             // The last sealed block when bootstrapped.
-	RootQC             *flow.QuorumCertificate // QC for Finalized Root Block
-	RootResult         *flow.ExecutionResult   // Result for SealedRootBlock
-	RootSeal           *flow.Seal              //Seal for RootResult
-	RootChainID        flow.ChainID
-	SporkID            flow.Identifier
+	FinalizedRootBlock  *flow.Block             // The last finalized block when bootstrapped.
+	SealedRootBlock     *flow.Block             // The last sealed block when bootstrapped.
+	RootQC              *flow.QuorumCertificate // QC for Finalized Root Block
+	RootResult          *flow.ExecutionResult   // Result for SealedRootBlock
+	RootSeal            *flow.Seal              //Seal for RootResult
+	RootChainID         flow.ChainID
+	SporkID             flow.Identifier
+	LastFinalizedHeader *flow.Header // for caching the last finalized header
 }
 
 func DefaultBaseConfig() *BaseConfig {
