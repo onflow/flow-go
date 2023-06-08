@@ -1054,7 +1054,9 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
-		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(node.IdentityProvider, node.DB, fnb.Middleware)
+		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(node.IdentityProvider, node.DB, func() network.DisallowListNotificationConsumer {
+			return fnb.Middleware
+		})
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
 		}
