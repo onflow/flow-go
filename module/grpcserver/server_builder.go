@@ -13,7 +13,7 @@ import (
 
 type Option func(*GrpcServerBuilder)
 
-// WithTransportCredentials sets the transport credentials parameters for a grpc server config.
+// WithTransportCredentials sets the transport credentials parameters for a grpc server builder.
 func WithTransportCredentials(transportCredentials credentials.TransportCredentials) Option {
 	return func(c *GrpcServerBuilder) {
 		c.transportCredentials = transportCredentials

@@ -107,6 +107,7 @@ func NewEng(
 	e := &Engine{
 		log:                 logger,
 		backend:             backend,
+		server:              server.Server(),
 		headers:             headers,
 		chain:               chainID.Chain(),
 		config:              config,
