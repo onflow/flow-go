@@ -366,7 +366,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			node.Me,
 			node.Metrics.Engine,
 			node.Storage.Headers,
-			builder.Finalized,
+			node.LastFinalizedHeader,
 			core,
 			node.ComplianceConfig,
 		)

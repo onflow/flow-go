@@ -356,7 +356,7 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 			node.Me,
 			node.Metrics.Engine,
 			node.Storage.Headers,
-			builder.Finalized,
+			node.LastFinalizedHeader,
 			core,
 			builder.ComplianceConfig,
 			follower.WithChannel(channels.PublicReceiveBlocks),
