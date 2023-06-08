@@ -221,7 +221,7 @@ type FlowAccessNodeBuilder struct {
 	AccessMetrics              module.AccessMetrics
 	PingMetrics                module.PingMetrics
 	Committee                  hotstuff.DynamicCommittee
-	Finalized                  *flow.Header
+	Finalized                  *flow.Header // latest finalized block that the node knows of at startup time
 	Pending                    []*flow.Header
 	FollowerCore               module.HotStuffFollower
 	Validator                  hotstuff.Validator
