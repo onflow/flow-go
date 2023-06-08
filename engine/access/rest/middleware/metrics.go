@@ -12,11 +12,13 @@ import (
 )
 
 func MetricsMiddleware(restCollector module.RestMetrics) mux.MiddlewareFunc {
-	metricsMiddleware := middleware.New(middleware.Config{Recorder: restCollector})
+	cfg := middleware.Config{Recorder: restCollector}
+	serviceID := cfg.Service
+	metricsMiddleware := middleware.New(cfg)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			// This is a custom metric being called on every http request
-			restCollector.AddTotalRequests(req.Context(), req.Method, req.URL.Path)
+			restCollector.AddTotalRequests(req.Context(), serviceID, req.Method)
 
 			// Modify the writer
 			respWriter := &responseWriter{w, http.StatusOK}
