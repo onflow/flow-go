@@ -2,9 +2,12 @@ package seed
 
 import "encoding/binary"
 
-// list of customizers used for different sub-protocol PRNGs.
-// These customizers help instantiate different PRNGs from the
+// list of customizers used for different sub-protocol PRGs.
+// These customizers help instantiate different PRGs from the
 // same source of randomness.
+//
+// Customizers used by the Flow protocol should not be equal or
+// prefixing each other to guarantee independant PRGs.
 
 var (
 	// ConsensusLeaderSelection is the customizer for consensus leader selection
