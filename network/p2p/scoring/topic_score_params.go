@@ -1,9 +1,11 @@
 package scoring
 
 import (
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/onflow/flow-go/model/flow"
+	"time"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
 )
 
@@ -14,6 +16,7 @@ const (
 	defaultInvalidMessageDeliveriesWeight = -10
 	// defaultInvalidMessageDeliveriesDecay decay factor used to decay the number of invalid message deliveries.
 	defaultInvalidMessageDeliveriesDecay = .99
+	defaultTimeInMeshQuantum             = time.Minute
 )
 
 func init() {
@@ -26,6 +29,7 @@ func defaultTopicScoreParams() *pubsub.TopicScoreParams {
 		SkipAtomicValidation:           defaultSkipAtomicValidation,
 		InvalidMessageDeliveriesWeight: defaultInvalidMessageDeliveriesWeight,
 		InvalidMessageDeliveriesDecay:  defaultInvalidMessageDeliveriesDecay,
+		TimeInMeshQuantum:              defaultTimeInMeshQuantum,
 	}
 }
 

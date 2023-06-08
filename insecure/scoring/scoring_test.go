@@ -2,6 +2,7 @@ package scoring
 
 import (
 	"context"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -32,7 +33,7 @@ func TestGossipSubInvalidMessageDeliveryScoring(t *testing.T) {
 	peerScoringCfg := &p2p.PeerScoringConfig{
 		TopicScoreParams: scoring.DefaultTopicScoreParams(sporkId),
 	}
-	spammer1 := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId, role, idProvider, p2ptest.WithPeerScoringEnabled(idProvider), p2ptest.WithPeerScoreParamsOption(peerScoringCfg))
+	spammer1 := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId, role, idProvider)
 	spammer2 := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId, role, idProvider)
 	spammer3 := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId, role, idProvider)
 	spammer4 := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId, role, idProvider)
@@ -45,17 +46,20 @@ func TestGossipSubInvalidMessageDeliveryScoring(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
+		p2ptest.WithPeerScoringEnabled(idProvider),
+		p2ptest.WithPeerScoreParamsOption(peerScoringCfg),
 	)
 	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer1.SpammerNode.Host().ID()).Return(nil, false).Maybe()
-	idProvider.On("ByPeerID", spammer2.SpammerNode.Host().ID()).Return(nil, false).Maybe()
-	idProvider.On("ByPeerID", spammer3.SpammerNode.Host().ID()).Return(nil, false).Maybe()
-	idProvider.On("ByPeerID", spammer4.SpammerNode.Host().ID()).Return(nil, false).Maybe()
+	idProvider.On("ByPeerID", spammer1.SpammerNode.Host().ID()).Return(&spammer1.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", spammer2.SpammerNode.Host().ID()).Return(&spammer2.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", spammer3.SpammerNode.Host().ID()).Return(&spammer3.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", spammer4.SpammerNode.Host().ID()).Return(&spammer4.SpammerId, true).Maybe()
 	ids := flow.IdentityList{&spammer1.SpammerId, &spammer2.SpammerId, &spammer3.SpammerId, &spammer4.SpammerId, &victimIdentity}
 	nodes := []p2p.LibP2PNode{spammer1.SpammerNode, spammer2.SpammerNode, spammer3.SpammerNode, spammer4.SpammerNode, victimNode}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+	p2ptest.EnsureConnected(t, ctx, nodes)
 	// checks end-to-end message delivery works on GossipSub
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
 		return unittest.ProposalFixture(), blockTopic
@@ -63,14 +67,20 @@ func TestGossipSubInvalidMessageDeliveryScoring(t *testing.T) {
 
 	topicStr := blockTopic.String()
 	missingSignatureMsg := &pb.Message{
-		Data:  []byte("some data"),
-		Topic: &topicStr,
-		//Signature: "", signature missing from message
-		From:  []byte(spammer1.SpammerNode.Host().ID()),
-		Seqno: []byte{byte(1)},
+		Data:      []byte("some data"),
+		Topic:     &topicStr,
+		Signature: nil, // signature missing from message
+		From:      []byte(spammer1.SpammerNode.Host().ID()),
+		Seqno:     []byte{byte(1)},
 	}
-	spammer1.SpamControlMessage(t, victimNode, spammer1.GenerateCtlMessages(1), missingSignatureMsg)
 
+	for i := 0; i <= 20; i++ {
+		b := make([]byte, 100)
+		rand.Read(b)
+		missingSignatureMsg.Seqno = b
+		spammer1.SpamControlMessage(t, victimNode, spammer1.GenerateCtlMessages(1), missingSignatureMsg)
+	}
+	time.Sleep(3 * time.Second)
 	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{victimNode}, []p2p.LibP2PNode{spammer1.SpammerNode}, func() (interface{}, channels.Topic) {
 		return unittest.ProposalFixture(), blockTopic
 	})

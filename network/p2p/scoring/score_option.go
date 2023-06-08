@@ -1,7 +1,6 @@
 package scoring
 
 import (
-	"fmt"
 	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -230,7 +229,6 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 	for _, topicParams := range cfg.topicParams {
 		topicParams(s.peerScoreParams.Topics)
 	}
-	fmt.Println(s.peerScoreParams.Topics)
 	return s
 }
 
