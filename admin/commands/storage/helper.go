@@ -5,6 +5,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -89,4 +90,34 @@ func getBlockHeader(state protocol.State, req *blocksRequest) (*flow.Header, err
 	default:
 		return nil, fmt.Errorf("invalid request type: %v", req.requestType)
 	}
+}
+
+func parseHeightRangeRequestData(req *admin.CommandRequest) (*heightRangeReqData, error) {
+	input, ok := req.Data.(map[string]interface{})
+	if !ok {
+		return nil, admin.NewInvalidAdminReqFormatError("missing 'data' field")
+	}
+
+	startHeight, err := findUint64(input, "start-height")
+	if err != nil {
+		return nil, fmt.Errorf("invalid start-height: %w", err)
+	}
+
+	endHeight, err := findUint64(input, "end-height")
+	if err != nil {
+		return nil, fmt.Errorf("invalid end-height: %w", err)
+	}
+
+	if endHeight < startHeight {
+		return nil, admin.NewInvalidAdminReqErrorf("end-height %v should not be smaller than start-height %v", endHeight, startHeight)
+	}
+
+	if endHeight-startHeight+1 > MAX_HEIGHT_RANGE {
+		return nil, admin.NewInvalidAdminReqErrorf("getting transactions for more than %v blocks at a time might have an impact to node's performance and is not allowed", MAX_HEIGHT_RANGE)
+	}
+
+	return &heightRangeReqData{
+		startHeight: startHeight,
+		endHeight:   endHeight,
+	}, nil
 }
