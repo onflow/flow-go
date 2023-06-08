@@ -6,14 +6,13 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
-func newRouter(backend access.API, logger zerolog.Logger, chain flow.Chain, restCollector module.RestMetrics) (*mux.Router, error) {
+func newRouter(serverAPI RestServerApi, logger zerolog.Logger, chain flow.Chain, restCollector module.RestMetrics) (*mux.Router, error) {
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
@@ -26,7 +25,7 @@ func newRouter(backend access.API, logger zerolog.Logger, chain flow.Chain, rest
 	linkGenerator := models.NewLinkGeneratorImpl(v1SubRouter)
 
 	for _, r := range Routes {
-		h := NewHandler(logger, backend, r.Handler, linkGenerator, chain)
+		h := NewHandler(logger, serverAPI, r.Handler, linkGenerator, chain)
 		v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).

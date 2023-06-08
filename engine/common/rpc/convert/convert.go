@@ -374,6 +374,19 @@ func MessageToBlock(m *entities.Block) (*flow.Block, error) {
 	}, nil
 }
 
+func MessagesToBlockStatus(s entities.BlockStatus) (flow.BlockStatus, error) {
+	switch s {
+	case entities.BlockStatus_BLOCK_UNKNOWN:
+		return flow.BlockStatusUnknown, nil
+	case entities.BlockStatus_BLOCK_FINALIZED:
+		return flow.BlockStatusFinalized, nil
+	case entities.BlockStatus_BLOCK_SEALED:
+		return flow.BlockStatusSealed, nil
+	}
+
+	return flow.BlockStatusUnknown, fmt.Errorf("failed to convert block status")
+}
+
 func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) flow.ExecutionReceiptMetaList {
 	execMetaList := make([]*flow.ExecutionReceiptMeta, len(m))
 	for i, message := range m {

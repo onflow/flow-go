@@ -15,8 +15,6 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/onflow/flow-go/access"
 )
 
 const MaxRequestSize = 2 << 20 // 2MB
@@ -25,7 +23,7 @@ const MaxRequestSize = 2 << 20 // 2MB
 // it fetches necessary resources and returns an error or response model.
 type ApiHandlerFunc func(
 	r *request.Request,
-	backend access.API,
+	srv RestServerApi,
 	generator models.LinkGenerator,
 ) (interface{}, error)
 
@@ -34,7 +32,7 @@ type ApiHandlerFunc func(
 // wraps functionality for handling error and responses outside of endpoint handling.
 type Handler struct {
 	logger         zerolog.Logger
-	backend        access.API
+	restServerAPI  RestServerApi
 	linkGenerator  models.LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
 	chain          flow.Chain
@@ -42,14 +40,14 @@ type Handler struct {
 
 func NewHandler(
 	logger zerolog.Logger,
-	backend access.API,
+	restServerAPI RestServerApi,
 	handlerFunc ApiHandlerFunc,
 	generator models.LinkGenerator,
 	chain flow.Chain,
 ) *Handler {
 	return &Handler{
 		logger:         logger,
-		backend:        backend,
+		restServerAPI:  restServerAPI,
 		apiHandlerFunc: handlerFunc,
 		linkGenerator:  generator,
 		chain:          chain,
@@ -74,7 +72,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	decoratedRequest := request.Decorate(r, h.chain)
 
 	// execute handler function and check for error
-	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator)
+	response, err := h.apiHandlerFunc(decoratedRequest, h.restServerAPI, h.linkGenerator)
 	if err != nil {
 		h.errorHandler(w, err, errLog)
 		return
