@@ -241,8 +241,8 @@ func (b *backendTransactions) GetTransactionResult(
 	start := time.Now()
 	tx, err := b.transactions.ByID(txID)
 
-	txErr := rpc.ConvertStorageError(err)
-	if txErr != nil {
+	if err != nil {
+		txErr := rpc.ConvertStorageError(err)
 		if status.Code(txErr) == codes.NotFound {
 			// Tx not found. If we have historical Sporks setup, lets look through those as well
 			historicalTxResult, err := b.getHistoricalTransactionResult(ctx, txID)
@@ -261,6 +261,10 @@ func (b *backendTransactions) GetTransactionResult(
 	}
 
 	block, err := b.retrieveBlock(blockID, collectionID, txID)
+
+	// an error occurred looking up the block or the requested block or collection was not found.
+	// If looking up the block based solely on the txID returns not found, then no error is
+	// returned.
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -273,16 +277,19 @@ func (b *backendTransactions) GetTransactionResult(
 
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
-		blockID = block.ID()
-		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, blockID)
-		blockHeight = block.Header.Height
+		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, block.ID())
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
 		}
 
 		// an additional check to ensure the correctness of the collection ID.
 		expectedCollectionID, err := b.lookupCollectionIDInBlock(block, txID)
-		if err != nil {
+
+		// if the collection has not been indexed yet, the lookup will return a not found error.
+		// if the request included a blockID or collectionID in its the search criteria, not found
+		// should result in an error because it's not possible to guarantee that the result found
+		// is the correct one.
+		if err != nil && (blockID != flow.ZeroID || collectionID != flow.ZeroID) {
 			return nil, rpc.ConvertStorageError(err)
 		}
 
@@ -291,6 +298,9 @@ func (b *backendTransactions) GetTransactionResult(
 		} else if collectionID != expectedCollectionID {
 			return nil, status.Error(codes.InvalidArgument, "transaction not found in provided collection")
 		}
+
+		blockID = block.ID()
+		blockHeight = block.Header.Height
 	}
 
 	// derive status of the transaction
@@ -337,6 +347,9 @@ func (b *backendTransactions) lookupCollectionIDInBlock(
 // retrieveBlock function returns a block based on the input argument. The block ID lookup has the highest priority,
 // followed by the collection ID lookup. If both are missing, the default lookup by transaction ID is performed.
 func (b *backendTransactions) retrieveBlock(
+
+	// the requested block or collection was not found. If looking up the block based solely on the txID returns
+	// not found, then no error is returned.
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	txID flow.Identifier,
@@ -351,6 +364,7 @@ func (b *backendTransactions) retrieveBlock(
 
 	// find the block for the transaction
 	block, err := b.lookupBlock(txID)
+
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return nil, err
 	}
