@@ -28,7 +28,7 @@ func ReadClusterBlockLightByHeightRange(clusterBlocks storage.ClusterBlocks, sta
 	for height := startHeight; height <= endHeight; height++ {
 		block, err := clusterBlocks.ByHeight(height)
 		if err != nil {
-			if errors.Is(storage.ErrNotFound, err) {
+			if errors.Is(err, storage.ErrNotFound) {
 				break
 			}
 			return nil, fmt.Errorf("could not get cluster block by height %v: %w", height, err)
@@ -58,9 +58,10 @@ func ReadBlockLightByHeightRange(blocks storage.Blocks, startHeight uint64, endH
 	for height := startHeight; height <= endHeight; height++ {
 		block, err := blocks.ByHeight(height)
 		if err != nil {
-			if errors.Is(storage.ErrNotFound, err) {
+			if errors.Is(err, storage.ErrNotFound) {
 				break
 			}
+
 			return nil, fmt.Errorf("could not get cluster block by height %v: %w", height, err)
 		}
 		light := BlockToLight(block)

@@ -249,6 +249,7 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 		// retrieve the item from the key-value store
 		item, err := tx.Get(key)
 		if errors.Is(err, badger.ErrKeyNotFound) {
+			fmt.Println("fffffffffff")
 			return storage.ErrNotFound
 		}
 		if err != nil {
