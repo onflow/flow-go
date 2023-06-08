@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 
@@ -17,7 +18,7 @@ var _ commands.AdminCommand = (*GetTransactionsCommand)(nil)
 // max number of block height to query transactions from
 var MAX_HEIGHT_RANGE = uint64(1000)
 
-type getTransactionsReqData struct {
+type heightRangeReqData struct {
 	startHeight uint64
 	endHeight   uint64
 }
@@ -37,7 +38,7 @@ func NewGetTransactionsCommand(state protocol.State, payloads storage.Payloads, 
 }
 
 func (c *GetTransactionsCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
-	data := req.ValidatorData.(*getTransactionsReqData)
+	data := req.ValidatorData.(*heightRangeReqData)
 
 	finder := &transactions.Finder{
 		State:       c.state,
@@ -69,36 +70,27 @@ func findUint64(input map[string]interface{}, field string) (uint64, error) {
 	return uint64(val), nil
 }
 
+func findString(input map[string]interface{}, field string) (string, error) {
+	data, ok := input[field]
+	if !ok {
+		return "", admin.NewInvalidAdminReqErrorf("missing required field '%s'", field)
+	}
+
+	str, ok := data.(string)
+	if !ok {
+		return "", admin.NewInvalidAdminReqErrorf("field '%s' is not string", field)
+	}
+
+	return strings.ToLower(strings.TrimSpace(str)), nil
+}
+
 // Validator validates the request.
 // Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (c *GetTransactionsCommand) Validator(req *admin.CommandRequest) error {
-	input, ok := req.Data.(map[string]interface{})
-	if !ok {
-		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
-	}
-
-	startHeight, err := findUint64(input, "start-height")
+	data, err := parseHeightRangeRequestData(req)
 	if err != nil {
 		return err
 	}
-
-	endHeight, err := findUint64(input, "end-height")
-	if err != nil {
-		return err
-	}
-
-	if endHeight < startHeight {
-		return admin.NewInvalidAdminReqErrorf("endHeight %v should not be smaller than startHeight %v", endHeight, startHeight)
-	}
-
-	if endHeight-startHeight+1 > MAX_HEIGHT_RANGE {
-		return admin.NewInvalidAdminReqErrorf("getting transactions for more than %v blocks at a time might have an impact to node's performance and is not allowed", MAX_HEIGHT_RANGE)
-	}
-
-	req.ValidatorData = &getTransactionsReqData{
-		startHeight: startHeight,
-		endHeight:   endHeight,
-	}
-
+	req.ValidatorData = data
 	return nil
 }

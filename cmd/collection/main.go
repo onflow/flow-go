@@ -186,6 +186,9 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
+		// AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
+		// 	return storageCommands.NewReadRangeBlocksCommand(conf.Storage.ClusterBlocks)
+		// }).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
 			followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
