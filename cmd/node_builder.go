@@ -309,7 +309,7 @@ type StateExcerptAtBoot struct {
 	RootSeal            *flow.Seal              //Seal for RootResult
 	RootChainID         flow.ChainID
 	SporkID             flow.Identifier
-	LastFinalizedHeader *flow.Header // for caching the last finalized header
+	LastFinalizedHeader *flow.Header // last finalized header when the node boots up
 }
 
 func DefaultBaseConfig() *BaseConfig {
