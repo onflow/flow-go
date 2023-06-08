@@ -65,9 +65,6 @@ func TestProtocolConstants(t *testing.T) {
 		customizerFromIndices(clusterLeaderSelectionPrefix...),
 	}
 
-	seed := []byte("c")
-	_ = getRandoms(t, seed, []byte("a"), []byte("b"), 1)
-
 	// go through all couples
 	for i, c := range customizers {
 		for j, other := range customizers {
