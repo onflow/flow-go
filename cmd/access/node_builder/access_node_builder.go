@@ -995,23 +995,17 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("creating grpc servers", func(node *cmd.NodeConfig) error {
-			secureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
-				builder.rpcConf.SecureGRPCListenAddr,
-				builder.rpcConf.MaxMsgSize, grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials))
-
 			builder.secureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
-				secureGrpcServerConfig,
+				builder.rpcConf.SecureGRPCListenAddr,
+				builder.rpcConf.MaxMsgSize,
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
-				builder.apiBurstlimits)
-
-			unsecureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
-				builder.rpcConf.UnsecureGRPCListenAddr,
-				builder.rpcConf.MaxMsgSize,
-			)
+				builder.apiBurstlimits,
+				grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials))
 
 			builder.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
-				unsecureGrpcServerConfig,
+				builder.rpcConf.UnsecureGRPCListenAddr,
+				builder.rpcConf.MaxMsgSize,
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits)

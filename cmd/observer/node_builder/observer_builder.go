@@ -847,24 +847,17 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 }
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
-	secureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
+	secureGrpcServer := grpcserver.NewGrpcServerBuilder(builder.Logger,
 		builder.rpcConf.SecureGRPCListenAddr,
 		builder.rpcConf.MaxMsgSize,
-		grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials))
-
-	secureGrpcServer := grpcserver.NewGrpcServerBuilder(builder.Logger,
-		secureGrpcServerConfig,
 		builder.rpcMetricsEnabled,
 		builder.apiRatelimits,
-		builder.apiBurstlimits)
-
-	unsecureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
-		builder.rpcConf.UnsecureGRPCListenAddr,
-		builder.rpcConf.MaxMsgSize,
-	)
+		builder.apiBurstlimits,
+		grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials))
 
 	unsecureGrpcServer := grpcserver.NewGrpcServerBuilder(builder.Logger,
-		unsecureGrpcServerConfig,
+		builder.rpcConf.UnsecureGRPCListenAddr,
+		builder.rpcConf.MaxMsgSize,
 		builder.rpcMetricsEnabled,
 		builder.apiRatelimits,
 		builder.apiBurstlimits)

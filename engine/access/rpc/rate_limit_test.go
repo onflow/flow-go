@@ -128,23 +128,17 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		"Ping": suite.rateLimit,
 	}
 
-	secureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
+	secureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
-		grpcserver.WithTransportCredentials(config.TransportCredentials))
-
-	unsecureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
-		config.UnsecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
-	)
-
-	secureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
-		secureGrpcServerConfig,
 		false,
 		apiRateLimt,
-		apiBurstLimt)
+		apiBurstLimt,
+		grpcserver.WithTransportCredentials(config.TransportCredentials))
+
 	unsecureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
-		unsecureGrpcServerConfig,
+		config.UnsecureGRPCListenAddr,
+		grpcutils.DefaultMaxMsgSize,
 		false,
 		apiRateLimt,
 		apiBurstLimt)

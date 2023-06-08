@@ -111,24 +111,17 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	// save the public key to use later in tests later
 	suite.publicKey = networkingKey.PublicKey()
 
-	secureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
+	secureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
-		grpcserver.WithTransportCredentials(config.TransportCredentials))
-
-	secureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
-		secureGrpcServerConfig,
 		false,
 		nil,
-		nil)
-
-	unsecureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
-		config.UnsecureGRPCListenAddr,
-		grpcutils.DefaultMaxMsgSize,
-	)
+		nil,
+		grpcserver.WithTransportCredentials(config.TransportCredentials))
 
 	unsecureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
-		unsecureGrpcServerConfig,
+		config.UnsecureGRPCListenAddr,
+		grpcutils.DefaultMaxMsgSize,
 		false,
 		nil,
 		nil)

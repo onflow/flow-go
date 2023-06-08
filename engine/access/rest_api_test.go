@@ -135,23 +135,17 @@ func (suite *RestAPITestSuite) SetupTest() {
 	// set the transport credentials for the server to use
 	config.TransportCredentials = credentials.NewTLS(tlsConfig)
 
-	secureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
+	secureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
-		grpcserver.WithTransportCredentials(config.TransportCredentials))
-
-	secureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
-		secureGrpcServerConfig,
 		false,
 		nil,
-		nil)
+		nil,
+		grpcserver.WithTransportCredentials(config.TransportCredentials))
 
-	unsecureGrpcServerConfig := grpcserver.NewGrpcServerConfig(
+	unsecureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
-	)
-	unsecureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
-		unsecureGrpcServerConfig,
 		false,
 		nil,
 		nil)
