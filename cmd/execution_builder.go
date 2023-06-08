@@ -473,7 +473,12 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	)
 
 	// in case node.FvmOptions already set a logger, we don't want to override it
-	opts := append([]fvm.Option{fvm.WithLogger(node.Logger)}, node.FvmOptions...)
+	opts := append([]fvm.Option{
+		fvm.WithLogger(
+			node.Logger.With().Str("module", "FVM").Logger(),
+		)},
+		node.FvmOptions...,
+	)
 	vmCtx := fvm.NewContext(opts...)
 
 	ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
