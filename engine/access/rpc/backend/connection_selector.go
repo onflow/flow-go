@@ -87,7 +87,7 @@ func (ncs *MainConnectionSelector) GetExecutionNodesForBlockID(
 
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
-	rootBlock, err := ncs.state.Params().Root()
+	rootBlock, err := ncs.state.Params().FinalizedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
@@ -177,7 +177,7 @@ func (nccbs *CircuitBreakerConnectionSelector) GetExecutionNodesForBlockID(
 
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
-	rootBlock, err := nccbs.state.Params().Root()
+	rootBlock, err := nccbs.state.Params().FinalizedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}

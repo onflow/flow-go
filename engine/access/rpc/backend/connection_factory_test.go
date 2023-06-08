@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"github.com/sony/gobreaker"
 	"net"
 	"strconv"
 	"strings"
@@ -405,6 +406,117 @@ func TestConnectionPoolStale(t *testing.T) {
 	resp, err := accessAPIClient.Ping(ctx, req)
 	assert.NoError(t, err)
 	assert.Equal(t, resp, expected)
+}
+
+// TestCircuitBreakerExecutionNode
+func TestCircuitBreakerExecutionNode(t *testing.T) {
+	timeout := time.Second
+
+	// create an execution node
+	en := new(executionNode)
+	en.start(t)
+	defer en.stop(t)
+
+	// setup the handler mock to not respond within the timeout
+	req := &execution.PingRequest{}
+	resp := &execution.PingResponse{}
+	en.handler.On("Ping", testifymock.Anything, req).After(timeout+time.Second).Return(resp, nil)
+
+	// create the factory
+	connectionFactory := new(ConnectionFactoryImpl)
+	// set the execution grpc port
+	connectionFactory.ExecutionGRPCPort = en.port
+	// set the execution grpc client timeout
+	connectionFactory.ExecutionNodeGRPCTimeout = timeout
+	// set the connection pool cache size
+	cacheSize := 5
+	connectionFactory.CacheSize = uint(cacheSize)
+	// set metrics reporting
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+	connectionFactory.CircuitBreakerConfig = CircuitBreakerConfig{
+		Enabled:           true,
+		MaxRequestToBreak: 1,
+		RestoreTimeout:    10 * time.Second,
+	}
+
+	// create the execution API client
+	client, _, err := connectionFactory.GetExecutionAPIClient(en.listener.Addr().String())
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+	callAndMeasurePingDuration := func() (time.Duration, error) {
+		start := time.Now()
+
+		// make the call to the execution node
+		_, err = client.Ping(ctx, req)
+
+		return time.Since(start), err
+	}
+
+	duration, err := callAndMeasurePingDuration()
+	// assert that the client timed out
+	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
+	assert.LessOrEqual(t, timeout, duration)
+
+	duration, err = callAndMeasurePingDuration()
+	assert.Equal(t, gobreaker.ErrOpenState, err)
+	assert.Greater(t, timeout, duration)
+}
+
+// TestCircuitBreakerCollectionNode
+func TestCircuitBreakerCollectionNode(t *testing.T) {
+	timeout := time.Second
+
+	// create a collection node
+	cn := new(collectionNode)
+	cn.start(t)
+	defer cn.stop(t)
+
+	// set up the handler mock to not respond within the timeout
+	req := &access.PingRequest{}
+	resp := &access.PingResponse{}
+	cn.handler.On("Ping", testifymock.Anything, req).After(timeout+time.Second).Return(resp, nil)
+
+	// create the factory
+	connectionFactory := new(ConnectionFactoryImpl)
+	// set the collection grpc port
+	connectionFactory.CollectionGRPCPort = cn.port
+	// set the collection grpc client timeout
+	connectionFactory.CollectionNodeGRPCTimeout = timeout
+	// set the connection pool cache size
+	cacheSize := 5
+	connectionFactory.CacheSize = uint(cacheSize)
+	// set metrics reporting
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+
+	connectionFactory.CircuitBreakerConfig = CircuitBreakerConfig{
+		Enabled:           true,
+		MaxRequestToBreak: 1,
+		RestoreTimeout:    10 * time.Second,
+	}
+
+	// create the collection API client
+	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String())
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+	callAndMeasurePingDuration := func() (time.Duration, error) {
+		start := time.Now()
+
+		// make the call to the collection node
+		_, err = client.Ping(ctx, req)
+
+		return time.Since(start), err
+	}
+
+	duration, err := callAndMeasurePingDuration()
+	// assert that the client timed out
+	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
+	assert.LessOrEqual(t, timeout, duration)
+
+	duration, err = callAndMeasurePingDuration()
+	assert.Equal(t, gobreaker.ErrOpenState, err)
+	assert.Greater(t, timeout, duration)
 }
 
 // node mocks a flow node that runs a GRPC server

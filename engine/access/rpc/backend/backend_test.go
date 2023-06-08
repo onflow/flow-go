@@ -3,8 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"testing"
-
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
@@ -16,6 +14,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"testing"
 
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
@@ -27,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -47,7 +47,7 @@ type Suite struct {
 	execClient             *access.ExecutionAPIClient
 	historicalAccessClient *access.AccessAPIClient
 	connectionFactory      *backendmock.ConnectionFactory
-	connSelector           *backendmock.ConnectionSelector
+	nil                    *backendmock.ConnectionSelector
 	chainID                flow.ChainID
 }
 
@@ -75,7 +75,7 @@ func (suite *Suite) SetupTest() {
 	suite.chainID = flow.Testnet
 	suite.historicalAccessClient = new(access.AccessAPIClient)
 	suite.connectionFactory = new(backendmock.ConnectionFactory)
-	suite.connSelector = new(backendmock.ConnectionSelector)
+	suite.nil = new(backendmock.ConnectionSelector)
 }
 
 func (suite *Suite) TestPing() {
@@ -648,8 +648,6 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-	connSelector := new(backendmock.ConnectionSelector)
-
 	exeEventReq := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockId[:],
 		Index:   index,
@@ -672,7 +670,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		connFactory, // the connection factory should be used to get the execution node client
-		connSelector,
+		nil,
 		false,
 		DefaultMaxHeightRange,
 		nil,
@@ -715,8 +713,6 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-	connSelector := new(backendmock.ConnectionSelector)
-
 	exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockId[:],
 	}
@@ -738,7 +734,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		connFactory, // the connection factory should be used to get the execution node client
-		connSelector,
+		nil,
 		false,
 		DefaultMaxHeightRange,
 		nil,
@@ -808,8 +804,6 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
 
-	connSelector := new(backendmock.ConnectionSelector)
-
 	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: txID[:],
@@ -832,7 +826,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		connFactory, // the connection factory should be used to get the execution node client
-		connSelector,
+		nil,
 		false,
 		DefaultMaxHeightRange,
 		nil,
@@ -1107,7 +1101,6 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 
 	// create a mock connection factory
 	connFactory := suite.setupConnectionFactory()
-	connSelector := new(backendmock.ConnectionSelector)
 
 	backend := New(
 		suite.state,
@@ -1122,7 +1115,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		connFactory, // the connection factory should be used to get the execution node client
-		connSelector,
+		nil,
 		false,
 		100,
 		nil,
@@ -1302,8 +1295,6 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-	connSelector := new(backendmock.ConnectionSelector)
-
 	// create the expected results from execution node and access node
 	exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blockHeaders))
 
@@ -1369,7 +1360,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
-			connSelector,
+			nil,
 			false,
 			DefaultMaxHeightRange,
 			nil,
@@ -1402,7 +1393,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
-			connSelector,
+			nil,
 			false,
 			DefaultMaxHeightRange,
 			nil,
@@ -1429,7 +1420,6 @@ func (suite *Suite) TestGetExecutionResultByID() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connSelector := new(backendmock.ConnectionSelector)
 
 	nonexistingID := unittest.IdentifierFixture()
 	blockID := unittest.IdentifierFixture()
@@ -1463,7 +1453,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
-			connSelector,
+			nil,
 			false,
 			DefaultMaxHeightRange,
 			nil,
@@ -1494,7 +1484,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
-			connSelector,
+			nil,
 			false,
 			DefaultMaxHeightRange,
 			nil,
@@ -1523,7 +1513,6 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
-	connSelector := new(backendmock.ConnectionSelector)
 
 	blockID := unittest.IdentifierFixture()
 	executionResult := unittest.ExecutionResultFixture(
@@ -1559,7 +1548,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
-			connSelector,
+			nil,
 			false,
 			DefaultMaxHeightRange,
 			nil,
@@ -1591,7 +1580,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
-			connSelector,
+			nil,
 			false,
 			DefaultMaxHeightRange,
 			nil,
@@ -1727,7 +1716,6 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	}
 
 	connFactory := suite.setupConnectionFactory()
-	connSelector := new(backendmock.ConnectionSelector)
 
 	suite.Run("invalid request max height < min height", func() {
 		backend := New(
@@ -1743,7 +1731,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
-			connSelector,
+			nil,
 			false,
 			DefaultMaxHeightRange,
 			nil,
@@ -1783,7 +1771,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
-			connSelector,
+			nil,
 			false,
 			DefaultMaxHeightRange,
 			nil,
@@ -1822,7 +1810,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
-			connSelector,
+			nil,
 			false,
 			DefaultMaxHeightRange,
 			nil,
@@ -1860,7 +1848,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
-			connSelector,
+			nil,
 			false,
 			1, // set maximum range to 1
 			nil,
@@ -1898,7 +1886,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
-			connSelector,
+			nil,
 			false,
 			DefaultMaxHeightRange,
 			nil,
@@ -1962,8 +1950,6 @@ func (suite *Suite) TestGetAccount() {
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-	connSelector := new(backendmock.ConnectionSelector)
-
 	// create the handler with the mock
 	backend := New(
 		suite.state,
@@ -1978,7 +1964,7 @@ func (suite *Suite) TestGetAccount() {
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		connFactory, // the connection factory should be used to get the execution node client
-		connSelector,
+		nil,
 		false,
 		DefaultMaxHeightRange,
 		nil,
@@ -2028,8 +2014,6 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-	connSelector := new(backendmock.ConnectionSelector)
-
 	// create the expected execution API request
 	blockID := h.ID()
 	exeReq := &execproto.GetAccountAtBlockIDRequest{
@@ -2062,7 +2046,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		flow.Testnet,
 		metrics.NewNoopCollector(),
 		connFactory, // the connection factory should be used to get the execution node client
-		connSelector,
+		nil,
 		false,
 		DefaultMaxHeightRange,
 		nil,
@@ -2171,6 +2155,19 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	connSelector := new(backendmock.ConnectionSelector)
+	connSelector.On("GetExecutionNodesForBlockID").Return(func() flow.IdentityList {
+		randomItems := make(flow.IdentityList, 0, maxExecutionNodesCnt)
+
+		for i := 0; i < maxExecutionNodesCnt; i++ {
+			// Generate a random index within the range of the array
+			randomIndex, err := rand.Uintn(uint(len(allExecutionNodes)))
+			require.NoError(suite.T(), err)
+			// Append the item at the random index to the new slice
+			randomItems = append(randomItems, allExecutionNodes[randomIndex])
+		}
+
+		return randomItems
+	})
 
 	testExecutionNodesForBlockID := func(preferredENs, fixedENs, expectedENs flow.IdentityList) {
 
@@ -2270,8 +2267,6 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
 
-	connSelector := new(backendmock.ConnectionSelector)
-
 	// create the handler with the mock
 	backend := New(
 		suite.state,
@@ -2286,7 +2281,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 		flow.Mainnet,
 		metrics.NewNoopCollector(),
 		connFactory, // the connection factory should be used to get the execution node client
-		connSelector,
+		nil,
 		false,
 		DefaultMaxHeightRange,
 		nil,

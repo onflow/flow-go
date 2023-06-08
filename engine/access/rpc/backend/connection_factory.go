@@ -265,7 +265,7 @@ func WithClientUnaryInterceptor(timeout time.Duration, circuitBreakerConfig Circ
 		circuitBreaker = gobreaker.NewCircuitBreaker(gobreaker.Settings{
 			Timeout: circuitBreakerConfig.RestoreTimeout,
 			ReadyToTrip: func(counts gobreaker.Counts) bool {
-				return counts.ConsecutiveFailures > circuitBreakerConfig.MaxRequestToBreak
+				return counts.ConsecutiveFailures >= circuitBreakerConfig.MaxRequestToBreak
 			},
 		})
 	}
