@@ -447,9 +447,10 @@ func (h *handler) GetTransactionResultsByBlockID(
 		events := convert.EventsToMessages(eventsByTxIndex[txIndex])
 
 		responseTxResults[index] = &execution.GetTransactionResultResponse{
-			StatusCode:   statusCode,
-			ErrorMessage: errMsg,
-			Events:       events,
+			StatusCode:           statusCode,
+			ErrorMessage:         errMsg,
+			Events:               events,
+			EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
 		}
 	}
 
