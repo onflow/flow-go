@@ -1179,6 +1179,12 @@ func (fnb *FlowNodeBuilder) initState() error {
 		}
 	}
 
+	lastFinalized, err := fnb.State.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not get last finalized block header: %w", err)
+	}
+	fnb.NodeConfig.LastFinalizedHeader = lastFinalized
+
 	fnb.Logger.Info().
 		Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
 		Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).

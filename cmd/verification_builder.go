@@ -382,7 +382,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
-				node.FinalizedRootBlock.Header,
+				node.LastFinalizedHeader,
 				core,
 				node.ComplianceConfig,
 			)
