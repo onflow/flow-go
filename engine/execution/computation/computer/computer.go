@@ -140,7 +140,11 @@ func NewBlockComputer(
 	signer module.Local,
 	executionDataProvider *provider.Provider,
 	colResCons []result.ExecutedCollectionConsumer,
+	maxConcurrency int,
 ) (BlockComputer, error) {
+	if maxConcurrency < 1 {
+		return nil, fmt.Errorf("invalid maxConcurrency: %d", maxConcurrency)
+	}
 	systemChunkCtx := SystemChunkContext(vmCtx, logger)
 	vmCtx = fvm.NewContextFromParent(
 		vmCtx,

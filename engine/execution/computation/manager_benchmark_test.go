@@ -104,6 +104,46 @@ func mustFundAccounts(
 func BenchmarkComputeBlock(b *testing.B) {
 	b.StopTimer()
 
+	type benchmarkCase struct {
+		numCollections               int
+		numTransactionsPerCollection int
+		maxConcurrency               int
+	}
+
+	for _, benchCase := range []benchmarkCase{
+		{
+			numCollections:               16,
+			numTransactionsPerCollection: 128,
+			maxConcurrency:               1,
+		},
+		{
+			numCollections:               16,
+			numTransactionsPerCollection: 128,
+			maxConcurrency:               2,
+		},
+	} {
+		b.Run(
+			fmt.Sprintf(
+				"%d/cols/%d/txes/%d/max-concurrency",
+				benchCase.numCollections,
+				benchCase.numTransactionsPerCollection,
+				benchCase.maxConcurrency),
+			func(b *testing.B) {
+				benchmarkComputeBlock(
+					b,
+					benchCase.numCollections,
+					benchCase.numTransactionsPerCollection,
+					benchCase.maxConcurrency)
+			})
+	}
+}
+
+func benchmarkComputeBlock(
+	b *testing.B,
+	numCollections int,
+	numTransactionsPerCollection int,
+	maxConcurrency int,
+) {
 	tracer, err := trace.NewTracer(zerolog.Nop(), "", "", 4)
 	require.NoError(b, err)
 
@@ -159,7 +199,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil)
+		nil,
+		maxConcurrency)
 	require.NoError(b, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(
