@@ -8,7 +8,7 @@ package heropool
 // poolIndex also furnished with methods to convert a "poolIndex" value to
 // a slice index, and vice versa.
 type poolIndex struct {
-	index uint32
+	index EIndex
 }
 
 // isUndefined returns true if this poolIndex is set to zero. An undefined
@@ -29,6 +29,6 @@ func (p poolIndex) getSliceIndex() EIndex {
 
 // setPoolIndex converts the input slice-based index into a pool index and
 // sets the underlying poolIndex.
-func (p *poolIndex) setPoolIndex(sliceIndex EIndex) {
-	p.index = uint32(sliceIndex)
-}
+//func (p *poolIndex) setPoolIndex(sliceIndex EIndex) {
+//	p.index = uint32(sliceIndex)
+//}
