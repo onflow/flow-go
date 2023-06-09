@@ -28,13 +28,14 @@ type state struct {
 }
 
 // Adds element to the tail of the list or creates first element
-func (s *state) addElement(p *Pool, element EIndex) {
+func (s *state) addElement(p *Pool, entity EIndex) {
 	if s.size == 0 {
-		s.head.index = element
-		s.tail.index = element
+		s.head.index = entity
+		s.tail.index = entity
 		s.size = 1
 		return
 	}
-	p.connect2(s.tail, element, s)
-	s.tail.index = element
+	p.connect(s.tail, entity)
+	s.size++
+	s.tail.index = entity
 }
