@@ -1,16 +1,7 @@
 package heropool
 
-//TODO
-// 1. introduce size into linked list struct  and make sure that it is correcly maintained
-// by adding checks to existing unit tests. The are several options to do that , bt for now lets maintain size in  basic interf method
-// like Add, Remove, init
-// 2. start replacing checks for undifined with checks for size , run tests
-// 3. finally remove the consept of 0 index as being undefined null ptr index
-
-// TBH I woould decouple lists and poolEntity.
 import (
 	"fmt"
-	"math/rand"
 
 	"github.com/rs/zerolog"
 
@@ -74,10 +65,6 @@ func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode, logger zerolog.Log
 		free: state{
 			head: poolIndex{index: 0},
 			tail: poolIndex{index: 0},
-			// It's a bit redundant to have a size of free as it can be deduced by
-			// len(poolEntities) - used.size. However in task it is specified
-			// "Adding a size attribute to track the number of items in the linked list."
-			// As there are 2 linked list looks like they suggested to have a size per list.
 			size: 0,
 		},
 		used: state{
@@ -101,7 +88,6 @@ func (p *Pool) modifyUsedBy(incrementBy int) {
 	p.free.size = len(p.poolEntities) - p.used.size
 }
 
-// DONE size updated
 // initFreeEntities initializes the free double linked-list with the indices of all cached entity poolEntities.
 func (p *Pool) initFreeEntities() {
 
@@ -133,9 +119,6 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 		p.poolEntities[entityIndex].entity = entity
 		p.poolEntities[entityIndex].id = entityId
 		p.poolEntities[entityIndex].owner = owner
-		//
-		//p.poolEntities[entityIndex].node.next.setUndefined()
-		//p.poolEntities[entityIndex].node.prev.setUndefined()
 
 		if p.used.size == 0 {
 			// used list is empty, hence setting head of used list to current entityIndex.
@@ -152,11 +135,6 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 			// since we are appending to the used list, entityIndex also acts as tail of the list.
 			p.used.tail.index = entityIndex
 		}
-		/*
-		   if !p.used.tail.isUndefined() {
-		       // links new entity to the tail
-		       p.connect(p.used.tail, entityIndex)
-		   }*/
 
 		// not sure why here it is incremented as  p.sliceIndexForEntity() couldve evict one element
 		// may be check for ejectedEntity ?
@@ -203,7 +181,6 @@ func (p Pool) Head() (flow.Entity, bool) {
 //
 // Ejection happens if there is no available slot, and there is an ejection mode set.
 // If an ejection occurred, ejectedEntity holds the ejected entity.
-// TODO update size here
 func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedEntity flow.Entity) {
 	lruEject := func() (EIndex, bool, flow.Entity) {
 		// LRU ejection
@@ -283,7 +260,6 @@ func (p *Pool) connect(prev poolIndex, next EIndex) {
 // invalidateUsedHead moves current used head forward by one node. It
 // also removes the entity the invalidated head is presenting and appends the
 // node represented by the used head to the tail of the free list.
-// TODO update size here
 func (p *Pool) invalidateUsedHead() flow.Entity {
 	headSliceIndex := p.used.head.getSliceIndex()
 	return p.invalidateEntityAtIndex(headSliceIndex)
@@ -291,11 +267,8 @@ func (p *Pool) invalidateUsedHead() flow.Entity {
 
 // claimFreeHead moves the free head forward, and returns the slice index of the
 // old free head to host a new entity.
-// TODO update size here
-
 func (p *Pool) claimFreeHead() EIndex {
 	oldFreeHeadIndex := p.free.head.getSliceIndex()
-	// moves head forward
 
 	if p.free.size == 0 {
 		fmt.Println("debug shouldnt happen")
@@ -309,31 +282,10 @@ func (p *Pool) claimFreeHead() EIndex {
 		p.free.head = p.poolEntities[oldFreeHeadIndex].node.next
 	}
 
-	// new head should point to an undefined prev,
-	// but we first check if list is not empty, i.e.,
-	// head itself is not undefined.
-	// irrelevant a heads prev is undefined by convention
-	//if p.free.size != 0 {
-	//  p.poolEntities[p.free.head.getSliceIndex()].node.prev.setUndefined()
-	//}
-
-	// also, we check if the old head and tail are aligned and, if so, update the
-	// tail as well. This happens when we claim the only existing
-	// node of the free list.
-	//same not needed as size set to 0
-	//if p.free.tail.getSliceIndex() == oldFreeHeadIndex {
-	//  p.free.tail.setUndefined()
-	//}
-
-	// clears pointers of claimed head
-	//p.poolEntities[oldFreeHeadIndex].node.next.setUndefined()
-	//p.poolEntities[oldFreeHeadIndex].node.prev.setUndefined()
-
 	return oldFreeHeadIndex
 }
 
 // Remove removes entity corresponding to given getSliceIndex from the list.
-// TODO update size here
 func (p *Pool) Remove(sliceIndex EIndex) flow.Entity {
 	return p.invalidateEntityAtIndex(sliceIndex)
 }
@@ -341,8 +293,6 @@ func (p *Pool) Remove(sliceIndex EIndex) flow.Entity {
 // invalidateEntityAtIndex invalidates the given getSliceIndex in the linked list by
 // removing its corresponding linked-list node from the used linked list, and appending
 // it to the tail of the free list. It also removes the entity that the invalidated node is presenting.
-// TODO update size here
-
 func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 	poolEntity := p.poolEntities[sliceIndex]
 	prev := poolEntity.node.prev
@@ -367,9 +317,8 @@ func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 
 		return invalidatedEntity
 	}
-	// here size > 1
+	// here size guaranteed > 1
 
-	// 3 cases index is middle, head or last of used
 	if sliceIndex != p.used.head.getSliceIndex() && sliceIndex != p.used.tail.getSliceIndex() {
 		// links next and prev elements for non-head and non-tail element
 		p.connect(prev, next.getSliceIndex())
@@ -380,37 +329,15 @@ func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 		// moves head forward
 		oldUsedHead, _ := p.getHeads()
 		p.used.head = oldUsedHead.node.next
-		// new head should point to an undefined prev,
-		// but we first check if list is not empty, i.e.,
-		// head itself is not undefined.
-		// if !p.used.head.isUndefined()
-		//not needed anymore
-		//if !p.used.head.isUndefined() {
-		//	usedHead, _ := p.getHeads()
-		//	usedHead.node.prev.setUndefined()
-		//}
 	}
 
 	if sliceIndex == p.used.tail.getSliceIndex() {
-		// invalidating used tail
-		// moves tail backward
 		oldUsedTail, _ := p.getTails()
 		p.used.tail = oldUsedTail.node.prev
-		// new head should point tail to an undefined next,
-		// but we first check if list is not empty, i.e.,
-		// tail itself is not undefined.
-		//not needed
-		//if !p.used.tail.isUndefined() {
-		//	usedTail, _ := p.getTails()
-		//	usedTail.node.next.setUndefined()
-		//}
 	}
 
-	// invalidates entity and adds it to free entities.
 	p.poolEntities[sliceIndex].id = flow.ZeroID
 	p.poolEntities[sliceIndex].entity = nil
-	//p.poolEntities[sliceIndex].node.next.setUndefined()
-	//p.poolEntities[sliceIndex].node.prev.setUndefined()
 
 	p.appendToFreeList(sliceIndex)
 
