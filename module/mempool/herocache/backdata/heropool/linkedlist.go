@@ -2,6 +2,8 @@ package heropool
 
 // link represents a slice-based doubly linked-list node that
 // consists of a next and previous poolIndex.
+// if a link doesn't belong to any state it's next and prev may have any values,
+// but those are treated as invalid and should not be used.
 type link struct {
 	// As we dont have from now on an invalid index we need either to make next/prev point to itself
 	// in order to show that its invalid
@@ -16,9 +18,23 @@ type link struct {
 }
 
 // state represents a doubly linked-list by its head and tail pool indices.
+// If satte has 0 size, its tail's and head's prev and next are treated as invalid.
+// Moreover head's prev and tails next are always treated as invalid and may hold any values.
 type state struct {
 	//those might now coincide rather than point to 0
 	head poolIndex
 	tail poolIndex
-	size int
+	size uint32
+}
+
+// Adds element to the tail of the list or creates first element
+func (s *state) addElement(p *Pool, element EIndex) {
+	if s.size == 0 {
+		s.head.index = element
+		s.tail.index = element
+		s.size = 1
+		return
+	}
+	p.connect2(s.tail, element, s)
+	s.tail.index = element
 }
