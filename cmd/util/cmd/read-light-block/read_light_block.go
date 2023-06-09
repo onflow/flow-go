@@ -9,15 +9,15 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type ClusterBlockLight struct {
+type ClusterLightBlock struct {
 	ID           flow.Identifier
 	Height       uint64
 	CollectionID flow.Identifier
 	Transactions []flow.Identifier
 }
 
-func ClusterBlockToLight(clusterBlock *cluster.Block) *ClusterBlockLight {
-	return &ClusterBlockLight{
+func ClusterBlockToLight(clusterBlock *cluster.Block) *ClusterLightBlock {
+	return &ClusterLightBlock{
 		ID:           clusterBlock.ID(),
 		Height:       clusterBlock.Header.Height,
 		CollectionID: clusterBlock.Payload.Collection.ID(),
@@ -25,8 +25,8 @@ func ClusterBlockToLight(clusterBlock *cluster.Block) *ClusterBlockLight {
 	}
 }
 
-func ReadClusterBlockLightByHeightRange(clusterBlocks storage.ClusterBlocks, startHeight uint64, endHeight uint64) ([]*ClusterBlockLight, error) {
-	blocks := make([]*ClusterBlockLight, 0)
+func ReadClusterLightBlockByHeightRange(clusterBlocks storage.ClusterBlocks, startHeight uint64, endHeight uint64) ([]*ClusterLightBlock, error) {
+	blocks := make([]*ClusterLightBlock, 0)
 	for height := startHeight; height <= endHeight; height++ {
 		block, err := clusterBlocks.ByHeight(height)
 		if err != nil {
@@ -41,22 +41,22 @@ func ReadClusterBlockLightByHeightRange(clusterBlocks storage.ClusterBlocks, sta
 	return blocks, nil
 }
 
-type BlockLight struct {
+type LightBlock struct {
 	ID          flow.Identifier
 	Height      uint64
 	Collections []flow.Identifier
 }
 
-func BlockToLight(block *flow.Block) *BlockLight {
-	return &BlockLight{
+func BlockToLight(block *flow.Block) *LightBlock {
+	return &LightBlock{
 		ID:          block.ID(),
 		Height:      block.Header.Height,
-		Collections: flow.EntityToIDs(block.Payload.Guarantees),
+		Collections: flow.EntitiesToIDs(block.Payload.Guarantees),
 	}
 }
 
-func ReadBlockLightByHeightRange(blocks storage.Blocks, startHeight uint64, endHeight uint64) ([]*BlockLight, error) {
-	bs := make([]*BlockLight, 0)
+func ReadLightBlockByHeightRange(blocks storage.Blocks, startHeight uint64, endHeight uint64) ([]*LightBlock, error) {
+	bs := make([]*LightBlock, 0)
 	for height := startHeight; height <= endHeight; height++ {
 		block, err := blocks.ByHeight(height)
 		if err != nil {

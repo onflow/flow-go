@@ -5,7 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
-	"github.com/onflow/flow-go/cmd/util/cmd/read-block-light"
+	"github.com/onflow/flow-go/cmd/util/cmd/read-light-block"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -22,12 +22,12 @@ func NewReadRangeBlocksCommand(blocks storage.Blocks) commands.AdminCommand {
 }
 
 func (c *ReadRangeBlocksCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
-	data, err := parseHeightRangeRequestData(req)
+	reqData, err := parseHeightRangeRequestData(req)
 	if err != nil {
 		return nil, err
 	}
 
-	lights, err := read.ReadBlockLightByHeightRange(c.blocks, data.startHeight, data.endHeight)
+	lights, err := read.ReadLightBlockByHeightRange(c.blocks, reqData.startHeight, reqData.endHeight)
 	if err != nil {
 		return nil, err
 	}

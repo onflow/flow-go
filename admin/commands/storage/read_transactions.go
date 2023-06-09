@@ -16,7 +16,7 @@ import (
 var _ commands.AdminCommand = (*GetTransactionsCommand)(nil)
 
 // max number of block height to query transactions from
-var MAX_HEIGHT_RANGE = uint64(1000)
+var Max_Height_Range = uint64(1000)
 
 type heightRangeReqData struct {
 	startHeight uint64

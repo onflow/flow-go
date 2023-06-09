@@ -112,12 +112,24 @@ func parseHeightRangeRequestData(req *admin.CommandRequest) (*heightRangeReqData
 		return nil, admin.NewInvalidAdminReqErrorf("end-height %v should not be smaller than start-height %v", endHeight, startHeight)
 	}
 
-	if endHeight-startHeight+1 > MAX_HEIGHT_RANGE {
-		return nil, admin.NewInvalidAdminReqErrorf("getting transactions for more than %v blocks at a time might have an impact to node's performance and is not allowed", MAX_HEIGHT_RANGE)
+	if endHeight-startHeight+1 > Max_Height_Range {
+		return nil, admin.NewInvalidAdminReqErrorf("getting transactions for more than %v blocks at a time might have an impact to node's performance and is not allowed", Max_Height_Range)
 	}
 
 	return &heightRangeReqData{
 		startHeight: startHeight,
 		endHeight:   endHeight,
 	}, nil
+}
+
+func parseString(req *admin.CommandRequest, field string) (string, error) {
+	input, ok := req.Data.(map[string]interface{})
+	if !ok {
+		return "", admin.NewInvalidAdminReqFormatError("missing 'data' field")
+	}
+	fieldValue, err := findString(input, field)
+	if err != nil {
+		return "", admin.NewInvalidAdminReqErrorf("missing %v field", field)
+	}
+	return fieldValue, nil
 }

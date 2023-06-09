@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
-	"github.com/onflow/flow-go/cmd/util/cmd/read-block-light"
+	"github.com/onflow/flow-go/cmd/util/cmd/read-light-block"
 	"github.com/onflow/flow-go/model/flow"
 	storage "github.com/onflow/flow-go/storage/badger"
 )
@@ -30,16 +30,12 @@ func NewReadRangeClusterBlocksCommand(db *badger.DB, headers *storage.Headers, p
 }
 
 func (c *ReadRangeClusterBlocksCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
-	input, ok := req.Data.(map[string]interface{})
-	if !ok {
-		return nil, admin.NewInvalidAdminReqFormatError("missing 'data' field")
-	}
-	chainID, err := findString(input, "chain-id")
+	chainID, err := parseString(req, "chain-id")
 	if err != nil {
-		return nil, admin.NewInvalidAdminReqErrorf("missing chain-id field")
+		return nil, err
 	}
 
-	data, err := parseHeightRangeRequestData(req)
+	reqData, err := parseHeightRangeRequestData(req)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +44,7 @@ func (c *ReadRangeClusterBlocksCommand) Handler(ctx context.Context, req *admin.
 		c.db, flow.ChainID(chainID), c.headers, c.payloads,
 	)
 
-	lights, err := read.ReadClusterBlockLightByHeightRange(clusterBlocks, data.startHeight, data.endHeight)
+	lights, err := read.ReadClusterLightBlockByHeightRange(clusterBlocks, reqData.startHeight, reqData.endHeight)
 	if err != nil {
 		return nil, fmt.Errorf("could not get with chainID id %v: %w", chainID, err)
 	}
