@@ -12,6 +12,7 @@ import (
 type ClusterBlockLight struct {
 	ID           flow.Identifier
 	Height       uint64
+	CollectionID flow.Identifier
 	Transactions []flow.Identifier
 }
 
@@ -19,6 +20,7 @@ func ClusterBlockToLight(clusterBlock *cluster.Block) *ClusterBlockLight {
 	return &ClusterBlockLight{
 		ID:           clusterBlock.ID(),
 		Height:       clusterBlock.Header.Height,
+		CollectionID: clusterBlock.Payload.Collection.ID(),
 		Transactions: clusterBlock.Payload.Collection.Light().Transactions,
 	}
 }
