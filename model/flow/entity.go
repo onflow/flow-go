@@ -17,7 +17,7 @@ type Entity interface {
 	Checksum() Identifier
 }
 
-func EntityToIDs[T Entity](entities []T) []Identifier {
+func EntitiesToIDs[T Entity](entities []T) []Identifier {
 	ids := make([]Identifier, 0, len(entities))
 	for _, entity := range entities {
 		ids = append(ids, entity.ID())

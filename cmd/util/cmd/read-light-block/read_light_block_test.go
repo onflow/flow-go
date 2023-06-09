@@ -44,7 +44,7 @@ func TestReadClusterRange(t *testing.T) {
 
 		startHeight := blocks[0].Header.Height
 		endHeight := startHeight + 10 // if end height is exceeded the last finalized height, only return up to the last finalized
-		lights, err := ReadClusterBlockLightByHeightRange(clusterBlocks, startHeight, endHeight)
+		lights, err := ReadClusterLightBlockByHeightRange(clusterBlocks, startHeight, endHeight)
 		require.NoError(t, err)
 
 		for i, light := range lights {
