@@ -105,14 +105,14 @@ func (p *Pool) modifyUsedBy(incrementBy int) {
 // initFreeEntities initializes the free double linked-list with the indices of all cached entity poolEntities.
 func (p *Pool) initFreeEntities() {
 
-	p.free.head.setPoolIndex(0)
-	p.free.tail.setPoolIndex(0)
+	p.free.head.index = EIndex(0)
+	p.free.tail.index = EIndex(0)
 
 	for i := 1; i < len(p.poolEntities); i++ {
 		// appends slice index i to tail of free linked list
 		p.connect(p.free.tail, EIndex(i))
 		// and updates its tail
-		p.free.tail.setPoolIndex(EIndex(i))
+		p.free.tail.index = EIndex(i)
 	}
 	p.free.size = len(p.poolEntities)
 }
@@ -139,10 +139,10 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 
 		if p.used.size == 0 {
 			// used list is empty, hence setting head of used list to current entityIndex.
-			p.used.head.setPoolIndex(entityIndex)
+			p.used.head.index = entityIndex
 			// as size gonna be non zero tail has to point somewhere and it cant point to 0 anylonger as 0 now
 			// is legitim. Lets then make tail and head concide.
-			p.used.tail.setPoolIndex(entityIndex)
+			p.used.tail.index = entityIndex
 			// we treat both as undefined prev and next if this node is tail and head so nothing to do
 			//p.poolEntities[p.used.head.getSliceIndex()].node.prev.setUndefined()
 		} else {
@@ -150,7 +150,7 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 			p.connect(p.used.tail, entityIndex)
 			// TODO will it work for corner cases like when capasity of pool is 1 or 2 etc ...
 			// since we are appending to the used list, entityIndex also acts as tail of the list.
-			p.used.tail.setPoolIndex(entityIndex)
+			p.used.tail.index = entityIndex
 		}
 		/*
 		   if !p.used.tail.isUndefined() {
@@ -276,7 +276,7 @@ func (p *Pool) getTails() (*poolEntity, *poolEntity) {
 
 // connect links the prev and next nodes as the adjacent nodes in the double-linked list.
 func (p *Pool) connect(prev poolIndex, next EIndex) {
-	p.poolEntities[prev.getSliceIndex()].node.next.setPoolIndex(next)
+	p.poolEntities[prev.getSliceIndex()].node.next.index = next
 	p.poolEntities[next].node.prev = prev
 }
 
@@ -307,7 +307,6 @@ func (p *Pool) claimFreeHead() EIndex {
 
 	if p.free.size > 1 {
 		p.free.head = p.poolEntities[oldFreeHeadIndex].node.next
-
 	}
 
 	// new head should point to an undefined prev,
@@ -426,14 +425,14 @@ func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 func (p *Pool) appendToFreeList(sliceIndex EIndex) {
 	if p.free.size == 0 {
 		// free list is empty
-		p.free.head.setPoolIndex(sliceIndex)
-		p.free.tail.setPoolIndex(sliceIndex)
+		p.free.head.index = sliceIndex
+		p.free.tail.index = sliceIndex
 		return
 	}
 
 	// appends to the tail, and updates the tail
 	p.connect(p.free.tail, sliceIndex)
-	p.free.tail.setPoolIndex(sliceIndex)
+	p.free.tail.index = sliceIndex
 	// it's gonna be reupdated but its a good practice to maintain size in sync
 	p.free.size++
 }
