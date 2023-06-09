@@ -61,13 +61,13 @@ type Pool struct {
 func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode, logger zerolog.Logger) *Pool {
 	l := &Pool{
 		free: state{
-			head: poolIndex{index: 0},
-			tail: poolIndex{index: 0},
+			head: 0,
+			tail: 0,
 			size: 0,
 		},
 		used: state{
-			head: poolIndex{index: 0},
-			tail: poolIndex{index: 0},
+			head: 0,
+			tail: 0,
 			size: 0,
 		},
 		poolEntities: make([]poolEntity, sizeLimit),
@@ -120,7 +120,7 @@ func (p Pool) All() []PoolEntity {
 	next := p.used.head
 
 	for i := uint32(0); i < p.used.size; i++ {
-		e := p.poolEntities[next.getSliceIndex()]
+		e := p.poolEntities[next]
 		all[i] = e.PoolEntity
 		next = e.node.next
 	}
@@ -134,7 +134,7 @@ func (p Pool) Head() (flow.Entity, bool) {
 	if p.used.size == 0 {
 		return nil, false
 	}
-	e := p.poolEntities[p.used.head.getSliceIndex()]
+	e := p.poolEntities[p.used.head]
 	return e.Entity(), true
 }
 
@@ -191,11 +191,11 @@ func (p *Pool) getHeads() (*poolEntity, *poolEntity) {
 	var usedHead, freeHead *poolEntity
 
 	if p.used.size != 0 {
-		usedHead = &p.poolEntities[p.used.head.getSliceIndex()]
+		usedHead = &p.poolEntities[p.used.head]
 	}
 
 	if p.free.size != 0 {
-		freeHead = &p.poolEntities[p.free.head.getSliceIndex()]
+		freeHead = &p.poolEntities[p.free.head]
 	}
 
 	return usedHead, freeHead
@@ -205,19 +205,19 @@ func (p *Pool) getHeads() (*poolEntity, *poolEntity) {
 func (p *Pool) getTails() (*poolEntity, *poolEntity) {
 	var usedTail, freeTail *poolEntity
 	if p.used.size != 0 {
-		usedTail = &p.poolEntities[p.used.tail.getSliceIndex()]
+		usedTail = &p.poolEntities[p.used.tail]
 	}
 
 	if p.free.size != 0 {
-		freeTail = &p.poolEntities[p.free.tail.getSliceIndex()]
+		freeTail = &p.poolEntities[p.free.tail]
 	}
 
 	return usedTail, freeTail
 }
 
 // connect links the prev and next nodes as the adjacent nodes in the double-linked list.
-func (p *Pool) connect(prev poolIndex, next EIndex) {
-	p.poolEntities[prev.getSliceIndex()].node.next.index = next
+func (p *Pool) connect(prev EIndex, next EIndex) {
+	p.poolEntities[prev].node.next = next
 	p.poolEntities[next].node.prev = prev
 }
 
@@ -225,14 +225,14 @@ func (p *Pool) connect(prev poolIndex, next EIndex) {
 // also removes the entity the invalidated head is presenting and appends the
 // node represented by the used head to the tail of the free list.
 func (p *Pool) invalidateUsedHead() flow.Entity {
-	headSliceIndex := p.used.head.getSliceIndex()
+	headSliceIndex := p.used.head
 	return p.invalidateEntityAtIndex(headSliceIndex)
 }
 
 // claimFreeHead moves the free head forward, and returns the slice index of the
 // old free head to host a new entity.
 func (p *Pool) claimFreeHead() EIndex {
-	oldFreeHeadIndex := p.free.head.getSliceIndex()
+	oldFreeHeadIndex := p.free.head
 	p.free.removeEntity(p, oldFreeHeadIndex)
 	return oldFreeHeadIndex
 }

@@ -13,8 +13,8 @@ type link struct {
 	// of if this is head or tail ... of one of the lists. For this reason I am not sure that this idea of removing 0 as undefined wont backfire
 
 	// lets start with head and tail check
-	next poolIndex
-	prev poolIndex
+	next EIndex
+	prev EIndex
 }
 
 // state represents a doubly linked-list by its head and tail pool indices.
@@ -22,22 +22,22 @@ type link struct {
 // Moreover head's prev and tails next are always treated as invalid and may hold any values.
 type state struct {
 	//those might now coincide rather than point to 0
-	head poolIndex
-	tail poolIndex
+	head EIndex
+	tail EIndex
 	size uint32
 }
 
 // Adds entity to the tail of the list or creates first element
 func (s *state) appendEntity(p *Pool, entityIndex EIndex) {
 	if s.size == 0 {
-		s.head.index = entityIndex
-		s.tail.index = entityIndex
+		s.head = entityIndex
+		s.tail = entityIndex
 		s.size = 1
 		return
 	}
 	p.connect(s.tail, entityIndex)
 	s.size++
-	s.tail.index = entityIndex
+	s.tail = entityIndex
 }
 
 // Removes an entity from the list
@@ -51,17 +51,17 @@ func (s *state) removeEntity(p *Pool, entityIndex EIndex) {
 	}
 	node := p.poolEntities[entityIndex].node
 
-	if entityIndex != s.head.getSliceIndex() && entityIndex != s.tail.getSliceIndex() {
+	if entityIndex != s.head && entityIndex != s.tail {
 		// links next and prev elements for non-head and non-tail element
-		p.connect(node.prev, node.next.getSliceIndex())
+		p.connect(node.prev, node.next)
 	}
 
-	if entityIndex == s.head.getSliceIndex() {
+	if entityIndex == s.head {
 		// moves head forward
 		s.head = node.next
 	}
 
-	if entityIndex == s.tail.getSliceIndex() {
+	if entityIndex == s.tail {
 		// moves tail backwards
 		s.tail = node.prev
 	}
