@@ -40,7 +40,7 @@ var _ hotstuff.PaceMaker = (*TestPaceMaker)(nil)
 
 func NewTestPaceMaker(
 	timeoutController *timeout.Controller,
-	proposalDelayProvider pacemaker.ProposalDurationProvider,
+	proposalDelayProvider hotstuff.ProposalDurationProvider,
 	notifier hotstuff.Consumer,
 	persist hotstuff.Persister,
 ) *TestPaceMaker {

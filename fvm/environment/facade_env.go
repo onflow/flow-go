@@ -36,6 +36,7 @@ type facadeEnvironment struct {
 	*SystemContracts
 
 	UUIDGenerator
+	AccountLocalIDGenerator
 
 	AccountCreator
 
@@ -108,6 +109,11 @@ func newFacadeEnvironment(
 			tracer,
 			meter,
 			txnState),
+		AccountLocalIDGenerator: NewAccountLocalIDGenerator(
+			tracer,
+			meter,
+			accounts,
+		),
 
 		AccountCreator: NoAccountCreator{},
 
@@ -269,6 +275,9 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.UUIDGenerator = NewParseRestrictedUUIDGenerator(
 		env.txnState,
 		env.UUIDGenerator)
+	env.AccountLocalIDGenerator = NewParseRestrictedAccountLocalIDGenerator(
+		env.txnState,
+		env.AccountLocalIDGenerator)
 	env.ValueStore = NewParseRestrictedValueStore(
 		env.txnState,
 		env.ValueStore)

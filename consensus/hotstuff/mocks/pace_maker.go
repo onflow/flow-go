@@ -19,20 +19,6 @@ type PaceMaker struct {
 	mock.Mock
 }
 
-// BlockRateDelay provides a mock function with given fields:
-func (_m *PaceMaker) BlockRateDelay() time.Duration {
-	ret := _m.Called()
-
-	var r0 time.Duration
-	if rf, ok := ret.Get(0).(func() time.Duration); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(time.Duration)
-	}
-
-	return r0
-}
-
 // CurView provides a mock function with given fields:
 func (_m *PaceMaker) CurView() uint64 {
 	ret := _m.Called()
@@ -134,6 +120,20 @@ func (_m *PaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent
 // Start provides a mock function with given fields: ctx
 func (_m *PaceMaker) Start(ctx context.Context) {
 	_m.Called(ctx)
+}
+
+// TargetPublicationTime provides a mock function with given fields: proposalView, timeViewEntered, parentBlockId
+func (_m *PaceMaker) TargetPublicationTime(proposalView uint64, timeViewEntered time.Time, parentBlockId flow.Identifier) time.Time {
+	ret := _m.Called(proposalView, timeViewEntered, parentBlockId)
+
+	var r0 time.Time
+	if rf, ok := ret.Get(0).(func(uint64, time.Time, flow.Identifier) time.Time); ok {
+		r0 = rf(proposalView, timeViewEntered, parentBlockId)
+	} else {
+		r0 = ret.Get(0).(time.Time)
+	}
+
+	return r0
 }
 
 // TimeoutChannel provides a mock function with given fields:
