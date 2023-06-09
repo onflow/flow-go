@@ -85,7 +85,7 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 // * has the same static committee as the last committed epoch
 func newEmergencyFallbackEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpochInfo, error) {
 
-	rng, err := prg.FromRandomSource(lastCommittedEpoch.randomSource, prg.ConsensusLeaderSelection)
+	rng, err := prg.FromRandomSource(lastCommittedEpoch.randomSource, prg.ConsensusLeaderSelection, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create rng from seed: %w", err)
 	}

@@ -11,7 +11,8 @@ import (
 
 func getRandomSource(t *testing.T) []byte {
 	seed := make([]byte, RandomSourceLength)
-	rand.Read(seed)
+	_, err := rand.Read(seed) // checking err is enough
+	require.NoError(t, err)
 	t.Logf("seed is %#x", seed)
 	return seed
 }
