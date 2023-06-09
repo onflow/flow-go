@@ -26,10 +26,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func init() {
-
-}
-
 // TestUnknownReferenceBlock tests queries for snapshots which should be unknown.
 // We use this fixture:
 //   - Root height: 100

@@ -89,6 +89,9 @@ func (pm *PeerManager) periodicLoop(ctx irrecoverable.SignalerContext) {
 	r, _ := rand.Uint64n(uint64(pm.peerUpdateInterval.Nanoseconds()))
 	// ignore the error here, if randomness fails `r` would be zero and there will be no delay
 	// for the current node
+	// TODO: treat the error properly instead of swallowing it. In this specific case, `utils/rand`
+	// only errors if there is a randomness system issue. Such issue will cause errors in many
+	// other components.
 	delay := time.Duration(r)
 
 	ticker := time.NewTicker(pm.peerUpdateInterval)

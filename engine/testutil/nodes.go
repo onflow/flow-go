@@ -302,7 +302,6 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 		coll, err := collections.ByID(collID)
 		return coll, err
 	}
-
 	providerEngine, err := provider.New(
 		node.Log,
 		node.Metrics,

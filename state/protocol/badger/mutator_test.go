@@ -40,10 +40,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func init() {
-
-}
-
 var participants = unittest.IdentityListFixture(5, unittest.WithAllRoles())
 
 func TestBootstrapValid(t *testing.T) {

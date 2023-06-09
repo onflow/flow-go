@@ -83,7 +83,12 @@ func (c *Cleaner) gcWorkerRoutine(ctx irrecoverable.SignalerContext, ready compo
 // Therefore GC is run every X seconds, where X is uniformly sampled from [interval, interval*1.2]
 func (c *Cleaner) nextWaitDuration() time.Duration {
 	jitter, err := rand.Uint64n(uint64(c.interval.Nanoseconds() / 5))
-	if err != nil { // if randomness fails, do not use a jitter for this instance.
+	if err != nil {
+		// if randomness fails, do not use a jitter for this instance.
+		// TODO: address the error properly and not swallow it.
+		// In this specific case, `utils/rand` only errors if the system randomness fails
+		// which is a symptom of a wider failure. Many other node components would catch such
+		// a failure.
 		jitter = 0
 	}
 	return time.Duration(c.interval.Nanoseconds() + int64(jitter))

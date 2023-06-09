@@ -61,7 +61,6 @@ func TestHeroQueue_Concurrent(t *testing.T) {
 	q := queue.NewHeroQueue(uint32(sizeLimit), unittest.Logger(), metrics.NewNoopCollector())
 	// initially queue must be zero
 	require.Zero(t, q.Size())
-
 	// initially there should be nothing to pop
 	entity, ok := q.Pop()
 	require.False(t, ok)

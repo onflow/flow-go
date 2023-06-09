@@ -35,10 +35,8 @@ type HeroStore struct {
 
 func NewHeroStore(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics,
 ) *HeroStore {
-	queue := NewHeroQueue(sizeLimit, logger, collector)
-
 	return &HeroStore{
-		q: queue,
+		q: NewHeroQueue(sizeLimit, logger, collector),
 	}
 }
 

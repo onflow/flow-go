@@ -166,8 +166,6 @@ func testAddressConstants(t *testing.T) {
 const invalidCodeWord = uint64(0xab2ae42382900010)
 
 func testAddressGeneration(t *testing.T) {
-	// seed random generator
-
 	// loops in each test
 	const loop = 50
 
@@ -258,8 +256,6 @@ func testAddressGeneration(t *testing.T) {
 }
 
 func testAddressesIntersection(t *testing.T) {
-	// seed random generator
-
 	// loops in each test
 	const loop = 25
 
@@ -326,8 +322,6 @@ func testAddressesIntersection(t *testing.T) {
 }
 
 func testIndexFromAddress(t *testing.T) {
-	// seed random generator
-
 	// loops in each test
 	const loop = 50
 
@@ -366,8 +360,6 @@ func testIndexFromAddress(t *testing.T) {
 }
 
 func TestUint48(t *testing.T) {
-	// seed random generator
-
 	const loop = 50
 	// test consistensy of putUint48 and uint48
 	for i := 0; i < loop; i++ {

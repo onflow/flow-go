@@ -480,8 +480,8 @@ func (il IdentityList) Sample(size uint) (IdentityList, error) {
 	return dup[:size], nil
 }
 
-// Shuffle non-deterministically randomly shuffles the identity
-// list, returning the shuffled list without modifying the receiver.
+// Shuffle randomly shuffles the identity list (non-deterministic),
+// and returns the shuffled list without modifying the receiver.
 func (il IdentityList) Shuffle() (IdentityList, error) {
 	n := uint(len(il))
 	dup := make([]*Identity, 0, n)

@@ -18,10 +18,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func init() {
-
-}
-
 type Entity struct {
 	ID uint64
 }
