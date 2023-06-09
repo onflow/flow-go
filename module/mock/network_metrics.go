@@ -50,6 +50,16 @@ func (_m *NetworkMetrics) AllowStream(p peer.ID, dir network.Direction) {
 	_m.Called(p, dir)
 }
 
+// AsyncProcessingFinished provides a mock function with given fields: msgType, duration
+func (_m *NetworkMetrics) AsyncProcessingFinished(msgType string, duration time.Duration) {
+	_m.Called(msgType, duration)
+}
+
+// AsyncProcessingStarted provides a mock function with given fields: msgType
+func (_m *NetworkMetrics) AsyncProcessingStarted(msgType string) {
+	_m.Called(msgType)
+}
+
 // BlockConn provides a mock function with given fields: dir, usefd
 func (_m *NetworkMetrics) BlockConn(dir network.Direction, usefd bool) {
 	_m.Called(dir, usefd)
@@ -88,6 +98,16 @@ func (_m *NetworkMetrics) BlockServicePeer(svc string, p peer.ID) {
 // BlockStream provides a mock function with given fields: p, dir
 func (_m *NetworkMetrics) BlockStream(p peer.ID, dir network.Direction) {
 	_m.Called(p, dir)
+}
+
+// BlockingPreProcessingFinished provides a mock function with given fields: msgType, sampleSize, duration
+func (_m *NetworkMetrics) BlockingPreProcessingFinished(msgType string, sampleSize uint, duration time.Duration) {
+	_m.Called(msgType, sampleSize, duration)
+}
+
+// BlockingPreProcessingStarted provides a mock function with given fields: msgType, sampleSize
+func (_m *NetworkMetrics) BlockingPreProcessingStarted(msgType string, sampleSize uint) {
+	_m.Called(msgType, sampleSize)
 }
 
 // DNSLookupDuration provides a mock function with given fields: duration
@@ -218,6 +238,11 @@ func (_m *NetworkMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
 // OnMeshMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
 func (_m *NetworkMetrics) OnMeshMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
 	_m.Called(_a0, _a1)
+}
+
+// OnMisbehaviorReported provides a mock function with given fields: channel, misbehaviorType
+func (_m *NetworkMetrics) OnMisbehaviorReported(channel string, misbehaviorType string) {
+	_m.Called(channel, misbehaviorType)
 }
 
 // OnOverallPeerScoreUpdated provides a mock function with given fields: _a0

@@ -12,10 +12,9 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/debug"
@@ -33,8 +32,7 @@ type Executor interface {
 		script []byte,
 		arguments [][]byte,
 		blockHeader *flow.Header,
-		derivedBlockData *derived.DerivedBlockData,
-		snapshot state.StorageSnapshot,
+		snapshot snapshot.StorageSnapshot,
 	) (
 		[]byte,
 		error,
@@ -44,7 +42,7 @@ type Executor interface {
 		ctx context.Context,
 		addr flow.Address,
 		header *flow.Header,
-		snapshot state.StorageSnapshot,
+		snapshot snapshot.StorageSnapshot,
 	) (
 		*flow.Account,
 		error,
@@ -103,9 +101,11 @@ func (e *QueryExecutor) ExecuteScript(
 	script []byte,
 	arguments [][]byte,
 	blockHeader *flow.Header,
-	derivedBlockData *derived.DerivedBlockData,
-	snapshot state.StorageSnapshot,
-) ([]byte, error) {
+	snapshot snapshot.StorageSnapshot,
+) (
+	encodedValue []byte,
+	err error,
+) {
 
 	startedAt := time.Now()
 	memAllocBefore := debug.GetHeapAllocsBytes()
@@ -128,67 +128,65 @@ func (e *QueryExecutor) ExecuteScript(
 	requestCtx, cancel := context.WithTimeout(ctx, e.config.ExecutionTimeLimit)
 	defer cancel()
 
-	scriptInContext := fvm.NewScriptWithContextAndArgs(script, requestCtx, arguments...)
-	blockCtx := fvm.NewContextFromParent(
-		e.vmCtx,
-		fvm.WithBlockHeader(blockHeader),
-		fvm.WithDerivedBlockData(derivedBlockData))
-
-	err := func() (err error) {
-
-		start := time.Now()
-
-		defer func() {
-
-			prepareLog := func() *zerolog.Event {
-
-				args := make([]string, 0, len(arguments))
-				for _, a := range arguments {
-					args = append(args, hex.EncodeToString(a))
-				}
-				return e.logger.Error().
-					Hex("script_hex", script).
-					Str("args", strings.Join(args, ","))
+	defer func() {
+		prepareLog := func() *zerolog.Event {
+			args := make([]string, 0, len(arguments))
+			for _, a := range arguments {
+				args = append(args, hex.EncodeToString(a))
 			}
+			return e.logger.Error().
+				Hex("script_hex", script).
+				Str("args", strings.Join(args, ","))
+		}
 
-			elapsed := time.Since(start)
+		elapsed := time.Since(startedAt)
 
-			if r := recover(); r != nil {
-				prepareLog().
-					Interface("recovered", r).
-					Msg("script execution caused runtime panic")
+		if r := recover(); r != nil {
+			prepareLog().
+				Interface("recovered", r).
+				Msg("script execution caused runtime panic")
 
-				err = fmt.Errorf("cadence runtime error: %s", r)
-				return
-			}
-			if elapsed >= e.config.LogTimeThreshold {
-				prepareLog().
-					Dur("duration", elapsed).
-					Msg("script execution exceeded threshold")
-			}
-		}()
-
-		view := delta.NewDeltaView(snapshot)
-		return e.vm.Run(blockCtx, scriptInContext, view)
+			err = fmt.Errorf("cadence runtime error: %s", r)
+			return
+		}
+		if elapsed >= e.config.LogTimeThreshold {
+			prepareLog().
+				Dur("duration", elapsed).
+				Msg("script execution exceeded threshold")
+		}
 	}()
+
+	var output fvm.ProcedureOutput
+	_, output, err = e.vm.Run(
+		fvm.NewContextFromParent(
+			e.vmCtx,
+			fvm.WithBlockHeader(blockHeader),
+			fvm.WithDerivedBlockData(
+				e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID()))),
+		fvm.NewScriptWithContextAndArgs(script, requestCtx, arguments...),
+		snapshot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}
 
-	if scriptInContext.Err != nil {
+	if output.Err != nil {
 		return nil, fmt.Errorf("failed to execute script at block (%s): %s",
 			blockHeader.ID(),
-			summarizeLog(scriptInContext.Err.Error(),
+			summarizeLog(output.Err.Error(),
 				e.config.MaxErrorMessageSize))
 	}
 
-	encodedValue, err := jsoncdc.Encode(scriptInContext.Value)
+	encodedValue, err = jsoncdc.Encode(output.Value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
 	}
 
 	memAllocAfter := debug.GetHeapAllocsBytes()
-	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), scriptInContext.GasUsed, memAllocAfter-memAllocBefore, scriptInContext.MemoryEstimate)
+	e.metrics.ExecutionScriptExecuted(
+		time.Since(startedAt),
+		output.ComputationUsed,
+		memAllocAfter-memAllocBefore,
+		output.MemoryEstimate)
 
 	return encodedValue, nil
 }
@@ -209,7 +207,7 @@ func (e *QueryExecutor) GetAccount(
 	ctx context.Context,
 	address flow.Address,
 	blockHeader *flow.Header,
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -221,7 +219,6 @@ func (e *QueryExecutor) GetAccount(
 		fvm.WithDerivedBlockData(
 			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
-	delta.NewDeltaView(snapshot)
 	account, err := e.vm.GetAccount(
 		blockCtx,
 		address,

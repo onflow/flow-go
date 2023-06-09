@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -34,11 +33,11 @@ type Builder struct {
 	gossipSubScoreTracerInterval time.Duration // the interval at which the gossipsub score tracer logs the peer scores.
 	// gossipSubTracer is a callback interface that is called by the gossipsub implementation upon
 	// certain events. Currently, we use it to log and observe the local mesh of the node.
-	gossipSubTracer             p2p.PubSubTracer
-	peerScoringParameterOptions []scoring.PeerScoreParamsOption
-	idProvider                  module.IdentityProvider
-	routingSystem               routing.Routing
-	rpcValidationInspector      p2p.GossipSubRPCInspector
+	gossipSubTracer   p2p.PubSubTracer
+	scoreOptionConfig *scoring.ScoreOptionConfig
+	idProvider        module.IdentityProvider
+	routingSystem     routing.Routing
+	rpcInspectorSuite p2p.GossipSubInspectorSuite
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -119,6 +118,7 @@ func (g *Builder) SetIDProvider(idProvider module.IdentityProvider) {
 	}
 
 	g.idProvider = idProvider
+	g.scoreOptionConfig.SetProvider(idProvider)
 }
 
 // SetRoutingSystem sets the routing system of the builder.
@@ -132,30 +132,28 @@ func (g *Builder) SetRoutingSystem(routingSystem routing.Routing) {
 }
 
 func (g *Builder) SetTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) {
-	g.peerScoringParameterOptions = append(g.peerScoringParameterOptions, scoring.WithTopicScoreParams(topic, topicScoreParams))
+	g.scoreOptionConfig.SetTopicScoreParams(topic, topicScoreParams)
 }
 
 func (g *Builder) SetAppSpecificScoreParams(f func(peer.ID) float64) {
-	g.peerScoringParameterOptions = append(g.peerScoringParameterOptions, scoring.WithAppSpecificScoreFunction(f))
+	g.scoreOptionConfig.SetAppSpecificScoreFunction(f)
 }
 
-// SetGossipSubValidationInspector sets the rpc validation inspector.
-// If the rpc validation inspector has already been set, a fatal error is logged.
-func (g *Builder) SetGossipSubValidationInspector(inspector p2p.GossipSubRPCInspector) {
-	if g.rpcValidationInspector != nil {
-		g.logger.Fatal().Msg("rpc validation inspector has already been set")
-		return
-	}
-	g.rpcValidationInspector = inspector
+// SetGossipSubRPCInspectorSuite sets the gossipsub rpc inspector suite of the builder. It contains the
+// inspector function that is injected into the gossipsub rpc layer, as well as the notification distributors that
+// are used to notify the app specific scoring mechanism of misbehaving peers..
+func (g *Builder) SetGossipSubRPCInspectorSuite(inspectorSuite p2p.GossipSubInspectorSuite) {
+	g.rpcInspectorSuite = inspectorSuite
 }
 
 func NewGossipSubBuilder(logger zerolog.Logger, metrics module.GossipSubMetrics) *Builder {
+	lg := logger.With().Str("component", "gossipsub").Logger()
 	return &Builder{
-		logger:                      logger.With().Str("component", "gossipsub").Logger(),
-		metrics:                     metrics,
-		gossipSubFactory:            defaultGossipSubFactory(),
-		gossipSubConfigFunc:         defaultGossipSubAdapterConfig(),
-		peerScoringParameterOptions: make([]scoring.PeerScoreParamsOption, 0),
+		logger:              lg,
+		metrics:             metrics,
+		gossipSubFactory:    defaultGossipSubFactory(),
+		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
+		scoreOptionConfig:   scoring.NewScoreOptionConfig(lg),
 	}
 }
 
@@ -196,10 +194,18 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 		gossipSubConfigs.WithSubscriptionFilter(g.subscriptionFilter)
 	}
 
+	if g.rpcInspectorSuite != nil {
+		gossipSubConfigs.WithInspectorSuite(g.rpcInspectorSuite)
+	}
+
 	var scoreOpt *scoring.ScoreOption
 	var scoreTracer p2p.PeerScoreTracer
 	if g.gossipSubPeerScoring {
-		scoreOpt = scoring.NewScoreOption(g.logger, g.idProvider, g.peerScoringParameterOptions...)
+		if g.rpcInspectorSuite != nil {
+			g.scoreOptionConfig.SetRegisterNotificationConsumerFunc(g.rpcInspectorSuite.AddInvCtrlMsgNotifConsumer)
+		}
+
+		scoreOpt = scoring.NewScoreOption(g.scoreOptionConfig)
 		gossipSubConfigs.WithScoreOption(scoreOpt)
 
 		if g.gossipSubScoreTracerInterval > 0 {
@@ -210,15 +216,8 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 				g.gossipSubScoreTracerInterval)
 			gossipSubConfigs.WithScoreTracer(scoreTracer)
 		}
-	}
 
-	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(g.metrics, g.logger)
-	metricsInspector := inspector.NewControlMsgMetricsInspector(gossipSubMetrics)
-	inspectors := []p2p.GossipSubRPCInspector{metricsInspector}
-	if g.rpcValidationInspector != nil {
-		inspectors = append(inspectors, g.rpcValidationInspector)
 	}
-	gossipSubConfigs.WithAppSpecificRpcInspectors(inspectors...)
 
 	if g.gossipSubTracer != nil {
 		gossipSubConfigs.WithTracer(g.gossipSubTracer)
@@ -234,7 +233,10 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 	}
 
 	if scoreOpt != nil {
-		scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(g.logger, gossipSub))
+		err := scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(g.logger, gossipSub))
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not set subscription provider: %w", err)
+		}
 	}
 
 	return gossipSub, scoreTracer, nil

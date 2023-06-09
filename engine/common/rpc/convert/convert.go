@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/cadence/encoding/ccf"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -31,7 +34,10 @@ var ValidChainIds = map[string]bool{
 	flow.MonotonicEmulator.String(): true,
 }
 
-func MessageToTransaction(m *entities.Transaction, chain flow.Chain) (flow.TransactionBody, error) {
+func MessageToTransaction(
+	m *entities.Transaction,
+	chain flow.Chain,
+) (flow.TransactionBody, error) {
 	if m == nil {
 		return flow.TransactionBody{}, ErrEmptyMessage
 	}
@@ -141,7 +147,10 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	}
 }
 
-func BlockHeaderToMessage(h *flow.Header, signerIDs flow.IdentifierList) (*entities.BlockHeader, error) {
+func BlockHeaderToMessage(
+	h *flow.Header,
+	signerIDs flow.IdentifierList,
+) (*entities.BlockHeader, error) {
 	id := h.ID()
 
 	t := timestamppb.New(h.Timestamp)
@@ -267,7 +276,10 @@ func MessagesToBlockSeals(m []*entities.BlockSeal) ([]*flow.Seal, error) {
 	return seals, nil
 }
 
-func ExecutionResultsToMessages(e []*flow.ExecutionResult) ([]*entities.ExecutionResult, error) {
+func ExecutionResultsToMessages(e []*flow.ExecutionResult) (
+	[]*entities.ExecutionResult,
+	error,
+) {
 	execResults := make([]*entities.ExecutionResult, len(e))
 	for i, execRes := range e {
 		parsedExecResult, err := ExecutionResultToMessage(execRes)
@@ -279,7 +291,10 @@ func ExecutionResultsToMessages(e []*flow.ExecutionResult) ([]*entities.Executio
 	return execResults, nil
 }
 
-func MessagesToExecutionResults(m []*entities.ExecutionResult) ([]*flow.ExecutionResult, error) {
+func MessagesToExecutionResults(m []*entities.ExecutionResult) (
+	[]*flow.ExecutionResult,
+	error,
+) {
 	execResults := make([]*flow.ExecutionResult, len(m))
 	for i, e := range m {
 		parsedExecResult, err := MessageToExecutionResult(e)
@@ -291,7 +306,10 @@ func MessagesToExecutionResults(m []*entities.ExecutionResult) ([]*flow.Executio
 	return execResults, nil
 }
 
-func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (*entities.Block, error) {
+func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
+	*entities.Block,
+	error,
+) {
 
 	id := h.ID()
 
@@ -620,6 +638,16 @@ func AccountKeyToMessage(a flow.AccountPublicKey) (*entities.AccountKey, error) 
 	}, nil
 }
 
+func MessageToEvent(m *entities.Event) flow.Event {
+	return flow.Event{
+		Type:             flow.EventType(m.GetType()),
+		TransactionID:    flow.HashToID(m.GetTransactionId()),
+		TransactionIndex: m.GetTransactionIndex(),
+		EventIndex:       m.GetEventIndex(),
+		Payload:          m.GetPayload(),
+	}
+}
+
 func MessagesToEvents(l []*entities.Event) []flow.Event {
 	events := make([]flow.Event, len(l))
 
@@ -630,14 +658,65 @@ func MessagesToEvents(l []*entities.Event) []flow.Event {
 	return events
 }
 
-func MessageToEvent(m *entities.Event) flow.Event {
-	return flow.Event{
-		Type:             flow.EventType(m.GetType()),
-		TransactionID:    flow.HashToID(m.GetTransactionId()),
-		TransactionIndex: m.GetTransactionIndex(),
-		EventIndex:       m.GetEventIndex(),
-		Payload:          m.GetPayload(),
+func MessagesToEventsFromVersion(l []*entities.Event, version execproto.EventEncodingVersion) ([]flow.Event, error) {
+	events := make([]flow.Event, len(l))
+	for i, m := range l {
+		event, err := MessageToEventFromVersion(m, version)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert event at index %d from format %d: %w",
+				m.EventIndex, version, err)
+		}
+		events[i] = *event
 	}
+	return events, nil
+}
+
+func MessageToEventFromVersion(m *entities.Event, version execproto.EventEncodingVersion) (*flow.Event, error) {
+	switch version {
+	case execproto.EventEncodingVersion_CCF_V0:
+		convertedPayload, err := CcfPayloadToJsonPayload(m.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
+		}
+		return &flow.Event{
+			Type:             flow.EventType(m.GetType()),
+			TransactionID:    flow.HashToID(m.GetTransactionId()),
+			TransactionIndex: m.GetTransactionIndex(),
+			EventIndex:       m.GetEventIndex(),
+			Payload:          convertedPayload,
+		}, nil
+	case execproto.EventEncodingVersion_JSON_CDC_V0:
+		je := MessageToEvent(m)
+		return &je, nil
+	default:
+		return nil, fmt.Errorf("invalid encoding format %d", version)
+	}
+}
+
+func CcfPayloadToJsonPayload(p []byte) ([]byte, error) {
+	val, err := ccf.Decode(nil, p)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode from ccf format: %w", err)
+	}
+	res, err := jsoncdc.Encode(val)
+	if err != nil {
+		return nil, fmt.Errorf("unable to encode to json-cdc format: %w", err)
+	}
+	return res, nil
+}
+
+func CcfEventToJsonEvent(e flow.Event) (*flow.Event, error) {
+	convertedPayload, err := CcfPayloadToJsonPayload(e.Payload)
+	if err != nil {
+		return nil, err
+	}
+	return &flow.Event{
+		Type:             e.Type,
+		TransactionID:    e.TransactionID,
+		TransactionIndex: e.TransactionIndex,
+		EventIndex:       e.EventIndex,
+		Payload:          convertedPayload,
+	}, nil
 }
 
 func EventsToMessages(flowEvents []flow.Event) []*entities.Event {
@@ -723,7 +802,10 @@ func MessagesToChunkList(m []*entities.Chunk) (flow.ChunkList, error) {
 	return parsedChunks, nil
 }
 
-func MessagesToServiceEventList(m []*entities.ServiceEvent) (flow.ServiceEventList, error) {
+func MessagesToServiceEventList(m []*entities.ServiceEvent) (
+	flow.ServiceEventList,
+	error,
+) {
 	parsedServiceEvents := make(flow.ServiceEventList, len(m))
 	for i, serviceEvent := range m {
 		parsedServiceEvent, err := MessageToServiceEvent(serviceEvent)
@@ -735,7 +817,10 @@ func MessagesToServiceEventList(m []*entities.ServiceEvent) (flow.ServiceEventLi
 	return parsedServiceEvents, nil
 }
 
-func MessageToExecutionResult(m *entities.ExecutionResult) (*flow.ExecutionResult, error) {
+func MessageToExecutionResult(m *entities.ExecutionResult) (
+	*flow.ExecutionResult,
+	error,
+) {
 	// convert Chunks
 	parsedChunks, err := MessagesToChunkList(m.Chunks)
 	if err != nil {
@@ -755,7 +840,10 @@ func MessageToExecutionResult(m *entities.ExecutionResult) (*flow.ExecutionResul
 	}, nil
 }
 
-func ExecutionResultToMessage(er *flow.ExecutionResult) (*entities.ExecutionResult, error) {
+func ExecutionResultToMessage(er *flow.ExecutionResult) (
+	*entities.ExecutionResult,
+	error,
+) {
 
 	chunks := make([]*entities.Chunk, len(er.Chunks))
 
@@ -789,37 +877,17 @@ func ServiceEventToMessage(event flow.ServiceEvent) (*entities.ServiceEvent, err
 	}
 
 	return &entities.ServiceEvent{
-		Type:    event.Type,
+		Type:    event.Type.String(),
 		Payload: bytes,
 	}, nil
 }
 
 func MessageToServiceEvent(m *entities.ServiceEvent) (*flow.ServiceEvent, error) {
-	var event interface{}
 	rawEvent := m.Payload
-	// map keys correctly
-	switch m.Type {
-	case flow.ServiceEventSetup:
-		setup := new(flow.EpochSetup)
-		err := json.Unmarshal(rawEvent, setup)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal to EpochSetup event: %w", err)
-		}
-		event = setup
-	case flow.ServiceEventCommit:
-		commit := new(flow.EpochCommit)
-		err := json.Unmarshal(rawEvent, commit)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal to EpochCommit event: %w", err)
-		}
-		event = commit
-	default:
-		return nil, fmt.Errorf("invalid event type: %s", m.Type)
-	}
-	return &flow.ServiceEvent{
-		Type:  m.Type,
-		Event: event,
-	}, nil
+	eventType := flow.ServiceEventType(m.Type)
+	se, err := flow.ServiceEventJSONMarshaller.UnmarshalWithType(rawEvent, eventType)
+
+	return &se, err
 }
 
 func ChunkToMessage(chunk *flow.Chunk) *entities.Chunk {
@@ -859,7 +927,10 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 	}, nil
 }
 
-func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (*entities.BlockExecutionData, error) {
+func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (
+	*entities.BlockExecutionData,
+	error,
+) {
 	chunkExecutionDatas := make([]*entities.ChunkExecutionData, len(data.ChunkExecutionDatas))
 	for i, chunk := range data.ChunkExecutionDatas {
 		chunkMessage, err := ChunkExecutionDataToMessage(chunk)
@@ -874,7 +945,10 @@ func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (*enti
 	}, nil
 }
 
-func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (*entities.ChunkExecutionData, error) {
+func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (
+	*entities.ChunkExecutionData,
+	error,
+) {
 	collection := &entities.ExecutionDataCollection{}
 	if data.Collection != nil {
 		collection = &entities.ExecutionDataCollection{
@@ -927,7 +1001,10 @@ func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (*enti
 	}, nil
 }
 
-func MessageToBlockExecutionData(m *entities.BlockExecutionData, chain flow.Chain) (*execution_data.BlockExecutionData, error) {
+func MessageToBlockExecutionData(
+	m *entities.BlockExecutionData,
+	chain flow.Chain,
+) (*execution_data.BlockExecutionData, error) {
 	if m == nil {
 		return nil, ErrEmptyMessage
 	}
@@ -946,7 +1023,10 @@ func MessageToBlockExecutionData(m *entities.BlockExecutionData, chain flow.Chai
 	}, nil
 }
 
-func MessageToChunkExecutionData(m *entities.ChunkExecutionData, chain flow.Chain) (*execution_data.ChunkExecutionData, error) {
+func MessageToChunkExecutionData(
+	m *entities.ChunkExecutionData,
+	chain flow.Chain,
+) (*execution_data.ChunkExecutionData, error) {
 	collection, err := messageToTrustedCollection(m.GetCollection(), chain)
 	if err != nil {
 		return nil, err
@@ -972,7 +1052,10 @@ func MessageToChunkExecutionData(m *entities.ChunkExecutionData, chain flow.Chai
 	}, nil
 }
 
-func messageToTrustedCollection(m *entities.ExecutionDataCollection, chain flow.Chain) (*flow.Collection, error) {
+func messageToTrustedCollection(
+	m *entities.ExecutionDataCollection,
+	chain flow.Chain,
+) (*flow.Collection, error) {
 	messages := m.GetTransactions()
 	transactions := make([]*flow.TransactionBody, len(messages))
 	for i, message := range messages {
@@ -993,7 +1076,10 @@ func messageToTrustedCollection(m *entities.ExecutionDataCollection, chain flow.
 // messageToTrustedTransaction converts a transaction message to a transaction body.
 // This is useful when converting transactions from trusted state like BlockExecutionData which
 // contain service transactions that do not conform to external transaction format.
-func messageToTrustedTransaction(m *entities.Transaction, chain flow.Chain) (flow.TransactionBody, error) {
+func messageToTrustedTransaction(
+	m *entities.Transaction,
+	chain flow.Chain,
+) (flow.TransactionBody, error) {
 	if m == nil {
 		return flow.TransactionBody{}, ErrEmptyMessage
 	}

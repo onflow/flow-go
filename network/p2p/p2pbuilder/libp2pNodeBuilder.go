@@ -21,10 +21,11 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -37,7 +38,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	gossipsubbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/gossipsub"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -76,58 +76,16 @@ func DefaultGossipSubConfig() *GossipSubConfig {
 		PeerScoring:          defaultPeerScoringEnabled,
 		LocalMeshLogInterval: defaultMeshTracerLoggingInterval,
 		ScoreTracerInterval:  defaultGossipSubScoreTracerInterval,
+		RpcInspector:         inspector.DefaultGossipSubRPCInspectorsConfig(),
 	}
 }
 
-// LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
-type LibP2PFactoryFunc func() (p2p.LibP2PNode, error)
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error)
 type CreateNodeFunc func(logger zerolog.Logger,
 	host host.Host,
 	pCache *p2pnode.ProtocolPeerCache,
 	peerManager *connection.PeerManager) p2p.LibP2PNode
 type GossipSubAdapterConfigFunc func(*p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig
-
-// DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
-// default options for the host, the pubsub and the ping service.
-func DefaultLibP2PNodeFactory(log zerolog.Logger,
-	address string,
-	flowKey fcrypto.PrivateKey,
-	sporkId flow.Identifier,
-	idProvider module.IdentityProvider,
-	metrics module.NetworkMetrics,
-	resolver madns.BasicResolver,
-	role string,
-	connGaterCfg *ConnectionGaterConfig,
-	peerManagerCfg *PeerManagerConfig,
-	gossipCfg *GossipSubConfig,
-	rCfg *ResourceManagerConfig,
-	uniCfg *UnicastConfig,
-	rpcValidationInspector p2p.GossipSubRPCInspector,
-) p2p.LibP2PFactoryFunc {
-	return func() (p2p.LibP2PNode, error) {
-		builder, err := DefaultNodeBuilder(log,
-			address,
-			flowKey,
-			sporkId,
-			idProvider,
-			metrics,
-			resolver,
-			role,
-			connGaterCfg,
-			peerManagerCfg,
-			gossipCfg,
-			rCfg,
-			uniCfg,
-			rpcValidationInspector)
-
-		if err != nil {
-			return nil, fmt.Errorf("could not create node builder: %w", err)
-		}
-
-		return builder.Build()
-	}
-}
 
 // ResourceManagerConfig returns the resource manager configuration for the libp2p node.
 // The resource manager is used to limit the number of open connections and streams (as well as any other resources
@@ -146,6 +104,8 @@ type GossipSubConfig struct {
 	ScoreTracerInterval time.Duration
 	// PeerScoring is whether to enable GossipSub peer scoring.
 	PeerScoring bool
+	// RpcInspector configuration for all gossipsub RPC control message inspectors.
+	RpcInspector *inspector.GossipSubRPCInspectorsConfig
 }
 
 func DefaultResourceManagerConfig() *ResourceManagerConfig {
@@ -153,27 +113,6 @@ func DefaultResourceManagerConfig() *ResourceManagerConfig {
 		MemoryLimitRatio:          defaultMemoryLimitRatio,
 		FileDescriptorsRatio:      defaultFileDescriptorsRatio,
 		PeerBaseLimitConnsInbound: defaultPeerBaseLimitConnsInbound,
-	}
-}
-
-// DefaultRPCValidationConfig returns default RPC control message inspector config.
-func DefaultRPCValidationConfig(opts ...queue.HeroStoreConfigOption) *validation.ControlMsgValidationInspectorConfig {
-	graftCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, validation.CtrlMsgValidationLimits{
-		validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
-		validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
-		validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
-	})
-	pruneCfg, _ := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgPrune, validation.CtrlMsgValidationLimits{
-		validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
-		validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
-		validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
-	})
-
-	return &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:     validation.DefaultNumberOfWorkers,
-		InspectMsgStoreOpts: opts,
-		GraftValidationCfg:  graftCfg,
-		PruneValidationCfg:  pruneCfg,
 	}
 }
 
@@ -313,8 +252,8 @@ func (builder *LibP2PNodeBuilder) SetGossipSubScoreTracerInterval(interval time.
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubValidationInspector(inspector p2p.GossipSubRPCInspector) p2p.NodeBuilder {
-	builder.gossipSubBuilder.SetGossipSubValidationInspector(inspector)
+func (builder *LibP2PNodeBuilder) SetGossipSubRpcInspectorSuite(inspectorSuite p2p.GossipSubInspectorSuite) p2p.NodeBuilder {
+	builder.gossipSubBuilder.SetGossipSubRPCInspectorSuite(inspectorSuite)
 	return builder
 }
 
@@ -412,7 +351,12 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	var peerManager p2p.PeerManager
 	if builder.peerManagerUpdateInterval > 0 {
-		connector, err := connection.NewLibp2pConnector(builder.logger, h, builder.peerManagerEnablePruning)
+		connector, err := connection.NewLibp2pConnector(&connection.ConnectorConfig{
+			PruneConnections:        builder.peerManagerEnablePruning,
+			Logger:                  builder.logger,
+			Host:                    connection.NewConnectorHost(h),
+			BackoffConnectorFactory: connection.DefaultLibp2pBackoffConnectorFactory(h),
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
 		}
@@ -548,17 +492,17 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metrics module.LibP2PMetrics,
+	metricsCfg *p2pconfig.MetricsConfig,
 	resolver madns.BasicResolver,
 	role string,
-	connGaterCfg *ConnectionGaterConfig,
-	peerManagerCfg *PeerManagerConfig,
+	connGaterCfg *p2pconfig.ConnectionGaterConfig,
+	peerManagerCfg *p2pconfig.PeerManagerConfig,
 	gossipCfg *GossipSubConfig,
+	rpcInspectorSuite p2p.GossipSubInspectorSuite,
 	rCfg *ResourceManagerConfig,
-	uniCfg *UnicastConfig,
-	rpcValidationInspector p2p.GossipSubRPCInspector) (p2p.NodeBuilder, error) {
+	uniCfg *p2pconfig.UnicastConfig) (p2p.NodeBuilder, error) {
 
-	connManager, err := connection.NewConnManager(log, metrics, connection.DefaultConnManagerConfig())
+	connManager, err := connection.NewConnManager(log, metricsCfg.Metrics, connection.DefaultConnManagerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
@@ -572,25 +516,25 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
-	builder := NewNodeBuilder(log, metrics, address, flowKey, sporkId, rCfg).
+	builder := NewNodeBuilder(log, metricsCfg.Metrics, address, flowKey, sporkId, rCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
 		SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
-			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), log, metrics, dht.AsServer())
+			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), log, metricsCfg.Metrics, dht.AsServer())
 		}).
 		SetPeerManagerOptions(peerManagerCfg.ConnectionPruning, peerManagerCfg.UpdateInterval).
 		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
 		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor).
-		SetGossipSubValidationInspector(rpcValidationInspector)
+		SetGossipSubRpcInspectorSuite(rpcInspectorSuite)
 
 	if gossipCfg.PeerScoring {
 		// currently, we only enable peer scoring with default parameters. So, we set the score parameters to nil.
 		builder.EnableGossipSubPeerScoring(idProvider, nil)
 	}
 
-	meshTracer := tracer.NewGossipSubMeshTracer(log, metrics, idProvider, gossipCfg.LocalMeshLogInterval)
+	meshTracer := tracer.NewGossipSubMeshTracer(log, metricsCfg.Metrics, idProvider, gossipCfg.LocalMeshLogInterval)
 	builder.SetGossipSubTracer(meshTracer)
 	builder.SetGossipSubScoreTracerInterval(gossipCfg.ScoreTracerInterval)
 
@@ -600,41 +544,4 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	}
 
 	return builder, nil
-}
-
-// BuildGossipSubRPCValidationInspector helper that sets up the gossipsub RPC validation inspector.
-func BuildGossipSubRPCValidationInspector(logger zerolog.Logger,
-	sporkId flow.Identifier,
-	validationConfigs *GossipSubRPCValidationConfigs,
-	distributor p2p.GossipSubInspectorNotificationDistributor,
-	heroStoreOpts ...queue.HeroStoreConfigOption,
-) (*validation.ControlMsgValidationInspector, error) {
-	controlMsgRPCInspectorCfg, err := gossipSubRPCValidationInspectorConfig(validationConfigs, heroStoreOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
-	}
-	rpcValidationInspector := validation.NewControlMsgValidationInspector(logger, sporkId, controlMsgRPCInspectorCfg, distributor)
-	return rpcValidationInspector, nil
-}
-
-// gossipSubRPCValidationInspectorConfig returns a new inspector.ControlMsgValidationInspectorConfig using configuration provided by the node builder.
-func gossipSubRPCValidationInspectorConfig(validationConfigs *GossipSubRPCValidationConfigs, opts ...queue.HeroStoreConfigOption) (*validation.ControlMsgValidationInspectorConfig, error) {
-	// setup rpc validation configuration for each control message type
-	graftValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, validationConfigs.GraftLimits)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
-	}
-	pruneValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgPrune, validationConfigs.PruneLimits)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
-	}
-
-	// setup gossip sub RPC control message inspector config
-	controlMsgRPCInspectorCfg := &validation.ControlMsgValidationInspectorConfig{
-		NumberOfWorkers:     validationConfigs.NumberOfWorkers,
-		InspectMsgStoreOpts: opts,
-		GraftValidationCfg:  graftValidationCfg,
-		PruneValidationCfg:  pruneValidationCfg,
-	}
-	return controlMsgRPCInspectorCfg, nil
 }

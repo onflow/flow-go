@@ -163,21 +163,86 @@ func (e InvalidTCError) Unwrap() error {
 	return e.Err
 }
 
-// InvalidBlockError indicates that the block with identifier `BlockID` is invalid
+// InvalidProposalError indicates that the proposal is invalid
+type InvalidProposalError struct {
+	InvalidProposal *Proposal
+	Err             error
+}
+
+func NewInvalidProposalErrorf(proposal *Proposal, msg string, args ...interface{}) error {
+	return InvalidProposalError{
+		InvalidProposal: proposal,
+		Err:             fmt.Errorf(msg, args...),
+	}
+}
+
+func (e InvalidProposalError) Error() string {
+	return fmt.Sprintf(
+		"invalid proposal %x at view %d: %s",
+		e.InvalidProposal.Block.BlockID,
+		e.InvalidProposal.Block.View,
+		e.Err.Error(),
+	)
+}
+
+func (e InvalidProposalError) Unwrap() error {
+	return e.Err
+}
+
+// IsInvalidProposalError returns whether an error is InvalidProposalError
+func IsInvalidProposalError(err error) bool {
+	var e InvalidProposalError
+	return errors.As(err, &e)
+}
+
+// AsInvalidProposalError determines whether the given error is a InvalidProposalError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsInvalidProposalError(err error) (*InvalidProposalError, bool) {
+	var e InvalidProposalError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
+	}
+	return nil, false
+}
+
+// InvalidBlockError indicates that the block is invalid
 type InvalidBlockError struct {
-	BlockID flow.Identifier
-	View    uint64
-	Err     error
+	InvalidBlock *Block
+	Err          error
+}
+
+func NewInvalidBlockErrorf(block *Block, msg string, args ...interface{}) error {
+	return InvalidBlockError{
+		InvalidBlock: block,
+		Err:          fmt.Errorf(msg, args...),
+	}
 }
 
 func (e InvalidBlockError) Error() string {
-	return fmt.Sprintf("invalid block %x at view %d: %s", e.BlockID, e.View, e.Err.Error())
+	return fmt.Sprintf(
+		"invalid block %x at view %d: %s",
+		e.InvalidBlock.BlockID,
+		e.InvalidBlock.View,
+		e.Err.Error(),
+	)
 }
 
 // IsInvalidBlockError returns whether an error is InvalidBlockError
 func IsInvalidBlockError(err error) bool {
 	var e InvalidBlockError
 	return errors.As(err, &e)
+}
+
+// AsInvalidBlockError determines whether the given error is a InvalidProposalError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsInvalidBlockError(err error) (*InvalidBlockError, bool) {
+	var e InvalidBlockError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
+	}
+	return nil, false
 }
 
 func (e InvalidBlockError) Unwrap() error {
@@ -222,10 +287,13 @@ func (e InvalidVoteError) Unwrap() error {
 	return e.Err
 }
 
-// ByzantineThresholdExceededError is raised if HotStuff detects malicious conditions which
-// prove a Byzantine threshold of consensus replicas has been exceeded.
-// Per definition, the byzantine threshold is exceeded if there are byzantine consensus
-// replicas with _at least_ 1/3 weight.
+// ByzantineThresholdExceededError is raised if HotStuff detects malicious conditions, which
+// prove that the Byzantine threshold of consensus replicas has been exceeded. Per definition,
+// this is the case when there are byzantine consensus replicas with ≥ 1/3 of the committee's
+// total weight. In this scenario, foundational consensus safety guarantees fail.
+// Generally, the protocol cannot continue in such conditions.
+// We represent this exception as with a dedicated type, so its occurrence can be detected by
+// higher-level logic and escalated to the node operator.
 type ByzantineThresholdExceededError struct {
 	Evidence string
 }

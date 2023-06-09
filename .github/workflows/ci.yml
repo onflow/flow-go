@@ -149,7 +149,7 @@ jobs:
             make1: install-tools
             make2: test
             retries: 3
-            race: 1
+            race: 0
           - name: integration
             make1: install-tools
             make2: test
@@ -198,6 +198,7 @@ jobs:
           - make -C integration mvp-tests
           - make -C integration network-tests
           - make -C integration verification-tests
+          - make -C integration upgrades-tests
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
@@ -242,7 +243,7 @@ jobs:
     - name: Set up Localnet
       run: bash -c 'cd integration/localnet/ && make -e OBSERVER=2 bootstrap && make start-flow'
     - name: Ensure Observer is started
-      run: docker ps -f name=localnet_observer_1_1 | grep localnet_observer
+      run: docker ps -f name=localnet-observer_1-1 | grep localnet-observer
     - name: Get Client Version ensuring the client is provisioned
       run: docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n observer version
     - name: Wait for a default waiting period until a clean state

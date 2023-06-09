@@ -21,11 +21,6 @@ libp2p, badger, and other golog-based libraries:
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-golog-level", "data": "debug"}'
 ```
 
-### To turn on profiler
-```
-curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-profiler-enabled", "data": true}'
-```
-
 ### To get the latest finalized block
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "read-blocks", "data": { "block": "final" }}'
@@ -71,6 +66,7 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"consensus-required-approvals-for-sealing": 1}}'
 ```
+TODO remove
 #### Example: set block rate delay to 750ms
 ```
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-config", "data": {"hotstuff-block-rate-delay": "750ms"}}'

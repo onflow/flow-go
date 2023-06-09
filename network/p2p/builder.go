@@ -18,8 +18,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 )
 
-// LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
-type LibP2PFactoryFunc func() (LibP2PNode, error)
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSubAdapterConfig) (PubSubAdapter, error)
 type CreateNodeFunc func(zerolog.Logger, host.Host, ProtocolPeerCache, PeerManager) LibP2PNode
 type GossipSubAdapterConfigFunc func(*BasePubSubAdapterConfig) PubSubAdapterConfig
@@ -63,9 +61,10 @@ type GossipSubBuilder interface {
 	// If the routing system has already been set, a fatal error is logged.
 	SetRoutingSystem(routing.Routing)
 
-	// SetGossipSubValidationInspector sets the rpc validation inspector.
-	// If the rpc validation inspector has already been set, a fatal error is logged.
-	SetGossipSubValidationInspector(inspector GossipSubRPCInspector)
+	// SetGossipSubRPCInspectorSuite sets the gossipsub rpc inspector suite of the builder. It contains the
+	// inspector function that is injected into the gossipsub rpc layer, as well as the notification distributors that
+	// are used to notify the app specific scoring mechanism of misbehaving peers.
+	SetGossipSubRPCInspectorSuite(GossipSubInspectorSuite)
 
 	// Build creates a new GossipSub pubsub system.
 	// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
@@ -112,7 +111,7 @@ type NodeBuilder interface {
 	SetRateLimiterDistributor(UnicastRateLimiterDistributor) NodeBuilder
 	SetGossipSubTracer(PubSubTracer) NodeBuilder
 	SetGossipSubScoreTracerInterval(time.Duration) NodeBuilder
-	SetGossipSubValidationInspector(GossipSubRPCInspector) NodeBuilder
+	SetGossipSubRpcInspectorSuite(GossipSubInspectorSuite) NodeBuilder
 	Build() (LibP2PNode, error)
 }
 

@@ -6,9 +6,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onflow/flow-go/network/p2p/distributor"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,12 +23,14 @@ import (
 	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/dns"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -185,7 +184,8 @@ type NetworkConfig struct {
 	// that are not part of protocol state should be trimmed
 	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
 	NetworkConnectionPruning bool
-	GossipSubConfig          *p2pbuilder.GossipSubConfig
+	// GossipSubConfig core gossipsub configuration.
+	GossipSubConfig *p2pbuilder.GossipSubConfig
 	// PreferredUnicastProtocols list of unicast protocols in preferred order
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
@@ -199,11 +199,33 @@ type NetworkConfig struct {
 	UnicastCreateStreamRetryDelay time.Duration
 	// size of the queue for notifications about new peers in the disallow list.
 	DisallowListNotificationCacheSize uint32
-	// size of the queue for notifications about gossipsub RPC inspections.
-	GossipSubRPCInspectorNotificationCacheSize uint32
-	GossipSubRPCInspectorCacheSize             uint32
-	UnicastRateLimitersConfig                  *UnicastRateLimitersConfig
-	GossipSubRPCValidationConfigs              *p2pbuilder.GossipSubRPCValidationConfigs
+	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
+	UnicastRateLimitersConfig *UnicastRateLimitersConfig
+	AlspConfig                *AlspConfig
+	// GossipSubRpcInspectorSuite rpc inspector suite.
+	GossipSubRpcInspectorSuite p2p.GossipSubInspectorSuite
+}
+
+// AlspConfig is the config for the Application Layer Spam Prevention (ALSP) protocol.
+type AlspConfig struct {
+	// Size of the cache for spam records. There is at most one spam record per authorized (i.e., staked) node.
+	// Recommended size is 10 * number of authorized nodes to allow for churn.
+	SpamRecordCacheSize uint32
+
+	// SpamReportQueueSize is the size of the queue for spam records. The queue is used to store spam records
+	// temporarily till they are picked by the workers. When the queue is full, new spam records are dropped.
+	// Recommended size is 100 * number of authorized nodes to allow for churn.
+	SpamReportQueueSize uint32
+
+	// DisablePenalty indicates whether applying the penalty to the misbehaving node is disabled.
+	// When disabled, the ALSP module logs the misbehavior reports and updates the metrics, but does not apply the penalty.
+	// This is useful for managing production incidents.
+	// Note: under normal circumstances, the ALSP module should not be disabled.
+	DisablePenalty bool
+
+	// HeartBeatInterval is the interval between heartbeats sent by the ALSP module. The heartbeats are recurring
+	// events that are used to perform critical ALSP tasks, such as updating the spam records cache.
+	HearBeatInterval time.Duration
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
@@ -261,13 +283,8 @@ type NodeConfig struct {
 
 	// root state information
 	RootSnapshot protocol.Snapshot
-	// cached properties of RootSnapshot for convenience
-	RootBlock   *flow.Block
-	RootQC      *flow.QuorumCertificate
-	RootResult  *flow.ExecutionResult
-	RootSeal    *flow.Seal
-	RootChainID flow.ChainID
-	SporkID     flow.Identifier
+	// excerpt of root snapshot and latest finalized snapshot, when we boot up
+	StateExcerptAtBoot
 
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool
@@ -276,8 +293,23 @@ type NodeConfig struct {
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
 	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
-	// GossipSubInspectorNotifDistributor notifies consumers when an invalid RPC message is encountered.
-	GossipSubInspectorNotifDistributor p2p.GossipSubInspectorNotificationDistributor
+}
+
+// StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.
+type StateExcerptAtBoot struct {
+	// properties of RootSnapshot for convenience
+	// For node bootstrapped with a root snapshot for the first block of a spork,
+	// 		FinalizedRootBlock and SealedRootBlock are the same block (special case of self-sealing block)
+	// For node bootstrapped with a root snapshot for a block above the first block of a spork (dynamically bootstrapped),
+	// 		FinalizedRootBlock.Height > SealedRootBlock.Height
+	FinalizedRootBlock  *flow.Block             // The last finalized block when bootstrapped.
+	SealedRootBlock     *flow.Block             // The last sealed block when bootstrapped.
+	RootQC              *flow.QuorumCertificate // QC for Finalized Root Block
+	RootResult          *flow.ExecutionResult   // Result for SealedRootBlock
+	RootSeal            *flow.Seal              //Seal for RootResult
+	RootChainID         flow.ChainID
+	SporkID             flow.Identifier
+	LastFinalizedHeader *flow.Header // last finalized header when the node boots up
 }
 
 func DefaultBaseConfig() *BaseConfig {
@@ -301,27 +333,18 @@ func DefaultBaseConfig() *BaseConfig {
 				BandwidthRateLimit:  0,
 				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
 			},
-			GossipSubRPCValidationConfigs: &p2pbuilder.GossipSubRPCValidationConfigs{
-				NumberOfWorkers: validation.DefaultNumberOfWorkers,
-				GraftLimits: map[string]int{
-					validation.DiscardThresholdMapKey: validation.DefaultGraftDiscardThreshold,
-					validation.SafetyThresholdMapKey:  validation.DefaultGraftSafetyThreshold,
-					validation.RateLimitMapKey:        validation.DefaultGraftRateLimit,
-				},
-				PruneLimits: map[string]int{
-					validation.DiscardThresholdMapKey: validation.DefaultPruneDiscardThreshold,
-					validation.SafetyThresholdMapKey:  validation.DefaultPruneSafetyThreshold,
-					validation.RateLimitMapKey:        validation.DefaultPruneRateLimit,
-				},
+			GossipSubConfig:                   p2pbuilder.DefaultGossipSubConfig(),
+			DNSCacheTTL:                       dns.DefaultTimeToLive,
+			LibP2PResourceManagerConfig:       p2pbuilder.DefaultResourceManagerConfig(),
+			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),
+			NetworkConnectionPruning:          connection.PruningEnabled,
+			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
+			AlspConfig: &AlspConfig{
+				SpamRecordCacheSize: alsp.DefaultSpamRecordCacheSize,
+				SpamReportQueueSize: alsp.DefaultSpamReportQueueSize,
+				HearBeatInterval:    alsp.DefaultHeartBeatInterval,
+				DisablePenalty:      false, // by default, apply the penalty
 			},
-			DNSCacheTTL:                                dns.DefaultTimeToLive,
-			LibP2PResourceManagerConfig:                p2pbuilder.DefaultResourceManagerConfig(),
-			ConnectionManagerConfig:                    connection.DefaultConnManagerConfig(),
-			NetworkConnectionPruning:                   connection.ConnectionPruningEnabled,
-			GossipSubConfig:                            p2pbuilder.DefaultGossipSubConfig(),
-			GossipSubRPCInspectorNotificationCacheSize: distributor.DefaultGossipSubInspectorNotificationQueueCacheSize,
-			GossipSubRPCInspectorCacheSize:             validation.DefaultControlMsgValidationInspectorQueueCacheSize,
-			DisallowListNotificationCacheSize:          distributor.DefaultDisallowListNotificationQueueCacheSize,
 		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,

@@ -181,7 +181,7 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 	executionDataID := executionResult.ExecutionDataID
 
 	// retrieving BlockExecutionData from EDS
-	executionData, err := b.execDataDownloader.Download(b.unit.Ctx(), executionDataID)
+	executionData, err := b.execDataDownloader.Get(b.unit.Ctx(), executionDataID)
 	if executionData == nil || err != nil {
 		log.Error().Err(err).Msgf(
 			"failed to retrieve BlockExecutionData from EDS with ID %s", executionDataID.String())
@@ -237,15 +237,41 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 		log.Warn().Msgf("failed to retrieve StateCommitment with BlockID %s. Error: %s", blockID.String(), err.Error())
 	}
 
+	executableBlock := &entity.ExecutableBlock{
+		Block:               block,
+		CompleteCollections: completeCollections,
+	}
+
+	compRes := execution.NewEmptyComputationResult(executableBlock)
+
+	eventsByTxIndex := make(map[int]flow.EventsList, 0)
+	for _, event := range events {
+		idx := int(event.TransactionIndex)
+		eventsByTxIndex[idx] = append(eventsByTxIndex[idx], event)
+	}
+
+	lastChunk := len(completeCollections)
+	lastCollection := compRes.CollectionExecutionResultAt(lastChunk)
+	for i, txRes := range transactionResults {
+		lastCollection.AppendTransactionResults(
+			eventsByTxIndex[i],
+			nil,
+			nil,
+			txRes,
+		)
+	}
+
+	compRes.AppendCollectionAttestationResult(
+		endState,
+		endState,
+		nil,
+		flow.ZeroID,
+		nil,
+	)
+
+	compRes.BlockExecutionData = executionData
+
 	// for now we only care about fields in BlockData
-	return &execution.ComputationResult{
-		ExecutableBlock: &entity.ExecutableBlock{
-			Block:               block,
-			CompleteCollections: completeCollections,
-		},
-		Events:             []flow.EventsList{events},
-		TransactionResults: transactionResults,
-		BlockExecutionData: executionData,
-		EndState:           endState,
-	}, nil
+	// Warning: this seems so broken just do the job, i only maintained previous behviour
+	return compRes, nil
 }

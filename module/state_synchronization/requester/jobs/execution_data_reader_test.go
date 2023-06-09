@@ -12,10 +12,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	exedatamock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/metrics"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -56,7 +60,7 @@ func (suite *ExecutionDataReaderSuite) SetupTest() {
 		suite.block.Header.Height: suite.block,
 	}
 
-	suite.executionData = synctest.ExecutionDataFixture(suite.block.ID())
+	suite.executionData = unittest.BlockExecutionDataFixture(unittest.WithBlockExecutionDataBlockID(suite.block.ID()))
 
 	suite.highestAvailableHeight = func() uint64 { return suite.block.Header.Height + 1 }
 
@@ -74,7 +78,10 @@ func (suite *ExecutionDataReaderSuite) reset() {
 		unittest.Seal.WithResult(result),
 	)
 
-	suite.headers = synctest.MockBlockHeaderStorage(synctest.WithByHeight(suite.blocksByHeight))
+	suite.headers = synctest.MockBlockHeaderStorage(
+		synctest.WithByHeight(suite.blocksByHeight),
+		synctest.WithBlockIDByHeight(suite.blocksByHeight),
+	)
 	suite.results = synctest.MockResultsStorage(
 		synctest.WithResultByID(map[flow.Identifier]*flow.ExecutionResult{
 			result.ID(): result,
@@ -87,11 +94,12 @@ func (suite *ExecutionDataReaderSuite) reset() {
 	)
 
 	suite.downloader = new(exedatamock.Downloader)
+
+	heroCache := herocache.NewBlockExecutionData(state_stream.DefaultCacheSize, unittest.Logger(), metrics.NewNoopCollector())
+	cache := cache.NewExecutionDataCache(suite.downloader, suite.headers, suite.seals, suite.results, heroCache)
+
 	suite.reader = NewExecutionDataReader(
-		suite.downloader,
-		suite.headers,
-		suite.results,
-		suite.seals,
+		cache,
 		suite.fetchTimeout,
 		func() uint64 {
 			return suite.highestAvailableHeight()
@@ -101,7 +109,7 @@ func (suite *ExecutionDataReaderSuite) reset() {
 
 func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 	setExecutionDataGet := func(executionData *execution_data.BlockExecutionData, err error) {
-		suite.downloader.On("Download", mock.Anything, suite.executionDataID).Return(
+		suite.downloader.On("Get", mock.Anything, suite.executionDataID).Return(
 			func(ctx context.Context, id flow.Identifier) *execution_data.BlockExecutionData {
 				return executionData
 			},
@@ -130,8 +138,10 @@ func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 	suite.Run("returns successfully", func() {
 		suite.reset()
 		suite.runTest(func() {
-			ed := synctest.ExecutionDataFixture(unittest.IdentifierFixture())
+			ed := unittest.BlockExecutionDataFixture()
 			setExecutionDataGet(ed, nil)
+
+			edEntity := execution_data.NewBlockExecutionDataEntity(suite.executionDataID, ed)
 
 			job, err := suite.reader.AtIndex(suite.block.Header.Height)
 			require.NoError(suite.T(), err)
@@ -139,7 +149,7 @@ func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 			entry, err := JobToBlockEntry(job)
 			assert.NoError(suite.T(), err)
 
-			assert.Equal(suite.T(), entry.ExecutionData, ed)
+			assert.Equal(suite.T(), edEntity, entry.ExecutionData)
 		})
 	})
 

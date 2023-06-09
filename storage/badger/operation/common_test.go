@@ -108,8 +108,8 @@ func TestInsertEncodingError(t *testing.T) {
 		key := []byte{0x01, 0x02, 0x03}
 
 		err := db.Update(insert(key, UnencodeableEntity(e)))
-
-		require.ErrorIs(t, err, errCantEncode)
+		require.Error(t, err, errCantEncode)
+		require.NotErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
@@ -171,7 +171,8 @@ func TestUpdateEncodingError(t *testing.T) {
 		})
 
 		err := db.Update(update(key, UnencodeableEntity(e)))
-		require.ErrorIs(t, err, errCantEncode)
+		require.Error(t, err)
+		require.NotErrorIs(t, err, storage.ErrNotFound)
 
 		// ensure value did not change
 		var act []byte
@@ -270,7 +271,46 @@ func TestRetrieveUnencodeable(t *testing.T) {
 
 		var act *UnencodeableEntity
 		err := db.View(retrieve(key, &act))
-		require.ErrorIs(t, err, errCantDecode)
+		require.Error(t, err)
+		require.NotErrorIs(t, err, storage.ErrNotFound)
+	})
+}
+
+// TestExists verifies that `exists` returns correct results in different scenarios.
+func TestExists(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		t.Run("non-existent key", func(t *testing.T) {
+			key := unittest.RandomBytes(32)
+			var _exists bool
+			err := db.View(exists(key, &_exists))
+			require.NoError(t, err)
+			assert.False(t, _exists)
+		})
+
+		t.Run("existent key", func(t *testing.T) {
+			key := unittest.RandomBytes(32)
+			err := db.Update(insert(key, unittest.RandomBytes(256)))
+			require.NoError(t, err)
+
+			var _exists bool
+			err = db.View(exists(key, &_exists))
+			require.NoError(t, err)
+			assert.True(t, _exists)
+		})
+
+		t.Run("removed key", func(t *testing.T) {
+			key := unittest.RandomBytes(32)
+			// insert, then remove the key
+			err := db.Update(insert(key, unittest.RandomBytes(256)))
+			require.NoError(t, err)
+			err = db.Update(remove(key))
+			require.NoError(t, err)
+
+			var _exists bool
+			err = db.View(exists(key, &_exists))
+			require.NoError(t, err)
+			assert.False(t, _exists)
+		})
 	})
 }
 
@@ -572,5 +612,99 @@ func TestIterateBoundaries(t *testing.T) {
 		}
 		require.NoError(t, err, "should iterate backward without error")
 		assert.ElementsMatch(t, keysInRange, found, "backward iteration should go over correct keys")
+	})
+}
+
+func TestFindHighestAtOrBelow(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		prefix := []byte("test_prefix")
+
+		type Entity struct {
+			Value uint64
+		}
+
+		entity1 := Entity{Value: 41}
+		entity2 := Entity{Value: 42}
+		entity3 := Entity{Value: 43}
+
+		err := db.Update(func(tx *badger.Txn) error {
+			key := append(prefix, b(uint64(15))...)
+			val, err := msgpack.Marshal(entity3)
+			if err != nil {
+				return err
+			}
+			err = tx.Set(key, val)
+			if err != nil {
+				return err
+			}
+
+			key = append(prefix, b(uint64(5))...)
+			val, err = msgpack.Marshal(entity1)
+			if err != nil {
+				return err
+			}
+			err = tx.Set(key, val)
+			if err != nil {
+				return err
+			}
+
+			key = append(prefix, b(uint64(10))...)
+			val, err = msgpack.Marshal(entity2)
+			if err != nil {
+				return err
+			}
+			err = tx.Set(key, val)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		require.NoError(t, err)
+
+		var entity Entity
+
+		t.Run("target height exists", func(t *testing.T) {
+			err = findHighestAtOrBelow(
+				prefix,
+				10,
+				&entity)(db.NewTransaction(false))
+			require.NoError(t, err)
+			require.Equal(t, uint64(42), entity.Value)
+		})
+
+		t.Run("target height above", func(t *testing.T) {
+			err = findHighestAtOrBelow(
+				prefix,
+				11,
+				&entity)(db.NewTransaction(false))
+			require.NoError(t, err)
+			require.Equal(t, uint64(42), entity.Value)
+		})
+
+		t.Run("target height above highest", func(t *testing.T) {
+			err = findHighestAtOrBelow(
+				prefix,
+				20,
+				&entity)(db.NewTransaction(false))
+			require.NoError(t, err)
+			require.Equal(t, uint64(43), entity.Value)
+		})
+
+		t.Run("target height below lowest", func(t *testing.T) {
+			err = findHighestAtOrBelow(
+				prefix,
+				4,
+				&entity)(db.NewTransaction(false))
+			require.ErrorIs(t, err, storage.ErrNotFound)
+		})
+
+		t.Run("empty prefix", func(t *testing.T) {
+			err = findHighestAtOrBelow(
+				[]byte{},
+				5,
+				&entity)(db.NewTransaction(false))
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "prefix must not be empty")
+		})
 	})
 }

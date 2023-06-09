@@ -33,12 +33,15 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 
 	// two groups of non-access nodes and one group of access nodes.
 	groupOneNodes, groupOneIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
+		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.WithPeerScoringEnabled(idProvider))
 	groupTwoNodes, groupTwoIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
+		idProvider,
 		p2ptest.WithRole(flow.RoleCollection),
 		p2ptest.WithPeerScoringEnabled(idProvider))
 	accessNodeGroup, accessNodeIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
+		idProvider,
 		p2ptest.WithRole(flow.RoleAccess),
 		p2ptest.WithPeerScoringEnabled(idProvider))
 
@@ -149,14 +152,15 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	if honestPeerScoring {
 		opts = append(opts, p2ptest.WithPeerScoringEnabled(idProvider))
 	}
-	con1Node, con1Id := p2ptest.NodeFixture(t, sporkId, t.Name(), opts...)
-	con2Node, con2Id := p2ptest.NodeFixture(t, sporkId, t.Name(), opts...)
+	con1Node, con1Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, opts...)
+	con2Node, con2Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, opts...)
 
 	// create > 2 * 12 malicious access nodes
 	// 12 is the maximum size of default GossipSub mesh.
 	// We want to make sure that it is unlikely for honest nodes to be in the same mesh (hence messages from
 	// one honest node to the other is routed through the malicious nodes).
 	accessNodeGroup, accessNodeIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 30,
+		idProvider,
 		p2ptest.WithRole(flow.RoleAccess),
 		p2ptest.WithPeerScoringEnabled(idProvider),
 		// overrides the default peer scoring parameters to mute GossipSub traffic from/to honest nodes.
@@ -217,7 +221,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	return p2pfixtures.HasSubReceivedMessage(t, ctx1s, proposalMsg, con2Sub)
 }
 
-// maliciousAppSpecificScore returns a malicious app specific score function that rewards the malicious node and
+// maliciousAppSpecificScore returns a malicious app specific penalty function that rewards the malicious node and
 // punishes the honest nodes.
 func maliciousAppSpecificScore(honestIds flow.IdentityList) func(peer.ID) float64 {
 	honestIdProvider := id.NewFixedIdentityProvider(honestIds)

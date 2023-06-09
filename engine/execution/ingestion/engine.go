@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -43,6 +44,7 @@ type Engine struct {
 	me                     module.Local
 	request                module.Requester // used to request collections
 	state                  protocol.State
+	headers                storage.Headers // see comments on getHeaderByHeight for why we need it
 	blocks                 storage.Blocks
 	collections            storage.Collections
 	events                 storage.Events
@@ -59,7 +61,7 @@ type Engine struct {
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	executionDataPruner    *pruner.Pruner
 	uploader               *uploader.Manager
-	stopControl            *StopControl
+	stopControl            *stop.StopControl
 }
 
 func New(
@@ -68,6 +70,7 @@ func New(
 	me module.Local,
 	request module.Requester,
 	state protocol.State,
+	headers storage.Headers,
 	blocks storage.Blocks,
 	collections storage.Collections,
 	events storage.Events,
@@ -82,7 +85,7 @@ func New(
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pruner *pruner.Pruner,
 	uploader *uploader.Manager,
-	stopControl *StopControl,
+	stopControl *stop.StopControl,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -94,6 +97,7 @@ func New(
 		me:                     me,
 		request:                request,
 		state:                  state,
+		headers:                headers,
 		blocks:                 blocks,
 		collections:            collections,
 		events:                 events,
@@ -119,15 +123,17 @@ func New(
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	if !e.stopControl.IsPaused() {
-		if err := e.uploader.RetryUploads(); err != nil {
-			e.log.Warn().Msg("failed to re-upload all ComputationResults")
-		}
+	if e.stopControl.IsExecutionStopped() {
+		return e.unit.Ready()
+	}
 
-		err := e.reloadUnexecutedBlocks()
-		if err != nil {
-			e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
-		}
+	if err := e.uploader.RetryUploads(); err != nil {
+		e.log.Warn().Msg("failed to re-upload all ComputationResults")
+	}
+
+	err := e.reloadUnexecutedBlocks()
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
 	}
 
 	return e.unit.Ready()
@@ -152,7 +158,11 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(channel channels.Channel, originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(
+	channel channels.Channel,
+	originID flow.Identifier,
+	event interface{},
+) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
@@ -166,7 +176,11 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 	return fmt.Errorf("ingestion error does not process local events")
 }
 
-func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(
+	channel channels.Channel,
+	originID flow.Identifier,
+	event interface{},
+) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -176,7 +190,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
-func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
+func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) (
+	[]flow.Identifier,
+	error,
+) {
 	// get finalized height
 	final, err := finalized.Head()
 	if err != nil {
@@ -193,13 +210,15 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 	// blocks.
 	lastExecuted := final.Height
 
-	rootBlock, err := e.state.Params().Root()
+	// dynamically bootstrapped execution node will reload blocks from
+	// [sealedRoot.Height + 1, finalizedRoot.Height] and execute them on startup.
+	rootBlock, err := e.state.Params().SealedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
 	}
 
 	for ; lastExecuted > rootBlock.Height; lastExecuted-- {
-		header, err := e.state.AtHeight(lastExecuted).Head()
+		header, err := e.getHeaderByHeight(lastExecuted)
 		if err != nil {
 			return nil, fmt.Errorf("could not get header at height: %v, %w", lastExecuted, err)
 		}
@@ -216,14 +235,12 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 
 	firstUnexecuted := lastExecuted + 1
 
-	e.log.Info().Msgf("last finalized and executed height: %v", lastExecuted)
-
 	unexecuted := make([]flow.Identifier, 0)
 
 	// starting from the first unexecuted block, go through each unexecuted and finalized block
 	// reload its block to execution queues
 	for height := firstUnexecuted; height <= final.Height; height++ {
-		header, err := e.state.AtHeight(height).Head()
+		header, err := e.getHeaderByHeight(height)
 		if err != nil {
 			return nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
 		}
@@ -231,10 +248,22 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 		unexecuted = append(unexecuted, header.ID())
 	}
 
+	e.log.Info().
+		Uint64("last_finalized", final.Height).
+		Uint64("last_finalized_executed", lastExecuted).
+		Uint64("sealed_root_height", rootBlock.Height).
+		Hex("sealed_root_id", logging.Entity(rootBlock)).
+		Uint64("first_unexecuted", firstUnexecuted).
+		Int("total_finalized_unexecuted", len(unexecuted)).
+		Msgf("finalized unexecuted blocks")
+
 	return unexecuted, nil
 }
 
-func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
+func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) (
+	[]flow.Identifier,
+	error,
+) {
 	pendings, err := finalized.Descendants()
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending blocks: %w", err)
@@ -256,7 +285,11 @@ func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Id
 	return unexecuted, nil
 }
 
-func (e *Engine) unexecutedBlocks() (finalized []flow.Identifier, pending []flow.Identifier, err error) {
+func (e *Engine) unexecutedBlocks() (
+	finalized []flow.Identifier,
+	pending []flow.Identifier,
+	err error,
+) {
 	// pin the snapshot so that finalizedUnexecutedBlocks and pendingUnexecutedBlocks are based
 	// on the same snapshot.
 	snapshot := e.state.Final()
@@ -286,7 +319,8 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 	// is called before reloading is finished, it will be blocked, which will avoid that edge case.
 	return e.mempool.Run(func(
 		blockByCollection *stdmap.BlockByCollectionBackdata,
-		executionQueues *stdmap.QueuesBackdata) error {
+		executionQueues *stdmap.QueuesBackdata,
+	) error {
 
 		// saving an executed block is currently not transactional, so it's possible
 		// the block is marked as executed but the receipt might not be saved during a crash.
@@ -302,13 +336,13 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 			return fmt.Errorf("could not get last executed: %w", err)
 		}
 
-		last, err := e.state.AtBlockID(lastExecutedID).Head()
+		last, err := e.headers.ByBlockID(lastExecutedID)
 		if err != nil {
 			return fmt.Errorf("could not get last executed final by ID: %w", err)
 		}
 
 		// don't reload root block
-		rootBlock, err := e.state.Params().Root()
+		rootBlock, err := e.state.Params().SealedRoot()
 		if err != nil {
 			return fmt.Errorf("failed to retrieve root block: %w", err)
 		}
@@ -367,7 +401,8 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 func (e *Engine) reloadBlock(
 	blockByCollection *stdmap.BlockByCollectionBackdata,
 	executionQueues *stdmap.QueuesBackdata,
-	blockID flow.Identifier) error {
+	blockID flow.Identifier,
+) error {
 	block, err := e.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not get block by ID: %v %w", blockID, err)
@@ -404,8 +439,10 @@ func (e *Engine) reloadBlock(
 // NOTE: Ready calls reloadUnexecutedBlocks during initialization, which handles dropped protocol events.
 func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 
+	// TODO: this should not be blocking: https://github.com/onflow/flow-go/issues/4400
+
 	// skip if stopControl tells to skip
-	if !e.stopControl.blockProcessable(b) {
+	if !e.stopControl.ShouldExecuteBlock(b) {
 		return
 	}
 
@@ -423,12 +460,6 @@ func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 	if err != nil {
 		e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to handle block")
 	}
-}
-
-// BlockFinalized implements part of state.protocol.Consumer interface.
-// Method gets called for every finalized block
-func (e *Engine) BlockFinalized(h *flow.Header) {
-	e.stopControl.blockFinalized(e.unit.Ctx(), e.execState, h)
 }
 
 // Main handling
@@ -479,7 +510,8 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 	blockByCollection *stdmap.BlockByCollectionBackdata,
 	executionQueues *stdmap.QueuesBackdata,
 	block *flow.Block,
-	checkStateSync bool) ([]*flow.CollectionGuarantee, error) {
+	checkStateSync bool,
+) ([]*flow.CollectionGuarantee, error) {
 	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
 		CompleteCollections: make(map[flow.Identifier]*entity.CompleteCollection),
@@ -574,8 +606,6 @@ func (e *Engine) executeBlock(
 
 	startedAt := time.Now()
 
-	e.stopControl.executingBlockHeight(executableBlock.Block.Header.Height)
-
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
 	defer span.End()
 
@@ -648,11 +678,12 @@ func (e *Engine) executeBlock(
 		}
 	}
 
+	finalEndState := computationResult.CurrentEndState()
 	lg.Info().
 		Hex("parent_block", executableBlock.Block.Header.ParentID[:]).
 		Int("collections", len(executableBlock.Block.Payload.Guarantees)).
 		Hex("start_state", executableBlock.StartState[:]).
-		Hex("final_state", computationResult.EndState[:]).
+		Hex("final_state", finalEndState[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
@@ -661,11 +692,7 @@ func (e *Engine) executeBlock(
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
 
-	for computationKind, intensity := range computationResult.ComputationIntensities {
-		e.metrics.ExecutionBlockExecutionEffortVectorComponent(computationKind.String(), intensity)
-	}
-
-	err = e.onBlockExecuted(executableBlock, computationResult.EndState)
+	err = e.onBlockExecuted(executableBlock, finalEndState)
 	if err != nil {
 		lg.Err(err).Msg("failed in process block's children")
 	}
@@ -674,9 +701,10 @@ func (e *Engine) executeBlock(
 		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
 	}
 
+	e.stopControl.OnBlockExecuted(executableBlock.Block.Header)
+
 	e.unit.Ctx()
 
-	e.stopControl.blockExecuted(executableBlock.Block.Header)
 }
 
 // we've executed the block, now we need to check:
@@ -695,7 +723,10 @@ func (e *Engine) executeBlock(
 //   13
 //   14 <- 15 <- 16
 
-func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState flow.StateCommitment) error {
+func (e *Engine) onBlockExecuted(
+	executed *entity.ExecutableBlock,
+	finalState flow.StateCommitment,
+) error {
 
 	e.metrics.ExecutionStorageStateCommitment(int64(len(finalState)))
 	e.metrics.ExecutionLastExecutedBlockHeight(executed.Block.Header.Height)
@@ -833,7 +864,10 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 // find all the blocks that are needing this collection, and then
 // check if any of these block becomes executable and execute it if
 // is.
-func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
+func (e *Engine) handleCollection(
+	originID flow.Identifier,
+	collection *flow.Collection,
+) error {
 	collID := collection.ID()
 
 	span, _ := e.tracer.StartCollectionSpan(context.Background(), collID, trace.EXEHandleCollection)
@@ -859,7 +893,10 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 	)
 }
 
-func (e *Engine) addCollectionToMempool(collection *flow.Collection, backdata *stdmap.BlockByCollectionBackdata) error {
+func (e *Engine) addCollectionToMempool(
+	collection *flow.Collection,
+	backdata *stdmap.BlockByCollectionBackdata,
+) error {
 	collID := collection.ID()
 	blockByCollectionID, exists := backdata.ByID(collID)
 
@@ -910,7 +947,10 @@ func (e *Engine) addCollectionToMempool(collection *flow.Collection, backdata *s
 	return nil
 }
 
-func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
+func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (
+	*queue.Queue,
+	bool,
+) {
 	q := queue.NewQueue(blockify)
 	qID := q.ID()
 	return q, queues.Add(qID, q)
@@ -940,7 +980,11 @@ func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Qu
 //	A <- B <- C
 //	  ^- D <- E
 //	G
-func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool, bool) {
+func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (
+	*queue.Queue,
+	bool,
+	bool,
+) {
 	for _, queue := range queues.All() {
 		if stored, isNew := queue.TryAdd(blockify); stored {
 			return queue, isNew, false
@@ -1004,7 +1048,12 @@ func (e *Engine) matchAndFindMissingCollections(
 	return missingCollections, nil
 }
 
-func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, arguments [][]byte, blockID flow.Identifier) ([]byte, error) {
+func (e *Engine) ExecuteScriptAtBlockID(
+	ctx context.Context,
+	script []byte,
+	arguments [][]byte,
+	blockID flow.Identifier,
+) ([]byte, error) {
 
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
@@ -1045,7 +1094,11 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 		blockSnapshot)
 }
 
-func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, key []byte, blockID flow.Identifier) ([]byte, error) {
+func (e *Engine) GetRegisterAtBlockID(
+	ctx context.Context,
+	owner, key []byte,
+	blockID flow.Identifier,
+) ([]byte, error) {
 
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
@@ -1063,7 +1116,11 @@ func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, key []byte, bl
 	return data, nil
 }
 
-func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow.Identifier) (*flow.Account, error) {
+func (e *Engine) GetAccount(
+	ctx context.Context,
+	addr flow.Address,
+	blockID flow.Identifier,
+) (*flow.Account, error) {
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
@@ -1106,7 +1163,7 @@ func (e *Engine) saveExecutionResults(
 		e.log.Info().
 			Uint64("block_height", result.ExecutableBlock.Height()).
 			Hex("block_id", logging.Entity(result.ExecutableBlock)).
-			Str("event_type", event.Type).
+			Str("event_type", event.Type.String()).
 			Msg("service event emitted")
 	}
 
@@ -1115,10 +1172,11 @@ func (e *Engine) saveExecutionResults(
 		return fmt.Errorf("cannot persist execution state: %w", err)
 	}
 
+	finalEndState := result.CurrentEndState()
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Hex("start_state", result.ExecutableBlock.StartState[:]).
-		Hex("final_state", result.EndState[:]).
+		Hex("final_state", finalEndState[:]).
 		Msg("saved computation results")
 
 	return nil
@@ -1157,7 +1215,11 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 // addOrFetch checks if there are stored collections for the given guarantees, if there is,
 // forward them to mempool to process the collection, otherwise fetch the collections.
 // any error returned are exception
-func (e *Engine) addOrFetch(blockID flow.Identifier, height uint64, guarantees []*flow.CollectionGuarantee) error {
+func (e *Engine) addOrFetch(
+	blockID flow.Identifier,
+	height uint64,
+	guarantees []*flow.CollectionGuarantee,
+) error {
 	return e.fetchAndHandleCollection(blockID, height, guarantees, func(collection *flow.Collection) error {
 		err := e.mempool.BlockByCollection.Run(
 			func(backdata *stdmap.BlockByCollectionBackdata) error {
@@ -1219,7 +1281,11 @@ func (e *Engine) fetchAndHandleCollection(
 
 // fetchCollection takes a guarantee and forwards to requester engine for fetching the collection
 // any error returned are fatal error
-func (e *Engine) fetchCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) error {
+func (e *Engine) fetchCollection(
+	blockID flow.Identifier,
+	height uint64,
+	guarantee *flow.CollectionGuarantee,
+) error {
 	e.log.Debug().
 		Hex("block", blockID[:]).
 		Hex("collection_id", logging.ID(guarantee.ID())).
@@ -1244,4 +1310,13 @@ func (e *Engine) fetchCollection(blockID flow.Identifier, height uint64, guarant
 	))
 
 	return nil
+}
+
+// if the EN is dynamically bootstrapped, the finalized blocks at height range:
+// [ sealedRoot.Height, finalizedRoot.Height - 1] can not be retrieved from
+// protocol state, but only from headers
+func (e *Engine) getHeaderByHeight(height uint64) (*flow.Header, error) {
+	// we don't use protocol state because for dynamic boostrapped execution node
+	// the last executed and sealed block is below the finalized root block
+	return e.headers.ByHeight(height)
 }

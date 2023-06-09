@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/messages"
@@ -260,7 +260,6 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			led,
 			startStateCommitment)
 		committer := committer.NewLedgerViewCommitter(led, trace.NewNoopTracer())
-		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := mocktracker.NewMockStorage()
@@ -335,14 +334,14 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			unittest.IdentifierFixture(),
 			executableBlock,
 			snapshot,
-			derivedBlockData)
+			derived.NewEmptyDerivedBlockData(0))
 		require.NoError(t, err)
 
-		for _, snapshot := range computationResult.StateSnapshots {
+		for _, snapshot := range computationResult.AllExecutionSnapshots() {
 			spockSecrets = append(spockSecrets, snapshot.SpockSecret)
 		}
 
-		chunkDataPacks = computationResult.ChunkDataPacks
+		chunkDataPacks = computationResult.AllChunkDataPacks()
 		result = &computationResult.ExecutionResult
 	})
 

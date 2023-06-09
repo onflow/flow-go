@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 )
@@ -15,23 +13,21 @@ import (
 // It directly passes the incoming messages to the corresponding methods of the
 // network Adapter.
 type DefaultConduitFactory struct {
-	*component.ComponentManager
 	adapter network.Adapter
 }
 
+var _ network.ConduitFactory = (*DefaultConduitFactory)(nil)
+
+// NewDefaultConduitFactory creates a new DefaultConduitFactory, this is the default conduit factory used by the node.
+// Args:
+//
+//	none
+//
+// Returns:
+//
+//	a new instance of the DefaultConduitFactory.
 func NewDefaultConduitFactory() *DefaultConduitFactory {
-	d := &DefaultConduitFactory{}
-	// worker added so conduit factory doesn't immediately shut down when it's started
-	cm := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-
-			<-ctx.Done()
-		}).Build()
-
-	d.ComponentManager = cm
-
-	return d
+	return &DefaultConduitFactory{}
 }
 
 // RegisterAdapter sets the Adapter component of the factory.
@@ -74,6 +70,8 @@ type Conduit struct {
 	adapter network.Adapter
 }
 
+var _ network.Conduit = (*Conduit)(nil)
+
 // Publish sends an event to the network layer for unreliable delivery
 // to subscribers of the given event on the network layer. It uses a
 // publish-subscribe layer and can thus not guarantee that the specified
@@ -102,6 +100,14 @@ func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Ident
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
 	return c.adapter.MulticastOnChannel(c.channel, event, num, targetIDs...)
+}
+
+// ReportMisbehavior reports the misbehavior of a node on sending a message to the current node that appears valid
+// based on the networking layer but is considered invalid by the current node based on the Flow protocol.
+// The misbehavior is reported to the networking layer to penalize the misbehaving node.
+// The implementation must be thread-safe and non-blocking.
+func (c *Conduit) ReportMisbehavior(report network.MisbehaviorReport) {
+	c.adapter.ReportMisbehaviorOnChannel(c.channel, report)
 }
 
 func (c *Conduit) Close() error {

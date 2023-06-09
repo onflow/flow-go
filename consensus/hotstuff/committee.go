@@ -25,8 +25,8 @@ import (
 // So for validating votes/timeouts we use *ByEpoch methods.
 //
 // Since the voter committee is considered static over an epoch:
-// * we can query identities by view
-// * we don't need the full block ancestry prior to validating messages
+//   - we can query identities by view
+//   - we don't need the full block ancestry prior to validating messages
 type Replicas interface {
 
 	// LeaderForView returns the identity of the leader for a given view.
@@ -34,14 +34,14 @@ type Replicas interface {
 	//          Therefore, a node retains its proposer view slots even if it is slashed.
 	//          Its proposal is simply considered invalid, as it is not from a legitimate participant.
 	// Returns the following expected errors for invalid inputs:
-	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+	//   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	LeaderForView(view uint64) (flow.Identifier, error)
 
 	// QuorumThresholdForView returns the minimum total weight for a supermajority
 	// at the given view. This weight threshold is computed using the total weight
 	// of the initial committee and is static over the course of an epoch.
 	// Returns the following expected errors for invalid inputs:
-	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+	//   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	QuorumThresholdForView(view uint64) (uint64, error)
 
 	// TimeoutThresholdForView returns the minimum total weight of observed timeout objects
@@ -49,7 +49,7 @@ type Replicas interface {
 	// using the total weight of the initial committee and is static over the course of
 	// an epoch.
 	// Returns the following expected errors for invalid inputs:
-	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+	//   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	TimeoutThresholdForView(view uint64) (uint64, error)
 
 	// Self returns our own node identifier.
@@ -60,23 +60,23 @@ type Replicas interface {
 
 	// DKG returns the DKG info for epoch given by the input view.
 	// Returns the following expected errors for invalid inputs:
-	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+	//   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	DKG(view uint64) (DKG, error)
 
 	// IdentitiesByEpoch returns a list of the legitimate HotStuff participants for the epoch
 	// given by the input view.
 	// The returned list of HotStuff participants:
-	//   * contains nodes that are allowed to submit votes or timeouts within the given epoch
+	//   - contains nodes that are allowed to submit votes or timeouts within the given epoch
 	//     (un-ejected, non-zero weight at the beginning of the epoch)
-	//   * is ordered in the canonical order
-	//   * contains no duplicates.
+	//   - is ordered in the canonical order
+	//   - contains no duplicates.
 	//
 	// CAUTION: DO NOT use this method for validating block proposals.
 	// CAUTION: This method considers epochs outside of Previous, Current, Next, w.r.t. the
 	// finalized block, to be unknown. https://github.com/onflow/flow-go/issues/4085
 	//
 	// Returns the following expected errors for invalid inputs:
-	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+	//   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	//
 	// TODO: should return identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
 	IdentitiesByEpoch(view uint64) (flow.IdentityList, error)
@@ -87,10 +87,10 @@ type Replicas interface {
 	// finalized block, to be unknown. https://github.com/onflow/flow-go/issues/4085
 	//
 	// ERROR conditions:
-	//  * model.InvalidSignerError if participantID does NOT correspond to an authorized HotStuff participant at the specified block.
+	//  - model.InvalidSignerError if participantID does NOT correspond to an authorized HotStuff participant at the specified block.
 	//
 	// Returns the following expected errors for invalid inputs:
-	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+	//   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	//
 	// TODO: should return identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
 	IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.Identity, error)
@@ -102,25 +102,27 @@ type Replicas interface {
 // For validating proposals, we use *ByBlock methods.
 //
 // Since the proposer committee can change at any block:
-// * we query by block ID
-// * we must have incorporated the full block ancestry prior to validating messages
+//   - we query by block ID
+//   - we must have incorporated the full block ancestry prior to validating messages
 type DynamicCommittee interface {
 	Replicas
 
 	// IdentitiesByBlock returns a list of the legitimate HotStuff participants for the given block.
 	// The returned list of HotStuff participants:
-	//   * contains nodes that are allowed to submit proposals, votes, and timeouts
+	//   - contains nodes that are allowed to submit proposals, votes, and timeouts
 	//     (un-ejected, non-zero weight at current block)
-	//   * is ordered in the canonical order
-	//   * contains no duplicates.
+	//   - is ordered in the canonical order
+	//   - contains no duplicates.
 	//
-	// No errors are expected during normal operation.
+	// ERROR conditions:
+	//  - state.ErrUnknownSnapshotReference if the blockID is for an unknown block
 	IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error)
 
 	// IdentityByBlock returns the full Identity for specified HotStuff participant.
 	// The node must be a legitimate HotStuff participant with NON-ZERO WEIGHT at the specified block.
 	// ERROR conditions:
-	//  * model.InvalidSignerError if participantID does NOT correspond to an authorized HotStuff participant at the specified block.
+	//  - model.InvalidSignerError if participantID does NOT correspond to an authorized HotStuff participant at the specified block.
+	//  - state.ErrUnknownSnapshotReference if the blockID is for an unknown block
 	IdentityByBlock(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error)
 }
 
@@ -132,8 +134,8 @@ type BlockSignerDecoder interface {
 	// consensus committee has reached agreement on validity of parent block. Consequently, the
 	// returned IdentifierList contains the consensus participants that signed the parent block.
 	// Expected Error returns during normal operations:
-	//   - signature.InvalidSignerIndicesError if signer indices included in the header do
-	//     not encode a valid subset of the consensus committee
+	//  - signature.InvalidSignerIndicesError if signer indices included in the header do
+	//    not encode a valid subset of the consensus committee
 	DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error)
 }
 

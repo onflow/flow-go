@@ -2,9 +2,7 @@ package compliance
 
 import (
 	"errors"
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -58,32 +56,29 @@ type CommonSuite struct {
 	childrenDB map[flow.Identifier][]flow.Slashable[*flow.Block]
 
 	// mocked dependencies
-	me                *module.Local
-	metrics           *metrics.NoopCollector
-	tracer            realModule.Tracer
-	cleaner           *storage.Cleaner
-	headers           *storage.Headers
-	payloads          *storage.Payloads
-	state             *protocol.ParticipantState
-	snapshot          *protocol.Snapshot
-	con               *mocknetwork.Conduit
-	net               *mocknetwork.Network
-	prov              *consensus.ProposalProvider
-	pending           *module.PendingBlockBuffer
-	hotstuff          *module.HotStuff
-	sync              *module.BlockRequester
-	validator         *hotstuff.Validator
-	voteAggregator    *hotstuff.VoteAggregator
-	timeoutAggregator *hotstuff.TimeoutAggregator
+	me                        *module.Local
+	metrics                   *metrics.NoopCollector
+	tracer                    realModule.Tracer
+	headers                   *storage.Headers
+	payloads                  *storage.Payloads
+	state                     *protocol.ParticipantState
+	snapshot                  *protocol.Snapshot
+	con                       *mocknetwork.Conduit
+	net                       *mocknetwork.Network
+	prov                      *consensus.ProposalProvider
+	pending                   *module.PendingBlockBuffer
+	hotstuff                  *module.HotStuff
+	sync                      *module.BlockRequester
+	proposalViolationNotifier *hotstuff.ProposalViolationConsumer
+	validator                 *hotstuff.Validator
+	voteAggregator            *hotstuff.VoteAggregator
+	timeoutAggregator         *hotstuff.TimeoutAggregator
 
 	// engine under test
 	core *Core
 }
 
 func (cs *CommonSuite) SetupTest() {
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
-
 	// initialize the paramaters
 	cs.participants = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleConsensus),
@@ -111,10 +106,6 @@ func (cs *CommonSuite) SetupTest() {
 		},
 	)
 
-	// set up storage cleaner
-	cs.cleaner = &storage.Cleaner{}
-	cs.cleaner.On("RunGC").Return()
-
 	// set up header storage mock
 	cs.headers = &storage.Headers{}
 	cs.headers.On("Store", mock.Anything).Return(
@@ -135,6 +126,13 @@ func (cs *CommonSuite) SetupTest() {
 			return nil
 		},
 	)
+	cs.headers.On("Exists", mock.Anything).Return(
+		func(blockID flow.Identifier) bool {
+			_, exists := cs.headerDB[blockID]
+			return exists
+		}, func(blockID flow.Identifier) error {
+			return nil
+		})
 
 	// set up payload storage mock
 	cs.payloads = &storage.Payloads{}
@@ -249,6 +247,9 @@ func (cs *CommonSuite) SetupTest() {
 	// set up no-op tracer
 	cs.tracer = trace.NewNoopTracer()
 
+	// set up notifier for reporting protocol violations
+	cs.proposalViolationNotifier = hotstuff.NewProposalViolationConsumer(cs.T())
+
 	// initialize the engine
 	e, err := NewCore(
 		unittest.Logger(),
@@ -256,8 +257,8 @@ func (cs *CommonSuite) SetupTest() {
 		cs.metrics,
 		cs.metrics,
 		cs.metrics,
+		cs.proposalViolationNotifier,
 		cs.tracer,
-		cs.cleaner,
 		cs.headers,
 		cs.payloads,
 		cs.state,
@@ -267,6 +268,7 @@ func (cs *CommonSuite) SetupTest() {
 		cs.hotstuff,
 		cs.voteAggregator,
 		cs.timeoutAggregator,
+		compliance.DefaultConfig(),
 	)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
@@ -327,7 +329,7 @@ func (cs *CoreSuite) TestOnBlockProposalSkipProposalThreshold() {
 	// create a proposal which is far enough ahead to be dropped
 	originID := cs.participants[1].NodeID
 	block := unittest.BlockFixture()
-	block.Header.Height = cs.head.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
+	block.Header.View = cs.head.View + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
 	proposal := unittest.ProposalFromBlock(&block)
 
 	err := cs.core.OnBlockProposal(originID, proposal)
@@ -361,7 +363,9 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 	cs.Run("invalid block error", func() {
 		// the block fails HotStuff validation
 		*cs.validator = *hotstuff.NewValidator(cs.T())
-		cs.validator.On("ValidateProposal", hotstuffProposal).Return(model.InvalidBlockError{})
+		sentinelError := model.NewInvalidProposalErrorf(hotstuffProposal, "")
+		cs.validator.On("ValidateProposal", hotstuffProposal).Return(sentinelError)
+		cs.proposalViolationNotifier.On("OnInvalidBlockDetected", sentinelError).Return().Once()
 		// we should notify VoteAggregator about the invalid block
 		cs.voteAggregator.On("InvalidBlock", hotstuffProposal).Return(nil)
 
@@ -517,7 +521,7 @@ func (cs *CoreSuite) TestProcessBlockAndDescendants() {
 	}
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(parent, cs.head)
+	err := cs.core.processBlockAndDescendants(parent)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// make sure we drop the cache after trying to process
