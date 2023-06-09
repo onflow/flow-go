@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/cruisectl"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
@@ -74,28 +73,32 @@ import (
 func main() {
 
 	var (
-		guaranteeLimit                       uint
-		resultLimit                          uint
-		approvalLimit                        uint
-		sealLimit                            uint
-		pendingReceiptsLimit                 uint
-		minInterval                          time.Duration
-		maxInterval                          time.Duration
-		maxSealPerBlock                      uint
-		maxGuaranteePerBlock                 uint
-		hotstuffMinTimeout                   time.Duration
-		hotstuffTimeoutAdjustmentFactor      float64
-		hotstuffHappyPathMaxRoundFailures    uint64
-		chunkAlpha                           uint
-		requiredApprovalsForSealVerification uint
-		requiredApprovalsForSealConstruction uint
-		emergencySealing                     bool
-		dkgControllerConfig                  dkgmodule.ControllerConfig
-		dkgMessagingEngineConfig             = dkgeng.DefaultMessagingEngineConfig()
-		cruiseCtlConfig                      = cruisectl.DefaultConfig()
-		cruiseCtlTargetTransitionTimeStr     = cruiseCtlConfig.TargetTransition.String()
-		startupTimeString                    string
-		startupTime                          time.Time
+		guaranteeLimit                        uint
+		resultLimit                           uint
+		approvalLimit                         uint
+		sealLimit                             uint
+		pendingReceiptsLimit                  uint
+		minInterval                           time.Duration
+		maxInterval                           time.Duration
+		maxSealPerBlock                       uint
+		maxGuaranteePerBlock                  uint
+		hotstuffMinTimeout                    time.Duration
+		hotstuffTimeoutAdjustmentFactor       float64
+		hotstuffHappyPathMaxRoundFailures     uint64
+		chunkAlpha                            uint
+		requiredApprovalsForSealVerification  uint
+		requiredApprovalsForSealConstruction  uint
+		emergencySealing                      bool
+		dkgControllerConfig                   dkgmodule.ControllerConfig
+		dkgMessagingEngineConfig              = dkgeng.DefaultMessagingEngineConfig()
+		cruiseCtlConfig                       = cruisectl.DefaultConfig()
+		cruiseCtlTargetTransitionTimeFlag     = cruiseCtlConfig.TargetTransition.String()
+		cruiseCtlFallbackProposalDurationFlag time.Duration
+		cruiseCtlMinViewDurationFlag          time.Duration
+		cruiseCtlMaxViewDurationFlag          time.Duration
+		cruiseCtlEnabledFlag                  bool
+		startupTimeString                     string
+		startupTime                           time.Time
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
@@ -121,7 +124,7 @@ func main() {
 		followerDistributor *pubsub.FollowerDistributor
 		dkgBrokerTunnel     *dkgmodule.BrokerTunnel
 		blockTimer          protocol.BlockTimer
-		proposalDurProvider pacemaker.ProposalDurationProvider
+		proposalDurProvider hotstuff.ProposalDurationProvider
 		committee           *committees.Consensus
 		epochLookup         *epochs.EpochLookup
 		hotstuffModules     *consensus.HotstuffModules
@@ -129,6 +132,7 @@ func main() {
 		safeBeaconKeys      *bstorage.SafeBeaconPrivateKeys
 		getSealingConfigs   module.SealingConfigsGetter
 	)
+	var deprecatedFlagBlockRateDelay time.Duration
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
 	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
@@ -146,18 +150,11 @@ func main() {
 		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
 		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor, "adjustment of timeout duration in case of time out event")
 		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures, "number of failed rounds before first timeout increase")
-		// TODO backward-compatibility for --block-rate-delay? if we remove in full, will need to update many environments, partner setups...
-		// TODO flag descriptions
-		flags.StringVar(&cruiseCtlTargetTransitionTimeStr, "cruise-ctl-target-epoch-transition-time", cruiseCtlTargetTransitionTimeStr, "")
-		flags.DurationVar(&cruiseCtlConfig.DefaultProposalDuration, "cruise-ctl-default-proposal-duration", cruiseCtlConfig.DefaultProposalDuration, "")
-		flags.DurationVar(&cruiseCtlConfig.MinProposalDuration, "cruise-ctl-min-proposal-duration", cruiseCtlConfig.MinProposalDuration, "")
-		flags.DurationVar(&cruiseCtlConfig.MaxProposalDuration, "cruise-ctl-max-proposal-duration", cruiseCtlConfig.MaxProposalDuration, "")
-		flags.BoolVar(&cruiseCtlConfig.Enabled, "cruise-ctl-enabled", cruiseCtlConfig.Enabled, "")
-		flags.UintVar(&cruiseCtlConfig.N_ewma, "cruise-ctl-param-newma", cruiseCtlConfig.N_ewma, "")
-		flags.UintVar(&cruiseCtlConfig.N_itg, "cruise-ctl-param-nitg", cruiseCtlConfig.N_itg, "")
-		flags.Float64Var(&cruiseCtlConfig.KP, "cruise-ctl-param-kp", cruiseCtlConfig.KP, "")
-		flags.Float64Var(&cruiseCtlConfig.KI, "cruise-ctl-param-ki", cruiseCtlConfig.KI, "")
-		flags.Float64Var(&cruiseCtlConfig.KD, "cruise-ctl-param-kd", cruiseCtlConfig.KD, "")
+		flags.StringVar(&cruiseCtlTargetTransitionTimeFlag, "cruise-ctl-target-epoch-transition-time", cruiseCtlTargetTransitionTimeFlag, "the target epoch switchover schedule")
+		flags.DurationVar(&cruiseCtlFallbackProposalDurationFlag, "cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.FallbackProposalDelay.Load(), "the proposal duration value to use when the controller is disabled, or in epoch fallback mode. In those modes, this value has the same as the old `--block-rate-delay`")
+		flags.DurationVar(&cruiseCtlMinViewDurationFlag, "cruise-ctl-min-view-duration", cruiseCtlConfig.MinViewDuration.Load(), "the lower bound of authority for the controller, when active. This is the smallest amount of time a view is allowed to take.")
+		flags.DurationVar(&cruiseCtlMaxViewDurationFlag, "cruise-ctl-max-view-duration", cruiseCtlConfig.MaxViewDuration.Load(), "the upper bound of authority for the controller when active. This is the largest amount of time a view is allowed to take.")
+		flags.BoolVar(&cruiseCtlEnabledFlag, "cruise-ctl-enabled", cruiseCtlConfig.Enabled.Load(), "whether the block time controller is enabled; when disabled, the FallbackProposalDelay is used")
 		flags.UintVar(&chunkAlpha, "chunk-alpha", flow.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", flow.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
 		flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", flow.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
@@ -171,8 +168,7 @@ func main() {
 		flags.Uint64Var(&dkgMessagingEngineConfig.RetryMax, "dkg-messaging-engine-retry-max", dkgMessagingEngineConfig.RetryMax, "the maximum number of retry attempts for an outbound DKG message")
 		flags.Uint64Var(&dkgMessagingEngineConfig.RetryJitterPercent, "dkg-messaging-engine-retry-jitter-percent", dkgMessagingEngineConfig.RetryJitterPercent, "the percentage of jitter to apply to each inter-attempt wait time")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 1996-04-24T15:04:05-07:00)")
-		var deprecated time.Duration
-		flags.DurationVar(&deprecated, "block-rate-delay", 0, "deprecated")
+		flags.DurationVar(&deprecatedFlagBlockRateDelay, "block-rate-delay", 0, "[deprecated in v0.30; Jun 2023] Use `cruise-ctl-*` flags instead, this flag has no effect and will eventually be removed")
 	}).ValidateFlags(func() error {
 		nodeBuilder.Logger.Info().Str("startup_time_str", startupTimeString).Msg("got startup_time_str")
 		if startupTimeString != cmd.NotSet {
@@ -183,12 +179,30 @@ func main() {
 			startupTime = t
 			nodeBuilder.Logger.Info().Time("startup_time", startupTime).Msg("got startup_time")
 		}
-		if cruiseCtlTargetTransitionTimeStr != cruiseCtlConfig.TargetTransition.String() {
-			transitionTime, err := cruisectl.ParseTransition(cruiseCtlTargetTransitionTimeStr)
+		// parse target transition time string, if set
+		if cruiseCtlTargetTransitionTimeFlag != cruiseCtlConfig.TargetTransition.String() {
+			transitionTime, err := cruisectl.ParseTransition(cruiseCtlTargetTransitionTimeFlag)
 			if err != nil {
 				return fmt.Errorf("invalid epoch transition time string: %w", err)
 			}
 			cruiseCtlConfig.TargetTransition = *transitionTime
+		}
+		// convert local flag variables to atomic config variables, for dynamically updatable fields
+		if cruiseCtlEnabledFlag != cruiseCtlConfig.Enabled.Load() {
+			cruiseCtlConfig.Enabled.Store(cruiseCtlEnabledFlag)
+		}
+		if cruiseCtlFallbackProposalDurationFlag != cruiseCtlConfig.FallbackProposalDelay.Load() {
+			cruiseCtlConfig.FallbackProposalDelay.Store(cruiseCtlFallbackProposalDurationFlag)
+		}
+		if cruiseCtlMinViewDurationFlag != cruiseCtlConfig.MinViewDuration.Load() {
+			cruiseCtlConfig.MinViewDuration.Store(cruiseCtlMinViewDurationFlag)
+		}
+		if cruiseCtlMaxViewDurationFlag != cruiseCtlConfig.MaxViewDuration.Load() {
+			cruiseCtlConfig.MaxViewDuration.Store(cruiseCtlMaxViewDurationFlag)
+		}
+		// log a warning about deprecated flags
+		if deprecatedFlagBlockRateDelay > 0 {
+			nodeBuilder.Logger.Warn().Msg("A deprecated flag was specified (--block-rate-delay). This flag is deprecated as of v0.30 (Jun 2023), has no effect, and will eventually be removed.")
 		}
 		return nil
 	})
@@ -679,12 +693,32 @@ func main() {
 			if err != nil {
 				return nil, err
 			}
-			ctlMetrics := metrics.NewCruiseCtlMetrics()
-			ctl, err := cruisectl.NewBlockRateController(node.Logger, ctlMetrics, cruiseCtlConfig, node.State, livenessData.CurrentView)
+			ctl, err := cruisectl.NewBlockTimeController(node.Logger, metrics.NewCruiseCtlMetrics(), cruiseCtlConfig, node.State, livenessData.CurrentView)
 			if err != nil {
 				return nil, err
 			}
 			proposalDurProvider = ctl
+			hotstuffModules.Notifier.AddOnBlockIncorporatedConsumer(ctl.OnBlockIncorporated)
+			node.ProtocolEvents.AddConsumer(ctl)
+
+			// set up admin commands for dynamically updating configs
+			err = node.ConfigManager.RegisterBoolConfig("cruise-ctl-enabled", cruiseCtlConfig.GetEnabled, cruiseCtlConfig.SetEnabled)
+			if err != nil {
+				return nil, err
+			}
+			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.GetFallbackProposalDuration, cruiseCtlConfig.SetFallbackProposalDuration)
+			if err != nil {
+				return nil, err
+			}
+			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-min-view-duration", cruiseCtlConfig.GetMinViewDuration, cruiseCtlConfig.SetMinViewDuration)
+			if err != nil {
+				return nil, err
+			}
+			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-max-view-duration", cruiseCtlConfig.GetMaxViewDuration, cruiseCtlConfig.SetMaxViewDuration)
+			if err != nil {
+				return nil, err
+			}
+
 			return ctl, nil
 		}).
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

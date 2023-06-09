@@ -41,13 +41,13 @@ func NewCruiseCtlMetrics() *CruiseCtlMetrics {
 			Name:      "target_proposal_dur_s",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCruiseCtl,
-			Help:      "The current target duration for a proposal",
+			Help:      "The current target duration from parent to child proposal",
 		}),
 		controllerOutput: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "controller_output_s",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCruiseCtl,
-			Help:      "The most recent output of the controller; the adjust to subtract from the baseline proposal duration",
+			Help:      "The most recent output of the controller; the adjustment to subtract from the baseline proposal duration",
 		}),
 	}
 }

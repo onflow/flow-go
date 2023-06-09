@@ -455,8 +455,11 @@ func VerifyBLSSignatureManyMessages(
 // Each signature at index (i) of the input signature slice is verified against
 // the public key of the same index (i) in the input key slice.
 // The input hasher is the same used to generate all signatures.
-// The returned boolean slice is a slice so that the value at index (i) is true
-// if signature (i) verifies against public key (i), and false otherwise.
+// The returned boolean slice is of the same length of the signatures slice,
+// where the boolean at index (i) is true if signature (i) verifies against
+// public key (i), and false otherwise.
+// In the case where an error occurs during the execution of the function,
+// all the returned boolean values are `false`.
 //
 // The caller must make sure the input public keys's proofs of possession have been
 // verified prior to calling this function (or each input key is sum of public
@@ -482,50 +485,58 @@ func BatchVerifyBLSSignaturesOneMessage(
 	// set BLS context
 	blsInstance.reInit()
 
+	// boolean array returned when errors occur
+	falseSlice := make([]bool, len(sigs))
+
 	// empty list check
 	if len(pks) == 0 {
-		return []bool{}, fmt.Errorf("invalid list of public keys: %w", blsAggregateEmptyListError)
+		return falseSlice, fmt.Errorf("invalid list of public keys: %w", blsAggregateEmptyListError)
 	}
 
 	if len(pks) != len(sigs) {
-		return []bool{}, invalidInputsErrorf(
+		return falseSlice, invalidInputsErrorf(
 			"keys length %d and signatures length %d are mismatching",
 			len(pks),
 			len(sigs))
 	}
 
-	verifBool := make([]bool, len(sigs))
 	if err := checkBLSHasher(kmac); err != nil {
-		return verifBool, err
+		return falseSlice, err
 	}
-
-	// an invalid signature with an incorrect header but correct length
-	invalidSig := make([]byte, signatureLengthBLSBLS12381)
-	invalidSig[0] = invalidBLSSignatureHeader // incorrect header
 
 	// flatten the shares (required by the C layer)
 	flatSigs := make([]byte, 0, signatureLengthBLSBLS12381*len(sigs))
 	pkPoints := make([]pointG2, 0, len(pks))
 
+	getIdentityPoint := func() pointG2 {
+		pk, _ := IdentityBLSPublicKey().(*pubKeyBLSBLS12381) // second value is guaranteed to be true
+		return pk.point
+	}
+
+	returnBool := make([]bool, len(sigs))
 	for i, pk := range pks {
 		pkBLS, ok := pk.(*pubKeyBLSBLS12381)
 		if !ok {
-			return verifBool, fmt.Errorf("key at index %d is invalid: %w", i, notBLSKeyError)
+			return falseSlice, fmt.Errorf("key at index %d is invalid: %w", i, notBLSKeyError)
 		}
-		pkPoints = append(pkPoints, pkBLS.point)
 
 		if len(sigs[i]) != signatureLengthBLSBLS12381 || pkBLS.isIdentity {
-			// force the signature to be invalid by replacing it with an invalid array
-			// that fails the deserialization in C.ep_read_bin_compact
-			flatSigs = append(flatSigs, invalidSig...)
+			// case of invalid signature: set the signature and public key at index `i`
+			// to identities so that there is no effect on the aggregation tree computation.
+			// However, the boolean return for index `i` is set to `false` and won't be overwritten.
+			returnBool[i] = false
+			pkPoints = append(pkPoints, getIdentityPoint())
+			flatSigs = append(flatSigs, identityBLSSignature...)
 		} else {
+			returnBool[i] = true // default to true
+			pkPoints = append(pkPoints, pkBLS.point)
 			flatSigs = append(flatSigs, sigs[i]...)
 		}
 	}
 
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(message)
-	verifInt := make([]byte, len(verifBool))
+	verifInt := make([]byte, len(sigs))
 
 	C.bls_batchVerify(
 		(C.int)(len(verifInt)),
@@ -538,12 +549,13 @@ func BatchVerifyBLSSignaturesOneMessage(
 
 	for i, v := range verifInt {
 		if (C.int)(v) != valid && (C.int)(v) != invalid {
-			return verifBool, fmt.Errorf("batch verification failed")
+			return falseSlice, fmt.Errorf("batch verification failed")
 		}
-		verifBool[i] = ((C.int)(v) == valid)
+		if returnBool[i] { // only overwrite if not previously set to false
+			returnBool[i] = ((C.int)(v) == valid)
+		}
 	}
-
-	return verifBool, nil
+	return returnBool, nil
 }
 
 // blsAggregateEmptyListError is returned when a list of BLS objects (e.g. signatures or keys)
