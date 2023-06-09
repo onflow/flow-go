@@ -85,7 +85,7 @@ func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode, logger zerolog.Log
 // initFreeEntities initializes the free double linked-list with the indices of all cached entity poolEntities.
 func (p *Pool) initFreeEntities() {
 	for i := 0; i < len(p.poolEntities); i++ {
-		p.free.addElement(p, EIndex(i))
+		p.free.appendEntity(p, EIndex(i))
 	}
 }
 
@@ -105,7 +105,7 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 		p.poolEntities[entityIndex].entity = entity
 		p.poolEntities[entityIndex].id = entityId
 		p.poolEntities[entityIndex].owner = owner
-		p.used.addElement(p, entityIndex)
+		p.used.appendEntity(p, entityIndex)
 	}
 
 	return entityIndex, slotAvailable, ejectedEntity
@@ -282,7 +282,7 @@ func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 		//se could set here p.ued.head.prev and next to 0s but its not needed
 		p.poolEntities[sliceIndex].id = flow.ZeroID
 		p.poolEntities[sliceIndex].entity = nil
-		p.free.addElement(p, EIndex(sliceIndex))
+		p.free.appendEntity(p, EIndex(sliceIndex))
 		p.used.size--
 
 		return invalidatedEntity
@@ -312,7 +312,7 @@ func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 	p.poolEntities[sliceIndex].id = flow.ZeroID
 	p.poolEntities[sliceIndex].entity = nil
 
-	p.free.addElement(p, EIndex(sliceIndex))
+	p.free.appendEntity(p, EIndex(sliceIndex))
 
 	return invalidatedEntity
 }
@@ -334,7 +334,7 @@ func (p *Pool) invalidateEntityAtIndex2(sliceIndex EIndex) flow.Entity {
 		//se could set here p.ued.head.prev and next to 0s but its not needed
 		p.poolEntities[sliceIndex].id = flow.ZeroID
 		p.poolEntities[sliceIndex].entity = nil
-		p.free.addElement(p, EIndex(sliceIndex))
+		p.free.appendEntity(p, EIndex(sliceIndex))
 		p.used.size--
 
 		return invalidatedEntity
@@ -364,7 +364,7 @@ func (p *Pool) invalidateEntityAtIndex2(sliceIndex EIndex) flow.Entity {
 	p.poolEntities[sliceIndex].id = flow.ZeroID
 	p.poolEntities[sliceIndex].entity = nil
 
-	p.free.addElement(p, EIndex(sliceIndex))
+	p.free.appendEntity(p, EIndex(sliceIndex))
 
 	return invalidatedEntity
 }
