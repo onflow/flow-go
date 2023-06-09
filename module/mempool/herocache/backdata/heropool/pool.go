@@ -223,13 +223,6 @@ func (p *Pool) connect(prev poolIndex, next EIndex) {
 	p.poolEntities[next].node.prev = prev
 }
 
-// removes element
-func (p *Pool) connect3(prev poolIndex, next EIndex, s *state) {
-	p.poolEntities[prev.getSliceIndex()].node.next.index = next
-	p.poolEntities[next].node.prev = prev
-	s.size--
-}
-
 // invalidateUsedHead moves current used head forward by one node. It
 // also removes the entity the invalidated head is presenting and appends the
 // node represented by the used head to the tail of the free list.
@@ -269,101 +262,10 @@ func (p *Pool) Remove(sliceIndex EIndex) flow.Entity {
 // it to the tail of the free list. It also removes the entity that the invalidated node is presenting.
 func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 	poolEntity := p.poolEntities[sliceIndex]
-	prev := poolEntity.node.prev
-	next := poolEntity.node.next
 	invalidatedEntity := poolEntity.entity
-
-	if p.used.size == 0 {
-		panic("Removing entity from an empty list")
-	}
-
-	if p.used.size == 1 {
-		// decrements Size
-		//se could set here p.ued.head.prev and next to 0s but its not needed
-		p.poolEntities[sliceIndex].id = flow.ZeroID
-		p.poolEntities[sliceIndex].entity = nil
-		p.free.appendEntity(p, EIndex(sliceIndex))
-		p.used.size--
-
-		return invalidatedEntity
-	}
-	// here size guaranteed > 1
-
-	if sliceIndex != p.used.head.getSliceIndex() && sliceIndex != p.used.tail.getSliceIndex() {
-		// links next and prev elements for non-head and non-tail element
-		p.connect3(prev, next.getSliceIndex(), &p.used)
-		//p.connect(prev, next.getSliceIndex())
-	}
-
-	if sliceIndex == p.used.head.getSliceIndex() {
-		// invalidating used head
-		// moves head forward
-		oldUsedHead, _ := p.getHeads()
-		p.used.head = oldUsedHead.node.next
-		p.used.size--
-	}
-
-	if sliceIndex == p.used.tail.getSliceIndex() {
-		oldUsedTail, _ := p.getTails()
-		p.used.tail = oldUsedTail.node.prev
-		p.used.size--
-	}
-
+	p.used.removeEntity(p, sliceIndex)
 	p.poolEntities[sliceIndex].id = flow.ZeroID
 	p.poolEntities[sliceIndex].entity = nil
-
-	p.free.appendEntity(p, EIndex(sliceIndex))
-
-	return invalidatedEntity
-}
-func (p *Pool) invalidateEntityAtIndex2(sliceIndex EIndex) flow.Entity {
-	poolEntity := p.poolEntities[sliceIndex]
-	prev := poolEntity.node.prev
-	next := poolEntity.node.next
-	invalidatedEntity := poolEntity.entity
-
-	if p.used.size == 0 {
-		fmt.Println("Debug shouldnt happen")
-		//this function works only when called on nonempty ued list. would be nice to have
-		// panic like a debug assert  later
-		return invalidatedEntity
-
-	}
-	if p.used.size == 1 {
-		// decrements Size
-		//se could set here p.ued.head.prev and next to 0s but its not needed
-		p.poolEntities[sliceIndex].id = flow.ZeroID
-		p.poolEntities[sliceIndex].entity = nil
-		p.free.appendEntity(p, EIndex(sliceIndex))
-		p.used.size--
-
-		return invalidatedEntity
-	}
-	// here size guaranteed > 1
-
-	if sliceIndex != p.used.head.getSliceIndex() && sliceIndex != p.used.tail.getSliceIndex() {
-		// links next and prev elements for non-head and non-tail element
-		p.connect3(prev, next.getSliceIndex(), &p.used)
-		//p.connect(prev, next.getSliceIndex())
-	}
-
-	if sliceIndex == p.used.head.getSliceIndex() {
-		// invalidating used head
-		// moves head forward
-		oldUsedHead, _ := p.getHeads()
-		p.used.head = oldUsedHead.node.next
-		p.used.size--
-	}
-
-	if sliceIndex == p.used.tail.getSliceIndex() {
-		oldUsedTail, _ := p.getTails()
-		p.used.tail = oldUsedTail.node.prev
-		p.used.size--
-	}
-
-	p.poolEntities[sliceIndex].id = flow.ZeroID
-	p.poolEntities[sliceIndex].entity = nil
-
 	p.free.appendEntity(p, EIndex(sliceIndex))
 
 	return invalidatedEntity

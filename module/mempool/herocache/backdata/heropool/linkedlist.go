@@ -27,15 +27,42 @@ type state struct {
 	size uint32
 }
 
-// Adds element to the tail of the list or creates first element
-func (s *state) appendEntity(p *Pool, entity EIndex) {
+// Adds entity to the tail of the list or creates first element
+func (s *state) appendEntity(p *Pool, entityIndex EIndex) {
 	if s.size == 0 {
-		s.head.index = entity
-		s.tail.index = entity
+		s.head.index = entityIndex
+		s.tail.index = entityIndex
 		s.size = 1
 		return
 	}
-	p.connect(s.tail, entity)
+	p.connect(s.tail, entityIndex)
 	s.size++
-	s.tail.index = entity
+	s.tail.index = entityIndex
+}
+
+func (s *state) removeEntity(p *Pool, entityIndex EIndex) {
+	if s.size == 0 {
+		panic("Removing entity from an empty list")
+	}
+	if s.size == 1 {
+		s.size--
+		return
+	}
+	node := p.poolEntities[entityIndex].node
+
+	if entityIndex != s.head.getSliceIndex() && entityIndex != s.tail.getSliceIndex() {
+		// links next and prev elements for non-head and non-tail element
+		p.connect(node.prev, node.next.getSliceIndex())
+	}
+
+	if entityIndex == s.head.getSliceIndex() {
+		// moves head forward
+		s.head = node.next
+	}
+
+	if entityIndex == s.tail.getSliceIndex() {
+		// moves tail backwards
+		s.tail = node.prev
+	}
+	s.size--
 }
