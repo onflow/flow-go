@@ -1,4 +1,4 @@
-package seed
+package prg
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ func getRandomSource(t *testing.T) []byte {
 }
 
 func getRandoms(t *testing.T, seed, customizer, diversifier []byte, N int) []byte {
-	prg, err := PRGFromRandomSource(seed, customizer, diversifier)
+	prg, err := FromRandomSource(seed, customizer, diversifier)
 	require.NoError(t, err)
 	rand := make([]byte, N)
 	prg.Read(rand)

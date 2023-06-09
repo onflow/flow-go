@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
-	"github.com/onflow/flow-go/state/protocol/seed"
+	"github.com/onflow/flow-go/state/protocol/prg"
 )
 
 // staticEpochInfo contains leader selection and the initial committee for one epoch.
@@ -85,7 +85,7 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 // * has the same static committee as the last committed epoch
 func newEmergencyFallbackEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpochInfo, error) {
 
-	rng, err := seed.PRGFromRandomSource(lastCommittedEpoch.randomSource, seed.ConsensusLeaderSelection)
+	rng, err := prg.FromRandomSource(lastCommittedEpoch.randomSource, prg.ConsensusLeaderSelection)
 	if err != nil {
 		return nil, fmt.Errorf("could not create rng from seed: %w", err)
 	}

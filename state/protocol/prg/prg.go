@@ -1,4 +1,4 @@
-package seed
+package prg
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 
 const RandomSourceLength = crypto.SignatureLenBLSBLS12381
 
-// PRGFromRandomSource returns a PRG seeded by the input source of randomness.
+// FromRandomSource returns a PRG seeded by the input source of randomness.
 // The customizer is used to generate a task-specific PRG. A customizer can be any slice
 // of up-to-12 bytes.
 // The diversifier is used to further diversify the PRGs beyond the customizer. A diversifer
@@ -19,7 +19,7 @@ const RandomSourceLength = crypto.SignatureLenBLSBLS12381
 // The function uses an extandable-output function (xof) to extract and expand the the input source,
 // so that any source with enough entropy (at least 128 bits) can be used (no need to pre-hash).
 // Current implementation generates a ChaCha20-based CSPRG.
-func PRGFromRandomSource(source []byte, customizer []byte, diversifier []byte) (random.Rand, error) {
+func FromRandomSource(source []byte, customizer []byte, diversifier []byte) (random.Rand, error) {
 	seed, err := xof(source, diversifier, random.Chacha20SeedLen)
 	if err != nil {
 		return nil, fmt.Errorf("extendable output function failed: %w", err)

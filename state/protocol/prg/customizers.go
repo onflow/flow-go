@@ -1,4 +1,4 @@
-package seed
+package prg
 
 import "encoding/binary"
 
