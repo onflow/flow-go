@@ -223,13 +223,6 @@ func (p *Pool) connect(prev poolIndex, next EIndex) {
 	p.poolEntities[next].node.prev = prev
 }
 
-// connect 2 move to state and call it add , enccapsulate together with size ==0 case
-func (p *Pool) connect2(prev poolIndex, next EIndex, s *state) {
-	p.poolEntities[prev.getSliceIndex()].node.next.index = next
-	p.poolEntities[next].node.prev = prev
-	s.size++
-}
-
 // removes element
 func (p *Pool) connect3(prev poolIndex, next EIndex, s *state) {
 	p.poolEntities[prev.getSliceIndex()].node.next.index = next
@@ -275,6 +268,55 @@ func (p *Pool) Remove(sliceIndex EIndex) flow.Entity {
 // removing its corresponding linked-list node from the used linked list, and appending
 // it to the tail of the free list. It also removes the entity that the invalidated node is presenting.
 func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
+	poolEntity := p.poolEntities[sliceIndex]
+	prev := poolEntity.node.prev
+	next := poolEntity.node.next
+	invalidatedEntity := poolEntity.entity
+
+	if p.used.size == 0 {
+		panic("Removing entity from an empty list")
+	}
+
+	if p.used.size == 1 {
+		// decrements Size
+		//se could set here p.ued.head.prev and next to 0s but its not needed
+		p.poolEntities[sliceIndex].id = flow.ZeroID
+		p.poolEntities[sliceIndex].entity = nil
+		p.free.addElement(p, EIndex(sliceIndex))
+		p.used.size--
+
+		return invalidatedEntity
+	}
+	// here size guaranteed > 1
+
+	if sliceIndex != p.used.head.getSliceIndex() && sliceIndex != p.used.tail.getSliceIndex() {
+		// links next and prev elements for non-head and non-tail element
+		p.connect3(prev, next.getSliceIndex(), &p.used)
+		//p.connect(prev, next.getSliceIndex())
+	}
+
+	if sliceIndex == p.used.head.getSliceIndex() {
+		// invalidating used head
+		// moves head forward
+		oldUsedHead, _ := p.getHeads()
+		p.used.head = oldUsedHead.node.next
+		p.used.size--
+	}
+
+	if sliceIndex == p.used.tail.getSliceIndex() {
+		oldUsedTail, _ := p.getTails()
+		p.used.tail = oldUsedTail.node.prev
+		p.used.size--
+	}
+
+	p.poolEntities[sliceIndex].id = flow.ZeroID
+	p.poolEntities[sliceIndex].entity = nil
+
+	p.free.addElement(p, EIndex(sliceIndex))
+
+	return invalidatedEntity
+}
+func (p *Pool) invalidateEntityAtIndex2(sliceIndex EIndex) flow.Entity {
 	poolEntity := p.poolEntities[sliceIndex]
 	prev := poolEntity.node.prev
 	next := poolEntity.node.next
