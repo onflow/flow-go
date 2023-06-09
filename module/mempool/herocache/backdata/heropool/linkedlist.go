@@ -28,7 +28,7 @@ type state struct {
 }
 
 // Adds element to the tail of the list or creates first element
-func (s *state) addElement(p *Pool, entity EIndex) {
+func (s *state) appendEntity(p *Pool, entity EIndex) {
 	if s.size == 0 {
 		s.head.index = entity
 		s.tail.index = entity
