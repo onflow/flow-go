@@ -207,7 +207,6 @@ func (p *Pool) getTails() (*poolEntity, *poolEntity) {
 	if p.used.size != 0 {
 		usedTail = &p.poolEntities[p.used.tail]
 	}
-
 	if p.free.size != 0 {
 		freeTail = &p.poolEntities[p.free.tail]
 	}
