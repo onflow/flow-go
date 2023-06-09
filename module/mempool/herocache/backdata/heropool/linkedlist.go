@@ -5,14 +5,6 @@ package heropool
 // if a link doesn't belong to any state it's next and prev may have any values,
 // but those are treated as invalid and should not be used.
 type link struct {
-	// As we dont have from now on an invalid index we need either to make next/prev point to itself
-	// in order to show that its invalid
-	// Other option is to say that  if a link is a tail or head then respectively its prev or next should not be used
-	// if tail and head concide then neither of them is to be used
-	// Both solutions defacto would reintroduce isDefined, we would need to check if next != current Index
-	// of if this is head or tail ... of one of the lists. For this reason I am not sure that this idea of removing 0 as undefined wont backfire
-
-	// lets start with head and tail check
 	next EIndex
 	prev EIndex
 }
@@ -27,7 +19,7 @@ type state struct {
 	size uint32
 }
 
-// Adds entity to the tail of the list or creates first element
+// adds entity to the tail of the list or creates first element
 func (s *state) appendEntity(p *Pool, entityIndex EIndex) {
 	if s.size == 0 {
 		s.head = entityIndex
@@ -40,7 +32,7 @@ func (s *state) appendEntity(p *Pool, entityIndex EIndex) {
 	s.tail = entityIndex
 }
 
-// Removes an entity from the list
+// removes an entity from the list
 func (s *state) removeEntity(p *Pool, entityIndex EIndex) {
 	if s.size == 0 {
 		panic("Removing entity from an empty list")
