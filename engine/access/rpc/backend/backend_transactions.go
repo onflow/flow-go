@@ -426,7 +426,8 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 				return nil, rpc.ConvertStorageError(err)
 			}
 
-			events, err := convert.MessagesToEventsFromVersion(txResult.GetEvents(), txResult.GetEventEncodingVersion())
+			// note: EventEncodingVersion is set on the GetTransactionResultsResponse, not the individual tx results
+			events, err := convert.MessagesToEventsFromVersion(txResult.GetEvents(), resp.GetEventEncodingVersion())
 			if err != nil {
 				return nil, status.Errorf(codes.Internal,
 					"failed to convert events to message in txID %x: %v", txID, err)
