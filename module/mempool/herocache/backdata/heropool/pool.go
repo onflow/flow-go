@@ -82,25 +82,11 @@ func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode, logger zerolog.Log
 	return l
 }
 
-// can be negative
-func (p *Pool) modifyUsedBy(incrementBy int) {
-	p.used.size += incrementBy
-	p.free.size = len(p.poolEntities) - p.used.size
-}
-
 // initFreeEntities initializes the free double linked-list with the indices of all cached entity poolEntities.
 func (p *Pool) initFreeEntities() {
-
-	p.free.head.index = EIndex(0)
-	p.free.tail.index = EIndex(0)
-
-	for i := 1; i < len(p.poolEntities); i++ {
-		// appends slice index i to tail of free linked list
-		p.connect(p.free.tail, EIndex(i))
-		// and updates its tail
-		p.free.tail.index = EIndex(i)
+	for i := 0; i < len(p.poolEntities); i++ {
+		p.free.addElement(p, EIndex(i))
 	}
-	p.free.size = len(p.poolEntities)
 }
 
 // Add writes given entity into a poolEntity on the underlying entities linked-list.
@@ -119,27 +105,7 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 		p.poolEntities[entityIndex].entity = entity
 		p.poolEntities[entityIndex].id = entityId
 		p.poolEntities[entityIndex].owner = owner
-
-		if p.used.size == 0 {
-			// used list is empty, hence setting head of used list to current entityIndex.
-			p.used.head.index = entityIndex
-			// as size gonna be non zero tail has to point somewhere and it cant point to 0 anylonger as 0 now
-			// is legitim. Lets then make tail and head concide.
-			p.used.tail.index = entityIndex
-			// we treat both as undefined prev and next if this node is tail and head so nothing to do
-			//p.poolEntities[p.used.head.getSliceIndex()].node.prev.setUndefined()
-		} else {
-			// if used is non empty then connect to its tail, we expect that eviction conserved valid list
-			p.connect(p.used.tail, entityIndex)
-			// TODO will it work for corner cases like when capasity of pool is 1 or 2 etc ...
-			// since we are appending to the used list, entityIndex also acts as tail of the list.
-			p.used.tail.index = entityIndex
-		}
-
-		// not sure why here it is incremented as  p.sliceIndexForEntity() couldve evict one element
-		// may be check for ejectedEntity ?
-		p.size++
-		p.modifyUsedBy(1)
+		p.used.addElement(p, entityIndex)
 	}
 
 	return entityIndex, slotAvailable, ejectedEntity
@@ -151,11 +117,11 @@ func (p *Pool) Get(entityIndex EIndex) (flow.Identifier, flow.Entity, uint64) {
 }
 
 // All returns all stored entities in this pool.
-func (p *Pool) All() []PoolEntity {
-	all := make([]PoolEntity, p.size)
+func (p Pool) All() []PoolEntity {
+	all := make([]PoolEntity, p.used.size)
 	next := p.used.head
 
-	for i := uint32(0); i < p.size; i++ {
+	for i := uint32(0); i < p.used.size; i++ {
 		e := p.poolEntities[next.getSliceIndex()]
 		all[i] = e.PoolEntity
 		next = e.node.next
@@ -218,8 +184,8 @@ func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedEn
 }
 
 // Size returns total number of entities that this list maintains.
-func (p *Pool) Size() uint32 {
-	return p.size
+func (p Pool) Size() uint32 {
+	return p.used.size
 }
 
 // getHeads returns entities corresponding to the used and free heads.
@@ -257,6 +223,20 @@ func (p *Pool) connect(prev poolIndex, next EIndex) {
 	p.poolEntities[next].node.prev = prev
 }
 
+// connect 2 move to state and call it add , enccapsulate together with size ==0 case
+func (p *Pool) connect2(prev poolIndex, next EIndex, s *state) {
+	p.poolEntities[prev.getSliceIndex()].node.next.index = next
+	p.poolEntities[next].node.prev = prev
+	s.size++
+}
+
+// removes element
+func (p *Pool) connect3(prev poolIndex, next EIndex, s *state) {
+	p.poolEntities[prev.getSliceIndex()].node.next.index = next
+	p.poolEntities[next].node.prev = prev
+	s.size--
+}
+
 // invalidateUsedHead moves current used head forward by one node. It
 // also removes the entity the invalidated head is presenting and appends the
 // node represented by the used head to the tail of the free list.
@@ -280,6 +260,7 @@ func (p *Pool) claimFreeHead() EIndex {
 
 	if p.free.size > 1 {
 		p.free.head = p.poolEntities[oldFreeHeadIndex].node.next
+		p.free.size = p.free.size - 1
 	}
 
 	return oldFreeHeadIndex
@@ -311,9 +292,8 @@ func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 		//se could set here p.ued.head.prev and next to 0s but its not needed
 		p.poolEntities[sliceIndex].id = flow.ZeroID
 		p.poolEntities[sliceIndex].entity = nil
-		p.appendToFreeList(sliceIndex)
-		p.size--
-		p.modifyUsedBy(-1)
+		p.free.addElement(p, EIndex(sliceIndex))
+		p.used.size--
 
 		return invalidatedEntity
 	}
@@ -321,7 +301,8 @@ func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 
 	if sliceIndex != p.used.head.getSliceIndex() && sliceIndex != p.used.tail.getSliceIndex() {
 		// links next and prev elements for non-head and non-tail element
-		p.connect(prev, next.getSliceIndex())
+		p.connect3(prev, next.getSliceIndex(), &p.used)
+		//p.connect(prev, next.getSliceIndex())
 	}
 
 	if sliceIndex == p.used.head.getSliceIndex() {
@@ -329,39 +310,21 @@ func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 		// moves head forward
 		oldUsedHead, _ := p.getHeads()
 		p.used.head = oldUsedHead.node.next
+		p.used.size--
 	}
 
 	if sliceIndex == p.used.tail.getSliceIndex() {
 		oldUsedTail, _ := p.getTails()
 		p.used.tail = oldUsedTail.node.prev
+		p.used.size--
 	}
 
 	p.poolEntities[sliceIndex].id = flow.ZeroID
 	p.poolEntities[sliceIndex].entity = nil
 
-	p.appendToFreeList(sliceIndex)
-
-	// decrements Size
-	p.size--
-	p.modifyUsedBy(-1)
+	p.free.addElement(p, EIndex(sliceIndex))
 
 	return invalidatedEntity
-}
-
-// appendToFreeList appends linked-list node represented by getSliceIndex to tail of free list.
-func (p *Pool) appendToFreeList(sliceIndex EIndex) {
-	if p.free.size == 0 {
-		// free list is empty
-		p.free.head.index = sliceIndex
-		p.free.tail.index = sliceIndex
-		return
-	}
-
-	// appends to the tail, and updates the tail
-	p.connect(p.free.tail, sliceIndex)
-	p.free.tail.index = sliceIndex
-	// it's gonna be reupdated but its a good practice to maintain size in sync
-	p.free.size++
 }
 
 // isInvalidated returns true if linked-list node represented by getSliceIndex does not contain
