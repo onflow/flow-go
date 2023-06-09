@@ -141,9 +141,8 @@ func NewBlockComputer(
 	signer module.Local,
 	executionDataProvider *provider.Provider,
 	colResCons []result.ExecutedCollectionConsumer,
+	maxConcurrency int,
 ) (BlockComputer, error) {
-	// TODO(patrick): expose this
-	maxConcurrency := 1
 	if maxConcurrency < 1 {
 		return nil, fmt.Errorf("invalid maxConcurrency: %d", maxConcurrency)
 	}
