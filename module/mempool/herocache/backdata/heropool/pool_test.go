@@ -300,7 +300,6 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			require.Nil(t, usedHead)
 			require.Nil(t, usedTail)
 			require.True(t, pool.used.size == 0)
-			//require.True(t, pool.used.head.isUndefined())
 		}
 	}
 }
