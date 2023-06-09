@@ -393,18 +393,14 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 
 // testInitialization evaluates the state of an initialized pool before adding any element to it.
 func testInitialization(t *testing.T, pool *Pool, _ []*unittest.MockEntity) {
-	// head and tail of "used" linked-list must be undefined at initialization time, since we have no elements in the list.
+	// "used" linked-list must have a zero size, since we have no elements in the list.
 	require.True(t, pool.used.size == 0)
-	//require.True(t, pool.used.tail.isUndefined())
 
 	for i := 0; i < len(pool.poolEntities); i++ {
 		if i == 0 {
 			// head of "free" linked-list should point to index 0 of entities slice.
+			// previous element of head must is always undefined by convention and may hold any value.
 			require.Equal(t, EIndex(i), pool.free.head.getSliceIndex())
-			// previous element of head must be undefined (linked-list head feature).
-
-			// TODO this is more tricky to change , leaving it for later.
-			//require.True(t, pool.poolEntities[i].node.prev.isUndefined())
 		}
 
 		if i != 0 {
@@ -419,10 +415,8 @@ func testInitialization(t *testing.T, pool *Pool, _ []*unittest.MockEntity) {
 
 		if i == len(pool.poolEntities)-1 {
 			// tail of "free" linked-list should point to the last index in entities slice.
+			// next element of tail is always undefined by convention and may hold any value.
 			require.Equal(t, EIndex(i), pool.free.tail.getSliceIndex())
-			// next element of tail must be undefined.
-			//TODO
-			//require.True(t, pool.poolEntities[i].node.next.isUndefined())
 		}
 	}
 }
@@ -680,8 +674,6 @@ func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 		require.NotEqual(t, tailSliceIndex, index, "tail visited in less expected steps (potential inconsistency)", i, steps)
 		_, ok := seen[index]
 		require.False(t, ok, "duplicate identifiers found")
-		//TODO
-		//require.False(t, pool.poolEntities[index].node.next.isUndefined(), "tail not found, and reached end of list")
 		index = pool.poolEntities[index].node.next.getSliceIndex()
 	}
 }
