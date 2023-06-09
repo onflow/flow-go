@@ -1,8 +1,6 @@
 package heropool
 
 import (
-	"fmt"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -235,20 +233,7 @@ func (p *Pool) invalidateUsedHead() flow.Entity {
 // old free head to host a new entity.
 func (p *Pool) claimFreeHead() EIndex {
 	oldFreeHeadIndex := p.free.head.getSliceIndex()
-
-	if p.free.size == 0 {
-		fmt.Println("debug shouldnt happen")
-	}
-
-	if p.free.size == 1 {
-		p.free.size = 0
-	}
-
-	if p.free.size > 1 {
-		p.free.head = p.poolEntities[oldFreeHeadIndex].node.next
-		p.free.size = p.free.size - 1
-	}
-
+	p.free.removeEntity(p, oldFreeHeadIndex)
 	return oldFreeHeadIndex
 }
 
