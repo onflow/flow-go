@@ -742,6 +742,7 @@ func (e *Engine) onBlockExecuted(
 			// find the block that was just executed
 			executionQueue, exists := executionQueues.ByID(executed.ID())
 			if !exists {
+				logQueueState(e.log, executionQueues, executed.ID())
 				// when the block no longer exists in the queue, it means there was a race condition that
 				// two onBlockExecuted was called for the same block, and one process has already removed the
 				// block from the queue, so we will print an error here
@@ -797,8 +798,9 @@ func (e *Engine) onBlockExecuted(
 		})
 
 	if err != nil {
-		e.log.Err(err).
+		e.log.Fatal().Err(err).
 			Hex("block", logging.Entity(executed)).
+			Uint64("height", executed.Block.Header.Height).
 			Msg("error while requeueing blocks after execution")
 	}
 
@@ -1319,4 +1321,13 @@ func (e *Engine) getHeaderByHeight(height uint64) (*flow.Header, error) {
 	// we don't use protocol state because for dynamic boostrapped execution node
 	// the last executed and sealed block is below the finalized root block
 	return e.headers.ByHeight(height)
+}
+
+func logQueueState(log zerolog.Logger, queues *stdmap.QueuesBackdata, blockID flow.Identifier) {
+	all := queues.All()
+
+	log.With().Hex("queue_state__executed_block_id", blockID[:]).Int("count", len(all)).Logger()
+	for i, queue := range all {
+		log.Error().Msgf("%v-th queue state: %v", i, queue.String())
+	}
 }
