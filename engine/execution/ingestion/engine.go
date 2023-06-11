@@ -2,10 +2,8 @@ package ingestion
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -1046,105 +1044,6 @@ func (e *Engine) matchAndFindMissingCollections(
 	}
 
 	return missingCollections, nil
-}
-
-func (e *Engine) ExecuteScriptAtBlockID(
-	ctx context.Context,
-	script []byte,
-	arguments [][]byte,
-	blockID flow.Identifier,
-) ([]byte, error) {
-
-	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
-	}
-
-	// return early if state with the given state commitment is not in memory
-	// and already purged. This reduces allocations for scripts targeting old blocks.
-	if !e.execState.HasState(stateCommit) {
-		return nil, fmt.Errorf("failed to execute script at block (%s): state commitment not found (%s). this error usually happens if the reference block for this script is not set to a recent block", blockID.String(), hex.EncodeToString(stateCommit[:]))
-	}
-
-	block, err := e.state.AtBlockID(blockID).Head()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
-	}
-
-	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
-
-	if e.extensiveLogging {
-		args := make([]string, 0)
-		for _, a := range arguments {
-			args = append(args, hex.EncodeToString(a))
-		}
-		e.log.Debug().
-			Hex("block_id", logging.ID(blockID)).
-			Uint64("block_height", block.Height).
-			Hex("state_commitment", stateCommit[:]).
-			Hex("script_hex", script).
-			Str("args", strings.Join(args[:], ",")).
-			Msg("extensive log: executed script content")
-	}
-	return e.computationManager.ExecuteScript(
-		ctx,
-		script,
-		arguments,
-		block,
-		blockSnapshot)
-}
-
-func (e *Engine) GetRegisterAtBlockID(
-	ctx context.Context,
-	owner, key []byte,
-	blockID flow.Identifier,
-) ([]byte, error) {
-
-	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
-	}
-
-	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
-
-	id := flow.NewRegisterID(string(owner), string(key))
-	data, err := blockSnapshot.Get(id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get the register (%s): %w", id, err)
-	}
-
-	return data, nil
-}
-
-func (e *Engine) GetAccount(
-	ctx context.Context,
-	addr flow.Address,
-	blockID flow.Identifier,
-) (*flow.Account, error) {
-	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
-	}
-
-	// return early if state with the given state commitment is not in memory
-	// and already purged. This reduces allocations for get accounts targeting old blocks.
-	if !e.execState.HasState(stateCommit) {
-		return nil, fmt.Errorf(
-			"failed to get account at block (%s): state commitment not "+
-				"found (%s). this error usually happens if the reference "+
-				"block for this script is not set to a recent block.",
-			blockID.String(),
-			hex.EncodeToString(stateCommit[:]))
-	}
-
-	block, err := e.state.AtBlockID(blockID).Head()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
-	}
-
-	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
-
-	return e.computationManager.GetAccount(ctx, addr, block, blockSnapshot)
 }
 
 // save the execution result of a block
