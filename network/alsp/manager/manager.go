@@ -54,11 +54,8 @@ func defaultSpamRecordCacheFactory() SpamRecordCacheFactory {
 	}
 }
 
-// MisbehaviorReportManager is responsible for handling misbehavior reports.
-// The current version is at the minimum viable product stage and only logs the reports.
-// TODO: the mature version should be able to handle the reports and take actions accordingly, i.e., penalize the misbehaving node
-//
-//	and report the node to be disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
+// MisbehaviorReportManager is responsible for handling misbehavior reports, i.e., penalizing the misbehaving node
+// and report the node to be disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
 type MisbehaviorReportManager struct {
 	component.Component
 	logger  zerolog.Logger
