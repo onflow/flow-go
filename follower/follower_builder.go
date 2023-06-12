@@ -479,7 +479,6 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
-		fmt.Println(builder.BaseConfig.FlowConfig)
 
 		builder.NodeDisallowListDistributor = cmd.BuildDisallowListNotificationDisseminator(builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
 
