@@ -8,7 +8,7 @@ import (
 )
 
 // ErrInvalidLimitConfig indicates the validation limit is < 0.
-type ErrInvalidLimitConfig struct {
+type InvalidLimitConfigError struct {
 	// controlMsg the control message type.
 	controlMsg p2p.ControlMessageType
 	err        error
