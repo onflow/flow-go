@@ -341,6 +341,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			// TODO: this can be done in batch but at this stage let's send individual notifications.
 			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
 			if record.Penalty == float64(0) {
+				// Penalty has fully decayed to zero and the node can be back in the allow list.
 				m.disallowListingConsumer.OnAllowListNotification(&network.AllowListingUpdate{
 					FlowIds: flow.IdentifierList{id},
 					Cause:   network.DisallowListedCauseAlsp, // clears the ALSP disallow listing cause from node
