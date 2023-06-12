@@ -78,7 +78,6 @@ type MisbehaviorReportManager struct {
 
 	// disallowListingConsumer is the consumer for the disallow-listing notifications.
 	// It is notified when a node is disallow-listed by this manager.
-	// Exactly one consumer must be set. The code should panic if the consumer is not set or set more than once.
 	disallowListingConsumer network.DisallowListNotificationConsumer
 
 	// workerPool is the worker pool for handling the misbehavior reports in a thread-safe and non-blocking manner.
@@ -163,7 +162,6 @@ func WithSpamRecordsCacheFactory(f SpamRecordCacheFactory) MisbehaviorReportMana
 // perform the lower-level disallow-listing action at the networking layer.
 // All connections to the disallow-listed node are closed and the node is removed from the overlay, and
 // no further connections are established to the disallow-listed node, either inbound or outbound.
-// Note: A consumer must be set before the manager is started. The manager panics if the consumer is not set.
 //
 // Returns:
 //
