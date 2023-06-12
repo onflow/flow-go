@@ -34,7 +34,7 @@ func (s *state) appendEntity(p *Pool, entityIndex EIndex) {
 // removes an entity from the list
 func (s *state) removeEntity(p *Pool, entityIndex EIndex) {
 	if s.size == 0 {
-		panic("Removing entity from an empty list")
+		panic("Removing an entity from the empty list")
 	}
 	if s.size == 1 {
 		s.size--
