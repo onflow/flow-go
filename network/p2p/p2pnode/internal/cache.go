@@ -86,8 +86,8 @@ func (d *DisallowListCache) init(peerID peer.ID) bool {
 // - peerID: the peerID of the peer to be disallow-listed.
 // - cause: the cause for disallow-listing the peer.
 // Returns:
-// - the list of causes for which the peer is disallow-listed.
-// - error if the operation fails, error is irrecoverable.
+// - []network.DisallowListedCause: the list of causes for which the peer is disallow-listed.
+// - error: if the operation fails, error is irrecoverable.
 func (d *DisallowListCache) DisallowFor(peerID peer.ID, cause network.DisallowListedCause) ([]network.DisallowListedCause, error) {
 	// first, we try to optimistically add the peer to the disallow list.
 	causes, err := d.disallowListFor(peerID, cause)
