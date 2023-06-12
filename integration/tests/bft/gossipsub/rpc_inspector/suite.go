@@ -26,7 +26,7 @@ func (s *Suite) SetupSuite() {
 	s.BaseSuite.SetupSuite()
 
 	// enable metrics server for all nodes
-	for i, _ := range s.NodeConfigs {
+	for i := range s.NodeConfigs {
 		s.NodeConfigs[i].EnableMetricsServer = true
 	}
 
