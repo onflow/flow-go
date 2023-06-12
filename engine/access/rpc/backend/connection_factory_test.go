@@ -410,34 +410,39 @@ func TestConnectionPoolStale(t *testing.T) {
 
 // TestCircuitBreakerExecutionNode
 func TestCircuitBreakerExecutionNode(t *testing.T) {
-	timeout := time.Second
-
+	requestTimeout := 1 * time.Second
+	circuitBreakerRestoreTimeout := 3 * time.Second
 	// create an execution node
 	en := new(executionNode)
 	en.start(t)
 	defer en.stop(t)
 
-	// setup the handler mock to not respond within the timeout
+	// setup the handler mock to not respond within the requestTimeout
 	req := &execution.PingRequest{}
 	resp := &execution.PingResponse{}
-	en.handler.On("Ping", testifymock.Anything, req).After(timeout+time.Second).Return(resp, nil)
+	en.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the execution grpc port
 	connectionFactory.ExecutionGRPCPort = en.port
-	// set the execution grpc client timeout
-	connectionFactory.ExecutionNodeGRPCTimeout = timeout
-	// set the connection pool cache size
-	cacheSize := 5
-	connectionFactory.CacheSize = uint(cacheSize)
-	// set metrics reporting
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+	// set the execution grpc client requestTimeout
+	connectionFactory.ExecutionNodeGRPCTimeout = requestTimeout
+	// set the configuration for circuit breaker
 	connectionFactory.CircuitBreakerConfig = CircuitBreakerConfig{
 		Enabled:           true,
 		MaxRequestToBreak: 1,
-		RestoreTimeout:    10 * time.Second,
+		RestoreTimeout:    circuitBreakerRestoreTimeout,
 	}
+	// set the connection pool cache size
+	cacheSize := 1
+	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
+		evictedValue.(*CachedClient).Close()
+	})
+	connectionFactory.ConnectionsCache = cache
+	connectionFactory.CacheSize = uint(cacheSize)
+	// set metrics reporting
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	// create the execution API client
 	client, _, err := connectionFactory.GetExecutionAPIClient(en.listener.Addr().String())
@@ -454,46 +459,59 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	}
 
 	duration, err := callAndMeasurePingDuration()
-	// assert that the client timed out
 	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
-	assert.LessOrEqual(t, timeout, duration)
+	assert.LessOrEqual(t, requestTimeout, duration)
 
 	duration, err = callAndMeasurePingDuration()
 	assert.Equal(t, gobreaker.ErrOpenState, err)
-	assert.Greater(t, timeout, duration)
+	assert.Greater(t, requestTimeout, duration)
+
+	//Wait until Circuit breaker go to Half-open state
+	time.Sleep(circuitBreakerRestoreTimeout + time.Second)
+
+	en.handler.On("Ping", testifymock.Anything, req).Unset()
+	en.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+
+	duration, err = callAndMeasurePingDuration()
+	assert.Greater(t, requestTimeout, duration)
+	assert.Equal(t, nil, err)
 }
 
 // TestCircuitBreakerCollectionNode
 func TestCircuitBreakerCollectionNode(t *testing.T) {
-	timeout := time.Second
-
+	requestTimeout := 1 * time.Second
+	circuitBreakerRestoreTimeout := 3 * time.Second
 	// create a collection node
 	cn := new(collectionNode)
 	cn.start(t)
 	defer cn.stop(t)
 
-	// set up the handler mock to not respond within the timeout
+	// set up the handler mock to not respond within the requestTimeout
 	req := &access.PingRequest{}
 	resp := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, req).After(timeout+time.Second).Return(resp, nil)
+	cn.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn.port
-	// set the collection grpc client timeout
-	connectionFactory.CollectionNodeGRPCTimeout = timeout
-	// set the connection pool cache size
-	cacheSize := 5
-	connectionFactory.CacheSize = uint(cacheSize)
-	// set metrics reporting
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
-
+	// set the collection grpc client requestTimeout
+	connectionFactory.CollectionNodeGRPCTimeout = requestTimeout
+	// set the configuration for circuit breaker
 	connectionFactory.CircuitBreakerConfig = CircuitBreakerConfig{
 		Enabled:           true,
 		MaxRequestToBreak: 1,
-		RestoreTimeout:    10 * time.Second,
+		RestoreTimeout:    circuitBreakerRestoreTimeout,
 	}
+	// set the connection pool cache size
+	cacheSize := 1
+	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
+		evictedValue.(*CachedClient).Close()
+	})
+	connectionFactory.ConnectionsCache = cache
+	connectionFactory.CacheSize = uint(cacheSize)
+	// set metrics reporting
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	// create the collection API client
 	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String())
@@ -510,13 +528,22 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	}
 
 	duration, err := callAndMeasurePingDuration()
-	// assert that the client timed out
 	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
-	assert.LessOrEqual(t, timeout, duration)
+	assert.LessOrEqual(t, requestTimeout, duration)
 
 	duration, err = callAndMeasurePingDuration()
 	assert.Equal(t, gobreaker.ErrOpenState, err)
-	assert.Greater(t, timeout, duration)
+	assert.Greater(t, requestTimeout, duration)
+
+	//Wait until Circuit breaker go to Half-open state
+	time.Sleep(circuitBreakerRestoreTimeout + time.Second)
+
+	cn.handler.On("Ping", testifymock.Anything, req).Unset()
+	cn.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+
+	duration, err = callAndMeasurePingDuration()
+	assert.Greater(t, requestTimeout, duration)
+	assert.Equal(t, nil, err)
 }
 
 // node mocks a flow node that runs a GRPC server
