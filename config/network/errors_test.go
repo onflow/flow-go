@@ -21,10 +21,10 @@ func TestErrInvalidLimitConfigRoundTrip(t *testing.T) {
 	expectedErrMsg := fmt.Errorf("invalid rpc control message %s validation limit configuration: %w", controlMsg, e).Error()
 	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
 
-	// tests the IsErrInvalidLimitConfig function.
-	assert.True(t, IsErrInvalidLimitConfig(err), "IsErrInvalidLimitConfig should return true for ErrInvalidLimitConfig error")
+	// tests the IsInvalidLimitConfigError function.
+	assert.True(t, IsInvalidLimitConfigError(err), "IsInvalidLimitConfigError should return true for ErrInvalidLimitConfig error")
 
-	// test IsErrInvalidLimitConfig with a different error type.
+	// test IsInvalidLimitConfigError with a different error type.
 	dummyErr := fmt.Errorf("dummy error")
-	assert.False(t, IsErrInvalidLimitConfig(dummyErr), "IsErrInvalidLimitConfig should return false for non-ErrInvalidLimitConfig error")
+	assert.False(t, IsInvalidLimitConfigError(dummyErr), "IsInvalidLimitConfigError should return false for non-ErrInvalidLimitConfig error")
 }
