@@ -9,17 +9,15 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestStoreAndRetrieval_BelowLimit checks health of heroPool for storing and retrieval scenarios that
-// do not involve ejection.
-// The test involves cases for testing the pool below its limit, and also up to its limit. However, it never gets beyond
-// the limit, so no ejection will kick-in.
-func TestAddElementsToList(t *testing.T) {
+// TestRemovingElementsFromList first insures that lit ha been initialized correclty,
+// then removes element and tests list consistency
+func TestRemovingElementsFromList(t *testing.T) {
 	limit_capacity := uint32(4)
 	number_of_entities := uint32(4)
 	t.Run(fmt.Sprintf("%d-limit-%d-entities", limit_capacity, number_of_entities), func(t *testing.T) {
 		withTestScenario(t, limit_capacity, number_of_entities, LRUEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
 			func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
-				testAddingElementsToList(t, pool, entities, LRUEjection)
+				testRemovingElementsFromList(t, pool, entities, LRUEjection)
 			},
 		}...,
 		)
@@ -42,7 +40,7 @@ func checkList(t *testing.T, expectedList []EIndex, pool *Pool, list *state) {
 	require.Equal(t, expectedList[i], node_index)
 }
 
-func testAddingElementsToList(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.MockEntity, ejectionMode EjectionMode) {
+func testRemovingElementsFromList(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.MockEntity, ejectionMode EjectionMode) {
 
 	//check entities are initalized
 	expectedList := [4]EIndex{0, 1, 2, 3}
