@@ -106,7 +106,9 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 	cfg := managerCfgFixture()
 
-	// create a new MisbehaviorReportManager
+	// this test is assessing the integration of the ALSP manager with the network. As the ALSP manager is an attribute
+	// of the network, we need to configure the ALSP manager via the network configuration, and let the network create
+	// the ALSP manager.
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
 		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
@@ -201,7 +203,9 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T) {
 	cfg := managerCfgFixture()
 
-	// create a new MisbehaviorReportManager
+	// this test is assessing the integration of the ALSP manager with the network. As the ALSP manager is an attribute
+	// of the network, we need to configure the ALSP manager via the network configuration, and let the network create
+	// the ALSP manager.
 	var victimSpamRecordCacheCache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
 		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
@@ -281,6 +285,10 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 // It fails the test if the metrics are not recorded or if they are recorded incorrectly.
 func TestMisbehaviorReportMetrics(t *testing.T) {
 	cfg := managerCfgFixture()
+
+	// this test is assessing the integration of the ALSP manager with the network. As the ALSP manager is an attribute
+	// of the network, we need to configure the ALSP manager via the network configuration, and let the network create
+	// the ALSP manager.
 	alspMetrics := mockmodule.NewAlspMetrics(t)
 	cfg.AlspMetrics = alspMetrics
 
