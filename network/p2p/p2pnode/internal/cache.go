@@ -71,8 +71,8 @@ func (d *DisallowListCache) GetAllDisallowedListCausesFor(peerID peer.ID) []netw
 // Args:
 // - peerID: the peerID of the peer to be disallow-listed.
 // Returns:
-// - true if the entity is successfully added to the cache.
-// - false if the entity already exists in the cache.
+// - bool: true if the entity is successfully added to the cache.
+//  false if the entity already exists in the cache.
 func (d *DisallowListCache) init(peerID peer.ID) bool {
 	return d.c.Add(&disallowListCacheEntity{
 		peerID: peerID,
