@@ -91,7 +91,6 @@ func (d *DisallowListCache) init(peerID peer.ID) bool {
 func (d *DisallowListCache) DisallowFor(peerID peer.ID, cause network.DisallowListedCause) ([]network.DisallowListedCause, error) {
 	// first, we try to optimistically add the peer to the disallow list.
 	causes, err := d.disallowListFor(peerID, cause)
-
 	switch {
 	case err == nil:
 		return causes, nil
