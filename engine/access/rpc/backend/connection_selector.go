@@ -50,9 +50,9 @@ func NewConnectionSelector(
 	}
 }
 
-func (ncs *MainConnectionSelector) GetCollectionNodes(txId flow.Identifier) ([]string, error) {
+func (mcs *MainConnectionSelector) GetCollectionNodes(txId flow.Identifier) ([]string, error) {
 	// retrieve the set of collector clusters
-	clusters, err := ncs.state.Final().Epochs().Current().Clustering()
+	clusters, err := mcs.state.Final().Epochs().Current().Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
@@ -78,7 +78,7 @@ func (ncs *MainConnectionSelector) GetCollectionNodes(txId flow.Identifier) ([]s
 // GetExecutionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities
 // which have executed the given block ID.
 // If no such execution node is found, an InsufficientExecutionReceipts error is returned.
-func (ncs *MainConnectionSelector) GetExecutionNodesForBlockID(
+func (mcs *MainConnectionSelector) GetExecutionNodesForBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
 ) (flow.IdentityList, error) {
@@ -87,37 +87,38 @@ func (ncs *MainConnectionSelector) GetExecutionNodesForBlockID(
 
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
-	rootBlock, err := ncs.state.Params().FinalizedRoot()
+	rootBlock, err := mcs.state.Params().FinalizedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
 
 	if rootBlock.ID() == blockID {
-		executorIdentities, err := ncs.state.Final().Identities(filter.HasRole(flow.RoleExecution))
+		executorIdentities, err := mcs.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 		if err != nil {
 			return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 		}
 		executorIDs = executorIdentities.NodeIDs()
 	} else {
-		// try to find at least minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
+		// try to find atleast minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
 		for attempt := 0; attempt < maxAttemptsForExecutionReceipt; attempt++ {
-			executorIDs, err = findAllExecutionNodes(blockID, ncs.executionReceipts, ncs.log)
+			executorIDs, err = findAllExecutionNodes(blockID, mcs.executionReceipts, mcs.log)
 			if err != nil {
 				return nil, err
 			}
 
-			if len(executorIDs) > 0 {
+			if len(executorIDs) >= minExecutionNodesCnt {
 				break
 			}
 
 			// log the attempt
-			ncs.log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
+			mcs.log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
 				Int("execution_receipts_found", len(executorIDs)).
 				Str("block_id", blockID.String()).
 				Msg("insufficient execution receipts")
 
 			// if one or less execution receipts may have been received then re-query
 			// in the hope that more might have been received by now
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -125,10 +126,20 @@ func (ncs *MainConnectionSelector) GetExecutionNodesForBlockID(
 				//retry after an exponential backoff
 			}
 		}
+
+		receiptCnt := len(executorIDs)
+		// if less than minExecutionNodesCnt execution receipts have been received so far, then return random ENs
+		if receiptCnt < minExecutionNodesCnt {
+			newExecutorIDs, err := mcs.state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
+			if err != nil {
+				return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
+			}
+			executorIDs = newExecutorIDs.NodeIDs()
+		}
 	}
 
 	// choose from the preferred or fixed execution nodes
-	subsetENs, err := chooseExecutionNodes(ncs.state, executorIDs)
+	subsetENs, err := chooseExecutionNodes(mcs.state, executorIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
@@ -143,9 +154,9 @@ func (ncs *MainConnectionSelector) GetExecutionNodesForBlockID(
 	return executionIdentitiesRandom, nil
 }
 
-func (nccbs *CircuitBreakerConnectionSelector) GetCollectionNodes(txId flow.Identifier) ([]string, error) {
+func (cbcs *CircuitBreakerConnectionSelector) GetCollectionNodes(txId flow.Identifier) ([]string, error) {
 	// retrieve the set of collector clusters
-	clusters, err := nccbs.state.Final().Epochs().Current().Clustering()
+	clusters, err := cbcs.state.Final().Epochs().Current().Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
@@ -168,7 +179,7 @@ func (nccbs *CircuitBreakerConnectionSelector) GetCollectionNodes(txId flow.Iden
 // GetExecutionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities
 // which have executed the given block ID.
 // If no such execution node is found, an InsufficientExecutionReceipts error is returned.
-func (nccbs *CircuitBreakerConnectionSelector) GetExecutionNodesForBlockID(
+func (cbcs *CircuitBreakerConnectionSelector) GetExecutionNodesForBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
 ) (flow.IdentityList, error) {
@@ -177,13 +188,13 @@ func (nccbs *CircuitBreakerConnectionSelector) GetExecutionNodesForBlockID(
 
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
-	rootBlock, err := nccbs.state.Params().FinalizedRoot()
+	rootBlock, err := cbcs.state.Params().FinalizedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
 
 	if rootBlock.ID() == blockID {
-		executorIdentities, err := nccbs.state.Final().Identities(filter.HasRole(flow.RoleExecution))
+		executorIdentities, err := cbcs.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 		if err != nil {
 			return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 		}
@@ -191,7 +202,7 @@ func (nccbs *CircuitBreakerConnectionSelector) GetExecutionNodesForBlockID(
 	} else {
 		// try to find at least minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
 		for attempt := 0; attempt < maxAttemptsForExecutionReceipt; attempt++ {
-			executorIDs, err = findAllExecutionNodes(blockID, nccbs.executionReceipts, nccbs.log)
+			executorIDs, err = findAllExecutionNodes(blockID, cbcs.executionReceipts, cbcs.log)
 			if err != nil {
 				return nil, err
 			}
@@ -201,7 +212,7 @@ func (nccbs *CircuitBreakerConnectionSelector) GetExecutionNodesForBlockID(
 			}
 
 			// log the attempt
-			nccbs.log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
+			cbcs.log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
 				Int("execution_receipts_found", len(executorIDs)).
 				Str("block_id", blockID.String()).
 				Msg("insufficient execution receipts")
@@ -215,22 +226,29 @@ func (nccbs *CircuitBreakerConnectionSelector) GetExecutionNodesForBlockID(
 				//retry after an exponential backoff
 			}
 		}
+
+		receiptCnt := len(executorIDs)
+		// if less than minExecutionNodesCnt execution receipts have been received so far, then return random ENs
+		if receiptCnt < minExecutionNodesCnt {
+			newExecutorIDs, err := cbcs.state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
+			if err != nil {
+				return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
+			}
+			executorIDs = newExecutorIDs.NodeIDs()
+		}
 	}
 
 	// choose from the preferred or fixed execution nodes
-	subsetENs, err := chooseExecutionNodes(nccbs.state, executorIDs)
+	subsetENs, err := chooseExecutionNodes(cbcs.state, executorIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
 
-	// randomly choose upto maxExecutionNodesCnt identities
-	executionIdentitiesRandom := subsetENs.Sample(maxExecutionNodesCnt)
-
-	if len(executionIdentitiesRandom) == 0 {
+	if len(subsetENs) == 0 {
 		return nil, fmt.Errorf("no matching execution node found for block ID %v", blockID)
 	}
 
-	return executionIdentitiesRandom, nil
+	return subsetENs, nil
 }
 
 // chooseExecutionNodes finds the subset of execution nodes defined in the identity table by first
