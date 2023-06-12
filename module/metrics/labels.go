@@ -91,7 +91,7 @@ const (
 	ResourceNetworkingApplicationLayerSpamRecordCache  = "application_layer_spam_record_cache"
 	ResourceNetworkingApplicationLayerSpamReportQueue  = "application_layer_spam_report_queue"
 	ResourceNetworkingRpcClusterPrefixReceivedCache    = "rpc_cluster_prefixed_received_cache"
-	ResourceNetworkingDisallowListCache                = "networking_disallow_list_cache"
+	ResourceNetworkingDisallowListCache                = "disallow_list_cache"
 
 	ResourceFollowerPendingBlocksCache = "follower_pending_block_cache"      // follower engine
 	ResourceClusterBlockProposalQueue  = "cluster_compliance_proposal_queue" // collection node, compliance engine
