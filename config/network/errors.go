@@ -9,18 +9,20 @@ import (
 
 // ErrInvalidLimitConfig indicates the validation limit is < 0.
 type ErrInvalidLimitConfig struct {
-	// controlMsg the control message type.
-	controlMsg p2p.ControlMessageType
-	err        error
+	err error
 }
 
 func (e ErrInvalidLimitConfig) Error() string {
-	return fmt.Errorf("invalid rpc control message %s validation limit configuration: %w", e.controlMsg, e.err).Error()
+	return e.err.Error()
+}
+
+func (e ErrInvalidLimitConfig) Unwrap() error {
+	return e.err
 }
 
 // NewInvalidLimitConfigErr returns a new ErrValidationLimit.
 func NewInvalidLimitConfigErr(controlMsg p2p.ControlMessageType, err error) ErrInvalidLimitConfig {
-	return ErrInvalidLimitConfig{controlMsg: controlMsg, err: err}
+	return ErrInvalidLimitConfig{fmt.Errorf("invalid rpc control message %s validation limit configuration: %w", controlMsg, err)}
 }
 
 // IsErrInvalidLimitConfig returns whether an error is ErrInvalidLimitConfig.
