@@ -30,7 +30,7 @@ type DisallowListCache struct {
 // - logger: the logger used by the cache.
 // - collector: the metrics collector used by the cache.
 // Returns:
-// - *DisallowListCache, the created cache.
+// - *DisallowListCache: the created cache.
 func NewDisallowListCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *DisallowListCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
