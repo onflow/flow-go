@@ -109,14 +109,6 @@ func (c *CtrlMsgValidationConfig) Validate() error {
 	return nil
 }
 
-func (c *CtrlMsgValidationConfig) SetRateLimiter(r p2p.BasicRateLimiter) {
-	c.rateLimiter = r
-}
-
-func (c *CtrlMsgValidationConfig) RateLimiter() p2p.BasicRateLimiter {
-	return c.rateLimiter
-}
-
 // ClusterPrefixedMessageConfig configuration values for cluster prefixed control message validation.
 type ClusterPrefixedMessageConfig struct {
 	// ClusterPrefixHardThreshold the upper bound on the amount of cluster prefixed control messages that will be processed

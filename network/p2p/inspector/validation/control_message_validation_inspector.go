@@ -50,8 +50,9 @@ type ControlMsgValidationInspector struct {
 	// 1. The cluster prefix topic is received while the inspector waits for the cluster IDs provider to be set (this can happen during the startup or epoch transitions).
 	// 2. The node sends a cluster prefix topic where the cluster prefix does not match any of the active cluster IDs.
 	// In such cases, the inspector will allow a configured number of these messages from the corresponding peer.
-	tracker    *cache.ClusterPrefixedMessagesReceivedTracker
-	idProvider module.IdentityProvider
+	tracker      *cache.ClusterPrefixedMessagesReceivedTracker
+	idProvider   module.IdentityProvider
+	rateLimiters map[p2p.ControlMessageType]p2p.BasicRateLimiter
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
@@ -87,13 +88,14 @@ func NewControlMsgValidationInspector(
 	}
 
 	c := &ControlMsgValidationInspector{
-		logger:      lg,
-		sporkID:     sporkID,
-		config:      config,
-		distributor: distributor,
-		tracker:     tracker,
-		idProvider:  idProvider,
-		metrics:     inspectorMetrics,
+		logger:       lg,
+		sporkID:      sporkID,
+		config:       config,
+		distributor:  distributor,
+		tracker:      tracker,
+		idProvider:   idProvider,
+		metrics:      inspectorMetrics,
+		rateLimiters: make(map[p2p.ControlMessageType]p2p.BasicRateLimiter),
 	}
 
 	store := queue.NewHeroStore(config.CacheSize, logger, inspectMsgQueueCacheCollector)
@@ -113,12 +115,11 @@ func NewControlMsgValidationInspector(
 	})
 	// start rate limiters cleanup loop in workers
 	for _, conf := range c.config.AllCtrlMsgValidationConfig() {
-		validationConfig := conf
+		limiter := ratelimit.NewControlMessageRateLimiter(rate.Limit(conf.RateLimit), conf.RateLimit)
+		c.rateLimiters[conf.ControlMsg] = limiter
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
-			limiter := ratelimit.NewControlMessageRateLimiter(rate.Limit(validationConfig.RateLimit), validationConfig.RateLimit)
 			limiter.Start(ctx)
-			validationConfig.SetRateLimiter(limiter)
 		})
 	}
 	for i := 0; i < c.config.NumberOfWorkers; i++ {
@@ -341,9 +342,10 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 		Str("peer_id", req.Peer.String()).
 		Str("ctrl_msg_type", string(req.validationConfig.ControlMsg)).
 		Uint64("ctrl_msg_count", count).Logger()
+
 	var validationErr error
 	switch {
-	case !req.validationConfig.RateLimiter().Allow(req.Peer, int(count)): // check if Peer RPC messages are rate limited
+	case !c.rateLimiters[req.validationConfig.ControlMsg].Allow(req.Peer, int(count)): // check if Peer RPC messages are rate limited
 		validationErr = NewRateLimitedControlMsgErr(req.validationConfig.ControlMsg)
 	case count > req.validationConfig.SafetyThreshold:
 		// check if Peer RPC messages Count greater than safety threshold further inspect each message individually
