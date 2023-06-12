@@ -194,7 +194,7 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 // The test sets up 3 nodes, one victim, one honest, and one (alledged) spammer.
 // Initially, the test ensures that all nodes are connected to each other.
 // Then, test imitates that victim node reports the spammer node for spamming.
-// The test generates enough spam reports to trigger the disallow listing of the victim node.
+// The test generates enough spam reports to trigger the disallow-listing of the victim node.
 // The test ensures that the victim node is disconnected from the spammer node.
 // The test ensures that despite attempting on connections, no inbound or outbound connections between the victim and
 // the disallow-listed spammer node are established.
