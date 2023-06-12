@@ -373,12 +373,12 @@ func (net *FlowNetwork) GetMetricFromContainers(t *testing.T, metricName string,
 func (net *FlowNetwork) GetMetricFromContainer(t *testing.T, containerName, metricsURL, metricName string) []*io_prometheus_client.Metric {
 	// download root snapshot from provided URL
 	res, err := http.Get(metricsURL)
-	require.NoError(t, err, fmt.Sprintf("failed to get metrics for container %s at url %s: %w", containerName, metricsURL, err))
+	require.NoError(t, err, fmt.Sprintf("failed to get metrics for container %s at url %s: %s", containerName, metricsURL, err))
 	defer res.Body.Close()
 
 	var parser expfmt.TextParser
 	mf, err := parser.TextToMetricFamilies(res.Body)
-	require.NoError(t, err, fmt.Sprintf("failed to parse metrics for container %s at url %s: %w", containerName, metricsURL, err))
+	require.NoError(t, err, fmt.Sprintf("failed to parse metrics for container %s at url %s: %s", containerName, metricsURL, err))
 	m, ok := mf[metricName]
 	require.True(t, ok, "failed to get metric %s for container %s at url %s metric does not exist", metricName, containerName, metricsURL)
 	return m.GetMetric()
