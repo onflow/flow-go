@@ -109,7 +109,7 @@ func (s *Suite) waitForStateCommitments(ctx context.Context, n int, waitFor, tic
 		if startStateComm != currStateComm {
 			numOfStateCommChanges++
 		}
-		return numOfStateCommChanges == n
+		return numOfStateCommChanges >= n
 	}, waitFor, tick)
 }
 
