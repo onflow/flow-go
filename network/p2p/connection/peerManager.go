@@ -18,7 +18,7 @@ import (
 
 // DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections.
 // We set it to 1 second to be aligned with the heartbeat intervals of libp2p, alsp, and gossipsub.
-var DefaultPeerUpdateInterval = 1 * time.Second
+var DefaultPeerUpdateInterval = time.Second
 
 var _ p2p.PeerManager = (*PeerManager)(nil)
 var _ component.Component = (*PeerManager)(nil)
