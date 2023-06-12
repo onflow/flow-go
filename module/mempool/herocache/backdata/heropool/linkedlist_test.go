@@ -9,8 +9,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestRemovingElementsFromList first insures that lit ha been initialized correclty,
-// then removes element and tests list consistency
+// TestRemovingElementsFromList - first insures that list has been initialized correclty,
+// then removes elements and tests lists consistency.
 func TestRemovingElementsFromList(t *testing.T) {
 	limit_capacity := uint32(4)
 	number_of_entities := uint32(4)
