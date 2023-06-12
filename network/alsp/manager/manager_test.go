@@ -154,11 +154,11 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 		wg.Add(len(reports))
 		// reports the misbehavior
 		for _, report := range reports {
-			report := report // capture range variable
+			r := report // capture range variable
 			go func() {
 				defer wg.Done()
 
-				con.ReportMisbehavior(report)
+				con.ReportMisbehavior(r)
 			}()
 		}
 	}
@@ -258,11 +258,11 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 	for i := 0; i < reportCount; i++ {
 		wg.Add(1)
 		// reports the misbehavior
-		report := report // capture range variable
+		r := report // capture range variable
 		go func() {
 			defer wg.Done()
 
-			con.ReportMisbehavior(report)
+			con.ReportMisbehavior(r)
 		}()
 	}
 
@@ -656,12 +656,12 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 	// handle the misbehavior reports
 	totalPenalty := float64(0)
 	for _, report := range reports {
-		report := report // capture range variable
+		r := report // capture range variable
 		totalPenalty += report.Penalty()
 		go func() {
 			defer wg.Done()
 
-			m.HandleMisbehaviorReport(channel, report)
+			m.HandleMisbehaviorReport(channel, r)
 		}()
 	}
 
@@ -786,12 +786,12 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 	// handle the misbehavior reports
 	totalPenalty := float64(0)
 	for _, report := range reports {
-		report := report // capture range variable
+		r := report // capture range variable
 		totalPenalty += report.Penalty()
 		go func() {
 			defer wg.Done()
 
-			m.HandleMisbehaviorReport(channel, report)
+			m.HandleMisbehaviorReport(channel, r)
 		}()
 	}
 
@@ -863,11 +863,11 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 	for _, reports := range peersReports {
 		wg.Add(len(reports))
 		for _, report := range reports {
-			report := report // capture range variable
+			r := report // capture range variable
 			go func() {
 				defer wg.Done()
 
-				m.HandleMisbehaviorReport(channel, report)
+				m.HandleMisbehaviorReport(channel, r)
 			}()
 		}
 	}
