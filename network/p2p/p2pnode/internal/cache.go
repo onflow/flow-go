@@ -51,7 +51,7 @@ func NewDisallowListCache(sizeLimit uint32, logger zerolog.Logger, collector mod
 // Args:
 // - peerID: the peer to check.
 // Returns:
-// - the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
+// - []network.DisallowListedCause: the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
 // an empty list is returned.
 func (d *DisallowListCache) GetAllDisallowedListCausesFor(peerID peer.ID) []network.DisallowListedCause {
 	causes := make([]network.DisallowListedCause, 0)
