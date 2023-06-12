@@ -15,7 +15,7 @@ type InvalidLimitConfigError struct {
 }
 
 func (e ErrInvalidLimitConfig) Error() string {
-	return fmt.Errorf("invalid rpc control message %s validation limit configuration: %w", e.controlMsg, e.err).Error()
+	return fmt.Sprintf("invalid rpc control message %s validation limit configuration: %s", e.controlMsg, e.err.Error())
 }
 
 // NewInvalidLimitConfigErr returns a new ErrValidationLimit.
