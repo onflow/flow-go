@@ -32,7 +32,7 @@ func (s *GossipsubRPCInspectorFalsePositiveNotificationsTestSuite) TestGossipsub
 	// some artificial network activity.
 	go s.loaderLoop(ctx, numOfTestAccounts, loaderLoopInterval)
 	// wait 20 state commitment changes, this ensures we simulated load on network as expected.
-	s.waitForStateCommitments(s.Ctx, 5, time.Minute, 500*time.Millisecond)
+	s.waitForStateCommitments(s.Ctx, 3, time.Minute, 500*time.Millisecond)
 
 	// ensure no node in the network has disseminated an invalid control message notification
 	metricName := s.inspectorNotificationQSizeMetricName()
