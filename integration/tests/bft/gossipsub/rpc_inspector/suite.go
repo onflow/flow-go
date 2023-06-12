@@ -31,7 +31,7 @@ func (s *Suite) SetupSuite() {
 	}
 
 	name := "bft_control_message_validation_false_positive_test"
-	// short epoch lens ensure faster state commitments 
+	// short epoch lens ensure faster state commitments
 	stakingAuctionLen := uint64(10)
 	dkgPhaseLen := uint64(50)
 	epochLen := uint64(300)
@@ -100,10 +100,10 @@ func (s *Suite) loaderLoop(ctx context.Context, numOfTestAccounts int, interval 
 
 // waitStateCommitments waits for n number of state commitment changes.
 func (s *Suite) waitForStateCommitments(ctx context.Context, n int, waitFor, tick time.Duration) {
-	prevStateComm := s.getCurrERFinalStateCommitment(ctx)
+	prevStateComm := s.getCurrentFinalExecutionStateCommitment(ctx)
 	numOfStateCommChanges := 0
 	require.Eventually(s.T(), func() bool {
-		currStateComm := s.getCurrERFinalStateCommitment(ctx)
+		currStateComm := s.getCurrentFinalExecutionStateCommitment(ctx)
 		if prevStateComm != currStateComm {
 			numOfStateCommChanges++
 			prevStateComm = currStateComm
