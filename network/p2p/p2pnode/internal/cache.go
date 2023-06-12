@@ -166,8 +166,8 @@ func (d *DisallowListCache) AllowFor(peerID peer.ID, cause network.DisallowListe
 	dEntity := mustBeDisallowListEntity(adjustedEntity)
 	// returning a deep copy of causes (to avoid being mutated externally).
 	causes := make([]network.DisallowListedCause, 0, len(dEntity.causes))
-	for cause := range dEntity.causes {
-		causes = append(causes, cause)
+	for c := range dEntity.causes {
+		causes = append(causes, c)
 	}
 	return causes
 }
