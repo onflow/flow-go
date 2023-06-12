@@ -934,7 +934,7 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		node.Me,
 		node.Metrics.Engine,
 		node.Storage.Headers,
-		exeNode.builder.FinalizedRootBlock.Header,
+		node.LastFinalizedHeader,
 		core,
 		node.ComplianceConfig,
 	)
