@@ -65,11 +65,10 @@ type ConnectionFactoryImpl struct {
 	CircuitBreakerConfig      CircuitBreakerConfig
 }
 
-// TODO: describe
 type CircuitBreakerConfig struct {
-	Enabled           bool
-	RestoreTimeout    time.Duration
-	MaxRequestToBreak uint32
+	Enabled        bool
+	RestoreTimeout time.Duration
+	MaxFailures    uint32
 }
 
 type CachedClient struct {
@@ -265,7 +264,7 @@ func WithClientUnaryInterceptor(timeout time.Duration, circuitBreakerConfig Circ
 		circuitBreaker = gobreaker.NewCircuitBreaker(gobreaker.Settings{
 			Timeout: circuitBreakerConfig.RestoreTimeout,
 			ReadyToTrip: func(counts gobreaker.Counts) bool {
-				return counts.ConsecutiveFailures >= circuitBreakerConfig.MaxRequestToBreak
+				return counts.ConsecutiveFailures >= circuitBreakerConfig.MaxFailures
 			},
 		})
 	}

@@ -430,9 +430,9 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	connectionFactory.ExecutionNodeGRPCTimeout = requestTimeout
 	// set the configuration for circuit breaker
 	connectionFactory.CircuitBreakerConfig = CircuitBreakerConfig{
-		Enabled:           true,
-		MaxRequestToBreak: 1,
-		RestoreTimeout:    circuitBreakerRestoreTimeout,
+		Enabled:        true,
+		MaxFailures:    1,
+		RestoreTimeout: circuitBreakerRestoreTimeout,
 	}
 	// set the connection pool cache size
 	cacheSize := 1
@@ -499,9 +499,9 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	connectionFactory.CollectionNodeGRPCTimeout = requestTimeout
 	// set the configuration for circuit breaker
 	connectionFactory.CircuitBreakerConfig = CircuitBreakerConfig{
-		Enabled:           true,
-		MaxRequestToBreak: 1,
-		RestoreTimeout:    circuitBreakerRestoreTimeout,
+		Enabled:        true,
+		MaxFailures:    1,
+		RestoreTimeout: circuitBreakerRestoreTimeout,
 	}
 	// set the connection pool cache size
 	cacheSize := 1

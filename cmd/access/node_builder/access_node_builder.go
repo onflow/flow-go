@@ -162,9 +162,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			ArchiveAddressList:        nil,
 			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
 			CircuitBreakerConfig: backend.CircuitBreakerConfig{
-				Enabled:           false,
-				RestoreTimeout:    time.Duration(60) * time.Second,
-				MaxRequestToBreak: 5,
+				Enabled:        false,
+				RestoreTimeout: time.Duration(60) * time.Second,
+				MaxFailures:    5,
 			},
 		},
 		stateStreamConf: state_stream.Config{
@@ -688,7 +688,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
 		flags.BoolVar(&builder.rpcConf.CircuitBreakerConfig.Enabled, "circuit-breaker-enabled", defaultConfig.rpcConf.CircuitBreakerConfig.Enabled, "whether to enable the circuit breaker for collection and execution node connections")
 		flags.DurationVar(&builder.rpcConf.CircuitBreakerConfig.RestoreTimeout, "circuit-breaker-restore-timeout", defaultConfig.rpcConf.CircuitBreakerConfig.RestoreTimeout, "initial timeout for circuit breaker to try connect again. Default value is 60s")
-		flags.Uint32Var(&builder.rpcConf.CircuitBreakerConfig.MaxRequestToBreak, "circuit-breaker-max-request-to-break", defaultConfig.rpcConf.CircuitBreakerConfig.MaxRequestToBreak, "number of consecutive failures to break connection. Default value is 5")
+		flags.Uint32Var(&builder.rpcConf.CircuitBreakerConfig.MaxFailures, "circuit-breaker-max-failures", defaultConfig.rpcConf.CircuitBreakerConfig.MaxFailures, "number of consecutive failures to break connection. Default value is 5")
 
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
@@ -754,7 +754,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			}
 		}
 		if builder.rpcConf.CircuitBreakerConfig.Enabled {
-			if builder.rpcConf.CircuitBreakerConfig.MaxRequestToBreak == 0 {
+			if builder.rpcConf.CircuitBreakerConfig.MaxFailures == 0 {
 				return errors.New("circuit-breaker-max-request-to-break must be greater than 0")
 			}
 		}
