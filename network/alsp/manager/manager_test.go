@@ -252,7 +252,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 	// imitates that the victim has detected the spammer on 120 times of violations and reports the misbehavior
 	// to the network. As each report has the default penalty, ideally the spammer should be disallow-listed after
 	// 100 reports (each having 0.01 * disallow-listing penalty). But we take 120 as a safe number to ensure that
-	// the spammer is disallow-listed definitely.
+	// the spammer is definitely disallow-listed.
 	reportCount := 120
 	wg := sync.WaitGroup{}
 	for i := 0; i < reportCount; i++ {
