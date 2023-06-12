@@ -10,13 +10,14 @@ import (
 // DisallowListCache is an interface for a cache that keeps the list of disallow-listed peers.
 // It is designed to present a centralized interface for keeping track of disallow-listed peers for different reasons.
 type DisallowListCache interface {
-	// GetAllDisallowedListCausesFor returns the list of causes for which the given peer is disallow-listed.
+	// IsDisallowListed determines whether the given peer is disallow-listed for any reason.
 	// Args:
 	// - peerID: the peer to check.
 	// Returns:
-	// - the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
-	// an empty list is returned.
-	GetAllDisallowedListCausesFor(peerID peer.ID) []network.DisallowListedCause
+	// - []network.DisallowListedCause: the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
+	// a nil slice is returned.
+	// - bool: true if the peer is disallow-listed for any reason, false otherwise.
+	IsDisallowListed(peerID peer.ID) ([]network.DisallowListedCause, bool)
 
 	// DisallowFor disallow-lists a peer for a cause.
 	// Args:

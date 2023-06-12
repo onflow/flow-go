@@ -14,11 +14,15 @@ type DisallowListOracle struct {
 	mock.Mock
 }
 
-// GetAllDisallowListedCauses provides a mock function with given fields: peerId
-func (_m *DisallowListOracle) GetAllDisallowListedCauses(peerId peer.ID) []network.DisallowListedCause {
+// IsDisallowListed provides a mock function with given fields: peerId
+func (_m *DisallowListOracle) IsDisallowListed(peerId peer.ID) ([]network.DisallowListedCause, bool) {
 	ret := _m.Called(peerId)
 
 	var r0 []network.DisallowListedCause
+	var r1 bool
+	if rf, ok := ret.Get(0).(func(peer.ID) ([]network.DisallowListedCause, bool)); ok {
+		return rf(peerId)
+	}
 	if rf, ok := ret.Get(0).(func(peer.ID) []network.DisallowListedCause); ok {
 		r0 = rf(peerId)
 	} else {
@@ -27,7 +31,13 @@ func (_m *DisallowListOracle) GetAllDisallowListedCauses(peerId peer.ID) []netwo
 		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(peer.ID) bool); ok {
+		r1 = rf(peerId)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
 }
 
 type mockConstructorTestingTNewDisallowListOracle interface {

@@ -74,7 +74,8 @@ func TestDisallowFor_MultiplePeers(t *testing.T) {
 
 	for i := 0; i <= 10; i++ {
 		// getting the disallow-listed causes for a peerID
-		causes := disallowListCache.GetAllDisallowedListCausesFor(peer.ID(fmt.Sprintf("peer-%d", i)))
+		causes, disallowListed := disallowListCache.IsDisallowListed(peer.ID(fmt.Sprintf("peer-%d", i)))
+		require.True(t, disallowListed)
 		require.Len(t, causes, 2)
 		require.ElementsMatch(t, causes, []network.DisallowListedCause{network.DisallowListedCauseAdmin, network.DisallowListedCauseAlsp})
 	}
@@ -108,7 +109,8 @@ func TestAllowFor_SinglePeer(t *testing.T) {
 	require.Contains(t, causes, network.DisallowListedCauseAdmin)
 
 	// getting the disallow-listed causes for the peerID
-	causes = disallowListCache.GetAllDisallowedListCausesFor(peerID)
+	causes, disallowListed := disallowListCache.IsDisallowListed(peerID)
+	require.True(t, disallowListed)
 	require.Len(t, causes, 1)
 	require.Contains(t, causes, network.DisallowListedCauseAdmin)
 
@@ -118,7 +120,8 @@ func TestAllowFor_SinglePeer(t *testing.T) {
 	require.Len(t, causes, 0)
 
 	// getting the disallow-listed causes for the peerID
-	causes = disallowListCache.GetAllDisallowedListCausesFor(peerID)
+	causes, disallowListed = disallowListCache.IsDisallowListed(peerID)
+	require.False(t, disallowListed)
 	require.Len(t, causes, 0)
 
 	// disallowing the peerID for a cause
@@ -179,7 +182,8 @@ func TestAllowFor_MultiplePeers_Sequentially(t *testing.T) {
 
 	for i := 0; i <= 10; i++ {
 		// getting the disallow-listed causes for a peerID
-		causes := disallowListCache.GetAllDisallowedListCausesFor(peer.ID(fmt.Sprintf("peer-%d", i)))
+		causes, disallowListed := disallowListCache.IsDisallowListed(peer.ID(fmt.Sprintf("peer-%d", i)))
+		require.True(t, disallowListed)
 		require.Len(t, causes, 1)
 		require.Contains(t, causes, network.DisallowListedCauseAlsp)
 	}
@@ -265,8 +269,9 @@ func TestAllowFor_MultiplePeers_Concurrently(t *testing.T) {
 			defer wg.Done()
 
 			// getting the disallow-listed causes for a peerID
-			causes := disallowListCache.GetAllDisallowedListCausesFor(peer.ID(fmt.Sprintf("peer-%d", i)))
+			causes, disallowListed := disallowListCache.IsDisallowListed(peer.ID(fmt.Sprintf("peer-%d", i)))
 			require.Len(t, causes, 1)
+			require.True(t, disallowListed)
 			require.Contains(t, causes, network.DisallowListedCauseAlsp)
 		}(i)
 	}
@@ -330,7 +335,8 @@ func TestAllowFor_MultiplePeers_Concurrently(t *testing.T) {
 			defer wg.Done()
 
 			// getting the disallow-listed causes for a peerID
-			causes := disallowListCache.GetAllDisallowedListCausesFor(peer.ID(fmt.Sprintf("peer-%d", i)))
+			causes, disallowListed := disallowListCache.IsDisallowListed(peer.ID(fmt.Sprintf("peer-%d", i)))
+			require.False(t, disallowListed)
 			require.Len(t, causes, 0)
 		}(i)
 	}

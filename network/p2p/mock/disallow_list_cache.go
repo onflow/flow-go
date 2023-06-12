@@ -56,11 +56,15 @@ func (_m *DisallowListCache) DisallowFor(peerID peer.ID, cause network.DisallowL
 	return r0, r1
 }
 
-// GetAllDisallowedListCausesFor provides a mock function with given fields: peerID
-func (_m *DisallowListCache) GetAllDisallowedListCausesFor(peerID peer.ID) []network.DisallowListedCause {
+// IsDisallowListed provides a mock function with given fields: peerID
+func (_m *DisallowListCache) IsDisallowListed(peerID peer.ID) ([]network.DisallowListedCause, bool) {
 	ret := _m.Called(peerID)
 
 	var r0 []network.DisallowListedCause
+	var r1 bool
+	if rf, ok := ret.Get(0).(func(peer.ID) ([]network.DisallowListedCause, bool)); ok {
+		return rf(peerID)
+	}
 	if rf, ok := ret.Get(0).(func(peer.ID) []network.DisallowListedCause); ok {
 		r0 = rf(peerID)
 	} else {
@@ -69,7 +73,13 @@ func (_m *DisallowListCache) GetAllDisallowedListCausesFor(peerID peer.ID) []net
 		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(peer.ID) bool); ok {
+		r1 = rf(peerID)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
 }
 
 type mockConstructorTestingTNewDisallowListCache interface {

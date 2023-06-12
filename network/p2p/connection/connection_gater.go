@@ -73,8 +73,8 @@ func NewConnGater(log zerolog.Logger, identityProvider module.IdentityProvider, 
 func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
 	lg := c.log.With().Str("peer_id", p.String()).Logger()
 
-	disallowListCauses := c.disallowListOracle.GetAllDisallowListedCauses(p)
-	if len(disallowListCauses) > 0 {
+	disallowListCauses, disallowListed := c.disallowListOracle.IsDisallowListed(p)
+	if disallowListed {
 		lg.Warn().
 			Str("disallow_list_causes", fmt.Sprintf("%v", disallowListCauses)).
 			Msg("outbound connection attempt to disallow listed peer is rejected")
@@ -132,8 +132,8 @@ func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr netw
 			Str("remote_address", addr.RemoteMultiaddr().String()).
 			Logger()
 
-		disallowListCauses := c.disallowListOracle.GetAllDisallowListedCauses(p)
-		if len(disallowListCauses) > 0 {
+		disallowListCauses, disallowListed := c.disallowListOracle.IsDisallowListed(p)
+		if disallowListed {
 			lg.Warn().
 				Str("disallow_list_causes", fmt.Sprintf("%v", disallowListCauses)).
 				Msg("inbound connection attempt to disallow listed peer is rejected")

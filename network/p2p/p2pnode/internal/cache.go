@@ -47,32 +47,37 @@ func NewDisallowListCache(sizeLimit uint32, logger zerolog.Logger, collector mod
 	}
 }
 
-// GetAllDisallowedListCausesFor returns the list of causes for which the given peer is disallow-listed.
+// IsDisallowListed determines whether the given peer is disallow-listed for any reason.
 // Args:
 // - peerID: the peer to check.
 // Returns:
 // - []network.DisallowListedCause: the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
-// an empty list is returned.
-func (d *DisallowListCache) GetAllDisallowedListCausesFor(peerID peer.ID) []network.DisallowListedCause {
-	causes := make([]network.DisallowListedCause, 0)
+// a nil slice is returned.
+// - bool: true if the peer is disallow-listed for any reason, false otherwise.
+func (d *DisallowListCache) IsDisallowListed(peerID peer.ID) ([]network.DisallowListedCause, bool) {
 	entity, exists := d.c.ByID(makeId(peerID))
 	if !exists {
-		return causes
+		return nil, false
 	}
 
 	dEntity := mustBeDisallowListEntity(entity)
-	for cause := range dEntity.causes {
-		causes = append(causes, cause)
+	if len(dEntity.causes) == 0 {
+		return nil, false
 	}
-	return causes
+
+	causes := make([]network.DisallowListedCause, 0, len(dEntity.causes))
+	for c := range dEntity.causes {
+		causes = append(causes, c)
+	}
+	return causes, true
 }
 
 // init initializes the disallow-list cache entity for the peerID.
 // Args:
 // - peerID: the peerID of the peer to be disallow-listed.
 // Returns:
-// - bool: true if the entity is successfully added to the cache.
-//  false if the entity already exists in the cache.
+//   - bool: true if the entity is successfully added to the cache.
+//     false if the entity already exists in the cache.
 func (d *DisallowListCache) init(peerID peer.ID) bool {
 	return d.c.Add(&disallowListCacheEntity{
 		peerID: peerID,

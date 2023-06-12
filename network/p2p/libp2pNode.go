@@ -141,12 +141,12 @@ type DisallowListNotificationConsumer interface {
 
 // DisallowListOracle is an interface for querying disallow-listed peers.
 type DisallowListOracle interface {
-	// GetAllDisallowListedCauses for a disallow-listed peer returns all disallow-listed causes.
-	// If the peer is not disallow-listed, returns an empty slice (not nil).
-	// The implementation must be concurrency safe.
+	// IsDisallowListed determines whether the given peer is disallow-listed for any reason.
 	// Args:
-	// 	none
+	// - peerID: the peer to check.
 	// Returns:
-	// 	[]network.DisallowListedCause: list of disallow-listed causes for the peer or empty slice if the peer is not disallow-listed.
-	GetAllDisallowListedCauses(peerId peer.ID) []network.DisallowListedCause
+	// - []network.DisallowListedCause: the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
+	// a nil slice is returned.
+	// - bool: true if the peer is disallow-listed for any reason, false otherwise.
+	IsDisallowListed(peerId peer.ID) ([]network.DisallowListedCause, bool)
 }

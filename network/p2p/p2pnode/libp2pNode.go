@@ -366,8 +366,8 @@ func (n *Node) WithPeersProvider(peersProvider p2p.PeersProvider) {
 				allowListedPeerIds := peer.IDSlice{} // subset of authorizedPeersIds that are not disallowed
 				for _, peerId := range authorizedPeersIds {
 					// exclude the disallowed peers from the authorized peers list
-					causes := n.disallowListedCache.GetAllDisallowedListCausesFor(peerId)
-					if len(causes) > 0 {
+					causes, disallowListed := n.disallowListedCache.IsDisallowListed(peerId)
+					if disallowListed {
 						n.logger.Warn().
 							Str("peer_id", peerId.String()).
 							Str("causes", fmt.Sprintf("%v", causes)).
@@ -525,16 +525,13 @@ func (n *Node) OnAllowListNotification(peerId peer.ID, cause flownet.DisallowLis
 		Msg("peer is allow-listed for cause")
 }
 
-// GetAllDisallowListedCauses for a disallow-listed peer returns all disallow-listed causes.
-// If the peer is not disallow-listed, returns an empty slice (not nil).
-// The implementation must be concurrency safe.
+// IsDisallowListed determines whether the given peer is disallow-listed for any reason.
 // Args:
-//
-//	none
-//
+// - peerID: the peer to check.
 // Returns:
-//
-//	[]network.DisallowListedCause: list of disallow-listed causes for the peer or empty slice if the peer is not disallow-listed.
-func (n *Node) GetAllDisallowListedCauses(peerId peer.ID) []flownet.DisallowListedCause {
-	return n.disallowListedCache.GetAllDisallowedListCausesFor(peerId)
+// - []network.DisallowListedCause: the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
+// a nil slice is returned.
+// - bool: true if the peer is disallow-listed for any reason, false otherwise.
+func (n *Node) IsDisallowListed(peerId peer.ID) ([]flownet.DisallowListedCause, bool) {
+	return n.disallowListedCache.IsDisallowListed(peerId)
 }
