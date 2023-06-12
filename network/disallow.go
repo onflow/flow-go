@@ -38,7 +38,7 @@ type AllowListingUpdate struct {
 // DisallowListNotificationConsumer is an interface for consuming disallow/allow list update notifications.
 type DisallowListNotificationConsumer interface {
 	// OnDisallowListNotification is called when a new disallow list update notification is distributed.
-	// Any error on consuming event must handle internally.
+	// Any error on consuming an event must be handled internally.
 	// The implementation must be concurrency safe.
 	OnDisallowListNotification(*DisallowListingUpdate)
 
