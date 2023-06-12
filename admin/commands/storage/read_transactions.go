@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"strings"
 
 	"github.com/rs/zerolog/log"
 
@@ -54,34 +53,6 @@ func (c *GetTransactionsCommand) Handler(ctx context.Context, req *admin.Command
 	}
 
 	return commands.ConvertToInterfaceList(blocks)
-}
-
-// Returns admin.InvalidAdminReqError for invalid inputs
-func findUint64(input map[string]interface{}, field string) (uint64, error) {
-	data, ok := input[field]
-	if !ok {
-		return 0, admin.NewInvalidAdminReqErrorf("missing required field '%s'", field)
-	}
-	val, err := parseN(data)
-	if err != nil {
-		return 0, admin.NewInvalidAdminReqErrorf("invalid 'n' field: %w", err)
-	}
-
-	return uint64(val), nil
-}
-
-func findString(input map[string]interface{}, field string) (string, error) {
-	data, ok := input[field]
-	if !ok {
-		return "", admin.NewInvalidAdminReqErrorf("missing required field '%s'", field)
-	}
-
-	str, ok := data.(string)
-	if !ok {
-		return "", admin.NewInvalidAdminReqErrorf("field '%s' is not string", field)
-	}
-
-	return strings.ToLower(strings.TrimSpace(str)), nil
 }
 
 // Validator validates the request.
