@@ -43,7 +43,7 @@ type DisallowListNotificationConsumer interface {
 	OnDisallowListNotification(*DisallowListingUpdate)
 
 	// OnAllowListNotification is called when a new allow list update notification is distributed.
-	// Any error on consuming event must handle internally.
+	// Any error on consuming an event must be handled internally.
 	// The implementation must be concurrency safe.
 	OnAllowListNotification(*AllowListingUpdate)
 }

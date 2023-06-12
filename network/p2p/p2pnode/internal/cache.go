@@ -30,7 +30,7 @@ type DisallowListCache struct {
 // - logger: the logger used by the cache.
 // - collector: the metrics collector used by the cache.
 // Returns:
-// - *DisallowListCache, the created cache.
+// - *DisallowListCache: the created cache.
 func NewDisallowListCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *DisallowListCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
@@ -51,7 +51,7 @@ func NewDisallowListCache(sizeLimit uint32, logger zerolog.Logger, collector mod
 // Args:
 // - peerID: the peer to check.
 // Returns:
-// - the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
+// - []network.DisallowListedCause: the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
 // an empty list is returned.
 func (d *DisallowListCache) GetAllDisallowedListCausesFor(peerID peer.ID) []network.DisallowListedCause {
 	causes := make([]network.DisallowListedCause, 0)
@@ -86,8 +86,8 @@ func (d *DisallowListCache) init(peerID peer.ID) bool {
 // - peerID: the peerID of the peer to be disallow-listed.
 // - cause: the cause for disallow-listing the peer.
 // Returns:
-// - the list of causes for which the peer is disallow-listed.
-// - error if the operation fails, error is irrecoverable.
+// - []network.DisallowListedCause: the list of causes for which the peer is disallow-listed.
+// - error: if the operation fails, error is irrecoverable.
 func (d *DisallowListCache) DisallowFor(peerID peer.ID, cause network.DisallowListedCause) ([]network.DisallowListedCause, error) {
 	// first, we try to optimistically add the peer to the disallow list.
 	causes, err := d.disallowListFor(peerID, cause)
