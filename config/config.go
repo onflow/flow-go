@@ -14,7 +14,7 @@ import (
 var (
 	conf = viper.New()
 
-	//go:embed config.yml
+	//go:embed default-config.yml
 	configFile string
 )
 
@@ -33,10 +33,10 @@ func (fc *FlowConfig) Validate() error {
 }
 
 // DefaultConfig initializes the flow configuration. All default values for the Flow
-// configuration are stored in the config.yml file. These values can be overriden
+// configuration are stored in the default-config.yml file. These values can be overriden
 // by node operators by setting the corresponding cli flag. DefaultConfig should be called
 // before any pflags are parsed, this will allow the configuration to initialize with defaults
-// from config.yml.
+// from default-config.yml.
 // Returns:
 //
 //	*FlowConfig: an instance of the network configuration fully initialized to the default values set in the config file
