@@ -31,14 +31,12 @@ func (s *Suite) SetupSuite() {
 	}
 
 	name := "bft_control_message_validation_false_positive_test"
-	netConfig := testnet.NewNetworkConfig(
-		name,
-		s.NodeConfigs,
-		// set long staking phase to avoid QC/DKG transactions during test run
-		testnet.WithViewsInStakingAuction(10_000),
-		testnet.WithViewsInEpoch(100_000),
-	)
-
+	// short epoch lens ensure faster state commitments 
+	stakingAuctionLen := uint64(10)
+	dkgPhaseLen := uint64(50)
+	epochLen := uint64(300)
+	epochCommitSafetyThreshold := uint64(50)
+	netConfig := testnet.NewNetworkConfigWithEpochConfig(name, s.NodeConfigs, stakingAuctionLen, dkgPhaseLen, epochLen, epochCommitSafetyThreshold)
 	s.Net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.BftTestnet)
 
 	s.Ctx, s.Cancel = context.WithCancel(context.Background())
@@ -102,14 +100,15 @@ func (s *Suite) loaderLoop(ctx context.Context, numOfTestAccounts int, interval 
 
 // waitStateCommitments waits for n number of state commitment changes.
 func (s *Suite) waitForStateCommitments(ctx context.Context, n int, waitFor, tick time.Duration) {
-	startStateComm := s.getCurrERFinalStateCommitment(ctx)
+	prevStateComm := s.getCurrERFinalStateCommitment(ctx)
 	numOfStateCommChanges := 0
 	require.Eventually(s.T(), func() bool {
 		currStateComm := s.getCurrERFinalStateCommitment(ctx)
-		if startStateComm != currStateComm {
+		if prevStateComm != currStateComm {
 			numOfStateCommChanges++
+			prevStateComm = currStateComm
 		}
-		return numOfStateCommChanges == n
+		return numOfStateCommChanges >= n
 	}, waitFor, tick)
 }
 
