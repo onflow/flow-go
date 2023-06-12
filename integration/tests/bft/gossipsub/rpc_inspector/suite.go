@@ -114,7 +114,7 @@ func (s *Suite) waitForStateCommitments(ctx context.Context, n int, waitFor, tic
 }
 
 // getCurrentFinalizedHeight returns the current finalized height.
-func (s *Suite) getCurrERFinalStateCommitment(ctx context.Context) string {
+func (s *Suite) getCurrentFinalExecutionStateCommitment(ctx context.Context) string {
 	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
 	executionResult, _, err := snapshot.SealedResult()
