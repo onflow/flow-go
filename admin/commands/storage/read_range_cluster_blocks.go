@@ -40,6 +40,11 @@ func (c *ReadRangeClusterBlocksCommand) Handler(ctx context.Context, req *admin.
 		return nil, err
 	}
 
+	limit := uint64(10001)
+	if reqData.Range() > limit {
+		return nil, admin.NewInvalidAdminReqErrorf("getting for more than %v blocks at a time might have an impact to node's performance and is not allowed", limit)
+	}
+
 	clusterBlocks := storage.NewClusterBlocks(
 		c.db, flow.ChainID(chainID), c.headers, c.payloads,
 	)
