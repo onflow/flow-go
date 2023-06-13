@@ -19,8 +19,9 @@ import (
 // that implements the PubSubAdapter interface for the Flow network.
 type GossipSubAdapter struct {
 	component.Component
-	gossipSub *pubsub.PubSub
-	logger    zerolog.Logger
+	gossipSub        *pubsub.PubSub
+	logger           zerolog.Logger
+	peerScoreExposer p2p.PeerScoreExposer
 }
 
 var _ p2p.PubSubAdapter = (*GossipSubAdapter)(nil)
@@ -53,6 +54,7 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 			<-scoreTracer.Done()
 			a.logger.Debug().Str("component", "gossipsub_score_tracer").Msg("score tracer stopped")
 		})
+		a.peerScoreExposer = scoreTracer
 	}
 
 	if tracer := gossipSubConfig.PubSubTracer(); tracer != nil {
@@ -133,4 +135,19 @@ func (g *GossipSubAdapter) GetTopics() []string {
 
 func (g *GossipSubAdapter) ListPeers(topic string) []peer.ID {
 	return g.gossipSub.ListPeers(topic)
+}
+
+// PeerScoreExposer returns the peer score exposer for the gossipsub adapter. The exposer is a read-only interface
+// for querying peer scores.
+// The exposer is only available if the gossipsub adapter was configured with a score tracer.
+// If the gossipsub adapter was not configured with a score tracer, the exposer will be nil.
+// Args:
+//
+//	None.
+//
+// Returns:
+//
+//	The peer score exposer for the gossipsub adapter.
+func (g *GossipSubAdapter) PeerScoreExposer() p2p.PeerScoreExposer {
+	return g.peerScoreExposer
 }

@@ -47,6 +47,16 @@ type PubSubAdapter interface {
 	// For example, if current peer has subscribed to topics A and B, then ListPeers only return
 	// subscribed peers for topics A and B, and querying for topic C will return an empty list.
 	ListPeers(topic string) []peer.ID
+
+	// PeerScoreExposer returns the peer score exposer for the gossipsub adapter. The exposer is a read-only interface
+	// for querying peer scores.
+	// The exposer is only available if the gossipsub adapter was configured with a score tracer.
+	// If the gossipsub adapter was not configured with a score tracer, the exposer will be nil.
+	// Args:
+	//     None.
+	// Returns:
+	//    The peer score exposer for the gossipsub adapter.
+	PeerScoreExposer() PeerScoreExposer
 }
 
 // PubSubAdapterConfig abstracts the configuration for the underlying pubsub implementation.

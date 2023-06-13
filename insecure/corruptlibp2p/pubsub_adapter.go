@@ -28,9 +28,10 @@ import (
 // totally separated from the rest of the codebase.
 type CorruptGossipSubAdapter struct {
 	component.Component
-	gossipSub *corrupt.PubSub
-	router    *corrupt.GossipSubRouter
-	logger    zerolog.Logger
+	gossipSub        *corrupt.PubSub
+	router           *corrupt.GossipSubRouter
+	logger           zerolog.Logger
+	peerScoreExposer p2p.PeerScoreExposer
 }
 
 var _ p2p.PubSubAdapter = (*CorruptGossipSubAdapter)(nil)
@@ -104,6 +105,10 @@ func (c *CorruptGossipSubAdapter) ListPeers(topic string) []peer.ID {
 	return c.gossipSub.ListPeers(topic)
 }
 
+func (c *CorruptGossipSubAdapter) PeerScoreExposer() p2p.PeerScoreExposer {
+	return c.peerScoreExposer
+}
+
 func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, *corrupt.GossipSubRouter, error) {
 	gossipSubConfig, ok := cfg.(*CorruptPubSubAdapterConfig)
 	if !ok {
@@ -119,18 +124,33 @@ func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h ho
 		return nil, nil, fmt.Errorf("failed to create corrupt gossipsub: %w", err)
 	}
 
-	builder := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-			<-ctx.Done()
-		}).Build()
-
+	builder := component.NewComponentManagerBuilder()
 	adapter := &CorruptGossipSubAdapter{
-		Component: builder,
 		gossipSub: gossipSub,
 		router:    router,
 		logger:    logger,
 	}
+
+	if scoreTracer := gossipSubConfig.ScoreTracer(); scoreTracer != nil {
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			logger.Debug().Str("component", "corrupt-gossipsub_score_tracer").Msg("starting score tracer")
+			scoreTracer.Start(ctx)
+			logger.Debug().Str("component", "corrupt-gossipsub_score_tracer").Msg("score tracer started")
+
+			<-scoreTracer.Done()
+			logger.Debug().Str("component", "corrupt-gossipsub_score_tracer").Msg("score tracer stopped")
+		})
+		adapter.peerScoreExposer = scoreTracer
+	}
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		ready()
+		// it is likely that this adapter is configured without a score tracer, so we need to
+		// wait for the context to be done in order to prevent immature shutdown.
+		<-ctx.Done()
+	})
+
+	adapter.Component = builder.Build()
 
 	return adapter, router, nil
 }
