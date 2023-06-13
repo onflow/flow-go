@@ -86,12 +86,10 @@ func (pm *PeerManager) updateLoop(ctx irrecoverable.SignalerContext) {
 func (pm *PeerManager) periodicLoop(ctx irrecoverable.SignalerContext) {
 	// add a random delay to initial launch to avoid synchronizing this
 	// potentially expensive operation across the network
-	r, _ := rand.Uint64n(uint64(pm.peerUpdateInterval.Nanoseconds()))
-	// ignore the error here, if randomness fails `r` would be zero and there will be no delay
-	// for the current node
-	// TODO: treat the error properly instead of swallowing it. In this specific case, `utils/rand`
-	// only errors if there is a randomness system issue. Such issue will cause errors in many
-	// other components.
+	r, err := rand.Uint64n(uint64(pm.peerUpdateInterval.Nanoseconds()))
+	if err != nil {
+		ctx.Throw(fmt.Errorf("unable to generate random interval: %w", err))
+	}
 	delay := time.Duration(r)
 
 	ticker := time.NewTicker(pm.peerUpdateInterval)
