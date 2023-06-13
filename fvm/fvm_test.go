@@ -2681,7 +2681,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 					[]byte(contractD),
 				))
 
-				// Store values, including `B.Bar()`
+				// Store values
 				runTransaction([]byte(fmt.Sprintf(
 					`
 					import D from %s
@@ -2699,8 +2699,8 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 							signer.link<&String>(/private/a, target:/storage/first)
 							signer.link<&[String]>(/private/b, target:/storage/second)
 							signer.link<&D.Bar>(/private/c, target:/storage/third)
-							signer.link<&C.Bar>(/private/c, target:/storage/third)
-							signer.link<&B.Bar>(/private/c, target:/storage/third)
+							signer.link<&C.Bar>(/private/d, target:/storage/fourth)
+							signer.link<&B.Bar>(/private/e, target:/storage/fifth)
 						}
 					}`,
 					accounts[0].HexWithPrefix(),
@@ -2708,7 +2708,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 					accounts[0].HexWithPrefix(),
 				)))
 
-				// Update `A`, so that `B` and `C` are now broken.
+				// Update `A`. `B`, `C` and `D` are now broken.
 				runTransaction(utils.UpdateTransaction(
 					"A",
 					[]byte(updatedContractA),
@@ -2720,21 +2720,13 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 					transaction {
 						prepare(account: AuthAccount) {
 							var total = 0
-
-							account.forEachStored(fun (path: StoragePath, type: Type): Bool {
+							account.forEachPrivate(fun (path: PrivatePath, type: Type): Bool {
+								account.getCapability<&AnyStruct>(path).borrow()!
 								total = total + 1
                               return true
 							})
 
-							//account.forEachPrivate(fun (path: PrivatePath, type: Type): Bool {
-							//	account.getCapability<&AnyStruct>(path).borrow()!
-							//	total = total + 1
-                            //    return true
-							//})
-
-							//// 2 from each
-							//// + 1 from flow vault storage
-							//assert(total == 5, message:"found ".concat(total.toString()))
+							assert(total == 2, message:"found ".concat(total.toString()))
 						}
 					}`,
 				))

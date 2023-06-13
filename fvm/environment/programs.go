@@ -219,7 +219,7 @@ func newProgramLoader(
 }
 
 func (loader *programLoader) Compute(
-	txState state.NestedTransactionPreparer,
+	_ state.NestedTransactionPreparer,
 	location common.AddressLocation,
 ) (
 	*derived.Program,
@@ -284,8 +284,8 @@ func (loader *programLoader) loadWithDependencyTracking(
 	// into the dependencies of the parent program. This is to prevent the parent program
 	// from thinking that this program was already loaded and is in the cache,
 	// if it requests it again.
-	// stackLocation, dependencies, depErr := loader.dependencyStack.pop(err == nil)
-	stackLocation, dependencies, depErr := loader.dependencyStack.pop(true)
+	merge := err == nil
+	stackLocation, dependencies, depErr := loader.dependencyStack.pop(merge)
 	if depErr != nil {
 		err = multierror.Append(err, depErr).ErrorOrNil()
 	}
