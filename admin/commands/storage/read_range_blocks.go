@@ -27,6 +27,11 @@ func (c *ReadRangeBlocksCommand) Handler(ctx context.Context, req *admin.Command
 		return nil, err
 	}
 
+	limit := uint64(10001)
+	if reqData.Range() > limit {
+		return nil, admin.NewInvalidAdminReqErrorf("getting for more than %v blocks at a time might have an impact to node's performance and is not allowed", limit)
+	}
+
 	lights, err := read.ReadLightBlockByHeightRange(c.blocks, reqData.startHeight, reqData.endHeight)
 	if err != nil {
 		return nil, err
