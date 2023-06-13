@@ -1773,6 +1773,8 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return common.NewListConfigCommand(config.ConfigManager)
 	}).AdminCommand("read-blocks", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadBlocksCommand(config.State, config.Storage.Blocks)
+	}).AdminCommand("read-range-blocks", func(conf *NodeConfig) commands.AdminCommand {
+		return storageCommands.NewReadRangeBlocksCommand(conf.Storage.Blocks)
 	}).AdminCommand("read-results", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadResultsCommand(config.State, config.Storage.Results)
 	}).AdminCommand("read-seals", func(config *NodeConfig) commands.AdminCommand {
