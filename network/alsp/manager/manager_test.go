@@ -249,7 +249,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 	// creates a misbehavior report for the spammer
 	report := misbehaviorReportFixtureWithPenalty(t, ids[spammerIndex].NodeID, model.DefaultPenaltyValue)
 
-	// imitates that the victim has detected the spammer on 120 times of violations and reports the misbehavior
+	// simulates the victim node reporting the spammer node misbehavior 120 times```
 	// to the network. As each report has the default penalty, ideally the spammer should be disallow-listed after
 	// 100 reports (each having 0.01 * disallow-listing penalty). But we take 120 as a safe number to ensure that
 	// the spammer is definitely disallow-listed.
