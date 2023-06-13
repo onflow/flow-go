@@ -222,6 +222,10 @@ type AlspConfig struct {
 	// This is useful for managing production incidents.
 	// Note: under normal circumstances, the ALSP module should not be disabled.
 	DisablePenalty bool
+
+	// HeartBeatInterval is the interval between heartbeats sent by the ALSP module. The heartbeats are recurring
+	// events that are used to perform critical ALSP tasks, such as updating the spam records cache.
+	HearBeatInterval time.Duration
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
@@ -298,13 +302,14 @@ type StateExcerptAtBoot struct {
 	// 		FinalizedRootBlock and SealedRootBlock are the same block (special case of self-sealing block)
 	// For node bootstrapped with a root snapshot for a block above the first block of a spork (dynamically bootstrapped),
 	// 		FinalizedRootBlock.Height > SealedRootBlock.Height
-	FinalizedRootBlock *flow.Block             // The last finalized block when bootstrapped.
-	SealedRootBlock    *flow.Block             // The last sealed block when bootstrapped.
-	RootQC             *flow.QuorumCertificate // QC for Finalized Root Block
-	RootResult         *flow.ExecutionResult   // Result for SealedRootBlock
-	RootSeal           *flow.Seal              //Seal for RootResult
-	RootChainID        flow.ChainID
-	SporkID            flow.Identifier
+	FinalizedRootBlock  *flow.Block             // The last finalized block when bootstrapped.
+	SealedRootBlock     *flow.Block             // The last sealed block when bootstrapped.
+	RootQC              *flow.QuorumCertificate // QC for Finalized Root Block
+	RootResult          *flow.ExecutionResult   // Result for SealedRootBlock
+	RootSeal            *flow.Seal              //Seal for RootResult
+	RootChainID         flow.ChainID
+	SporkID             flow.Identifier
+	LastFinalizedHeader *flow.Header // last finalized header when the node boots up
 }
 
 func DefaultBaseConfig() *BaseConfig {
@@ -337,6 +342,7 @@ func DefaultBaseConfig() *BaseConfig {
 			AlspConfig: &AlspConfig{
 				SpamRecordCacheSize: alsp.DefaultSpamRecordCacheSize,
 				SpamReportQueueSize: alsp.DefaultSpamReportQueueSize,
+				HearBeatInterval:    alsp.DefaultHeartBeatInterval,
 				DisablePenalty:      false, // by default, apply the penalty
 			},
 		},

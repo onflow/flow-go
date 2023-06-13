@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -60,7 +61,7 @@ type Engine struct {
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	executionDataPruner    *pruner.Pruner
 	uploader               *uploader.Manager
-	stopControl            *StopControl
+	stopControl            *stop.StopControl
 }
 
 func New(
@@ -84,7 +85,7 @@ func New(
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pruner *pruner.Pruner,
 	uploader *uploader.Manager,
-	stopControl *StopControl,
+	stopControl *stop.StopControl,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -122,15 +123,17 @@ func New(
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	if !e.stopControl.IsPaused() {
-		if err := e.uploader.RetryUploads(); err != nil {
-			e.log.Warn().Msg("failed to re-upload all ComputationResults")
-		}
+	if e.stopControl.IsExecutionStopped() {
+		return e.unit.Ready()
+	}
 
-		err := e.reloadUnexecutedBlocks()
-		if err != nil {
-			e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
-		}
+	if err := e.uploader.RetryUploads(); err != nil {
+		e.log.Warn().Msg("failed to re-upload all ComputationResults")
+	}
+
+	err := e.reloadUnexecutedBlocks()
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
 	}
 
 	return e.unit.Ready()
@@ -436,8 +439,10 @@ func (e *Engine) reloadBlock(
 // NOTE: Ready calls reloadUnexecutedBlocks during initialization, which handles dropped protocol events.
 func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 
+	// TODO: this should not be blocking: https://github.com/onflow/flow-go/issues/4400
+
 	// skip if stopControl tells to skip
-	if !e.stopControl.blockProcessable(b) {
+	if !e.stopControl.ShouldExecuteBlock(b) {
 		return
 	}
 
@@ -455,12 +460,6 @@ func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 	if err != nil {
 		e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to handle block")
 	}
-}
-
-// BlockFinalized implements part of state.protocol.Consumer interface.
-// Method gets called for every finalized block
-func (e *Engine) BlockFinalized(h *flow.Header) {
-	e.stopControl.blockFinalized(e.unit.Ctx(), e.execState, h)
 }
 
 // Main handling
@@ -607,8 +606,6 @@ func (e *Engine) executeBlock(
 
 	startedAt := time.Now()
 
-	e.stopControl.executingBlockHeight(executableBlock.Block.Header.Height)
-
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
 	defer span.End()
 
@@ -704,9 +701,10 @@ func (e *Engine) executeBlock(
 		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
 	}
 
+	e.stopControl.OnBlockExecuted(executableBlock.Block.Header)
+
 	e.unit.Ctx()
 
-	e.stopControl.blockExecuted(executableBlock.Block.Header)
 }
 
 // we've executed the block, now we need to check:
@@ -744,6 +742,7 @@ func (e *Engine) onBlockExecuted(
 			// find the block that was just executed
 			executionQueue, exists := executionQueues.ByID(executed.ID())
 			if !exists {
+				logQueueState(e.log, executionQueues, executed.ID())
 				// when the block no longer exists in the queue, it means there was a race condition that
 				// two onBlockExecuted was called for the same block, and one process has already removed the
 				// block from the queue, so we will print an error here
@@ -799,8 +798,9 @@ func (e *Engine) onBlockExecuted(
 		})
 
 	if err != nil {
-		e.log.Err(err).
+		e.log.Fatal().Err(err).
 			Hex("block", logging.Entity(executed)).
+			Uint64("height", executed.Block.Header.Height).
 			Msg("error while requeueing blocks after execution")
 	}
 
@@ -1321,4 +1321,13 @@ func (e *Engine) getHeaderByHeight(height uint64) (*flow.Header, error) {
 	// we don't use protocol state because for dynamic boostrapped execution node
 	// the last executed and sealed block is below the finalized root block
 	return e.headers.ByHeight(height)
+}
+
+func logQueueState(log zerolog.Logger, queues *stdmap.QueuesBackdata, blockID flow.Identifier) {
+	all := queues.All()
+
+	log.With().Hex("queue_state__executed_block_id", blockID[:]).Int("count", len(all)).Logger()
+	for i, queue := range all {
+		log.Error().Msgf("%v-th queue state: %v", i, queue.String())
+	}
 }

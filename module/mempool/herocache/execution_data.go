@@ -31,21 +31,23 @@ func NewBlockExecutionData(limit uint32, logger zerolog.Logger, collector module
 	}
 }
 
-// Has checks whether the block execution data with the given hash is currently in
+// Has checks whether the block execution data for the given block ID is currently in
 // the memory pool.
-func (t *BlockExecutionData) Has(id flow.Identifier) bool {
-	return t.c.Has(id)
+func (t *BlockExecutionData) Has(blockID flow.Identifier) bool {
+	return t.c.Has(blockID)
 }
 
-// Add adds a block execution data to the mempool.
+// Add adds a block execution data to the mempool, keyed by block ID.
+// It returns false if the execution data was already in the mempool.
 func (t *BlockExecutionData) Add(ed *execution_data.BlockExecutionDataEntity) bool {
 	entity := internal.NewWrappedEntity(ed.BlockID, ed)
 	return t.c.Add(*entity)
 }
 
-// ByID returns the block execution data with the given ID from the mempool.
-func (t *BlockExecutionData) ByID(txID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
-	entity, exists := t.c.ByID(txID)
+// ByID returns the block execution data for the given block ID from the mempool.
+// It returns false if the execution data was not found in the mempool.
+func (t *BlockExecutionData) ByID(blockID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
+	entity, exists := t.c.ByID(blockID)
 	if !exists {
 		return nil, false
 	}
@@ -74,9 +76,10 @@ func (t *BlockExecutionData) Size() uint {
 	return t.c.Size()
 }
 
-// Remove removes block execution data from mempool.
-func (t *BlockExecutionData) Remove(id flow.Identifier) bool {
-	return t.c.Remove(id)
+// Remove removes block execution data from mempool by block ID.
+// It returns true if the execution data was known and removed.
+func (t *BlockExecutionData) Remove(blockID flow.Identifier) bool {
+	return t.c.Remove(blockID)
 }
 
 // unwrap converts an internal.WrappedEntity to a BlockExecutionDataEntity.

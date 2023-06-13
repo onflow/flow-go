@@ -4,12 +4,15 @@ import (
 	crand "crypto/rand"
 	"errors"
 	"fmt"
+	"math"
+	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -32,6 +35,9 @@ var (
 	// ErrSpamReportQueueSizeNotSet is returned when the spam report queue size is not set, it is a fatal irrecoverable error,
 	// and the ALSP module cannot be initialized.
 	ErrSpamReportQueueSizeNotSet = errors.New("spam report queue size is not set")
+	// ErrHeartBeatIntervalNotSet is returned when the heartbeat interval is not set, it is a fatal irrecoverable error,
+	// and the ALSP module cannot be initialized.
+	ErrHeartBeatIntervalNotSet = errors.New("heartbeat interval is not set")
 )
 
 type SpamRecordCacheFactory func(zerolog.Logger, uint32, module.HeroCacheMetrics) alsp.SpamRecordCache
@@ -96,7 +102,10 @@ type MisbehaviorReportManagerConfig struct {
 	// NetworkType is the type of the network it is used to determine whether the ALSP module is utilized in the
 	// public (unstaked) or private (staked) network.
 	NetworkType network.NetworkingType
-	Opts        []MisbehaviorReportManagerOption
+	// HeartBeatInterval is the interval between the heartbeats. Heartbeat is a recurring event that is used to
+	// apply recurring actions, e.g., decay the penalty of the misbehaving nodes.
+	HeartBeatInterval time.Duration
+	Opts              []MisbehaviorReportManagerOption
 }
 
 // validate validates the MisbehaviorReportManagerConfig instance. It returns an error if the config is invalid.
@@ -115,6 +124,9 @@ func (c MisbehaviorReportManagerConfig) validate() error {
 	}
 	if c.SpamReportQueueSize == 0 {
 		return ErrSpamReportQueueSizeNotSet
+	}
+	if c.HeartBeatInterval == 0 {
+		return ErrHeartBeatIntervalNotSet
 	}
 	return nil
 }
@@ -182,6 +194,10 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig) (*Misbehav
 		metrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory, cfg.NetworkType))
 
 	builder := component.NewComponentManagerBuilder()
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		ready()
+		m.heartbeatLoop(ctx, cfg.HeartBeatInterval) // blocking call
+	})
 	for i := 0; i < defaultMisbehaviorReportManagerWorkers; i++ {
 		builder.AddWorker(m.workerPool.WorkerLogic())
 	}
@@ -236,6 +252,82 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 	}
 
 	lg.Debug().Msg("misbehavior report submitted")
+}
+
+// heartbeatLoop starts the heartbeat ticks ticker to tick at the given intervals. It is a blocking function, and
+// should be called in a separate goroutine. It returns when the context is canceled. Hearbeats are recurring events that
+// are used to perform periodic tasks.
+// Args:
+//
+//	ctx: the context.
+//	interval: the interval between two ticks.
+//
+// Returns:
+//
+//	none.
+func (m *MisbehaviorReportManager) heartbeatLoop(ctx irrecoverable.SignalerContext, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	m.logger.Info().Dur("interval", interval).Msg("starting heartbeat ticks")
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			m.logger.Debug().Msg("heartbeat ticks stopped")
+			return
+		case <-ticker.C:
+			m.logger.Trace().Msg("new heartbeat ticked")
+			if err := m.onHeartbeat(); err != nil {
+				// any error returned from onHeartbeat is considered irrecoverable.
+				ctx.Throw(fmt.Errorf("failed to perform heartbeat: %w", err))
+			}
+		}
+	}
+}
+
+// onHeartbeat is called upon a heartbeatLoop. It encapsulates the recurring tasks that should be performed
+// during a heartbeat, which currently includes decay of the spam records.
+// Args:
+//
+//	none.
+//
+// Returns:
+//
+//		error: if an error occurs, it is returned. No error is expected during normal operation. Any returned error must
+//	 be considered as irrecoverable.
+func (m *MisbehaviorReportManager) onHeartbeat() error {
+	allIds := m.cache.Identities()
+
+	for _, id := range allIds {
+		penalty, err := m.cache.Adjust(id, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+			if record.Penalty > 0 {
+				// sanity check; this should never happen.
+				return record, fmt.Errorf("illegal state: spam record %x has positive penalty %f", id, record.Penalty)
+			}
+			if record.Decay <= 0 {
+				// sanity check; this should never happen.
+				return record, fmt.Errorf("illegal state: spam record %x has non-positive decay %f", id, record.Decay)
+			}
+
+			// each time we decay the penalty by the decay speed, the penalty is a negative number, and the decay speed
+			// is a positive number. So the penalty is getting closer to zero.
+			// We use math.Min() to make sure the penalty is never positive.
+			record.Penalty = math.Min(record.Penalty+record.Decay, 0)
+			return record, nil
+		})
+
+		// any error here is fatal because it indicates a bug in the cache. All ids being iterated over are in the cache,
+		// and adjust function above should not return an error unless there is a bug.
+		if err != nil {
+			return fmt.Errorf("failed to decay spam record %x: %w", id, err)
+		}
+
+		m.logger.Trace().
+			Hex("identifier", logging.ID(id)).
+			Float64("updated_penalty", penalty).
+			Msg("spam record decayed")
+	}
+
+	return nil
 }
 
 // processMisbehaviorReport is the worker function that processes the misbehavior reports.
