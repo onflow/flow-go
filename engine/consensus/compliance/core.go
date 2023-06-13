@@ -337,9 +337,9 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 			// We know:
 			//  - the parent of this block is valid and was appended to the state (ie. we knew the epoch for it)
 			//  - if we then see this for the child, one of two things must have happened:
-			//    1. the proposer malicious created the block for a view very far in the future (it's invalid)
+			//    1. the proposer maliciously created the block for a view very far in the future (it's invalid)
 			//      -> in this case we can disregard the block
-			//    2. no blocks have been finalized within  the epoch commitment deadline, and the epoch ended
+			//    2. no blocks have been finalized within the epoch commitment deadline, and the epoch ended
 			//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
 			//      -> in this case, the network has encountered a critical failure
 			//  - we assume in general that Case 2 will not happen, therefore this must be Case 1 - an invalid block
