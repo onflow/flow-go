@@ -421,7 +421,6 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	req := &execution.PingRequest{}
 	resp := &execution.PingResponse{}
 	en.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
-
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the execution grpc port
@@ -454,6 +453,7 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 
 		// make the call to the execution node
 		_, err = client.Ping(ctx, req)
+		en.handler.AssertCalled(t, "Ping", testifymock.Anything, req)
 
 		return time.Since(start), err
 	}
@@ -466,11 +466,11 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	assert.Equal(t, gobreaker.ErrOpenState, err)
 	assert.Greater(t, requestTimeout, duration)
 
-	//Wait until Circuit breaker go to Half-open state
-	time.Sleep(circuitBreakerRestoreTimeout + time.Second)
-
 	en.handler.On("Ping", testifymock.Anything, req).Unset()
 	en.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+
+	//Wait until Circuit breaker go to Half-open state
+	time.Sleep(circuitBreakerRestoreTimeout + time.Second)
 
 	duration, err = callAndMeasurePingDuration()
 	assert.Greater(t, requestTimeout, duration)
@@ -523,6 +523,7 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 
 		// make the call to the collection node
 		_, err = client.Ping(ctx, req)
+		cn.handler.AssertCalled(t, "Ping", testifymock.Anything, req)
 
 		return time.Since(start), err
 	}
@@ -535,11 +536,11 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	assert.Equal(t, gobreaker.ErrOpenState, err)
 	assert.Greater(t, requestTimeout, duration)
 
-	//Wait until Circuit breaker go to Half-open state
-	time.Sleep(circuitBreakerRestoreTimeout + time.Second)
-
 	cn.handler.On("Ping", testifymock.Anything, req).Unset()
 	cn.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+
+	//Wait until Circuit breaker go to Half-open state
+	time.Sleep(circuitBreakerRestoreTimeout + time.Second)
 
 	duration, err = callAndMeasurePingDuration()
 	assert.Greater(t, requestTimeout, duration)
