@@ -89,6 +89,7 @@ func (c *Cleaner) nextWaitDuration() time.Duration {
 		// In this specific case, `utils/rand` only errors if the system randomness fails
 		// which is a symptom of a wider failure. Many other node components would catch such
 		// a failure.
+		c.log.Warn().Msg("jitter is zero beacuse system randomness has failed")
 		jitter = 0
 	}
 	return time.Duration(c.interval.Nanoseconds() + int64(jitter))

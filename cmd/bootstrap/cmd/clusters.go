@@ -38,8 +38,7 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo) (f
 	}
 
 	// shuffle both collector lists based on a non-deterministic algorithm
-	var err error
-	partners, err = partners.Shuffle()
+	partners, err := partners.Shuffle()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not shuffle partners")
 	}

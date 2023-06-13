@@ -113,11 +113,11 @@ func (e *QueryExecutor) ExecuteScript(
 	// TODO: this is a temporary measure, we could remove this in the future
 	if e.logger.Debug().Enabled() {
 		e.rngLock.Lock()
+		defer e.rngLock.Unlock()
 		trackerID, err := rand.Uint32()
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate trackerID: %w", err)
 		}
-		e.rngLock.Unlock()
 
 		trackedLogger := e.logger.With().Hex("script_hex", script).Uint32("trackerID", trackerID).Logger()
 		trackedLogger.Debug().Msg("script is sent for execution")
