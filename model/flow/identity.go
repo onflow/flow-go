@@ -466,16 +466,15 @@ func (il IdentityList) Sample(size uint) (IdentityList, error) {
 	n := uint(len(il))
 	dup := make([]*Identity, 0, n)
 	dup = append(dup, il...)
-	// if sample size is greater than total size, return all the elements
-	if n <= size {
-		return dup, nil
+	if n < size {
+		size = n
 	}
 	swap := func(i, j uint) {
 		dup[i], dup[j] = dup[j], dup[i]
 	}
 	err := rand.Samples(n, size, swap)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate randomness: %w", err)
+		return nil, fmt.Errorf("failed to sample identity list: %w", err)
 	}
 	return dup[:size], nil
 }
@@ -483,17 +482,7 @@ func (il IdentityList) Sample(size uint) (IdentityList, error) {
 // Shuffle randomly shuffles the identity list (non-deterministic),
 // and returns the shuffled list without modifying the receiver.
 func (il IdentityList) Shuffle() (IdentityList, error) {
-	n := uint(len(il))
-	dup := make([]*Identity, 0, n)
-	dup = append(dup, il...)
-	swap := func(i, j uint) {
-		dup[i], dup[j] = dup[j], dup[i]
-	}
-	err := rand.Shuffle(n, swap)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate randomness: %w", err)
-	}
-	return dup, nil
+	return il.Sample(uint(len(il)))
 }
 
 // SamplePct returns a random sample from the receiver identity list. The
