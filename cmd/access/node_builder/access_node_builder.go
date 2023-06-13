@@ -926,7 +926,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcConf.CollectionAddr,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(builder.rpcConf.MaxMsgSize))),
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
-				backend.WithClientUnaryInterceptor(builder.rpcConf.CollectionClientTimeout, builder.rpcConf.CircuitBreakerConfig))
+				grpc.WithUnaryInterceptor(backend.WithClientUnaryInterceptor(builder.rpcConf.CollectionClientTimeout)))
 			if err != nil {
 				return err
 			}

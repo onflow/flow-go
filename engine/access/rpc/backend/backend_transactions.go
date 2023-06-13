@@ -24,6 +24,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+const collectionNodesToTry uint = 3
+
 type backendTransactions struct {
 	staticCollectionRPC  accessproto.AccessAPIClient // rpc client tied to a fixed collection node
 	transactions         storage.Transactions
@@ -36,7 +38,6 @@ type backendTransactions struct {
 	transactionValidator *access.TransactionValidator
 	retry                *Retry
 	connFactory          ConnectionFactory
-	connSelector         ConnectionSelector
 
 	previousAccessNodes []accessproto.AccessAPIClient
 	log                 zerolog.Logger
@@ -85,7 +86,7 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 	}
 
 	// otherwise choose a random set of collections nodes to try
-	collAddrs, err := b.connSelector.GetCollectionNodes(tx.ID())
+	collAddrs, err := b.chooseCollectionNodes(tx, collectionNodesToTry)
 	if err != nil {
 		return fmt.Errorf("failed to determine collection node for tx %x: %w", tx, err)
 	}
@@ -109,6 +110,34 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 	}
 
 	return sendErrors.ErrorOrNil()
+}
+
+// chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
+// collection node cluster responsible for the given tx
+func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sampleSize uint) ([]string, error) {
+
+	// retrieve the set of collector clusters
+	clusters, err := b.state.Final().Epochs().Current().Clustering()
+	if err != nil {
+		return nil, fmt.Errorf("could not cluster collection nodes: %w", err)
+	}
+
+	// get the cluster responsible for the transaction
+	txCluster, ok := clusters.ByTxID(tx.ID())
+	if !ok {
+		return nil, fmt.Errorf("could not get local cluster by txID: %x", tx.ID())
+	}
+
+	// select a random subset of collection nodes from the cluster to be tried in order
+	targetNodes := txCluster.Sample(sampleSize)
+
+	// collect the addresses of all the chosen collection nodes
+	var targetAddrs = make([]string, len(targetNodes))
+	for i, id := range targetNodes {
+		targetAddrs[i] = id.Address
+	}
+
+	return targetAddrs, nil
 }
 
 // sendTransactionToCollection sends the transaction to the given collection node via grpc
@@ -342,7 +371,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	req := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockID[:],
 	}
-	execNodes, err := b.connSelector.GetExecutionNodesForBlockID(ctx, blockID)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Errorf(codes.NotFound, err.Error())
@@ -473,7 +502,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		BlockId: blockID[:],
 		Index:   index,
 	}
-	execNodes, err := b.connSelector.GetExecutionNodesForBlockID(ctx, blockID)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Errorf(codes.NotFound, err.Error())
@@ -702,7 +731,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		TransactionId: transactionID,
 	}
 
-	execNodes, err := b.connSelector.GetExecutionNodesForBlockID(ctx, blockID)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		// if no execution receipt were found, return a NotFound GRPC error
 		if IsInsufficientExecutionReceipts(err) {

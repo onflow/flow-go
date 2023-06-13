@@ -25,7 +25,6 @@ type backendEvents struct {
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
 	connFactory       ConnectionFactory
-	connSelector      ConnectionSelector
 	log               zerolog.Logger
 	maxHeightRange    uint
 }
@@ -130,7 +129,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	// choose the last block ID to find the list of execution nodes
 	lastBlockID := blockIDs[len(blockIDs)-1]
 
-	execNodes, err := b.connSelector.GetExecutionNodesForBlockID(ctx, lastBlockID)
+	execNodes, err := executionNodesForBlockID(ctx, lastBlockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		b.log.Error().Err(err).Msg("failed to retrieve events from execution node")
 		return nil, rpc.ConvertError(err, "failed to retrieve events from execution node", codes.Internal)

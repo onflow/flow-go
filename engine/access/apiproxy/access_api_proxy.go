@@ -65,9 +65,7 @@ func (h *FlowAccessAPIForwarder) reconnectingClient(i int) error {
 				identity.Address,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(h.maxMsgSize))),
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
-				backend.WithClientUnaryInterceptor(timeout, backend.CircuitBreakerConfig{
-					Enabled: false,
-				}))
+				grpc.WithUnaryInterceptor(backend.WithClientUnaryInterceptor(timeout)))
 			if err != nil {
 				return err
 			}
@@ -81,9 +79,7 @@ func (h *FlowAccessAPIForwarder) reconnectingClient(i int) error {
 				identity.Address,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(h.maxMsgSize))),
 				grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
-				backend.WithClientUnaryInterceptor(timeout, backend.CircuitBreakerConfig{
-					Enabled: false,
-				}))
+				grpc.WithUnaryInterceptor(backend.WithClientUnaryInterceptor(timeout)))
 			if err != nil {
 				return fmt.Errorf("cannot connect to %s %w", identity.Address, err)
 			}

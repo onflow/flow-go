@@ -28,7 +28,6 @@ type backendScripts struct {
 	executionReceipts  storage.ExecutionReceipts
 	state              protocol.State
 	connFactory        ConnectionFactory
-	connSelector       ConnectionSelector
 	log                zerolog.Logger
 	metrics            module.BackendScriptsMetrics
 	loggedScripts      *lru.Cache
@@ -92,7 +91,7 @@ func (b *backendScripts) findScriptExecutors(
 		return b.archiveAddressList, nil
 	}
 
-	executors, err := b.connSelector.GetExecutionNodesForBlockID(ctx, blockID)
+	executors, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		return nil, err
 	}
