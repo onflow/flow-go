@@ -3,6 +3,8 @@ package backend
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
@@ -14,7 +16,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"testing"
 
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
@@ -26,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -47,7 +47,6 @@ type Suite struct {
 	execClient             *access.ExecutionAPIClient
 	historicalAccessClient *access.AccessAPIClient
 	connectionFactory      *backendmock.ConnectionFactory
-	nil                    *backendmock.ConnectionSelector
 	chainID                flow.ChainID
 }
 
@@ -75,7 +74,6 @@ func (suite *Suite) SetupTest() {
 	suite.chainID = flow.Testnet
 	suite.historicalAccessClient = new(access.AccessAPIClient)
 	suite.connectionFactory = new(backendmock.ConnectionFactory)
-	suite.nil = new(backendmock.ConnectionSelector)
 }
 
 func (suite *Suite) TestPing() {
@@ -2123,21 +2121,6 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		func(flow.IdentityFilter) error { return nil })
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
-	connSelector := new(backendmock.ConnectionSelector)
-	connSelector.On("GetExecutionNodesForBlockID").Return(func() flow.IdentityList {
-		randomItems := make(flow.IdentityList, 0, maxExecutionNodesCnt)
-
-		for i := 0; i < maxExecutionNodesCnt; i++ {
-			// Generate a random index within the range of the array
-			randomIndex, err := rand.Uintn(uint(len(allExecutionNodes)))
-			require.NoError(suite.T(), err)
-			// Append the item at the random index to the new slice
-			randomItems = append(randomItems, allExecutionNodes[randomIndex])
-		}
-
-		return randomItems
-	})
-
 	testExecutionNodesForBlockID := func(preferredENs, fixedENs, expectedENs flow.IdentityList) {
 
 		if preferredENs != nil {
@@ -2146,7 +2129,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		if fixedENs != nil {
 			fixedENIdentifiers = fixedENs.NodeIDs()
 		}
-		actualList, err := connSelector.GetExecutionNodesForBlockID(context.Background(), block.ID())
+		actualList, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
 		require.NoError(suite.T(), err)
 		if expectedENs == nil {
 			expectedENs = flow.IdentityList{}
@@ -2166,7 +2149,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		attempt2Receipts = flow.ExecutionReceiptList{}
 		attempt3Receipts = flow.ExecutionReceiptList{}
 		suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
-		actualList, err := connSelector.GetExecutionNodesForBlockID(context.Background(), block.ID())
+		actualList, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
 		require.NoError(suite.T(), err)
 		require.Equal(suite.T(), len(actualList), maxExecutionNodesCnt)
 	})

@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/sony/gobreaker"
 	"net"
 	"strconv"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/sony/gobreaker"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"

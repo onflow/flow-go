@@ -3,20 +3,20 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow/filter"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
