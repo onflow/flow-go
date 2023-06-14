@@ -1218,7 +1218,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		builder.LibP2PResourceManagerConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.BaseConfig.NetworkConfig.DisallowListCacheSize,
-			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PrivateNetwork),
+			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		}).
 		SetBasicResolver(builder.Resolver).
 		SetSubscriptionFilter(
