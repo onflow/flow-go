@@ -18,7 +18,7 @@ The ALSP manager is responsible for maintaining records of misbehavior reports a
 remote nodes and for calculating their accumulated misbehavior penalties. 
 Should a node’s misbehavior penalty surpass a certain threshold 
 (referred to as `DisallowListingThreshold`), the ALSP manager initiates the disallow listing process. When a remote node is disallow-listed,
-it is effectively isolated from the network by the `ConnectionGater` and `PeerManager` components, i.e., the exisitng 
+it is effectively isolated from the network by the `ConnectionGater` and `PeerManager` components, i.e., the existing 
 connections to that remote node are closed and no new connections are allowed to be established.
 
 ##### Disallow Listing Process
