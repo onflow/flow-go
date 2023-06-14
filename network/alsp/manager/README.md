@@ -19,7 +19,7 @@ remote nodes and for calculating their accumulated misbehavior penalties.
 Should a node’s misbehavior penalty surpass a certain threshold 
 (referred to as `DisallowListingThreshold`), the ALSP manager initiates the disallow listing process. When a remote node is disallow-listed,
 it is effectively isolated from the network by the `ConnectionGater` and `PeerManager` components, i.e., the existing 
-connections to that remote node are closed and no new connections are allowed to be established.
+connections to that remote node are closed and new connections attempts are rejected.
 
 ##### Disallow Listing Process
 1. The ALSP manager communicates with the `LibP2PNode` by calling its `OnDisallowListNotification` method to indicate that a particular remote node has been disallow-listed.
