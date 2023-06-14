@@ -31,6 +31,7 @@ import (
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -57,7 +58,7 @@ func NodeFixture(
 	opts ...NodeFixtureParameterOption,
 ) (p2p.LibP2PNode, flow.Identity) {
 
-	logger := unittest.Logger().Level(zerolog.ErrorLevel)
+	logger := unittest.Logger().Level(zerolog.InfoLevel)
 
 	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), idProvider, metrics.NewNoopCollector()).
 		Build()
@@ -75,6 +76,9 @@ func NodeFixture(
 		ResourceManager:                  testutils.NewResourceManager(t),
 		GossipSubPeerScoreTracerInterval: 0, // disabled by default
 		GossipSubRPCInspector:            rpcInspectorSuite,
+		PeerScoreConfig: &p2p.PeerScoringConfig{
+			TopicScoreParams: scoring.DefaultTopicScoreParams(sporkID),
+		},
 	}
 
 	for _, opt := range opts {
