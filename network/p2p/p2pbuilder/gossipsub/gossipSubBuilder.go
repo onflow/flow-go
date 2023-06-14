@@ -179,14 +179,14 @@ func defaultGossipSubAdapterConfig() p2p.GossipSubAdapterConfigFunc {
 // - p2p.PeerScoreTracer: a peer score tracer for the GossipSub pubsub system (if enabled, otherwise nil).
 // - error: if an error occurs during the creation of the GossipSub pubsub system, it is returned. Otherwise, nil is returned.
 // Note that on happy path, the returned error is nil. Any error returned is unexpected and should be handled as irrecoverable.
-func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p2p.PeerScoreTracer, error) {
+func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, error) {
 	gossipSubConfigs := g.gossipSubConfigFunc(&p2p.BasePubSubAdapterConfig{
 		MaxMessageSize: p2pnode.DefaultMaxPubSubMsgSize,
 	})
 	gossipSubConfigs.WithMessageIdFunction(utils.MessageID)
 
 	if g.routingSystem == nil {
-		return nil, nil, fmt.Errorf("could not create gossipsub: routing system is nil")
+		return nil, fmt.Errorf("could not create gossipsub: routing system is nil")
 	}
 	gossipSubConfigs.WithRoutingDiscovery(g.routingSystem)
 
@@ -224,20 +224,20 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 	}
 
 	if g.h == nil {
-		return nil, nil, fmt.Errorf("could not create gossipsub: host is nil")
+		return nil, fmt.Errorf("could not create gossipsub: host is nil")
 	}
 
 	gossipSub, err := g.gossipSubFactory(ctx, g.logger, g.h, gossipSubConfigs)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not create gossipsub: %w", err)
+		return nil, fmt.Errorf("could not create gossipsub: %w", err)
 	}
 
 	if scoreOpt != nil {
 		err := scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(g.logger, gossipSub))
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not set subscription provider: %w", err)
+			return nil, fmt.Errorf("could not set subscription provider: %w", err)
 		}
 	}
 
-	return gossipSub, scoreTracer, nil
+	return gossipSub, nil
 }
