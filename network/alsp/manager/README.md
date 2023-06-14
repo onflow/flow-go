@@ -27,7 +27,7 @@ connections to that remote node are closed and new connections attempts are reje
 
    a. It alerts the `PeerManager`, instructing it to sever the connection with the disallow-listed node.
    b. It notifies the `ConnectionGater` to block any incoming or outgoing connections to and from the disallow-listed node.
-This ensures that the disallow-listed node is effectively isolated from the network.
+This ensures that the disallow-listed node is effectively isolated from the local node's network.
 
 ##### Penalty Decay and Allow Listing Process
 The ALSP manager also includes a penalty decay mechanism, which gradually reduces the penalties of nodes over time upon regular hearbeat intervals (default is evey one second).
