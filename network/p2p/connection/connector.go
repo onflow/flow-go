@@ -110,7 +110,7 @@ func (l *Libp2pConnector) connectToPeers(ctx context.Context, peerIDs peer.IDSli
 
 	for _, peerID := range peerIDs {
 		if l.host.IsConnectedTo(peerID) {
-			l.log.Debug().Str("peer_id", peerID.String()).Msg("already connected to peer, skipping connection")
+			l.log.Trace().Str("peer_id", peerID.String()).Msg("already connected to peer, skipping connection")
 			continue
 		}
 		peerCh <- peer.AddrInfo{ID: peerID}
