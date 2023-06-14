@@ -68,7 +68,7 @@ func (committer *LedgerViewCommitter) collectProofs(
 	err error,
 ) {
 	// get all deduplicated register IDs
-	allIds := snapshot.AllRegisterIDs()
+	allIds := snapshot.ReadRegisterIDs()
 	keys := make([]ledger.Key, 0, len(allIds))
 	for _, id := range allIds {
 		keys = append(keys, execState.RegisterIDToKey(id))
