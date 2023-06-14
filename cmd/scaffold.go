@@ -1184,7 +1184,16 @@ func (fnb *FlowNodeBuilder) initState() error {
 	}
 	fnb.NodeConfig.LastFinalizedHeader = lastFinalized
 
+	lastSealed, err := fnb.State.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("could not get last sealed block header: %w", err)
+	}
+
 	fnb.Logger.Info().
+		Hex("last_finalized_block_id", logging.Entity(lastFinalized)).
+		Uint64("last_finalized_block_height", lastFinalized.Height).
+		Hex("last_sealed_block_id", logging.Entity(lastSealed)).
+		Uint64("last_sealed_block_height", lastSealed.Height).
 		Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
 		Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
 		Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
