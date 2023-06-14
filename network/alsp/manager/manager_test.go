@@ -2,7 +2,6 @@ package alspmgr_test
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -182,6 +181,8 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 			require.Equal(t, totalPenalty, record.Penalty)
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
 			require.Equal(t, uint64(0), record.CutoffCounter)
+			// with just reporting a single misbehavior report, the node should not be disallowed.
+			require.False(t, record.DisallowListed)
 			// the decay should be the default decay value.
 			require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
 		}
@@ -491,6 +492,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 		}
 		require.NotNil(t, record)
 		require.Equal(t, penalty, record.Penalty)
+		require.False(t, record.DisallowListed)                                                       // the peer should not be disallow listed yet
 		require.Equal(t, uint64(0), record.CutoffCounter)                                             // with just reporting a misbehavior, the cutoff counter should not be incremented.
 		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay) // the decay should be the default decay value.
 
@@ -609,6 +611,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentiall
 			// all the misbehavior reports should be processed by now, so the penalty should be equal to the total penalty
 			return false
 		}
+		require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
 		require.Equal(t, uint64(0), record.CutoffCounter)
 		// the decay should be the default decay value.
@@ -679,6 +682,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 			// all the misbehavior reports should be processed by now, so the penalty should be equal to the total penalty
 			return false
 		}
+		require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
 		require.Equal(t, uint64(0), record.CutoffCounter)
 		// the decay should be the default decay value.
@@ -735,7 +739,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequential
 				return false
 			}
 			require.NotNil(t, record)
-
+			require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
 			require.Equal(t, report.Penalty(), record.Penalty)
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
 			require.Equal(t, uint64(0), record.CutoffCounter)
@@ -806,7 +810,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 				return false
 			}
 			require.NotNil(t, record)
-
+			require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
 			require.Equal(t, report.Penalty(), record.Penalty)
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
 			require.Equal(t, uint64(0), record.CutoffCounter)
@@ -884,11 +888,10 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 
 			record, ok := cache.Get(originID)
 			if !ok {
-				fmt.Println("not ok")
 				return false
 			}
 			require.NotNil(t, record)
-
+			require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
 			require.Equal(t, totalPenalty, record.Penalty)
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
 			require.Equal(t, uint64(0), record.CutoffCounter)
@@ -960,7 +963,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurre
 				return false
 			}
 			require.NotNil(t, record)
-
+			require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
 			require.Equal(t, totalPenalty, record.Penalty)
 			// with just reporting a single misbehavior report, the cutoff counter should not be incremented.
 			require.Equal(t, uint64(0), record.CutoffCounter)
@@ -1034,6 +1037,7 @@ func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *t
 		if record.Penalty != report.Penalty()*float64(times) {
 			return false
 		}
+		require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
 		require.Equal(t, uint64(0), record.CutoffCounter)
 		// the decay should be the default decay value.
@@ -1105,6 +1109,7 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 		if record.Penalty != report.Penalty()*float64(times) {
 			return false
 		}
+		require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
 		// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
 		require.Equal(t, uint64(0), record.CutoffCounter)
 		// the decay should be the default decay value.
@@ -1215,6 +1220,7 @@ func TestDecayMisbehaviorPenalty_MultipleHeartbeats(t *testing.T) {
 	require.Greater(t, record.Penalty, penaltyBeforeDecay)
 	// with 3 heartbeats processed, the decayed penalty should be less than the value after 4 heartbeats.
 	require.Less(t, record.Penalty, penaltyBeforeDecay+4*record.Decay)
+	require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
 	// with just reporting a few misbehavior reports, the cutoff counter should not be incremented.
 	require.Equal(t, uint64(0), record.CutoffCounter)
 	// the decay should be the default decay value.
@@ -1290,12 +1296,6 @@ func TestDecayMisbehaviorPenalty_DecayToZero(t *testing.T) {
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 
-	// eventually, we expect the ALSP manager to emit an allow list notification to the network layer when the penalty is decayed to zero.
-	consumer.On("OnAllowListNotification", &network.AllowListingUpdate{
-		FlowIds: flow.IdentifierList{report.OriginId()},
-		Cause:   network.DisallowListedCauseAlsp,
-	}).Return(nil).Once()
-
 	// phase-2: default decay speed is 1000 and with 10 penalties in range of [-1, -10], the penalty should be decayed to zero in
 	// a single heartbeat.
 	time.Sleep(1 * time.Second)
@@ -1305,10 +1305,90 @@ func TestDecayMisbehaviorPenalty_DecayToZero(t *testing.T) {
 	require.True(t, ok) // the record should be in the cache
 	require.NotNil(t, record)
 
+	require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
 	// with a single heartbeat and decay speed of 1000, the penalty should be decayed to zero.
 	require.Equal(t, float64(0), record.Penalty)
 	// the decay should be the default decay value.
 	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+}
+
+// TestDecayMisbehaviorPenalty_DecayToZero_AllowListing tests that when the misbehavior penalty of an already disallow-listed
+// peer is decayed to zero, the peer is allow-listed back in the network, and its spam record cache is updated accordingly.
+func TestDecayMisbehaviorPenalty_DecayToZero_AllowListing(t *testing.T) {
+	cfg := managerCfgFixture()
+	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
+
+	var cache alsp.SpamRecordCache
+	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return cache
+		}),
+	}
+	m, err := alspmgr.NewMisbehaviorReportManager(cfg, consumer)
+	require.NoError(t, err)
+
+	// start the ALSP manager
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		unittest.RequireCloseBefore(t, m.Done(), 100*time.Millisecond, "ALSP manager did not stop")
+	}()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	m.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, m.Ready(), 100*time.Millisecond, "ALSP manager did not start")
+
+	// simulates a disallow-listed peer in cache.
+	originId := unittest.IdentifierFixture()
+	penalty, err := cache.Adjust(originId, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+		record.Penalty = -10 // set the penalty to -10 to simulate that the penalty has already been decayed for a while.
+		record.CutoffCounter = 1
+		record.DisallowListed = true
+		record.OriginId = originId
+		record.Decay = model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay
+		return record, nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, float64(-10), penalty)
+
+	// sanity check
+	record, ok := cache.Get(originId)
+	require.True(t, ok) // the record should be in the cache
+	require.NotNil(t, record)
+	require.Equal(t, float64(-10), record.Penalty)
+	require.True(t, record.DisallowListed)
+	require.Equal(t, uint64(1), record.CutoffCounter)
+	require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
+
+	// eventually, we expect the ALSP manager to emit an allow list notification to the network layer when the penalty is decayed to zero.
+	consumer.On("OnAllowListNotification", &network.AllowListingUpdate{
+		FlowIds: flow.IdentifierList{originId},
+		Cause:   network.DisallowListedCauseAlsp,
+	}).Return(nil).Once()
+
+	// wait for at most two heartbeats; default decay speed is 1000 and with a penalty of -10, the penalty should be decayed to zero in a single heartbeat.
+	require.Eventually(t, func() bool {
+		record, ok = cache.Get(originId)
+		if !ok {
+			return false
+		}
+		if record.DisallowListed {
+			return false // the peer should not be allow-listed yet.
+		}
+		if record.Penalty != float64(0) {
+			return false // the penalty should be decayed to zero.
+		}
+		if record.CutoffCounter != 1 {
+			return false // the cutoff counter should be incremented.
+		}
+		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			return false // the decay should be the default decay value.
+		}
+
+		return true
+
+	}, 2*time.Second, 10*time.Millisecond, "penalty was not decayed to zero")
+
 }
 
 // TestDisallowListNotification tests the emission of the allow list notification to the network layer when the misbehavior
@@ -1384,6 +1464,7 @@ func TestDisallowListNotification(t *testing.T) {
 		if record.Penalty != report.Penalty()*float64(times)+record.Decay {
 			return false
 		}
+		require.True(t, record.DisallowListed) // the peer should be disallow-listed.
 		// cuttoff counter should be incremented since the penalty is above the disallowlisting threshold.
 		require.Equal(t, uint64(1), record.CutoffCounter)
 		// the decay should be the default decay value.

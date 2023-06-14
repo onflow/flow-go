@@ -317,13 +317,16 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			// as long as record.Penalty is NOT below model.DisallowListingThreshold,
 			// the node is considered allow-listed and can conduct inbound and outbound connections.
 			// Once it falls below model.DisallowListingThreshold, it needs to be disallow listed.
-			if record.Penalty < model.DisallowListingThreshold {
+			if record.Penalty < model.DisallowListingThreshold && !record.DisallowListed {
 				// cutoff counter keeps track of how many times the penalty has been below the threshold.
 				record.CutoffCounter++
+				record.DisallowListed = true
 				m.logger.Warn().
 					Str("key", logging.KeySuspicious).
 					Hex("identifier", logging.ID(id)).
 					Uint64("cutoff_counter", record.CutoffCounter).
+					Float64("decay_speed", record.Decay).
+					Bool("disallow_listed", record.DisallowListed).
 					Msg("node penalty is below threshold, disallow listing")
 				m.disallowListingConsumer.OnDisallowListNotification(&network.DisallowListingUpdate{
 					FlowIds: flow.IdentifierList{id},
@@ -338,7 +341,14 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 
 			// TODO: this can be done in batch but at this stage let's send individual notifications.
 			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
-			if record.Penalty == float64(0) {
+			if record.Penalty == float64(0) && record.DisallowListed {
+				record.DisallowListed = false
+				m.logger.Info().
+					Hex("identifier", logging.ID(id)).
+					Uint64("cutoff_counter", record.CutoffCounter).
+					Float64("decay_speed", record.Decay).
+					Bool("disallow_listed", record.DisallowListed).
+					Msg("allow-listing a node that was disallow listed")
 				// Penalty has fully decayed to zero and the node can be back in the allow list.
 				m.disallowListingConsumer.OnAllowListNotification(&network.AllowListingUpdate{
 					FlowIds: flow.IdentifierList{id},
@@ -346,6 +356,12 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 				})
 			}
 
+			m.logger.Trace().
+				Hex("identifier", logging.ID(id)).
+				Uint64("cutoff_counter", record.CutoffCounter).
+				Float64("decay_speed", record.Decay).
+				Bool("disallow_listed", record.DisallowListed).
+				Msg("spam record decayed successfully")
 			return record, nil
 		})
 

@@ -166,10 +166,11 @@ func (s *SpamRecordCache) Get(originId flow.Identifier) (*model.ProtocolSpamReco
 
 	// return a copy of the record (we do not want the caller to modify the record).
 	return &model.ProtocolSpamRecord{
-		OriginId:      record.OriginId,
-		Decay:         record.Decay,
-		CutoffCounter: record.CutoffCounter,
-		Penalty:       record.Penalty,
+		OriginId:       record.OriginId,
+		Decay:          record.Decay,
+		CutoffCounter:  record.CutoffCounter,
+		Penalty:        record.Penalty,
+		DisallowListed: record.DisallowListed,
 	}, true
 }
 
