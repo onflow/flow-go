@@ -96,8 +96,7 @@ jobs:
           cache: true
       - name: Set Test Matrix
         id: set-test-matrix
-#        run: go run utils/test_matrix/test_matrix.go access admin cmd consensus engine fvm ledger module network utils
-        run: go run utils/test_matrix/test_matrix.go ledger
+        run: go run utils/test_matrix/test_matrix.go access admin cmd consensus engine fvm ledger module network utils
 
   unit-test:
     name: Unit Tests (${{ matrix.targets.name }})
@@ -124,7 +123,9 @@ jobs:
         timeout_minutes: 25
         max_attempts: 3
         command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
-
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+      if: failure()
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
