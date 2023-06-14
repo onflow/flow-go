@@ -3,11 +3,12 @@ package storage
 import (
 	"context"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/cmd/util/cmd/read-light-block"
 	"github.com/onflow/flow-go/storage"
-	"github.com/rs/zerolog/log"
 )
 
 var _ commands.AdminCommand = (*ReadRangeBlocksCommand)(nil)
