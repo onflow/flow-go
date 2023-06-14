@@ -374,9 +374,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		BlockId: blockID[:],
 	}
 
-	var execNodes flow.IdentityList
-
-	execNodes, err = executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Errorf(codes.NotFound, err.Error())
@@ -507,9 +505,8 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		BlockId: blockID[:],
 		Index:   index,
 	}
-	var execNodes flow.IdentityList
 
-	execNodes, err = executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Errorf(codes.NotFound, err.Error())
@@ -738,10 +735,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		TransactionId: transactionID,
 	}
 
-	var execNodes flow.IdentityList
-	var err error
-
-	execNodes, err = executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		// if no execution receipt were found, return a NotFound GRPC error
 		if IsInsufficientExecutionReceipts(err) {

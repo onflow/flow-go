@@ -83,11 +83,7 @@ func (b *backendAccounts) getAccountAtBlockID(
 		BlockId: blockID[:],
 	}
 
-	var execNodes flow.IdentityList
-	var err error
-
-	execNodes, err = executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
-
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to get account from the execution node", codes.Internal)
 	}
