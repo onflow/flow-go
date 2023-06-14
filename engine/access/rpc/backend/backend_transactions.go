@@ -27,20 +27,20 @@ import (
 const collectionNodesToTry uint = 3
 
 type backendTransactions struct {
-	staticCollectionRPC  accessproto.AccessAPIClient // rpc client tied to a fixed collection node
-	transactions         storage.Transactions
-	executionReceipts    storage.ExecutionReceipts
-	collections          storage.Collections
-	blocks               storage.Blocks
-	state                protocol.State
-	chainID              flow.ChainID
-	transactionMetrics   module.TransactionMetrics
-	transactionValidator *access.TransactionValidator
-	retry                *Retry
-	connFactory          ConnectionFactory
-
-	previousAccessNodes []accessproto.AccessAPIClient
-	log                 zerolog.Logger
+	staticCollectionRPC   accessproto.AccessAPIClient // rpc client tied to a fixed collection node
+	transactions          storage.Transactions
+	executionReceipts     storage.ExecutionReceipts
+	collections           storage.Collections
+	blocks                storage.Blocks
+	state                 protocol.State
+	chainID               flow.ChainID
+	transactionMetrics    module.TransactionMetrics
+	transactionValidator  *access.TransactionValidator
+	retry                 *Retry
+	connFactory           ConnectionFactory
+	previousAccessNodes   []accessproto.AccessAPIClient
+	log                   zerolog.Logger
+	circuitBreakerEnabled bool
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -123,13 +123,15 @@ func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sa
 	}
 
 	// get the cluster responsible for the transaction
-	txCluster, ok := clusters.ByTxID(tx.ID())
+	targetNodes, ok := clusters.ByTxID(tx.ID())
 	if !ok {
 		return nil, fmt.Errorf("could not get local cluster by txID: %x", tx.ID())
 	}
 
-	// select a random subset of collection nodes from the cluster to be tried in order
-	targetNodes := txCluster.Sample(sampleSize)
+	if !b.circuitBreakerEnabled {
+		// select a random subset of collection nodes from the cluster to be tried in order
+		targetNodes = targetNodes.Sample(sampleSize)
+	}
 
 	// collect the addresses of all the chosen collection nodes
 	var targetAddrs = make([]string, len(targetNodes))
@@ -371,7 +373,10 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	req := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockID[:],
 	}
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+
+	var execNodes flow.IdentityList
+
+	execNodes, err = executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Errorf(codes.NotFound, err.Error())
@@ -502,7 +507,9 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		BlockId: blockID[:],
 		Index:   index,
 	}
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	var execNodes flow.IdentityList
+
+	execNodes, err = executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Errorf(codes.NotFound, err.Error())
@@ -731,7 +738,10 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		TransactionId: transactionID,
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	var execNodes flow.IdentityList
+	var err error
+
+	execNodes, err = executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		// if no execution receipt were found, return a NotFound GRPC error
 		if IsInsufficientExecutionReceipts(err) {
@@ -762,6 +772,10 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 	execNodes flow.IdentityList,
 	req *execproto.GetTransactionResultRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
+	if !b.circuitBreakerEnabled {
+		execNodes = execNodes.Sample(maxExecutionNodesCnt)
+	}
+
 	var errs *multierror.Error
 	logAnyError := func() {
 		errToReturn := errs.ErrorOrNil()
@@ -817,6 +831,10 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	execNodes flow.IdentityList,
 	req *execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
+	if !b.circuitBreakerEnabled {
+		execNodes = execNodes.Sample(maxExecutionNodesCnt)
+	}
+
 	var errs *multierror.Error
 
 	defer func() {
@@ -876,6 +894,10 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 	execNodes flow.IdentityList,
 	req *execproto.GetTransactionByIndexRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
+	if !b.circuitBreakerEnabled {
+		execNodes = execNodes.Sample(maxExecutionNodesCnt)
+	}
+
 	var errs *multierror.Error
 	logAnyError := func() {
 		errToReturn := errs.ErrorOrNil()

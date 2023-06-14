@@ -18,11 +18,12 @@ import (
 )
 
 type backendAccounts struct {
-	state             protocol.State
-	headers           storage.Headers
-	executionReceipts storage.ExecutionReceipts
-	connFactory       ConnectionFactory
-	log               zerolog.Logger
+	state                 protocol.State
+	headers               storage.Headers
+	executionReceipts     storage.ExecutionReceipts
+	connFactory           ConnectionFactory
+	log                   zerolog.Logger
+	circuitBreakerEnabled bool
 }
 
 func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
@@ -82,7 +83,11 @@ func (b *backendAccounts) getAccountAtBlockID(
 		BlockId: blockID[:],
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	var execNodes flow.IdentityList
+	var err error
+
+	execNodes, err = executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+
 	if err != nil {
 		return nil, rpc.ConvertError(err, "failed to get account from the execution node", codes.Internal)
 	}
@@ -107,7 +112,12 @@ func (b *backendAccounts) getAccountAtBlockID(
 // other ENs are logged and swallowed. If all ENs fail to return a valid response, then an
 // error aggregating all failures is returned.
 func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
+	if !b.circuitBreakerEnabled {
+		execNodes = execNodes.Sample(maxExecutionNodesCnt)
+	}
+
 	var errors *multierror.Error
+
 	for _, execNode := range execNodes {
 		// TODO: use the GRPC Client interceptor
 		start := time.Now()

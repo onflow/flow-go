@@ -3,13 +3,12 @@ package backend
 import (
 	"context"
 	"fmt"
-	"time"
-
 	lru "github.com/hashicorp/golang-lru"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"time"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
@@ -97,6 +96,7 @@ func New(
 	log zerolog.Logger,
 	snapshotHistoryLimit int,
 	archiveAddressList []string,
+	circuitBreakerEnabled bool,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
@@ -122,19 +122,20 @@ func New(
 			archiveAddressList: archiveAddressList,
 		},
 		backendTransactions: backendTransactions{
-			staticCollectionRPC:  collectionRPC,
-			state:                state,
-			chainID:              chainID,
-			collections:          collections,
-			blocks:               blocks,
-			transactions:         transactions,
-			executionReceipts:    executionReceipts,
-			transactionValidator: configureTransactionValidator(state, chainID),
-			transactionMetrics:   accessMetrics,
-			retry:                retry,
-			connFactory:          connFactory,
-			previousAccessNodes:  historicalAccessNodes,
-			log:                  log,
+			staticCollectionRPC:   collectionRPC,
+			state:                 state,
+			chainID:               chainID,
+			collections:           collections,
+			blocks:                blocks,
+			transactions:          transactions,
+			executionReceipts:     executionReceipts,
+			transactionValidator:  configureTransactionValidator(state, chainID),
+			transactionMetrics:    accessMetrics,
+			retry:                 retry,
+			connFactory:           connFactory,
+			previousAccessNodes:   historicalAccessNodes,
+			log:                   log,
+			circuitBreakerEnabled: circuitBreakerEnabled,
 		},
 		backendEvents: backendEvents{
 			state:             state,
@@ -153,11 +154,12 @@ func New(
 			state:  state,
 		},
 		backendAccounts: backendAccounts{
-			state:             state,
-			headers:           headers,
-			executionReceipts: executionReceipts,
-			connFactory:       connFactory,
-			log:               log,
+			state:                 state,
+			headers:               headers,
+			executionReceipts:     executionReceipts,
+			connFactory:           connFactory,
+			log:                   log,
+			circuitBreakerEnabled: circuitBreakerEnabled,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: executionResults,
@@ -356,14 +358,11 @@ func executionNodesForBlockID(
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
 
-	// randomly choose upto maxExecutionNodesCnt identities
-	executionIdentitiesRandom := subsetENs.Sample(maxExecutionNodesCnt)
-
-	if len(executionIdentitiesRandom) == 0 {
+	if len(subsetENs) == 0 {
 		return nil, fmt.Errorf("no matching execution node found for block ID %v", blockID)
 	}
 
-	return executionIdentitiesRandom, nil
+	return subsetENs, nil
 }
 
 // findAllExecutionNodes find all the execution nodes ids from the execution receipts that have been received for the

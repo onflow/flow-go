@@ -21,12 +21,13 @@ import (
 )
 
 type backendEvents struct {
-	headers           storage.Headers
-	executionReceipts storage.ExecutionReceipts
-	state             protocol.State
-	connFactory       ConnectionFactory
-	log               zerolog.Logger
-	maxHeightRange    uint
+	headers               storage.Headers
+	executionReceipts     storage.ExecutionReceipts
+	state                 protocol.State
+	connFactory           ConnectionFactory
+	log                   zerolog.Logger
+	maxHeightRange        uint
+	circuitBreakerEnabled bool
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
@@ -129,7 +130,11 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	// choose the last block ID to find the list of execution nodes
 	lastBlockID := blockIDs[len(blockIDs)-1]
 
-	execNodes, err := executionNodesForBlockID(ctx, lastBlockID, b.executionReceipts, b.state, b.log)
+	var execNodes flow.IdentityList
+	var err error
+
+	execNodes, err = executionNodesForBlockID(ctx, lastBlockID, b.executionReceipts, b.state, b.log)
+
 	if err != nil {
 		b.log.Error().Err(err).Msg("failed to retrieve events from execution node")
 		return nil, rpc.ConvertError(err, "failed to retrieve events from execution node", codes.Internal)
@@ -209,6 +214,10 @@ func verifyAndConvertToAccessEvents(
 func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 	execNodes flow.IdentityList,
 	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, *flow.Identity, error) {
+	if !b.circuitBreakerEnabled {
+		execNodes = execNodes.Sample(maxExecutionNodesCnt)
+	}
+
 	var errors *multierror.Error
 	// try to get events from one of the execution nodes
 	for _, execNode := range execNodes {
