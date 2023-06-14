@@ -36,6 +36,7 @@ the `ConnectionGater` to lift the block on the disallow-listed node and instruct
 
 1. The ALSP manager calls the `OnAllowListNotification` method on the `LibP2PNode` to signify that a previously disallow-listed node is now allow-listed.
 2. The `LibP2PNode` responds by:
+
    a. Instructing the `ConnectionGater` to lift the block, thereby permitting connections with the now allow-listed node.
    b. Requesting the `PeerManager` to initiate an outbound connection with the allow-listed node.
 
