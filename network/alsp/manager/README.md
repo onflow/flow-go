@@ -18,23 +18,25 @@ The ALSP manager is responsible for maintaining records of misbehavior reports a
 remote nodes and for calculating their accumulated misbehavior penalties. 
 Should a node’s misbehavior penalty surpass a certain threshold 
 (referred to as `DisallowListingThreshold`), the ALSP manager initiates the disallow listing process. When a remote node is disallow-listed,
-it is effectively isolated from the network by the `ConnectionGater` and `PeerManager` components, i.e., the exisitng 
-connections to that remote node are closed and no new connections are allowed to be established.
+it is effectively isolated from the network by the `ConnectionGater` and `PeerManager` components, i.e., the existing 
+connections to that remote node are closed and new connections attempts are rejected.
 
 ##### Disallow Listing Process
 1. The ALSP manager communicates with the `LibP2PNode` by calling its `OnDisallowListNotification` method to indicate that a particular remote node has been disallow-listed.
 2. In response, the `LibP2PNode` takes two important actions:
+
    a. It alerts the `PeerManager`, instructing it to sever the connection with the disallow-listed node.
    b. It notifies the `ConnectionGater` to block any incoming or outgoing connections to and from the disallow-listed node.
-This ensures that the disallow-listed node is effectively isolated from the network.
+This ensures that the disallow-listed node is effectively isolated from the local node's network.
 
 ##### Penalty Decay and Allow Listing Process
-The ALSP manager also includes a penalty decay mechanism, which gradually reduces the penalties of nodes over time upon regular hearbeat intervals (default is evey one second).
+The ALSP manager also includes a penalty decay mechanism, which gradually reduces the penalties of nodes over time upon regular heartbeat intervals (default is every one second).
 Once a disallow-listed node's penalty decays back to zero, the node can be reintegrated into the network through the allow listing process. The allow-listing process involves allowing
 the `ConnectionGater` to lift the block on the disallow-listed node and instructing the `PeerManager` to initiate an outbound connection with the allow-listed node.
 
 1. The ALSP manager calls the `OnAllowListNotification` method on the `LibP2PNode` to signify that a previously disallow-listed node is now allow-listed.
 2. The `LibP2PNode` responds by:
+
    a. Instructing the `ConnectionGater` to lift the block, thereby permitting connections with the now allow-listed node.
    b. Requesting the `PeerManager` to initiate an outbound connection with the allow-listed node.
 

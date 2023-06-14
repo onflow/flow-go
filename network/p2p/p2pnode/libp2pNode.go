@@ -518,7 +518,7 @@ func (n *Node) OnDisallowListNotification(peerId peer.ID, cause flownet.Disallow
 func (n *Node) OnAllowListNotification(peerId peer.ID, cause flownet.DisallowListedCause) {
 	remainingCauses := n.disallowListedCache.AllowFor(peerId, cause)
 
-	n.logger.Warn().
+	n.logger.Info().
 		Str("peer_id", peerId.String()).
 		Str("causes", fmt.Sprintf("%v", cause)).
 		Str("remaining_causes", fmt.Sprintf("%v", remainingCauses)).
