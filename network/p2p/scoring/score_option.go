@@ -245,7 +245,30 @@ func (s *ScoreOption) BuildFlowPubSubScoreOption() pubsub.Option {
 		Float64("graylist_threshold", s.peerThresholdParams.GraylistThreshold).
 		Float64("accept_px_threshold", s.peerThresholdParams.AcceptPXThreshold).
 		Float64("opportunistic_graft_threshold", s.peerThresholdParams.OpportunisticGraftThreshold).
-		Msg("peer penalty thresholds configured")
+		Msg("pubsub score thresholds are set")
+
+	for topic, topicParams := range s.peerScoreParams.Topics {
+		s.logger.Info().Str("topic", topic).
+			Bool("atomic_validation", topicParams.SkipAtomicValidation).
+			Float64("topic_weight", topicParams.TopicWeight).
+			Float64("time_in_mesh_weight", topicParams.TimeInMeshWeight).
+			Dur("time_in_mesh_quantum", topicParams.TimeInMeshQuantum).
+			Float64("time_in_mesh_cap", topicParams.TimeInMeshCap).
+			Float64("first_message_deliveries_weight", topicParams.FirstMessageDeliveriesWeight).
+			Float64("first_message_deliveries_decay", topicParams.FirstMessageDeliveriesDecay).
+			Float64("first_message_deliveries_cap", topicParams.FirstMessageDeliveriesCap).
+			Float64("mesh_message_deliveries_weight", topicParams.MeshMessageDeliveriesWeight).
+			Float64("mesh_message_deliveries_decay", topicParams.MeshMessageDeliveriesDecay).
+			Float64("mesh_message_deliveries_cap", topicParams.MeshMessageDeliveriesCap).
+			Float64("mesh_message_deliveries_threshold", topicParams.MeshMessageDeliveriesThreshold).
+			Dur("mesh_message_deliveries_window", topicParams.MeshMessageDeliveriesWindow).
+			Dur("mesh_message_deliveries_activation", topicParams.MeshMessageDeliveriesActivation).
+			Float64("mesh_failure_penalty_weight", topicParams.MeshFailurePenaltyWeight).
+			Float64("mesh_failure_penalty_decay", topicParams.MeshFailurePenaltyDecay).
+			Float64("invalid_message_deliveries_weight", topicParams.InvalidMessageDeliveriesWeight).
+			Float64("invalid_message_deliveries_decay", topicParams.InvalidMessageDeliveriesDecay).
+			Msg("pubsub score topic parameters are set for topic")
+	}
 
 	return pubsub.WithPeerScore(
 		s.peerScoreParams,
@@ -280,21 +303,4 @@ func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 		// AppSpecificWeight is the weight of the application specific penalty.
 		AppSpecificWeight: DefaultAppSpecificScoreWeight,
 	}
-}
-
-func (s *ScoreOption) BuildGossipSubScoreOption() pubsub.Option {
-	s.preparePeerScoreThresholds()
-
-	s.logger.Info().
-		Float64("gossip_threshold", s.peerThresholdParams.GossipThreshold).
-		Float64("publish_threshold", s.peerThresholdParams.PublishThreshold).
-		Float64("graylist_threshold", s.peerThresholdParams.GraylistThreshold).
-		Float64("accept_px_threshold", s.peerThresholdParams.AcceptPXThreshold).
-		Float64("opportunistic_graft_threshold", s.peerThresholdParams.OpportunisticGraftThreshold).
-		Msg("peer penalty thresholds configured")
-
-	return pubsub.WithPeerScore(
-		s.peerScoreParams,
-		s.peerThresholdParams,
-	)
 }
