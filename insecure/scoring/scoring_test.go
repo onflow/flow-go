@@ -2,8 +2,11 @@ package scoring
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/model/flow"
@@ -41,7 +44,7 @@ func TestGossipSubInvalidMessageDeliveryScoring(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithGossipSubTracer()
+		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
 		p2ptest.WithPeerScoringEnabled(idProvider),
 		p2ptest.WithPeerScoreParamsOption(peerScoringCfg),
 	)
@@ -64,11 +67,14 @@ func TestGossipSubInvalidMessageDeliveryScoring(t *testing.T) {
 	for i := 0; i <= 20; i++ {
 		spammer.SpamControlMessage(t, victimNode,
 			spammer.GenerateCtlMessages(1),
-			p2ptest.PubsubMessageFixture(t, p2ptest.WithFrom(spammer.SpammerNode.Host().ID()), p2ptest.WithNoSignature()))
+			p2ptest.PubsubMessageFixture(t, p2ptest.WithFrom(spammer.SpammerNode.Host().ID()), p2ptest.WithNoSignature(), p2ptest.WithTopic(blockTopic.String())))
 	}
 
 	time.Sleep(3 * time.Second)
 
+	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.Host().ID())
+	require.True(t, ok)
+	fmt.Println("Spammer Score: ", spammerScore)
 	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{victimNode}, []p2p.LibP2PNode{spammer.SpammerNode}, func() (interface{}, channels.Topic) {
 		return unittest.ProposalFixture(), blockTopic
 	})
