@@ -34,7 +34,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
@@ -60,7 +60,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -90,7 +90,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -111,7 +111,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
@@ -160,7 +160,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -204,7 +204,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
@@ -231,7 +231,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true

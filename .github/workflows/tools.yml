@@ -23,7 +23,7 @@ jobs:
       with:
         credentials_json: ${{ secrets.GCR_SERVICE_KEY }} # TODO: we need a new key to allow uploads
     - name: Setup Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v4
       with:
         go-version: '1.19'
     - name: Set up Google Cloud SDK
