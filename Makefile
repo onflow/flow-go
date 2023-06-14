@@ -130,10 +130,6 @@ generate-proto:
 generate-fvm-env-wrappers:
 	go run ./fvm/environment/generate-wrappers fvm/environment/parse_restricted_checker.go
 
-.PHONY: clean-go-modcache
-clean-go-modcache:
-	go clean -modcache
-
 .PHONY: generate-mocks
 generate-mocks: install-mock-generators
 	mockery --name '(Connector|PingInfoProvider)' --dir=network/p2p --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
