@@ -77,7 +77,7 @@ install-tools: crypto_setup_gopath check-go-version install-mock-generators
 	go install golang.org/x/tools/cmd/stringer@master;
 
 .PHONY: verify-mocks
-verify-mocks: generate-mocks
+verify-mocks: clean-go-modcache generate-mocks
 	git diff --exit-code
 
 ############################################################################################
@@ -129,6 +129,10 @@ generate-proto:
 .PHONY: generate-fvm-env-wrappers
 generate-fvm-env-wrappers:
 	go run ./fvm/environment/generate-wrappers fvm/environment/parse_restricted_checker.go
+
+.PHONY: clean-go-modcache
+clean-go-modcache:
+	go clean -modcache
 
 .PHONY: generate-mocks
 generate-mocks: install-mock-generators
