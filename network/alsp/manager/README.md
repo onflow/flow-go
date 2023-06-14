@@ -30,7 +30,7 @@ connections to that remote node are closed and new connections attempts are reje
 This ensures that the disallow-listed node is effectively isolated from the local node's network.
 
 ##### Penalty Decay and Allow Listing Process
-The ALSP manager also includes a penalty decay mechanism, which gradually reduces the penalties of nodes over time upon regular hearbeat intervals (default is evey one second).
+The ALSP manager also includes a penalty decay mechanism, which gradually reduces the penalties of nodes over time upon regular heartbeat intervals (default is every one second).
 Once a disallow-listed node's penalty decays back to zero, the node can be reintegrated into the network through the allow listing process. The allow-listing process involves allowing
 the `ConnectionGater` to lift the block on the disallow-listed node and instructing the `PeerManager` to initiate an outbound connection with the allow-listed node.
 
