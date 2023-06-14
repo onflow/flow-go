@@ -13,10 +13,10 @@ const (
 	defaultSkipAtomicValidation = true
 	// defaultInvalidMessageDeliveriesWeight the default weight for invalid message delivery penalization. With a default value of 10, 3 invalid message deliveries
 	// will result in the nodes peer score decreasing to -1000 (-10^3) this will result in the connection to the node being pruned.
-	defaultInvalidMessageDeliveriesWeight = -10
+	defaultInvalidMessageDeliveriesWeight = -100
 	// defaultInvalidMessageDeliveriesDecay decay factor used to decay the number of invalid message deliveries.
 	defaultInvalidMessageDeliveriesDecay = .99
-	defaultTimeInMeshQuantum             = time.Minute
+	defaultTimeInMeshQuantum             = time.Second
 )
 
 func init() {
