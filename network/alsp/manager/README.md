@@ -24,6 +24,7 @@ connections to that remote node are closed and new connections attempts are reje
 ##### Disallow Listing Process
 1. The ALSP manager communicates with the `LibP2PNode` by calling its `OnDisallowListNotification` method to indicate that a particular remote node has been disallow-listed.
 2. In response, the `LibP2PNode` takes two important actions:
+
    a. It alerts the `PeerManager`, instructing it to sever the connection with the disallow-listed node.
    b. It notifies the `ConnectionGater` to block any incoming or outgoing connections to and from the disallow-listed node.
 This ensures that the disallow-listed node is effectively isolated from the network.
