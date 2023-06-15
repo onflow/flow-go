@@ -79,6 +79,9 @@ type MisbehaviorReportManager struct {
 
 	// workerPool is the worker pool for handling the misbehavior reports in a thread-safe and non-blocking manner.
 	workerPool *worker.Pool[internal.ReportedMisbehaviorWork]
+
+	// params is the ALSP module parameters used for penalties and decays.
+	penaltyParams model.PenaltyParams
 }
 
 var _ network.MisbehaviorReportManager = (*MisbehaviorReportManager)(nil)
@@ -152,6 +155,14 @@ func WithSpamRecordsCacheFactory(f SpamRecordCacheFactory) MisbehaviorReportMana
 	}
 }
 
+// WithDefaults sets the default values for the MisbehaviorReportManager.
+//func WithDefaults() MisbehaviorReportManagerOption {
+//	return func(m *MisbehaviorReportManager) {
+//		m.cacheFactory = defaultSpamRecordCacheFactory()
+//		m.disablePenalty = false
+//	}
+//}
+
 // NewMisbehaviorReportManager creates a new instance of the MisbehaviorReportManager.
 // Args:
 // cfg: the configuration for the MisbehaviorReportManager.
@@ -176,6 +187,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, consumer n
 		disablePenalty:          cfg.DisablePenalty,
 		disallowListingConsumer: consumer,
 		cacheFactory:            defaultSpamRecordCacheFactory(),
+		penaltyParams:           model.DefaultParams(),
 	}
 
 	store := queue.NewHeroStore(
