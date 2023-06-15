@@ -123,9 +123,6 @@ jobs:
         timeout_minutes: 25
         max_attempts: 3
         command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
-      if: failure()
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
