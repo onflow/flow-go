@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -31,9 +30,6 @@ func TestGossipSubInvalidMessageDeliveryScoring(t *testing.T) {
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
 	idProvider := mock.NewIdentityProvider(t)
-	peerScoringCfg := &p2p.PeerScoringConfig{
-		TopicScoreParams: scoring.DefaultTopicScoreParams(sporkId),
-	}
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId, role, idProvider)
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -46,8 +42,10 @@ func TestGossipSubInvalidMessageDeliveryScoring(t *testing.T) {
 		p2ptest.WithRole(role),
 		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
 		p2ptest.WithPeerScoringEnabled(idProvider),
-		p2ptest.WithPeerScoreParamsOption(peerScoringCfg),
 	)
+	fmt.Println("spammer.SpammerNode.Host().ID(): ", spammer.SpammerNode.Host().ID(), "spammer.SpammerId: ", spammer.SpammerId.NodeID)
+	fmt.Println("victimNode.Host().ID(): ", victimNode.Host().ID(), "victimIdentity: ", victimIdentity.NodeID)
+
 	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
