@@ -132,7 +132,7 @@ func (g *Builder) SetRoutingSystem(routingSystem routing.Routing) {
 }
 
 func (g *Builder) SetTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) {
-	g.scoreOptionConfig.SetTopicScoreParams(topic, topicScoreParams)
+	g.scoreOptionConfig.OverrideTopicScoreParams(topic, topicScoreParams)
 }
 
 func (g *Builder) SetAppSpecificScoreParams(f func(peer.ID) float64) {
