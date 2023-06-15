@@ -492,6 +492,20 @@ func ClusterBlockFixture() cluster.Block {
 	}
 }
 
+func ClusterBlockChainFixture(n int) []cluster.Block {
+	clusterBlocks := make([]cluster.Block, 0, n)
+
+	parent := ClusterBlockFixture()
+
+	for i := 0; i < n; i++ {
+		block := ClusterBlockWithParent(&parent)
+		clusterBlocks = append(clusterBlocks, block)
+		parent = block
+	}
+
+	return clusterBlocks
+}
+
 // ClusterBlockWithParent creates a new cluster consensus block that is valid
 // with respect to the given parent block.
 func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
@@ -791,6 +805,12 @@ func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionRes
 		for _, chunk := range result.Chunks {
 			chunk.BlockID = blockID
 		}
+	}
+}
+
+func WithFinalState(commit flow.StateCommitment) func(*flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.Chunks[len(result.Chunks)-1].EndState = commit
 	}
 }
 
@@ -2018,8 +2038,16 @@ func BootstrapFixture(
 	participants flow.IdentityList,
 	opts ...func(*flow.Block),
 ) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+	return BootstrapFixtureWithChainID(participants, flow.Emulator, opts...)
+}
 
-	root := GenesisFixture()
+func BootstrapFixtureWithChainID(
+	participants flow.IdentityList,
+	chainID flow.ChainID,
+	opts ...func(*flow.Block),
+) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+
+	root := flow.Genesis(chainID)
 	for _, apply := range opts {
 		apply(root)
 	}
@@ -2037,7 +2065,8 @@ func BootstrapFixture(
 		WithDKGFromParticipants(participants),
 	)
 
-	result := BootstrapExecutionResultFixture(root, GenesisStateCommitment)
+	stateCommit := GenesisStateCommitmentByChainID(chainID)
+	result := BootstrapExecutionResultFixture(root, stateCommit)
 	result.ServiceEvents = []flow.ServiceEvent{
 		setup.ServiceEvent(),
 		commit.ServiceEvent(),
@@ -2054,7 +2083,15 @@ func RootSnapshotFixture(
 	participants flow.IdentityList,
 	opts ...func(*flow.Block),
 ) *inmem.Snapshot {
-	block, result, seal := BootstrapFixture(participants.Sort(order.Canonical), opts...)
+	return RootSnapshotFixtureWithChainID(participants, flow.Emulator, opts...)
+}
+
+func RootSnapshotFixtureWithChainID(
+	participants flow.IdentityList,
+	chainID flow.ChainID,
+	opts ...func(*flow.Block),
+) *inmem.Snapshot {
+	block, result, seal := BootstrapFixtureWithChainID(participants.Sort(order.Canonical), chainID, opts...)
 	qc := QuorumCertificateFixture(QCWithRootBlockID(block.ID()))
 	root, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 	if err != nil {

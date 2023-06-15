@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 
@@ -308,7 +309,7 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 
 		for _, event := range computationResult.AllEvents() {
 			if event.Type == flow.EventAccountCreated {
-				data, err := jsoncdc.Decode(nil, event.Payload)
+				data, err := ccf.Decode(nil, event.Payload)
 				if err != nil {
 					tb.Fatal("setup account failed, error decoding events")
 				}
@@ -446,7 +447,9 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			computationResult := blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
 			totalInteractionUsed := uint64(0)
 			totalComputationUsed := uint64(0)
-			for _, txRes := range computationResult.AllTransactionResults() {
+			results := computationResult.AllTransactionResults()
+			// not interested in the system transaction
+			for _, txRes := range results[0 : len(results)-1] {
 				require.Empty(b, txRes.ErrorMessage)
 				totalInteractionUsed += logE.InteractionUsed[txRes.ID().String()]
 				totalComputationUsed += txRes.ComputationUsed
@@ -691,7 +694,9 @@ func BenchRunNFTBatchTransfer(b *testing.B,
 		}
 
 		computationResult = blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
-		for _, txRes := range computationResult.AllTransactionResults() {
+		results := computationResult.AllTransactionResults()
+		// not interested in the system transaction
+		for _, txRes := range results[0 : len(results)-1] {
 			require.Empty(b, txRes.ErrorMessage)
 		}
 	}

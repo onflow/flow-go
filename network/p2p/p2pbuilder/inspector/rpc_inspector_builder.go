@@ -6,8 +6,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector"
@@ -26,11 +28,13 @@ type GossipSubInspectorBuilder struct {
 	sporkID          flow.Identifier
 	inspectorsConfig *GossipSubRPCInspectorsConfig
 	metricsCfg       *p2pconfig.MetricsConfig
-	publicNetwork    bool
+	idProvider       module.IdentityProvider
+	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics
+	networkType      network.NetworkingType
 }
 
 // NewGossipSubInspectorBuilder returns new *GossipSubInspectorBuilder.
-func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier, inspectorsConfig *GossipSubRPCInspectorsConfig) *GossipSubInspectorBuilder {
+func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier, inspectorsConfig *GossipSubRPCInspectorsConfig, provider module.IdentityProvider, inspectorMetrics module.GossipSubRpcValidationInspectorMetrics) *GossipSubInspectorBuilder {
 	return &GossipSubInspectorBuilder{
 		logger:           logger,
 		sporkID:          sporkID,
@@ -39,7 +43,9 @@ func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier
 			Metrics:          metrics.NewNoopCollector(),
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		},
-		publicNetwork: p2p.PublicNetwork,
+		idProvider:       provider,
+		inspectorMetrics: inspectorMetrics,
+		networkType:      network.PublicNetwork,
 	}
 }
 
@@ -49,10 +55,14 @@ func (b *GossipSubInspectorBuilder) SetMetrics(metricsCfg *p2pconfig.MetricsConf
 	return b
 }
 
-// SetPublicNetwork used to differentiate between libp2p nodes used for public vs private networks.
-// Currently, there are different metrics collectors for public vs private networks.
-func (b *GossipSubInspectorBuilder) SetPublicNetwork(public bool) *GossipSubInspectorBuilder {
-	b.publicNetwork = public
+// SetNetworkType sets the network type for the inspector.
+// This is used to determine if the node is running on a public or private network.
+// Args:
+// - networkType: the network type.
+// Returns:
+// - *GossipSubInspectorBuilder: the builder.
+func (b *GossipSubInspectorBuilder) SetNetworkType(networkType network.NetworkingType) *GossipSubInspectorBuilder {
+	b.networkType = networkType
 	return b
 }
 
@@ -65,7 +75,7 @@ func (b *GossipSubInspectorBuilder) buildGossipSubMetricsInspector() p2p.GossipS
 		b.inspectorsConfig.MetricsInspectorConfigs.NumberOfWorkers,
 		[]queue.HeroStoreConfigOption{
 			queue.WithHeroStoreSizeLimit(b.inspectorsConfig.MetricsInspectorConfigs.CacheSize),
-			queue.WithHeroStoreCollector(metrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.publicNetwork)),
+			queue.WithHeroStoreCollector(metrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType)),
 		}...)
 	return metricsInspector
 }
@@ -87,10 +97,15 @@ func (b *GossipSubInspectorBuilder) validationInspectorConfig(validationConfigs 
 	}
 	// setup gossip sub RPC control message inspector config
 	controlMsgRPCInspectorCfg := &validation.ControlMsgValidationInspectorConfig{
+		ClusterPrefixedMessageConfig: &validation.ClusterPrefixedMessageConfig{
+			ClusterPrefixHardThreshold:                   validationConfigs.ClusterPrefixHardThreshold,
+			ClusterPrefixedControlMsgsReceivedCacheSize:  validationConfigs.ClusterPrefixedControlMsgsReceivedCacheSize,
+			ClusterPrefixedControlMsgsReceivedCacheDecay: validationConfigs.ClusterPrefixedControlMsgsReceivedCacheDecay,
+		},
 		NumberOfWorkers: validationConfigs.NumberOfWorkers,
 		InspectMsgStoreOpts: []queue.HeroStoreConfigOption{
 			queue.WithHeroStoreSizeLimit(validationConfigs.CacheSize),
-			queue.WithHeroStoreCollector(metrics.GossipSubRPCInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.publicNetwork))},
+			queue.WithHeroStoreCollector(metrics.GossipSubRPCInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType))},
 		GraftValidationCfg: graftValidationCfg,
 		PruneValidationCfg: pruneValidationCfg,
 		IHaveValidationCfg: iHaveValidationCfg,
@@ -104,20 +119,24 @@ func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.Gos
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
 	}
-
 	notificationDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(
 		b.logger,
 		[]queue.HeroStoreConfigOption{
 			queue.WithHeroStoreSizeLimit(b.inspectorsConfig.GossipSubRPCInspectorNotificationCacheSize),
-			queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.publicNetwork))}...)
-
-	rpcValidationInspector := validation.NewControlMsgValidationInspector(
+			queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType))}...)
+	clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType)
+	rpcValidationInspector, err := validation.NewControlMsgValidationInspector(
 		b.logger,
 		b.sporkID,
 		controlMsgRPCInspectorCfg,
 		notificationDistributor,
-		metrics.NewNoopCollector(),
+		clusterPrefixedCacheCollector,
+		b.idProvider,
+		b.inspectorMetrics,
 	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
+	}
 	return rpcValidationInspector, notificationDistributor, nil
 }
 

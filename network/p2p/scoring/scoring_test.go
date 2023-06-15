@@ -72,6 +72,10 @@ func (m *mockInspectorSuite) AddInvCtrlMsgNotifConsumer(c p2p.GossipSubInvCtrlMs
 	m.consumer = c
 }
 
+func (m *mockInspectorSuite) Inspectors() []p2p.GossipSubRPCInspector {
+	return []p2p.GossipSubRPCInspector{}
+}
+
 // TestInvalidCtrlMsgScoringIntegration tests the impact of invalid control messages on the scoring and connectivity of nodes in a network.
 // It creates a network of 2 nodes, and sends a set of control messages with invalid topic IDs to one of the nodes.
 // It then checks that the node receiving the invalid control messages decreases its score for the peer spamming the invalid messages, and
@@ -88,6 +92,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.WithPeerScoringEnabled(idProvider),
 		p2ptest.WithGossipSubRpcInspectorSuite(inspectorSuite1))
@@ -96,6 +101,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.WithPeerScoringEnabled(idProvider))
 
