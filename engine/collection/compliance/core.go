@@ -392,7 +392,8 @@ func checkForAndLogOutdatedInputError(err error, log zerolog.Logger) bool {
 func checkForAndLogUnverifiableInputError(err error, log zerolog.Logger) bool {
 	if engine.IsUnverifiableInputError(err) {
 		// the block cannot be validated
-		log.Err(err).Msg("received unverifiable block proposal; this is an indicator of a proposal that cannot be verified under current state")
+		log.Warn().Err(err).Msg("received collection proposal with unknown reference block; " +
+			"this might be an indicator that the node is slightly behind or the proposer published an invalid collection")
 		return true
 	}
 	return false

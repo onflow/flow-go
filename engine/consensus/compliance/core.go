@@ -425,7 +425,8 @@ func checkForAndLogOutdatedInputError(err error, log zerolog.Logger) bool {
 func checkForAndLogUnverifiableInputError(err error, log zerolog.Logger) bool {
 	if engine.IsUnverifiableInputError(err) {
 		// the block cannot be validated
-		log.Err(err).Msg("received unverifiable block proposal; this might be an indicator that a malicious proposer is generating detached blocks very far ahead")
+		log.Warn().Err(err).Msg("received unverifiable block proposal; " +
+			"this might be an indicator that a malicious proposer is generating detached blocks very far ahead")
 		return true
 	}
 	return false
