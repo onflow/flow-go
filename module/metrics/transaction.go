@@ -13,20 +13,22 @@ import (
 )
 
 type TransactionCollector struct {
-	transactionTimings         mempool.TransactionTimings
-	log                        zerolog.Logger
-	logTimeToFinalized         bool
-	logTimeToExecuted          bool
-	logTimeToFinalizedExecuted bool
-	timeToFinalized            prometheus.Summary
-	timeToExecuted             prometheus.Summary
-	timeToFinalizedExecuted    prometheus.Summary
-	transactionSubmission      *prometheus.CounterVec
-	scriptExecutedDuration     *prometheus.HistogramVec
-	transactionResultDuration  *prometheus.HistogramVec
-	scriptSize                 prometheus.Histogram
-	transactionSize            prometheus.Histogram
-	maxReceiptHeight           prometheus.Gauge
+	transactionTimings                mempool.TransactionTimings
+	log                               zerolog.Logger
+	logTimeToFinalized                bool
+	logTimeToExecuted                 bool
+	logTimeToFinalizedExecuted        bool
+	timeToFinalized                   prometheus.Summary
+	timeToExecuted                    prometheus.Summary
+	timeToFinalizedExecuted           prometheus.Summary
+	transactionSubmission             *prometheus.CounterVec
+	scriptExecutedDuration            *prometheus.HistogramVec
+	scriptExecutionErrorArchiveNode   *prometheus.GaugeVec
+	scriptExecutionErrorExecutionNode *prometheus.GaugeVec
+	transactionResultDuration         *prometheus.HistogramVec
+	scriptSize                        prometheus.Histogram
+	transactionSize                   prometheus.Histogram
+	maxReceiptHeight                  prometheus.Gauge
 
 	// used to skip heights that are lower than the current max height
 	maxReceiptHeightValue counters.StrictMonotonousCounter
@@ -97,6 +99,18 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Help:      "histogram for the duration in ms of the round trip time for executing a script",
 			Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
 		}, []string{"script_size"}),
+		scriptExecutionErrorArchiveNode: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name:      "script_execution_error_archive",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "histogram for the internal errors for executing a script for a block on the archive node",
+		}, []string{"block_id", "script"}),
+		scriptExecutionErrorExecutionNode: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name:      "script_execution_error_execution",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "histogram for the internal errors for executing a script for a block on the execution node",
+		}, []string{"block_id", "script"}),
 		transactionResultDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "transaction_result_fetched_duration",
 			Namespace: namespaceAccess,
@@ -128,6 +142,8 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 	return tc
 }
 
+// Script exec metrics
+
 func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
 	// record the execute script duration and script size
 	tc.scriptSize.Observe(float64(size / 1024))
@@ -135,6 +151,18 @@ func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
 		"script_size": tc.sizeLabel(size),
 	}).Observe(float64(dur.Milliseconds()))
 }
+
+func (tc *TransactionCollector) ScriptExecutionErrorOnArchiveNode(blockID flow.Identifier, scriptHash string) {
+	// record the execution error along with blockID and scriptHash for Archive node
+	tc.scriptExecutionErrorArchiveNode.With(prometheus.Labels{"block_id": blockID.String(), "script": scriptHash}).Inc()
+}
+
+func (tc *TransactionCollector) ScriptExecutionErrorOnExecutionNode(blockID flow.Identifier, scriptHash string) {
+	// record the execution error along with blockID and scriptHash for Execution node
+	tc.scriptExecutionErrorExecutionNode.With(prometheus.Labels{"block_id": blockID.String(), "script": scriptHash}).Inc()
+}
+
+// TransactionResult metrics
 
 func (tc *TransactionCollector) TransactionResultFetched(dur time.Duration, size int) {
 	// record the transaction result duration and transaction script/payload size
