@@ -49,7 +49,7 @@ type Cache struct {
 	byView   map[uint64]BlocksByID          // lookup of blocks by their respective view; used to detect equivocation
 	byParent map[flow.Identifier]BlocksByID // lookup of blocks by their parentID, for finding a block's known children
 
-	notifier   hotstuff.ProposalViolationConsumer // equivocation will be reported using this notifier
+	notifier   hotstuff.ProposalViolationConsumer // equivocations will be reported using this notifier
 	lowestView counters.StrictMonotonousCounter   // lowest view that the cache accepts blocks for
 }
 
