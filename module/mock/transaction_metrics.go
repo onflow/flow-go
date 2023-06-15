@@ -19,6 +19,16 @@ func (_m *TransactionMetrics) ScriptExecuted(dur time.Duration, size int) {
 	_m.Called(dur, size)
 }
 
+// ScriptExecutionErrorOnArchiveNode provides a mock function with given fields: blockID, scriptHash
+func (_m *TransactionMetrics) ScriptExecutionErrorOnArchiveNode(blockID flow.Identifier, scriptHash string) {
+	_m.Called(blockID, scriptHash)
+}
+
+// ScriptExecutionErrorOnExecutionNode provides a mock function with given fields: blockID, scriptHash
+func (_m *TransactionMetrics) ScriptExecutionErrorOnExecutionNode(blockID flow.Identifier, scriptHash string) {
+	_m.Called(blockID, scriptHash)
+}
+
 // TransactionExecuted provides a mock function with given fields: txID, when
 func (_m *TransactionMetrics) TransactionExecuted(txID flow.Identifier, when time.Time) {
 	_m.Called(txID, when)
