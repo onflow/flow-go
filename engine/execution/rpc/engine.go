@@ -27,7 +27,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-const DefaultMaxBlockRange = 250
+const DefaultMaxBlockRange = 300
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
@@ -166,7 +166,10 @@ type handler struct {
 var _ execution.ExecutionAPIServer = &handler{}
 
 // Ping responds to requests when the server is up.
-func (h *handler) Ping(_ context.Context, _ *execution.PingRequest) (*execution.PingResponse, error) {
+func (h *handler) Ping(
+	_ context.Context,
+	_ *execution.PingRequest,
+) (*execution.PingResponse, error) {
 	return &execution.PingResponse{}, nil
 }
 
@@ -180,12 +183,12 @@ func (h *handler) ExecuteScriptAtBlockID(
 		return nil, err
 	}
 
-	// return a more user friendly error if block does not exist
-	if _, err = h.headers.ByBlockID(blockID); err != nil {
+	// return a more user friendly error if block has not been executed
+	if _, err = h.commits.ByBlockID(blockID); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Errorf(codes.NotFound, "block %s not found", blockID)
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node", blockID)
 		}
-		return nil, status.Errorf(codes.Internal, "failed to get header for block: %v", err)
+		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
 	}
 
 	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
@@ -226,8 +229,10 @@ func (h *handler) GetRegisterAtBlockID(
 	return res, nil
 }
 
-func (h *handler) GetEventsForBlockIDs(_ context.Context,
-	req *execution.GetEventsForBlockIDsRequest) (*execution.GetEventsForBlockIDsResponse, error) {
+func (h *handler) GetEventsForBlockIDs(
+	_ context.Context,
+	req *execution.GetEventsForBlockIDsRequest,
+) (*execution.GetEventsForBlockIDsResponse, error) {
 
 	// validate request
 	blockIDs := req.GetBlockIds()
@@ -245,18 +250,6 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 		return nil, status.Errorf(codes.InvalidArgument, "too many block IDs requested")
 	}
 
-	// make sure all blocks exist first to fail fast and avoid unused lookups
-	// must verify block exists first, since ByBlockID* calls on sets like events or commits will
-	// return an empty slice if block does not exist
-	for _, blockID := range flowBlockIDs {
-		if _, err = h.headers.ByBlockID(blockID); err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				return nil, status.Errorf(codes.NotFound, "block %s not found", blockID)
-			}
-			return nil, status.Errorf(codes.Internal, "failed to get header for block: %v", err)
-		}
-	}
-
 	results := make([]*execution.GetEventsForBlockIDsResponse_Result, len(blockIDs))
 
 	// collect all the events and create a EventsResponse_Result for each block
@@ -264,7 +257,7 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 		// Check if block has been executed
 		if _, err := h.commits.ByBlockID(bID); err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				return nil, status.Errorf(codes.NotFound, "state commitment for block ID %s does not exist", bID)
+				return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node", bID)
 			}
 			return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", bID)
 		}
@@ -422,13 +415,13 @@ func (h *handler) GetTransactionResultsByBlockID(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
-	// must verify block exists first, since transactionResults.ByBlockID will return an empty slice
-	// if block does not exist
-	if _, err = h.headers.ByBlockID(blockID); err != nil {
+	// must verify block was locally executed first since transactionResults.ByBlockID will return
+	// an empty slice if block does not exist
+	if _, err = h.commits.ByBlockID(blockID); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Errorf(codes.NotFound, "block %s not found", blockID)
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node", blockID)
 		}
-		return nil, status.Errorf(codes.Internal, "failed to get header for block: %v", err)
+		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
 	}
 
 	// Get all tx results
@@ -498,8 +491,10 @@ func (h *handler) GetTransactionResultsByBlockID(
 }
 
 // eventResult creates EventsResponse_Result from flow.Event for the given blockID
-func (h *handler) eventResult(blockID flow.Identifier,
-	flowEvents []flow.Event) (*execution.GetEventsForBlockIDsResponse_Result, error) {
+func (h *handler) eventResult(
+	blockID flow.Identifier,
+	flowEvents []flow.Event,
+) (*execution.GetEventsForBlockIDsResponse_Result, error) {
 
 	// convert events to event message
 	events := convert.EventsToMessages(flowEvents)
@@ -533,12 +528,12 @@ func (h *handler) GetAccountAtBlockID(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	// return a more user friendly error if block does not exist
-	if _, err = h.headers.ByBlockID(blockFlowID); err != nil {
+	// return a more user friendly error if block has not been executed
+	if _, err = h.commits.ByBlockID(blockFlowID); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Errorf(codes.NotFound, "block %s not found", blockFlowID)
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node", blockFlowID)
 		}
-		return nil, status.Errorf(codes.Internal, "failed to get header for block: %v", err)
+		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockFlowID)
 	}
 
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
@@ -587,7 +582,7 @@ func (h *handler) GetLatestBlockHeader(
 	if err != nil {
 		// this header MUST exist in the db, otherwise the node likely has inconsistent state.
 		// Don't crash as a result of an external API request, but other components will likely panic.
-		h.log.Err(err).Msg("unable to get latest block header")
+		h.log.Err(err).Msg("failed to get latest block header. potentially inconsistent protocol state.")
 		return nil, status.Errorf(codes.Internal, "unable to get latest header: %v", err)
 	}
 
