@@ -93,9 +93,9 @@ const (
 	defaultScoreCacheSize = 1000
 
 	// defaultDecayInterval is the default decay interval for the overall score of a peer at the GossipSub scoring
-	// system. It is the interval over which we decay the effect of past behavior. So that the effect of past behavior
-	// is not permanent.
-	defaultDecayInterval = 1 * time.Hour
+	// system. We set it to 1 minute so that it is not too short so that a malicious node can recover from a penalty
+	// and is not too long so that a well-behaved node can't recover from a penalty.
+	defaultDecayInterval = 1 * time.Minute
 
 	// defaultDecayToZero is the default decay to zero for the overall score of a peer at the GossipSub scoring system.
 	// It defines the maximum value below which a peer scoring counter is reset to zero.
@@ -104,6 +104,43 @@ const (
 	// When a counter hits the DecayToZero threshold, it means that the peer did not exhibit the behavior
 	// for a long time, and we can reset the counter.
 	defaultDecayToZero = 0.01
+
+	// defaultTopicSkipAtomicValidation is the default value for the skip atomic validation flag for topics.
+	// We set it to true, which means gossipsub parameter validation will not fail if we leave some of the
+	// topic parameters at their default values, i.e., zero. This decision is since we are not setting all
+	// topic parameters at the current implementation.
+	defaultTopicSkipAtomicValidation = true
+
+	// defaultTopicInvalidMessageDeliveriesWeight this value is applied to the square of the number of invalid message deliveries on a topic.
+	// It is used to penalize peers that send invalid messages. By an invalid message, we mean a message that is not signed by the
+	// publisher, or a message that is not signed by the peer that sent it. We set it to -1.0, which means that with around 14 invalid
+	// message deliveries within a gossipsub heartbeat interval, the peer will be disconnected.
+	// The supporting math is as follows:
+	// - each staked (i.e., authorized) peer is rewarded by the fixed reward of 100 (i.e., DefaultStakedIdentityReward).
+	// - x invalid message deliveries will result in a penalty of x^2 * DefaultTopicInvalidMessageDeliveriesWeight, i.e., -x^2.
+	// - the peer will be disconnected when its penalty reaches -100 (i.e., MaxAppSpecificPenalty).
+	// - so, the maximum number of invalid message deliveries that a peer can have before being disconnected is sqrt(200/DefaultTopicInvalidMessageDeliveriesWeight) ~ 14.
+	defaultTopicInvalidMessageDeliveriesWeight = -1.0
+
+	// defaultTopicInvalidMessageDeliveriesDecay decay factor used to decay the number of invalid message deliveries.
+	// The total number of invalid message deliveries is multiplied by this factor at each heartbeat interval to
+	// decay the number of invalid message deliveries, and prevent the peer from being disconnected if it stops
+	// sending invalid messages. We set it to 0.99, which means that the number of invalid message deliveries will
+	// decay by 1% at each heartbeat interval.
+	// The decay heartbeats are defined by the heartbeat interval of the gossipsub scoring system, which is 1 Minute (defaultDecayInterval).
+	defaultTopicInvalidMessageDeliveriesDecay = .99
+
+	// defaultTopicTimeInMeshQuantum is the default time in mesh quantum for the GossipSub scoring system. It is used to gauge
+	// a discrete time interval for the time in mesh counter. We set it to 1 hour, which means that every one complete hour a peer is
+	// in a topic mesh, the time in mesh counter will be incremented by 1 and is counted towards the availability score of the peer in that topic mesh.
+	// The reason of setting it to 1 hour is that we want to reward peers that are in a topic mesh for a long time, and we want to avoid rewarding peers that
+	// are churners, i.e., peers that join and leave a topic mesh frequently.
+	defaultTopicTimeInMesh = time.Hour
+
+	// defaultTopicWeight is the default weight of a topic in the GossipSub scoring system. The overall score of a peer in a topic mesh is
+	// multiplied by the weight of the topic when calculating the overall score of the peer.
+	// We set it to 1.0, which means that the overall score of a peer in a topic mesh is not affected by the weight of the topic.
+	defaultTopicWeight = 1.0
 )
 
 // ScoreOption is a functional option for configuring the peer scoring system.
@@ -167,10 +204,10 @@ func (c *ScoreOptionConfig) SetAppSpecificScoreFunction(appSpecificScoreFunction
 	c.appScoreFunc = appSpecificScoreFunction
 }
 
-// SetTopicScoreParams adds the topic penalty parameters to the peer penalty parameters.
-// It is used to configure the topic penalty parameters for the pubsub system.
-// If there is already a topic penalty parameter for the given topic, the last call will be used.
-func (c *ScoreOptionConfig) SetTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) {
+// OverrideTopicScoreParams overrides the topic score parameters for the given topic.
+// It is used to override the default topic score parameters for a specific topic.
+// If the topic score parameters are not set, the default ones will be used.
+func (c *ScoreOptionConfig) OverrideTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) {
 	c.topicParams = append(c.topicParams, func(topics map[string]*pubsub.TopicScoreParams) {
 		topics[topic.String()] = topicScoreParams
 	})
@@ -286,6 +323,22 @@ func (s *ScoreOption) preparePeerScoreThresholds() {
 	}
 }
 
+// TopicScoreParams returns the topic score parameters for the given topic. If the topic
+// score parameters are not set, it returns the default topic score parameters.
+// The custom topic parameters are set at the initialization of the score option.
+// Args:
+// - topic: the topic for which the score parameters are requested.
+// Returns:
+//   - the topic score parameters for the given topic, or the default topic score parameters if
+//     the topic score parameters are not set.
+func (s *ScoreOption) TopicScoreParams(topic *pubsub.Topic) *pubsub.TopicScoreParams {
+	params, exists := s.peerScoreParams.Topics[topic.String()]
+	if !exists {
+		return defaultTopicScoreParams()
+	}
+	return params
+}
+
 func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 	return &pubsub.PeerScoreParams{
 		Topics: make(map[string]*pubsub.TopicScoreParams),
@@ -302,5 +355,16 @@ func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 		DecayToZero: defaultDecayToZero,
 		// AppSpecificWeight is the weight of the application specific penalty.
 		AppSpecificWeight: DefaultAppSpecificScoreWeight,
+	}
+}
+
+// defaultTopicScoreParams returns the default score params for topics.
+func defaultTopicScoreParams() *pubsub.TopicScoreParams {
+	return &pubsub.TopicScoreParams{
+		TopicWeight:                    defaultTopicWeight,
+		SkipAtomicValidation:           defaultTopicSkipAtomicValidation,
+		InvalidMessageDeliveriesWeight: defaultTopicInvalidMessageDeliveriesWeight,
+		InvalidMessageDeliveriesDecay:  defaultTopicInvalidMessageDeliveriesDecay,
+		TimeInMeshQuantum:              defaultTopicTimeInMesh,
 	}
 }
