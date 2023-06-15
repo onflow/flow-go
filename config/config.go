@@ -4,7 +4,10 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"path/filepath"
+	"strings"
 
+	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -20,6 +23,8 @@ var (
 
 // FlowConfig Flow configuration.
 type FlowConfig struct {
+	// ConfigFile used to set a path to a config.yml file used to override the default-config.yml file.
+	ConfigFile    string          `mapstructure:"config-file"`
 	NetworkConfig *network.Config `mapstructure:"network-config"`
 }
 
@@ -47,12 +52,12 @@ func DefaultConfig() (*FlowConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshall the Flow config: %w", err)
 	}
-
 	return &flowConf, nil
 }
 
 // BindPFlags binds the configuration to the cli pflag set. This should be called
-// after all pflags have been parsed.
+// after all pflags have been parsed. If the --config-file flag has been set the config will
+// be loaded from the specified config file.
 // Args:
 //
 //	c: The Flow configuration that will be used to unmarshall the configuration values into after binding pflags.
@@ -61,19 +66,35 @@ func DefaultConfig() (*FlowConfig, error) {
 // Returns:
 //
 //	error: if there is any error encountered binding pflags or unmarshalling the config struct, all errors are considered irrecoverable.
+//	bool: true if --config-file flag was set and config file was loaded, false otherwise.
 //
 // Note: As configuration management is improved this func should accept the entire Flow config as the arg to unmarshall new config values into.
-func BindPFlags(c *FlowConfig) error {
-	if err := conf.BindPFlags(pflag.CommandLine); err != nil {
-		return fmt.Errorf("failed to bind pflags: %w", err)
+func BindPFlags(c *FlowConfig, flags *pflag.FlagSet) (error, bool) {
+	if !flags.Parsed() {
+		return fmt.Errorf("failed to bind flags to configuration values, pflags must be parsed before binding"), false
 	}
 
-	err := Unmarshall(c)
+	// update the config store values from config file if --config-file flag is set
+	// if config file provided we will use values from the file and skip binding pflags
+	err, overridden := overrideConfigFile(flags)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshall the Flow config: %w", err)
+		return err, false
 	}
 
-	return nil
+	if !overridden {
+		err = conf.BindPFlags(flags)
+		if err != nil {
+			return fmt.Errorf("failed to bind pflag set: %w", err), false
+		}
+		setAliases()
+	}
+
+	err = Unmarshall(c)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshall the Flow config: %w", err), false
+	}
+
+	return nil, overridden
 }
 
 // Unmarshall unmarshalls the Flow configuration into the provided FlowConfig struct.
@@ -90,6 +111,71 @@ func Unmarshall(flowConfig *FlowConfig) error {
 		return fmt.Errorf("failed to unmarshal network config: %w", err)
 	}
 	return nil
+}
+
+// Print prints current configuration keys and values.
+// Returns:
+// map[string]struct{}: map of keys to avoid printing if they were set by an config file.
+// This is required because we still have other config values not migrated to the config package. When a
+// config file is used currently only network-configs are set, we want to avoid printing the config file
+// value and also the flag value.
+func Print(info *zerolog.Event, flags *pflag.FlagSet) map[string]struct{} {
+	// only print config values if they were overridden with a config file
+	m := make(map[string]struct{})
+	if flags.Lookup(configFilePath).Changed {
+		for _, key := range conf.AllKeys() {
+			info.Str(key, fmt.Sprintf("%v", conf.Get(key)))
+			s := strings.Split(key, ".")
+			if len(s) == 2 {
+				m[s[1]] = struct{}{}
+			} else {
+				m[key] = struct{}{}
+			}
+		}
+	}
+
+	return m
+}
+
+// setAliases sets aliases for config sub packages. This should be done directly after pflags are bound to the configuration store.
+// Upon initialization the conf will be loaded with the default config values, those values are then used as the default values for
+// all the CLI flags, the CLI flags are then bound to the configuration store and at this point all aliases should be set if configuration
+// keys do not match the CLI flags 1:1. ie: networking-connection-pruning -> network-config.networking-connection-pruning. After aliases
+// are set the conf store will override values with any CLI flag values that are set as expected.
+func setAliases() {
+	err := network.SetAliases(conf)
+	if err != nil {
+		panic(fmt.Errorf("failed to set network aliases: %w", err))
+	}
+}
+
+// overrideConfigFile overrides the default config file by reading in the config file at the path set
+// by the --config-file and --config-file-name flags in our viper config store.
+//
+// Returns:
+//
+//	error: if there is any error encountered while reading new config file, all errors are considered irrecoverable.
+//	bool: true if the config was overridden by the new config file, false otherwise or if an error is encountered reading the new config file.
+func overrideConfigFile(flags *pflag.FlagSet) (error, bool) {
+	configFileFlag := flags.Lookup(configFilePath)
+	if configFileFlag.Changed {
+		p := configFileFlag.Value.String()
+		dirPath, fileName := splitConfigPath(p)
+		conf.AddConfigPath(dirPath)
+		conf.SetConfigName(fileName)
+		err := conf.ReadInConfig()
+		if err != nil {
+			return fmt.Errorf("failed to read config file %s: %w", p, err), false
+		}
+		return nil, true
+	}
+	return nil, false
+}
+
+// getConfigNameFromPath returns the directory and name of the config file from the provided path string.
+func splitConfigPath(path string) (string, string) {
+	dir, name := filepath.Split(path)
+	return dir, strings.Split(name, ".")[0]
 }
 
 func init() {

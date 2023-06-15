@@ -26,7 +26,6 @@ import (
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/config"
-	netconf "github.com/onflow/flow-go/config/network"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -137,10 +136,11 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		fnb.Logger.Fatal().Err(err).Msg("failed to initialize flow config")
 	}
 
+	// initialize pflag set for Flow node
+	config.InitializePFlagSet(fnb.flags, defaultFlowConfig)
+
 	defaultConfig := DefaultBaseConfig()
 
-	// initialize network configuration flags
-	netconf.InitializeNetworkFlags(fnb.flags, defaultFlowConfig.NetworkConfig)
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", defaultConfig.nodeIDHex, "identity of our node")
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
@@ -349,7 +349,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
 		}
 
-		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, fnb.FlowConfig.NetworkConfig.GossipSubConfig.RpcInspector, fnb.IdentityProvider, fnb.Metrics.Network).
+		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, &fnb.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, fnb.IdentityProvider, fnb.Metrics.Network).
 			SetNetworkType(network.PrivateNetwork).
 			SetMetrics(metricsCfg).
 			Build()
@@ -370,11 +370,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
 			peerManagerCfg,
-			fnb.FlowConfig.NetworkConfig.GossipSubConfig,
+			&fnb.FlowConfig.NetworkConfig.GossipSubConfig,
 			fnb.FlowConfig.NetworkConfig.GossipSubRpcInspectorSuite,
-			fnb.FlowConfig.NetworkConfig.LibP2PResourceManagerConfig,
+			&fnb.FlowConfig.NetworkConfig.ResourceManagerConfig,
 			uniCfg,
-			fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig)
+			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
@@ -576,20 +576,24 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 	// parse configuration parameters
 	pflag.Parse()
 
-	err := config.BindPFlags(&fnb.BaseConfig.FlowConfig)
+	err, configOverride := config.BindPFlags(&fnb.BaseConfig.FlowConfig, fnb.flags)
 	if err != nil {
 		return err
 	}
 
-	// print all flags
-	log := fnb.Logger.Info()
+	if configOverride {
+		fnb.Logger.Info().Str("config-file", fnb.FlowConfig.ConfigFile).Msg("configuration file updated")
+	}
 
-	pflag.VisitAll(func(flag *pflag.Flag) {
-		log = log.Str(flag.Name, flag.Value.String())
+	info := fnb.Logger.Info()
+
+	noPrint := config.Print(info, fnb.flags)
+	fnb.flags.VisitAll(func(flag *pflag.Flag) {
+		if _, ok := noPrint[flag.Name]; !ok {
+			info.Str(flag.Name, fmt.Sprintf("%v", flag.Value))
+		}
 	})
-
-	log.Msg("flags loaded")
-
+	info.Msg("configuration loaded")
 	return fnb.extraFlagsValidation()
 }
 

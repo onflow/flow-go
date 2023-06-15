@@ -1,5 +1,5 @@
-# Network Configuration
 network-config:
+  # Network Configuration
   # Connection pruning determines whether connections to nodes
   # that are not part of protocol state should be trimmed
   networking-connection-pruning: true
@@ -14,111 +14,96 @@ network-config:
   # The size of the queue for notifications about new peers in the disallow list.
   disallow-list-notification-cache-size: 100
   # unicast rate limiters config
-  unicast-rate-limiters:
-    # Setting this to true will disable connection disconnects and gating when unicast rate limiters are configured
-    unicast-dry-run: true
-    # The number of seconds a peer will be forced to wait before being allowed to successfully reconnect to the node after being rate limited
-    unicast-lockout-duration: 10s
-    # Amount of unicast messages that can be sent by a peer per second
-    unicast-message-rate-limit: 0
-    # Bandwidth size in bytes a peer is allowed to send via unicast streams per second
-    unicast-bandwidth-rate-limit: 0
-    # Bandwidth size in bytes a peer is allowed to send via unicast streams at once
-    unicast-bandwidth-burst-limit: 1e9
+  # Setting this to true will disable connection disconnects and gating when unicast rate limiters are configured
+  unicast-dry-run: true
+  # The number of seconds a peer will be forced to wait before being allowed to successfully reconnect to the node after being rate limited
+  unicast-lockout-duration: 10s
+  # Amount of unicast messages that can be sent by a peer per second
+  unicast-message-rate-limit: 0
+  # Bandwidth size in bytes a peer is allowed to send via unicast streams per second
+  unicast-bandwidth-rate-limit: 0
+  # Bandwidth size in bytes a peer is allowed to send via unicast streams at once
+  unicast-bandwidth-burst-limit: 1e9
   # Resource manager config
-  libp2p-resource-manager:
-    # Maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
-    memory-limit-ratio: 0.5 # flow default
-    # Maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
-    file-descriptors-ratio: 0.2 # libp2p default
-    # The default value for libp2p PeerBaseLimitConnsInbound. This limit
-    # restricts the amount of inbound connections from a peer to 1, forcing libp2p to reuse the connection.
-    #	Without this limit peers can end up in a state where there exists n number of connections per peer which
-    #	can lead to resource exhaustion of the libp2p node.
-    peer-base-limits-conns-inbound: 1
+  # Maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
+  libp2p-memory-limit-ratio: 0.5 # flow default
+  # Maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
+  libp2p-file-descriptors-ratio: 0.2 # libp2p default
+  # The default value for libp2p PeerBaseLimitConnsInbound. This limit
+  # restricts the amount of inbound connections from a peer to 1, forcing libp2p to reuse the connection.
+  #	Without this limit peers can end up in a state where there exists n number of connections per peer which
+  #	can lead to resource exhaustion of the libp2p node.
+  libp2p-peer-base-limits-conns-inbound: 1
   # Connection manager config
-  connection-manager:
-    # HighWatermark and LowWatermark govern the number of connections are maintained by the ConnManager.
-    # When the peer count exceeds the HighWatermark, as many peers will be pruned (and
-    # their connections terminated) until LowWatermark peers remain. In other words, whenever the
-    # peer count is x > HighWatermark, the ConnManager will prune x - LowWatermark peers.
-    # The pruning algorithm is as follows:
-    # 1. The ConnManager will not prune any peers that have been connected for less than GracePeriod.
-    # 2. The ConnManager will not prune any peers that are protected.
-    # 3. The ConnManager will sort the peers based on their number of streams and direction of connections, and
-    # prunes the peers with the least number of streams. If there are ties, the peer with the incoming connection
-    # will be pruned. If both peers have incoming connections, and there are still ties, one of the peers will be
-    # pruned at random.
-    # Algorithm implementation is in https://github.com/libp2p/go-libp2p/blob/master/p2p/net/connmgr/connmgr.go#L262-L318
-    high-watermark: 500
-    low-watermark: 450
-    # The time to wait before pruning a new connection
-    silence-period: 10s
-    # The time to wait before start pruning connections
-    grace-period: 1m
+  # HighWatermark and LowWatermark govern the number of connections are maintained by the ConnManager.
+  # When the peer count exceeds the HighWatermark, as many peers will be pruned (and
+  # their connections terminated) until LowWatermark peers remain. In other words, whenever the
+  # peer count is x > HighWatermark, the ConnManager will prune x - LowWatermark peers.
+  # The pruning algorithm is as follows:
+  # 1. The ConnManager will not prune any peers that have been connected for less than GracePeriod.
+  # 2. The ConnManager will not prune any peers that are protected.
+  # 3. The ConnManager will sort the peers based on their number of streams and direction of connections, and
+  # prunes the peers with the least number of streams. If there are ties, the peer with the incoming connection
+  # will be pruned. If both peers have incoming connections, and there are still ties, one of the peers will be
+  # pruned at random.
+  # Algorithm implementation is in https://github.com/libp2p/go-libp2p/blob/master/p2p/net/connmgr/connmgr.go#L262-L318
+  libp2p-high-watermark: 500
+  libp2p-low-watermark: 450
+  # The time to wait before pruning a new connection
+  libp2p-silence-period: 10s
+  # The time to wait before start pruning connections
+  libp2p-grace-period: 1m
   # Gossipsub config
-  gossipsub:
-    # The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes.
-    #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the
-    #	mesh updates will be logged individually and separately. The logging interval is only used to log the mesh
-    #	topology as a whole specially when there are no updates to the mesh topology for a long time.
-    local-mesh-logging-interval: 1m
-    # The default interval at which the gossipsub score tracer logs the peer scores. This is used for debugging and forensics purposes.
-    #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs.
-    score-tracer-interval: 1m
-    # Peer scoring is the default value for enabling peer scoring
-    peer-scoring-enabled: true
-    # Gossipsub rpc inspectors configs
-    rpc-inspectors:
-      # The size of the queue for notifications about invalid RPC messages
-      notification-cache-size: 10000
-      # RPC control message validation inspector configs
-      validation-inspector:
-        # Rpc validation inspector number of pool workers
-        number-of-workers: 5
-        # The size of the queue used by worker pool for the control message validation inspector
-        queue-cache-size: 100
-        # Cluster prefixed control message validation configs
-        cluster-prefixed-messages:
-          # The size of the cache used to track the amount of cluster prefixed topics received by peers
-          tracker-cache-size: 100
-          # The decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers
-          tracker-cache-decay: 0.99
-          # The upper bound on the amount of cluster prefixed control messages that will be processed
-          hard-threshold: 100
-        # GRAFT libp2p control message validation limits
-        graft-limits:
-          control-message-type: GRAFT
-          hard-threshold: 30
-          safety-threshold: 15
-          rate-limit: 30
-        # PRUNE libp2p control message validation limits
-        prune-limits:
-          control-message-type: PRUNE
-          hard-threshold: 30
-          safety-threshold: 15
-          rate-limit: 30
-        # IHAVE libp2p control message validation limits
-        ihave-limits:
-          control-message-type: IHAVE
-          hard-threshold: 100
-          safety-threshold: 50
-          # Rate limiting is disabled for ihave control messages
-          rate-limit: 0
-        # Percentage of ihaves to use as the sample size for synchronous inspection 25%
-        ihave-sync-inspection-sample-size-percentage: .25
-        # Percentage of ihaves to use as the sample size for asynchronous inspection 10%
-        ihave-async-inspection-sample-size-percentage: .10
-        # Max number of ihave messages in a sample to be inspected
-        ihave-max-sample-size: 100
-      # RPC metrics observer inspector configs
-      metrics-inspector:
-        # The number of metrics inspector pool workers
-        number-of-workers: 1
-        # The size of the queue used by worker pool for the control message metrics inspector
-        cache-size: 100
+  # The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes.
+  #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the
+  #	mesh updates will be logged individually and separately. The logging interval is only used to log the mesh
+  #	topology as a whole specially when there are no updates to the mesh topology for a long time.
+  gossipsub-local-mesh-logging-interval: 1m
+  # The default interval at which the gossipsub score tracer logs the peer scores. This is used for debugging and forensics purposes.
+  #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs.
+  gossipsub-score-tracer-interval: 1m
+  # Peer scoring is the default value for enabling peer scoring
+  gossipsub-peer-scoring-enabled: true
+  # Gossipsub rpc inspectors configs
+  # The size of the queue for notifications about invalid RPC messages
+  gossipsub-rpc-inspector-notification-cache-size: 10000
+  # RPC control message validation inspector configs
+  # Rpc validation inspector number of pool workers
+  gossipsub-rpc-validation-inspector-workers: 5
+  # The size of the queue used by worker pool for the control message validation inspector
+  gossipsub-rpc-validation-inspector-queue-cache-size: 100
+  # Cluster prefixed control message validation configs
+  # The size of the cache used to track the amount of cluster prefixed topics received by peers
+  gossipsub-cluster-prefix-tracker-cache-size: 100
+  # The decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers
+  gossipsub-cluster-prefix-tracker-cache-decay: 0.99
+  # The upper bound on the amount of cluster prefixed control messages that will be processed
+  gossipsub-rpc-cluster-prefixed-hard-threshold: 100
+  # GRAFT libp2p control message validation limits
+  gossipsub-rpc-graft-hard-threshold: 30
+  gossipsub-rpc-graft-safety-threshold: 15
+  gossipsub-rpc-graft-rate-limit: 30
+  # PRUNE libp2p control message validation limits
+  gossipsub-rpc-prune-hard-threshold: 30
+  gossipsub-rpc-prune-safety-threshold: 15
+  gossipsub-rpc-prune-rate-limit: 30
+  # IHAVE libp2p control message validation limits
+  gossipsub-rpc-ihave-hard-threshold: 100
+  gossipsub-rpc-ihave-safety-threshold: 50
+  # Rate limiting is disabled for ihave control messages
+  gossipsub-rpc-ihave-rate-limit: 0
+  # Percentage of ihaves to use as the sample size for synchronous inspection 25%
+  ihave-sync-inspection-sample-size-percentage: .25
+  # Percentage of ihaves to use as the sample size for asynchronous inspection 10%
+  ihave-async-inspection-sample-size-percentage: .10
+  # Max number of ihave messages in a sample to be inspected
+  ihave-max-sample-size: 100
+  # RPC metrics observer inspector configs
+  # The number of metrics inspector pool workers
+  gossipsub-rpc-metrics-inspector-workers: 1
+  # The size of the queue used by worker pool for the control message metrics inspector
+  gossipsub-rpc-metrics-inspector-cache-size: 100
   # Application layer spam prevention
-  alsp:
-    spam-record-cache-size: 10e3
-    spam-report-queue-size: 10e4
-    disable-penalty: false
+  alsp-spam-record-cache-size: 10e3
+  alsp-spam-report-queue-size: 10e4
+  alsp-disable-penalty: false
