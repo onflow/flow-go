@@ -19,68 +19,18 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/inspector/internal"
+	"github.com/onflow/flow-go/network/p2p/inspector/internal/cache"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
 	flowrand "github.com/onflow/flow-go/utils/rand"
 )
-
-const (
-	// DefaultNumberOfWorkers default number of workers for the inspector component.
-	DefaultNumberOfWorkers = 5
-	// DefaultControlMsgValidationInspectorQueueCacheSize is the default size of the inspect message queue.
-	DefaultControlMsgValidationInspectorQueueCacheSize = 100
-	// rpcInspectorComponentName the rpc inspector component name.
-	rpcInspectorComponentName = "gossipsub_rpc_validation_inspector"
-)
-
-// InspectMsgRequest represents a short digest of an RPC control message. It is used for further message inspection by component workers.
-type InspectMsgRequest struct {
-	// Nonce adds random value so that when msg req is stored on hero store a unique ID can be created from the struct fields.
-	Nonce []byte
-	// Peer sender of the message.
-	Peer peer.ID
-	// CtrlMsg the control message that will be inspected.
-	ctrlMsg          *pubsub_pb.ControlMessage
-	validationConfig *CtrlMsgValidationConfig
-}
-
-// ControlMsgValidationInspectorConfig validation configuration for each type of RPC control message.
-type ControlMsgValidationInspectorConfig struct {
-	// NumberOfWorkers number of component workers to start for processing RPC messages.
-	NumberOfWorkers int
-	// InspectMsgStoreOpts options used to configure the underlying herocache message store.
-	InspectMsgStoreOpts []queue.HeroStoreConfigOption
-	// GraftValidationCfg validation configuration for GRAFT control messages.
-	GraftValidationCfg *CtrlMsgValidationConfig
-	// PruneValidationCfg validation configuration for PRUNE control messages.
-	PruneValidationCfg *CtrlMsgValidationConfig
-	// IHaveValidationCfg validation configuration for IHAVE control messages.
-	IHaveValidationCfg *CtrlMsgValidationConfig
-}
-
-// getCtrlMsgValidationConfig returns the CtrlMsgValidationConfig for the specified p2p.ControlMessageType.
-func (conf *ControlMsgValidationInspectorConfig) getCtrlMsgValidationConfig(controlMsg p2p.ControlMessageType) (*CtrlMsgValidationConfig, bool) {
-	switch controlMsg {
-	case p2p.CtrlMsgGraft:
-		return conf.GraftValidationCfg, true
-	case p2p.CtrlMsgPrune:
-		return conf.PruneValidationCfg, true
-	case p2p.CtrlMsgIHave:
-		return conf.IHaveValidationCfg, true
-	default:
-		return nil, false
-	}
-}
-
-// allCtrlMsgValidationConfig returns all control message validation configs in a list.
-func (conf *ControlMsgValidationInspectorConfig) allCtrlMsgValidationConfig() CtrlMsgValidationConfigs {
-	return CtrlMsgValidationConfigs{conf.GraftValidationCfg, conf.PruneValidationCfg, conf.IHaveValidationCfg}
-}
 
 // ControlMsgValidationInspector RPC message inspector that inspects control messages and performs some validation on them,
 // when some validation rule is broken feedback is given via the Peer scoring notifier.
 type ControlMsgValidationInspector struct {
 	component.Component
+	events.Noop
 	logger  zerolog.Logger
 	sporkID flow.Identifier
 	metrics module.GossipSubRpcValidationInspectorMetrics
@@ -90,35 +40,57 @@ type ControlMsgValidationInspector struct {
 	distributor p2p.GossipSubInspectorNotifDistributor
 	// workerPool queue that stores *InspectMsgRequest that will be processed by component workers.
 	workerPool *worker.Pool[*InspectMsgRequest]
+	// tracker is a map that associates the hash of a peer's ID with the
+	// number of cluster-prefix topic control messages received from that peer. It helps in tracking
+	// and managing the rate of incoming control messages from each peer, ensuring that the system
+	// stays performant and resilient against potential spam or abuse.
+	// The counter is incremented in the following scenarios:
+	// 1. The cluster prefix topic is received while the inspector waits for the cluster IDs provider to be set (this can happen during the startup or epoch transitions).
+	// 2. The node sends a cluster prefix topic where the cluster prefix does not match any of the active cluster IDs.
+	// In such cases, the inspector will allow a configured number of these messages from the corresponding peer.
+	tracker    *cache.ClusterPrefixedMessagesReceivedTracker
+	idProvider module.IdentityProvider
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
 var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
-
-// NewInspectMsgRequest returns a new *InspectMsgRequest.
-func NewInspectMsgRequest(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) (*InspectMsgRequest, error) {
-	nonce, err := internal.Nonce()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get inspect message request nonce: %w", err)
-	}
-	return &InspectMsgRequest{Nonce: nonce, Peer: from, validationConfig: validationConfig, ctrlMsg: ctrlMsg}, nil
-}
+var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
+// Args:
+//   - logger: the logger used by the inspector.
+//   - sporkID: the current spork ID.
+//   - config: inspector configuration.
+//   - distributor: gossipsub inspector notification distributor.
+//   - clusterPrefixedCacheCollector: metrics collector for the underlying cluster prefix received tracker cache.
+//   - idProvider: identity provider is used to get the flow identifier for a peer.
+//
+// Returns:
+//   - *ControlMsgValidationInspector: a new control message validation inspector.
+//   - error: an error if there is any error while creating the inspector. All errors are irrecoverable and unexpected.
 func NewControlMsgValidationInspector(
 	logger zerolog.Logger,
 	sporkID flow.Identifier,
 	config *ControlMsgValidationInspectorConfig,
 	distributor p2p.GossipSubInspectorNotifDistributor,
-	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics,
-) *ControlMsgValidationInspector {
+	clusterPrefixedCacheCollector module.HeroCacheMetrics,
+	idProvider module.IdentityProvider,
+	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics) (*ControlMsgValidationInspector, error) {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
+
+	tracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(logger, config.ClusterPrefixedControlMsgsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedControlMsgsReceivedCacheDecay)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
+	}
+
 	c := &ControlMsgValidationInspector{
 		logger:      lg,
 		sporkID:     sporkID,
-		metrics:     inspectorMetrics,
 		config:      config,
 		distributor: distributor,
+		tracker:     tracker,
+		idProvider:  idProvider,
+		metrics:     inspectorMetrics,
 	}
 
 	cfg := &queue.HeroStoreConfig{
@@ -157,22 +129,27 @@ func NewControlMsgValidationInspector(
 		builder.AddWorker(pool.WorkerLogic())
 	}
 	c.Component = builder.Build()
-	return c
+	return c, nil
 }
 
-// Inspect inspects the rpc received and returns an error if any validation rule is broken.
-// For each control message type an initial inspection is done synchronously to check the amount
-// of messages in the control message. Further inspection is done asynchronously to check rate limits
-// and validate topic IDS each control message if initial validation is passed.
-// All errors returned from this function can be considered benign.
-// errors returned:
+// Inspect is called by gossipsub upon reception of an rpc from a remote node.
+// It examines the provided message to ensure it adheres to the expected
+// format and conventions. If the message passes validation, the method returns
+// a nil error. If an issue is found, the method returns an error detailing
+// the specific issue encountered.
+// The returned error can be of two types:
+//  1. Expected errors: These are issues that are expected to occur during normal
+//     operation, such as invalid messages or messages that don't follow the
+//     conventions. These errors should be handled gracefully by the caller.
+//  2. Exceptions: These are unexpected issues, such as internal system errors
+//     or misconfigurations, that may require immediate attention or a change in
+//     the system's behavior. The caller should log and handle these errors
+//     accordingly.
 //
-//	ErrHardThreshold - if the message count for the control message type exceeds the hard threshold.
+// The returned error is returned to the gossipsub node which causes the rejection of rpc (for non-nil errors).
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	control := rpc.GetControl()
-
 	for _, ctrlMsgType := range p2p.ControlMessageTypes() {
-
 		lg := c.logger.With().
 			Str("peer_id", from.String()).
 			Str("ctrl_msg_type", string(ctrlMsgType)).Logger()
@@ -225,6 +202,15 @@ func (c *ControlMsgValidationInspector) Name() string {
 	return rpcInspectorComponentName
 }
 
+// ClusterIdsUpdated consumes cluster ID update protocol events.
+func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow.ChainIDList) {
+	c.tracker.StoreActiveClusterIds(clusterIDList)
+}
+
+// blockingPreprocessingRpc ensures the RPC control message count does not exceed the configured discard threshold.
+// Expected error returns during normal operations:
+//   - ErrDiscardThreshold: if control message count exceeds the configured discard threshold.
+//
 // blockingPreprocessingRpc generic pre-processing validation func that ensures the RPC control message count does not exceed the configured hard threshold.
 func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
 	if validationConfig.ControlMsg != p2p.CtrlMsgGraft && validationConfig.ControlMsg != p2p.CtrlMsgPrune {
@@ -271,7 +257,6 @@ func (c *ControlMsgValidationInspector) blockingIHaveSamplePreprocessing(from pe
 	defer func() {
 		c.metrics.BlockingPreProcessingFinished(p2p.CtrlMsgIHave.String(), sampleSize, time.Since(start))
 	}()
-
 	err := c.blockingPreprocessingSampleRpc(from, validationConfig, controlMessage, sampleSize)
 	if err != nil {
 		return fmt.Errorf("failed to pre-process a sample of iHave messages: %w", err)
@@ -286,7 +271,7 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 	if validationConfig.ControlMsg != p2p.CtrlMsgIHave && validationConfig.ControlMsg != p2p.CtrlMsgIWant {
 		return fmt.Errorf("unexpected control message type %s encountered during blocking pre-processing sample rpc, expected %s or %s", validationConfig.ControlMsg, p2p.CtrlMsgIHave, p2p.CtrlMsgIWant)
 	}
-
+	activeClusterIDS := c.tracker.GetActiveClusterIds()
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
 		Uint64("ctrl_msg_count", count).
@@ -300,20 +285,21 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 		if err != nil {
 			return fmt.Errorf("failed to sample ihave messages: %w", err)
 		}
-		err = c.validateTopicsSample(validationConfig.ControlMsg, controlMessage, sampleSize)
+		err = c.validateTopicsSample(from, validationConfig, controlMessage, activeClusterIDS, sampleSize)
 		if err != nil {
 			lg.Warn().
 				Err(err).
 				Bool(logging.KeySuspicious, true).
 				Msg("topic validation pre-processing failed rejecting rpc control message")
-			err = c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, err))
-			if err != nil {
+			disErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, err))
+			if disErr != nil {
 				lg.Error().
-					Err(err).
+					Err(disErr).
 					Bool(logging.KeySuspicious, true).
 					Msg("failed to distribute invalid control message notification")
-				return err
+				return disErr
 			}
+			return err
 		}
 	}
 
@@ -324,6 +310,23 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 	err := c.sampleCtrlMessages(p2p.CtrlMsgIHave, controlMessage, sampleSize)
 	if err != nil {
 		return fmt.Errorf("failed to sample ihave messages: %w", err)
+	}
+	return nil
+}
+
+// sampleCtrlMessages performs sampling on the specified control message that will randomize
+// the items in the control message slice up to index sampleSize-1.
+func (c *ControlMsgValidationInspector) sampleCtrlMessages(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage, sampleSize uint) error {
+	switch ctrlMsgType {
+	case p2p.CtrlMsgIHave:
+		iHaves := ctrlMsg.GetIhave()
+		swap := func(i, j uint) {
+			iHaves[i], iHaves[j] = iHaves[j], iHaves[i]
+		}
+		err := flowrand.Samples(uint(len(iHaves)), sampleSize, swap)
+		if err != nil {
+			return fmt.Errorf("failed to get random sample of ihave control messages: %w", err)
+		}
 	}
 	return nil
 }
@@ -348,7 +351,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 		validationErr = NewRateLimitedControlMsgErr(req.validationConfig.ControlMsg)
 	case count > req.validationConfig.SafetyThreshold:
 		// check if Peer RPC messages Count greater than safety threshold further inspect each message individually
-		validationErr = c.validateTopics(req.validationConfig, req.ctrlMsg)
+		validationErr = c.validateTopics(req.Peer, req.validationConfig, req.ctrlMsg)
 	default:
 		lg.Trace().
 			Uint64("hard_threshold", req.validationConfig.HardThreshold).
@@ -387,103 +390,212 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlM
 }
 
 // validateTopics ensures all topics in the specified control message are valid flow topic/channel and no duplicate topics exist.
-// All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) validateTopics(validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) error {
-	seen := make(map[channels.Topic]struct{})
-	validateTopic := c.validateTopicInlineFunc(seen)
-	controlMsg := validationConfig.ControlMsg
-	switch controlMsg {
+// Expected error returns during normal operations:
+//   - channels.InvalidTopicErr: if topic is invalid.
+//   - ErrDuplicateTopic: if a duplicate topic ID is encountered.
+func (c *ControlMsgValidationInspector) validateTopics(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) error {
+	activeClusterIDS := c.tracker.GetActiveClusterIds()
+	switch validationConfig.ControlMsg {
 	case p2p.CtrlMsgGraft:
-		for _, graft := range ctrlMsg.GetGraft() {
-			topic := channels.Topic(graft.GetTopicID())
-			err := validateTopic(topic)
-			if err != nil {
-				return err
-			}
-		}
+		return c.validateGrafts(from, ctrlMsg, activeClusterIDS)
 	case p2p.CtrlMsgPrune:
-		for _, prune := range ctrlMsg.GetPrune() {
-			topic := channels.Topic(prune.GetTopicID())
-			err := validateTopic(topic)
-			if err != nil {
-				return err
-			}
-		}
+		return c.validatePrunes(from, ctrlMsg, activeClusterIDS)
 	case p2p.CtrlMsgIHave:
-		// we only perform async inspection on a sample size of iHave messages
-		sampleSize := util.SampleN(len(ctrlMsg.GetIhave()), validationConfig.IHaveInspectionMaxSampleSize, validationConfig.IHaveAsyncInspectSampleSizePercentage)
-		return c.validateTopicsSample(controlMsg, ctrlMsg, sampleSize)
+		return c.validateIhaves(from, validationConfig, ctrlMsg, activeClusterIDS)
 	default:
 		// sanity check
 		// This should never happen validateTopics is only used to validate GRAFT and PRUNE control message types
 		// if any other control message type is encountered here this indicates invalid state irrecoverable error.
-		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics expected %s, %s or %s got %s", p2p.CtrlMsgGraft, p2p.CtrlMsgPrune, p2p.CtrlMsgIHave, controlMsg))
+		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics expected %s, %s or %s got %s", p2p.CtrlMsgGraft, p2p.CtrlMsgPrune, p2p.CtrlMsgIHave, validationConfig.ControlMsg))
 	}
 	return nil
+}
+
+// validateGrafts performs topic validation on all grafts in the control message using the provided validateTopic func while tracking duplicates.
+func (c *ControlMsgValidationInspector) validateGrafts(from peer.ID, ctrlMsg *pubsub_pb.ControlMessage, activeClusterIDS flow.ChainIDList) error {
+	tracker := make(duplicateTopicTracker)
+	for _, graft := range ctrlMsg.GetGraft() {
+		topic := channels.Topic(graft.GetTopicID())
+		if tracker.isDuplicate(topic) {
+			return NewDuplicateTopicErr(topic)
+		}
+		tracker.set(topic)
+		err := c.validateTopic(from, topic, activeClusterIDS)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validatePrunes performs topic validation on all prunes in the control message using the provided validateTopic func while tracking duplicates.
+func (c *ControlMsgValidationInspector) validatePrunes(from peer.ID, ctrlMsg *pubsub_pb.ControlMessage, activeClusterIDS flow.ChainIDList) error {
+	tracker := make(duplicateTopicTracker)
+	for _, prune := range ctrlMsg.GetPrune() {
+		topic := channels.Topic(prune.GetTopicID())
+		if tracker.isDuplicate(topic) {
+			return NewDuplicateTopicErr(topic)
+		}
+		tracker.set(topic)
+		err := c.validateTopic(from, topic, activeClusterIDS)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateIhaves performs topic validation on all ihaves in the control message using the provided validateTopic func while tracking duplicates.
+func (c *ControlMsgValidationInspector) validateIhaves(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage, activeClusterIDS flow.ChainIDList) error {
+	sampleSize := util.SampleN(len(ctrlMsg.GetIhave()), validationConfig.IHaveInspectionMaxSampleSize, validationConfig.IHaveAsyncInspectSampleSizePercentage)
+	return c.validateTopicsSample(from, validationConfig, ctrlMsg, activeClusterIDS, sampleSize)
 }
 
 // validateTopicsSample samples a subset of topics from the specified control message and ensures the sample contains only valid flow topic/channel and no duplicate topics exist.
 // Sample size ensures liveness of the network when validating messages with no upper bound on the amount of messages that may be received.
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) validateTopicsSample(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage, sampleSize uint) error {
-	seen := make(map[channels.Topic]struct{})
-	validateTopic := c.validateTopicInlineFunc(seen)
-	switch ctrlMsgType {
+func (c *ControlMsgValidationInspector) validateTopicsSample(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage, activeClusterIDS flow.ChainIDList, sampleSize uint) error {
+	tracker := make(duplicateTopicTracker)
+	switch validationConfig.ControlMsg {
 	case p2p.CtrlMsgIHave:
 		for i := uint(0); i < sampleSize; i++ {
 			topic := channels.Topic(ctrlMsg.Ihave[i].GetTopicID())
-			err := validateTopic(topic)
+			if tracker.isDuplicate(topic) {
+				return NewDuplicateTopicErr(topic)
+			}
+			tracker.set(topic)
+			err := c.validateTopic(from, topic, activeClusterIDS)
 			if err != nil {
-				return NewInvalidTopicErr(topic, sampleSize, err)
+				return err
 			}
 		}
 	default:
 		// sanity check
 		// This should never happen validateTopicsSample is only used to validate IHAVE control message types
 		// if any other control message type is encountered here this indicates invalid state irrecoverable error.
-		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics sample expected %s got %s", p2p.CtrlMsgIHave, ctrlMsgType))
+		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics sample expected %s got %s", p2p.CtrlMsgIHave, validationConfig.ControlMsg))
 	}
 	return nil
 }
 
-// sampleCtrlMessages performs sampling on the specified control message that will randomize
-// the items in the control message slice up to index sampleSize-1.
-func (c *ControlMsgValidationInspector) sampleCtrlMessages(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage, sampleSize uint) error {
-	switch ctrlMsgType {
-	case p2p.CtrlMsgIHave:
-		iHaves := ctrlMsg.GetIhave()
-		swap := func(i, j uint) {
-			iHaves[i], iHaves[j] = iHaves[j], iHaves[i]
-		}
-		err := flowrand.Samples(uint(len(iHaves)), sampleSize, swap)
-		if err != nil {
-			return fmt.Errorf("failed to get random sample of ihave control messages: %w", err)
-		}
+// validateTopic ensures the topic is a valid flow topic/channel.
+// Expected error returns during normal operations:
+//   - channels.InvalidTopicErr: if topic is invalid.
+//   - ErrActiveClusterIdsNotSet: if the cluster ID provider is not set.
+//   - channels.UnknownClusterIDErr: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
+//
+// This func returns an exception in case of unexpected bug or state corruption if cluster prefixed topic validation
+// fails due to unexpected error returned when getting the active cluster IDS.
+func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) error {
+	channel, ok := channels.ChannelFromTopic(topic)
+	if !ok {
+		return channels.NewInvalidTopicErr(topic, fmt.Errorf("failed to get channel from topic"))
 	}
-	return nil
-}
 
-// validateTopic the topic is a valid flow topic/channel.
-// All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) validateTopic(topic channels.Topic) error {
-	err := channels.IsValidFlowTopic(topic, c.sporkID)
+	// handle cluster prefixed topics
+	if channels.IsClusterChannel(channel) {
+		return c.validateClusterPrefixedTopic(from, topic, activeClusterIds)
+	}
+
+	// non cluster prefixed topic validation
+	err := channels.IsValidNonClusterFlowTopic(topic, c.sporkID)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// validateTopicInlineFunc returns a callback func that validates topics and keeps track of duplicates.
-func (c *ControlMsgValidationInspector) validateTopicInlineFunc(seen map[channels.Topic]struct{}) func(topic channels.Topic) error {
-	return func(topic channels.Topic) error {
-		if _, ok := seen[topic]; ok {
-			return NewIDuplicateTopicErr(topic)
-		}
-		seen[topic] = struct{}{}
-		err := c.validateTopic(topic)
-		if err != nil {
-			return NewInvalidTopicErr(topic, 0, err)
-		}
-		return nil
+// validateClusterPrefixedTopic validates cluster prefixed topics.
+// Expected error returns during normal operations:
+//   - ErrActiveClusterIdsNotSet: if the cluster ID provider is not set.
+//   - channels.InvalidTopicErr: if topic is invalid.
+//   - channels.UnknownClusterIDErr: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
+//
+// In the case where an ErrActiveClusterIdsNotSet or UnknownClusterIDErr is encountered and the cluster prefixed topic received
+// tracker for the peer is less than or equal to the configured ClusterPrefixHardThreshold an error will only be logged and not returned.
+// At the point where the hard threshold is crossed the error will be returned and the sender will start to be penalized.
+// Any errors encountered while incrementing or loading the cluster prefixed control message gauge for a peer will result in a fatal log, these
+// errors are unexpected and irrecoverable indicating a bug.
+func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) error {
+	lg := c.logger.With().
+		Str("from", from.String()).
+		Logger()
+	// reject messages from unstaked nodes for cluster prefixed topics
+	nodeID, err := c.getFlowIdentifier(from)
+	if err != nil {
+		return err
 	}
+
+	if len(activeClusterIds) == 0 {
+		// cluster IDs have not been updated yet
+		_, err = c.tracker.Inc(nodeID)
+		if err != nil {
+			return err
+		}
+
+		// if the amount of messages received is below our hard threshold log the error and return nil.
+		if c.checkClusterPrefixHardThreshold(nodeID) {
+			lg.Warn().
+				Err(err).
+				Str("topic", topic.String()).
+				Msg("failed to validate cluster prefixed control message with cluster pre-fixed topic active cluster ids not set")
+			return nil
+		}
+
+		return NewActiveClusterIdsNotSetErr(topic)
+	}
+
+	err = channels.IsValidFlowClusterTopic(topic, activeClusterIds)
+	if err != nil {
+		if channels.IsUnknownClusterIDErr(err) {
+			// unknown cluster ID error could indicate that a node has fallen
+			// behind and needs to catchup increment to topics received cache.
+			_, incErr := c.tracker.Inc(nodeID)
+			if incErr != nil {
+				// irrecoverable error encountered
+				c.logger.Fatal().Err(incErr).
+					Str("node_id", nodeID.String()).
+					Msg("unexpected irrecoverable error encountered while incrementing the cluster prefixed control message gauge")
+			}
+			// if the amount of messages received is below our hard threshold log the error and return nil.
+			if c.checkClusterPrefixHardThreshold(nodeID) {
+				lg.Warn().
+					Err(err).
+					Str("topic", topic.String()).
+					Msg("processing unknown cluster prefixed topic received below cluster prefixed discard threshold peer may be behind in the protocol")
+				return nil
+			}
+		}
+		return err
+	}
+
+	return nil
+}
+
+// getFlowIdentifier returns the flow identity identifier for a peer.
+// Args:
+//   - peerID: the peer id of the sender.
+//
+// The returned error indicates that the peer is un-staked.
+func (c *ControlMsgValidationInspector) getFlowIdentifier(peerID peer.ID) (flow.Identifier, error) {
+	id, ok := c.idProvider.ByPeerID(peerID)
+	if !ok {
+		return flow.ZeroID, NewUnstakedPeerErr(fmt.Errorf("failed to get flow identity for peer: %s", peerID))
+	}
+	return id.ID(), nil
+}
+
+// checkClusterPrefixHardThreshold returns true if the cluster prefix received tracker count is less than
+// the configured ClusterPrefixHardThreshold, false otherwise.
+// If any error is encountered while loading from the tracker this func will emit a fatal level log, these errors
+// are unexpected and irrecoverable indicating a bug.
+func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID flow.Identifier) bool {
+	gauge, err := c.tracker.Load(nodeID)
+	if err != nil {
+		// irrecoverable error encountered
+		c.logger.Fatal().Err(err).
+			Str("node_id", nodeID.String()).
+			Msg("unexpected irrecoverable error encountered while loading the cluster prefixed control message gauge during hard threshold check")
+	}
+	return gauge <= c.config.ClusterPrefixHardThreshold
 }

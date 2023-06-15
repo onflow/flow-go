@@ -14,11 +14,11 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
@@ -76,13 +76,8 @@ func NewCore(
 	hotstuff module.HotStuff,
 	voteAggregator hotstuff.VoteAggregator,
 	timeoutAggregator hotstuff.TimeoutAggregator,
-	opts ...compliance.Opt,
+	config compliance.Config,
 ) (*Core, error) {
-
-	config := compliance.DefaultConfig()
-	for _, apply := range opts {
-		apply(&config)
-	}
 
 	c := &Core{
 		log:                       log.With().Str("compliance", "core").Logger(),
@@ -158,12 +153,13 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 		return nil
 	}
 
+	skipNewProposalsThreshold := c.config.GetSkipNewProposalsThreshold()
 	// ignore proposals which are too far ahead of our local finalized state
 	// instead, rely on sync engine to catch up finalization more effectively, and avoid
 	// large subtree of blocks to be cached.
-	if header.View > finalView+c.config.SkipNewProposalsThreshold {
+	if header.View > finalView+skipNewProposalsThreshold {
 		log.Debug().
-			Uint64("skip_new_proposals_threshold", c.config.SkipNewProposalsThreshold).
+			Uint64("skip_new_proposals_threshold", skipNewProposalsThreshold).
 			Msg("dropping block too far ahead of locally finalized view")
 		return nil
 	}

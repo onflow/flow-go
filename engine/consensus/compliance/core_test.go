@@ -268,6 +268,7 @@ func (cs *CommonSuite) SetupTest() {
 		cs.hotstuff,
 		cs.voteAggregator,
 		cs.timeoutAggregator,
+		compliance.DefaultConfig(),
 	)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 

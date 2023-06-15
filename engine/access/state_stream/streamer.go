@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -25,21 +26,30 @@ type Streamable interface {
 // Streamer
 type Streamer struct {
 	log         zerolog.Logger
+	sub         Streamable
 	broadcaster *engine.Broadcaster
 	sendTimeout time.Duration
-	sub         Streamable
+	limiter     *rate.Limiter
 }
 
 func NewStreamer(
 	log zerolog.Logger,
 	broadcaster *engine.Broadcaster,
 	sendTimeout time.Duration,
+	limit float64,
 	sub Streamable,
 ) *Streamer {
+	var limiter *rate.Limiter
+	if limit > 0 {
+		// allows for 1 response per call, averaging `limit` responses per second over longer time frames
+		limiter = rate.NewLimiter(rate.Limit(limit), 1)
+	}
+
 	return &Streamer{
 		log:         log.With().Str("sub_id", sub.ID()).Logger(),
 		broadcaster: broadcaster,
 		sendTimeout: sendTimeout,
+		limiter:     limiter,
 		sub:         sub,
 	}
 }
@@ -79,6 +89,11 @@ func (s *Streamer) Stream(ctx context.Context) {
 // sendAllAvailable reads data from the streamable and sends it to the client until no more data is available.
 func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 	for {
+		// blocking wait for the streamer's rate limit to have available capacity
+		if err := s.checkRateLimit(ctx); err != nil {
+			return fmt.Errorf("error waiting for response capacity: %w", err)
+		}
+
 		response, err := s.sub.Next(ctx)
 
 		if err != nil {
@@ -101,4 +116,15 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 			return err
 		}
 	}
+}
+
+// checkRateLimit checks the stream's rate limit and blocks until there is room to send a response.
+// An error is returned if the context is canceled or the expected wait time exceeds the context's
+// deadline.
+func (s *Streamer) checkRateLimit(ctx context.Context) error {
+	if s.limiter == nil {
+		return nil
+	}
+
+	return s.limiter.WaitN(ctx, 1)
 }
