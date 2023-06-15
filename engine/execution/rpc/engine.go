@@ -27,6 +27,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+const DefaultMaxBlockRange = 250
+
 // Config defines the configurable options for the gRPC server.
 type Config struct {
 	ListenAddr        string
@@ -98,6 +100,7 @@ func New(
 			transactionResults:   txResults,
 			commits:              commits,
 			log:                  log,
+			maxBlockRange:        DefaultMaxBlockRange,
 		},
 		server: server,
 		config: config,
@@ -157,6 +160,7 @@ type handler struct {
 	transactionResults   storage.TransactionResults
 	log                  zerolog.Logger
 	commits              storage.Commits
+	maxBlockRange        int
 }
 
 var _ execution.ExecutionAPIServer = &handler{}
@@ -174,6 +178,14 @@ func (h *handler) ExecuteScriptAtBlockID(
 	blockID, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
 		return nil, err
+	}
+
+	// return a more user friendly error if block does not exist
+	if _, err = h.headers.ByBlockID(blockID); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "block %s not found", blockID)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get header for block: %v", err)
 	}
 
 	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
@@ -227,6 +239,22 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	eType, err := convert.EventType(reqEvent)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(blockIDs) > h.maxBlockRange {
+		return nil, status.Errorf(codes.InvalidArgument, "too many block IDs requested")
+	}
+
+	// make sure all blocks exist first to fail fast and avoid unused lookups
+	// must verify block exists first, since ByBlockID* calls on sets like events or commits will
+	// return an empty slice if block does not exist
+	for _, blockID := range flowBlockIDs {
+		if _, err = h.headers.ByBlockID(blockID); err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, status.Errorf(codes.NotFound, "block %s not found", blockID)
+			}
+			return nil, status.Errorf(codes.Internal, "failed to get header for block: %v", err)
+		}
 	}
 
 	results := make([]*execution.GetEventsForBlockIDsResponse_Result, len(blockIDs))
@@ -394,6 +422,15 @@ func (h *handler) GetTransactionResultsByBlockID(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
+	// must verify block exists first, since transactionResults.ByBlockID will return an empty slice
+	// if block does not exist
+	if _, err = h.headers.ByBlockID(blockID); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "block %s not found", blockID)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get header for block: %v", err)
+	}
+
 	// Get all tx results
 	txResults, err := h.transactionResults.ByBlockID(blockID)
 	if err != nil {
@@ -496,6 +533,14 @@ func (h *handler) GetAccountAtBlockID(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
+	// return a more user friendly error if block does not exist
+	if _, err = h.headers.ByBlockID(blockFlowID); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "block %s not found", blockFlowID)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get header for block: %v", err)
+	}
+
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
 	if errors.Is(err, storage.ErrNotFound) {
 		return nil, status.Errorf(codes.NotFound, "account with address %s not found", flowAddress)
@@ -540,7 +585,10 @@ func (h *handler) GetLatestBlockHeader(
 		header, err = h.state.Final().Head()
 	}
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
+		// this header MUST exist in the db, otherwise the node likely has inconsistent state.
+		// Don't crash as a result of an external API request, but other components will likely panic.
+		h.log.Err(err).Msg("unable to get latest block header")
+		return nil, status.Errorf(codes.Internal, "unable to get latest header: %v", err)
 	}
 
 	return h.blockHeaderResponse(header)
