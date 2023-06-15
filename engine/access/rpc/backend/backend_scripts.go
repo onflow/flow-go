@@ -123,8 +123,15 @@ func (b *backendScripts) executeScriptOnExecutor(
 	if len(b.archiveAddressList) > 0 {
 		startTime := time.Now()
 		for _, rnAddr := range b.archiveAddressList {
-			result, err := b.tryExecuteScriptOnExecutionNode(ctx, rnAddr, blockID, script, arguments)
+			result, err := b.tryExecuteScriptOnArchiveNode(ctx, rnAddr, blockID, script, arguments)
 			if err == nil {
+				b.log.Debug().Err(err).
+					Str("script_executor_addr", rnAddr).
+					Hex("block_id", blockID[:]).
+					Hex("script_hash", insecureScriptHash[:]).
+					Str("script", string(script)).
+					Msg("script executed on the archive node")
+				return nil, err
 				// log execution time
 				b.metrics.ScriptExecuted(
 					time.Since(startTime),
@@ -138,7 +145,7 @@ func (b *backendScripts) executeScriptOnExecutor(
 					Hex("block_id", blockID[:]).
 					Hex("script_hash", insecureScriptHash[:]).
 					Str("script", string(script)).
-					Msg("script failed to execute on the execution node")
+					Msg("script failed to execute on the archive node")
 				return nil, err
 			}
 		}
