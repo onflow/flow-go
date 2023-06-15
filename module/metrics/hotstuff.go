@@ -294,9 +294,9 @@ func (hc *HotstuffCollector) PayloadProductionDuration(duration time.Duration) {
 	hc.payloadProductionDuration.Observe(duration.Seconds()) // unit: seconds; with float64 precision
 }
 
-	// TimeoutCollectorsRange collects information from the node's `TimeoutAggregator` component.
-	// Specifically, it measurers the number of views for which we are currently collecting timeouts
-	// (i.e. the number of `TimeoutCollector` instances we are maintaining) and their lowest/highest view.
+// TimeoutCollectorsRange collects information from the node's `TimeoutAggregator` component.
+// Specifically, it measurers the number of views for which we are currently collecting timeouts
+// (i.e. the number of `TimeoutCollector` instances we are maintaining) and their lowest/highest view.
 func (hc *HotstuffCollector) TimeoutCollectorsRange(lowestRetainedView uint64, newestViewCreatedCollector uint64, activeCollectors int) {
 	hc.timeoutCollectorsRange.WithLabelValues("lowest_view_of_active_timeout_collectors").Set(float64(lowestRetainedView))
 	hc.timeoutCollectorsRange.WithLabelValues("newest_view_of_active_timeout_collectors").Set(float64(newestViewCreatedCollector))
