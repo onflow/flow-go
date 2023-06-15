@@ -77,10 +77,12 @@ func (t *TimeoutCollectors) GetOrCreateCollector(view uint64) (hotstuff.TimeoutC
 	if t.newestViewCachedCollector < view {
 		t.newestViewCachedCollector = view
 	}
+	lowestRetainedView := t.lowestRetainedView
+	numCollectors := len(t.collectors)
+	newestViewCachedCollector := t.newestViewCachedCollector
 	t.lock.Unlock()
 
-	// report metrics outside lock and accept the fact that we might report not the same value observed in critical section.
-	t.metrics.TimeoutCollectorsRange(t.lowestRetainedView, t.newestViewCachedCollector, len(t.collectors))
+	t.metrics.TimeoutCollectorsRange(lowestRetainedView, newestViewCachedCollector, numCollectors)
 	t.log.Info().Uint64("view", view).Msg("timeout collector has been created")
 	return collector, true, nil
 }
@@ -135,9 +137,10 @@ func (t *TimeoutCollectors) PruneUpToView(lowestRetainedView uint64) {
 	from := t.lowestRetainedView
 	t.lowestRetainedView = lowestRetainedView
 	numCollectors := len(t.collectors)
+	newestViewCachedCollector := t.newestViewCachedCollector
 	t.lock.Unlock()
 
-	t.metrics.TimeoutCollectorsRange(lowestRetainedView, t.newestViewCachedCollector, numCollectors)
+	t.metrics.TimeoutCollectorsRange(lowestRetainedView, newestViewCachedCollector, numCollectors)
 	t.log.Debug().
 		Uint64("prior_lowest_retained_view", from).
 		Uint64("lowest_retained_view", lowestRetainedView).
