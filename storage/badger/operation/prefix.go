@@ -30,9 +30,10 @@ const (
 	codeSealedHeight            = 21 // latest sealed block height
 	codeClusterHeight           = 22 // latest finalized height on cluster
 	codeExecutedBlock           = 23 // latest executed block with max height
-	codeRootHeight              = 24 // the height of the highest block contained in the root snapshot
+	codeFinalizedRootHeight     = 24 // the height of the highest finalized block contained in the root snapshot
 	codeLastCompleteBlockHeight = 25 // the height of the last block for which all collections were received
 	codeEpochFirstHeight        = 26 // the height of the first block in a given epoch
+	codeSealedRootHeight        = 27 // the height of the highest sealed block contained in the root snapshot
 
 	// codes for single entity storage
 	// 31 was used for identities before epochs
@@ -56,23 +57,23 @@ const (
 
 	// codes for indexing multiple identifiers by identifier
 	// NOTE: 51 was used for identity indexes before epochs
-	codeBlockChildren       = 50 // index mapping block ID to children blocks
-	codePayloadGuarantees   = 52 // index mapping block ID to payload guarantees
-	codePayloadSeals        = 53 // index mapping block ID to payload seals
-	codeCollectionBlock     = 54 // index mapping collection ID to block ID
-	codeOwnBlockReceipt     = 55 // index mapping block ID to execution receipt ID for execution nodes
-	codeBlockEpochStatus    = 56 // index mapping block ID to epoch status
-	codePayloadReceipts     = 57 // index mapping block ID  to payload receipts
-	codePayloadResults      = 58 // index mapping block ID to payload results
-	codeAllBlockReceipts    = 59 // index mapping of blockID to multiple receipts
-	codeIndexBlockByChunkID = 60 // index mapping chunk ID to block ID
+	codeBlockChildren     = 50 // index mapping block ID to children blocks
+	codePayloadGuarantees = 52 // index mapping block ID to payload guarantees
+	codePayloadSeals      = 53 // index mapping block ID to payload seals
+	codeCollectionBlock   = 54 // index mapping collection ID to block ID
+	codeOwnBlockReceipt   = 55 // index mapping block ID to execution receipt ID for execution nodes
+	codeBlockEpochStatus  = 56 // index mapping block ID to epoch status
+	codePayloadReceipts   = 57 // index mapping block ID  to payload receipts
+	codePayloadResults    = 58 // index mapping block ID to payload results
+	codeAllBlockReceipts  = 59 // index mapping of blockID to multiple receipts
 
-	// codes related to epoch information
+	// codes related to protocol level information
 	codeEpochSetup       = 61 // EpochSetup service event, keyed by ID
 	codeEpochCommit      = 62 // EpochCommit service event, keyed by ID
 	codeBeaconPrivateKey = 63 // BeaconPrivateKey, keyed by epoch counter
 	codeDKGStarted       = 64 // flag that the DKG for an epoch has been started
 	codeDKGEnded         = 65 // flag that the DKG for an epoch has ended (stores end state)
+	codeVersionBeacon    = 67 // flag for storing version beacons
 
 	// code for ComputationResult upload status storage
 	// NOTE: for now only GCP uploader is supported. When other uploader (AWS e.g.) needs to

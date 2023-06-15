@@ -46,5 +46,15 @@ type Engine interface {
 // (including invalid message types, malformed messages, etc.). Because of this,
 // node-internal messages should NEVER be submitted to a component using Process.
 type MessageProcessor interface {
+	// Process is exposed by engines to accept messages from the networking layer.
+	// Implementations of Process should be non-blocking. In general, Process should
+	// only queue the message internally by the engine for later async processing.
+	//
+	// TODO: This function should not return an error.
+	//  The networking layer's responsibility is fulfilled once it delivers a message to an engine.
+	//  It does not possess the context required to handle errors that may arise during an engine's processing
+	//  of the message, as error handling for message processing falls outside the domain of the networking layer.
+	//  Consequently, it is reasonable to remove the error from the Process function's signature,
+	//  since returning an error to the networking layer would not be useful in this context.
 	Process(channel channels.Channel, originID flow.Identifier, message interface{}) error
 }

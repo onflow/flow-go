@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/utils"
-
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -113,14 +113,16 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 		metrics.NewNoopCollector(),
 		cfg)
 	require.NoError(t, err)
-
-	thisNode, _ := p2ptest.NodeFixture(
+	idProvider := mockmodule.NewIdentityProvider(t)
+	thisNode, identity := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithConnectionManager(thisConnMgr))
+	idProvider.On("ByPeerID", thisNode.Host().ID()).Return(&identity, true).Maybe()
 
-	otherNodes, _ := p2ptest.NodesFixture(t, sporkId, t.Name(), 5)
+	otherNodes, _ := p2ptest.NodesFixture(t, sporkId, t.Name(), 5, idProvider)
 
 	nodes := append(otherNodes, thisNode)
 

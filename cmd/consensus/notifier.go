@@ -17,11 +17,9 @@ func createLogger(log zerolog.Logger, chainID flow.ChainID) zerolog.Logger {
 
 // createNotifier creates a pubsub distributor and connects it to consensus consumers.
 func createNotifier(log zerolog.Logger, metrics module.HotstuffMetrics) *pubsub.Distributor {
-	telemetryConsumer := notifications.NewTelemetryConsumer(log)
 	metricsConsumer := metricsconsumer.NewMetricsConsumer(metrics)
 	logsConsumer := notifications.NewLogConsumer(log)
 	dis := pubsub.NewDistributor()
-	dis.AddConsumer(telemetryConsumer)
 	dis.AddConsumer(metricsConsumer)
 	dis.AddConsumer(logsConsumer)
 	return dis

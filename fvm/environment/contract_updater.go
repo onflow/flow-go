@@ -10,7 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -80,12 +80,12 @@ type ContractUpdater interface {
 }
 
 type ParseRestrictedContractUpdater struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 	impl     ContractUpdater
 }
 
 func NewParseRestrictedContractUpdater(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	impl ContractUpdater,
 ) ParseRestrictedContractUpdater {
 	return ParseRestrictedContractUpdater{

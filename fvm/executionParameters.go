@@ -12,10 +12,20 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/state"
 )
+
+func ProcedureStateParameters(
+	ctx Context,
+	proc Procedure,
+) state.StateParameters {
+	return state.DefaultParameters().
+		WithMeterParameters(getBasicMeterParameters(ctx, proc)).
+		WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
+		WithMaxValueSizeAllowed(ctx.MaxStateValueSize)
+}
 
 // getBasicMeterParameters returns the set of meter parameters used for
 // general procedure execution.  Subparts of the procedure execution may
@@ -45,7 +55,7 @@ func getBasicMeterParameters(
 func getBodyMeterParameters(
 	ctx Context,
 	proc Procedure,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) (
 	meter.MeterParameters,
 	error,
@@ -84,12 +94,12 @@ func getBodyMeterParameters(
 
 type MeterParamOverridesComputer struct {
 	ctx      Context
-	txnState storage.Transaction
+	txnState storage.TransactionPreparer
 }
 
 func NewMeterParamOverridesComputer(
 	ctx Context,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) MeterParamOverridesComputer {
 	return MeterParamOverridesComputer{
 		ctx:      ctx,
@@ -98,7 +108,7 @@ func NewMeterParamOverridesComputer(
 }
 
 func (computer MeterParamOverridesComputer) Compute(
-	_ state.NestedTransaction,
+	_ state.NestedTransactionPreparer,
 	_ struct{},
 ) (
 	derived.MeterParamOverrides,

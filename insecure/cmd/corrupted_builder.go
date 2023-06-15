@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -70,25 +70,23 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
 		}
 
-		uniCfg := &p2pbuilder.UnicastConfig{
+		uniCfg := &p2pconfig.UnicastConfig{
 			StreamRetryInterval:    cnb.UnicastCreateStreamRetryDelay,
 			RateLimiterDistributor: cnb.UnicastRateLimiterDistributor,
 		}
 
-		connGaterCfg := &p2pbuilder.ConnectionGaterConfig{
+		connGaterCfg := &p2pconfig.ConnectionGaterConfig{
 			InterceptPeerDialFilters: []p2p.PeerFilter{}, // disable connection gater onInterceptPeerDialFilters
 			InterceptSecuredFilters:  []p2p.PeerFilter{}, // disable connection gater onInterceptSecuredFilters
 		}
 
-		peerManagerCfg := &p2pbuilder.PeerManagerConfig{
+		peerManagerCfg := &p2pconfig.PeerManagerConfig{
 			ConnectionPruning: cnb.NetworkConnectionPruning,
 			UpdateInterval:    cnb.PeerUpdateInterval,
 		}
 
-		cnb.GossipSubInspectorNotifDistributor = cmd.BuildGossipsubRPCValidationInspectorNotificationDisseminator(cnb.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize, cnb.MetricsRegisterer, cnb.Logger, cnb.MetricsEnabled)
-
 		// create default libp2p factory if corrupt node should enable the topic validator
-		libP2PNodeFactory := corruptlibp2p.NewCorruptLibP2PNodeFactory(
+		corruptLibp2pNode, err := corruptlibp2p.InitCorruptLibp2pNode(
 			cnb.Logger,
 			cnb.RootChainID,
 			myAddr,
@@ -107,19 +105,17 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			cnb.WithPubSubMessageSigning,
 			cnb.WithPubSubStrictSignatureVerification,
 		)
-
-		libp2pNode, err := libP2PNodeFactory()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p node: %w", err)
 		}
-		cnb.LibP2PNode = libp2pNode
+		cnb.LibP2PNode = corruptLibp2pNode
 		cnb.Logger.Info().
 			Hex("node_id", logging.ID(cnb.NodeID)).
 			Str("address", myAddr).
 			Bool("topic_validator_disabled", cnb.TopicValidatorDisabled).
 			Msg("corrupted libp2p node initialized")
 
-		return libp2pNode, nil
+		return corruptLibp2pNode, nil
 	})
 	cnb.FlowNodeBuilder.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		myAddr := cnb.FlowNodeBuilder.NodeConfig.Me.Address()

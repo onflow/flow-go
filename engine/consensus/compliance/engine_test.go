@@ -70,7 +70,6 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		for i := 0; i < blockCount; i++ {
 			block := unittest.BlockWithParentFixture(cs.head)
 			proposal := messages.NewBlockProposal(block)
-			cs.headerDB[block.Header.ParentID] = cs.head
 			hotstuffProposal := model.ProposalFromFlow(block.Header)
 			cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 			cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
@@ -89,8 +88,6 @@ func (cs *EngineSuite) TestSubmittingMultipleEntries() {
 		block := unittest.BlockWithParentFixture(cs.head)
 		proposal := unittest.ProposalFromBlock(block)
 
-		// store the data for retrieval
-		cs.headerDB[block.Header.ParentID] = cs.head
 		hotstuffProposal := model.ProposalFromFlow(block.Header)
 		cs.hotstuff.On("SubmitProposal", hotstuffProposal).Return().Once()
 		cs.voteAggregator.On("AddBlock", hotstuffProposal).Once()
@@ -128,6 +125,7 @@ func (cs *EngineSuite) TestOnFinalizedBlock() {
 		Run(func(_ mock.Arguments) { wg.Done() }).
 		Return(uint(0)).Once()
 
-	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock))
+	err := cs.engine.processOnFinalizedBlock(model.BlockFromFlow(finalizedBlock))
+	require.NoError(cs.T(), err)
 	unittest.AssertReturnsBefore(cs.T(), wg.Wait, time.Second, "an expected call to block buffer wasn't made")
 }

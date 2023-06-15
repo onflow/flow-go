@@ -29,7 +29,6 @@ import (
 // NOTE: the epoch-related callbacks are only called once the fork containing
 // the relevant event has been finalized.
 type Consumer interface {
-
 	// BlockFinalized is called when a block is finalized.
 	// Formally, this callback is informationally idempotent. I.e. the consumer
 	// of this callback must handle repeated calls for the same block.

@@ -256,7 +256,8 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	}
 
 	return &execution.GetEventsForBlockIDsResponse{
-		Results: results,
+		Results:              results,
+		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -316,9 +317,10 @@ func (h *handler) GetTransactionResult(
 
 	// compose a response with the events and the transaction error
 	return &execution.GetTransactionResultResponse{
-		StatusCode:   statusCode,
-		ErrorMessage: errMsg,
-		Events:       events,
+		StatusCode:           statusCode,
+		ErrorMessage:         errMsg,
+		Events:               events,
+		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -374,9 +376,10 @@ func (h *handler) GetTransactionResultByIndex(
 
 	// compose a response with the events and the transaction error
 	return &execution.GetTransactionResultResponse{
-		StatusCode:   statusCode,
-		ErrorMessage: errMsg,
-		Events:       events,
+		StatusCode:           statusCode,
+		ErrorMessage:         errMsg,
+		Events:               events,
+		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -444,15 +447,17 @@ func (h *handler) GetTransactionResultsByBlockID(
 		events := convert.EventsToMessages(eventsByTxIndex[txIndex])
 
 		responseTxResults[index] = &execution.GetTransactionResultResponse{
-			StatusCode:   statusCode,
-			ErrorMessage: errMsg,
-			Events:       events,
+			StatusCode:           statusCode,
+			ErrorMessage:         errMsg,
+			Events:               events,
+			EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
 		}
 	}
 
 	// compose a response
 	return &execution.GetTransactionResultsResponse{
-		TransactionResults: responseTxResults,
+		TransactionResults:   responseTxResults,
+		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 

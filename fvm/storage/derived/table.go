@@ -6,19 +6,21 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/errors"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
 )
 
 // ValueComputer is used by DerivedDataTable's GetOrCompute to compute the
 // derived value when the value is not in DerivedDataTable (i.e., "cache miss").
 type ValueComputer[TKey any, TVal any] interface {
-	Compute(txnState state.NestedTransaction, key TKey) (TVal, error)
+	Compute(txnState state.NestedTransactionPreparer, key TKey) (TVal, error)
 }
 
 type invalidatableEntry[TVal any] struct {
-	Value             TVal                     // immutable after initialization.
-	ExecutionSnapshot *state.ExecutionSnapshot // immutable after initialization.
+	Value             TVal                        // immutable after initialization.
+	ExecutionSnapshot *snapshot.ExecutionSnapshot // immutable after initialization.
 
 	isInvalid bool // Guarded by DerivedDataTable' lock.
 }
@@ -77,29 +79,17 @@ type TableTransaction[TKey comparable, TVal any] struct {
 	invalidators              chainedTableInvalidators[TKey, TVal]
 }
 
-func newEmptyTable[TKey comparable, TVal any](
-	latestCommit logical.Time,
-) *DerivedDataTable[TKey, TVal] {
-	return &DerivedDataTable[TKey, TVal]{
-		items:                     map[TKey]*invalidatableEntry[TVal]{},
-		latestCommitExecutionTime: latestCommit,
-		invalidators:              nil,
-	}
-}
-
-func NewEmptyTable[TKey comparable, TVal any]() *DerivedDataTable[TKey, TVal] {
-	return newEmptyTable[TKey, TVal](logical.ParentBlockTime)
-}
-
-// This variant is needed by the chunk verifier, which does not start at the
-// beginning of the block.
-func NewEmptyTableWithOffset[
+func NewEmptyTable[
 	TKey comparable,
 	TVal any,
 ](
-	offset uint32,
+	initialSnapshotTime logical.Time,
 ) *DerivedDataTable[TKey, TVal] {
-	return newEmptyTable[TKey, TVal](logical.Time(offset) - 1)
+	return &DerivedDataTable[TKey, TVal]{
+		items:                     map[TKey]*invalidatableEntry[TVal]{},
+		latestCommitExecutionTime: initialSnapshotTime - 1,
+		invalidators:              nil,
+	}
 }
 
 func (table *DerivedDataTable[TKey, TVal]) NewChildTable() *DerivedDataTable[TKey, TVal] {
@@ -177,16 +167,16 @@ func (table *DerivedDataTable[TKey, TVal]) get(
 
 func (table *DerivedDataTable[TKey, TVal]) unsafeValidate(
 	txn *TableTransaction[TKey, TVal],
-) RetryableError {
+) error {
 	if txn.isSnapshotReadTransaction &&
 		txn.invalidators.ShouldInvalidateEntries() {
 
-		return newNotRetryableError(
+		return fmt.Errorf(
 			"invalid TableTransaction: snapshot read can't invalidate")
 	}
 
 	if table.latestCommitExecutionTime >= txn.executionTime {
-		return newNotRetryableError(
+		return fmt.Errorf(
 			"invalid TableTransaction: non-increasing time (%v >= %v)",
 			table.latestCommitExecutionTime,
 			txn.executionTime)
@@ -194,8 +184,15 @@ func (table *DerivedDataTable[TKey, TVal]) unsafeValidate(
 
 	for _, entry := range txn.readSet {
 		if entry.isInvalid {
-			return newRetryableError(
-				"invalid TableTransactions. outdated read set")
+			if txn.snapshotTime == txn.executionTime {
+				// This should never happen since the transaction is
+				// sequentially executed.
+				return fmt.Errorf(
+					"invalid TableTransaction: unrecoverable outdated read set")
+			}
+
+			return errors.NewRetryableConflictError(
+				"invalid TableTransaction: outdated read set")
 		}
 	}
 
@@ -208,8 +205,16 @@ func (table *DerivedDataTable[TKey, TVal]) unsafeValidate(
 				entry.Value,
 				entry.ExecutionSnapshot) {
 
-				return newRetryableError(
-					"invalid TableTransactions. outdated write set")
+				if txn.snapshotTime == txn.executionTime {
+					// This should never happen since the transaction is
+					// sequentially executed.
+					return fmt.Errorf(
+						"invalid TableTransaction: unrecoverable outdated " +
+							"write set")
+				}
+
+				return errors.NewRetryableConflictError(
+					"invalid TableTransaction: outdated write set")
 			}
 		}
 	}
@@ -221,7 +226,7 @@ func (table *DerivedDataTable[TKey, TVal]) unsafeValidate(
 
 func (table *DerivedDataTable[TKey, TVal]) validate(
 	txn *TableTransaction[TKey, TVal],
-) RetryableError {
+) error {
 	table.lock.RLock()
 	defer table.lock.RUnlock()
 
@@ -230,15 +235,14 @@ func (table *DerivedDataTable[TKey, TVal]) validate(
 
 func (table *DerivedDataTable[TKey, TVal]) commit(
 	txn *TableTransaction[TKey, TVal],
-) RetryableError {
+) error {
 	table.lock.Lock()
 	defer table.lock.Unlock()
 
-	if table.latestCommitExecutionTime+1 < txn.snapshotTime &&
-		(!txn.isSnapshotReadTransaction ||
-			txn.snapshotTime != logical.EndOfBlockExecutionTime) {
+	if !txn.isSnapshotReadTransaction &&
+		table.latestCommitExecutionTime+1 < txn.snapshotTime {
 
-		return newNotRetryableError(
+		return fmt.Errorf(
 			"invalid TableTransaction: missing commit range [%v, %v)",
 			table.latestCommitExecutionTime+1,
 			txn.snapshotTime)
@@ -249,6 +253,12 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 	err := table.unsafeValidate(txn)
 	if err != nil {
 		return err
+	}
+
+	// Don't perform actual commit for snapshot read transaction.  This is
+	// safe since all values are derived from the primary source.
+	if txn.isSnapshotReadTransaction {
+		return nil
 	}
 
 	for key, entry := range txn.writeSet {
@@ -280,26 +290,43 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 			txn.invalidators...)
 	}
 
-	// NOTE: We cannot advance commit time when we encounter a snapshot read
-	// (aka script) transaction since these transactions don't generate new
-	// snapshots.  It is safe to commit the entries since snapshot read
-	// transactions never invalidate entries.
-	if !txn.isSnapshotReadTransaction {
-		table.latestCommitExecutionTime = txn.executionTime
-	}
+	table.latestCommitExecutionTime = txn.executionTime
 	return nil
 }
 
 func (table *DerivedDataTable[TKey, TVal]) newTableTransaction(
-	upperBoundExecutionTime logical.Time,
 	snapshotTime logical.Time,
 	executionTime logical.Time,
 	isSnapshotReadTransaction bool,
+) *TableTransaction[TKey, TVal] {
+	return &TableTransaction[TKey, TVal]{
+		table:                     table,
+		snapshotTime:              snapshotTime,
+		executionTime:             executionTime,
+		toValidateTime:            snapshotTime,
+		readSet:                   map[TKey]*invalidatableEntry[TVal]{},
+		writeSet:                  map[TKey]*invalidatableEntry[TVal]{},
+		isSnapshotReadTransaction: isSnapshotReadTransaction,
+	}
+}
+
+func (table *DerivedDataTable[TKey, TVal]) NewSnapshotReadTableTransaction() *TableTransaction[TKey, TVal] {
+	return table.newTableTransaction(
+		logical.EndOfBlockExecutionTime,
+		logical.EndOfBlockExecutionTime,
+		true)
+}
+
+func (table *DerivedDataTable[TKey, TVal]) NewTableTransaction(
+	snapshotTime logical.Time,
+	executionTime logical.Time,
 ) (
 	*TableTransaction[TKey, TVal],
 	error,
 ) {
-	if executionTime < 0 || executionTime > upperBoundExecutionTime {
+	if executionTime < 0 ||
+		executionTime > logical.LargestNormalTransactionExecutionTime {
+
 		return nil, fmt.Errorf(
 			"invalid TableTransactions: execution time out of bound: %v",
 			executionTime)
@@ -312,49 +339,16 @@ func (table *DerivedDataTable[TKey, TVal]) newTableTransaction(
 			executionTime)
 	}
 
-	return &TableTransaction[TKey, TVal]{
-		table:                     table,
-		snapshotTime:              snapshotTime,
-		executionTime:             executionTime,
-		toValidateTime:            snapshotTime,
-		readSet:                   map[TKey]*invalidatableEntry[TVal]{},
-		writeSet:                  map[TKey]*invalidatableEntry[TVal]{},
-		isSnapshotReadTransaction: isSnapshotReadTransaction,
-	}, nil
-}
-
-func (table *DerivedDataTable[TKey, TVal]) NewSnapshotReadTableTransaction(
-	snapshotTime logical.Time,
-	executionTime logical.Time,
-) (
-	*TableTransaction[TKey, TVal],
-	error,
-) {
 	return table.newTableTransaction(
-		logical.LargestSnapshotReadTransactionExecutionTime,
 		snapshotTime,
 		executionTime,
-		true)
-}
-
-func (table *DerivedDataTable[TKey, TVal]) NewTableTransaction(
-	snapshotTime logical.Time,
-	executionTime logical.Time,
-) (
-	*TableTransaction[TKey, TVal],
-	error,
-) {
-	return table.newTableTransaction(
-		logical.LargestNormalTransactionExecutionTime,
-		snapshotTime,
-		executionTime,
-		false)
+		false), nil
 }
 
 // Note: use GetOrCompute instead of Get/Set whenever possible.
 func (txn *TableTransaction[TKey, TVal]) get(key TKey) (
 	TVal,
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	bool,
 ) {
 
@@ -380,7 +374,7 @@ func (txn *TableTransaction[TKey, TVal]) get(key TKey) (
 
 func (txn *TableTransaction[TKey, TVal]) GetForTestingOnly(key TKey) (
 	TVal,
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	bool,
 ) {
 	return txn.get(key)
@@ -389,7 +383,7 @@ func (txn *TableTransaction[TKey, TVal]) GetForTestingOnly(key TKey) (
 func (txn *TableTransaction[TKey, TVal]) set(
 	key TKey,
 	value TVal,
-	snapshot *state.ExecutionSnapshot,
+	snapshot *snapshot.ExecutionSnapshot,
 ) {
 	txn.writeSet[key] = &invalidatableEntry[TVal]{
 		Value:             value,
@@ -405,7 +399,7 @@ func (txn *TableTransaction[TKey, TVal]) set(
 func (txn *TableTransaction[TKey, TVal]) SetForTestingOnly(
 	key TKey,
 	value TVal,
-	snapshot *state.ExecutionSnapshot,
+	snapshot *snapshot.ExecutionSnapshot,
 ) {
 	txn.set(key, value, snapshot)
 }
@@ -418,7 +412,7 @@ func (txn *TableTransaction[TKey, TVal]) SetForTestingOnly(
 // Note: valFunc must be an idempotent function and it must not modify
 // txnState's values.
 func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	key TKey,
 	computer ValueComputer[TKey, TVal],
 ) (
@@ -478,11 +472,11 @@ func (txn *TableTransaction[TKey, TVal]) AddInvalidator(
 		})
 }
 
-func (txn *TableTransaction[TKey, TVal]) Validate() RetryableError {
+func (txn *TableTransaction[TKey, TVal]) Validate() error {
 	return txn.table.validate(txn)
 }
 
-func (txn *TableTransaction[TKey, TVal]) Commit() RetryableError {
+func (txn *TableTransaction[TKey, TVal]) Commit() error {
 	return txn.table.commit(txn)
 }
 

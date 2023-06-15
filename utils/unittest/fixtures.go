@@ -22,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/testutils"
@@ -334,8 +334,8 @@ func WithoutGuarantee(payload *flow.Payload) {
 	payload.Guarantees = nil
 }
 
-func StateInteractionsFixture() *state.ExecutionSnapshot {
-	return &state.ExecutionSnapshot{}
+func StateInteractionsFixture() *snapshot.ExecutionSnapshot {
+	return &snapshot.ExecutionSnapshot{}
 }
 
 func BlockWithParentAndProposerFixture(
@@ -490,6 +490,20 @@ func ClusterBlockFixture() cluster.Block {
 		Header:  header,
 		Payload: payload,
 	}
+}
+
+func ClusterBlockChainFixture(n int) []cluster.Block {
+	clusterBlocks := make([]cluster.Block, 0, n)
+
+	parent := ClusterBlockFixture()
+
+	for i := 0; i < n; i++ {
+		block := ClusterBlockWithParent(&parent)
+		clusterBlocks = append(clusterBlocks, block)
+		parent = block
+	}
+
+	return clusterBlocks
 }
 
 // ClusterBlockWithParent creates a new cluster consensus block that is valid
@@ -791,6 +805,12 @@ func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionRes
 		for _, chunk := range result.Chunks {
 			chunk.BlockID = blockID
 		}
+	}
+}
+
+func WithFinalState(commit flow.StateCommitment) func(*flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.Chunks[len(result.Chunks)-1].EndState = commit
 	}
 }
 
@@ -1982,14 +2002,31 @@ func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 	return commit
 }
 
-func VersionBeaconFixture() *flow.VersionBeacon {
+func WithBoundaries(boundaries ...flow.VersionBoundary) func(*flow.VersionBeacon) {
+	return func(b *flow.VersionBeacon) {
+		b.VersionBoundaries = append(b.VersionBoundaries, boundaries...)
+	}
+}
+
+func VersionBeaconFixture(options ...func(*flow.VersionBeacon)) *flow.VersionBeacon {
+
 	versionTable := &flow.VersionBeacon{
-		VersionBoundaries: []flow.VersionBoundary{
-			{
-				Version: "0.0.0",
-			},
-		},
-		Sequence: uint64(0),
+		VersionBoundaries: []flow.VersionBoundary{},
+		Sequence:          uint64(0),
+	}
+	opts := options
+
+	if len(opts) == 0 {
+		opts = []func(*flow.VersionBeacon){
+			WithBoundaries(flow.VersionBoundary{
+				Version:     "0.0.0",
+				BlockHeight: 0,
+			}),
+		}
+	}
+
+	for _, apply := range opts {
+		apply(versionTable)
 	}
 
 	return versionTable
@@ -2001,8 +2038,16 @@ func BootstrapFixture(
 	participants flow.IdentityList,
 	opts ...func(*flow.Block),
 ) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+	return BootstrapFixtureWithChainID(participants, flow.Emulator, opts...)
+}
 
-	root := GenesisFixture()
+func BootstrapFixtureWithChainID(
+	participants flow.IdentityList,
+	chainID flow.ChainID,
+	opts ...func(*flow.Block),
+) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+
+	root := flow.Genesis(chainID)
 	for _, apply := range opts {
 		apply(root)
 	}
@@ -2020,7 +2065,8 @@ func BootstrapFixture(
 		WithDKGFromParticipants(participants),
 	)
 
-	result := BootstrapExecutionResultFixture(root, GenesisStateCommitment)
+	stateCommit := GenesisStateCommitmentByChainID(chainID)
+	result := BootstrapExecutionResultFixture(root, stateCommit)
 	result.ServiceEvents = []flow.ServiceEvent{
 		setup.ServiceEvent(),
 		commit.ServiceEvent(),
@@ -2037,7 +2083,15 @@ func RootSnapshotFixture(
 	participants flow.IdentityList,
 	opts ...func(*flow.Block),
 ) *inmem.Snapshot {
-	block, result, seal := BootstrapFixture(participants.Sort(order.Canonical), opts...)
+	return RootSnapshotFixtureWithChainID(participants, flow.Emulator, opts...)
+}
+
+func RootSnapshotFixtureWithChainID(
+	participants flow.IdentityList,
+	chainID flow.ChainID,
+	opts ...func(*flow.Block),
+) *inmem.Snapshot {
+	block, result, seal := BootstrapFixtureWithChainID(participants.Sort(order.Canonical), chainID, opts...)
 	qc := QuorumCertificateFixture(QCWithRootBlockID(block.ID()))
 	root, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 	if err != nil {

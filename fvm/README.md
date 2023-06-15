@@ -11,7 +11,7 @@ functionality required by the Flow protocol.
 import (
     "github.com/onflow/cadence/runtime"
     "github.com/onflow/flow-go/fvm"
-    "github.com/onflow/flow-go/fvm/state"
+    "github.com/onflow/flow-go/fvm/storage/state"
     "github.com/onflow/flow-go/model/flow"
 )
 
@@ -26,7 +26,7 @@ ledger := state.NewMapLedger()
 txIndex := uint32(0)
 txProc := fvm.Transaction(tx, txIndex)
 
-err := vm.Run(ctx, txProc, ledger)
+executionSnapshot, output, err := vm.Run(ctx, txProc, ledger)
 if err != nil {
   panic("fatal error during transaction procedure!")
 }

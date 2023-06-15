@@ -29,7 +29,6 @@ func TestEntityByID(t *testing.T) {
 	request := Engine{
 		unit:  engine.NewUnit(),
 		items: make(map[flow.Identifier]*Item),
-		rng:   rand.New(rand.NewSource(0)),
 	}
 
 	now := time.Now().UTC()
@@ -136,7 +135,6 @@ func TestDispatchRequestVarious(t *testing.T) {
 		items:    items,
 		requests: make(map[uint64]*messages.EntityRequest),
 		selector: filter.HasNodeID(targetID),
-		rng:      rand.New(rand.NewSource(0)),
 	}
 	dispatched, err := request.dispatchRequest()
 	require.NoError(t, err)
@@ -213,7 +211,6 @@ func TestDispatchRequestBatchSize(t *testing.T) {
 		items:    items,
 		requests: make(map[uint64]*messages.EntityRequest),
 		selector: filter.Any,
-		rng:      rand.New(rand.NewSource(0)),
 	}
 	dispatched, err := request.dispatchRequest()
 	require.NoError(t, err)
@@ -293,7 +290,6 @@ func TestOnEntityResponseValid(t *testing.T) {
 				close(done)
 			}
 		},
-		rng: rand.New(rand.NewSource(0)),
 	}
 
 	request.items[iwanted1.EntityID] = iwanted1
@@ -377,7 +373,6 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 		selector: filter.HasNodeID(targetID),
 		create:   func() flow.Entity { return &flow.Collection{} },
 		handle:   func(flow.Identifier, flow.Entity) { close(called) },
-		rng:      rand.New(rand.NewSource(0)),
 	}
 
 	request.items[iwanted.EntityID] = iwanted

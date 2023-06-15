@@ -31,13 +31,15 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
@@ -160,12 +162,12 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		var opts []nodeBuilderOption
 
 		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
-		opts = append(opts, withPeerManagerOptions(connection.ConnectionPruningEnabled, o.peerUpdateInterval))
+		opts = append(opts, withPeerManagerOptions(connection.PruningEnabled, o.peerUpdateInterval))
 		opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
 		opts = append(opts, withConnectionGater(o.connectionGater))
 		opts = append(opts, withUnicastManagerOpts(o.createStreamRetryInterval))
 
-		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, opts...)
+		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, idProvider, opts...)
 
 		_, port, err := libP2PNodes[i].GetIPPort()
 		require.NoError(t, err)
@@ -224,43 +226,67 @@ func GenerateMiddlewares(t *testing.T,
 	return mws, idProviders
 }
 
-// GenerateNetworks generates the network for the given middlewares
-func GenerateNetworks(t *testing.T,
+// NetworksFixture generates the network for the given middlewares
+func NetworksFixture(t *testing.T,
 	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
 	sms []network.SubscriptionManager) []network.Network {
+
 	count := len(ids)
 	nets := make([]network.Network, 0)
 
 	for i := 0; i < count; i++ {
-
-		// creates and mocks me
-		me := &mock.Local{}
-		me.On("NodeID").Return(ids[i].NodeID)
-		me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID(me.NodeID())))
-		me.On("Address").Return(ids[i].Address)
-
-		receiveCache := netcache.NewHeroReceiveCache(p2p.DefaultReceiveCacheSize, log, metrics.NewNoopCollector())
-
-		// create the network
-		net, err := p2p.NewNetwork(&p2p.NetworkParameters{
-			Logger:              log,
-			Codec:               cbor.NewCodec(),
-			Me:                  me,
-			MiddlewareFactory:   func() (network.Middleware, error) { return mws[i], nil },
-			Topology:            unittest.NetworkTopology(),
-			SubscriptionManager: sms[i],
-			Metrics:             metrics.NewNoopCollector(),
-			IdentityProvider:    id.NewFixedIdentityProvider(ids),
-			ReceiveCache:        receiveCache,
-		})
+		params := NetworkConfigFixture(t, log, *ids[i], ids, mws[i], sms[i])
+		net, err := p2p.NewNetwork(params)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
 	}
 
 	return nets
+}
+
+func NetworkConfigFixture(
+	t *testing.T,
+	logger zerolog.Logger,
+	myId flow.Identity,
+	allIds flow.IdentityList,
+	mw network.Middleware,
+	subMgr network.SubscriptionManager, opts ...p2p.NetworkConfigOption) *p2p.NetworkConfig {
+
+	me := mock.NewLocal(t)
+	me.On("NodeID").Return(myId.NodeID).Maybe()
+	me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID(me.NodeID()))).Maybe()
+	me.On("Address").Return(myId.Address).Maybe()
+
+	receiveCache := netcache.NewHeroReceiveCache(p2p.DefaultReceiveCacheSize, logger, metrics.NewNoopCollector())
+	params := &p2p.NetworkConfig{
+		Logger:              logger,
+		Codec:               cbor.NewCodec(),
+		Me:                  me,
+		MiddlewareFactory:   func() (network.Middleware, error) { return mw, nil },
+		Topology:            unittest.NetworkTopology(),
+		SubscriptionManager: subMgr,
+		Metrics:             metrics.NewNoopCollector(),
+		IdentityProvider:    id.NewFixedIdentityProvider(allIds),
+		ReceiveCache:        receiveCache,
+		ConduitFactory:      conduit.NewDefaultConduitFactory(),
+		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  unittest.Logger(),
+			SpamRecordCacheSize:     alsp.DefaultSpamRecordCacheSize,
+			SpamReportQueueSize:     alsp.DefaultSpamReportQueueSize,
+			HeartBeatInterval:       alsp.DefaultHeartBeatInterval,
+			AlspMetrics:             metrics.NewNoopCollector(),
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		},
+	}
+
+	for _, opt := range opts {
+		opt(params)
+	}
+
+	return params
 }
 
 // GenerateIDsAndMiddlewares returns nodeIDs, libp2pNodes, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
@@ -352,7 +378,7 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []network.Network, []observable.Observable) {
 	ids, libp2pNodes, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, consumer, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks := GenerateNetworks(t, log, ids, mws, sms)
+	networks := NetworksFixture(t, log, ids, mws, sms)
 
 	return ids, libp2pNodes, mws, networks, observables
 }
@@ -368,16 +394,36 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	return engs
 }
 
-// StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel
-func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.Network, duration time.Duration) {
+// StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel.
+// Arguments:
+// - ctx: the irrecoverable context to use for starting the nodes and networks.
+// - t: the test object.
+// - nodes: the libp2p nodes to start.
+// - nets: the networks to start.
+// - timeout: the timeout to use for waiting for the nodes and networks to start.
+//
+// This function fails the test if the nodes or networks do not start within the given timeout.
+func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.Network, timeout time.Duration) {
+	StartNetworks(ctx, t, nets, timeout)
+
+	// start up nodes and Peer managers
+	StartNodes(ctx, t, nodes, timeout)
+}
+
+// StartNetworks starts the provided networks using the provided irrecoverable context
+// Arguments:
+// - ctx: the irrecoverable context to use for starting the networks.
+// - t: the test object.
+// - nets: the networks to start.
+// - duration: the timeout to use for waiting for the networks to start.
+//
+// This function fails the test if the networks do not start within the given timeout.
+func StartNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nets []network.Network, duration time.Duration) {
 	// start up networks (this will implicitly start middlewares)
 	for _, net := range nets {
 		net.Start(ctx)
 		unittest.RequireComponentsReadyBefore(t, duration, net)
 	}
-
-	// start up nodes and Peer managers
-	StartNodes(ctx, t, nodes, duration)
 }
 
 // StartNodes starts the provided nodes and their peer managers using the provided irrecoverable context
@@ -438,23 +484,20 @@ func withUnicastManagerOpts(delay time.Duration) nodeBuilderOption {
 }
 
 // generateLibP2PNode generates a `LibP2PNode` on localhost using a port assigned by the OS
-func generateLibP2PNode(t *testing.T,
-	logger zerolog.Logger,
-	key crypto.PrivateKey,
-	opts ...nodeBuilderOption) (p2p.LibP2PNode, observable.Observable) {
+func generateLibP2PNode(t *testing.T, logger zerolog.Logger, key crypto.PrivateKey, provider *UpdatableIDProvider, opts ...nodeBuilderOption) (p2p.LibP2PNode, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
 
 	// Inject some logic to be able to observe connections of this node
 	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, connection.DefaultConnManagerConfig())
 	require.NoError(t, err)
-
-	rpcInspectors, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(logger)).Build()
+	met := metrics.NewNoopCollector()
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), provider, met).Build()
 	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
-		metrics.NewNoopCollector(),
+		met,
 		unittest.DefaultAddress,
 		key,
 		sporkID,
@@ -462,7 +505,7 @@ func generateLibP2PNode(t *testing.T,
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t)).
 		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
-		SetGossipSubRPCInspectors(rpcInspectors...)
+		SetGossipSubRpcInspectorSuite(rpcInspectorSuite)
 
 	for _, opt := range opts {
 		opt(builder)

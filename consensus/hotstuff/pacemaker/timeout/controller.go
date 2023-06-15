@@ -38,7 +38,9 @@ type Controller struct {
 	r              uint64  // failed rounds counter, higher value results in longer round duration
 }
 
-// NewController creates a new Controller.
+// NewController creates a new Controller. Note that the input Config is implemented such that
+// it can be passed by value, while still supporting updates of `BlockRateDelayMS` at runtime
+// (all configs share the same memory holding `BlockRateDelayMS`).
 func NewController(timeoutConfig Config) *Controller {
 	// the initial value for the timeout channel is a closed channel which returns immediately
 	// this prevents indefinite blocking when no timeout has been started
@@ -144,9 +146,4 @@ func (t *Controller) OnProgressBeforeTimeout() {
 	if t.r > 0 {
 		t.r--
 	}
-}
-
-// BlockRateDelay is a delay to broadcast the proposal in order to control block production rate
-func (t *Controller) BlockRateDelay() time.Duration {
-	return time.Duration(t.cfg.BlockRateDelayMS.Load() * float64(time.Millisecond))
 }

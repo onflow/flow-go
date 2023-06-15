@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -24,12 +24,12 @@ type AccountInfo interface {
 }
 
 type ParseRestrictedAccountInfo struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 	impl     AccountInfo
 }
 
 func NewParseRestrictedAccountInfo(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	impl AccountInfo,
 ) AccountInfo {
 	return ParseRestrictedAccountInfo{

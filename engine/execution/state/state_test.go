@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 
 	"github.com/onflow/flow-go/engine/execution/state"
-	fvmstate "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -77,7 +77,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
 		assert.NoError(t, err)
 
-		executionSnapshot := &fvmstate.ExecutionSnapshot{
+		executionSnapshot := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
 				registerID1: flow.RegisterValue("apple"),
 				registerID2: flow.RegisterValue("carrot"),
@@ -138,7 +138,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
 		assert.NoError(t, err)
 
-		executionSnapshot1 := &fvmstate.ExecutionSnapshot{
+		executionSnapshot1 := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
 				registerID1: []byte("apple"),
 			},
@@ -148,7 +148,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
-		executionSnapshot2 := &fvmstate.ExecutionSnapshot{
+		executionSnapshot2 := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
 				registerID1: []byte("orange"),
 			},
@@ -180,7 +180,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// set initial value
-		executionSnapshot1 := &fvmstate.ExecutionSnapshot{
+		executionSnapshot1 := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
 				registerID1: []byte("apple"),
 				registerID2: []byte("apple"),
@@ -191,7 +191,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
-		executionSnapshot2 := &fvmstate.ExecutionSnapshot{
+		executionSnapshot2 := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
 				registerID1: nil,
 			},
@@ -223,7 +223,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// set initial value
-		executionSnapshot1 := &fvmstate.ExecutionSnapshot{
+		executionSnapshot1 := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
 				registerID1: flow.RegisterValue("apple"),
 				registerID2: flow.RegisterValue("apple"),

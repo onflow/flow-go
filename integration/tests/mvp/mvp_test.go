@@ -114,12 +114,12 @@ func TestMVP_Bootstrap(t *testing.T) {
 
 func buildMVPNetConfig() testnet.NetworkConfig {
 	collectionConfigs := []func(*testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=100ms"),
 		testnet.WithLogLevel(zerolog.FatalLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		testnet.WithLogLevel(zerolog.FatalLevel),
@@ -177,7 +177,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		SetGasLimit(9999)
 
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	err = serviceAccountClient.SignAndSendTransaction(ctx, createAccountTx)
+	err = serviceAccountClient.SignAndSendTransaction(childCtx, createAccountTx)
 	require.NoError(t, err)
 
 	cancel()

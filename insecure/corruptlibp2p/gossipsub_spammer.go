@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 )
@@ -21,14 +22,16 @@ import (
 type GossipSubRouterSpammer struct {
 	router      *atomicRouter
 	SpammerNode p2p.LibP2PNode
+	SpammerId   flow.Identity
 }
 
 // NewGossipSubRouterSpammer is the main method tests call for spamming attacks.
-func NewGossipSubRouterSpammer(t *testing.T, sporkId flow.Identifier, role flow.Role) *GossipSubRouterSpammer {
-	spammerNode, router := createSpammerNode(t, sporkId, role)
+func NewGossipSubRouterSpammer(t *testing.T, sporkId flow.Identifier, role flow.Role, provider module.IdentityProvider) *GossipSubRouterSpammer {
+	spammerNode, spammerId, router := createSpammerNode(t, sporkId, role, provider)
 	return &GossipSubRouterSpammer{
 		router:      router,
 		SpammerNode: spammerNode,
+		SpammerId:   spammerId,
 	}
 }
 
@@ -61,12 +64,13 @@ func (s *GossipSubRouterSpammer) Start(t *testing.T) {
 	s.router.set(s.router.Get())
 }
 
-func createSpammerNode(t *testing.T, sporkId flow.Identifier, role flow.Role) (p2p.LibP2PNode, *atomicRouter) {
+func createSpammerNode(t *testing.T, sporkId flow.Identifier, role flow.Role, provider module.IdentityProvider) (p2p.LibP2PNode, flow.Identity, *atomicRouter) {
 	router := newAtomicRouter()
-	spammerNode, _ := p2ptest.NodeFixture(
+	spammerNode, spammerId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
+		provider,
 		p2ptest.WithRole(role),
 		internal.WithCorruptGossipSub(CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter) {
 			require.NotNil(t, r)
@@ -77,7 +81,7 @@ func createSpammerNode(t *testing.T, sporkId flow.Identifier, role flow.Role) (p
 				return nil
 			})),
 	)
-	return spammerNode, router
+	return spammerNode, spammerId, router
 }
 
 // atomicRouter is a wrapper around the corrupt.GossipSubRouter that allows atomic access to the router.
