@@ -7,33 +7,35 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 )
 
 type TransactionCollector struct {
-	transactionTimings         mempool.TransactionTimings
-	log                        zerolog.Logger
-	logTimeToFinalized         bool
-	logTimeToExecuted          bool
-	logTimeToFinalizedExecuted bool
-	timeToFinalized            prometheus.Summary
-	timeToExecuted             prometheus.Summary
-	timeToFinalizedExecuted    prometheus.Summary
-	transactionSubmission      *prometheus.CounterVec
-	scriptExecutedDuration     *prometheus.HistogramVec
-	transactionResultDuration  *prometheus.HistogramVec
-	scriptSize                 prometheus.Histogram
-	transactionSize            prometheus.Histogram
+	transactionTimings                mempool.TransactionTimings
+	log                               zerolog.Logger
+	logTimeToFinalized                bool
+	logTimeToExecuted                 bool
+	logTimeToFinalizedExecuted        bool
+	timeToFinalized                   prometheus.Summary
+	timeToExecuted                    prometheus.Summary
+	timeToFinalizedExecuted           prometheus.Summary
+	transactionSubmission             *prometheus.CounterVec
+	scriptExecutedDuration            *prometheus.HistogramVec
+	scriptExecutionErrorArchiveNode   *prometheus.GaugeVec
+	scriptExecutionErrorExecutionNode *prometheus.GaugeVec
+	transactionResultDuration         *prometheus.HistogramVec
+	scriptSize                        prometheus.Histogram
+	transactionSize                   prometheus.Histogram
+	maxReceiptHeight                  prometheus.Gauge
+
+	// used to skip heights that are lower than the current max height
+	maxReceiptHeightValue counters.StrictMonotonousCounter
 }
 
-func NewTransactionCollector(
-	log zerolog.Logger,
-	transactionTimings mempool.TransactionTimings,
-	logTimeToFinalized bool,
-	logTimeToExecuted bool,
-	logTimeToFinalizedExecuted bool,
-) *TransactionCollector {
+func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log zerolog.Logger,
+	logTimeToFinalized bool, logTimeToExecuted bool, logTimeToFinalizedExecuted bool) *TransactionCollector {
 
 	tc := &TransactionCollector{
 		transactionTimings:         transactionTimings,
@@ -97,6 +99,18 @@ func NewTransactionCollector(
 			Help:      "histogram for the duration in ms of the round trip time for executing a script",
 			Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
 		}, []string{"script_size"}),
+		scriptExecutionErrorArchiveNode: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name:      "script_execution_error_archive",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "histogram for the internal errors for executing a script for a block on the archive node",
+		}, []string{"block_id", "script"}),
+		scriptExecutionErrorExecutionNode: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name:      "script_execution_error_execution",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "histogram for the internal errors for executing a script for a block on the execution node",
+		}, []string{"block_id", "script"}),
 		transactionResultDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "transaction_result_fetched_duration",
 			Namespace: namespaceAccess,
@@ -116,10 +130,19 @@ func NewTransactionCollector(
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "histogram for the transaction size in kb of scripts used in GetTransactionResult",
 		}),
+		maxReceiptHeight: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "max_receipt_height",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemIngestion,
+			Help:      "gauge to track the maximum block height of execution receipts received",
+		}),
+		maxReceiptHeightValue: counters.NewMonotonousCounter(0),
 	}
 
 	return tc
 }
+
+// Script exec metrics
 
 func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
 	// record the execute script duration and script size
@@ -128,6 +151,18 @@ func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
 		"script_size": tc.sizeLabel(size),
 	}).Observe(float64(dur.Milliseconds()))
 }
+
+func (tc *TransactionCollector) ScriptExecutionErrorOnArchiveNode(blockID flow.Identifier, scriptHash string) {
+	// record the execution error along with blockID and scriptHash for Archive node
+	tc.scriptExecutionErrorArchiveNode.With(prometheus.Labels{"block_id": blockID.String(), "script": scriptHash}).Inc()
+}
+
+func (tc *TransactionCollector) ScriptExecutionErrorOnExecutionNode(blockID flow.Identifier, scriptHash string) {
+	// record the execution error along with blockID and scriptHash for Execution node
+	tc.scriptExecutionErrorExecutionNode.With(prometheus.Labels{"block_id": blockID.String(), "script": scriptHash}).Inc()
+}
+
+// TransactionResult metrics
 
 func (tc *TransactionCollector) TransactionResultFetched(dur time.Duration, size int) {
 	// record the transaction result duration and transaction script/payload size
@@ -272,4 +307,10 @@ func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
 	}
 	tc.transactionSubmission.WithLabelValues("expired").Inc()
 	tc.transactionTimings.Remove(txID)
+}
+
+func (tc *TransactionCollector) UpdateExecutionReceiptMaxHeight(height uint64) {
+	if tc.maxReceiptHeightValue.Set(height) {
+		tc.maxReceiptHeight.Set(float64(height))
+	}
 }
