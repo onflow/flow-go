@@ -18,11 +18,12 @@ import (
 )
 
 type backendAccounts struct {
+	log               zerolog.Logger
 	state             protocol.State
 	headers           storage.Headers
 	executionReceipts storage.ExecutionReceipts
 	connFactory       ConnectionFactory
-	log               zerolog.Logger
+	maxENRequests     uint
 }
 
 func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
@@ -83,7 +84,7 @@ func (b *backendAccounts) getAccountAtBlockID(
 		BlockId: blockID[:],
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.maxENRequests, b.log)
 	if err != nil {
 		return nil, getAccountError(err)
 	}

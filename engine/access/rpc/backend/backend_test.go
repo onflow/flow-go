@@ -103,6 +103,7 @@ func (suite *Suite) TestPing() {
 		nil,
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		nil,
 		suite.log,
@@ -137,6 +138,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 		nil,
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		nil,
 		suite.log,
@@ -201,6 +203,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 			nil,
 			false,
 			100,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			nil,
 			suite.log,
@@ -272,6 +275,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 			nil,
 			false,
 			100,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			nil,
 			suite.log,
@@ -336,6 +340,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 			nil,
 			false,
 			100,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			nil,
 			suite.log,
@@ -411,6 +416,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 			nil,
 			false,
 			100,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			nil,
 			suite.log,
@@ -470,6 +476,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 			nil,
 			false,
 			DefaultMaxHeightRange,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			nil,
 			suite.log,
@@ -507,6 +514,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		nil,
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		nil,
 		suite.log,
@@ -552,6 +560,7 @@ func (suite *Suite) TestGetTransaction() {
 		nil,
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		nil,
 		suite.log,
@@ -591,6 +600,7 @@ func (suite *Suite) TestGetCollection() {
 		nil,
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		nil,
 		suite.log,
@@ -653,6 +663,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
 		suite.log,
@@ -715,6 +726,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
 		suite.log,
@@ -800,6 +812,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
 		suite.log,
@@ -919,6 +932,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		nil,
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		nil,
 		suite.log,
@@ -1077,6 +1091,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		100,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		flow.IdentifierList(enIDs.NodeIDs()).Strings(),
 		suite.log,
@@ -1134,6 +1149,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		nil,
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		nil,
 		suite.log,
@@ -1187,6 +1203,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		nil,
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		nil,
 		suite.log,
@@ -1316,6 +1333,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
@@ -1347,6 +1365,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
@@ -1405,6 +1424,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
@@ -1434,6 +1454,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
@@ -1496,6 +1517,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
@@ -1526,6 +1548,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
@@ -1675,6 +1698,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			nil,
 			suite.log,
@@ -1713,6 +1737,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			fixedENIdentifiersStr,
 			suite.log,
@@ -1750,6 +1775,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			fixedENIdentifiersStr,
 			suite.log,
@@ -1786,6 +1812,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			1, // set maximum range to 1
+			DefaultMaxExecutionNodesCount,
 			nil,
 			fixedENIdentifiersStr,
 			suite.log,
@@ -1822,6 +1849,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
+			DefaultMaxExecutionNodesCount,
 			nil,
 			fixedENIdentifiersStr,
 			suite.log,
@@ -1898,6 +1926,7 @@ func (suite *Suite) TestGetAccount() {
 		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		nil,
 		suite.log,
@@ -1978,6 +2007,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		nil,
 		suite.log,
@@ -2015,6 +2045,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 		nil,
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		nil,
 		suite.log,
@@ -2087,12 +2118,12 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		if fixedENs != nil {
 			fixedENIdentifiers = fixedENs.NodeIDs()
 		}
-		actualList, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
+		actualList, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, DefaultMaxExecutionNodesCount, suite.log)
 		require.NoError(suite.T(), err)
 		if expectedENs == nil {
 			expectedENs = flow.IdentityList{}
 		}
-		if len(expectedENs) > maxExecutionNodesCnt {
+		if len(expectedENs) > DefaultMaxExecutionNodesCount {
 			for _, actual := range actualList {
 				require.Contains(suite.T(), expectedENs, actual)
 			}
@@ -2107,9 +2138,9 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		attempt2Receipts = flow.ExecutionReceiptList{}
 		attempt3Receipts = flow.ExecutionReceiptList{}
 		suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
-		actualList, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
+		actualList, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, DefaultMaxExecutionNodesCount, suite.log)
 		require.NoError(suite.T(), err)
-		require.Equal(suite.T(), len(actualList), maxExecutionNodesCnt)
+		require.Equal(suite.T(), len(actualList), DefaultMaxExecutionNodesCount)
 	})
 
 	// if no preferred or fixed ENs are specified, the ExecutionNodesForBlockID function should
@@ -2193,6 +2224,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		DefaultMaxHeightRange,
+		DefaultMaxExecutionNodesCount,
 		nil,
 		nil,
 		suite.log,

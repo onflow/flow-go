@@ -44,6 +44,7 @@ type Config struct {
 	CollectionClientTimeout   time.Duration                    // collection API GRPC client timeout
 	ConnectionPoolSize        uint                             // size of the cache for storing collection and execution connections
 	MaxHeightRange            uint                             // max size of height range requests
+	MaxExecutionRequests      uint                             // max number of execution nodes that will be contacted to complete an execution api request
 	PreferredExecutionNodeIDs []string                         // preferred list of upstream execution node IDs
 	FixedExecutionNodeIDs     []string                         // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
 }
@@ -179,6 +180,7 @@ func NewBuilder(log zerolog.Logger,
 		connectionFactory,
 		retryEnabled,
 		config.MaxHeightRange,
+		config.MaxExecutionRequests,
 		config.PreferredExecutionNodeIDs,
 		config.FixedExecutionNodeIDs,
 		log,

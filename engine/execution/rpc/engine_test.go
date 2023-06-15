@@ -708,6 +708,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 			events:             suite.events,
 			transactionResults: txResults,
 			chain:              flow.Mainnet,
+			commits:            suite.commits,
 		}
 		return handler
 	}
@@ -732,6 +733,9 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 
 	// happy path - valid requests receives all events for the given transaction
 	suite.Run("happy path with valid events and no transaction error", func() {
+
+		// lookup commits does not fail (resource ignored)
+		suite.commits.On("ByBlockID", bID).Return(nil, nil).Once()
 
 		// expect a call to lookup events by block ID and transaction ID
 		suite.events.On("ByBlockID", bID).Return(eventsForBlock, nil).Once()
@@ -787,6 +791,9 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 
 	// happy path - valid requests receives all events and an error for the given transaction
 	suite.Run("happy path with valid events and a transaction error", func() {
+
+		// lookup commits does not fail (resource ignored)
+		suite.commits.On("ByBlockID", bID).Return(nil, nil).Once()
 
 		// expect a call to lookup events by block ID and transaction ID
 		suite.events.On("ByBlockID", bID).Return(eventsForBlock, nil).Once()
@@ -865,20 +872,10 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	// failure path - nonexisting block id in the request results in valid, but empty
 	suite.Run("request with nonexisting block ID", func() {
 
-		// expect a call to lookup events by block ID and transaction ID
-		suite.events.On("ByBlockID", nonexistingBlockID).Return(eventsForBlock, nil).Once()
+		// lookup commits does not fail (resource ignored)
+		suite.commits.On("ByBlockID", nonexistingBlockID).Return(nil, realstorage.ErrNotFound).Once()
 
-		// create the expected result
-		expectedResult := &execution.GetTransactionResultsResponse{
-			TransactionResults: []*execution.GetTransactionResultResponse{},
-		}
-
-		// expect a call to lookup transaction result by block ID return a result with no error
-		txResultsMock := new(storage.TransactionResults)
-		var txResults []flow.TransactionResult
-		txResultsMock.On("ByBlockID", nonexistingBlockID).Return(txResults, nil).Once()
-
-		handler := createHandler(txResultsMock)
+		handler := createHandler(new(storage.TransactionResults))
 
 		// create a valid API request
 		req := concoctReq(nonexistingBlockID[:])
@@ -887,13 +884,11 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		actualResult, err := handler.GetTransactionResultsByBlockID(context.Background(), req)
 
 		// check that a successful response is received
-		suite.Require().NoError(err)
-
-		// check that all fields in response are as expected
-		assertEqual(expectedResult, actualResult)
+		suite.Assert().Error(err)
+		suite.Assert().Equal(codes.NotFound, status.Code(err))
+		suite.Assert().Nil(actualResult)
 
 		// check that appropriate storage calls were made
 		suite.events.AssertExpectations(suite.T())
-		txResultsMock.AssertExpectations(suite.T())
 	})
 }

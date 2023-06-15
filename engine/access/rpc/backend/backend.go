@@ -19,8 +19,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
-const maxExecutionNodesCnt = 3
+// DefaultMaxExecutionNodesCount is the max number of execution nodes that will be contacted to complete an execution api request
+const DefaultMaxExecutionNodesCount = 3
 
 // minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
 const minExecutionNodesCnt = 2
@@ -89,6 +89,7 @@ func New(
 	connFactory ConnectionFactory,
 	retryEnabled bool,
 	maxHeightRange uint,
+	maxENRequests uint,
 	preferredExecutionNodeIDs []string,
 	fixedExecutionNodeIDs []string,
 	log zerolog.Logger,
@@ -108,15 +109,17 @@ func New(
 		state: state,
 		// create the sub-backends
 		backendScripts: backendScripts{
+			log:               log,
 			headers:           headers,
 			executionReceipts: executionReceipts,
 			connFactory:       connFactory,
 			state:             state,
-			log:               log,
 			metrics:           transactionMetrics,
 			loggedScripts:     loggedScripts,
+			maxENRequests:     maxENRequests,
 		},
 		backendTransactions: backendTransactions{
+			log:                  log,
 			staticCollectionRPC:  collectionRPC,
 			state:                state,
 			chainID:              chainID,
@@ -129,15 +132,16 @@ func New(
 			retry:                retry,
 			connFactory:          connFactory,
 			previousAccessNodes:  historicalAccessNodes,
-			log:                  log,
+			maxENRequests:        maxENRequests,
 		},
 		backendEvents: backendEvents{
+			log:               log,
 			state:             state,
 			headers:           headers,
 			executionReceipts: executionReceipts,
 			connFactory:       connFactory,
-			log:               log,
 			maxHeightRange:    maxHeightRange,
+			maxENRequests:     maxENRequests,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: headers,
@@ -148,11 +152,12 @@ func New(
 			state:  state,
 		},
 		backendAccounts: backendAccounts{
+			log:               log,
 			state:             state,
 			headers:           headers,
 			executionReceipts: executionReceipts,
 			connFactory:       connFactory,
-			log:               log,
+			maxENRequests:     maxENRequests,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: executionResults,
@@ -259,7 +264,7 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 	return convert.SnapshotToBytes(validSnapshot)
 }
 
-// executionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities
+// executionNodesForBlockID returns upto maxExecutionNodesCount number of randomly chosen execution node identities
 // which have executed the given block ID.
 // If no such execution node is found, an InsufficientExecutionReceipts error is returned.
 func executionNodesForBlockID(
@@ -267,7 +272,9 @@ func executionNodesForBlockID(
 	blockID flow.Identifier,
 	executionReceipts storage.ExecutionReceipts,
 	state protocol.State,
-	log zerolog.Logger) (flow.IdentityList, error) {
+	maxExecutionNodesCount uint,
+	log zerolog.Logger,
+) (flow.IdentityList, error) {
 
 	var executorIDs flow.IdentifierList
 
@@ -330,8 +337,8 @@ func executionNodesForBlockID(
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
 
-	// randomly choose upto maxExecutionNodesCnt identities
-	executionIdentitiesRandom := subsetENs.Sample(maxExecutionNodesCnt)
+	// randomly choose upto maxExecutionNodesCount identities
+	executionIdentitiesRandom := subsetENs.Sample(maxExecutionNodesCount)
 
 	if len(executionIdentitiesRandom) == 0 {
 		return nil, fmt.Errorf("no matching execution node found for block ID %v", blockID)

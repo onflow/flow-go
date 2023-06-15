@@ -20,12 +20,13 @@ import (
 )
 
 type backendEvents struct {
+	log               zerolog.Logger
 	headers           storage.Headers
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
 	connFactory       ConnectionFactory
-	log               zerolog.Logger
 	maxHeightRange    uint
+	maxENRequests     uint
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
@@ -128,7 +129,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	// choose the last block ID to find the list of execution nodes
 	lastBlockID := blockIDs[len(blockIDs)-1]
 
-	execNodes, err := executionNodesForBlockID(ctx, lastBlockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, lastBlockID, b.executionReceipts, b.state, b.maxENRequests, b.log)
 	if err != nil {
 		b.log.Error().Err(err).Msg("failed to retrieve events from execution node")
 		return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)

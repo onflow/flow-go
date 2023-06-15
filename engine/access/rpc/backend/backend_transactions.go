@@ -38,6 +38,7 @@ type backendTransactions struct {
 	transactionValidator *access.TransactionValidator
 	retry                *Retry
 	connFactory          ConnectionFactory
+	maxENRequests        uint
 
 	previousAccessNodes []accessproto.AccessAPIClient
 	log                 zerolog.Logger
@@ -312,7 +313,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	req := execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockID[:],
 	}
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.maxENRequests, b.log)
 	if err != nil {
 		_, isInsufficientExecReceipts := err.(*InsufficientExecutionReceipts)
 		if isInsufficientExecReceipts {
@@ -422,7 +423,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		BlockId: blockID[:],
 		Index:   index,
 	}
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.maxENRequests, b.log)
 	if err != nil {
 		_, isInsufficientExecReceipts := err.(*InsufficientExecutionReceipts)
 		if isInsufficientExecReceipts {
@@ -647,7 +648,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		TransactionId: transactionID,
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.maxENRequests, b.log)
 	if err != nil {
 		// if no execution receipt were found, return a NotFound GRPC error
 		if errors.As(err, &InsufficientExecutionReceipts{}) {
@@ -693,9 +694,6 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 				Hex("transaction_id", req.GetTransactionId()).
 				Msg("Successfully got transaction results from any node")
 			return resp, nil
-		}
-		if status.Code(err) == codes.NotFound {
-			return nil, err
 		}
 		errs = multierror.Append(errs, err)
 	}
@@ -750,9 +748,6 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 				Hex("block_id", req.GetBlockId()).
 				Msg("Successfully got transaction results from any node")
 			return resp, nil
-		}
-		if status.Code(err) == codes.NotFound {
-			return nil, err
 		}
 		errs = multierror.Append(errs, err)
 	}
@@ -809,9 +804,6 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 				Uint32("index", req.GetIndex()).
 				Msg("Successfully got transaction results from any node")
 			return resp, nil
-		}
-		if status.Code(err) == codes.NotFound {
-			return nil, err
 		}
 		errs = multierror.Append(errs, err)
 	}
