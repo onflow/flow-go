@@ -192,24 +192,28 @@ func (nc *NoopCollector) RuntimeSetNumberOfAccounts(count uint64)               
 func (nc *NoopCollector) RuntimeTransactionProgramsCacheMiss()                             {}
 func (nc *NoopCollector) RuntimeTransactionProgramsCacheHit()                              {}
 func (nc *NoopCollector) ScriptExecuted(dur time.Duration, size int)                       {}
-func (nc *NoopCollector) TransactionResultFetched(dur time.Duration, size int)             {}
-func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)         {}
-func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)        {}
-func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)         {}
-func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                          {}
-func (nc *NoopCollector) TransactionSubmissionFailed()                                     {}
-func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)                    {}
-func (nc *NoopCollector) ChunkDataPackRequestProcessed()                                   {}
-func (nc *NoopCollector) ExecutionSync(syncing bool)                                       {}
-func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                 {}
-func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)               {}
-func (nc *NoopCollector) ExecutionComputationResultUploaded()                              {}
-func (nc *NoopCollector) ExecutionComputationResultUploadRetried()                         {}
-func (nc *NoopCollector) RootIDComputed(duration time.Duration, numberOfChunks int)        {}
-func (nc *NoopCollector) AddBlobsSucceeded(duration time.Duration, totalSize uint64)       {}
-func (nc *NoopCollector) AddBlobsFailed()                                                  {}
-func (nc *NoopCollector) FulfilledHeight(blockHeight uint64)                               {}
-func (nc *NoopCollector) ReceiptSkipped()                                                  {}
+func (nc *NoopCollector) ScriptExecutionErrorOnExecutionNode(blockID flow.Identifier, scriptHash string) {
+}
+func (nc *NoopCollector) ScriptExecutionErrorOnArchiveNode(blockID flow.Identifier, scriptHash string) {
+}
+func (nc *NoopCollector) TransactionResultFetched(dur time.Duration, size int)       {}
+func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)   {}
+func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)  {}
+func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)   {}
+func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                    {}
+func (nc *NoopCollector) TransactionSubmissionFailed()                               {}
+func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)              {}
+func (nc *NoopCollector) ChunkDataPackRequestProcessed()                             {}
+func (nc *NoopCollector) ExecutionSync(syncing bool)                                 {}
+func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                           {}
+func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)         {}
+func (nc *NoopCollector) ExecutionComputationResultUploaded()                        {}
+func (nc *NoopCollector) ExecutionComputationResultUploadRetried()                   {}
+func (nc *NoopCollector) RootIDComputed(duration time.Duration, numberOfChunks int)  {}
+func (nc *NoopCollector) AddBlobsSucceeded(duration time.Duration, totalSize uint64) {}
+func (nc *NoopCollector) AddBlobsFailed()                                            {}
+func (nc *NoopCollector) FulfilledHeight(blockHeight uint64)                         {}
+func (nc *NoopCollector) ReceiptSkipped()                                            {}
 func (nc *NoopCollector) RequestSucceeded(blockHeight uint64, duration time.Duration, totalSize uint64, numberOfAttempts int) {
 }
 func (nc *NoopCollector) RequestFailed(duration time.Duration, retryable bool)                  {}

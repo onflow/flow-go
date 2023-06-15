@@ -54,7 +54,7 @@ func (b *backendScripts) ExecuteScriptAtLatestBlock(
 	latestBlockID := latestHeader.ID()
 
 	// execute script on the execution node at that block id
-	return b.executeScriptOnExecutionNode(ctx, latestBlockID, script, arguments)
+	return b.executeScriptOnExecutor(ctx, latestBlockID, script, arguments)
 }
 
 func (b *backendScripts) ExecuteScriptAtBlockID(
@@ -64,7 +64,7 @@ func (b *backendScripts) ExecuteScriptAtBlockID(
 	arguments [][]byte,
 ) ([]byte, error) {
 	// execute script on the execution node at that block id
-	return b.executeScriptOnExecutionNode(ctx, blockID, script, arguments)
+	return b.executeScriptOnExecutor(ctx, blockID, script, arguments)
 }
 
 func (b *backendScripts) ExecuteScriptAtBlockHeight(
@@ -83,23 +83,17 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 	blockID := header.ID()
 
 	// execute script on the execution node at that block id
-	return b.executeScriptOnExecutionNode(ctx, blockID, script, arguments)
+	return b.executeScriptOnExecutor(ctx, blockID, script, arguments)
 }
 
 func (b *backendScripts) findScriptExecutors(
 	ctx context.Context,
 	blockID flow.Identifier,
 ) ([]string, error) {
-	// send script queries to archive nodes if archive addres is configured
-	if len(b.archiveAddressList) > 0 {
-		return b.archiveAddressList, nil
-	}
-
 	executors, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		return nil, err
 	}
-
 	executorAddrs := make([]string, 0, len(executors))
 	for _, executor := range executors {
 		executorAddrs = append(executorAddrs, executor.Address)
@@ -109,16 +103,12 @@ func (b *backendScripts) findScriptExecutors(
 
 // executeScriptOnExecutionNode forwards the request to the execution node using the execution node
 // grpc client and converts the response back to the access node api response format
-func (b *backendScripts) executeScriptOnExecutionNode(
+func (b *backendScripts) executeScriptOnExecutor(
 	ctx context.Context,
 	blockID flow.Identifier,
 	script []byte,
 	arguments [][]byte,
 ) ([]byte, error) {
-	tryScriptExecFunc := b.tryExecuteScriptOnExecutionNode
-	if len(b.archiveAddressList) > 0 {
-		tryScriptExecFunc = b.tryExecuteScriptOnArchiveNode
-	}
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
 	scriptExecutors, err := b.findScriptExecutors(ctx, blockID)
 	if err != nil {
@@ -129,12 +119,42 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
 	insecureScriptHash := md5.Sum(script) //nolint:gosec
 
+	// try execution on Archive nodes first
+	if len(b.archiveAddressList) > 0 {
+		startTime := time.Now()
+		for _, rnAddr := range b.archiveAddressList {
+			result, err := b.tryExecuteScriptOnExecutionNode(ctx, rnAddr, blockID, script, arguments)
+			if err == nil {
+				// log execution time
+				b.metrics.ScriptExecuted(
+					time.Since(startTime),
+					len(script),
+				)
+				return result, nil
+			}
+			if status.Code(err) != codes.InvalidArgument {
+				b.log.Debug().Err(err).
+					Str("script_executor_addr", rnAddr).
+					Hex("block_id", blockID[:]).
+					Hex("script_hash", insecureScriptHash[:]).
+					Str("script", string(script)).
+					Msg("script failed to execute on the execution node")
+				return nil, err
+			}
+		}
+	}
+	// log and try execution nodes if there are still errors
+	if err != nil {
+		b.metrics.ScriptExecutionErrorOnArchiveNode(blockID, string(script))
+		b.log.Error().Err(err).Msg("script execution failed for archive node internal reasons")
+	}
+
 	// try each of the executor nodes found
 	var errors *multierror.Error
 	// try to execute the script on one of the execution/archive nodes
 	for _, executorAddress := range scriptExecutors {
 		execStartTime := time.Now() // record start time
-		result, err := tryScriptExecFunc(ctx, executorAddress, blockID, script, arguments)
+		result, err := b.tryExecuteScriptOnExecutionNode(ctx, executorAddress, blockID, script, arguments)
 		if err == nil {
 			if b.log.GetLevel() == zerolog.DebugLevel {
 				executionTime := time.Now()
@@ -172,6 +192,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 
 	errToReturn := errors.ErrorOrNil()
 	if errToReturn != nil {
+		b.metrics.ScriptExecutionErrorOnExecutionNode(blockID, string(script))
 		b.log.Error().Err(err).Msg("script execution failed for execution node internal reasons")
 	}
 
