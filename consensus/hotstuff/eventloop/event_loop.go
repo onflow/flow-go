@@ -273,7 +273,6 @@ func (el *EventLoop) SubmitProposal(proposal *model.Proposal) {
 	case <-el.ComponentManager.ShutdownSignal():
 		return
 	}
-
 	el.mempoolMetrics.MempoolEntries(metrics.HotstuffEventTypeOnProposal, uint(len(el.proposals)))
 }
 

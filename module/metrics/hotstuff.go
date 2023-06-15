@@ -191,14 +191,14 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Name:        "timeout_collectors_range",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "active range of TimeoutCollectors, lowest and highest views that we are collecting timeouts for",
+			Help:        "lowest and highest views that we are maintaining TimeoutCollectors for",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{"prefix"}),
 		numberOfActiveCollectors: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:        "active_collectors",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "number of active collectors stored in TimeoutCollectors",
+			Help:        "number of active TimeoutCollectors that the TimeoutAggregator component currently maintains",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 	}
@@ -294,10 +294,11 @@ func (hc *HotstuffCollector) PayloadProductionDuration(duration time.Duration) {
 	hc.payloadProductionDuration.Observe(duration.Seconds()) // unit: seconds; with float64 precision
 }
 
-// TimeoutCollectorsRange reports information about state of timeout collectors, it measurers how many
-// timeout collectors were created and what is the lowest/highest retained view for them.
+	// TimeoutCollectorsRange collects information from the node's `TimeoutAggregator` component.
+	// Specifically, it measurers the number of views for which we are currently collecting timeouts
+	// (i.e. the number of `TimeoutCollector` instances we are maintaining) and their lowest/highest view.
 func (hc *HotstuffCollector) TimeoutCollectorsRange(lowestRetainedView uint64, newestViewCreatedCollector uint64, activeCollectors int) {
-	hc.timeoutCollectorsRange.WithLabelValues("lowest_retained_view").Set(float64(lowestRetainedView))
-	hc.timeoutCollectorsRange.WithLabelValues("newest_view_of_created_collector").Set(float64(newestViewCreatedCollector))
+	hc.timeoutCollectorsRange.WithLabelValues("lowest_view_of_active_timeout_collectors").Set(float64(lowestRetainedView))
+	hc.timeoutCollectorsRange.WithLabelValues("newest_view_of_active_timeout_collectors").Set(float64(newestViewCreatedCollector))
 	hc.numberOfActiveCollectors.Set(float64(activeCollectors))
 }

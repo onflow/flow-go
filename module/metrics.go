@@ -342,8 +342,9 @@ type HotstuffMetrics interface {
 	// spends in the module.Builder component, i.e. the with generating block payloads.
 	PayloadProductionDuration(duration time.Duration)
 
-	// TimeoutCollectorsRange reports information about state of timeout collectors, it measurers how many
-	// timeout collectors were created and what is the lowest/highest retained view for them.
+	// TimeoutCollectorsRange collects information from the node's `TimeoutAggregator` component.
+	// Specifically, it measurers the number of views for which we are currently collecting timeouts
+	// (i.e. the number of `TimeoutCollector` instances we are maintaining) and their lowest/highest view.
 	TimeoutCollectorsRange(lowestRetainedView uint64, newestViewCreatedCollector uint64, activeCollectors int)
 }
 

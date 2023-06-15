@@ -138,7 +138,6 @@ func (t *TimeoutCollectors) PruneUpToView(lowestRetainedView uint64) {
 	t.lock.Unlock()
 
 	t.metrics.TimeoutCollectorsRange(lowestRetainedView, t.newestViewCachedCollector, numCollectors)
-
 	t.log.Debug().
 		Uint64("prior_lowest_retained_view", from).
 		Uint64("lowest_retained_view", lowestRetainedView).

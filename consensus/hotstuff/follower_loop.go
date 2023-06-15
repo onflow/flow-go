@@ -81,7 +81,6 @@ func (fl *FollowerLoop) AddCertifiedBlock(certifiedBlock *model.CertifiedBlock) 
 
 	blocksQueued := uint(len(fl.certifiedBlocks))
 	fl.mempoolMetrics.MempoolEntries(metrics.ResourceFollowerLoopCertifiedBlocksChannel, blocksQueued)
-
 	fl.log.Debug().Hex("block_id", logging.ID(certifiedBlock.ID())).
 		Uint64("view", certifiedBlock.View()).
 		Uint("blocks_queued", blocksQueued).
