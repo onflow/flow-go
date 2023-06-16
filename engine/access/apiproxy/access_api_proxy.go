@@ -199,17 +199,27 @@ func (h *FlowAccessAPIRouter) GetExecutionResultForBlockID(context context.Conte
 	return res, err
 }
 
+func (h *FlowAccessAPIRouter) GetExecutionResultByID(context context.Context, req *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
+	res, err := h.Upstream.GetExecutionResultByID(context, req)
+	h.log("upstream", "GetExecutionResultByID", err)
+	return res, err
+}
+
 // FlowAccessAPIForwarder forwards all requests to a set of upstream access nodes or observers
 type FlowAccessAPIForwarder struct {
 	forwarder.Forwarder
 }
 
 func NewFlowAccessAPIForwarder(identities flow.IdentityList, timeout time.Duration, maxMsgSize uint) (*FlowAccessAPIForwarder, error) {
-	commonForwarder, err := forwarder.NewForwarder(identities, timeout, maxMsgSize)
+	forwarder, err := forwarder.NewForwarder(identities, timeout, maxMsgSize)
+	if err != nil {
+		return nil, err
+	}
 
-	forwarder := &FlowAccessAPIForwarder{}
-	forwarder.Forwarder = commonForwarder
-	return forwarder, err
+	accessApiForwarder := &FlowAccessAPIForwarder{
+		Forwarder: forwarder,
+	}
+	return accessApiForwarder, nil
 }
 
 // Ping pings the service. It is special in the sense that it responds successful,
@@ -445,4 +455,13 @@ func (h *FlowAccessAPIForwarder) GetExecutionResultForBlockID(context context.Co
 		return nil, err
 	}
 	return upstream.GetExecutionResultForBlockID(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetExecutionResultByID(context context.Context, req *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
+	// This is a passthrough request
+	upstream, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	return upstream.GetExecutionResultByID(context, req)
 }

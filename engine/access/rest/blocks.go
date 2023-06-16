@@ -3,7 +3,6 @@ package rest
 import (
 	"context"
 	"fmt"
-
 	"net/http"
 
 	"google.golang.org/grpc/codes"
@@ -14,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
@@ -76,9 +76,9 @@ func getBlock(option blockRequestOption, context context.Context, expandFields m
 	return &block, nil
 }
 
-func getForwarderBlock(option blockRequestOption, context context.Context, expandFields map[string]bool, upstream accessproto.AccessAPIClient, link models.LinkGenerator) (*models.Block, error) {
+func getBlockFromGrpc(option blockRequestOption, context context.Context, expandFields map[string]bool, upstream accessproto.AccessAPIClient, link models.LinkGenerator) (*models.Block, error) {
 	// lookup block
-	blkProvider := NewBlockForwarderProvider(upstream, option)
+	blkProvider := NewBlockFromGrpcProvider(upstream, option)
 	blk, blockStatus, err := blkProvider.getBlock(context)
 	if err != nil {
 		return nil, err
@@ -164,7 +164,7 @@ func forFinalized(queryParam uint64) blockRequestOption {
 	}
 }
 
-// blockProvider is a layer of abstraction on top of the backend access.API and provides a uniform way to
+// blockRequestProvider is a layer of abstraction on top of the backend access.API and provides a uniform way to
 // look up a block or a block header either by ID or by height
 type blockRequestProvider struct {
 	blockRequest
@@ -211,25 +211,25 @@ func (blkProvider *blockRequestProvider) getBlock(ctx context.Context) (*flow.Bl
 	return blk, status, nil
 }
 
-// blockProvider is a layer of abstraction on top of the accessproto.AccessAPIClient and provides a uniform way to
+// blockFromGrpcProvider is a layer of abstraction on top of the accessproto.AccessAPIClient and provides a uniform way to
 // look up a block or a block header either by ID or by height
-type blockForwarderProvider struct {
+type blockFromGrpcProvider struct {
 	blockRequest
 	upstream accessproto.AccessAPIClient
 }
 
-func NewBlockForwarderProvider(upstream accessproto.AccessAPIClient, options ...blockRequestOption) *blockForwarderProvider {
-	blockForwarderProvider := &blockForwarderProvider{
+func NewBlockFromGrpcProvider(upstream accessproto.AccessAPIClient, options ...blockRequestOption) *blockFromGrpcProvider {
+	blockFromGrpcProvider := &blockFromGrpcProvider{
 		upstream: upstream,
 	}
 
 	for _, o := range options {
-		o(&blockForwarderProvider.blockRequest)
+		o(&blockFromGrpcProvider.blockRequest)
 	}
-	return blockForwarderProvider
+	return blockFromGrpcProvider
 }
 
-func (blkProvider *blockForwarderProvider) getBlock(ctx context.Context) (*entities.Block, entities.BlockStatus, error) {
+func (blkProvider *blockFromGrpcProvider) getBlock(ctx context.Context) (*entities.Block, entities.BlockStatus, error) {
 	if blkProvider.id != nil {
 		getBlockByIdRequest := &accessproto.GetBlockByIDRequest{
 			Id: []byte(blkProvider.id.String()),

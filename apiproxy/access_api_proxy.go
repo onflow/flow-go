@@ -248,6 +248,10 @@ func (h *FlowAccessAPIRouter) GetExecutionResultForBlockID(context context.Conte
 	return h.upstream.GetExecutionResultForBlockID(context, req)
 }
 
+func (h *FlowAccessAPIRouter) GetExecutionResultByID(context context.Context, req *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
+	return h.upstream.GetExecutionResultByID(context, req)
+}
+
 // FlowAccessAPIForwarder forwards all requests to a set of upstream access nodes or observers
 type FlowAccessAPIForwarder struct {
 	lock        sync.Mutex
@@ -465,4 +469,13 @@ func (h *FlowAccessAPIForwarder) GetExecutionResultForBlockID(context context.Co
 		return nil, err
 	}
 	return upstream.GetExecutionResultForBlockID(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetExecutionResultByID(context context.Context, req *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
+	// This is a passthrough request
+	upstream, err := h.faultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	return upstream.GetExecutionResultByID(context, req)
 }

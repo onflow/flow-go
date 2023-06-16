@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"strings"
 	"time"
 
@@ -27,7 +28,9 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
+	accessengine "github.com/onflow/flow-go/engine/access"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
+	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -847,8 +850,8 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		engineBuilder, err := rpc.NewBuilder(
-			node.Logger,
+		accessMetrics := metrics.NewNoopCollector()
+		accessBackend, err := accessengine.NewBackend(node.Logger,
 			node.State,
 			builder.rpcConf,
 			nil,
@@ -860,14 +863,25 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			node.Storage.Receipts,
 			node.Storage.Results,
 			node.RootChainID,
-			metrics.NewNoopCollector(),
+			accessMetrics,
 			0,
 			0,
-			false,
+			false)
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize backend: %w", err)
+		}
+
+		engineBuilder, err := rpc.NewBuilder(
+			node.Logger,
+			node.State,
+			builder.rpcConf,
+			node.RootChainID,
+			accessMetrics,
 			builder.rpcMetricsEnabled,
 			builder.apiRatelimits,
 			builder.apiBurstlimits,
 			builder.Me,
+			accessBackend,
 		)
 		if err != nil {
 			return nil, err
@@ -879,9 +893,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		proxy := &apiproxy.FlowAccessAPIRouter{
+		metrics := metrics.NewObserverCollector()
+
+		rpcHandler := &apiproxy.FlowAccessAPIRouter{
 			Logger:   builder.Logger,
-			Metrics:  metrics.NewObserverCollector(),
+			Metrics:  metrics,
 			Upstream: forwarder,
 			Observer: protocol.NewHandler(protocol.New(
 				node.State,
@@ -891,9 +907,25 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			)),
 		}
 
+		restForwarder, err := rest.NewRestForwarder(builder.Logger,
+			builder.upstreamIdentities,
+			builder.apiTimeout,
+			builder.rpcConf.MaxMsgSize)
+		if err != nil {
+			return nil, err
+		}
+
+		restHandler := &rest.RestRouter{
+			Logger:   builder.Logger,
+			Metrics:  metrics,
+			Upstream: restForwarder,
+			Observer: rest.NewRequestHandler(builder.Logger, accessBackend),
+		}
+
 		// build the rpc engine
 		builder.RpcEng, err = engineBuilder.
-			WithNewHandler(proxy).
+			WithRpcHandler(rpcHandler).
+			WithRestHandler(restHandler).
 			WithLegacy().
 			Build()
 		if err != nil {

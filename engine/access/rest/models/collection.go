@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
@@ -69,10 +70,6 @@ func (c *Collection) BuildFromGrpc(
 	var expandable CollectionExpandable
 	var transactions Transactions
 	if expand[ExpandsTransactions] {
-		var txIds []flow.Identifier
-		for _, id := range collection.TransactionIds {
-			txIds = append(txIds, convert.MessageToIdentifier(id))
-		}
 		transactions.Build(transactionsBody, link)
 	} else {
 		expandable.Transactions = make([]string, len(collection.TransactionIds))

@@ -278,3 +278,6 @@ require (
 	lukechampine.com/blake3 v1.1.7 // indirect
 	nhooyr.io/websocket v1.8.6 // indirect
 )
+
+//TODO: Remove when onflow/flow branch will be merged
+replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230428213521-89bcc9e8517e => github.com/UlyanaAndrukhiv/flow/protobuf/go/flow v0.0.0-20230612132933-04dabe947702

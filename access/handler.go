@@ -590,6 +590,27 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 	return executionResultToMessages(result, metadata)
 }
 
+// GetExecutionResultByID returns the execution result for the given ID.
+func (h *Handler) GetExecutionResultByID(ctx context.Context, req *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	blockID := convert.MessageToIdentifier(req.GetId())
+
+	result, err := h.api.GetExecutionResultByID(ctx, blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	execResult, err := convert.ExecutionResultToMessage(result)
+	if err != nil {
+		return nil, err
+	}
+	return &access.ExecutionResultByIDResponse{
+		ExecutionResult: execResult,
+		Metadata:        metadata,
+	}, nil
+}
+
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {
 	metadata := h.buildMetadataResponse()
 

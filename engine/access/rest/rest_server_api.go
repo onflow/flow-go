@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"google.golang.org/grpc/status"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
@@ -13,10 +15,122 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forwarder"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow-go/module/metrics"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
+
+// RestRouter is a structure that represents the routing proxy algorithm.
+// It splits requests between a local and a remote rest service.
+type RestRouter struct {
+	Logger   zerolog.Logger
+	Metrics  *metrics.ObserverCollector
+	Upstream *RestForwarder
+	Observer *RequestHandler
+}
+
+func (r *RestRouter) log(handler, rpc string, err error) {
+	code := status.Code(err)
+	r.Metrics.RecordRPC(handler, rpc, code)
+
+	logger := r.Logger.With().
+		Str("handler", handler).
+		Str("rest_method", rpc).
+		Str("rest_code", code.String()).
+		Logger()
+
+	if err != nil {
+		logger.Error().Err(err).Msg("request failed")
+		return
+	}
+
+	logger.Info().Msg("request succeeded")
+}
+
+func (r *RestRouter) GetTransactionByID(req request.GetTransaction, context context.Context, link models.LinkGenerator, chain flow.Chain) (models.Transaction, error) {
+	res, err := r.Upstream.GetTransactionByID(req, context, link, chain)
+	r.log("upstream", "GetNodeVersionInfo", err)
+	return res, err
+}
+
+func (r *RestRouter) CreateTransaction(req request.CreateTransaction, context context.Context, link models.LinkGenerator) (models.Transaction, error) {
+	res, err := r.Upstream.CreateTransaction(req, context, link)
+	r.log("upstream", "CreateTransaction", err)
+	return res, err
+}
+
+func (r *RestRouter) GetTransactionResultByID(req request.GetTransactionResult, context context.Context, link models.LinkGenerator) (models.TransactionResult, error) {
+	res, err := r.Upstream.GetTransactionResultByID(req, context, link)
+	r.log("upstream", "GetTransactionResultByID", err)
+	return res, err
+}
+
+func (r *RestRouter) GetBlocksByIDs(req request.GetBlockByIDs, context context.Context, expandFields map[string]bool, link models.LinkGenerator) ([]*models.Block, error) {
+	res, err := r.Observer.GetBlocksByIDs(req, context, expandFields, link)
+	r.log("observer", "GetBlocksByIDs", err)
+	return res, err
+}
+
+func (r *RestRouter) GetBlocksByHeight(req *request.Request, link models.LinkGenerator) ([]*models.Block, error) {
+	res, err := r.Observer.GetBlocksByHeight(req, link)
+	r.log("observer", "GetBlocksByHeight", err)
+	return res, err
+}
+
+func (r *RestRouter) GetBlockPayloadByID(req request.GetBlockPayload, context context.Context, link models.LinkGenerator) (models.BlockPayload, error) {
+	res, err := r.Observer.GetBlockPayloadByID(req, context, link)
+	r.log("observer", "GetBlockPayloadByID", err)
+	return res, err
+}
+
+func (r *RestRouter) GetExecutionResultByID(req request.GetExecutionResult, context context.Context, link models.LinkGenerator) (models.ExecutionResult, error) {
+	res, err := r.Upstream.GetExecutionResultByID(req, context, link)
+	r.log("upstream", "GetExecutionResultByID", err)
+	return res, err
+}
+
+func (r *RestRouter) GetExecutionResultsByBlockIDs(req request.GetExecutionResultByBlockIDs, context context.Context, link models.LinkGenerator) ([]models.ExecutionResult, error) {
+	res, err := r.Upstream.GetExecutionResultsByBlockIDs(req, context, link)
+	r.log("upstream", "GetExecutionResultsByBlockIDs", err)
+	return res, err
+}
+
+func (r *RestRouter) GetCollectionByID(req request.GetCollection, context context.Context, expandFields map[string]bool, link models.LinkGenerator, chain flow.Chain) (models.Collection, error) {
+	res, err := r.Upstream.GetCollectionByID(req, context, expandFields, link, chain)
+	r.log("upstream", "GetCollectionByID", err)
+	return res, err
+}
+
+func (r *RestRouter) ExecuteScript(req request.GetScript, context context.Context, link models.LinkGenerator) ([]byte, error) {
+	res, err := r.Upstream.ExecuteScript(req, context, link)
+	r.log("upstream", "ExecuteScript", err)
+	return res, err
+}
+
+func (r *RestRouter) GetAccount(req request.GetAccount, context context.Context, expandFields map[string]bool, link models.LinkGenerator) (models.Account, error) {
+	res, err := r.Upstream.GetAccount(req, context, expandFields, link)
+	r.log("upstream", "GetAccount", err)
+	return res, err
+}
+
+func (r *RestRouter) GetEvents(req request.GetEvents, context context.Context) (models.BlocksEvents, error) {
+	res, err := r.Upstream.GetEvents(req, context)
+	r.log("upstream", "GetEvents", err)
+	return res, err
+}
+
+func (r *RestRouter) GetNetworkParameters(req *request.Request) (models.NetworkParameters, error) {
+	res, err := r.Observer.GetNetworkParameters(req)
+	r.log("observer", "GetNetworkParameters", err)
+	return res, err
+}
+
+func (r *RestRouter) GetNodeVersionInfo(req *request.Request) (models.NodeVersionInfo, error) {
+	res, err := r.Observer.GetNodeVersionInfo(req)
+	r.log("observer", "GetNodeVersionInfo", err)
+	return res, err
+}
 
 type RestServerApi interface {
 	// GetTransactionByID gets a transaction by requested ID.
@@ -55,8 +169,16 @@ type RequestHandler struct {
 	backend access.API
 }
 
+//// NewRequestHandler returns new RequestHandler.
+//func NewRequestHandler(log zerolog.Logger, backend access.API) RestServerApi {
+//	return &RequestHandler{
+//		log:     log,
+//		backend: backend,
+//	}
+//}
+
 // NewRequestHandler returns new RequestHandler.
-func NewRequestHandler(log zerolog.Logger, backend access.API) RestServerApi {
+func NewRequestHandler(log zerolog.Logger, backend access.API) *RequestHandler {
 	return &RequestHandler{
 		log:     log,
 		backend: backend,
@@ -384,14 +506,14 @@ type RestForwarder struct {
 }
 
 // NewRestForwarder returns new RestForwarder.
-func NewRestForwarder(log zerolog.Logger, identities flow.IdentityList, timeout time.Duration, maxMsgSize uint) (RestServerApi, error) {
-	commonForwarder, err := forwarder.NewForwarder(identities, timeout, maxMsgSize)
+func NewRestForwarder(log zerolog.Logger, identities flow.IdentityList, timeout time.Duration, maxMsgSize uint) (*RestForwarder, error) {
+	forwarder, err := forwarder.NewForwarder(identities, timeout, maxMsgSize)
 
-	forwarder := &RestForwarder{
+	restForwarder := &RestForwarder{
 		log: log,
 	}
-	forwarder.Forwarder = commonForwarder
-	return forwarder, err
+	restForwarder.Forwarder = forwarder
+	return restForwarder, err
 }
 
 // GetTransactionByID gets a transaction by requested ID.
@@ -492,7 +614,7 @@ func (f *RestForwarder) GetBlocksByIDs(r request.GetBlockByIDs, context context.
 	}
 
 	for i, id := range r.IDs {
-		block, err := getForwarderBlock(forID(&id), context, expandFields, upstream, link)
+		block, err := getBlockFromGrpc(forID(&id), context, expandFields, upstream, link)
 		if err != nil {
 			return nil, err
 		}
@@ -515,7 +637,7 @@ func (f *RestForwarder) GetBlocksByHeight(r *request.Request, link models.LinkGe
 	}
 
 	if req.FinalHeight || req.SealedHeight {
-		block, err := getForwarderBlock(forFinalized(req.Heights[0]), r.Context(), r.ExpandFields, upstream, link)
+		block, err := getBlockFromGrpc(forFinalized(req.Heights[0]), r.Context(), r.ExpandFields, upstream, link)
 		if err != nil {
 			return nil, err
 		}
@@ -527,7 +649,7 @@ func (f *RestForwarder) GetBlocksByHeight(r *request.Request, link models.LinkGe
 	if req.HasHeights() {
 		blocks := make([]*models.Block, len(req.Heights))
 		for i, height := range req.Heights {
-			block, err := getForwarderBlock(forHeight(height), r.Context(), r.ExpandFields, upstream, link)
+			block, err := getBlockFromGrpc(forHeight(height), r.Context(), r.ExpandFields, upstream, link)
 			if err != nil {
 				return nil, err
 			}
@@ -557,7 +679,7 @@ func (f *RestForwarder) GetBlocksByHeight(r *request.Request, link models.LinkGe
 	blocks := make([]*models.Block, 0)
 	// start and end height inclusive
 	for i := req.StartHeight; i <= req.EndHeight; i++ {
-		block, err := getForwarderBlock(forHeight(i), r.Context(), r.ExpandFields, upstream, link)
+		block, err := getBlockFromGrpc(forHeight(i), r.Context(), r.ExpandFields, upstream, link)
 		if err != nil {
 			return nil, err
 		}
@@ -576,7 +698,7 @@ func (f *RestForwarder) GetBlockPayloadByID(r request.GetBlockPayload, context c
 		return payload, err
 	}
 
-	blkProvider := NewBlockForwarderProvider(upstream, forID(&r.ID))
+	blkProvider := NewBlockFromGrpcProvider(upstream, forID(&r.ID))
 	block, _, statusErr := blkProvider.getBlock(context)
 	if statusErr != nil {
 		return payload, statusErr
@@ -596,8 +718,38 @@ func (f *RestForwarder) GetBlockPayloadByID(r request.GetBlockPayload, context c
 }
 
 // GetExecutionResultByID gets execution result by the ID.
-func (f *RestForwarder) GetExecutionResultByID(r request.GetExecutionResult, context context.Context, link models.LinkGenerator) (models.ExecutionResult, error) { /**/
-	panic("Need to be implemented after grpc call added")
+func (f *RestForwarder) GetExecutionResultByID(r request.GetExecutionResult, context context.Context, link models.LinkGenerator) (models.ExecutionResult, error) {
+	var response models.ExecutionResult
+
+	upstream, err := f.FaultTolerantClient()
+	if err != nil {
+		return response, err
+	}
+
+	executionResultByIDRequest := &accessproto.GetExecutionResultByIDRequest{
+		Id: r.ID[:],
+	}
+
+	executionResultByIDResponse, err := upstream.GetExecutionResultByID(context, executionResultByIDRequest)
+	if err != nil {
+		return response, err
+	}
+
+	if executionResultByIDResponse == nil {
+		err := fmt.Errorf("execution result with ID: %s not found", r.ID.String())
+		return response, NewNotFoundError(err.Error(), err)
+	}
+
+	flowExecResult, err := convert.MessageToExecutionResult(executionResultByIDResponse.ExecutionResult)
+	if err != nil {
+		return response, err
+	}
+	err = response.Build(flowExecResult, link)
+	if err != nil {
+		return response, err
+	}
+
+	return response, nil
 }
 
 // GetExecutionResultsByBlockIDs gets Execution Result payload by block IDs.
@@ -677,7 +829,7 @@ func (f *RestForwarder) GetCollectionByID(r request.GetCollection, context conte
 }
 
 // ExecuteScript handler sends the script from the request to be executed.
-func (f *RestForwarder) ExecuteScript(r request.GetScript, context context.Context, link models.LinkGenerator) ([]byte, error) {
+func (f *RestForwarder) ExecuteScript(r request.GetScript, context context.Context, _ models.LinkGenerator) ([]byte, error) {
 	upstream, err := f.FaultTolerantClient()
 	if err != nil {
 		return nil, err

@@ -2,6 +2,7 @@ package models
 
 import (
 	"github.com/onflow/flow-go/access"
+
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 

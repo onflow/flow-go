@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
+	accessengine "github.com/onflow/flow-go/engine/access"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -991,8 +992,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			engineBuilder, err := rpc.NewBuilder(
-				node.Logger,
+			backend, err := accessengine.NewBackend(node.Logger,
 				node.State,
 				builder.rpcConf,
 				builder.CollectionRPC,
@@ -1007,11 +1007,22 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.AccessMetrics,
 				builder.collectionGRPCPort,
 				builder.executionGRPCPort,
-				builder.retryEnabled,
+				builder.retryEnabled)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize backend: %w", err)
+			}
+
+			engineBuilder, err := rpc.NewBuilder(
+				node.Logger,
+				node.State,
+				builder.rpcConf,
+				node.RootChainID,
+				builder.AccessMetrics,
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
 				builder.Me,
+				backend,
 			)
 			if err != nil {
 				return nil, err

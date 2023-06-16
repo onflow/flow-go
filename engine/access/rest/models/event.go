@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 

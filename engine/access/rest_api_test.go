@@ -118,7 +118,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 		RESTListenAddr:         unittest.DefaultAddress,
 	}
 
-	rpcEngBuilder, err := rpc.NewBuilder(
+	backend, err := NewBackend(
 		suite.log,
 		suite.state,
 		config,
@@ -134,11 +134,20 @@ func (suite *RestAPITestSuite) SetupTest() {
 		suite.metrics,
 		0,
 		0,
-		false,
+		false)
+	require.NoError(suite.T(), err)
+
+	rpcEngBuilder, err := rpc.NewBuilder(
+		suite.log,
+		suite.state,
+		config,
+		suite.chainID,
+		suite.metrics,
 		false,
 		nil,
 		nil,
 		suite.me,
+		backend,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()

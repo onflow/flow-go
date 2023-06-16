@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/util"
+
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 

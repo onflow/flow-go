@@ -9,12 +9,10 @@ import (
 	"sync"
 	"time"
 
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	lru "github.com/hashicorp/golang-lru"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
@@ -26,7 +24,8 @@ import (
 	"github.com/onflow/flow-go/module/events"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/storage"
+
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 )
 
 // Config defines the configurable options for the access node server
@@ -74,31 +73,23 @@ type Engine struct {
 	unsecureGrpcAddress net.Addr
 	secureGrpcAddress   net.Addr
 	restAPIAddress      net.Addr
+
+	restHandler rest.RestServerApi
 }
+type Option func(*RPCEngineBuilder)
 
 // NewBuilder returns a new RPC engine builder.
 func NewBuilder(log zerolog.Logger,
 	state protocol.State,
 	config Config,
-	collectionRPC accessproto.AccessAPIClient,
-	historicalAccessNodes []accessproto.AccessAPIClient,
-	blocks storage.Blocks,
-	headers storage.Headers,
-	collections storage.Collections,
-	transactions storage.Transactions,
-	executionReceipts storage.ExecutionReceipts,
-	executionResults storage.ExecutionResults,
 	chainID flow.ChainID,
 	accessMetrics module.AccessMetrics,
-	collectionGRPCPort uint,
-	executionGRPCPort uint,
-	retryEnabled bool,
 	rpcMetricsEnabled bool,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
 	me module.Local,
+	backend *backend.Backend,
 ) (*RPCEngineBuilder, error) {
-
 	log = log.With().Str("engine", "rpc").Logger()
 
 	// create a GRPC server to serve GRPC clients
@@ -136,63 +127,6 @@ func NewBuilder(log zerolog.Logger,
 
 	// wrap the unsecured server with an HTTP proxy server to serve HTTP clients
 	httpServer := newHTTPProxyServer(unsecureGrpcServer)
-
-	var cache *lru.Cache
-	cacheSize := config.ConnectionPoolSize
-	if cacheSize > 0 {
-		// TODO: remove this fallback after fixing issues with evictions
-		// It was observed that evictions cause connection errors for in flight requests. This works around
-		// the issue by forcing hte pool size to be greater than the number of ENs + LNs
-		if cacheSize < backend.DefaultConnectionPoolSize {
-			log.Warn().Msg("connection pool size below threshold, setting pool size to default value ")
-			cacheSize = backend.DefaultConnectionPoolSize
-		}
-		var err error
-		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
-			store := evictedValue.(*backend.CachedClient)
-			store.Close()
-			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
-			if accessMetrics != nil {
-				accessMetrics.ConnectionFromPoolEvicted()
-			}
-		})
-		if err != nil {
-			return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
-		}
-	}
-
-	connectionFactory := &backend.ConnectionFactoryImpl{
-		CollectionGRPCPort:        collectionGRPCPort,
-		ExecutionGRPCPort:         executionGRPCPort,
-		CollectionNodeGRPCTimeout: config.CollectionClientTimeout,
-		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
-		ConnectionsCache:          cache,
-		CacheSize:                 cacheSize,
-		MaxMsgSize:                config.MaxMsgSize,
-		AccessMetrics:             accessMetrics,
-		Log:                       log,
-	}
-
-	backend := backend.New(state,
-		collectionRPC,
-		historicalAccessNodes,
-		blocks,
-		headers,
-		collections,
-		transactions,
-		executionReceipts,
-		executionResults,
-		chainID,
-		accessMetrics,
-		connectionFactory,
-		retryEnabled,
-		config.MaxHeightRange,
-		config.PreferredExecutionNodeIDs,
-		config.FixedExecutionNodeIDs,
-		log,
-		backend.DefaultSnapshotHistoryLimit,
-		config.ArchiveAddressList,
-	)
 
 	finalizedCache, finalizedCacheWorker, err := events.NewFinalizedHeaderCache(state)
 	if err != nil {
@@ -384,7 +318,7 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 
 	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
 
-	r, err := rest.NewServer(e.backend, e.config.RESTListenAddr, e.log, e.chain, e.restCollector)
+	r, err := rest.NewServer(e.restHandler, e.config.RESTListenAddr, e.log, e.chain, e.restCollector)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
 		ctx.Throw(err)
