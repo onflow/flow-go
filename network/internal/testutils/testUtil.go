@@ -291,7 +291,7 @@ func NetworkConfigFixture(
 	return params
 }
 
-// GenerateIDsAndMiddlewares returns nodeIDs, libp2pNodes, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
+// GenerateIDsAndMiddlewares returns nodeIDs, libp2pNodes, middlewares, and observables which can be subscribed to in order to witness events from pubsub
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	logger zerolog.Logger,
