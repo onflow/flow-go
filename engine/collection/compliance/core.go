@@ -111,28 +111,31 @@ func NewCore(
 
 // OnBlockProposal handles incoming block proposals.
 // No errors are expected during normal operation.
-func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
+func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.ClusterBlockProposal]) error {
 	startTime := time.Now()
 	defer func() {
 		c.hotstuffMetrics.BlockProcessingDuration(time.Since(startTime))
 	}()
 
-	block := proposal.Block.ToInternal()
-	header := block.Header
+	block := flow.Slashable[*cluster.Block]{
+		OriginID: proposal.OriginID,
+		Message:  proposal.Message.Block.ToInternal(),
+	}
+	header := block.Message.Header
 	blockID := header.ID()
 	finalHeight := c.finalizedHeight.Value()
 	finalView := c.finalizedView.Value()
 
 	log := c.log.With().
-		Hex("origin_id", originID[:]).
+		Hex("origin_id", proposal.OriginID[:]).
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", blockID[:]).
 		Hex("parent_id", header.ParentID[:]).
-		Hex("ref_block_id", block.Payload.ReferenceBlockID[:]).
-		Hex("collection_id", logging.Entity(block.Payload.Collection)).
-		Int("tx_count", block.Payload.Collection.Len()).
+		Hex("ref_block_id", block.Message.Payload.ReferenceBlockID[:]).
+		Hex("collection_id", logging.Entity(block.Message.Payload.Collection)).
+		Int("tx_count", block.Message.Payload.Collection.Len()).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("parent_signer_indices", header.ParentVoterIndices).
@@ -140,7 +143,8 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		Uint64("finalized_view", finalView).
 		Logger()
 	if log.Debug().Enabled() {
-		log = log.With().Strs("tx_ids", flow.IdentifierList(block.Payload.Collection.Light().Transactions).Strings()).Logger()
+		log = log.With().Strs("tx_ids",
+			flow.IdentifierList(block.Message.Payload.Collection.Light().Transactions).Strings()).Logger()
 	}
 	log.Info().Msg("block proposal received")
 
@@ -196,7 +200,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	_, found := c.pending.ByID(header.ParentID)
 	if found {
 		// add the block to the cache
-		_ = c.pending.Add(originID, block)
+		_ = c.pending.Add(block)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		return nil
@@ -210,7 +214,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		return fmt.Errorf("could not check parent exists: %w", err)
 	}
 	if !exists {
-		_ = c.pending.Add(originID, block)
+		_ = c.pending.Add(block)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
@@ -223,7 +227,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	err = c.processBlockAndDescendants(originID, block)
+	err = c.processBlockAndDescendants(block)
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -236,17 +240,18 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 // its pending descendants. By induction, any child block of a
 // valid proposal is itself connected to the finalized state and can be
 // processed as well.
-func (c *Core) processBlockAndDescendants(originID flow.Identifier, proposal *cluster.Block) error {
-	blockID := proposal.ID()
+func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Block]) error {
+	header := proposal.Message.Header
+	blockID := header.ID()
 	log := c.log.With().
 		Str("block_id", blockID.String()).
-		Uint64("block_height", proposal.Header.Height).
-		Uint64("block_view", proposal.Header.View).
-		Uint64("parent_view", proposal.Header.ParentView).
+		Uint64("block_height", header.Height).
+		Uint64("block_view", header.View).
+		Uint64("parent_view", header.ParentView).
 		Logger()
 
 	// process block itself
-	err := c.processBlockProposal(proposal)
+	err := c.processBlockProposal(proposal.Message)
 	if err != nil {
 		if checkForAndLogOutdatedInputError(err, log) || checkForAndLogUnverifiableInputError(err, log) {
 			return nil
@@ -256,12 +261,12 @@ func (c *Core) processBlockAndDescendants(originID flow.Identifier, proposal *cl
 
 			// notify consumers about invalid block
 			c.proposalViolationNotifier.OnInvalidBlockDetected(flow.Slashable[model.InvalidProposalError]{
-				OriginID: originID,
+				OriginID: proposal.OriginID,
 				Message:  *invalidBlockErr,
 			})
 
 			// notify VoteAggregator about the invalid block
-			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header))
+			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(header))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
 					log.Warn().Msg("received invalid block, but is below pruned threshold")
@@ -283,7 +288,7 @@ func (c *Core) processBlockAndDescendants(originID flow.Identifier, proposal *cl
 		return nil
 	}
 	for _, child := range children {
-		cpr := c.processBlockAndDescendants(originID, child.Message)
+		cpr := c.processBlockAndDescendants(child)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr
