@@ -39,7 +39,7 @@ func (fc *FlowConfig) Validate() error {
 }
 
 // DefaultConfig initializes the flow configuration. All default values for the Flow
-// configuration are stored in the default-config.yml file. These values can be overriden
+// configuration are stored in the default-config.yml file. These values can be overridden
 // by node operators by setting the corresponding cli flag. DefaultConfig should be called
 // before any pflags are parsed, this will allow the configuration to initialize with defaults
 // from default-config.yml.
