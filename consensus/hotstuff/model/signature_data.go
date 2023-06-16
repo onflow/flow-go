@@ -47,17 +47,6 @@ func (p *SigDataPacker) Decode(data []byte) (*SignatureData, error) {
 	return &sigData, nil
 }
 
-// UnpackRandomBeaconSig takes sigData previously packed by packer,
-// decodes it and extracts random beacon signature.
-// This function is side-effect free. It only ever returns a
-// model.InvalidFormatError, which indicates an invalid encoding.
-func unpackRandomBeaconSig(sigData []byte) (crypto.Signature, error) {
-	// decode into typed data
-	packer := SigDataPacker{}
-	sig, err := packer.Decode(sigData)
-	return sig.ReconstructedRandomBeaconSig, err
-}
-
 // BeaconSignature extracts the source of randomness from the QC sigData.
 //
 // The sigData is an RLP encoded structure that is part of QuorumCertificate.
@@ -65,9 +54,10 @@ func unpackRandomBeaconSig(sigData []byte) (crypto.Signature, error) {
 // invalid encoding.
 func BeaconSignature(qc *flow.QuorumCertificate) ([]byte, error) {
 	// unpack sig data to extract random beacon signature
-	randomBeaconSig, err := unpackRandomBeaconSig(qc.SigData)
+	packer := SigDataPacker{}
+	sigData, err := packer.Decode(qc.SigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not unpack block signature: %w", err)
 	}
-	return randomBeaconSig, nil
+	return sigData.ReconstructedRandomBeaconSig, nil
 }
