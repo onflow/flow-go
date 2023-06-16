@@ -29,7 +29,9 @@ type FlowConfig struct {
 	NetworkConfig *network.Config `mapstructure:"network-config"`
 }
 
-// Validate validate Flow config.
+// Validate checks validity of the Flow config. Errors indicate that either the configuration is broken, 
+// incompatible with the node's internal state, or that the node's internal state is corrupted. In all 
+// cases, continuation is impossible. 
 func (fc *FlowConfig) Validate() error {
 	err := fc.NetworkConfig.Validate()
 	if err != nil {
