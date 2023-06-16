@@ -30,7 +30,9 @@ type FlowConfig struct {
 	NetworkConfig *network.Config `mapstructure:"network-config"`
 }
 
-// Validate validate Flow config.
+// Validate checks validity of the Flow config. Errors indicate that either the configuration is broken, 
+// incompatible with the node's internal state, or that the node's internal state is corrupted. In all 
+// cases, continuation is impossible. 
 func (fc *FlowConfig) Validate() error {
 	err := validate.Struct(fc)
 	if err != nil {
@@ -73,7 +75,7 @@ func DefaultConfig() (*FlowConfig, error) {
 //	error: if there is any error encountered binding pflags or unmarshalling the config struct, all errors are considered irrecoverable.
 //	bool: true if --config-file flag was set and config file was loaded, false otherwise.
 //
-// Note: As configuration management is improved this func should accept the entire Flow config as the arg to unmarshall new config values into.
+// Note: As configuration management is improved, this func should accept the entire Flow config as the arg to unmarshall new config values into.
 func BindPFlags(c *FlowConfig, flags *pflag.FlagSet) (error, bool) {
 	if !flags.Parsed() {
 		return fmt.Errorf("failed to bind flags to configuration values, pflags must be parsed before binding"), false
