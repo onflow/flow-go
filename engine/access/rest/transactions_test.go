@@ -102,9 +102,11 @@ func validCreateBody(tx flow.TransactionBody) map[string]interface{} {
 }
 
 func TestGetTransactions(t *testing.T) {
+	backend := &mock.API{}
+	restHandler := newAccessRestHandler(backend)
 
 	t.Run("get by ID without results", func(t *testing.T) {
-		backend := &mock.API{}
+
 		tx := unittest.TransactionFixture()
 		req := getTransactionReq(tx.ID().String(), false, "", "")
 
@@ -145,7 +147,7 @@ func TestGetTransactions(t *testing.T) {
 			}`,
 			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
 
-		assertOKResponse(t, req, expected, backend)
+		assertOKResponse(t, req, expected, restHandler)
 	})
 
 	t.Run("Get by ID with results", func(t *testing.T) {
@@ -214,19 +216,16 @@ func TestGetTransactions(t *testing.T) {
 			   }
 			}`,
 			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ReferenceBlockID, txr.CollectionID, tx.ID(), tx.ID(), tx.ID())
-		assertOKResponse(t, req, expected, backend)
+		assertOKResponse(t, req, expected, restHandler)
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
-		backend := &mock.API{}
-
 		req := getTransactionReq("invalid", false, "", "")
 		expected := `{"code":400, "message":"invalid ID format"}`
-		assertResponse(t, req, http.StatusBadRequest, expected, backend)
+		assertResponse(t, req, http.StatusBadRequest, expected, restHandler)
 	})
 
 	t.Run("get by ID non-existing", func(t *testing.T) {
-		backend := &mock.API{}
 		tx := unittest.TransactionFixture()
 		req := getTransactionReq(tx.ID().String(), false, "", "")
 
@@ -235,7 +234,7 @@ func TestGetTransactions(t *testing.T) {
 			Return(nil, status.Error(codes.NotFound, "transaction not found"))
 
 		expected := `{"code":404, "message":"Flow resource not found: transaction not found"}`
-		assertResponse(t, req, http.StatusNotFound, expected, backend)
+		assertResponse(t, req, http.StatusNotFound, expected, restHandler)
 	})
 }
 
@@ -276,15 +275,17 @@ func TestGetTransactionResult(t *testing.T) {
 			}
 		}`, bid.String(), cid.String(), id.String(), util.ToBase64(txr.Events[0].Payload), id.String())
 
+	backend := &mock.API{}
+	restHandler := newAccessRestHandler(backend)
+
 	t.Run("get by transaction ID", func(t *testing.T) {
-		backend := &mock.API{}
 		req := getTransactionResultReq(id.String(), "", "")
 
 		backend.Mock.
 			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID).
 			Return(txr, nil)
 
-		assertOKResponse(t, req, expected, backend)
+		assertOKResponse(t, req, expected, restHandler)
 	})
 
 	t.Run("get by block ID", func(t *testing.T) {
@@ -295,7 +296,7 @@ func TestGetTransactionResult(t *testing.T) {
 			On("GetTransactionResult", mocks.Anything, id, bid, flow.ZeroID).
 			Return(txr, nil)
 
-		assertOKResponse(t, req, expected, backend)
+		assertOKResponse(t, req, expected, restHandler)
 	})
 
 	t.Run("get by collection ID", func(t *testing.T) {
@@ -306,7 +307,7 @@ func TestGetTransactionResult(t *testing.T) {
 			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, cid).
 			Return(txr, nil)
 
-		assertOKResponse(t, req, expected, backend)
+		assertOKResponse(t, req, expected, restHandler)
 	})
 
 	t.Run("get execution statuses", func(t *testing.T) {
@@ -353,23 +354,23 @@ func TestGetTransactionResult(t *testing.T) {
 					"_self": "/v1/transaction_results/%s"
 				}
 			}`, bid.String(), cid.String(), err, cases.Title(language.English).String(strings.ToLower(txResult.Status.String())), txResult.ErrorMessage, id.String())
-			assertOKResponse(t, req, expectedResp, backend)
+			assertOKResponse(t, req, expectedResp, restHandler)
 		}
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
-		backend := &mock.API{}
 		req := getTransactionResultReq("invalid", "", "")
 
 		expected := `{"code":400, "message":"invalid ID format"}`
-		assertResponse(t, req, http.StatusBadRequest, expected, backend)
+		assertResponse(t, req, http.StatusBadRequest, expected, restHandler)
 	})
 }
 
 func TestCreateTransaction(t *testing.T) {
+	backend := &mock.API{}
+	restHandler := newAccessRestHandler(backend)
 
 	t.Run("create", func(t *testing.T) {
-		backend := &mock.API{}
 		tx := unittest.TransactionBodyFixture()
 		tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
 		tx.Arguments = [][]uint8{}
@@ -417,11 +418,10 @@ func TestCreateTransaction(t *testing.T) {
 			   }
 			}`,
 			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.PayloadSignatures[0].Signature), util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
-		assertOKResponse(t, req, expected, backend)
+		assertOKResponse(t, req, expected, restHandler)
 	})
 
 	t.Run("post invalid transaction", func(t *testing.T) {
-		backend := &mock.API{}
 		tests := []struct {
 			inputField string
 			inputValue string
@@ -445,7 +445,7 @@ func TestCreateTransaction(t *testing.T) {
 			testTx[test.inputField] = test.inputValue
 			req := createTransactionReq(testTx)
 
-			assertResponse(t, req, http.StatusBadRequest, test.output, backend)
+			assertResponse(t, req, http.StatusBadRequest, test.output, restHandler)
 		}
 	})
 }

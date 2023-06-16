@@ -24,6 +24,7 @@ func nodeVersionInfoURL(t *testing.T) string {
 
 func TestGetNodeVersionInfo(t *testing.T) {
 	backend := mock.NewAPI(t)
+	restHandler := newAccessRestHandler(backend)
 
 	t.Run("get node version info", func(t *testing.T) {
 		req := getNodeVersionInfoRequest(t)
@@ -41,7 +42,7 @@ func TestGetNodeVersionInfo(t *testing.T) {
 
 		expected := nodeVersionInfoExpectedStr(params)
 
-		assertOKResponse(t, req, expected, backend)
+		assertOKResponse(t, req, expected, restHandler)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 }

@@ -26,7 +26,7 @@ import (
 type RestRouter struct {
 	Logger   zerolog.Logger
 	Metrics  *metrics.ObserverCollector
-	Upstream *RestForwarder
+	Upstream RestServerApi
 	Observer *RequestHandler
 }
 

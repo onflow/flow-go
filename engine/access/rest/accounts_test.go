@@ -35,6 +35,7 @@ func accountURL(t *testing.T, address string, height string) string {
 
 func TestGetAccount(t *testing.T) {
 	backend := &mock.API{}
+	restHandler := newAccessRestHandler(backend)
 
 	t.Run("get by address at latest sealed block", func(t *testing.T) {
 		account := accountFixture(t)
@@ -53,7 +54,7 @@ func TestGetAccount(t *testing.T) {
 
 		expected := expectedExpandedResponse(account)
 
-		assertOKResponse(t, req, expected, backend)
+		assertOKResponse(t, req, expected, restHandler)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -73,7 +74,7 @@ func TestGetAccount(t *testing.T) {
 
 		expected := expectedExpandedResponse(account)
 
-		assertOKResponse(t, req, expected, backend)
+		assertOKResponse(t, req, expected, restHandler)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -88,7 +89,7 @@ func TestGetAccount(t *testing.T) {
 
 		expected := expectedExpandedResponse(account)
 
-		assertOKResponse(t, req, expected, backend)
+		assertOKResponse(t, req, expected, restHandler)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -103,7 +104,7 @@ func TestGetAccount(t *testing.T) {
 
 		expected := expectedCondensedResponse(account)
 
-		assertOKResponse(t, req, expected, backend)
+		assertOKResponse(t, req, expected, restHandler)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -118,7 +119,7 @@ func TestGetAccount(t *testing.T) {
 
 		for i, test := range tests {
 			req, _ := http.NewRequest("GET", test.url, nil)
-			rr, err := executeRequest(req, backend)
+			rr, err := executeRequest(req, restHandler)
 			assert.NoError(t, err)
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -126,6 +127,206 @@ func TestGetAccount(t *testing.T) {
 		}
 	})
 }
+
+//func TestObserverGetAccount(t *testing.T) {
+//	backend := &mock.API{}
+//	address := unittest.IPPort("11632")
+//
+//	t.Run("get by address at latest sealed block", func(t *testing.T) {
+//		account := accountFixture(t)
+//		entityAccount, err := convert.AccountToMessage(account)
+//		assert.NoError(t, err)
+//
+//		var height uint64 = 100
+//		blockHeader, err := convert.BlockHeaderToMessage(unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height)), unittest.IdentifierListFixture(4)) //?
+//		assert.NoError(t, err)
+//
+//		req := getAccountRequest(t, account, sealedHeightQueryParam, expandableFieldKeys, expandableFieldContracts)
+//
+//		done := make(chan int)
+//		// Bring up 1st upstream server
+//		mockServer := new(engineaccessmock.AccessAPIServer)
+//		mockServer.Mock.
+//			On("GetLatestBlockHeader", mocktestify.Anything,
+//				&access.GetLatestBlockHeaderRequest{
+//					IsSealed: true,
+//				}).
+//			Return(&access.BlockHeaderResponse{
+//				Block:       blockHeader,
+//				BlockStatus: entities.BlockStatus_BLOCK_SEALED,
+//				Metadata:    nil,
+//			}, nil)
+//
+//		mockServer.Mock.
+//			On("GetAccountAtBlockHeight", mocktestify.Anything, &access.GetAccountAtBlockHeightRequest{
+//				Address:     account.Address.Bytes(),
+//				BlockHeight: height,
+//			}).
+//			Return(&access.AccountResponse{
+//				Account:  entityAccount,
+//				Metadata: nil,
+//			}, nil)
+//		expected := expectedExpandedResponse(account)
+//
+//		server, _, err := newGrpcServer(mockServer, "tcp", address, done)
+//		assert.NoError(t, err)
+//
+//		restHandler, err := newObserverRestHandler(backend, flow.IdentityList{{Address: address}})
+//		assert.NoError(t, err)
+//
+//		assertOKResponse(t, req, expected, restHandler)
+//		mocktestify.AssertExpectationsForObjects(t, backend)
+//
+//		server.Stop()
+//		<-done
+//	})
+//
+//	//t.Run("get by address at latest finalized block", func(t *testing.T) {
+//	//	var height uint64 = 100
+//	//	blockHeader, err := convert.BlockHeaderToMessage(unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height)), unittest.IdentifierListFixture(4))
+//	//	assert.NoError(t, err)
+//	//	account := accountFixture(t)
+//	//	entityAccount, err := convert.AccountToMessage(account)
+//	//	assert.NoError(t, err)
+//	//
+//	//	req := getAccountRequest(t, account, finalHeightQueryParam, expandableFieldKeys, expandableFieldContracts)
+//	//
+//	//	done := make(chan int)
+//	//	// Bring up 1st upstream server
+//	//	mockServer := new(engineaccessmock.AccessAPIServer)
+//	//	mockServer.Mock.
+//	//		On("GetLatestBlockHeader", mocktestify.Anything,
+//	//			&access.GetLatestBlockHeaderRequest{
+//	//				IsSealed: false,
+//	//			}).
+//	//		Return(&access.BlockHeaderResponse{
+//	//			Block:       blockHeader,
+//	//			BlockStatus: entities.BlockStatus_BLOCK_FINALIZED,
+//	//			Metadata:    nil,
+//	//		}, nil)
+//	//	mockServer.Mock.
+//	//		On("GetAccountAtBlockHeight", mocktestify.Anything, &access.GetAccountAtBlockHeightRequest{
+//	//			Address:     account.Address.Bytes(),
+//	//			BlockHeight: height,
+//	//		}).
+//	//		Return(&access.AccountResponse{
+//	//			Account:  entityAccount,
+//	//			Metadata: nil,
+//	//		}, nil)
+//	//	expected := expectedExpandedResponse(account)
+//	//
+//	//	server, _, err := newGrpcServer(mockServer, "tcp", address, done)
+//	//	assert.NoError(t, err)
+//	//
+//	//	restHandler, err := newObserverRestHandler(backend, flow.IdentityList{{Address: address}})
+//	//	assert.NoError(t, err)
+//	//
+//	//	assertOKResponse(t, req, expected, restHandler)
+//	//	mocktestify.AssertExpectationsForObjects(t, backend)
+//	//
+//	//	server.Stop()
+//	//	<-done
+//	//})
+//	//
+//	//t.Run("get by address at height", func(t *testing.T) {
+//	//	var height uint64 = 1337
+//	//	account := accountFixture(t)
+//	//	entityAccount, err := convert.AccountToMessage(account)
+//	//	assert.NoError(t, err)
+//	//
+//	//	req := getAccountRequest(t, account, fmt.Sprintf("%d", height), expandableFieldKeys, expandableFieldContracts)
+//	//
+//	//	done := make(chan int)
+//	//	// Bring up 1st upstream server
+//	//	mockServer := new(engineaccessmock.AccessAPIServer)
+//	//	mockServer.Mock.
+//	//		On("GetAccountAtBlockHeight", mocktestify.Anything, &access.GetAccountAtBlockHeightRequest{
+//	//			Address:     account.Address.Bytes(),
+//	//			BlockHeight: height,
+//	//		}).
+//	//		Return(&access.AccountResponse{
+//	//			Account:  entityAccount,
+//	//			Metadata: nil,
+//	//		}, nil)
+//	//	expected := expectedExpandedResponse(account)
+//	//
+//	//	server, _, err := newGrpcServer(mockServer, "tcp", address, done)
+//	//	assert.NoError(t, err)
+//	//
+//	//	restHandler, err := newObserverRestHandler(backend, flow.IdentityList{{Address: address}})
+//	//	assert.NoError(t, err)
+//	//
+//	//	assertOKResponse(t, req, expected, restHandler)
+//	//	mocktestify.AssertExpectationsForObjects(t, backend)
+//	//
+//	//	server.Stop()
+//	//	<-done
+//	//})
+//	//
+//	//t.Run("get by address at height condensed", func(t *testing.T) {
+//	//	var height uint64 = 1337
+//	//	account := accountFixture(t)
+//	//	entityAccount, err := convert.AccountToMessage(account)
+//	//	assert.NoError(t, err)
+//	//
+//	//	req := getAccountRequest(t, account, fmt.Sprintf("%d", height))
+//	//
+//	//	done := make(chan int)
+//	//	// Bring up 1st upstream server
+//	//	mockServer := new(engineaccessmock.AccessAPIServer)
+//	//	mockServer.Mock.
+//	//		On("GetAccountAtBlockHeight", mocktestify.Anything, &access.GetAccountAtBlockHeightRequest{
+//	//			Address:     account.Address.Bytes(),
+//	//			BlockHeight: height,
+//	//		}).
+//	//		Return(&access.AccountResponse{
+//	//			Account:  entityAccount,
+//	//			Metadata: nil,
+//	//		}, nil)
+//	//	expected := expectedCondensedResponse(account)
+//	//
+//	//	server, _, err := newGrpcServer(mockServer, "tcp", address, done)
+//	//	assert.NoError(t, err)
+//	//
+//	//	restHandler, err := newObserverRestHandler(backend, flow.IdentityList{{Address: address}})
+//	//	assert.NoError(t, err)
+//	//
+//	//	assertOKResponse(t, req, expected, restHandler)
+//	//	mocktestify.AssertExpectationsForObjects(t, backend)
+//	//
+//	//	server.Stop()
+//	//	<-done
+//	//})
+//	//
+//	//t.Run("get invalid", func(t *testing.T) {
+//	//	tests := []struct {
+//	//		url string
+//	//		out string
+//	//	}{
+//	//		{accountURL(t, "123", ""), `{"code":400, "message":"invalid address"}`},
+//	//		{accountURL(t, unittest.AddressFixture().String(), "foo"), `{"code":400, "message":"invalid height format"}`},
+//	//	}
+//	//
+//	//	done := make(chan int)
+//	//	// Bring up 1st upstream server
+//	//	server, _, err := newGrpcServer(new(engineaccessmock.AccessAPIServer), "tcp", address, done)
+//	//	assert.NoError(t, err)
+//	//
+//	//	restHandler, err := newObserverRestHandler(backend, flow.IdentityList{{Address: address}})
+//	//	assert.NoError(t, err)
+//	//	for i, test := range tests {
+//	//		req, _ := http.NewRequest("GET", test.url, nil)
+//	//		rr, err := executeRequest(req, restHandler)
+//	//		assert.NoError(t, err)
+//	//
+//	//		assert.Equal(t, http.StatusBadRequest, rr.Code)
+//	//		assert.JSONEq(t, test.out, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))
+//	//	}
+//	//
+//	//	server.Stop()
+//	//	<-done
+//	//})
+//}
 
 func expectedExpandedResponse(account *flow.Account) string {
 	return fmt.Sprintf(`{

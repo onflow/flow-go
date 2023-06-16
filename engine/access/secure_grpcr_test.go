@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -108,7 +109,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	rpcEngBuilder, err := rpc.NewBuilder(
+	backend, err := NewBackend(
 		suite.log,
 		suite.state,
 		config,
@@ -124,11 +125,20 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		suite.metrics,
 		0,
 		0,
-		false,
+		false)
+	require.NoError(suite.T(), err)
+
+	rpcEngBuilder, err := rpc.NewBuilder(
+		suite.log,
+		suite.state,
+		config,
+		suite.chainID,
+		suite.metrics,
 		false,
 		nil,
 		nil,
 		suite.me,
+		backend,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()

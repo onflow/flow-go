@@ -31,12 +31,13 @@ type testVector struct {
 	expectedResponse string
 }
 
-// TestGetBlocks tests the get blocks by ID and get blocks by heights API
-func TestGetBlocks(t *testing.T) {
-	backend := &mock.API{}
-
-	blkCnt := 10
-	blockIDs, heights, blocks, executionResults := generateMocks(backend, blkCnt)
+// ?
+func prepareTestVectors(t *testing.T,
+	blockIDs []string,
+	heights []string,
+	blocks []*flow.Block,
+	executionResults []*flow.ExecutionResult,
+	blkCnt int) []testVector {
 
 	singleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusUnknown)
 	singleSealedBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusSealed)
@@ -137,15 +138,65 @@ func TestGetBlocks(t *testing.T) {
 			expectedResponse: fmt.Sprintf(`{"code":400, "message": "at most %d IDs can be requested at a time"}`, request.MaxBlockRequestHeightRange),
 		},
 	}
+	return testVectors
+}
+
+// TestGetBlocks tests the get blocks by ID and get blocks by heights API
+func TestGetBlocks(t *testing.T) {
+	backend := &mock.API{}
+
+	blkCnt := 10
+	blockIDs, heights, blocks, executionResults := generateMocks(backend, blkCnt)
+	testVectors := prepareTestVectors(t, blockIDs, heights, blocks, executionResults, blkCnt)
+	restHandler := newAccessRestHandler(backend)
 
 	for _, tv := range testVectors {
-		responseRec, err := executeRequest(tv.request, backend)
+		responseRec, err := executeRequest(tv.request, restHandler)
 		assert.NoError(t, err)
 		require.Equal(t, tv.expectedStatus, responseRec.Code, "failed test %s: incorrect response code", tv.description)
 		actualResp := responseRec.Body.String()
 		require.JSONEq(t, tv.expectedResponse, actualResp, "Failed: %s: incorrect response body", tv.description)
 	}
 }
+
+// ?
+//func TestGetBlockFromObserver(t *testing.T) {
+//	backend := &mock.API{}
+//
+//	// Bring up upstream server
+//	blkCnt := 10
+//	blockIDs, heights, blocks, executionResults := generateMocks(backend, blkCnt)
+//	address := unittest.IPPort("11633")
+//
+//	done := make(chan int)
+//	server, _, err := newGrpcServer(new(engineaccessmock.AccessAPIServer), "tcp", address, done)
+//	assert.NoError(t, err)
+//
+//	testVectors := prepareTestVectors(t, blockIDs, heights, blocks, executionResults, blkCnt)
+//
+//	var b bytes.Buffer
+//	logger := zerolog.New(&b)
+//
+//	restForwarder, err := NewRestForwarder(logger,
+//		flow.IdentityList{{Address: address}},
+//		time.Second,
+//		grpcutils.DefaultMaxMsgSize)
+//	assert.NoError(t, err)
+//
+//	restHandler, err := newObserverRestHandler_v2(backend, )
+//	assert.NoError(t, err)
+//
+//	for _, tv := range testVectors {
+//		responseRec, err := executeRequest(tv.request, restHandler)
+//		assert.NoError(t, err)
+//		require.Equal(t, tv.expectedStatus, responseRec.Code, "failed test %s: incorrect response code", tv.description)
+//		actualResp := responseRec.Body.String()
+//		require.JSONEq(t, tv.expectedResponse, actualResp, "Failed: %s: incorrect response body", tv.description)
+//
+//	}
+//	server.Stop()
+//	<-done
+//}
 
 func requestURL(t *testing.T, ids []string, start string, end string, expandResponse bool, heights ...string) *http.Request {
 	u, _ := url.Parse("/v1/blocks")

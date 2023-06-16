@@ -3,17 +3,26 @@ package rest
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+
+	"google.golang.org/grpc"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/access/mock"
+	engineaccessmock "github.com/onflow/flow-go/engine/access/mock"
+	restmock "github.com/onflow/flow-go/engine/access/rest/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/grpcutils"
+
+	"github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 const (
@@ -26,11 +35,12 @@ const (
 	heightQueryParam          = "height"
 )
 
-func executeRequest(req *http.Request, backend *mock.API) (*httptest.ResponseRecorder, error) {
+func executeRequest(req *http.Request, restHandler RestServerApi) (*httptest.ResponseRecorder, error) {
 	var b bytes.Buffer
 	logger := zerolog.New(&b)
-	restCollector := metrics.NewNoopCollector()
-	router, err := newRouter(backend, logger, flow.Testnet.Chain(), restCollector)
+	metrics := metrics.NewNoopCollector()
+
+	router, err := newRouter(restHandler, logger, flow.Testnet.Chain(), metrics)
 	if err != nil {
 		return nil, err
 	}
@@ -40,14 +50,68 @@ func executeRequest(req *http.Request, backend *mock.API) (*httptest.ResponseRec
 	return rr, nil
 }
 
-func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API) {
-	assertResponse(t, req, http.StatusOK, expectedRespBody, backend)
+func newAccessRestHandler(backend *mock.API) RestServerApi {
+	var b bytes.Buffer
+	logger := zerolog.New(&b)
+
+	return NewRequestHandler(logger, backend)
 }
 
-func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API) {
-	rr, err := executeRequest(req, backend)
-	assert.NoError(t, err)
+func newObserverRestHandler_v2(backend *mock.API, restForwarder *restmock.RestServerApi) (RestServerApi, error) {
+	var b bytes.Buffer
+	logger := zerolog.New(&b)
+	observerCollector := metrics.NewObserverCollector() //
 
+	return &RestRouter{
+		Logger:   logger,
+		Metrics:  observerCollector,
+		Upstream: restForwarder,
+		Observer: NewRequestHandler(logger, backend),
+	}, nil
+}
+
+func newObserverRestHandler(backend *mock.API, identities flow.IdentityList) (RestServerApi, error) {
+	var b bytes.Buffer
+	logger := zerolog.New(&b)
+	observerCollector := metrics.NewObserverCollector()
+
+	restForwarder, err := NewRestForwarder(logger,
+		identities,
+		time.Second,
+		grpcutils.DefaultMaxMsgSize)
+	if err != nil {
+		return nil, err
+	}
+
+	return &RestRouter{
+		Logger:   logger,
+		Metrics:  observerCollector,
+		Upstream: restForwarder,
+		Observer: NewRequestHandler(logger, backend),
+	}, nil
+}
+
+func newGrpcServer(mockServer *engineaccessmock.AccessAPIServer, network string, address string, done chan int) (*grpc.Server, *net.Listener, error) {
+	l, err := net.Listen(network, address)
+	if err != nil {
+		return nil, nil, err
+	}
+	s := grpc.NewServer()
+	go func(done chan int) {
+		access.RegisterAccessAPIServer(s, mockServer)
+		_ = s.Serve(l)
+		done <- 1
+	}(done)
+	return s, &l, nil
+}
+
+func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, restHandler RestServerApi) {
+	assertResponse(t, req, http.StatusOK, expectedRespBody, restHandler)
+}
+
+func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, restHandler RestServerApi) {
+	rr, err := executeRequest(req, restHandler)
+	assert.NoError(t, err)
 	actualResponseBody := rr.Body.String()
 	require.JSONEq(t,
 		expectedRespBody,

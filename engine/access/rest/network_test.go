@@ -23,6 +23,7 @@ func networkURL(t *testing.T) string {
 
 func TestGetNetworkParameters(t *testing.T) {
 	backend := &mock.API{}
+	restHandler := newAccessRestHandler(backend)
 
 	t.Run("get network parameters on mainnet", func(t *testing.T) {
 
@@ -38,7 +39,7 @@ func TestGetNetworkParameters(t *testing.T) {
 
 		expected := networkParametersExpectedStr(flow.Mainnet)
 
-		assertOKResponse(t, req, expected, backend)
+		assertOKResponse(t, req, expected, restHandler)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 }
