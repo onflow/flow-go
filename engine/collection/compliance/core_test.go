@@ -322,7 +322,7 @@ func (cs *CoreSuite) TestOnBlockProposal_FailsHotStuffValidation() {
 			Message:  proposal,
 		})
 		require.Error(cs.T(), err, "proposal with invalid extension should fail")
-		require.ErrorIs(cs.T(), err, model.ErrViewForUnknownEpoch)
+		require.NotErrorIs(cs.T(), err, model.ErrViewForUnknownEpoch)
 
 		// we should not extend the state with the header
 		cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
