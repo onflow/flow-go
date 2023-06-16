@@ -585,6 +585,10 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 		fnb.Logger.Info().Str("config-file", fnb.FlowConfig.ConfigFile).Msg("configuration file updated")
 	}
 
+	if err = fnb.BaseConfig.FlowConfig.Validate(); err != nil {
+		fnb.Logger.Fatal().Err(err).Msg("flow configuration validation failed")
+	}
+
 	info := fnb.Logger.Info()
 
 	noPrint := config.Print(info, fnb.flags)

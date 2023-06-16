@@ -32,33 +32,33 @@ func (c *GossipSubRPCInspectorsConfig) Validate() error {
 type GossipSubRPCValidationInspectorConfigs struct {
 	ClusterPrefixedMessageConfig `mapstructure:",squash"`
 	// NumberOfWorkers number of worker pool workers.
-	NumberOfWorkers int `mapstructure:"gossipsub-rpc-validation-inspector-workers"`
+	NumberOfWorkers int `validate:"gte=1" mapstructure:"gossipsub-rpc-validation-inspector-workers"`
 	// CacheSize size of the queue used by worker pool for the control message validation inspector.
-	CacheSize uint32 `mapstructure:"gossipsub-rpc-validation-inspector-queue-cache-size"`
+	CacheSize uint32 `validate:"gte=100" mapstructure:"gossipsub-rpc-validation-inspector-queue-cache-size"`
 	// GraftLimits GRAFT control message validation limits.
 	GraftLimits struct {
-		HardThreshold   uint64 `mapstructure:"gossipsub-rpc-graft-hard-threshold"`
-		SafetyThreshold uint64 `mapstructure:"gossipsub-rpc-graft-safety-threshold"`
-		RateLimit       int    `mapstructure:"gossipsub-rpc-graft-rate-limit"`
+		HardThreshold   uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-graft-hard-threshold"`
+		SafetyThreshold uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-graft-safety-threshold"`
+		RateLimit       int    `validate:"gte=0" mapstructure:"gossipsub-rpc-graft-rate-limit"`
 	} `mapstructure:",squash"`
 	// PruneLimits PRUNE control message validation limits.
 	PruneLimits struct {
-		HardThreshold   uint64 `mapstructure:"gossipsub-rpc-prune-hard-threshold"`
-		SafetyThreshold uint64 `mapstructure:"gossipsub-rpc-prune-safety-threshold"`
-		RateLimit       int    `mapstructure:"gossipsub-rpc-prune-rate-limit"`
+		HardThreshold   uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-prune-hard-threshold"`
+		SafetyThreshold uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-prune-safety-threshold"`
+		RateLimit       int    `validate:"gte=0" mapstructure:"gossipsub-rpc-prune-rate-limit"`
 	} `mapstructure:",squash"`
 	// IHaveLimits IHAVE control message validation limits.
 	IHaveLimits struct {
-		HardThreshold   uint64 `mapstructure:"gossipsub-rpc-ihave-hard-threshold"`
-		SafetyThreshold uint64 `mapstructure:"gossipsub-rpc-ihave-safety-threshold"`
-		RateLimit       int    `mapstructure:"gossipsub-rpc-ihave-rate-limit"`
+		HardThreshold   uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-ihave-hard-threshold"`
+		SafetyThreshold uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-ihave-safety-threshold"`
+		RateLimit       int    `validate:"gte=0" mapstructure:"gossipsub-rpc-ihave-rate-limit"`
 	} `mapstructure:",squash"`
 	// IHaveSyncInspectSampleSizePercentage the percentage of topics to sample for sync pre-processing in float64 form.
-	IHaveSyncInspectSampleSizePercentage float64 `mapstructure:"ihave-sync-inspection-sample-size-percentage"`
+	IHaveSyncInspectSampleSizePercentage float64 `validate:"gte=.25" mapstructure:"ihave-sync-inspection-sample-size-percentage"`
 	// IHaveAsyncInspectSampleSizePercentage  the percentage of topics to sample for async pre-processing in float64 form.
-	IHaveAsyncInspectSampleSizePercentage float64 `mapstructure:"ihave-async-inspection-sample-size-percentage"`
+	IHaveAsyncInspectSampleSizePercentage float64 `validate:"gte=.10" mapstructure:"ihave-async-inspection-sample-size-percentage"`
 	// IHaveInspectionMaxSampleSize the max number of ihave messages in a sample to be inspected.
-	IHaveInspectionMaxSampleSize float64 `mapstructure:"ihave-max-sample-size"`
+	IHaveInspectionMaxSampleSize float64 `validate:"gte=100" mapstructure:"ihave-max-sample-size"`
 }
 
 // GetCtrlMsgValidationConfig returns the CtrlMsgValidationConfig for the specified p2p.ControlMessageType.
@@ -150,17 +150,17 @@ type ClusterPrefixedMessageConfig struct {
 	// when the cluster ID's provider is set asynchronously. It also allows processing of some stale messages that may be sent by nodes
 	// that fall behind in the protocol. After the amount of cluster prefixed control messages processed exceeds this threshold the node
 	// will be pushed to the edge of the network mesh.
-	ClusterPrefixHardThreshold float64 `mapstructure:"gossipsub-rpc-cluster-prefixed-hard-threshold"`
+	ClusterPrefixHardThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-cluster-prefixed-hard-threshold"`
 	// ClusterPrefixedControlMsgsReceivedCacheSize size of the cache used to track the amount of cluster prefixed topics received by peers.
-	ClusterPrefixedControlMsgsReceivedCacheSize uint32 `mapstructure:"gossipsub-cluster-prefix-tracker-cache-size"`
+	ClusterPrefixedControlMsgsReceivedCacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-cluster-prefix-tracker-cache-size"`
 	// ClusterPrefixedControlMsgsReceivedCacheDecay decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers.
-	ClusterPrefixedControlMsgsReceivedCacheDecay float64 `mapstructure:"gossipsub-cluster-prefix-tracker-cache-decay"`
+	ClusterPrefixedControlMsgsReceivedCacheDecay float64 `validate:"gt=0" mapstructure:"gossipsub-cluster-prefix-tracker-cache-decay"`
 }
 
 // GossipSubRPCMetricsInspectorConfigs rpc metrics observer inspector configuration.
 type GossipSubRPCMetricsInspectorConfigs struct {
 	// NumberOfWorkers number of worker pool workers.
-	NumberOfWorkers int `mapstructure:"gossipsub-rpc-metrics-inspector-workers"`
+	NumberOfWorkers int `validate:"gte=1" mapstructure:"gossipsub-rpc-metrics-inspector-workers"`
 	// CacheSize size of the queue used by worker pool for the control message metrics inspector.
-	CacheSize uint32 `mapstructure:"gossipsub-rpc-metrics-inspector-cache-size"`
+	CacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-rpc-metrics-inspector-cache-size"`
 }

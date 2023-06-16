@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/mapstructure"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -16,8 +17,8 @@ import (
 )
 
 var (
-	conf = viper.New()
-
+	conf     = viper.New()
+	validate *validator.Validate
 	//go:embed default-config.yml
 	configFile string
 )
@@ -25,15 +26,18 @@ var (
 // FlowConfig Flow configuration.
 type FlowConfig struct {
 	// ConfigFile used to set a path to a config.yml file used to override the default-config.yml file.
-	ConfigFile    string          `mapstructure:"config-file"`
+	ConfigFile    string          `validate:"filepath" mapstructure:"config-file"`
 	NetworkConfig *network.Config `mapstructure:"network-config"`
 }
 
 // Validate validate Flow config.
 func (fc *FlowConfig) Validate() error {
-	err := fc.NetworkConfig.Validate()
+	err := validate.Struct(fc)
 	if err != nil {
-		return fmt.Errorf("failed to validate flow network configuration values: %w", err)
+		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			return fmt.Errorf("failed to validate flow configuration: %w", validationErrors)
+		}
+		return fmt.Errorf("unexpeceted error encountered while validating flow configuration: %w", err)
 	}
 	return nil
 }
@@ -191,4 +195,8 @@ func init() {
 	if err := conf.ReadConfig(buf); err != nil {
 		panic(fmt.Errorf("failed to initialize flow config failed to read in config file: %w", err))
 	}
+
+	// create validator, at this point you can register custom validation funcs
+	// struct tag translation etc.
+	validate = validator.New()
 }
