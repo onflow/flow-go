@@ -71,7 +71,7 @@ func DefaultConfig() (*FlowConfig, error) {
 //	error: if there is any error encountered binding pflags or unmarshalling the config struct, all errors are considered irrecoverable.
 //	bool: true if --config-file flag was set and config file was loaded, false otherwise.
 //
-// Note: As configuration management is improved this func should accept the entire Flow config as the arg to unmarshall new config values into.
+// Note: As configuration management is improved, this func should accept the entire Flow config as the arg to unmarshall new config values into.
 func BindPFlags(c *FlowConfig, flags *pflag.FlagSet) (error, bool) {
 	if !flags.Parsed() {
 		return fmt.Errorf("failed to bind flags to configuration values, pflags must be parsed before binding"), false
