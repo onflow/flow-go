@@ -67,7 +67,14 @@ func (committer *LedgerViewCommitter) collectProofs(
 	proof []byte,
 	err error,
 ) {
-	// get all deduplicated register IDs
+	// Reason for including AllRegisterIDs (read and written registers) instead of ReadRegisterIDs (only read registers):
+	// AllRegisterIDs returns deduplicated register IDs that were touched by both
+	// reads and writes during the block execution.
+	// Verification nodes only need the registers in the storage proof that were touched by reads
+	// in order to execute transactions in a chunk. However, without the registers touched
+	// by writes, especially the interim trie nodes for them, verification nodes won't be
+	// able to reconstruct the trie root hash of the execution state post execution. That's why
+	// the storage proof needs both read registers and write registers, which specifically is AllRegisterIDs
 	allIds := snapshot.AllRegisterIDs()
 	keys := make([]ledger.Key, 0, len(allIds))
 	for _, id := range allIds {
