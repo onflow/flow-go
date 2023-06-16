@@ -115,7 +115,8 @@ func NewControlMsgValidationInspector(
 	})
 	// start rate limiters cleanup loop in workers
 	for _, conf := range c.config.AllCtrlMsgValidationConfig() {
-		limiter := ratelimit.NewControlMessageRateLimiter(rate.Limit(conf.RateLimit), conf.RateLimit)
+		l := logger.With().Str("control_message_type", conf.ControlMsg.String()).Logger()
+		limiter := ratelimit.NewControlMessageRateLimiter(l, rate.Limit(conf.RateLimit), conf.RateLimit)
 		c.rateLimiters[conf.ControlMsg] = limiter
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
