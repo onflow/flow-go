@@ -24,10 +24,13 @@ const RandomSourceLength = crypto.SignatureLenBLSBLS12381
 // How to use the function in Flow protocol: any sub-protocol that requires deterministic and
 // distributed randomness should rely on the Flow native randomness provided by the Random Beacon.
 // The beacon SoR for block B is part of the QC certifying B and can be extracted using the
-// function `consensus/hotstuff/model.BeaconSignature(*flow.QuorumCertificate)`. While the output is
-// a distributed source of randomness, it should _not_ be used as random numbers itself. Instead,
-// please use the function `New` to instantiate a PRG, for deterministic generation of random
-// numbers or permutations (check the random.Rand interface).
+// function `consensus/hotstuff/model.BeaconSignature(*flow.QuorumCertificate)`. It can also be
+// extracted using the `state/protocol/snapshot.RandomSource()` function.
+//
+// While the output is a distributed source of randomness, it should _not_ be used as random
+// numbers itself. Instead, please use the function `New` to instantiate a PRG,
+// for deterministic generation of random numbers or permutations (check the random.Rand interface).
+//
 // Every Flow sub-protocol should use its own customizer to create an independent PRG. Use the list in
 // "customizers.go" to add new values. The same sub-protocol can further create independent PRGs
 // by using `diversifier`.
