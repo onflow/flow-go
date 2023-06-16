@@ -897,6 +897,7 @@ func createFollowerCore(
 	// creates a consensus follower with noop consumer as the notifier
 	followerCore, err := consensus.NewFollower(
 		node.Log,
+		node.Metrics,
 		node.Headers,
 		finalizer,
 		notifier,
