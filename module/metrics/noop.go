@@ -7,14 +7,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	httpmetrics "github.com/slok/go-http-metrics/metrics"
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/channels"
-
-	httpmetrics "github.com/slok/go-http-metrics/metrics"
 )
 
 type NoopCollector struct{}
@@ -116,6 +115,7 @@ func (nc *NoopCollector) CommitteeProcessingDuration(duration time.Duration)    
 func (nc *NoopCollector) SignerProcessingDuration(duration time.Duration)                        {}
 func (nc *NoopCollector) ValidatorProcessingDuration(duration time.Duration)                     {}
 func (nc *NoopCollector) PayloadProductionDuration(duration time.Duration)                       {}
+func (nc *NoopCollector) TimeoutCollectorsRange(uint64, uint64, int)                             {}
 func (nc *NoopCollector) TransactionIngested(txID flow.Identifier)                               {}
 func (nc *NoopCollector) ClusterBlockProposed(*cluster.Block)                                    {}
 func (nc *NoopCollector) ClusterBlockFinalized(*cluster.Block)                                   {}
@@ -199,6 +199,7 @@ func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Tim
 func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                          {}
 func (nc *NoopCollector) TransactionSubmissionFailed()                                     {}
 func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)                    {}
+func (nc *NoopCollector) UpdateLastFullBlockHeight(height uint64)                          {}
 func (nc *NoopCollector) ChunkDataPackRequestProcessed()                                   {}
 func (nc *NoopCollector) ExecutionSync(syncing bool)                                       {}
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                 {}
@@ -290,4 +291,10 @@ func (nc *NoopCollector) OnBehaviourPenaltyUpdated(f float64)                   
 func (nc *NoopCollector) OnIPColocationFactorUpdated(f float64)                            {}
 func (nc *NoopCollector) OnAppSpecificScoreUpdated(f float64)                              {}
 func (nc *NoopCollector) OnOverallPeerScoreUpdated(f float64)                              {}
-func (nc *NoopCollector) OnMisbehaviorReported(string, string)                             {}
+
+func (nc *NoopCollector) BlockingPreProcessingStarted(string, uint)                 {}
+func (nc *NoopCollector) BlockingPreProcessingFinished(string, uint, time.Duration) {}
+func (nc *NoopCollector) AsyncProcessingStarted(string)                             {}
+func (nc *NoopCollector) AsyncProcessingFinished(string, time.Duration)             {}
+
+func (nc *NoopCollector) OnMisbehaviorReported(string, string) {}

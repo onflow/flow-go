@@ -6,11 +6,9 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -22,9 +20,9 @@ type EventsResponse struct {
 
 type EventsBackend struct {
 	log            zerolog.Logger
-	headers        storage.Headers
 	broadcaster    *engine.Broadcaster
 	sendTimeout    time.Duration
+	responseLimit  float64
 	sendBufferSize int
 
 	getExecutionData GetExecutionDataFunc
@@ -34,33 +32,21 @@ type EventsBackend struct {
 func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) Subscription {
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
 	if err != nil {
-		sub := NewSubscription(b.sendBufferSize)
-		if st, ok := status.FromError(err); ok {
-			sub.Fail(status.Errorf(st.Code(), "could not get start height: %s", st.Message()))
-			return sub
-		}
-
-		sub.Fail(fmt.Errorf("could not get start height: %w", err))
-		return sub
+		return NewFailedSubscription(err, "could not get start height")
 	}
 
 	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponseFactory(filter))
 
-	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, sub).Stream(ctx)
+	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
 	return sub
 }
 
 func (b EventsBackend) getResponseFactory(filter EventFilter) GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
-		header, err := b.headers.ByHeight(height)
+		executionData, err := b.getExecutionData(ctx, height)
 		if err != nil {
-			return nil, fmt.Errorf("could not get block header for height %d: %w", height, err)
-		}
-
-		executionData, err := b.getExecutionData(ctx, header.ID())
-		if err != nil {
-			return nil, fmt.Errorf("could not get execution data for block %s: %w", header.ID(), err)
+			return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 		}
 
 		events := []flow.Event{}
@@ -69,13 +55,13 @@ func (b EventsBackend) getResponseFactory(filter EventFilter) GetDataByHeightFun
 		}
 
 		b.log.Trace().
-			Hex("block_id", logging.ID(header.ID())).
-			Uint64("height", header.Height).
+			Hex("block_id", logging.ID(executionData.BlockID)).
+			Uint64("height", height).
 			Msgf("sending %d events", len(events))
 
 		return &EventsResponse{
-			BlockID: header.ID(),
-			Height:  header.Height,
+			BlockID: executionData.BlockID,
+			Height:  height,
 			Events:  events,
 		}, nil
 	}

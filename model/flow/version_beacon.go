@@ -39,7 +39,8 @@ type VersionBeacon struct {
 }
 
 // SealedVersionBeacon is a VersionBeacon with a SealHeight field.
-// Version beacons are effective only after they are sealed.
+// Version beacons are effective only after the results containing the version beacon
+// are sealed.
 type SealedVersionBeacon struct {
 	*VersionBeacon
 	SealHeight uint64

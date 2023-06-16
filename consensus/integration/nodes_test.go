@@ -40,6 +40,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	synccore "github.com/onflow/flow-go/module/chainsync"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -376,7 +377,7 @@ func createNode(
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
 	statusesDB := storage.NewEpochStatuses(metricsCollector, db)
 	versionBeaconDB := storage.NewVersionBeacons(db)
-	consumer := events.NewDistributor()
+	protocolStateEvents := events.NewDistributor()
 
 	localID := identity.ID()
 
@@ -407,7 +408,7 @@ func createNode(
 	fullState, err := bprotocol.NewFullConsensusState(
 		log,
 		tracer,
-		consumer,
+		protocolStateEvents,
 		state,
 		indexDB,
 		payloadsDB,
@@ -434,9 +435,9 @@ func createNode(
 
 	// log with node index
 	logConsumer := notifications.NewLogConsumer(log)
-	notifier := pubsub.NewDistributor()
-	notifier.AddConsumer(counterConsumer)
-	notifier.AddConsumer(logConsumer)
+	hotstuffDistributor := pubsub.NewDistributor()
+	hotstuffDistributor.AddConsumer(counterConsumer)
+	hotstuffDistributor.AddConsumer(logConsumer)
 
 	require.Equal(t, participant.nodeInfo.NodeID, localID)
 	privateKeys, err := participant.nodeInfo.PrivateKeys()
@@ -474,7 +475,7 @@ func createNode(
 	// selector := filter.HasRole(flow.RoleConsensus)
 	committee, err := committees.NewConsensusCommittee(state, localID)
 	require.NoError(t, err)
-	consumer.AddConsumer(committee)
+	protocolStateEvents.AddConsumer(committee)
 
 	// initialize the block finalizer
 	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
@@ -485,7 +486,7 @@ func createNode(
 	voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
 	voteAggregationDistributor.AddVoteAggregationConsumer(logConsumer)
 
-	forks, err := consensus.NewForks(rootHeader, headersDB, final, notifier, rootHeader, rootQC)
+	forks, err := consensus.NewForks(rootHeader, headersDB, final, hotstuffDistributor, rootHeader, rootQC)
 	require.NoError(t, err)
 
 	validator := consensus.NewValidator(metricsCollector, committee)
@@ -548,7 +549,12 @@ func createNode(
 		timeoutAggregationDistributor,
 		timeoutProcessorFactory,
 	)
-	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorsFactory)
+	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(
+		log,
+		metricsCollector,
+		livenessData.CurrentView,
+		timeoutCollectorsFactory,
+	)
 
 	timeoutAggregator, err := timeoutaggregator.NewTimeoutAggregator(
 		log,
@@ -563,7 +569,7 @@ func createNode(
 	hotstuffModules := &consensus.HotstuffModules{
 		Forks:                       forks,
 		Validator:                   validator,
-		Notifier:                    notifier,
+		Notifier:                    hotstuffDistributor,
 		Committee:                   committee,
 		Signer:                      signer,
 		Persist:                     persist,
@@ -576,6 +582,7 @@ func createNode(
 	// initialize hotstuff
 	hot, err := consensus.NewParticipant(
 		log,
+		metricsCollector,
 		metricsCollector,
 		build,
 		rootHeader,
@@ -595,7 +602,7 @@ func createNode(
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		notifier,
+		hotstuffDistributor,
 		tracer,
 		headersDB,
 		payloadsDB,
@@ -606,6 +613,7 @@ func createNode(
 		hot,
 		voteAggregator,
 		timeoutAggregator,
+		modulecompliance.DefaultConfig(),
 	)
 	require.NoError(t, err)
 
@@ -652,7 +660,7 @@ func createNode(
 	)
 	require.NoError(t, err)
 
-	notifier.AddConsumer(messageHub)
+	hotstuffDistributor.AddConsumer(messageHub)
 
 	node.compliance = comp
 	node.sync = sync

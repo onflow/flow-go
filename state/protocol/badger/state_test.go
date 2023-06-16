@@ -81,6 +81,10 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics.AssertExpectations(t)
 
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
+
+		vb, err := state.Final().VersionBeacon()
+		require.NoError(t, err)
+		require.Nil(t, vb)
 	})
 }
 
@@ -580,7 +584,7 @@ func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot pr
 		segment, err := state.Final().SealingSegment()
 		require.NoError(t, err)
 
-		rootBlock, err := state.Params().Root()
+		rootBlock, err := state.Params().FinalizedRoot()
 		require.NoError(t, err)
 
 		// root block should be the highest block from the sealing segment

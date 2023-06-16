@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector"
@@ -28,7 +29,7 @@ func TestMetricsInspector_ObserveRPC(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
-	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role)
+	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
@@ -56,14 +57,17 @@ func TestMetricsInspector_ObserveRPC(t *testing.T) {
 		})
 	metricsInspector := inspector.NewControlMsgMetricsInspector(unittest.Logger(), mockMetricsObserver, 2)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(metricsInspector)
-	victimNode, _ := p2ptest.NodeFixture(
+	idProvider := mockmodule.NewIdentityProvider(t)
+	victimNode, victimIdentity := p2ptest.NodeFixture(
 		t,
 		sporkID,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(role),
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
+	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
 	metricsInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
@@ -73,7 +77,7 @@ func TestMetricsInspector_ObserveRPC(t *testing.T) {
 	ctlMsgs := spammer.GenerateCtlMessages(controlMessageCount,
 		corruptlibp2p.WithGraft(messageCount, channels.PushBlocks.String()),
 		corruptlibp2p.WithPrune(messageCount, channels.PushBlocks.String()),
-		corruptlibp2p.WithIHave(messageCount, 1000))
+		corruptlibp2p.WithIHave(messageCount, 1000, channels.PushBlocks.String()))
 
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, ctlMsgs)

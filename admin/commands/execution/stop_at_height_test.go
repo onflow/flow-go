@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/admin"
-	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestCommandParsing(t *testing.T) {
@@ -88,7 +89,16 @@ func TestCommandParsing(t *testing.T) {
 
 func TestCommandsSetsValues(t *testing.T) {
 
-	stopControl := ingestion.NewStopControl(zerolog.Nop(), false, 0)
+	stopControl := stop.NewStopControl(
+		zerolog.Nop(),
+		nil,
+		nil,
+		nil,
+		nil,
+		&flow.Header{Height: 1},
+		false,
+		false,
+	)
 
 	cmd := NewStopAtHeightCommand(stopControl)
 
@@ -102,9 +112,9 @@ func TestCommandsSetsValues(t *testing.T) {
 	_, err := cmd.Handler(context.TODO(), req)
 	require.NoError(t, err)
 
-	height, crash := stopControl.GetStopHeight()
+	s := stopControl.GetStopParameters()
 
-	require.Equal(t, stopControl.GetState(), ingestion.StopControlSet)
-	require.Equal(t, uint64(37), height)
-	require.Equal(t, true, crash)
+	require.NotNil(t, s)
+	require.Equal(t, uint64(37), s.StopBeforeHeight)
+	require.Equal(t, true, s.ShouldCrash)
 }

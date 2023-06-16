@@ -24,7 +24,7 @@ const ServiceAccountPrivateKeySignAlgo = crypto.ECDSAP256
 const ServiceAccountPrivateKeyHashAlgo = hash.SHA2_256
 
 // Pre-calculated state commitment with root account with the above private key
-const GenesisStateCommitmentHex = "1fa4f0ccd3b991627d2c95a7aca3294fbe7407f82711b55f6863dc03c970ce08"
+const GenesisStateCommitmentHex = "d6776e9d835b1764fd585b6c70d65c6f9193fdd1ab20f71ffe6a2cafac5bcca7"
 
 var GenesisStateCommitment flow.StateCommitment
 
@@ -67,4 +67,31 @@ func init() {
 	// Cannot import virtual machine, due to circular dependency. Just use the value of
 	// fvm.AccountKeyWeightThreshold here
 	ServiceAccountPublicKey = ServiceAccountPrivateKey.PublicKey(1000)
+}
+
+// this is done by printing the state commitment in TestBootstrapLedger test with different chain ID
+func GenesisStateCommitmentByChainID(chainID flow.ChainID) flow.StateCommitment {
+	commitString := genesisCommitHexByChainID(chainID)
+	bytes, err := hex.DecodeString(commitString)
+	if err != nil {
+		panic("error while hex decoding hardcoded state commitment")
+	}
+	commit, err := flow.ToStateCommitment(bytes)
+	if err != nil {
+		panic("genesis state commitment size is invalid")
+	}
+	return commit
+}
+
+func genesisCommitHexByChainID(chainID flow.ChainID) string {
+	if chainID == flow.Mainnet {
+		return GenesisStateCommitmentHex
+	}
+	if chainID == flow.Testnet {
+		return "cacf4805b264997d060ec066d4f9ec4d6236c3946412fbb39b7ec1d4a97eaa34"
+	}
+	if chainID == flow.Sandboxnet {
+		return "75e1ec7d2af323043aa9751ec2ae3fdf5ed9f445e1cb4349d14008d5edc892e2"
+	}
+	return "3fcd850482b4173ac899a156ad3ea55a94c4dae05f810b7cf94601a57c6937a9"
 }

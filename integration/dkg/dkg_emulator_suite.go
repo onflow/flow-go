@@ -14,7 +14,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	emulator "github.com/onflow/flow-emulator"
+	emulator "github.com/onflow/flow-emulator/emulator"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -46,7 +46,7 @@ type EmulatorSuite struct {
 	chainID                flow.ChainID
 	hub                    *stub.Hub // in-mem test network
 	env                    templates.Environment
-	blockchain             *emulator.Blockchain
+	blockchain             emulator.Emulator
 	adminEmulatorClient    *utils.EmulatorClient
 	adminDKGContractClient *dkg.Client
 	dkgAddress             sdk.Address
@@ -109,11 +109,11 @@ func (s *EmulatorSuite) TearDownTest() {
 func (s *EmulatorSuite) initEmulator() {
 	s.chainID = flow.Emulator
 
-	blockchain, err := emulator.NewBlockchain(
+	blockchain, err := emulator.New(
 		emulator.WithTransactionExpiry(flow.DefaultTransactionExpiry),
 		emulator.WithStorageLimitEnabled(false),
 	)
-	require.NoError(s.T(), err)
+	s.Require().NoError(err)
 
 	s.blockchain = blockchain
 
@@ -129,7 +129,7 @@ func (s *EmulatorSuite) deployDKGContract() {
 	dkgAccountKey, dkgAccountSigner := test.AccountKeyGenerator().NewWithSigner()
 
 	// deploy the contract to the emulator
-	dkgAddress, err := s.blockchain.CreateAccount([]*sdk.AccountKey{dkgAccountKey}, []sdktemplates.Contract{
+	dkgAddress, err := s.adminEmulatorClient.CreateAccount([]*sdk.AccountKey{dkgAccountKey}, []sdktemplates.Contract{
 		{
 			Name:   "FlowDKG",
 			Source: string(contracts.FlowDKG()),
@@ -190,7 +190,7 @@ func (s *EmulatorSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount 
 	create Flow account
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-	newAccountAddress, err := s.blockchain.CreateAccount(
+	newAccountAddress, err := s.adminEmulatorClient.CreateAccount(
 		[]*sdk.AccountKey{accountKey},
 		[]sdktemplates.Contract{},
 	)

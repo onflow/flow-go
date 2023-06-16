@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/compliance"
 	moduleconsensus "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -105,7 +106,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		validator.On("ValidateProposal", mock.Anything).Return(nil)
 
 		// initialize the follower loop
-		followerLoop, err := hotstuff.NewFollowerLoop(unittest.Logger(), forks)
+		followerLoop, err := hotstuff.NewFollowerLoop(unittest.Logger(), metrics, forks)
 		require.NoError(t, err)
 
 		syncCore := module.NewBlockRequester(t)
@@ -131,7 +132,16 @@ func TestFollowerHappyPath(t *testing.T) {
 		net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 
 		// use real engine
-		engine, err := NewComplianceLayer(unittest.Logger(), net, me, metrics, all.Headers, rootHeader, followerCore)
+		engine, err := NewComplianceLayer(
+			unittest.Logger(),
+			net,
+			me,
+			metrics,
+			all.Headers,
+			rootHeader,
+			followerCore,
+			compliance.DefaultConfig(),
+		)
 		require.NoError(t, err)
 		// don't forget to subscribe for finalization notifications
 		consensusConsumer.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
