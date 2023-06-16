@@ -48,7 +48,11 @@ func (fc *FlowConfig) Validate() error {
 //	error: if there is any error encountered while initializing the configuration, all errors are considered irrecoverable.
 func DefaultConfig() (*FlowConfig, error) {
 	var flowConf FlowConfig
-	err := Unmarshall(&flowConf)
+	err := conf.Unmarshal(flowConfig, func(decoderConfig *mapstructure.DecoderConfig) {
+		// enforce that the default config contains no missing or extraneous fields
+		decoderConfig.ErrorUnused = true
+		decoderConfig.ErrorUnset = true
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshall the Flow config: %w", err)
 	}
