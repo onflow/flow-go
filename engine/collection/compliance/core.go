@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state"
@@ -332,7 +333,7 @@ func (c *Core) processBlockProposal(proposal *cluster.Block) error {
 		if errors.Is(err, model.ErrViewForUnknownEpoch) {
 			// The cluster committee never returns ErrViewForUnknownEpoch, therefore this case
 			// is an unexpected error in cluster consensus.
-			return fmt.Errorf("unexpected error: cluster committee reported unknown epoch : %w", err)
+			return fmt.Errorf("unexpected error: cluster committee reported unknown epoch : %w", irrecoverable.NewException(err))
 		}
 		return fmt.Errorf("unexpected error validating proposal: %w", err)
 	}
