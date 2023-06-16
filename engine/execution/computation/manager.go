@@ -118,6 +118,7 @@ func New(
 				},
 			),
 		),
+		fvm.WithProtocolState(protoState),
 	}
 	if params.ExtensiveTracing {
 		options = append(options, fvm.WithExtensiveTracing())

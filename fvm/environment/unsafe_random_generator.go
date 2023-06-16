@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 type UnsafeRandomGenerator interface {
@@ -26,8 +27,8 @@ type UnsafeRandomGenerator interface {
 type unsafeRandomGenerator struct {
 	tracer tracing.TracerSpan
 
-	blockHeader *flow.Header
-	txId        flow.Identifier
+	stateSnapshot protocol.Snapshot
+	txId          flow.Identifier
 
 	prg        random.Rand
 	createOnce sync.Once
@@ -61,13 +62,13 @@ func (gen ParseRestrictedUnsafeRandomGenerator) UnsafeRandom() (
 
 func NewUnsafeRandomGenerator(
 	tracer tracing.TracerSpan,
-	blockHeader *flow.Header,
+	stateSnapshot protocol.Snapshot,
 	txId flow.Identifier,
 ) UnsafeRandomGenerator {
 	gen := &unsafeRandomGenerator{
-		tracer:      tracer,
-		blockHeader: blockHeader,
-		txId:        txId,
+		tracer:        tracer,
+		stateSnapshot: stateSnapshot,
+		txId:          txId,
 	}
 
 	return gen
@@ -77,14 +78,21 @@ func (gen *unsafeRandomGenerator) createRandomGenerator() (
 	random.Rand,
 	error,
 ) {
-	if gen.blockHeader == nil {
+	if gen.stateSnapshot == nil {
 		return nil, nil
 	}
 
-	// The block header ID is currently used as the entropy source.
-	// This should evolve to become the beacon signature (safer entropy
-	// source than the block ID)
-	source := gen.blockHeader.ID()
+	// Use the protocol state source of randomness for the currrent block
+	// execution (which is the randmoness beacon output for thiss block)
+	source, err := gen.stateSnapshot.RandomSource()
+	// expected errors of RandomSource() are :
+	// - storage.ErrNotFound if the QC is unknown.
+	// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
+	// at this stage, snapshot reference block should be known and the QC should also be known,
+	// so no error is expected in normal operations
+	if err != nil {
+		return nil, fmt.Errorf("reading random source from state failed: %w", err)
+	}
 
 	// Diversify the seed per transaction ID
 	salt := gen.txId[:]
@@ -98,7 +106,7 @@ func (gen *unsafeRandomGenerator) createRandomGenerator() (
 		salt,
 		nil)
 	seed := make([]byte, random.Chacha20SeedLen)
-	_, err := io.ReadFull(hkdf, seed)
+	_, err = io.ReadFull(hkdf, seed)
 	if err != nil {
 		return nil, fmt.Errorf("extracting seed with HKDF failed: %w", err)
 	}

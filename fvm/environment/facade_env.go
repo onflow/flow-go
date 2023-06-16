@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 var _ Environment = &facadeEnvironment{}
@@ -65,6 +66,11 @@ func newFacadeEnvironment(
 		logger,
 		runtime)
 
+	var protocolSnapshot protocol.Snapshot
+	if params.State != nil && params.BlockHeader != nil {
+		protocolSnapshot = params.State.AtBlockID(params.BlockHeader.ID())
+	}
+
 	env := &facadeEnvironment{
 		Runtime: runtime,
 
@@ -76,7 +82,7 @@ func newFacadeEnvironment(
 
 		UnsafeRandomGenerator: NewUnsafeRandomGenerator(
 			tracer,
-			params.BlockHeader,
+			protocolSnapshot,
 			params.TxId,
 		),
 		CryptoLibrary: NewCryptoLibrary(tracer, meter),

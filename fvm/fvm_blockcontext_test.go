@@ -24,6 +24,7 @@ import (
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
+	pmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -1670,10 +1671,15 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	header := &flow.Header{Height: 42}
+	snapshot := pmock.Snapshot{}
+	state := pmock.State{}
+	state.On("AtBlockID", mock.Anything).Return(&snapshot)
+	snapshot.On("RandomSource").Return(unittest.RandomBytes(48), nil)
 
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithBlockHeader(header),
+		fvm.WithProtocolState(&state),
 		fvm.WithCadenceLogging(true),
 	)
 
@@ -1700,9 +1706,10 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 		require.Len(t, output.Logs, 1)
 
-		num, err := strconv.ParseUint(output.Logs[0], 10, 64)
+		// output cannot be deterministic because transaction signature is not deterministic
+		// (which makes the tx hash and the PRG seed used by the execution not deterministic)
+		_, err = strconv.ParseUint(output.Logs[0], 10, 64)
 		require.NoError(t, err)
-		require.Equal(t, uint64(0x7515f254adc6f8af), num)
 	})
 }
 

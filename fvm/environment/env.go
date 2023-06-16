@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // Environment implements the accounts business logic and exposes cadence
@@ -97,6 +98,8 @@ type EnvironmentParams struct {
 
 	BlockInfoParams
 	TransactionInfoParams
+
+	protocol.State
 
 	ContractUpdaterParams
 }

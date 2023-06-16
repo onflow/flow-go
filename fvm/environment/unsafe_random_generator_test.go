@@ -11,17 +11,20 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
+	pmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestUnsafeRandomGenerator(t *testing.T) {
-	bh := unittest.BlockHeaderFixtureOnChain(flow.Mainnet.Chain().ChainID())
+	// protocol snapshot mock
+	snapshot := &pmock.Snapshot{}
+	snapshot.On("RandomSource").Return(unittest.RandomBytes(48), nil)
 
 	getRandoms := func(txId flow.Identifier, N int) []uint64 {
 		// seed the RG with the same block header
 		urg := environment.NewUnsafeRandomGenerator(
 			tracing.NewTracerSpan(),
-			bh,
+			snapshot,
 			txId)
 		numbers := make([]uint64, N)
 		for i := 0; i < N; i++ {
@@ -39,7 +42,7 @@ func TestUnsafeRandomGenerator(t *testing.T) {
 			txId := unittest.TransactionFixture().ID()
 			urg := environment.NewUnsafeRandomGenerator(
 				tracing.NewTracerSpan(),
-				bh,
+				snapshot,
 				txId)
 
 			// make sure n is a power of 2 so that there is no bias in the last class

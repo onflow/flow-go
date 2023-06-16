@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 const (
@@ -160,10 +161,20 @@ func WithEventCollectionSizeLimit(limit uint64) Option {
 	}
 }
 
+// WithProtocolState sets the protocol state for a virtual machine context.
+//
+// The VM uses the protocol state to provide protocol information to the Cadence runtime,
+// including the source of the pseudorandom number generator.
+func WithProtocolState(protocolState protocol.State) Option {
+	return func(ctx Context) Context {
+		ctx.State = protocolState
+		return ctx
+	}
+}
+
 // WithBlockHeader sets the block header for a virtual machine context.
 //
-// The VM uses the header to provide current block information to the Cadence runtime,
-// as well as to seed the pseudorandom number generator.
+// The VM uses the header to provide current block information to the Cadence runtime.
 func WithBlockHeader(header *flow.Header) Option {
 	return func(ctx Context) Context {
 		ctx.BlockHeader = header
