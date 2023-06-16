@@ -59,7 +59,7 @@ func TestConnectionManagerProtection(t *testing.T) {
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 	noopMetrics := metrics.NewNoopCollector()
-	connManager, err := connection.NewConnManager(log, noopMetrics, flowConfig.NetworkConfig.ConnectionManagerConfig)
+	connManager, err := connection.NewConnManager(log, noopMetrics, &flowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 
 	testCases := [][]fun{

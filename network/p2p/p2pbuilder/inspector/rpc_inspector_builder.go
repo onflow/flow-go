@@ -73,9 +73,9 @@ func (b *GossipSubInspectorBuilder) buildGossipSubMetricsInspector() p2p.GossipS
 	metricsInspector := inspector.NewControlMsgMetricsInspector(
 		b.logger,
 		gossipSubMetrics,
-		b.inspectorsConfig.MetricsInspectorConfigs.NumberOfWorkers,
+		b.inspectorsConfig.GossipSubRPCMetricsInspectorConfigs.NumberOfWorkers,
 		[]queue.HeroStoreConfigOption{
-			queue.WithHeroStoreSizeLimit(b.inspectorsConfig.MetricsInspectorConfigs.CacheSize),
+			queue.WithHeroStoreSizeLimit(b.inspectorsConfig.GossipSubRPCMetricsInspectorConfigs.CacheSize),
 			queue.WithHeroStoreCollector(metrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType)),
 		}...)
 	return metricsInspector
@@ -94,7 +94,7 @@ func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.Gos
 	rpcValidationInspector, err := validation.NewControlMsgValidationInspector(
 		b.logger,
 		b.sporkID,
-		b.inspectorsConfig.ValidationInspectorConfigs,
+		&b.inspectorsConfig.GossipSubRPCValidationInspectorConfigs,
 		notificationDistributor,
 		inspectMsgQueueCacheCollector,
 		clusterPrefixedCacheCollector,

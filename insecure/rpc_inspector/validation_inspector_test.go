@@ -42,7 +42,7 @@ func TestValidationInspector_SafetyThreshold(t *testing.T) {
 	// create our RPC validation inspector
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
 	inspectorConfig.NumberOfWorkers = 1
 	inspectorConfig.GraftLimits.SafetyThreshold = safetyThreshold
 	inspectorConfig.PruneLimits.SafetyThreshold = safetyThreshold
@@ -67,7 +67,7 @@ func TestValidationInspector_SafetyThreshold(t *testing.T) {
 	})
 	logger := zerolog.New(os.Stdout).Hook(hook)
 
-	signalerCtx, cancelFunc, spammer, victimNode, _, distributor, validationInspector, _ := setupTest(t, logger, role, sporkID, inspectorConfig)
+	signalerCtx, cancelFunc, spammer, victimNode, _, distributor, validationInspector, _ := setupTest(t, logger, role, sporkID, &inspectorConfig)
 
 	messageCount := 5
 	controlMessageCount := int64(2)
@@ -106,7 +106,7 @@ func TestValidationInspector_HardThreshold_Detection(t *testing.T) {
 	// create our RPC validation inspector
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
 	inspectorConfig.NumberOfWorkers = 1
 	inspectorConfig.GraftLimits.HardThreshold = hardThreshold
 	inspectorConfig.PruneLimits.HardThreshold = hardThreshold
@@ -139,7 +139,7 @@ func TestValidationInspector_HardThreshold_Detection(t *testing.T) {
 		}
 	}
 
-	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, _ := setupTest(t, unittest.Logger(), role, sporkID, inspectorConfig, withExpectedNotificationDissemination(2, inspectDisseminatedNotif))
+	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, _ := setupTest(t, unittest.Logger(), role, sporkID, &inspectorConfig, withExpectedNotificationDissemination(2, inspectDisseminatedNotif))
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
@@ -170,7 +170,7 @@ func TestValidationInspector_HardThresholdIHave_Detection(t *testing.T) {
 	// create our RPC validation inspector
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
 	inspectorConfig.NumberOfWorkers = 1
 	inspectorConfig.IHaveLimits.HardThreshold = 50
 	inspectorConfig.IHaveInspectionMaxSampleSize = 100
@@ -205,7 +205,7 @@ func TestValidationInspector_HardThresholdIHave_Detection(t *testing.T) {
 		}
 	}
 
-	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, _ := setupTest(t, unittest.Logger(), role, sporkID, inspectorConfig, withExpectedNotificationDissemination(1, inspectDisseminatedNotif))
+	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, _ := setupTest(t, unittest.Logger(), role, sporkID, &inspectorConfig, withExpectedNotificationDissemination(1, inspectDisseminatedNotif))
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
@@ -234,7 +234,7 @@ func TestValidationInspector_RateLimitedPeer_Detection(t *testing.T) {
 	// create our RPC validation inspector
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
 	inspectorConfig.NumberOfWorkers = 1
 
 	// here we set the message count to the amount of flow channels
@@ -270,7 +270,7 @@ func TestValidationInspector_RateLimitedPeer_Detection(t *testing.T) {
 		}
 	}
 
-	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, _ := setupTest(t, unittest.Logger(), role, sporkID, inspectorConfig, withExpectedNotificationDissemination(4, inspectDisseminatedNotif))
+	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, _ := setupTest(t, unittest.Logger(), role, sporkID, &inspectorConfig, withExpectedNotificationDissemination(4, inspectDisseminatedNotif))
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
@@ -319,7 +319,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	// create our RPC validation inspector
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
 	// set safety thresholds to 0 to force inspector to validate all control messages
 	inspectorConfig.PruneLimits.SafetyThreshold = 0
 	inspectorConfig.GraftLimits.SafetyThreshold = 0
@@ -371,7 +371,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 		}
 	}
 
-	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, _ := setupTest(t, unittest.Logger(), role, sporkID, inspectorConfig, withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif))
+	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, _ := setupTest(t, unittest.Logger(), role, sporkID, &inspectorConfig, withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif))
 
 	// create unknown topic
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID))
@@ -433,7 +433,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	// create our RPC validation inspector
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
 	// set safety thresholds to 0 to force inspector to validate all control messages
 	inspectorConfig.PruneLimits.SafetyThreshold = 0
 	inspectorConfig.GraftLimits.SafetyThreshold = 0
@@ -474,7 +474,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 		}
 	}
 
-	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, _ := setupTest(t, unittest.Logger(), role, sporkID, inspectorConfig, withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif))
+	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, _ := setupTest(t, unittest.Logger(), role, sporkID, &inspectorConfig, withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif))
 
 	// a topics spork ID is considered invalid if it does not match the current spork ID
 	duplicateTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
@@ -510,7 +510,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	// create our RPC validation inspector
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
 	// set safety thresholds to 0 to force inspector to validate all control messages
 	inspectorConfig.PruneLimits.SafetyThreshold = 0
 	inspectorConfig.GraftLimits.SafetyThreshold = 0
@@ -551,7 +551,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 		}
 	}
 
-	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, idProvider := setupTest(t, unittest.Logger(), role, sporkID, inspectorConfig, withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif))
+	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, idProvider := setupTest(t, unittest.Logger(), role, sporkID, &inspectorConfig, withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif))
 	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Twice()
 
 	// setup cluster prefixed topic with an invalid cluster ID
@@ -590,7 +590,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	// create our RPC validation inspector
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
 	inspectorConfig.GraftLimits.SafetyThreshold = 0
 	inspectorConfig.ClusterPrefixHardThreshold = 5
 	inspectorConfig.NumberOfWorkers = 1
@@ -620,7 +620,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 		}
 	}
 
-	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, idProvider := setupTest(t, unittest.Logger(), role, sporkID, inspectorConfig, withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif))
+	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, idProvider := setupTest(t, unittest.Logger(), role, sporkID, &inspectorConfig, withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif))
 	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Times(int(controlMessageCount))
 
 	// we deliberately avoid setting the cluster IDs so that we eventually receive errors after we have exceeded the allowed cluster
@@ -654,7 +654,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	// create our RPC validation inspector
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
 	inspectorConfig.PruneLimits.SafetyThreshold = 0
 	inspectorConfig.ClusterPrefixHardThreshold = 5
 	inspectorConfig.NumberOfWorkers = 1
@@ -684,7 +684,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 		}
 	}
 
-	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, idProvider := setupTest(t, unittest.Logger(), role, sporkID, inspectorConfig, withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif))
+	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, idProvider := setupTest(t, unittest.Logger(), role, sporkID, &inspectorConfig, withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif))
 	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Times(int(controlMessageCount))
 
 	// we deliberately avoid setting the cluster IDs so that we eventually receive errors after we have exceeded the allowed cluster
@@ -717,7 +717,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	// create our RPC validation inspector
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
 	// set safety thresholds to 0 to force inspector to validate all control messages
 	inspectorConfig.PruneLimits.SafetyThreshold = 0
 	inspectorConfig.GraftLimits.SafetyThreshold = 0
@@ -758,7 +758,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 		}
 	}
 
-	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, idProvider := setupTest(t, unittest.Logger(), role, sporkID, inspectorConfig, withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif))
+	signalerCtx, cancelFunc, spammer, victimNode, _, _, validationInspector, idProvider := setupTest(t, unittest.Logger(), role, sporkID, &inspectorConfig, withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif))
 	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(nil, false).Twice()
 
 	// setup cluster prefixed topic with an invalid cluster ID

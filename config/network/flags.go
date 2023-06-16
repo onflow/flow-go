@@ -28,7 +28,7 @@ const (
 	// resource manager config
 	MemoryLimitRatio          = "libp2p-memory-limit-ratio"
 	FileDescriptorsRatio      = "libp2p-file-descriptors-ratio"
-	PeerBaseLimitConnsInbound = "libp2p-inbound-conns-limit"
+	PeerBaseLimitConnsInbound = "libp2p-peer-base-limits-conns-inbound"
 	// connection manager
 	HighWatermark = "libp2p-high-watermark"
 	LowWatermark  = "libp2p-low-watermark"

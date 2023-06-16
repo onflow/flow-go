@@ -73,7 +73,7 @@ func InitCorruptLibp2pNode(
 		Metrics:          metricsCfg,
 	}
 
-	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, netConfig.GossipSubConfig.RpcInspector, idProvider, metricsCfg).
+	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, &netConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, idProvider, metricsCfg).
 		SetNetworkType(network.PrivateNetwork).
 		SetMetrics(metCfg).
 		Build()
@@ -92,11 +92,11 @@ func InitCorruptLibp2pNode(
 		role,
 		connGaterCfg,
 		peerManagerCfg,
-		netConfig.GossipSubConfig,
+		&netConfig.GossipSubConfig,
 		rpcInspectorSuite,
-		netConfig.LibP2PResourceManagerConfig,
+		&netConfig.ResourceManagerConfig,
 		uniCfg,
-		netConfig.ConnectionManagerConfig)
+		&netConfig.ConnectionManagerConfig)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)

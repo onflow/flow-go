@@ -719,7 +719,7 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		builder.IdentityProvider,
 		builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval)
 
-	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.FlowConfig.NetworkConfig.GossipSubConfig.RpcInspector, builder.IdentityProvider, builder.Metrics.Network).
+	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, &builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, builder.IdentityProvider, builder.Metrics.Network).
 		SetNetworkType(network.PublicNetwork).
 		SetMetrics(&p2pconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
@@ -735,7 +735,7 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		builder.BaseConfig.BindAddr,
 		networkKey,
 		builder.SporkID,
-		builder.FlowConfig.NetworkConfig.LibP2PResourceManagerConfig).
+		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, builder.IdentityProvider,

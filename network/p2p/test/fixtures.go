@@ -62,7 +62,7 @@ func NodeFixture(
 
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
 
-	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, defaultFlowConfig.NetworkConfig.GossipSubConfig.RpcInspector, idProvider, metrics.NewNoopCollector()).
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, &defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, idProvider, metrics.NewNoopCollector()).
 		Build()
 	require.NoError(t, err)
 
@@ -91,7 +91,7 @@ func NodeFixture(
 
 	logger = parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
-	connManager, err := connection.NewConnManager(logger, parameters.Metrics, defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
+	connManager, err := connection.NewConnManager(logger, parameters.Metrics, &defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
@@ -100,7 +100,7 @@ func NodeFixture(
 		parameters.Address,
 		parameters.Key,
 		sporkID,
-		defaultFlowConfig.NetworkConfig.LibP2PResourceManagerConfig).
+		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig).
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h,

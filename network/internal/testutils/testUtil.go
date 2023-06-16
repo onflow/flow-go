@@ -480,10 +480,11 @@ func generateLibP2PNode(t *testing.T, logger zerolog.Logger, key crypto.PrivateK
 	require.NoError(t, err)
 
 	// Inject some logic to be able to observe connections of this node
-	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
+	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, &defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 	met := metrics.NewNoopCollector()
-	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, defaultFlowConfig.NetworkConfig.GossipSubConfig.RpcInspector, provider, met).Build()
+
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, &defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, provider, met).Build()
 	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
@@ -492,7 +493,7 @@ func generateLibP2PNode(t *testing.T, logger zerolog.Logger, key crypto.PrivateK
 		unittest.DefaultAddress,
 		key,
 		sporkID,
-		defaultFlowConfig.NetworkConfig.LibP2PResourceManagerConfig).
+		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig).
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t)).
 		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
@@ -591,7 +592,6 @@ func IsRateLimitedPeerFilter(rateLimiter p2p.RateLimiter) p2p.PeerFilter {
 		if rateLimiter.IsRateLimited(p) {
 			return fmt.Errorf("peer is rate limited")
 		}
-
 		return nil
 	}
 }

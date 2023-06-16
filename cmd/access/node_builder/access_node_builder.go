@@ -1156,7 +1156,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 // - The libp2p node instance for the public network.
 // - Any error encountered during initialization. Any error should be considered fatal.
 func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.PrivateKey, bindAddress string, networkMetrics module.LibP2PMetrics) (p2p.LibP2PNode, error) {
-	connManager, err := connection.NewConnManager(builder.Logger, networkMetrics, builder.FlowConfig.NetworkConfig.ConnectionManagerConfig)
+	connManager, err := connection.NewConnManager(builder.Logger, networkMetrics, &builder.FlowConfig.NetworkConfig.ConnectionManagerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
@@ -1168,7 +1168,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval)
 
 	// setup RPC inspectors
-	rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.FlowConfig.NetworkConfig.GossipSubConfig.RpcInspector, builder.IdentityProvider, builder.Metrics.Network)
+	rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, &builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, builder.IdentityProvider, builder.Metrics.Network)
 	rpcInspectorSuite, err := rpcInspectorBuilder.
 		SetNetworkType(network.PublicNetwork).
 		SetMetrics(&p2pconfig.MetricsConfig{
@@ -1185,7 +1185,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		bindAddress,
 		networkKey,
 		builder.SporkID,
-		builder.FlowConfig.NetworkConfig.LibP2PResourceManagerConfig).
+		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig).
 		SetBasicResolver(builder.Resolver).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(

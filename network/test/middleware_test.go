@@ -380,7 +380,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	require.NoError(m.T(), err)
 
 	// setup bandwidth rate limiter
-	bandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(limit, burst, 4)
+	bandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(limit, burst, 4*time.Second)
 
 	// the onRateLimit call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch.

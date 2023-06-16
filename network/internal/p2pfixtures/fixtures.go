@@ -108,7 +108,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		defaultFlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval)
 
 	met := metrics.NewNoopCollector()
-	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, defaultFlowConfig.NetworkConfig.GossipSubConfig.RpcInspector, idProvider, met).Build()
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, &defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, idProvider, met).Build()
 	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
@@ -117,7 +117,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		unittest.DefaultAddress,
 		networkKey,
 		sporkID,
-		defaultFlowConfig.NetworkConfig.LibP2PResourceManagerConfig).
+		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
@@ -242,7 +242,7 @@ func EnsureNotConnected(t *testing.T, ctx context.Context, from []p2p.LibP2PNode
 			// Hence, we instead check for any trace of the connection being established in the receiver side.
 			_ = this.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID()))
 			// ensures that other node has never received a connection from this node.
-			require.Equal(t, other.Host().Network().Connectedness(thisId), network.NotConnected)
+			require.Equal(t, network.NotConnected, other.Host().Network().Connectedness(thisId))
 			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
 		}
 	}
