@@ -194,7 +194,7 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 // TestHandleReportedMisbehavior_And_DisallowListing_Integration implements an end-to-end integration test for the
 // handling of reported misbehavior and disallow listing.
 //
-// The test sets up 3 nodes, one victim, one honest, and one (alledged) spammer.
+// The test sets up 3 nodes, one victim, one honest, and one (alleged) spammer.
 // Initially, the test ensures that all nodes are connected to each other.
 // Then, test imitates that victim node reports the spammer node for spamming.
 // The test generates enough spam reports to trigger the disallow-listing of the victim node.
@@ -1388,7 +1388,6 @@ func TestDecayMisbehaviorPenalty_DecayToZero_AllowListing(t *testing.T) {
 		return true
 
 	}, 2*time.Second, 10*time.Millisecond, "penalty was not decayed to zero")
-
 }
 
 // TestDisallowListNotification tests the emission of the allow list notification to the network layer when the misbehavior
