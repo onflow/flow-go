@@ -72,3 +72,17 @@ func testRemovingElementsFromList(t *testing.T, pool *Pool, entitiesToBeAdded []
 
 	pool.free.removeEntity(pool, 1)
 }
+
+func testAppendingElementsToList(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.MockEntity, ejectionMode EjectionMode) {
+
+	//check entities are initalized
+	expectedList := [4]EIndex{0, 1, 2, 3}
+	checkList(t, expectedList[:], pool, &pool.free)
+
+	// add Elements
+	expectedAfterAppendList := [3]EIndex{3, 0, 1}
+	pool.used.appendEntity(pool, 3)
+	pool.used.appendEntity(pool, 0)
+	pool.used.appendEntity(pool, 1)
+	checkList(t, expectedAfterAppendList[:], pool, &pool.used)
+}
