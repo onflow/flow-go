@@ -9,20 +9,20 @@ import (
 // item represents an item in the cache: a block header, payload, and the ID
 // of the node that sent it to us. The payload is generic.
 type item struct {
-	block   flow.Slashable[*flow.Header]
+	header  flow.Slashable[*flow.Header]
 	payload interface{}
 }
 
 // backend implements a simple cache of pending blocks, indexed by parent ID.
 type backend struct {
 	mu sync.RWMutex
-	// map of pending block IDs, keyed by parent ID for ByParentID lookups
+	// map of pending header IDs, keyed by parent ID for ByParentID lookups
 	blocksByParent map[flow.Identifier][]flow.Identifier
 	// set of pending blocks, keyed by ID to avoid duplication
 	blocksByID map[flow.Identifier]*item
 }
 
-// newBackend returns a new pending block cache.
+// newBackend returns a new pending header cache.
 func newBackend() *backend {
 	cache := &backend{
 		blocksByParent: make(map[flow.Identifier][]flow.Identifier),
@@ -46,7 +46,7 @@ func (b *backend) add(block flow.Slashable[*flow.Header], payload interface{}) b
 	}
 
 	item := &item{
-		block:   block,
+		header:  block,
 		payload: payload,
 	}
 
@@ -114,9 +114,9 @@ func (b *backend) pruneByView(view uint64) {
 	defer b.mu.Unlock()
 
 	for id, item := range b.blocksByID {
-		if item.block.Message.View <= view {
+		if item.header.Message.View <= view {
 			delete(b.blocksByID, id)
-			delete(b.blocksByParent, item.block.Message.ParentID)
+			delete(b.blocksByParent, item.header.Message.ParentID)
 		}
 	}
 }

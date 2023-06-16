@@ -30,9 +30,9 @@ func (b *PendingBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*flow.Bloc
 	}
 
 	block := flow.Slashable[*flow.Block]{
-		OriginID: item.block.OriginID,
+		OriginID: item.header.OriginID,
 		Message: &flow.Block{
-			Header:  item.block.Message,
+			Header:  item.header.Message,
 			Payload: item.payload.(*flow.Payload),
 		},
 	}
@@ -49,9 +49,9 @@ func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*
 	blocks := make([]flow.Slashable[*flow.Block], 0, len(items))
 	for _, item := range items {
 		block := flow.Slashable[*flow.Block]{
-			OriginID: item.block.OriginID,
+			OriginID: item.header.OriginID,
 			Message: &flow.Block{
-				Header:  item.block.Message,
+				Header:  item.header.Message,
 				Payload: item.payload.(*flow.Payload),
 			},
 		}
