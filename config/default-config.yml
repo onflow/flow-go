@@ -1,3 +1,4 @@
+config-file: "./default-config.yml"
 network-config:
   # Network Configuration
   # Connection pruning determines whether connections to nodes

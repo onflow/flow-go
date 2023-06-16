@@ -6,19 +6,6 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-
-	"github.com/onflow/flow-go/network/p2p"
-)
-
-const (
-	// NetworkConfigPathPrefix this is the prefix that its prepended to the viper key
-	// for a network configuration value, this is prepended because our network configs
-	// are defined under the network-config property in config.yml files. This top level
-	// property is prepended to all viper keys, subsequent nested structures will result
-	// in additional top level properties being prepended. ie: networking-connection-pruning
-	// can be accessed in viper by the key network-config.networking-connection-pruning. We use
-	// this const to add an alias from our CLI flags to the prepended viper keys.
-	NetworkConfigPathPrefix = "network-config"
 )
 
 // Config encapsulation of configuration structs for all components related to the Flow network.
@@ -43,10 +30,8 @@ type Config struct {
 	// UnicastCreateStreamRetryDelay initial delay used in the exponential backoff for create stream retries
 	UnicastCreateStreamRetryDelay time.Duration `mapstructure:"unicast-create-stream-retry-delay"`
 	DNSCacheTTL                   time.Duration `mapstructure:"dns-cache-ttl"`
-	// size of the queue for notifications about new peers in the disallow list.
+	// DisallowListNotificationCacheSize size of the queue for notifications about new peers in the disallow list.
 	DisallowListNotificationCacheSize uint32 `mapstructure:"disallow-list-notification-cache-size"`
-	// GossipSubRpcInspectorSuite rpc inspector suite.
-	GossipSubRpcInspectorSuite p2p.GossipSubInspectorSuite
 }
 
 // Validate validate configuration values and all sub config structs.

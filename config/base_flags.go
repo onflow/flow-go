@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	configFilePath = "config-file"
+	configFileFlagName = "config-file"
 )
 
 // InitializePFlagSet initializes all CLI flags for the Flow node base configuration on the provided pflag set.
@@ -18,6 +18,6 @@ const (
 //
 // Note: in subsequent PR's all flag initialization for Flow node should be moved to this func.
 func InitializePFlagSet(flags *pflag.FlagSet, config *FlowConfig) {
-	flags.String(configFilePath, config.ConfigFile, "provide a path to a Flow configuration file that will be used to set configuration values")
+	flags.String(configFileFlagName, "", "provide a path to a Flow configuration file that will be used to set configuration values")
 	netconf.InitializeNetworkFlags(flags, config.NetworkConfig)
 }

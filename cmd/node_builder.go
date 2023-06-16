@@ -225,6 +225,9 @@ type NodeConfig struct {
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
 	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
+
+	// GossipSubRpcInspectorSuite rpc inspector suite.
+	GossipSubRpcInspectorSuite p2p.GossipSubInspectorSuite
 }
 
 // StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.

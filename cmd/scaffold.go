@@ -357,7 +357,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for default libp2p node: %w", err)
 		}
 
-		fnb.FlowConfig.NetworkConfig.GossipSubRpcInspectorSuite = rpcInspectorSuite
+		fnb.GossipSubRpcInspectorSuite = rpcInspectorSuite
 
 		builder, err := p2pbuilder.DefaultNodeBuilder(
 			fnb.Logger,
@@ -371,7 +371,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			connGaterCfg,
 			peerManagerCfg,
 			&fnb.FlowConfig.NetworkConfig.GossipSubConfig,
-			fnb.FlowConfig.NetworkConfig.GossipSubRpcInspectorSuite,
+			fnb.GossipSubRpcInspectorSuite,
 			&fnb.FlowConfig.NetworkConfig.ResourceManagerConfig,
 			uniCfg,
 			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig)

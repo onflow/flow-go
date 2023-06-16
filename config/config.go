@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -47,16 +48,12 @@ func (fc *FlowConfig) Validate() error {
 //	*FlowConfig: an instance of the network configuration fully initialized to the default values set in the config file
 //	error: if there is any error encountered while initializing the configuration, all errors are considered irrecoverable.
 func DefaultConfig() (*FlowConfig, error) {
-	var flowConf FlowConfig
-	err := conf.Unmarshal(flowConfig, func(decoderConfig *mapstructure.DecoderConfig) {
-		// enforce that the default config contains no missing or extraneous fields
-		decoderConfig.ErrorUnused = true
-		decoderConfig.ErrorUnset = true
-	})
+	var flowConfig FlowConfig
+	err := Unmarshall(&flowConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshall the Flow config: %w", err)
 	}
-	return &flowConf, nil
+	return &flowConfig, nil
 }
 
 // BindPFlags binds the configuration to the cli pflag set. This should be called
@@ -110,7 +107,13 @@ func BindPFlags(c *FlowConfig, flags *pflag.FlagSet) (error, bool) {
 //
 //	error: if there is any error encountered unmarshalling the configuration, all errors are considered irrecoverable.
 func Unmarshall(flowConfig *FlowConfig) error {
-	err := conf.Unmarshal(flowConfig)
+	err := conf.Unmarshal(flowConfig, func(decoderConfig *mapstructure.DecoderConfig) {
+		// enforce all fields are set on the FlowConfig struct
+		decoderConfig.ErrorUnset = true
+		// currently the entire flow configuration has not been moved to this package
+		// for now we all key's in the config which are unused.
+		decoderConfig.ErrorUnused = false
+	})
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal network config: %w", err)
 	}
@@ -126,7 +129,7 @@ func Unmarshall(flowConfig *FlowConfig) error {
 func Print(info *zerolog.Event, flags *pflag.FlagSet) map[string]struct{} {
 	// only print config values if they were overridden with a config file
 	m := make(map[string]struct{})
-	if flags.Lookup(configFilePath).Changed {
+	if flags.Lookup(configFileFlagName).Changed {
 		for _, key := range conf.AllKeys() {
 			info.Str(key, fmt.Sprintf("%v", conf.Get(key)))
 			s := strings.Split(key, ".")
@@ -161,7 +164,7 @@ func setAliases() {
 //	error: if there is any error encountered while reading new config file, all errors are considered irrecoverable.
 //	bool: true if the config was overridden by the new config file, false otherwise or if an error is encountered reading the new config file.
 func overrideConfigFile(flags *pflag.FlagSet) (error, bool) {
-	configFileFlag := flags.Lookup(configFilePath)
+	configFileFlag := flags.Lookup(configFileFlagName)
 	if configFileFlag.Changed {
 		p := configFileFlag.Value.String()
 		dirPath, fileName := splitConfigPath(p)
