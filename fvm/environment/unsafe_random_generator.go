@@ -1,14 +1,9 @@
 package environment
 
 import (
-	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
-	"hash"
-	"io"
 	"sync"
-
-	"golang.org/x/crypto/hkdf"
 
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -17,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/prg"
 )
 
 type UnsafeRandomGenerator interface {
@@ -82,8 +78,8 @@ func (gen *unsafeRandomGenerator) createRandomGenerator() (
 		return nil, nil
 	}
 
-	// Use the protocol state source of randomness for the currrent block
-	// execution (which is the randmoness beacon output for thiss block)
+	// Use the protocol state source of randomness [SoR] for the current block
+	// execution
 	source, err := gen.stateSnapshot.RandomSource()
 	// expected errors of RandomSource() are :
 	// - storage.ErrNotFound if the QC is unknown.
@@ -94,36 +90,23 @@ func (gen *unsafeRandomGenerator) createRandomGenerator() (
 		return nil, fmt.Errorf("reading random source from state failed: %w", err)
 	}
 
-	// Diversify the seed per transaction ID
-	salt := gen.txId[:]
-
-	// Extract the entropy from the source and expand it into the required
-	// seed length.  Note that we can use any implementation which provide
-	// similar properties.
-	hkdf := hkdf.New(
-		func() hash.Hash { return sha256.New() },
-		source[:],
-		salt,
-		nil)
-	seed := make([]byte, random.Chacha20SeedLen)
-	_, err = io.ReadFull(hkdf, seed)
+	// Use the state/protocol PRG derivation from the source of randomness:
+	//  - for the transaction execution case, the PRG used must be a CSPRG
+	//  - use the state/protocol/prg customizer defined for the execution environment
+	//  - use the transaction ID as an extra diversifier of the CSPRG. Although this
+	//    does not add any extra entropy to the output, it allows creating an independent
+	//    PRG for each transaction.
+	csprg, err := prg.FromRandomSource(source, prg.ExecutionEnvironment, gen.txId[:])
 	if err != nil {
-		return nil, fmt.Errorf("extracting seed with HKDF failed: %w", err)
+		return nil, fmt.Errorf("failed to create a CSPRG from source: %w", err)
 	}
 
-	// initialize a fresh crypto-secure PRG with the seed (here ChaCha20)
-	// This PRG provides all outputs of Cadence UnsafeRandom.
-	prg, err := random.NewChacha20PRG(seed, []byte{})
-	if err != nil {
-		return nil, fmt.Errorf("creating random generator failed: %w", err)
-	}
-
-	return prg, nil
+	return csprg, nil
 }
 
 // maybeCreateRandomGenerator seeds the pseudo-random number generator using the
 // block header ID and transaction index as an entropy source.  The seed
-// function is currently called for each tranaction, the PRG is used to
+// function is currently called for each transaction, the PRG is used to
 // provide all the randoms the transaction needs through UnsafeRandom.
 //
 // This allows lazy seeding of the random number generator, since not a lot of
