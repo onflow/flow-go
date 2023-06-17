@@ -43,7 +43,7 @@ const (
 	// by 90% from 100 to 10, and it takes around 2.5 hours to recover. If the node is disallow-listed for the fourth time,
 	// its decay speed is decreased by 90% from 10 to 1, and it takes around a day to recover. From this point on, the decay
 	// speed is 1, and it takes around a day to recover from each disallow-listing.
-	InitialDecaySpeed = 10000 // (Don't change this value)
+	InitialDecaySpeed = 1000 // (Don't change this value)
 )
 
 type PenaltyParams struct {
