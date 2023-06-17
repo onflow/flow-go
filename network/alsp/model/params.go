@@ -24,7 +24,7 @@ const (
 	// By default, each reported infringement will be penalized by this value. However, the penalty can be amplified
 	// by the engine that reports the misbehavior. The penalty system is designed in a way that more than 100 misbehaviors/sec
 	// at the default penalty value will result in disallow-listing the node. By amplifying the penalty, the engine can
-	// decrease the number of misbehavior/sec that will result in disallow-listing the node. For example, if the engine
+	// decrease the number of misbehaviors/sec that will result in disallow-listing the node. For example, if the engine
 	// amplifies the penalty by 10, the number of misbehaviors/sec that will result in disallow-listing the node will be
 	// 10 times less than the default penalty value and the node will be disallow-listed after 10 misbehaviors/sec.
 	DefaultPenaltyValue = 0.01 * disallowListingThreshold // (Don't change this value)
