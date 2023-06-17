@@ -22,11 +22,11 @@ const (
 
 	// DefaultPenaltyValue is the default penalty value for misbehaving nodes.
 	// By default, each reported infringement will be penalized by this value. However, the penalty can be amplified
-	// by the engine that reports the misbehavior. The penalty system is designed in a way that more than 100 misbehavior/sec
+	// by the engine that reports the misbehavior. The penalty system is designed in a way that more than 100 misbehaviors/sec
 	// at the default penalty value will result in disallow-listing the node. By amplifying the penalty, the engine can
 	// decrease the number of misbehavior/sec that will result in disallow-listing the node. For example, if the engine
-	// amplifies the penalty by 10, the number of misbehavior/sec that will result in disallow-listing the node will be
-	// 10 times less than the default penalty value and the node will be disallow-listed after 10 times more misbehavior/sec.
+	// amplifies the penalty by 10, the number of misbehaviors/sec that will result in disallow-listing the node will be
+	// 10 times less than the default penalty value and the node will be disallow-listed after 10 misbehaviors/sec.
 	DefaultPenaltyValue = 0.01 * disallowListingThreshold // (Don't change this value)
 
 	// InitialDecaySpeed is the initial decay speed of the penalty of a misbehaving node.
@@ -43,7 +43,7 @@ const (
 	// by 90% from 100 to 10, and it takes around 2.5 hours to recover. If the node is disallow-listed for the fourth time,
 	// its decay speed is decreased by 90% from 10 to 1, and it takes around a day to recover. From this point on, the decay
 	// speed is 1, and it takes around a day to recover from each disallow-listing.
-	InitialDecaySpeed = 1000 // (Don't change this value)
+	InitialDecaySpeed = 10000 // (Don't change this value)
 )
 
 type PenaltyParams struct {
