@@ -78,6 +78,11 @@ func (_m *HotstuffMetrics) SignerProcessingDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
+// TimeoutCollectorsRange provides a mock function with given fields: lowestRetainedView, newestViewCreatedCollector, activeCollectors
+func (_m *HotstuffMetrics) TimeoutCollectorsRange(lowestRetainedView uint64, newestViewCreatedCollector uint64, activeCollectors int) {
+	_m.Called(lowestRetainedView, newestViewCreatedCollector, activeCollectors)
+}
+
 // TimeoutObjectProcessingDuration provides a mock function with given fields: duration
 func (_m *HotstuffMetrics) TimeoutObjectProcessingDuration(duration time.Duration) {
 	_m.Called(duration)
