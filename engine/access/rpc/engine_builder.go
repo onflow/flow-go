@@ -68,7 +68,7 @@ func (builder *RPCEngineBuilder) WithRpcHandler(handler accessproto.AccessAPISer
 	return builder
 }
 
-// WithRestHandler specifies that the given `RestServerApi` should be used for serving REST queries.
+// WithRestHandler specifies that the given `RestServerApi` should be used for REST.
 func (builder *RPCEngineBuilder) WithRestHandler(handler rest.RestServerApi) *RPCEngineBuilder {
 	builder.restHandler = handler
 	return builder

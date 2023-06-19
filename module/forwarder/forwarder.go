@@ -30,8 +30,8 @@ type Forwarder struct {
 	maxMsgSize  uint
 }
 
-func NewForwarder(identities flow.IdentityList, timeout time.Duration, maxMsgSize uint) (Forwarder, error) {
-	forwarder := Forwarder{maxMsgSize: maxMsgSize}
+func NewForwarder(identities flow.IdentityList, timeout time.Duration, maxMsgSize uint) (*Forwarder, error) {
+	forwarder := &Forwarder{maxMsgSize: maxMsgSize}
 	err := forwarder.setFlowAccessAPI(identities, timeout)
 	return forwarder, err
 }

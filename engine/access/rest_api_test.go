@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rpc"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -118,10 +119,9 @@ func (suite *RestAPITestSuite) SetupTest() {
 		RESTListenAddr:         unittest.DefaultAddress,
 	}
 
-	backend, err := NewBackend(
+	backend, err := backend.NewBackend(
 		suite.log,
 		suite.state,
-		config,
 		suite.collClient,
 		nil,
 		suite.blocks,
@@ -134,7 +134,16 @@ func (suite *RestAPITestSuite) SetupTest() {
 		suite.metrics,
 		0,
 		0,
-		false)
+		false,
+		0,
+		0,
+		0,
+		0,
+		0,
+		nil,
+		nil,
+		nil)
+
 	require.NoError(suite.T(), err)
 
 	rpcEngBuilder, err := rpc.NewBuilder(

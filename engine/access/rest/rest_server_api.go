@@ -132,6 +132,7 @@ func (r *RestRouter) GetNodeVersionInfo(req *request.Request) (models.NodeVersio
 	return res, err
 }
 
+// RestServerApi is the server API for REST service.
 type RestServerApi interface {
 	// GetTransactionByID gets a transaction by requested ID.
 	GetTransactionByID(r request.GetTransaction, context context.Context, link models.LinkGenerator, chain flow.Chain) (models.Transaction, error)
@@ -163,19 +164,12 @@ type RestServerApi interface {
 	GetNodeVersionInfo(r *request.Request) (models.NodeVersionInfo, error)
 }
 
+// RequestHandler is a structure that represents local requests
 type RequestHandler struct {
 	RestServerApi
 	log     zerolog.Logger
 	backend access.API
 }
-
-//// NewRequestHandler returns new RequestHandler.
-//func NewRequestHandler(log zerolog.Logger, backend access.API) RestServerApi {
-//	return &RequestHandler{
-//		log:     log,
-//		backend: backend,
-//	}
-//}
 
 // NewRequestHandler returns new RequestHandler.
 func NewRequestHandler(log zerolog.Logger, backend access.API) *RequestHandler {
@@ -500,19 +494,20 @@ func (h *RequestHandler) GetNodeVersionInfo(r *request.Request) (models.NodeVers
 	return response, nil
 }
 
+// RestForwarder handles the request forwarding to upstream
 type RestForwarder struct {
 	log zerolog.Logger
-	forwarder.Forwarder
+	*forwarder.Forwarder
 }
 
 // NewRestForwarder returns new RestForwarder.
 func NewRestForwarder(log zerolog.Logger, identities flow.IdentityList, timeout time.Duration, maxMsgSize uint) (*RestForwarder, error) {
-	forwarder, err := forwarder.NewForwarder(identities, timeout, maxMsgSize)
+	f, err := forwarder.NewForwarder(identities, timeout, maxMsgSize)
 
 	restForwarder := &RestForwarder{
-		log: log,
+		log:       log,
+		Forwarder: f,
 	}
-	restForwarder.Forwarder = forwarder
 	return restForwarder, err
 }
 

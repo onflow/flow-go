@@ -189,6 +189,90 @@ func New(
 	return b
 }
 
+func NewBackend(
+	log zerolog.Logger,
+	state protocol.State,
+	collectionRPC accessproto.AccessAPIClient,
+	historicalAccessNodes []accessproto.AccessAPIClient,
+	blocks storage.Blocks,
+	headers storage.Headers,
+	collections storage.Collections,
+	transactions storage.Transactions,
+	executionReceipts storage.ExecutionReceipts,
+	executionResults storage.ExecutionResults,
+	chainID flow.ChainID,
+	accessMetrics module.AccessMetrics,
+	collectionGRPCPort uint,
+	executionGRPCPort uint,
+	retryEnabled bool,
+	maxMsgSize uint,
+	executionClientTimeout time.Duration,
+	collectionClientTimeout time.Duration,
+	connectionPoolSize uint,
+	maxHeightRange uint,
+	preferredExecutionNodeIDs []string,
+	fixedExecutionNodeIDs,
+	archiveAddressList []string,
+) (*Backend, error) {
+
+	var cache *lru.Cache
+	cacheSize := connectionPoolSize
+	if cacheSize > 0 {
+		// TODO: remove this fallback after fixing issues with evictions
+		// It was observed that evictions cause connection errors for in flight requests. This works around
+		// the issue by forcing hte pool size to be greater than the number of ENs + LNs
+		if cacheSize < DefaultConnectionPoolSize {
+			log.Warn().Msg("connection pool size below threshold, setting pool size to default value ")
+			cacheSize = DefaultConnectionPoolSize
+		}
+		var err error
+		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
+			store := evictedValue.(*CachedClient)
+			store.Close()
+			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
+			if accessMetrics != nil {
+				accessMetrics.ConnectionFromPoolEvicted()
+			}
+		})
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
+		}
+	}
+
+	connectionFactory := &ConnectionFactoryImpl{
+		CollectionGRPCPort:        collectionGRPCPort,
+		ExecutionGRPCPort:         executionGRPCPort,
+		CollectionNodeGRPCTimeout: collectionClientTimeout,
+		ExecutionNodeGRPCTimeout:  executionClientTimeout,
+		ConnectionsCache:          cache,
+		CacheSize:                 cacheSize,
+		MaxMsgSize:                maxMsgSize,
+		AccessMetrics:             accessMetrics,
+		Log:                       log,
+	}
+
+	return New(state,
+		collectionRPC,
+		historicalAccessNodes,
+		blocks,
+		headers,
+		collections,
+		transactions,
+		executionReceipts,
+		executionResults,
+		chainID,
+		accessMetrics,
+		connectionFactory,
+		retryEnabled,
+		maxHeightRange,
+		preferredExecutionNodeIDs,
+		fixedExecutionNodeIDs,
+		log,
+		DefaultSnapshotHistoryLimit,
+		archiveAddressList,
+	), nil
+}
+
 func identifierList(ids []string) (flow.IdentifierList, error) {
 	idList := make(flow.IdentifierList, len(ids))
 	for i, idStr := range ids {

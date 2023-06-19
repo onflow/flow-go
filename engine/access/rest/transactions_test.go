@@ -102,10 +102,9 @@ func validCreateBody(tx flow.TransactionBody) map[string]interface{} {
 }
 
 func TestGetTransactions(t *testing.T) {
-	backend := &mock.API{}
-	restHandler := newAccessRestHandler(backend)
-
 	t.Run("get by ID without results", func(t *testing.T) {
+		backend := &mock.API{}
+		restHandler := newAccessRestHandler(backend)
 
 		tx := unittest.TransactionFixture()
 		req := getTransactionReq(tx.ID().String(), false, "", "")
@@ -152,6 +151,8 @@ func TestGetTransactions(t *testing.T) {
 
 	t.Run("Get by ID with results", func(t *testing.T) {
 		backend := &mock.API{}
+		restHandler := newAccessRestHandler(backend)
+
 		tx := unittest.TransactionFixture()
 		txr := transactionResultFixture(tx)
 
@@ -220,12 +221,18 @@ func TestGetTransactions(t *testing.T) {
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
+		backend := &mock.API{}
+		restHandler := newAccessRestHandler(backend)
+
 		req := getTransactionReq("invalid", false, "", "")
 		expected := `{"code":400, "message":"invalid ID format"}`
 		assertResponse(t, req, http.StatusBadRequest, expected, restHandler)
 	})
 
 	t.Run("get by ID non-existing", func(t *testing.T) {
+		backend := &mock.API{}
+		restHandler := newAccessRestHandler(backend)
+
 		tx := unittest.TransactionFixture()
 		req := getTransactionReq(tx.ID().String(), false, "", "")
 
@@ -275,10 +282,10 @@ func TestGetTransactionResult(t *testing.T) {
 			}
 		}`, bid.String(), cid.String(), id.String(), util.ToBase64(txr.Events[0].Payload), id.String())
 
-	backend := &mock.API{}
-	restHandler := newAccessRestHandler(backend)
-
 	t.Run("get by transaction ID", func(t *testing.T) {
+		backend := &mock.API{}
+		restHandler := newAccessRestHandler(backend)
+
 		req := getTransactionResultReq(id.String(), "", "")
 
 		backend.Mock.
@@ -290,6 +297,8 @@ func TestGetTransactionResult(t *testing.T) {
 
 	t.Run("get by block ID", func(t *testing.T) {
 		backend := &mock.API{}
+		restHandler := newAccessRestHandler(backend)
+
 		req := getTransactionResultReq(id.String(), bid.String(), "")
 
 		backend.Mock.
@@ -301,6 +310,8 @@ func TestGetTransactionResult(t *testing.T) {
 
 	t.Run("get by collection ID", func(t *testing.T) {
 		backend := &mock.API{}
+		restHandler := newAccessRestHandler(backend)
+
 		req := getTransactionResultReq(id.String(), "", cid.String())
 
 		backend.Mock.
@@ -312,6 +323,8 @@ func TestGetTransactionResult(t *testing.T) {
 
 	t.Run("get execution statuses", func(t *testing.T) {
 		backend := &mock.API{}
+		restHandler := newAccessRestHandler(backend)
+
 		testVectors := map[*access.TransactionResult]string{{
 			Status:       flow.TransactionStatusExpired,
 			ErrorMessage: "",
@@ -359,6 +372,9 @@ func TestGetTransactionResult(t *testing.T) {
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
+		backend := &mock.API{}
+		restHandler := newAccessRestHandler(backend)
+
 		req := getTransactionResultReq("invalid", "", "")
 
 		expected := `{"code":400, "message":"invalid ID format"}`

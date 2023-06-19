@@ -45,10 +45,11 @@ func TestScripts(t *testing.T) {
 		"script":    util.ToBase64(validCode),
 		"arguments": []string{util.ToBase64(validArgs)},
 	}
-	backend := &mock.API{}
-	restHandler := newAccessRestHandler(backend)
 
 	t.Run("get by Latest height", func(t *testing.T) {
+		backend := &mock.API{}
+		restHandler := newAccessRestHandler(backend)
+
 		backend.Mock.
 			On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}).
 			Return([]byte("hello world"), nil)
@@ -62,6 +63,9 @@ func TestScripts(t *testing.T) {
 
 	t.Run("get by height", func(t *testing.T) {
 		height := uint64(1337)
+
+		backend := &mock.API{}
+		restHandler := newAccessRestHandler(backend)
 
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, height, validCode, [][]byte{validArgs}).
@@ -77,6 +81,9 @@ func TestScripts(t *testing.T) {
 	t.Run("get by ID", func(t *testing.T) {
 		id, _ := flow.HexStringToIdentifier("222dc5dd51b9e4910f687e475f892f495f3352362ba318b53e318b4d78131312")
 
+		backend := &mock.API{}
+		restHandler := newAccessRestHandler(backend)
+
 		backend.Mock.
 			On("ExecuteScriptAtBlockID", mocks.Anything, id, validCode, [][]byte{validArgs}).
 			Return([]byte("hello world"), nil)
@@ -89,6 +96,9 @@ func TestScripts(t *testing.T) {
 	})
 
 	t.Run("get error", func(t *testing.T) {
+		backend := &mock.API{}
+		restHandler := newAccessRestHandler(backend)
+
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, uint64(1337), validCode, [][]byte{validArgs}).
 			Return(nil, status.Error(codes.Internal, "internal server error"))
@@ -104,6 +114,9 @@ func TestScripts(t *testing.T) {
 	})
 
 	t.Run("get invalid", func(t *testing.T) {
+		backend := &mock.API{}
+		restHandler := newAccessRestHandler(backend)
+
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, mocks.Anything, mocks.Anything, mocks.Anything).
 			Return(nil, nil)

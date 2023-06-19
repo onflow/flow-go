@@ -28,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
-	accessengine "github.com/onflow/flow-go/engine/access"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -851,9 +850,9 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		accessMetrics := metrics.NewNoopCollector()
-		accessBackend, err := accessengine.NewBackend(node.Logger,
+		config := builder.rpcConf
+		accessBackend, err := backend.NewBackend(node.Logger,
 			node.State,
-			builder.rpcConf,
 			nil,
 			nil,
 			node.Storage.Blocks,
@@ -866,7 +865,16 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			accessMetrics,
 			0,
 			0,
-			false)
+			false,
+			config.MaxHeightRange,
+			config.ExecutionClientTimeout,
+			config.CollectionClientTimeout,
+			config.ConnectionPoolSize,
+			config.MaxHeightRange,
+			config.PreferredExecutionNodeIDs,
+			config.FixedExecutionNodeIDs,
+			config.ArchiveAddressList)
+
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize backend: %w", err)
 		}
@@ -874,7 +882,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
 			node.State,
-			builder.rpcConf,
+			config,
 			node.RootChainID,
 			accessMetrics,
 			builder.rpcMetricsEnabled,
@@ -888,16 +896,16 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		// upstream access node forwarder
-		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout, builder.rpcConf.MaxMsgSize)
+		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout, config.MaxMsgSize)
 		if err != nil {
 			return nil, err
 		}
 
-		metrics := metrics.NewObserverCollector()
+		observerCollector := metrics.NewObserverCollector()
 
 		rpcHandler := &apiproxy.FlowAccessAPIRouter{
 			Logger:   builder.Logger,
-			Metrics:  metrics,
+			Metrics:  observerCollector,
 			Upstream: forwarder,
 			Observer: protocol.NewHandler(protocol.New(
 				node.State,
@@ -910,14 +918,14 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		restForwarder, err := rest.NewRestForwarder(builder.Logger,
 			builder.upstreamIdentities,
 			builder.apiTimeout,
-			builder.rpcConf.MaxMsgSize)
+			config.MaxMsgSize)
 		if err != nil {
 			return nil, err
 		}
 
 		restHandler := &rest.RestRouter{
 			Logger:   builder.Logger,
-			Metrics:  metrics,
+			Metrics:  observerCollector,
 			Upstream: restForwarder,
 			Observer: rest.NewRequestHandler(builder.Logger, accessBackend),
 		}

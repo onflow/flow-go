@@ -207,7 +207,7 @@ func (h *FlowAccessAPIRouter) GetExecutionResultByID(context context.Context, re
 
 // FlowAccessAPIForwarder forwards all requests to a set of upstream access nodes or observers
 type FlowAccessAPIForwarder struct {
-	forwarder.Forwarder
+	*forwarder.Forwarder
 }
 
 func NewFlowAccessAPIForwarder(identities flow.IdentityList, timeout time.Duration, maxMsgSize uint) (*FlowAccessAPIForwarder, error) {
@@ -216,10 +216,9 @@ func NewFlowAccessAPIForwarder(identities flow.IdentityList, timeout time.Durati
 		return nil, err
 	}
 
-	accessApiForwarder := &FlowAccessAPIForwarder{
+	return &FlowAccessAPIForwarder{
 		Forwarder: forwarder,
-	}
-	return accessApiForwarder, nil
+	}, nil
 }
 
 // Ping pings the service. It is special in the sense that it responds successful,

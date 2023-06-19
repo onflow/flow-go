@@ -35,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
-	accessengine "github.com/onflow/flow-go/engine/access"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -992,9 +991,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			backend, err := accessengine.NewBackend(node.Logger,
+			config := builder.rpcConf
+			backend, err := backend.NewBackend(node.Logger,
 				node.State,
-				builder.rpcConf,
 				builder.CollectionRPC,
 				builder.HistoricalAccessRPCs,
 				node.Storage.Blocks,
@@ -1007,7 +1006,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.AccessMetrics,
 				builder.collectionGRPCPort,
 				builder.executionGRPCPort,
-				builder.retryEnabled)
+				builder.retryEnabled,
+				config.MaxHeightRange,
+				config.ExecutionClientTimeout,
+				config.CollectionClientTimeout,
+				config.ConnectionPoolSize,
+				config.MaxHeightRange,
+				config.PreferredExecutionNodeIDs,
+				config.FixedExecutionNodeIDs,
+				config.ArchiveAddressList)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
 			}
@@ -1015,7 +1022,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			engineBuilder, err := rpc.NewBuilder(
 				node.Logger,
 				node.State,
-				builder.rpcConf,
+				config,
 				node.RootChainID,
 				builder.AccessMetrics,
 				builder.rpcMetricsEnabled,

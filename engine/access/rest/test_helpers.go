@@ -3,26 +3,18 @@ package rest
 import (
 	"bytes"
 	"fmt"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
-
-	"google.golang.org/grpc"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/access/mock"
-	engineaccessmock "github.com/onflow/flow-go/engine/access/mock"
 	restmock "github.com/onflow/flow-go/engine/access/rest/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/utils/grpcutils"
-
-	"github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 const (
@@ -57,10 +49,11 @@ func newAccessRestHandler(backend *mock.API) RestServerApi {
 	return NewRequestHandler(logger, backend)
 }
 
-func newObserverRestHandler_v2(backend *mock.API, restForwarder *restmock.RestServerApi) (RestServerApi, error) {
+func newObserverRestHandler(backend *mock.API, restForwarder *restmock.RestServerApi) (RestServerApi, error) {
 	var b bytes.Buffer
 	logger := zerolog.New(&b)
-	observerCollector := metrics.NewObserverCollector() //
+	observerCollector := metrics.NewObserverCollector() //TODO:
+	//metrics := metrics.NewNoopCollector()
 
 	return &RestRouter{
 		Logger:   logger,
@@ -68,41 +61,6 @@ func newObserverRestHandler_v2(backend *mock.API, restForwarder *restmock.RestSe
 		Upstream: restForwarder,
 		Observer: NewRequestHandler(logger, backend),
 	}, nil
-}
-
-func newObserverRestHandler(backend *mock.API, identities flow.IdentityList) (RestServerApi, error) {
-	var b bytes.Buffer
-	logger := zerolog.New(&b)
-	observerCollector := metrics.NewObserverCollector()
-
-	restForwarder, err := NewRestForwarder(logger,
-		identities,
-		time.Second,
-		grpcutils.DefaultMaxMsgSize)
-	if err != nil {
-		return nil, err
-	}
-
-	return &RestRouter{
-		Logger:   logger,
-		Metrics:  observerCollector,
-		Upstream: restForwarder,
-		Observer: NewRequestHandler(logger, backend),
-	}, nil
-}
-
-func newGrpcServer(mockServer *engineaccessmock.AccessAPIServer, network string, address string, done chan int) (*grpc.Server, *net.Listener, error) {
-	l, err := net.Listen(network, address)
-	if err != nil {
-		return nil, nil, err
-	}
-	s := grpc.NewServer()
-	go func(done chan int) {
-		access.RegisterAccessAPIServer(s, mockServer)
-		_ = s.Serve(l)
-		done <- 1
-	}(done)
-	return s, &l, nil
 }
 
 func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, restHandler RestServerApi) {
