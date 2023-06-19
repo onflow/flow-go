@@ -29,6 +29,22 @@ func (_m *ScoreOptionBuilder) BuildFlowPubSubScoreOption() pubsub.Option {
 	return r0
 }
 
+// TopicScoreParams provides a mock function with given fields: _a0
+func (_m *ScoreOptionBuilder) TopicScoreParams(_a0 *pubsub.Topic) *pubsub.TopicScoreParams {
+	ret := _m.Called(_a0)
+
+	var r0 *pubsub.TopicScoreParams
+	if rf, ok := ret.Get(0).(func(*pubsub.Topic) *pubsub.TopicScoreParams); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*pubsub.TopicScoreParams)
+		}
+	}
+
+	return r0
+}
+
 type mockConstructorTestingTNewScoreOptionBuilder interface {
 	mock.TestingT
 	Cleanup(func())
