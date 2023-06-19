@@ -43,6 +43,15 @@ var (
 
 type SpamRecordCacheFactory func(zerolog.Logger, uint32, module.HeroCacheMetrics) alsp.SpamRecordCache
 
+// SpamRecordDecayFunc is the function that calculates the decay of the spam record.
+type SpamRecordDecayFunc func(model.ProtocolSpamRecord) float64
+
+func defaultSpamRecordDecayFunc() SpamRecordDecayFunc {
+	return func(record model.ProtocolSpamRecord) float64 {
+		return math.Min(record.Penalty+record.Decay, 0)
+	}
+}
+
 // defaultSpamRecordCacheFactory is the default spam record cache factory. It creates a new spam record cache with the given parameter.
 func defaultSpamRecordCacheFactory() SpamRecordCacheFactory {
 	return func(logger zerolog.Logger, size uint32, cacheMetrics module.HeroCacheMetrics) alsp.SpamRecordCache {
@@ -82,6 +91,9 @@ type MisbehaviorReportManager struct {
 
 	// params is the ALSP module parameters used for penalties and decays.
 	penaltyParams model.PenaltyParams
+
+	// decayFunc is the function that calculates the decay of the spam record.
+	decayFunc SpamRecordDecayFunc
 }
 
 var _ network.MisbehaviorReportManager = (*MisbehaviorReportManager)(nil)
@@ -163,6 +175,12 @@ func WithPenaltyParams(params model.PenaltyParams) MisbehaviorReportManagerOptio
 	}
 }
 
+func WithDecayFunc(f SpamRecordDecayFunc) MisbehaviorReportManagerOption {
+	return func(m *MisbehaviorReportManager) {
+		m.decayFunc = f
+	}
+}
+
 // WithDefaults sets the default values for the MisbehaviorReportManager.
 //func WithDefaults() MisbehaviorReportManagerOption {
 //	return func(m *MisbehaviorReportManager) {
@@ -196,6 +214,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, consumer n
 		disallowListingConsumer: consumer,
 		cacheFactory:            defaultSpamRecordCacheFactory(),
 		penaltyParams:           model.DefaultParams(),
+		decayFunc:               defaultSpamRecordDecayFunc(),
 	}
 
 	store := queue.NewHeroStore(
@@ -358,7 +377,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			// each time we decay the penalty by the decay speed, the penalty is a negative number, and the decay speed
 			// is a positive number. So the penalty is getting closer to zero.
 			// We use math.Min() to make sure the penalty is never positive.
-			record.Penalty = math.Min(record.Penalty+record.Decay, 0)
+			record.Penalty = m.decayFunc(record)
 
 			// TODO: this can be done in batch but at this stage let's send individual notifications.
 			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
@@ -439,6 +458,12 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 			return record, fmt.Errorf("penalty value is positive, expected negative %f", report.Penalty)
 		}
 		record.Penalty += report.Penalty // penalty value is negative. We add it to the current penalty.
+		lg = lg.With().
+			Float64("penalty_before_update", record.Penalty).
+			Uint64("cutoff_counter", record.CutoffCounter).
+			Float64("decay_speed", record.Decay).
+			Bool("disallow_listed", record.DisallowListed).
+			Logger()
 		return record, nil
 	})
 	if err != nil {

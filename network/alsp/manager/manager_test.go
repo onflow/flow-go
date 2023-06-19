@@ -285,6 +285,15 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 // handling of repeated reported misbehavior and disallow listing.
 func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integration(t *testing.T) {
 	cfg := managerCfgFixture()
+	resetZero := false
+	decayFuc := func(record model.ProtocolSpamRecord) float64 {
+		if resetZero {
+			return 0
+		} else {
+			// decay as usual
+			return math.Min(record.Penalty+record.Decay, 0)
+		}
+	}
 
 	// this test is assessing the integration of the ALSP manager with the network. As the ALSP manager is an attribute
 	// of the network, we need to configure the ALSP manager via the network configuration, and let the network create
@@ -295,6 +304,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 			victimSpamRecordCacheCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return victimSpamRecordCacheCache
 		}),
+		alspmgr.WithDecayFunc(decayFuc),
 	}
 
 	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
@@ -363,9 +373,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	p2ptest.EnsureNotConnectedBetweenGroups(t, ctx, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]})
 
 	// the dissalow listing should last about 86 seconds so we wait for 90 seconds to be sure
-	t.Logf("about to sleep for 110 seconds")
-	time.Sleep(110 * time.Second)
-	t.Logf("just finished sleeping for 110 seconds")
+	resetZero = true
 
 	// after serving the disallow-listing period, the spammer should be able to connect to the victim node again.
 	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[honestIndex]}, 1*time.Millisecond, 100*time.Second)
