@@ -812,11 +812,11 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
-		builder.NodeDisallowListDistributor = cmd.BuildDisallowListNotificationDisseminator(builder.DisallowListNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
-
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
-		disallowListWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeDisallowListDistributor)
+		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
+			return builder.Middleware
+		})
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
 		}
@@ -824,9 +824,9 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 
 		// register the wrapper for dynamic configuration via admin command
 		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
-			disallowListWrapper.GetBlocklist, disallowListWrapper.Update)
+			disallowListWrapper.GetDisallowList, disallowListWrapper.Update)
 		if err != nil {
-			return fmt.Errorf("failed to register blocklist with config manager: %w", err)
+			return fmt.Errorf("failed to register disallow-list wrapper with config manager: %w", err)
 		}
 
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
@@ -840,11 +840,6 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 			)
 		}
 		return nil
-	})
-
-	builder.Component("disallow list notification distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// distributor is returned as a component to be started and stopped.
-		return builder.NodeDisallowListDistributor, nil
 	})
 }
 
@@ -1221,7 +1216,11 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		bindAddress,
 		networkKey,
 		builder.SporkID,
-		builder.LibP2PResourceManagerConfig).
+		builder.LibP2PResourceManagerConfig,
+		&p2p.DisallowListCacheConfig{
+			MaxSize: builder.BaseConfig.NetworkConfig.DisallowListCacheSize,
+			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
+		}).
 		SetBasicResolver(builder.Resolver).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
@@ -1262,20 +1261,19 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	validators ...network.MessageValidator,
 ) network.Middleware {
 	logger := builder.Logger.With().Bool("staked", false).Logger()
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, networkMetrics)
-	mw := middleware.NewMiddleware(
-		logger,
-		libp2pNode,
-		nodeID,
-		builder.Metrics.Bitswap,
-		builder.SporkID,
-		middleware.DefaultUnicastTimeout,
-		builder.IDTranslator,
-		builder.CodecFactory(),
-		slashingViolationsConsumer,
+	mw := middleware.NewMiddleware(&middleware.Config{
+		Logger:                     logger,
+		Libp2pNode:                 libp2pNode,
+		FlowId:                     nodeID,
+		BitSwapMetrics:             builder.Metrics.Bitswap,
+		RootBlockID:                builder.SporkID,
+		UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
+		IdTranslator:               builder.IDTranslator,
+		Codec:                      builder.CodecFactory(),
+		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(logger, networkMetrics),
+	},
 		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)
-	builder.NodeDisallowListDistributor.AddConsumer(mw)
 	builder.Middleware = mw
 	return builder.Middleware
 }

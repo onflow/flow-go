@@ -59,6 +59,7 @@ func InitCorruptLibp2pNode(
 	peerManagerCfg *p2pconfig.PeerManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig,
 	gossipSubCfg *p2pbuilder.GossipSubConfig,
+	disallowListCacheCfg *p2p.DisallowListCacheConfig,
 	topicValidatorDisabled,
 	withMessageSigning,
 	withStrictSignatureVerification bool,
@@ -94,7 +95,8 @@ func InitCorruptLibp2pNode(
 		gossipSubCfg,
 		rpcInspectorSuite,
 		p2pbuilder.DefaultResourceManagerConfig(),
-		uniCfg)
+		uniCfg,
+		disallowListCacheCfg)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)

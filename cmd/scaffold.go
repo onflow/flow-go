@@ -225,7 +225,6 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	// networking event notifications
 	fnb.flags.Uint32Var(&fnb.BaseConfig.GossipSubConfig.RpcInspector.GossipSubRPCInspectorNotificationCacheSize, "gossipsub-rpc-inspector-notification-cache-size", defaultConfig.GossipSubConfig.RpcInspector.GossipSubRPCInspectorNotificationCacheSize, "cache size for notification events from gossipsub rpc inspector")
-	fnb.flags.Uint32Var(&fnb.BaseConfig.DisallowListNotificationCacheSize, "disallow-list-notification-cache-size", defaultConfig.DisallowListNotificationCacheSize, "cache size for notification events from disallow list")
 
 	// unicast manager options
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastCreateStreamRetryDelay, "unicast-manager-create-stream-retry-delay", defaultConfig.NetworkConfig.UnicastCreateStreamRetryDelay, "Initial delay between failing to establish a connection with another node and retrying. This delay increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.")
@@ -413,7 +412,12 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.GossipSubConfig,
 			fnb.GossipSubRpcInspectorSuite,
 			fnb.LibP2PResourceManagerConfig,
-			uniCfg)
+			uniCfg,
+			&p2p.DisallowListCacheConfig{
+				MaxSize: fnb.BaseConfig.NetworkConfig.DisallowListCacheSize,
+				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
+			},
+		)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
@@ -458,8 +462,13 @@ func (fnb *FlowNodeBuilder) HeroCacheMetricsFactory() metrics.HeroCacheMetricsFa
 	return metrics.NewNoopHeroCacheMetricsFactory()
 }
 
-func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory, unicastRateLimiters *ratelimit.RateLimiters, peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
-	var mwOpts []middleware.MiddlewareOption
+func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
+	node *NodeConfig,
+	cf network.ConduitFactory,
+	unicastRateLimiters *ratelimit.RateLimiters,
+	peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
+
+	var mwOpts []middleware.OptionFn
 	if len(fnb.MsgValidators) > 0 {
 		mwOpts = append(mwOpts, middleware.WithMessageValidators(fnb.MsgValidators...))
 	}
@@ -476,20 +485,19 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	if len(peerManagerFilters) > 0 {
 		mwOpts = append(mwOpts, middleware.WithPeerManagerFilters(peerManagerFilters))
 	}
-
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
-	mw := middleware.NewMiddleware(
-		fnb.Logger,
-		fnb.LibP2PNode,
-		fnb.Me.NodeID(),
-		fnb.Metrics.Bitswap,
-		fnb.SporkID,
-		fnb.BaseConfig.UnicastMessageTimeout,
-		fnb.IDTranslator,
-		fnb.CodecFactory(),
-		slashingViolationsConsumer,
+	mw := middleware.NewMiddleware(&middleware.Config{
+		Logger:                     fnb.Logger,
+		Libp2pNode:                 fnb.LibP2PNode,
+		FlowId:                     fnb.Me.NodeID(),
+		BitSwapMetrics:             fnb.Metrics.Bitswap,
+		RootBlockID:                fnb.SporkID,
+		UnicastMessageTimeout:      fnb.BaseConfig.UnicastMessageTimeout,
+		IdTranslator:               fnb.IDTranslator,
+		Codec:                      fnb.CodecFactory(),
+		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network),
+	},
 		mwOpts...)
-	fnb.NodeDisallowListDistributor.AddConsumer(mw)
+
 	fnb.Middleware = mw
 
 	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
@@ -1037,13 +1045,6 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 }
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
-	fnb.Component("disallow list notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		// distributor is returned as a component to be started and stopped.
-		if fnb.NodeDisallowListDistributor == nil {
-			return nil, fmt.Errorf("disallow list notification distributor has not been set")
-		}
-		return fnb.NodeDisallowListDistributor, nil
-	})
 	fnb.Module("id providers", func(node *NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
@@ -1051,11 +1052,11 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		}
 		node.IDTranslator = idCache
 
-		fnb.NodeDisallowListDistributor = BuildDisallowListNotificationDisseminator(fnb.DisallowListNotificationCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
-
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
-		disallowListWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, fnb.NodeDisallowListDistributor)
+		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
+			return fnb.Middleware
+		})
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
 		}
@@ -1063,9 +1064,9 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		// register the disallow list wrapper for dynamic configuration via admin command
 		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
-			disallowListWrapper.GetBlocklist, disallowListWrapper.Update)
+			disallowListWrapper.GetDisallowList, disallowListWrapper.Update)
 		if err != nil {
-			return fmt.Errorf("failed to register blocklist with config manager: %w", err)
+			return fmt.Errorf("failed to register disallow-list wrapper with config manager: %w", err)
 		}
 
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(

@@ -152,7 +152,7 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not create middleware: %w", err)
 	}
-	misbehaviorMngr, err := alspmgr.NewMisbehaviorReportManager(param.AlspCfg)
+	misbehaviorMngr, err := alspmgr.NewMisbehaviorReportManager(param.AlspCfg, mw)
 	if err != nil {
 		return nil, fmt.Errorf("could not create misbehavior report manager: %w", err)
 	}

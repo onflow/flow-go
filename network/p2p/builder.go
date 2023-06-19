@@ -19,7 +19,7 @@ import (
 )
 
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSubAdapterConfig) (PubSubAdapter, error)
-type CreateNodeFunc func(zerolog.Logger, host.Host, ProtocolPeerCache, PeerManager) LibP2PNode
+type CreateNodeFunc func(zerolog.Logger, host.Host, ProtocolPeerCache, PeerManager, *DisallowListCacheConfig) LibP2PNode
 type GossipSubAdapterConfigFunc func(*BasePubSubAdapterConfig) PubSubAdapterConfig
 
 // GossipSubBuilder provides a builder pattern for creating a GossipSub pubsub system.
@@ -96,7 +96,7 @@ type NodeBuilder interface {
 	SetSubscriptionFilter(pubsub.SubscriptionFilter) NodeBuilder
 	SetResourceManager(network.ResourceManager) NodeBuilder
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
-	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
+	SetConnectionGater(ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
 	SetPeerManagerOptions(bool, time.Duration) NodeBuilder
 
