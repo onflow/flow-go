@@ -20,7 +20,13 @@ import (
 // that implements the PubSubAdapter interface for the Flow network.
 type GossipSubAdapter struct {
 	component.Component
-	gossipSub           *pubsub.PubSub
+	gossipSub *pubsub.PubSub
+	// topicScoreParamFunc is a function that returns the topic score params for a given topic.
+	// If no function is provided the node will join the topic with no scoring params. As the
+	// node will not be able to score other peers in the topic, it may be vulnerable to routing
+	// attacks on the topic that may also affect the overall function of the node.
+	// It is not recommended to use this adapter without a topicScoreParamFunc. Also in mature
+	// implementations of the Flow network, the topicScoreParamFunc must be a required parameter.
 	topicScoreParamFunc func(topic *pubsub.Topic) *pubsub.TopicScoreParams
 	logger              zerolog.Logger
 	peerScoreExposer    p2p.PeerScoreExposer
