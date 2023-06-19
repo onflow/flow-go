@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/state/protocol"
 )
 
 var _ Environment = &facadeEnvironment{}
@@ -66,11 +65,6 @@ func newFacadeEnvironment(
 		logger,
 		runtime)
 
-	var protocolSnapshot protocol.Snapshot
-	if params.State != nil && params.BlockHeader != nil {
-		protocolSnapshot = params.State.AtBlockID(params.BlockHeader.ID())
-	}
-
 	env := &facadeEnvironment{
 		Runtime: runtime,
 
@@ -80,11 +74,6 @@ func newFacadeEnvironment(
 		ProgramLogger: logger,
 		EventEmitter:  NoEventEmitter{},
 
-		UnsafeRandomGenerator: NewUnsafeRandomGenerator(
-			tracer,
-			protocolSnapshot,
-			params.TxId,
-		),
 		CryptoLibrary: NewCryptoLibrary(tracer, meter),
 
 		BlockInfo: NewBlockInfo(
@@ -173,6 +162,8 @@ func NewScriptEnv(
 		txnState,
 		NewCancellableMeter(ctx, txnState))
 
+	env.UnsafeRandomGenerator = NewDummyRandomGenerator()
+
 	env.addParseRestrictedChecks()
 
 	return env
@@ -228,6 +219,14 @@ func NewTransactionEnvironment(
 		env.accounts,
 		txnState,
 		env)
+
+	if params.State != nil && params.BlockHeader != nil {
+		env.UnsafeRandomGenerator = NewUnsafeRandomGenerator(
+			tracer,
+			params.State.AtBlockID(params.BlockHeader.ID()),
+			params.TxId,
+		)
+	}
 
 	env.addParseRestrictedChecks()
 

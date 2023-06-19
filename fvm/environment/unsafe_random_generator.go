@@ -20,6 +20,10 @@ type UnsafeRandomGenerator interface {
 	UnsafeRandom() (uint64, error)
 }
 
+var _ UnsafeRandomGenerator = (*unsafeRandomGenerator)(nil)
+
+// unsafeRandomGenerator implements UnsafeRandomGenerator and is used
+// for the transactions execution environment
 type unsafeRandomGenerator struct {
 	tracer tracing.TracerSpan
 
@@ -74,10 +78,6 @@ func (gen *unsafeRandomGenerator) createRandomGenerator() (
 	random.Rand,
 	error,
 ) {
-	if gen.stateSnapshot == nil {
-		return nil, nil
-	}
-
 	// Use the protocol state source of randomness [SoR] for the current block
 	// execution
 	source, err := gen.stateSnapshot.RandomSource()
@@ -136,11 +136,23 @@ func (gen *unsafeRandomGenerator) UnsafeRandom() (uint64, error) {
 		return 0, err
 	}
 
-	if gen.prg == nil {
-		return 0, errors.NewOperationNotSupportedError("UnsafeRandom")
-	}
-
 	buf := make([]byte, 8)
 	gen.prg.Read(buf) // Note: prg.Read does not return error
 	return binary.LittleEndian.Uint64(buf), nil
+}
+
+var _ UnsafeRandomGenerator = (*dummyRandomGenerator)(nil)
+
+// dummyRandomGenerator implements UnsafeRandomGenerator and is used
+// for the scripts execution environment
+type dummyRandomGenerator struct{}
+
+func NewDummyRandomGenerator() UnsafeRandomGenerator {
+	return &dummyRandomGenerator{}
+}
+
+// UnsafeRandom() returns an error because executing scripts
+// does not support randomness APIs.
+func (gen *dummyRandomGenerator) UnsafeRandom() (uint64, error) {
+	return 0, errors.NewOperationNotSupportedError("UnsafeRandom")
 }
