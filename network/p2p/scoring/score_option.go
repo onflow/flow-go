@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -285,25 +286,8 @@ func (s *ScoreOption) BuildFlowPubSubScoreOption() pubsub.Option {
 		Msg("pubsub score thresholds are set")
 
 	for topic, topicParams := range s.peerScoreParams.Topics {
-		s.logger.Info().Str("topic", topic).
-			Bool("atomic_validation", topicParams.SkipAtomicValidation).
-			Float64("topic_weight", topicParams.TopicWeight).
-			Float64("time_in_mesh_weight", topicParams.TimeInMeshWeight).
-			Dur("time_in_mesh_quantum", topicParams.TimeInMeshQuantum).
-			Float64("time_in_mesh_cap", topicParams.TimeInMeshCap).
-			Float64("first_message_deliveries_weight", topicParams.FirstMessageDeliveriesWeight).
-			Float64("first_message_deliveries_decay", topicParams.FirstMessageDeliveriesDecay).
-			Float64("first_message_deliveries_cap", topicParams.FirstMessageDeliveriesCap).
-			Float64("mesh_message_deliveries_weight", topicParams.MeshMessageDeliveriesWeight).
-			Float64("mesh_message_deliveries_decay", topicParams.MeshMessageDeliveriesDecay).
-			Float64("mesh_message_deliveries_cap", topicParams.MeshMessageDeliveriesCap).
-			Float64("mesh_message_deliveries_threshold", topicParams.MeshMessageDeliveriesThreshold).
-			Dur("mesh_message_deliveries_window", topicParams.MeshMessageDeliveriesWindow).
-			Dur("mesh_message_deliveries_activation", topicParams.MeshMessageDeliveriesActivation).
-			Float64("mesh_failure_penalty_weight", topicParams.MeshFailurePenaltyWeight).
-			Float64("mesh_failure_penalty_decay", topicParams.MeshFailurePenaltyDecay).
-			Float64("invalid_message_deliveries_weight", topicParams.InvalidMessageDeliveriesWeight).
-			Float64("invalid_message_deliveries_decay", topicParams.InvalidMessageDeliveriesDecay).
+		topicScoreParamLogger := utils.TopicScoreParamsLogger(s.logger, topic, topicParams)
+		topicScoreParamLogger.Info().
 			Msg("pubsub score topic parameters are set for topic")
 	}
 
