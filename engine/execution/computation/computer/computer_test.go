@@ -166,7 +166,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil)
+			nil,
+			testutil.ProtocolStateFixture())
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -299,7 +300,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil)
+			nil,
+			testutil.ProtocolStateFixture())
 		require.NoError(t, err)
 
 		// create an empty block
@@ -395,7 +397,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			comm,
 			me,
 			prov,
-			nil)
+			nil,
+			testutil.ProtocolStateFixture())
 		require.NoError(t, err)
 
 		// create an empty block
@@ -453,7 +456,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil)
+			nil,
+			testutil.ProtocolStateFixture())
 		require.NoError(t, err)
 
 		collectionCount := 2
@@ -669,6 +673,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				me,
 				prov,
 				nil,
+				testutil.ProtocolStateFixture(),
 			)
 			require.NoError(t, err)
 
@@ -778,7 +783,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer.NewNoopViewCommitter(),
 			me,
 			prov,
-			nil)
+			nil,
+			testutil.ProtocolStateFixture())
 		require.NoError(t, err)
 
 		const collectionCount = 2
@@ -889,7 +895,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer.NewNoopViewCommitter(),
 			me,
 			prov,
-			nil)
+			nil,
+			testutil.ProtocolStateFixture())
 		require.NoError(t, err)
 
 		key := flow.AccountStatusRegisterID(
@@ -932,7 +939,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil)
+			nil,
+			testutil.ProtocolStateFixture())
 		require.NoError(t, err)
 
 		collectionCount := 5
@@ -1249,7 +1257,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		committer,
 		me,
 		prov,
-		nil)
+		nil,
+		testutil.ProtocolStateFixture())
 	require.NoError(t, err)
 
 	// create empty block, it will have system collection attached while executing

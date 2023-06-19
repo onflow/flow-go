@@ -99,7 +99,7 @@ type EnvironmentParams struct {
 	BlockInfoParams
 	TransactionInfoParams
 
-	protocol.State
+	protocol.Snapshot
 
 	ContractUpdaterParams
 }

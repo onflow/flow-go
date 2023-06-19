@@ -220,13 +220,11 @@ func NewTransactionEnvironment(
 		txnState,
 		env)
 
-	if params.State != nil && params.BlockHeader != nil {
-		env.UnsafeRandomGenerator = NewUnsafeRandomGenerator(
-			tracer,
-			params.State.AtBlockID(params.BlockHeader.ID()),
-			params.TxId,
-		)
-	}
+	env.UnsafeRandomGenerator = NewUnsafeRandomGenerator(
+		tracer,
+		params.Snapshot,
+		params.TxId,
+	)
 
 	env.addParseRestrictedChecks()
 

@@ -116,9 +116,7 @@ func New(
 					// Attachments are enabled everywhere except for Mainnet
 					AttachmentsEnabled: chainID != flow.Mainnet,
 				},
-			),
-		),
-		fvm.WithProtocolState(protoState),
+			)),
 	}
 	if params.ExtensiveTracing {
 		options = append(options, fvm.WithExtensiveTracing())
@@ -136,6 +134,7 @@ func New(
 		me,
 		executionDataProvider,
 		nil, // TODO(ramtin): update me with proper consumers
+		protoState,
 	)
 
 	if err != nil {

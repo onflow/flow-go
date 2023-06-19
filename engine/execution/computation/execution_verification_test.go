@@ -774,7 +774,8 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		ledgerCommiter,
 		me,
 		prov,
-		nil)
+		nil,
+		testutil.ProtocolStateFixture())
 	require.NoError(t, err)
 
 	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)

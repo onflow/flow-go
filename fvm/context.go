@@ -161,13 +161,13 @@ func WithEventCollectionSizeLimit(limit uint64) Option {
 	}
 }
 
-// WithProtocolState sets the protocol state for a virtual machine context.
+// WithProtocolSnapshot sets the protocol state for a virtual machine context.
 //
 // The VM uses the protocol state to provide protocol information to the Cadence runtime,
 // including the source of the pseudorandom number generator.
-func WithProtocolState(protocolState protocol.State) Option {
+func WithProtocolSnapshot(snapshot protocol.Snapshot) Option {
 	return func(ctx Context) Context {
-		ctx.State = protocolState
+		ctx.Snapshot = snapshot
 		return ctx
 	}
 }

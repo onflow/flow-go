@@ -288,6 +288,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			committer,
 			me,
 			prov,
+			nil,
 			nil)
 		require.NoError(t, err)
 

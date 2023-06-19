@@ -159,7 +159,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil)
+		nil,
+		testutil.ProtocolStateFixture())
 	require.NoError(b, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(

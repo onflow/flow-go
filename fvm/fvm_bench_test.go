@@ -223,6 +223,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		ledgerCommitter,
 		me,
 		prov,
+		nil,
 		nil)
 	require.NoError(tb, err)
 

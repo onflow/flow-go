@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -113,6 +114,7 @@ type blockComputer struct {
 	spockHasher           hash.Hasher
 	receiptHasher         hash.Hasher
 	colResCons            []result.ExecutedCollectionConsumer
+	protocolState         protocol.State
 }
 
 func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
@@ -140,6 +142,7 @@ func NewBlockComputer(
 	signer module.Local,
 	executionDataProvider *provider.Provider,
 	colResCons []result.ExecutedCollectionConsumer,
+	state protocol.State,
 ) (BlockComputer, error) {
 	systemChunkCtx := SystemChunkContext(vmCtx, logger)
 	vmCtx = fvm.NewContextFromParent(
@@ -159,6 +162,7 @@ func NewBlockComputer(
 		spockHasher:           utils.NewSPOCKHasher(),
 		receiptHasher:         utils.NewExecutionReceiptHasher(),
 		colResCons:            colResCons,
+		protocolState:         state,
 	}, nil
 }
 
@@ -198,7 +202,9 @@ func (e *blockComputer) queueTransactionRequests(
 
 	collectionCtx := fvm.NewContextFromParent(
 		e.vmCtx,
-		fvm.WithBlockHeader(blockHeader))
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithProtocolSnapshot(e.protocolState.AtBlockID(blockId)),
+	)
 
 	for idx, collection := range rawCollections {
 		collectionLogger := collectionCtx.Logger.With().
@@ -231,7 +237,9 @@ func (e *blockComputer) queueTransactionRequests(
 
 	systemCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
-		fvm.WithBlockHeader(blockHeader))
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithProtocolSnapshot(e.protocolState.AtBlockID(blockId)),
+	)
 	systemCollectionLogger := systemCtx.Logger.With().
 		Str("block_id", blockIdStr).
 		Uint64("height", blockHeader.Height).

@@ -142,7 +142,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil)
+		nil,
+		testutil.ProtocolStateFixture())
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -827,6 +828,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		me,
 		prov,
 		nil,
+		testutil.ProtocolStateFixture(),
 	)
 	require.NoError(t, err)
 

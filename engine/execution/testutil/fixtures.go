@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -23,6 +24,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/state/protocol"
+	pmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -624,4 +627,14 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 			},
 		},
 	}
+}
+
+// ProtocolStateFixture returns a protocol state that can be used
+// by BlockComputer tests
+func ProtocolStateFixture() protocol.State {
+	snapshot := pmock.Snapshot{}
+	state := pmock.State{}
+	state.On("AtBlockID", mock.Anything).Return(&snapshot)
+	snapshot.On("RandomSource").Return(unittest.RandomBytes(48), nil)
+	return &state
 }

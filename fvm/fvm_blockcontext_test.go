@@ -1672,14 +1672,12 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 	header := &flow.Header{Height: 42}
 	snapshot := pmock.Snapshot{}
-	state := pmock.State{}
-	state.On("AtBlockID", mock.Anything).Return(&snapshot)
 	snapshot.On("RandomSource").Return(unittest.RandomBytes(48), nil)
 
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithBlockHeader(header),
-		fvm.WithProtocolState(&state),
+		fvm.WithProtocolSnapshot(&snapshot),
 		fvm.WithCadenceLogging(true),
 	)
 
