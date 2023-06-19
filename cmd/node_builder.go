@@ -27,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
@@ -197,8 +196,11 @@ type NetworkConfig struct {
 	ConnectionManagerConfig     *connection.ManagerConfig
 	// UnicastCreateStreamRetryDelay initial delay used in the exponential backoff for create stream retries
 	UnicastCreateStreamRetryDelay time.Duration
-	// size of the queue for notifications about new peers in the disallow list.
-	DisallowListNotificationCacheSize uint32
+	// size of the cache keeping the status of disallow-listed peers. Recommended to be 100 * number of authorized nodes.
+	// Note: this cache is meant to only keep the authorized (i.e., staked) but disallow-listed peers. There is no sybil
+	// vulnerability for this cache. However, the cache must be large enough to ensure it never runs out of space even if
+	// the node has not been re-configured for a long time.
+	DisallowListCacheSize uint32
 	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
 	UnicastRateLimitersConfig *UnicastRateLimitersConfig
 	AlspConfig                *AlspConfig
@@ -291,8 +293,6 @@ type NodeConfig struct {
 
 	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
-	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
-	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
 }
 
 // StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.
@@ -302,13 +302,14 @@ type StateExcerptAtBoot struct {
 	// 		FinalizedRootBlock and SealedRootBlock are the same block (special case of self-sealing block)
 	// For node bootstrapped with a root snapshot for a block above the first block of a spork (dynamically bootstrapped),
 	// 		FinalizedRootBlock.Height > SealedRootBlock.Height
-	FinalizedRootBlock *flow.Block             // The last finalized block when bootstrapped.
-	SealedRootBlock    *flow.Block             // The last sealed block when bootstrapped.
-	RootQC             *flow.QuorumCertificate // QC for Finalized Root Block
-	RootResult         *flow.ExecutionResult   // Result for SealedRootBlock
-	RootSeal           *flow.Seal              //Seal for RootResult
-	RootChainID        flow.ChainID
-	SporkID            flow.Identifier
+	FinalizedRootBlock  *flow.Block             // The last finalized block when bootstrapped.
+	SealedRootBlock     *flow.Block             // The last sealed block when bootstrapped.
+	RootQC              *flow.QuorumCertificate // QC for Finalized Root Block
+	RootResult          *flow.ExecutionResult   // Result for SealedRootBlock
+	RootSeal            *flow.Seal              //Seal for RootResult
+	RootChainID         flow.ChainID
+	SporkID             flow.Identifier
+	LastFinalizedHeader *flow.Header // last finalized header when the node boots up
 }
 
 func DefaultBaseConfig() *BaseConfig {
@@ -332,12 +333,12 @@ func DefaultBaseConfig() *BaseConfig {
 				BandwidthRateLimit:  0,
 				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
 			},
-			GossipSubConfig:                   p2pbuilder.DefaultGossipSubConfig(),
-			DNSCacheTTL:                       dns.DefaultTimeToLive,
-			LibP2PResourceManagerConfig:       p2pbuilder.DefaultResourceManagerConfig(),
-			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),
-			NetworkConnectionPruning:          connection.PruningEnabled,
-			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
+			GossipSubConfig:             p2pbuilder.DefaultGossipSubConfig(),
+			DNSCacheTTL:                 dns.DefaultTimeToLive,
+			LibP2PResourceManagerConfig: p2pbuilder.DefaultResourceManagerConfig(),
+			ConnectionManagerConfig:     connection.DefaultConnManagerConfig(),
+			NetworkConnectionPruning:    connection.PruningEnabled,
+			DisallowListCacheSize:       middleware.DisallowListCacheSize,
 			AlspConfig: &AlspConfig{
 				SpamRecordCacheSize: alsp.DefaultSpamRecordCacheSize,
 				SpamReportQueueSize: alsp.DefaultSpamReportQueueSize,

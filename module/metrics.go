@@ -341,6 +341,11 @@ type HotstuffMetrics interface {
 	// PayloadProductionDuration measures the time which the HotStuff's core logic
 	// spends in the module.Builder component, i.e. the with generating block payloads.
 	PayloadProductionDuration(duration time.Duration)
+
+	// TimeoutCollectorsRange collects information from the node's `TimeoutAggregator` component.
+	// Specifically, it measurers the number of views for which we are currently collecting timeouts
+	// (i.e. the number of `TimeoutCollector` instances we are maintaining) and their lowest/highest view.
+	TimeoutCollectorsRange(lowestRetainedView uint64, newestViewCreatedCollector uint64, activeCollectors int)
 }
 
 type CruiseCtlMetrics interface {

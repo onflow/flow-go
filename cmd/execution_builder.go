@@ -50,6 +50,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/rpc"
+	"github.com/onflow/flow-go/engine/execution/scripts"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/fvm"
@@ -129,6 +130,7 @@ type ExecutionNode struct {
 	computationManager     *computation.Manager
 	collectionRequester    *requester.Engine
 	ingestionEng           *ingestion.Engine
+	scriptsEng             *scripts.Engine
 	followerDistributor    *pubsub.FollowerDistributor
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	diskWAL                *wal.DiskWAL
@@ -198,6 +200,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("provider engine", exeNode.LoadProviderEngine).
 		Component("checker engine", exeNode.LoadCheckerEngine).
 		Component("ingestion engine", exeNode.LoadIngestionEngine).
+		Component("scripts engine", exeNode.LoadScriptsEngine).
 		Component("consensus committee", exeNode.LoadConsensusCommittee).
 		Component("follower core", exeNode.LoadFollowerCore).
 		Component("follower engine", exeNode.LoadFollowerEngine).
@@ -472,7 +475,14 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		exeNode.executionDataTracker,
 	)
 
-	vmCtx := fvm.NewContext(node.FvmOptions...)
+	// in case node.FvmOptions already set a logger, we don't want to override it
+	opts := append([]fvm.Option{
+		fvm.WithLogger(
+			node.Logger.With().Str("module", "FVM").Logger(),
+		)},
+		node.FvmOptions...,
+	)
+	vmCtx := fvm.NewContext(opts...)
 
 	ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
 	manager, err := computation.New(
@@ -842,6 +852,19 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	return exeNode.ingestionEng, err
 }
 
+// create scripts engine for handling script execution
+func (exeNode *ExecutionNode) LoadScriptsEngine(node *NodeConfig) (module.ReadyDoneAware, error) {
+	// for RPC to load it
+	exeNode.scriptsEng = scripts.New(
+		node.Logger,
+		node.State,
+		exeNode.computationManager,
+		exeNode.executionState,
+	)
+
+	return exeNode.scriptsEng, nil
+}
+
 func (exeNode *ExecutionNode) LoadConsensusCommittee(
 	node *NodeConfig,
 ) (
@@ -882,6 +905,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 	// so that it gets notified upon each new finalized block
 	exeNode.followerCore, err = consensus.NewFollower(
 		node.Logger,
+		node.Metrics.Mempool,
 		node.Storage.Headers,
 		final,
 		exeNode.followerDistributor,
@@ -934,7 +958,7 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 		node.Me,
 		node.Metrics.Engine,
 		node.Storage.Headers,
-		exeNode.builder.FinalizedRootBlock.Header,
+		node.LastFinalizedHeader,
 		core,
 		node.ComplianceConfig,
 	)
@@ -1028,7 +1052,7 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 	return rpc.New(
 		node.Logger,
 		exeNode.exeConf.rpcConf,
-		exeNode.ingestionEng,
+		exeNode.scriptsEng,
 		node.Storage.Headers,
 		node.State,
 		exeNode.events,

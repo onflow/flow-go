@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2pnode/internal"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -46,6 +47,8 @@ const (
 	findPeerQueryTimeout = 10 * time.Second
 )
 
+var _ p2p.LibP2PNode = (*Node)(nil)
+
 // Node is a wrapper around the LibP2P host.
 type Node struct {
 	component.Component
@@ -60,6 +63,9 @@ type Node struct {
 	pCache           p2p.ProtocolPeerCache
 	peerManager      p2p.PeerManager
 	peerScoreExposer p2p.PeerScoreExposer
+	// Cache of temporary disallow-listed peers, when a peer is disallow-listed, the connections to that peer
+	// are closed and further connections are not allowed till the peer is removed from the disallow-list.
+	disallowListedCache p2p.DisallowListCache
 }
 
 // NewNode creates a new libp2p node and sets its parameters.
@@ -68,14 +74,20 @@ func NewNode(
 	host host.Host,
 	pCache p2p.ProtocolPeerCache,
 	peerManager p2p.PeerManager,
+	disallowLstCacheCfg *p2p.DisallowListCacheConfig,
 ) *Node {
+	lg := logger.With().Str("component", "libp2p-node").Logger()
 	return &Node{
 		host:        host,
-		logger:      logger.With().Str("component", "libp2p-node").Logger(),
+		logger:      lg,
 		topics:      make(map[channels.Topic]p2p.Topic),
 		subs:        make(map[channels.Topic]p2p.Subscription),
 		pCache:      pCache,
 		peerManager: peerManager,
+		disallowListedCache: internal.NewDisallowListCache(
+			disallowLstCacheCfg.MaxSize,
+			logger.With().Str("module", "disallow-list-cache").Logger(),
+			disallowLstCacheCfg.Metrics),
 	}
 }
 
@@ -346,8 +358,29 @@ func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler
 // WithPeersProvider sets the PeersProvider for the peer manager.
 // If a peer manager factory is set, this method will set the peer manager's PeersProvider.
 func (n *Node) WithPeersProvider(peersProvider p2p.PeersProvider) {
+	// TODO: chore: we should not allow overriding the peers provider if one is already set.
 	if n.peerManager != nil {
-		n.peerManager.SetPeersProvider(peersProvider)
+		n.peerManager.SetPeersProvider(
+			func() peer.IDSlice {
+				authorizedPeersIds := peersProvider()
+				allowListedPeerIds := peer.IDSlice{} // subset of authorizedPeersIds that are not disallowed
+				for _, peerId := range authorizedPeersIds {
+					// exclude the disallowed peers from the authorized peers list
+					causes, disallowListed := n.disallowListedCache.IsDisallowListed(peerId)
+					if disallowListed {
+						n.logger.Warn().
+							Str("peer_id", peerId.String()).
+							Str("causes", fmt.Sprintf("%v", causes)).
+							Msg("peer is disallowed for a cause, removing from authorized peers of peer manager")
+
+						// exclude the peer from the authorized peers list
+						continue
+					}
+					allowListedPeerIds = append(allowListedPeerIds, peerId)
+				}
+
+				return allowListedPeerIds
+			})
 	}
 }
 
@@ -443,4 +476,62 @@ func (n *Node) SetUnicastManager(uniMgr p2p.UnicastManager) {
 		n.logger.Fatal().Msg("unicast manager already set")
 	}
 	n.uniMgr = uniMgr
+}
+
+// OnDisallowListNotification is called when a new disallow list update notification is distributed.
+// Any error on consuming event must handle internally.
+// The implementation must be concurrency safe.
+// Args:
+//
+//	id: peer ID of the peer being disallow-listed.
+//	cause: cause of the peer being disallow-listed (only this cause is added to the peer's disallow-listed causes).
+//
+// Returns:
+//
+//	none
+func (n *Node) OnDisallowListNotification(peerId peer.ID, cause flownet.DisallowListedCause) {
+	causes, err := n.disallowListedCache.DisallowFor(peerId, cause)
+	if err != nil {
+		// returned error is fatal.
+		n.logger.Fatal().Err(err).Str("peer_id", peerId.String()).Msg("failed to add peer to disallow list")
+	}
+
+	// TODO: this code should further be refactored to also log the Flow id.
+	n.logger.Warn().
+		Str("peer_id", peerId.String()).
+		Str("notification_cause", cause.String()).
+		Str("causes", fmt.Sprintf("%v", causes)).
+		Msg("peer added to disallow list cache")
+}
+
+// OnAllowListNotification is called when a new allow list update notification is distributed.
+// Any error on consuming event must handle internally.
+// The implementation must be concurrency safe.
+// Args:
+//
+//	id: peer ID of the peer being allow-listed.
+//	cause: cause of the peer being allow-listed (only this cause is removed from the peer's disallow-listed causes).
+//
+// Returns:
+//
+//	none
+func (n *Node) OnAllowListNotification(peerId peer.ID, cause flownet.DisallowListedCause) {
+	remainingCauses := n.disallowListedCache.AllowFor(peerId, cause)
+
+	n.logger.Info().
+		Str("peer_id", peerId.String()).
+		Str("causes", fmt.Sprintf("%v", cause)).
+		Str("remaining_causes", fmt.Sprintf("%v", remainingCauses)).
+		Msg("peer is allow-listed for cause")
+}
+
+// IsDisallowListed determines whether the given peer is disallow-listed for any reason.
+// Args:
+// - peerID: the peer to check.
+// Returns:
+// - []network.DisallowListedCause: the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
+// a nil slice is returned.
+// - bool: true if the peer is disallow-listed for any reason, false otherwise.
+func (n *Node) IsDisallowListed(peerId peer.ID) ([]flownet.DisallowListedCause, bool) {
+	return n.disallowListedCache.IsDisallowListed(peerId)
 }

@@ -11,7 +11,10 @@ import (
 
 const (
 	// minBackoff is the minimum backoff duration for the backoff connector.
-	minBackoff = time.Second * 10
+	// We set it to 1 second as we want to let the LibP2PNode be in charge of connection establishment and can disconnect
+	// and reconnect to peers as soon as it needs. This is essential to ensure that the allow-listing and disallow-listing
+	// time intervals are working as expected.
+	minBackoff = 1 * time.Second
 	// maxBackoff is the maximum backoff duration for the backoff connector. When the backoff duration reaches this value,
 	// it will not increase any further.
 	maxBackoff = time.Hour
@@ -21,7 +24,7 @@ const (
 	timeUnit = time.Second
 	// exponentialBackOffBase is the base for the exponential backoff. The backoff duration will be a multiple of the time unit
 	// multiplied by the exponential base raised to the exponential offset, i.e., exponentialBase^(timeUnit*attempt).
-	exponentialBackOffBase = 5.0
+	exponentialBackOffBase = 2.0
 	// exponentialBackOffOffset is the offset for the exponential backoff. It acts as a constant that is added result
 	// of the exponential base raised to the exponential offset, i.e., exponentialBase^(timeUnit*attempt) + exponentialBackOffOffset.
 	// This is used to ensure that the backoff duration is always greater than the time unit. We set this to 0 as we want the

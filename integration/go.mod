@@ -17,17 +17,19 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.2.0
-	github.com/onflow/cadence v0.39.3
+	github.com/onflow/cadence v0.39.8
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.3
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
-	github.com/onflow/flow-emulator v0.50.2
-	github.com/onflow/flow-go v0.30.1-0.20230606183951-596485936163
-	github.com/onflow/flow-go-sdk v0.41.2
+	github.com/onflow/flow-emulator v0.50.6
+	github.com/onflow/flow-go v0.31.1-0.20230607185125-e75265a6c631
+	github.com/onflow/flow-go-sdk v0.41.5
 	github.com/onflow/flow-go/crypto v0.24.7
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230602212908-08fc6536d391
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.14.0
+	github.com/prometheus/client_model v0.3.0
+	github.com/prometheus/common v0.39.0
 	github.com/rs/zerolog v1.29.0
 	github.com/stretchr/testify v1.8.4
 	go.einride.tech/pid v0.1.0
@@ -247,8 +249,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/polydawn/refmt v0.0.0-20201211092308-30ac6d18308e // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
-	github.com/prometheus/client_model v0.3.0 // indirect
-	github.com/prometheus/common v0.39.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/psiemens/graceland v1.0.0 // indirect
 	github.com/psiemens/sconfig v0.1.0 // indirect

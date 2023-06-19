@@ -896,13 +896,13 @@ func (state *State) populateCache() error {
 			return fmt.Errorf("could not lookup sealed height: %w", err)
 		}
 		var cachedSealedHeader cachedHeader
-		err = operation.LookupBlockHeight(finalizedHeight, &cachedSealedHeader.id)(tx)
+		err = operation.LookupBlockHeight(sealedHeight, &cachedSealedHeader.id)(tx)
 		if err != nil {
-			return fmt.Errorf("could not lookup sealed id (height=%d): %w", finalizedHeight, err)
+			return fmt.Errorf("could not lookup sealed id (height=%d): %w", sealedHeight, err)
 		}
 		cachedSealedHeader.header, err = state.headers.ByBlockID(cachedSealedHeader.id)
 		if err != nil {
-			return fmt.Errorf("could not get sealed block (id=%x): %w", cachedFinalHeader.id, err)
+			return fmt.Errorf("could not get sealed block (id=%x): %w", cachedSealedHeader.id, err)
 		}
 		state.cachedSealed.Store(&cachedSealedHeader)
 		return nil

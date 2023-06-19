@@ -8,6 +8,8 @@ import (
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/admin/commands"
+	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
@@ -51,6 +53,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -186,6 +189,14 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
+		AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
+			clusterPayloads := badger.NewClusterPayloads(&metrics.NoopCollector{}, conf.DB)
+			headers, ok := conf.Storage.Headers.(*badger.Headers)
+			if !ok {
+				panic("fail to initialize admin tool, conf.Storage.Headers can not be casted as badger headers")
+			}
+			return storageCommands.NewReadRangeClusterBlocksCommand(conf.DB, headers, clusterPayloads)
+		}).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
 			followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
@@ -292,6 +303,7 @@ func main() {
 			// creates a consensus follower with noop consumer as the notifier
 			followerCore, err = consensus.NewFollower(
 				node.Logger,
+				node.Metrics.Mempool,
 				node.Storage.Headers,
 				finalizer,
 				followerDistributor,
@@ -338,7 +350,7 @@ func main() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
-				node.FinalizedRootBlock.Header,
+				node.LastFinalizedHeader,
 				core,
 				node.ComplianceConfig,
 			)
