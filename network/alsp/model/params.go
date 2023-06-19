@@ -18,7 +18,8 @@ const (
 	// the networking layer, i.e., existing connections to the node are closed and the node is no longer allowed to connect till
 	// its penalty is decayed back to zero.
 	// maximum block-list period is 1 day
-	disallowListingThreshold = -24 * 60 * 60 // (Don't change this value)
+	//disallowListingThreshold = -24 * 60 * 60 // (Don't change this value)
+	disallowListingThreshold = -24 * 60 * 6 // (Don't change this value)
 
 	// DefaultPenaltyValue is the default penalty value for misbehaving nodes.
 	// By default, each reported infringement will be penalized by this value. However, the penalty can be amplified
