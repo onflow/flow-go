@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -131,29 +132,22 @@ func (b *backendScripts) executeScriptOnExecutor(
 					Hex("script_hash", insecureScriptHash[:]).
 					Str("script", string(script)).
 					Msg("script executed on the archive node")
-				return nil, err
 				// log execution time
 				b.metrics.ScriptExecuted(
 					time.Since(startTime),
 					len(script),
 				)
 				return result, nil
-			}
-			if status.Code(err) != codes.InvalidArgument {
+			} else if strings.Contains(err.Error(), "data unavailable for block height") {
 				b.log.Debug().Err(err).
 					Str("script_executor_addr", rnAddr).
 					Hex("block_id", blockID[:]).
 					Hex("script_hash", insecureScriptHash[:]).
 					Str("script", string(script)).
-					Msg("script failed to execute on the archive node")
-				return nil, err
+					Msg("register data for block unavailable on archive node")
+				b.metrics.ScriptExecutionErrorOnArchiveNode(blockID, string(script))
 			}
 		}
-	}
-	// log and try execution nodes if there are still errors
-	if err != nil {
-		b.metrics.ScriptExecutionErrorOnArchiveNode(blockID, string(script))
-		b.log.Error().Err(err).Msg("script execution failed for archive node internal reasons")
 	}
 
 	// try each of the executor nodes found
