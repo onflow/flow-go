@@ -319,6 +319,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 
 		followerCore, err := consensus.NewFollower(
 			node.Logger,
+			node.Metrics.Mempool,
 			node.Storage.Headers,
 			final,
 			builder.FollowerDistributor,

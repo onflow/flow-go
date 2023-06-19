@@ -114,9 +114,12 @@ func NewCore(
 // OnBlockProposal handles incoming block proposals.
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
-func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
-	block := proposal.Block.ToInternal()
-	header := block.Header
+func (c *Core) OnBlockProposal(proposal flow.Slashable[*messages.BlockProposal]) error {
+	block := flow.Slashable[*flow.Block]{
+		OriginID: proposal.OriginID,
+		Message:  proposal.Message.Block.ToInternal(),
+	}
+	header := block.Message.Header
 	blockID := header.ID()
 	finalHeight := c.finalizedHeight.Value()
 	finalView := c.finalizedView.Value()
@@ -124,14 +127,14 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	span, _ := c.tracer.StartBlockSpan(context.Background(), header.ID(), trace.CONCompOnBlockProposal)
 	span.SetAttributes(
 		attribute.Int64("view", int64(header.View)),
-		attribute.String("origin_id", originID.String()),
+		attribute.String("origin_id", proposal.OriginID.String()),
 		attribute.String("proposer", header.ProposerID.String()),
 	)
 	traceID := span.SpanContext().TraceID().String()
 	defer span.End()
 
 	log := c.log.With().
-		Hex("origin_id", originID[:]).
+		Hex("origin_id", proposal.OriginID[:]).
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
@@ -200,7 +203,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	_, found := c.pending.ByID(header.ParentID)
 	if found {
 		// add the block to the cache
-		_ = c.pending.Add(originID, block)
+		_ = c.pending.Add(block)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		return nil
@@ -214,7 +217,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 		return fmt.Errorf("could not check parent exists: %w", err)
 	}
 	if !exists {
-		_ = c.pending.Add(originID, block)
+		_ = c.pending.Add(block)
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
 		c.sync.RequestBlock(header.ParentID, header.Height-1)
@@ -243,18 +246,19 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 // processed as well.
 // No errors are expected during normal operation. All returned exceptions
 // are potential symptoms of internal state corruption and should be fatal.
-func (c *Core) processBlockAndDescendants(proposal *flow.Block) error {
-	blockID := proposal.Header.ID()
+func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*flow.Block]) error {
+	header := proposal.Message.Header
+	blockID := header.ID()
 
 	log := c.log.With().
 		Str("block_id", blockID.String()).
-		Uint64("block_height", proposal.Header.Height).
-		Uint64("block_view", proposal.Header.View).
-		Uint64("parent_view", proposal.Header.ParentView).
+		Uint64("block_height", header.Height).
+		Uint64("block_view", header.View).
+		Uint64("parent_view", header.ParentView).
 		Logger()
 
 	// process block itself
-	err := c.processBlockProposal(proposal)
+	err := c.processBlockProposal(proposal.Message)
 	if err != nil {
 		if checkForAndLogOutdatedInputError(err, log) || checkForAndLogUnverifiableInputError(err, log) {
 			return nil
@@ -263,10 +267,13 @@ func (c *Core) processBlockAndDescendants(proposal *flow.Block) error {
 			log.Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
 
 			// notify consumers about invalid block
-			c.proposalViolationNotifier.OnInvalidBlockDetected(*invalidBlockErr)
+			c.proposalViolationNotifier.OnInvalidBlockDetected(flow.Slashable[model.InvalidProposalError]{
+				OriginID: proposal.OriginID,
+				Message:  *invalidBlockErr,
+			})
 
 			// notify VoteAggregator about the invalid block
-			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(proposal.Header))
+			err = c.voteAggregator.InvalidBlock(model.ProposalFromFlow(header))
 			if err != nil {
 				if mempool.IsBelowPrunedThresholdError(err) {
 					log.Warn().Msg("received invalid block, but is below pruned threshold")
@@ -288,7 +295,7 @@ func (c *Core) processBlockAndDescendants(proposal *flow.Block) error {
 		return nil
 	}
 	for _, child := range children {
-		cpr := c.processBlockAndDescendants(child.Message)
+		cpr := c.processBlockAndDescendants(child)
 		if cpr != nil {
 			// unexpected error: potentially corrupted internal state => abort processing and escalate error
 			return cpr
