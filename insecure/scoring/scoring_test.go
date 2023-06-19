@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -68,11 +69,17 @@ func TestGossipSubInvalidMessageDeliveryScoring(t *testing.T) {
 			p2ptest.PubsubMessageFixture(t, p2ptest.WithFrom(spammer.SpammerNode.Host().ID()), p2ptest.WithNoSignature(), p2ptest.WithTopic(blockTopic.String())))
 	}
 
+	// wait for 3 heartbeats to ensure the score is updated.
 	time.Sleep(3 * time.Second)
 
 	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.Host().ID())
 	require.True(t, ok)
-	fmt.Println("Spammer Score: ", spammerScore)
+	// ensure the score is low enough so that no gossip is routed by victim node to spammer node.
+	require.True(t, spammerScore < scoring.DefaultGossipThreshold, "spammerScore: %d", spammerScore)
+	// ensure the score is low enough so that non of the published messages of the victim node are routed to the spammer node.
+	require.True(t, spammerScore < scoring.DefaultPublishThreshold, "spammerScore: %d", spammerScore)
+	// ensure the score is low enough so that the victim node does not accept RPC messages from the spammer node.
+	require.True(t, spammerScore < scoring.DefaultGraylistThreshold, "spammerScore: %d", spammerScore)
 	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{victimNode}, []p2p.LibP2PNode{spammer.SpammerNode}, func() (interface{}, channels.Topic) {
 		return unittest.ProposalFixture(), blockTopic
 	})
