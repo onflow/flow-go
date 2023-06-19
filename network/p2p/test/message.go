@@ -23,10 +23,16 @@ func WithTopic(topic string) func(*pb.Message) {
 	}
 }
 
-// WithNoSignature is a test helper that returns a function that sets the signature of a pubsub message to nil.
-func WithNoSignature() func(*pb.Message) {
+// WithoutSignature is a test helper that returns a function that sets the signature of a pubsub message to nil.
+func WithoutSignature() func(*pb.Message) {
 	return func(m *pb.Message) {
 		m.Signature = nil
+	}
+}
+
+func WithoutSignerId() func(*pb.Message) {
+	return func(m *pb.Message) {
+		m.From = nil
 	}
 }
 
