@@ -365,7 +365,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]}, 100*time.Millisecond, 3*time.Second)
 
 	// despite disallow-listing spammer, ensure that (victim and honest) and (honest and spammer) are still connected.
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[honestIndex]}, 1*time.Millisecond, 100*time.Second)
+	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[honestIndex]}, 1*time.Millisecond, 100*time.Millisecond)
 	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
 
 	// while the spammer node is disallow-listed, it cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the spammer node, unless
@@ -376,8 +376,10 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	resetZero = true
 
 	// after serving the disallow-listing period, the spammer should be able to connect to the victim node again.
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[honestIndex]}, 1*time.Millisecond, 100*time.Second)
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+
+	// all the nodes should be able to connect to each other again.
+	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
 
 	t.Logf("about to report misbehavior again")
 
@@ -402,7 +404,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 
 	// loop 10 times
 	totalSleepTime := 0
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 11; i++ {
 		// log the iteration
 		t.Logf("iteration %d", i)
 
@@ -424,6 +426,9 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 		// log total sleep time
 		t.Logf("Finished sleeping, total sleep time %d seconds", totalSleepTime)
 	}
+
+	// after serving the disallow-listing period for the second time, the spammer should be able to connect to the victim node again.
+	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
 
 	// this should fail because the spammer is not disallow-listed
 	//p2ptest.EnsureNotConnectedBetweenGroups(t, ctx, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]})
