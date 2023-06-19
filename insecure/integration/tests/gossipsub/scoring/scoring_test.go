@@ -112,7 +112,7 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
-	p2ptest.EnsureConnected(t, ctx, nodes)
+	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
 
 	// checks end-to-end message delivery works on GossipSub
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {

@@ -178,7 +178,7 @@ func (g *GossipSubAdapter) ListPeers(topic string) []peer.ID {
 }
 
 // PeerScoreExposer returns the peer score exposer for the gossipsub adapter. The exposer is a read-only interface
-// for querying peer scores.
+// for querying peer scores and returns the local scoring table of the underlying gossipsub node.
 // The exposer is only available if the gossipsub adapter was configured with a score tracer.
 // If the gossipsub adapter was not configured with a score tracer, the exposer will be nil.
 // Args:
