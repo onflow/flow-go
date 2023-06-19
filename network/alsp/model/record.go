@@ -20,6 +20,11 @@ type ProtocolSpamRecord struct {
 	// Note that the cutoff connections are recovered after a certain amount of time.
 	CutoffCounter uint64
 
+	// DisallowListed indicates whether the node is currently disallow-listed or not. When a node is in the disallow-list,
+	// the existing connections to the node are cut and no new connections are allowed to be established, neither incoming
+	// nor outgoing.
+	DisallowListed bool
+
 	// total Penalty value of the misbehaving node. Should be a negative value.
 	Penalty float64
 }
@@ -44,10 +49,11 @@ type SpamRecordFactoryFunc func(flow.Identifier) ProtocolSpamRecord
 func SpamRecordFactory() SpamRecordFactoryFunc {
 	return func(originId flow.Identifier) ProtocolSpamRecord {
 		return ProtocolSpamRecord{
-			OriginId:      originId,
-			Decay:         InitialDecaySpeed,
-			CutoffCounter: uint64(0),
-			Penalty:       float64(0),
+			OriginId:       originId,
+			Decay:          InitialDecaySpeed,
+			DisallowListed: false,
+			CutoffCounter:  uint64(0),
+			Penalty:        float64(0),
 		}
 	}
 }

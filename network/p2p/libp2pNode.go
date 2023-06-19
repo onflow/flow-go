@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
@@ -31,6 +32,11 @@ type LibP2PNode interface {
 	PeerConnections
 	// PeerScore exposes the peer score API.
 	PeerScore
+	// DisallowListNotificationConsumer exposes the disallow list notification consumer API for the node so that
+	// it will be notified when a new disallow list update is distributed.
+	DisallowListNotificationConsumer
+	// DisallowListOracle exposes the disallow list oracle API for external consumers to query about the disallow list.
+	DisallowListOracle
 	// Start the libp2p node.
 	Start(ctx irrecoverable.SignalerContext)
 	// Stop terminates the libp2p node.
@@ -104,4 +110,39 @@ type PeerConnections interface {
 	//  * network.ErrIllegalConnectionState if the underlying libp2p host reports connectedness as NotConnected but the connections list
 	// 	  to the peer is not empty. This indicates a bug within libp2p.
 	IsConnected(peerID peer.ID) (bool, error)
+}
+
+// DisallowListNotificationConsumer is an interface for consuming disallow/allow list update notifications.
+type DisallowListNotificationConsumer interface {
+	// OnDisallowListNotification is called when a new disallow list update notification is distributed.
+	// Any error on consuming event must handle internally.
+	// The implementation must be concurrency safe.
+	// Args:
+	// 	id: peer ID of the peer being disallow-listed.
+	// 	cause: cause of the peer being disallow-listed (only this cause is added to the peer's disallow-listed causes).
+	// Returns:
+	// 	none
+	OnDisallowListNotification(id peer.ID, cause network.DisallowListedCause)
+
+	// OnAllowListNotification is called when a new allow list update notification is distributed.
+	// Any error on consuming event must handle internally.
+	// The implementation must be concurrency safe.
+	// Args:
+	// 	id: peer ID of the peer being allow-listed.
+	// 	cause: cause of the peer being allow-listed (only this cause is removed from the peer's disallow-listed causes).
+	// Returns:
+	// 	none
+	OnAllowListNotification(id peer.ID, cause network.DisallowListedCause)
+}
+
+// DisallowListOracle is an interface for querying disallow-listed peers.
+type DisallowListOracle interface {
+	// IsDisallowListed determines whether the given peer is disallow-listed for any reason.
+	// Args:
+	// - peerID: the peer to check.
+	// Returns:
+	// - []network.DisallowListedCause: the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
+	// a nil slice is returned.
+	// - bool: true if the peer is disallow-listed for any reason, false otherwise.
+	IsDisallowListed(peerId peer.ID) ([]network.DisallowListedCause, bool)
 }

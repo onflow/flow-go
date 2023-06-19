@@ -46,7 +46,7 @@ func (s *EventLoopTestSuite) SetupTest() {
 
 	log := zerolog.New(io.Discard)
 
-	eventLoop, err := NewEventLoop(log, metrics.NewNoopCollector(), s.eh, time.Time{})
+	eventLoop, err := NewEventLoop(log, metrics.NewNoopCollector(), metrics.NewNoopCollector(), s.eh, time.Time{})
 	require.NoError(s.T(), err)
 	s.eventLoop = eventLoop
 
@@ -200,7 +200,8 @@ func TestEventLoop_Timeout(t *testing.T) {
 
 	log := zerolog.New(io.Discard)
 
-	eventLoop, err := NewEventLoop(log, metrics.NewNoopCollector(), eh, time.Time{})
+	metricsCollector := metrics.NewNoopCollector()
+	eventLoop, err := NewEventLoop(log, metricsCollector, metricsCollector, eh, time.Time{})
 	require.NoError(t, err)
 
 	eh.On("TimeoutChannel").Return(time.After(100 * time.Millisecond))
@@ -253,7 +254,7 @@ func TestReadyDoneWithStartTime(t *testing.T) {
 
 	startTimeDuration := 2 * time.Second
 	startTime := time.Now().Add(startTimeDuration)
-	eventLoop, err := NewEventLoop(log, metrics, eh, startTime)
+	eventLoop, err := NewEventLoop(log, metrics, metrics, eh, startTime)
 	require.NoError(t, err)
 
 	done := make(chan struct{})
