@@ -341,6 +341,11 @@ type HotstuffMetrics interface {
 	// PayloadProductionDuration measures the time which the HotStuff's core logic
 	// spends in the module.Builder component, i.e. the with generating block payloads.
 	PayloadProductionDuration(duration time.Duration)
+
+	// TimeoutCollectorsRange collects information from the node's `TimeoutAggregator` component.
+	// Specifically, it measurers the number of views for which we are currently collecting timeouts
+	// (i.e. the number of `TimeoutCollector` instances we are maintaining) and their lowest/highest view.
+	TimeoutCollectorsRange(lowestRetainedView uint64, newestViewCreatedCollector uint64, activeCollectors int)
 }
 
 type CruiseCtlMetrics interface {
@@ -349,12 +354,12 @@ type CruiseCtlMetrics interface {
 	// and derivative terms of the PID controller.
 	PIDError(p, i, d float64)
 
-	// TargetProposalDuration measures the current value of the Block Rate Controller output:
-	// the target duration for a proposal, from entering the view to broadcasting.
+	// TargetProposalDuration measures the current value of the Block Time Controller output:
+	// the target duration from parent to child proposal.
 	TargetProposalDuration(duration time.Duration)
 
 	// ControllerOutput measures the output of the cruise control PID controller.
-	// Concretely, this is the quantity to subtract from the baseline proposal duration.
+	// Concretely, this is the quantity to subtract from the baseline view duration.
 	ControllerOutput(duration time.Duration)
 }
 

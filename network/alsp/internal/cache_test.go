@@ -75,12 +75,13 @@ func TestSpamRecordCache_Adjust_Init(t *testing.T) {
 	// adjusting a spam record for an origin ID that does not exist in the cache should initialize the record.
 	initializedPenalty, err := cache.Adjust(originID1, adjustFuncIncrement)
 	require.NoError(t, err, "expected no error")
-	require.Equal(t, float64(1), initializedPenalty, "expected initialized penalty to be 0")
+	require.Equal(t, float64(1), initializedPenalty, "expected initialized penalty to be 1")
 
 	record1, ok := cache.Get(originID1)
 	require.True(t, ok, "expected record to exist")
 	require.NotNil(t, record1, "expected non-nil record")
 	require.Equal(t, originID1, record1.OriginId, "expected record to have correct origin ID")
+	require.False(t, record1.DisallowListed, "expected record to not be disallow listed")
 	require.Equal(t, cache.Size(), uint(1), "expected cache to have one record")
 
 	// adjusting a spam record for an origin ID that already exists in the cache should not initialize the record,
@@ -92,6 +93,7 @@ func TestSpamRecordCache_Adjust_Init(t *testing.T) {
 	require.True(t, ok, "expected record to still exist")
 	require.NotNil(t, record1Again, "expected non-nil record")
 	require.Equal(t, originID1, record1Again.OriginId, "expected record to have correct origin ID")
+	require.False(t, record1Again.DisallowListed, "expected record not to be disallow listed")
 	require.Equal(t, cache.Size(), uint(1), "expected cache to still have one record")
 
 	// adjusting a spam record for a different origin ID should initialize the record.
@@ -103,6 +105,7 @@ func TestSpamRecordCache_Adjust_Init(t *testing.T) {
 	require.True(t, ok, "expected record to exist")
 	require.NotNil(t, record2, "expected non-nil record")
 	require.Equal(t, originID2, record2.OriginId, "expected record to have correct origin ID")
+	require.False(t, record2.DisallowListed, "expected record not to be disallow listed")
 	require.Equal(t, cache.Size(), uint(2), "expected cache to have two records")
 }
 
@@ -356,6 +359,8 @@ func TestSpamRecordCache_ConcurrentSameRecordAdjust(t *testing.T) {
 	}
 	adjustFn := func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 		record.Penalty -= 1.0
+		record.DisallowListed = true
+		record.Decay += 1.0
 		return record, nil // no-op
 	}
 
@@ -380,10 +385,13 @@ func TestSpamRecordCache_ConcurrentSameRecordAdjust(t *testing.T) {
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
 
 	// ensure that the record is correctly initialized and adjusted in the cache
+	initDecay := model.SpamRecordFactory()(originID).Decay
 	record, found := cache.Get(originID)
 	require.True(t, found)
 	require.NotNil(t, record)
 	require.Equal(t, concurrentAttempts*-1.0, record.Penalty)
+	require.Equal(t, initDecay+concurrentAttempts*1.0, record.Decay)
+	require.True(t, record.DisallowListed)
 	require.Equal(t, originID, record.OriginId)
 }
 

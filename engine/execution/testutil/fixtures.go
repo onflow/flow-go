@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/stretchr/testify/require"
 
@@ -281,7 +282,7 @@ func CreateAccountsWithSimpleAddresses(
 
 		for _, event := range output.Events {
 			if event.Type == flow.EventAccountCreated {
-				data, err := jsoncdc.Decode(nil, event.Payload)
+				data, err := ccf.Decode(nil, event.Payload)
 				if err != nil {
 					return snapshotTree, nil, errors.New(
 						"error decoding events")
