@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -199,6 +200,7 @@ func setAliases() {
 func overrideConfigFile(flags *pflag.FlagSet) (bool, error) {
 	configFileFlag := flags.Lookup(configFileFlagName)
 	if configFileFlag.Changed {
+		fmt.Println(flags.Lookup(configFileFlagName).Value)
 		p := configFileFlag.Value.String()
 		dirPath, fileName := splitConfigPath(p)
 		conf.AddConfigPath(dirPath)
@@ -212,10 +214,44 @@ func overrideConfigFile(flags *pflag.FlagSet) (bool, error) {
 	return false, nil
 }
 
-// getConfigNameFromPath returns the directory and name of the config file from the provided path string.
+// splitConfigPath returns the directory and base name (without extension) of the config file from the provided path string.
+// If the file name does not match the expected pattern, the function panics.
+//
+// The expected pattern for file names is that they must consist of alphanumeric characters, hyphens, or underscores,
+// followed by a single dot and then the extension.
+//
+// Legitimate Inputs:
+//   - /path/to/my_config.yaml
+//   - /path/to/my-config123.yaml
+//   - my-config.yaml (when in the current directory)
+//
+// Illegitimate Inputs:
+//   - /path/to/my.config.yaml (contains multiple dots)
+//   - /path/to/my config.yaml (contains spaces)
+//   - /path/to/.config.yaml (does not have a file name before the dot)
+//
+// Args:
+//   - path: The file path string to be split into directory and base name.
+//
+// Returns:
+//   - The directory and base name without extension.
+//
+// Panics:
+//   - If the file name does not match the expected pattern.
 func splitConfigPath(path string) (string, string) {
+	// Regex to match filenames like 'my_config.yaml' or 'my-config.yaml' but not 'my.config.yaml'
+	validFileNamePattern := regexp.MustCompile(`^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$`)
+
 	dir, name := filepath.Split(path)
-	return dir, strings.Split(name, ".")[0]
+
+	// Panic if the file name does not match the expected pattern
+	if !validFileNamePattern.MatchString(name) {
+		panic(fmt.Errorf("Invalid config file name '%s'. Expected pattern: alphanumeric, hyphens, or underscores followed by a single dot and extension", name))
+	}
+
+	// Extracting the base name without extension
+	baseName := strings.Split(name, ".")[0]
+	return dir, baseName
 }
 
 func init() {
