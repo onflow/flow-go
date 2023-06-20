@@ -71,6 +71,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 		"cache size for Cadence execution")
 	flags.BoolVar(&exeConf.computationConfig.ExtensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
 	flags.BoolVar(&exeConf.computationConfig.CadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
+	flags.IntVar(&exeConf.computationConfig.MaxConcurrency, "computer-max-concurrency", 1, "set to greater than 1 to enable concurrent transaction execution")
 	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for chunk data packs")
 	flags.Uint32Var(&exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
 	flags.DurationVar(&exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")

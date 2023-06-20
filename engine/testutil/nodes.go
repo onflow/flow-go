@@ -672,6 +672,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		computation.ComputationConfig{
 			QueryConfig:          query.NewDefaultConfig(),
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 	require.NoError(t, err)
@@ -897,6 +898,7 @@ func createFollowerCore(
 	// creates a consensus follower with noop consumer as the notifier
 	followerCore, err := consensus.NewFollower(
 		node.Log,
+		node.Metrics,
 		node.Headers,
 		finalizer,
 		notifier,
