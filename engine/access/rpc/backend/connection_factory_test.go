@@ -408,7 +408,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	assert.Equal(t, resp, expected)
 }
 
-// TestCircuitBreakerExecutionNode
+// TestCircuitBreakerExecutionNode tests circuit breaker states changed for execution nodes
 func TestCircuitBreakerExecutionNode(t *testing.T) {
 	requestTimeout := 1 * time.Second
 	circuitBreakerRestoreTimeout := 3 * time.Second
@@ -477,7 +477,7 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	assert.Equal(t, nil, err)
 }
 
-// TestCircuitBreakerCollectionNode
+// TestCircuitBreakerCollectionNode tests circuit breaker states changed for collection nodes
 func TestCircuitBreakerCollectionNode(t *testing.T) {
 	requestTimeout := 1 * time.Second
 	circuitBreakerRestoreTimeout := 3 * time.Second
@@ -536,7 +536,7 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	assert.Equal(t, gobreaker.ErrOpenState, err)
 	assert.Greater(t, requestTimeout, duration)
 
-	cn.handler.On("Ping", testifymock.Anything, req).Unset()
+	//cn.handler.On("Ping", testifymock.Anything, req).Unset()
 	cn.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
 
 	//Wait until Circuit breaker go to Half-open state
