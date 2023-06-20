@@ -5,9 +5,7 @@ package mock
 import (
 	context "context"
 
-	flow "github.com/onflow/flow-go/model/flow"
 	execution_data "github.com/onflow/flow-go/module/executiondatasync/execution_data"
-
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -17,15 +15,15 @@ type GetExecutionDataFunc struct {
 }
 
 // Execute provides a mock function with given fields: _a0, _a1
-func (_m *GetExecutionDataFunc) Execute(_a0 context.Context, _a1 flow.Identifier) (*execution_data.BlockExecutionDataEntity, error) {
+func (_m *GetExecutionDataFunc) Execute(_a0 context.Context, _a1 uint64) (*execution_data.BlockExecutionDataEntity, error) {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 *execution_data.BlockExecutionDataEntity
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (*execution_data.BlockExecutionDataEntity, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)); ok {
 		return rf(_a0, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *execution_data.BlockExecutionDataEntity); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) *execution_data.BlockExecutionDataEntity); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
@@ -33,7 +31,7 @@ func (_m *GetExecutionDataFunc) Execute(_a0 context.Context, _a1 flow.Identifier
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, uint64) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)

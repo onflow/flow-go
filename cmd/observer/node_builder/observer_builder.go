@@ -306,6 +306,7 @@ func (builder *ObserverServiceBuilder) buildFollowerCore() *ObserverServiceBuild
 
 		followerCore, err := consensus.NewFollower(
 			node.Logger,
+			node.Metrics.Mempool,
 			node.Storage.Headers,
 			final,
 			builder.FollowerDistributor,
@@ -469,22 +470,7 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 	topology network.Topology,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
-
-	cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-		Logger:                  builder.Logger,
-		SpamRecordCacheSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
-		SpamReportQueueSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
-		DisablePenalty:          builder.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
-		AlspMetrics:             builder.Metrics.Network,
-		HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
-		NetworkType:             network.PublicNetwork,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize conduit factory: %w", err)
-	}
-
-	// creates network instance
-	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
 		Logger:              builder.Logger,
 		Codec:               cborcodec.NewCodec(),
 		Me:                  nodeID,
@@ -494,7 +480,17 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 		Metrics:             networkMetrics,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
-		ConduitFactory:      cf,
+		ConduitFactory:      conduit.NewDefaultConduitFactory(),
+		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  builder.Logger,
+			SpamRecordCacheSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
+			SpamReportQueueSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
+			DisablePenalty:          builder.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
+			HeartBeatInterval:       builder.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
+			AlspMetrics:             builder.Metrics.Network,
+			HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
+			NetworkType:             network.PublicNetwork,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -585,11 +581,11 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
-		builder.NodeDisallowListDistributor = cmd.BuildDisallowListNotificationDisseminator(builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
-
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
-		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeDisallowListDistributor)
+		builder.IdentityProvider, err = cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
+			return builder.Middleware
+		})
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
 		}
@@ -619,11 +615,6 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 		}
 
 		return nil
-	})
-
-	builder.Component("disallow list notification distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// distributor is returned as a component to be started and stopped.
-		return builder.NodeDisallowListDistributor, nil
 	})
 }
 
@@ -735,7 +726,11 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		builder.BaseConfig.BindAddr,
 		networkKey,
 		builder.SporkID,
-		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig).
+		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
+		&p2p.DisallowListCacheConfig{
+			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
+			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
+		}).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, builder.IdentityProvider,
@@ -865,8 +860,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			node.Storage.Receipts,
 			node.Storage.Results,
 			node.RootChainID,
-			nil,
-			nil,
+			metrics.NewNoopCollector(),
 			0,
 			0,
 			false,
@@ -917,18 +911,19 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	validators ...network.MessageValidator,
 ) network.Middleware {
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network)
-	mw := middleware.NewMiddleware(
-		builder.Logger,
-		libp2pNode, nodeID,
-		builder.Metrics.Bitswap,
-		builder.SporkID,
-		middleware.DefaultUnicastTimeout,
-		builder.IDTranslator,
-		builder.CodecFactory(),
-		slashingViolationsConsumer,
+	mw := middleware.NewMiddleware(&middleware.Config{
+		Logger:                     builder.Logger,
+		Libp2pNode:                 libp2pNode,
+		FlowId:                     nodeID,
+		BitSwapMetrics:             builder.Metrics.Bitswap,
+		RootBlockID:                builder.SporkID,
+		UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
+		IdTranslator:               builder.IDTranslator,
+		Codec:                      builder.CodecFactory(),
+		SlashingViolationsConsumer: slashingViolationsConsumer,
+	},
 		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)
-	builder.NodeDisallowListDistributor.AddConsumer(mw)
 	builder.Middleware = mw
 	return builder.Middleware
 }

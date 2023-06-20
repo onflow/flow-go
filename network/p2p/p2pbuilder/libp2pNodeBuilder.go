@@ -22,25 +22,24 @@ import (
 	"github.com/rs/zerolog"
 
 	netconf "github.com/onflow/flow-go/config/network"
-	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/dht"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
-	"github.com/onflow/flow-go/network/p2p/subscription"
-	"github.com/onflow/flow-go/network/p2p/tracer"
-	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
-	"github.com/onflow/flow-go/network/p2p/unicast/stream"
-	"github.com/onflow/flow-go/network/p2p/utils"
-
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/connection"
+	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	gossipsubbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/gossipsub"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
+	"github.com/onflow/flow-go/network/p2p/unicast/stream"
+	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error)
@@ -62,7 +61,7 @@ type LibP2PNodeBuilder struct {
 	resourceManager           network.ResourceManager
 	resourceManagerCfg        *netconf.ResourceManagerConfig
 	connManager               connmgr.ConnManager
-	connGater                 connmgr.ConnectionGater
+	connGater                 p2p.ConnectionGater
 	routingFactory            func(context.Context, host.Host) (routing.Routing, error)
 	peerManagerEnablePruning  bool
 	peerManagerUpdateInterval time.Duration
@@ -70,6 +69,7 @@ type LibP2PNodeBuilder struct {
 	createStreamRetryInterval time.Duration
 	rateLimiterDistributor    p2p.UnicastRateLimiterDistributor
 	gossipSubTracer           p2p.PubSubTracer
+	disallowListCacheCfg      *p2p.DisallowListCacheConfig
 }
 
 func NewNodeBuilder(logger zerolog.Logger,
@@ -77,16 +77,18 @@ func NewNodeBuilder(logger zerolog.Logger,
 	addr string,
 	networkKey fcrypto.PrivateKey,
 	sporkID flow.Identifier,
-	rCfg *netconf.ResourceManagerConfig) *LibP2PNodeBuilder {
+	rCfg *netconf.ResourceManagerConfig,
+	disallowListCacheCfg *p2p.DisallowListCacheConfig) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
-		logger:             logger,
-		sporkID:            sporkID,
-		addr:               addr,
-		networkKey:         networkKey,
-		createNode:         DefaultCreateNodeFunc,
-		metrics:            metrics,
-		resourceManagerCfg: rCfg,
-		gossipSubBuilder:   gossipsubbuilder.NewGossipSubBuilder(logger, metrics),
+		logger:               logger,
+		sporkID:              sporkID,
+		addr:                 addr,
+		networkKey:           networkKey,
+		createNode:           DefaultCreateNodeFunc,
+		metrics:              metrics,
+		resourceManagerCfg:   rCfg,
+		gossipSubBuilder:     gossipsubbuilder.NewGossipSubBuilder(logger, metrics),
+		disallowListCacheCfg: disallowListCacheCfg,
 	}
 }
 
@@ -115,7 +117,7 @@ func (builder *LibP2PNodeBuilder) SetConnectionManager(manager connmgr.ConnManag
 }
 
 // SetConnectionGater sets the connection gater for the node.
-func (builder *LibP2PNodeBuilder) SetConnectionGater(gater connmgr.ConnectionGater) p2p.NodeBuilder {
+func (builder *LibP2PNodeBuilder) SetConnectionGater(gater p2p.ConnectionGater) p2p.NodeBuilder {
 	builder.connGater = gater
 	return builder
 }
@@ -302,7 +304,11 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		}
 	}
 
-	node := builder.createNode(builder.logger, h, pCache, peerManager)
+	node := builder.createNode(builder.logger, h, pCache, peerManager, builder.disallowListCacheCfg)
+
+	if builder.connGater != nil {
+		builder.connGater.SetDisallowListOracle(node)
+	}
 
 	unicastManager := unicast.NewUnicastManager(builder.logger,
 		stream.NewLibP2PStreamFactory(h),
@@ -416,8 +422,9 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 func DefaultCreateNodeFunc(logger zerolog.Logger,
 	host host.Host,
 	pCache p2p.ProtocolPeerCache,
-	peerManager p2p.PeerManager) p2p.LibP2PNode {
-	return p2pnode.NewNode(logger, host, pCache, peerManager)
+	peerManager p2p.PeerManager,
+	disallowListCacheCfg *p2p.DisallowListCacheConfig) p2p.LibP2PNode {
+	return p2pnode.NewNode(logger, host, pCache, peerManager, disallowListCacheCfg)
 }
 
 // DefaultNodeBuilder returns a node builder.
@@ -435,7 +442,8 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	rpcInspectorSuite p2p.GossipSubInspectorSuite,
 	rCfg *netconf.ResourceManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig,
-	connMgrConfig *netconf.ConnectionManagerConfig) (p2p.NodeBuilder, error) {
+	connMgrConfig *netconf.ConnectionManagerConfig,
+	disallowListCacheCfg *p2p.DisallowListCacheConfig) (p2p.NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(log, metricsCfg.Metrics, connMgrConfig)
 	if err != nil {
@@ -451,7 +459,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
-	builder := NewNodeBuilder(log, metricsCfg.Metrics, address, flowKey, sporkId, rCfg).
+	builder := NewNodeBuilder(log, metricsCfg.Metrics, address, flowKey, sporkId, rCfg, disallowListCacheCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).

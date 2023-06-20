@@ -115,6 +115,7 @@ func (nc *NoopCollector) CommitteeProcessingDuration(duration time.Duration)    
 func (nc *NoopCollector) SignerProcessingDuration(duration time.Duration)                        {}
 func (nc *NoopCollector) ValidatorProcessingDuration(duration time.Duration)                     {}
 func (nc *NoopCollector) PayloadProductionDuration(duration time.Duration)                       {}
+func (nc *NoopCollector) TimeoutCollectorsRange(uint64, uint64, int)                             {}
 func (nc *NoopCollector) TransactionIngested(txID flow.Identifier)                               {}
 func (nc *NoopCollector) ClusterBlockProposed(*cluster.Block)                                    {}
 func (nc *NoopCollector) ClusterBlockFinalized(*cluster.Block)                                   {}
@@ -198,6 +199,7 @@ func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Tim
 func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                          {}
 func (nc *NoopCollector) TransactionSubmissionFailed()                                     {}
 func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)                    {}
+func (nc *NoopCollector) UpdateLastFullBlockHeight(height uint64)                          {}
 func (nc *NoopCollector) ChunkDataPackRequestProcessed()                                   {}
 func (nc *NoopCollector) ExecutionSync(syncing bool)                                       {}
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                 {}

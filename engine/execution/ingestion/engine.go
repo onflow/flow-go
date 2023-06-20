@@ -2,10 +2,8 @@ package ingestion
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -60,7 +59,7 @@ type Engine struct {
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	executionDataPruner    *pruner.Pruner
 	uploader               *uploader.Manager
-	stopControl            *StopControl
+	stopControl            *stop.StopControl
 }
 
 func New(
@@ -84,7 +83,7 @@ func New(
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pruner *pruner.Pruner,
 	uploader *uploader.Manager,
-	stopControl *StopControl,
+	stopControl *stop.StopControl,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -122,15 +121,17 @@ func New(
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	if !e.stopControl.IsPaused() {
-		if err := e.uploader.RetryUploads(); err != nil {
-			e.log.Warn().Msg("failed to re-upload all ComputationResults")
-		}
+	if e.stopControl.IsExecutionStopped() {
+		return e.unit.Ready()
+	}
 
-		err := e.reloadUnexecutedBlocks()
-		if err != nil {
-			e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
-		}
+	if err := e.uploader.RetryUploads(); err != nil {
+		e.log.Warn().Msg("failed to re-upload all ComputationResults")
+	}
+
+	err := e.reloadUnexecutedBlocks()
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
 	}
 
 	return e.unit.Ready()
@@ -436,8 +437,10 @@ func (e *Engine) reloadBlock(
 // NOTE: Ready calls reloadUnexecutedBlocks during initialization, which handles dropped protocol events.
 func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 
+	// TODO: this should not be blocking: https://github.com/onflow/flow-go/issues/4400
+
 	// skip if stopControl tells to skip
-	if !e.stopControl.blockProcessable(b) {
+	if !e.stopControl.ShouldExecuteBlock(b) {
 		return
 	}
 
@@ -455,12 +458,6 @@ func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 	if err != nil {
 		e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to handle block")
 	}
-}
-
-// BlockFinalized implements part of state.protocol.Consumer interface.
-// Method gets called for every finalized block
-func (e *Engine) BlockFinalized(h *flow.Header) {
-	e.stopControl.blockFinalized(e.unit.Ctx(), e.execState, h)
 }
 
 // Main handling
@@ -607,8 +604,6 @@ func (e *Engine) executeBlock(
 
 	startedAt := time.Now()
 
-	e.stopControl.executingBlockHeight(executableBlock.Block.Header.Height)
-
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
 	defer span.End()
 
@@ -704,9 +699,10 @@ func (e *Engine) executeBlock(
 		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
 	}
 
+	e.stopControl.OnBlockExecuted(executableBlock.Block.Header)
+
 	e.unit.Ctx()
 
-	e.stopControl.blockExecuted(executableBlock.Block.Header)
 }
 
 // we've executed the block, now we need to check:
@@ -744,6 +740,7 @@ func (e *Engine) onBlockExecuted(
 			// find the block that was just executed
 			executionQueue, exists := executionQueues.ByID(executed.ID())
 			if !exists {
+				logQueueState(e.log, executionQueues, executed.ID())
 				// when the block no longer exists in the queue, it means there was a race condition that
 				// two onBlockExecuted was called for the same block, and one process has already removed the
 				// block from the queue, so we will print an error here
@@ -799,8 +796,9 @@ func (e *Engine) onBlockExecuted(
 		})
 
 	if err != nil {
-		e.log.Err(err).
+		e.log.Fatal().Err(err).
 			Hex("block", logging.Entity(executed)).
+			Uint64("height", executed.Block.Header.Height).
 			Msg("error while requeueing blocks after execution")
 	}
 
@@ -1050,105 +1048,6 @@ func (e *Engine) matchAndFindMissingCollections(
 	return missingCollections, nil
 }
 
-func (e *Engine) ExecuteScriptAtBlockID(
-	ctx context.Context,
-	script []byte,
-	arguments [][]byte,
-	blockID flow.Identifier,
-) ([]byte, error) {
-
-	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
-	}
-
-	// return early if state with the given state commitment is not in memory
-	// and already purged. This reduces allocations for scripts targeting old blocks.
-	if !e.execState.HasState(stateCommit) {
-		return nil, fmt.Errorf("failed to execute script at block (%s): state commitment not found (%s). this error usually happens if the reference block for this script is not set to a recent block", blockID.String(), hex.EncodeToString(stateCommit[:]))
-	}
-
-	block, err := e.state.AtBlockID(blockID).Head()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
-	}
-
-	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
-
-	if e.extensiveLogging {
-		args := make([]string, 0)
-		for _, a := range arguments {
-			args = append(args, hex.EncodeToString(a))
-		}
-		e.log.Debug().
-			Hex("block_id", logging.ID(blockID)).
-			Uint64("block_height", block.Height).
-			Hex("state_commitment", stateCommit[:]).
-			Hex("script_hex", script).
-			Str("args", strings.Join(args[:], ",")).
-			Msg("extensive log: executed script content")
-	}
-	return e.computationManager.ExecuteScript(
-		ctx,
-		script,
-		arguments,
-		block,
-		blockSnapshot)
-}
-
-func (e *Engine) GetRegisterAtBlockID(
-	ctx context.Context,
-	owner, key []byte,
-	blockID flow.Identifier,
-) ([]byte, error) {
-
-	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
-	}
-
-	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
-
-	id := flow.NewRegisterID(string(owner), string(key))
-	data, err := blockSnapshot.Get(id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get the register (%s): %w", id, err)
-	}
-
-	return data, nil
-}
-
-func (e *Engine) GetAccount(
-	ctx context.Context,
-	addr flow.Address,
-	blockID flow.Identifier,
-) (*flow.Account, error) {
-	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
-	}
-
-	// return early if state with the given state commitment is not in memory
-	// and already purged. This reduces allocations for get accounts targeting old blocks.
-	if !e.execState.HasState(stateCommit) {
-		return nil, fmt.Errorf(
-			"failed to get account at block (%s): state commitment not "+
-				"found (%s). this error usually happens if the reference "+
-				"block for this script is not set to a recent block.",
-			blockID.String(),
-			hex.EncodeToString(stateCommit[:]))
-	}
-
-	block, err := e.state.AtBlockID(blockID).Head()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
-	}
-
-	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
-
-	return e.computationManager.GetAccount(ctx, addr, block, blockSnapshot)
-}
-
 // save the execution result of a block
 func (e *Engine) saveExecutionResults(
 	ctx context.Context,
@@ -1321,4 +1220,13 @@ func (e *Engine) getHeaderByHeight(height uint64) (*flow.Header, error) {
 	// we don't use protocol state because for dynamic boostrapped execution node
 	// the last executed and sealed block is below the finalized root block
 	return e.headers.ByHeight(height)
+}
+
+func logQueueState(log zerolog.Logger, queues *stdmap.QueuesBackdata, blockID flow.Identifier) {
+	all := queues.All()
+
+	log.With().Hex("queue_state__executed_block_id", blockID[:]).Int("count", len(all)).Logger()
+	for i, queue := range all {
+		log.Error().Msgf("%v-th queue state: %v", i, queue.String())
+	}
 }

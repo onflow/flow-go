@@ -169,7 +169,7 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 	mockComputationResultStorage.On("Upsert", testBlockID, mock.Anything).Return(nil)
 
 	mockExecutionDataDowloader := new(executionDataMock.Downloader)
-	mockExecutionDataDowloader.On("Download", mock.Anything, testEDID).Return(
+	mockExecutionDataDowloader.On("Get", mock.Anything, testEDID).Return(
 		&execution_data.BlockExecutionData{
 			BlockID:             testBlockID,
 			ChunkExecutionDatas: testChunkExecutionDatas,
@@ -259,8 +259,7 @@ func createTestBadgerRetryableUploaderWrapper(asyncUploader *AsyncUploader) *Bad
 	mockComputationResultStorage.On("Upsert", mock.Anything, mock.Anything).Return(nil)
 
 	mockExecutionDataDowloader := new(executionDataMock.Downloader)
-	mockExecutionDataDowloader.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
-	mockExecutionDataDowloader.On("Download", mock.Anything, mock.Anything).Return(
+	mockExecutionDataDowloader.On("Get", mock.Anything, mock.Anything).Return(
 		&execution_data.BlockExecutionData{
 			BlockID:             flow.ZeroID,
 			ChunkExecutionDatas: make([]*execution_data.ChunkExecutionData, 0),

@@ -1,14 +1,20 @@
 package utils
 
 import (
+	"context"
 	_ "embed"
+	"fmt"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 //go:embed templates/create-and-setup-node.cdc
@@ -171,4 +177,27 @@ func MakeAdminRemoveNodeTx(
 	}
 
 	return tx, nil
+}
+
+// submitSmokeTestTransaction will submit a create account transaction to smoke test network
+// This ensures a single transaction can be sealed by the network.
+func CreateFlowAccount(ctx context.Context, client *testnet.Client) (sdk.Address, error) {
+	fullAccountKey := sdk.NewAccountKey().
+		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen).PublicKey()).
+		SetHashAlgo(sdkcrypto.SHA2_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	latestBlockID, err := client.GetLatestBlockID(ctx)
+	if err != nil {
+		return sdk.EmptyAddress, fmt.Errorf("failed to get latest block id: %w", err)
+	}
+
+	// createAccount will submit a create account transaction and wait for it to be sealed
+	addr, err := client.CreateAccount(ctx, fullAccountKey, client.Account(), client.SDKServiceAddress(), sdk.Identifier(latestBlockID))
+	if err != nil {
+		return sdk.EmptyAddress, fmt.Errorf("failed to create account: %w", err)
+	}
+
+	client.Account().Keys[0].SequenceNumber++
+	return addr, nil
 }

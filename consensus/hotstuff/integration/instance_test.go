@@ -391,7 +391,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 	// initialize the pacemaker
 	controller := timeout.NewController(cfg.Timeouts)
-	in.pacemaker, err = pacemaker.New(controller, notifier, in.persist)
+	in.pacemaker, err = pacemaker.New(controller, pacemaker.NoProposalDelay(), notifier, in.persist)
 	require.NoError(t, err)
 
 	// initialize the forks handler
@@ -502,7 +502,12 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		timeoutAggregationDistributor,
 		timeoutProcessorFactory,
 	)
-	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorFactory)
+	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(
+		log,
+		metricsCollector,
+		livenessData.CurrentView,
+		timeoutCollectorFactory,
+	)
 
 	// initialize the timeout aggregator
 	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(

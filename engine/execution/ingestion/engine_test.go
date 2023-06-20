@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	mathRand "math/rand"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -21,6 +20,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	uploadermock "github.com/onflow/flow-go/engine/execution/ingestion/uploader/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
@@ -122,7 +122,7 @@ type testingContext struct {
 	broadcastedReceipts map[flow.Identifier]*flow.ExecutionReceipt
 	collectionRequester *module.MockRequester
 	identities          flow.IdentityList
-	stopControl         *StopControl
+	stopControl         *stop.StopControl
 	uploadMgr           *uploader.Manager
 
 	mu *sync.Mutex
@@ -202,7 +202,16 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
-	stopControl := NewStopControl(zerolog.Nop(), false, 0)
+	stopControl := stop.NewStopControl(
+		zerolog.Nop(),
+		executionState,
+		headers,
+		nil,
+		nil,
+		&flow.Header{Height: 1},
+		false,
+		false,
+	)
 
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
@@ -1019,8 +1028,8 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		require.True(t, ok)
 
 		// make sure no stopping has been engaged, as it was not set
-		stopState := ctx.stopControl.GetState()
-		require.Equal(t, stopState, StopControlOff)
+		require.False(t, ctx.stopControl.IsExecutionStopped())
+		require.False(t, ctx.stopControl.GetStopParameters().Set())
 	})
 }
 
@@ -1038,7 +1047,9 @@ func TestStopAtHeight(t *testing.T) {
 		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header, blocks["A"].StartState)
 
 		// stop at block C
-		_, _, err := ctx.stopControl.SetStopHeight(blockSealed.Height+3, false)
+		err := ctx.stopControl.SetStopParameters(stop.StopParameters{
+			StopBeforeHeight: blockSealed.Height + 3,
+		})
 		require.NoError(t, err)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
@@ -1084,7 +1095,7 @@ func TestStopAtHeight(t *testing.T) {
 			*blocks["B"].StartState,
 			nil)
 
-		assert.False(t, ctx.stopControl.IsPaused())
+		assert.False(t, ctx.stopControl.IsExecutionStopped())
 
 		wg.Add(1)
 		ctx.engine.BlockProcessable(blocks["A"].Block.Header, nil)
@@ -1098,16 +1109,16 @@ func TestStopAtHeight(t *testing.T) {
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
 		// we don't pause until a block has been finalized
-		assert.False(t, ctx.stopControl.IsPaused())
+		assert.False(t, ctx.stopControl.IsExecutionStopped())
 
-		ctx.engine.BlockFinalized(blocks["A"].Block.Header)
-		ctx.engine.BlockFinalized(blocks["B"].Block.Header)
+		ctx.stopControl.BlockFinalizedForTesting(blocks["A"].Block.Header)
+		ctx.stopControl.BlockFinalizedForTesting(blocks["B"].Block.Header)
 
-		assert.False(t, ctx.stopControl.IsPaused())
-		ctx.engine.BlockFinalized(blocks["C"].Block.Header)
-		assert.True(t, ctx.stopControl.IsPaused())
+		assert.False(t, ctx.stopControl.IsExecutionStopped())
+		ctx.stopControl.BlockFinalizedForTesting(blocks["C"].Block.Header)
+		assert.True(t, ctx.stopControl.IsExecutionStopped())
 
-		ctx.engine.BlockFinalized(blocks["D"].Block.Header)
+		ctx.stopControl.BlockFinalizedForTesting(blocks["D"].Block.Header)
 
 		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		assert.False(t, more)
@@ -1163,7 +1174,9 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["B"].Block.Header, nil)
 
 		// stop at block B, so B-1 (A) will be last executed
-		_, _, err := ctx.stopControl.SetStopHeight(blocks["B"].Height(), false)
+		err := ctx.stopControl.SetStopParameters(stop.StopParameters{
+			StopBeforeHeight: blocks["B"].Height(),
+		})
 		require.NoError(t, err)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
@@ -1213,16 +1226,16 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 			*blocks["A"].StartState,
 			nil)
 
-		assert.False(t, ctx.stopControl.IsPaused())
+		assert.False(t, ctx.stopControl.IsExecutionStopped())
 
 		executionWg.Add(1)
 		ctx.engine.BlockProcessable(blocks["A"].Block.Header, nil)
 		ctx.engine.BlockProcessable(blocks["B"].Block.Header, nil)
 
-		assert.False(t, ctx.stopControl.IsPaused())
+		assert.False(t, ctx.stopControl.IsExecutionStopped())
 
 		finalizationWg.Add(1)
-		ctx.engine.BlockFinalized(blocks["B"].Block.Header)
+		ctx.stopControl.BlockFinalizedForTesting(blocks["B"].Block.Header)
 
 		finalizationWg.Wait()
 		executionWg.Wait()
@@ -1230,7 +1243,7 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		assert.False(t, more)
 
-		assert.True(t, ctx.stopControl.IsPaused())
+		assert.True(t, ctx.stopControl.IsExecutionStopped())
 
 		var ok bool
 
@@ -1299,73 +1312,6 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	assert.NoError(t, err)
 
 	execState.AssertExpectations(t)
-}
-
-func TestExecuteScriptAtBlockID(t *testing.T) {
-	t.Run("happy path", func(t *testing.T) {
-		runWithEngine(t, func(ctx testingContext) {
-			// Meaningless script
-			script := []byte{1, 1, 2, 3, 5, 8, 11}
-			scriptResult := []byte{1}
-
-			// Ensure block we're about to query against is executable
-			blockA := unittest.ExecutableBlockFixture(nil, unittest.StateCommitmentPointerFixture())
-
-			snapshot := new(protocol.Snapshot)
-			snapshot.On("Head").Return(blockA.Block.Header, nil)
-
-			commits := make(map[flow.Identifier]flow.StateCommitment)
-			commits[blockA.ID()] = *blockA.StartState
-
-			ctx.stateCommitmentExist(blockA.ID(), *blockA.StartState)
-
-			ctx.state.On("AtBlockID", blockA.Block.ID()).Return(snapshot)
-			ctx.executionState.On("NewStorageSnapshot", *blockA.StartState).Return(nil)
-
-			ctx.executionState.On("HasState", *blockA.StartState).Return(true)
-
-			// Successful call to computation manager
-			ctx.computationManager.
-				On("ExecuteScript", mock.Anything, script, [][]byte(nil), blockA.Block.Header, nil).
-				Return(scriptResult, nil)
-
-			// Execute our script and expect no error
-			res, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, blockA.Block.ID())
-			assert.NoError(t, err)
-			assert.Equal(t, scriptResult, res)
-
-			// Assert other components were called as expected
-			ctx.computationManager.AssertExpectations(t)
-			ctx.executionState.AssertExpectations(t)
-			ctx.state.AssertExpectations(t)
-		})
-	})
-
-	t.Run("return early when state commitment not exist", func(t *testing.T) {
-		runWithEngine(t, func(ctx testingContext) {
-			// Meaningless script
-			script := []byte{1, 1, 2, 3, 5, 8, 11}
-
-			// Ensure block we're about to query against is executable
-			blockA := unittest.ExecutableBlockFixture(nil, unittest.StateCommitmentPointerFixture())
-
-			// make sure blockID to state commitment mapping exist
-			ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blockA.ID()).Return(*blockA.StartState, nil)
-
-			// but the state commitment does not exist (e.g. purged)
-			ctx.executionState.On("HasState", *blockA.StartState).Return(false)
-
-			// Execute our script and expect no error
-			_, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, blockA.Block.ID())
-			assert.Error(t, err)
-			assert.True(t, strings.Contains(err.Error(), "state commitment not found"))
-
-			// Assert other components were called as expected
-			ctx.executionState.AssertExpectations(t)
-			ctx.state.AssertExpectations(t)
-		})
-	})
-
 }
 
 func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
@@ -1567,7 +1513,16 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		checkAuthorizedAtBlock,
 		nil,
 		nil,
-		NewStopControl(zerolog.Nop(), false, 0),
+		stop.NewStopControl(
+			zerolog.Nop(),
+			nil,
+			headers,
+			nil,
+			nil,
+			&flow.Header{Height: 1},
+			false,
+			false,
+		),
 	)
 
 	require.NoError(t, err)

@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"context"
+	"github.com/dgraph-io/badger/v2"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
@@ -223,8 +223,6 @@ type NodeConfig struct {
 
 	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
-	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
-	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
 
 	// GossipSubRpcInspectorSuite rpc inspector suite.
 	GossipSubRpcInspectorSuite p2p.GossipSubInspectorSuite
@@ -237,13 +235,14 @@ type StateExcerptAtBoot struct {
 	// 		FinalizedRootBlock and SealedRootBlock are the same block (special case of self-sealing block)
 	// For node bootstrapped with a root snapshot for a block above the first block of a spork (dynamically bootstrapped),
 	// 		FinalizedRootBlock.Height > SealedRootBlock.Height
-	FinalizedRootBlock *flow.Block             // The last finalized block when bootstrapped.
-	SealedRootBlock    *flow.Block             // The last sealed block when bootstrapped.
-	RootQC             *flow.QuorumCertificate // QC for Finalized Root Block
-	RootResult         *flow.ExecutionResult   // Result for SealedRootBlock
-	RootSeal           *flow.Seal              //Seal for RootResult
-	RootChainID        flow.ChainID
-	SporkID            flow.Identifier
+	FinalizedRootBlock  *flow.Block             // The last finalized block when bootstrapped.
+	SealedRootBlock     *flow.Block             // The last sealed block when bootstrapped.
+	RootQC              *flow.QuorumCertificate // QC for Finalized Root Block
+	RootResult          *flow.ExecutionResult   // Result for SealedRootBlock
+	RootSeal            *flow.Seal              //Seal for RootResult
+	RootChainID         flow.ChainID
+	SporkID             flow.Identifier
+	LastFinalizedHeader *flow.Header // last finalized header when the node boots up
 }
 
 func DefaultBaseConfig() *BaseConfig {

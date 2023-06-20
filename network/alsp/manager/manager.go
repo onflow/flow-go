@@ -4,12 +4,16 @@ import (
 	crand "crypto/rand"
 	"errors"
 	"fmt"
+	"math"
+	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/common/worker"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -32,6 +36,9 @@ var (
 	// ErrSpamReportQueueSizeNotSet is returned when the spam report queue size is not set, it is a fatal irrecoverable error,
 	// and the ALSP module cannot be initialized.
 	ErrSpamReportQueueSizeNotSet = errors.New("spam report queue size is not set")
+	// ErrHeartBeatIntervalNotSet is returned when the heartbeat interval is not set, it is a fatal irrecoverable error,
+	// and the ALSP module cannot be initialized.
+	ErrHeartBeatIntervalNotSet = errors.New("heartbeat interval is not set")
 )
 
 type SpamRecordCacheFactory func(zerolog.Logger, uint32, module.HeroCacheMetrics) alsp.SpamRecordCache
@@ -47,11 +54,8 @@ func defaultSpamRecordCacheFactory() SpamRecordCacheFactory {
 	}
 }
 
-// MisbehaviorReportManager is responsible for handling misbehavior reports.
-// The current version is at the minimum viable product stage and only logs the reports.
-// TODO: the mature version should be able to handle the reports and take actions accordingly, i.e., penalize the misbehaving node
-//
-//	and report the node to be disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
+// MisbehaviorReportManager is responsible for handling misbehavior reports, i.e., penalizing the misbehaving node
+// and report the node to be disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
 type MisbehaviorReportManager struct {
 	component.Component
 	logger  zerolog.Logger
@@ -68,6 +72,10 @@ type MisbehaviorReportManager struct {
 	// This is useful for managing production incidents.
 	// Note: under normal circumstances, the ALSP module should not be disabled.
 	disablePenalty bool
+
+	// disallowListingConsumer is the consumer for the disallow-listing notifications.
+	// It is notified when a node is disallow-listed by this manager.
+	disallowListingConsumer network.DisallowListNotificationConsumer
 
 	// workerPool is the worker pool for handling the misbehavior reports in a thread-safe and non-blocking manner.
 	workerPool *worker.Pool[internal.ReportedMisbehaviorWork]
@@ -96,6 +104,10 @@ type MisbehaviorReportManagerConfig struct {
 	// NetworkType is the type of the network it is used to determine whether the ALSP module is utilized in the
 	// public (unstaked) or private (staked) network.
 	NetworkType network.NetworkingType
+	// HeartBeatInterval is the interval between the heartbeats. Heartbeat is a recurring event that is used to
+	// apply recurring actions, e.g., decay the penalty of the misbehaving nodes.
+	HeartBeatInterval time.Duration
+	Opts              []MisbehaviorReportManagerOption
 }
 
 // validate validates the MisbehaviorReportManagerConfig instance. It returns an error if the config is invalid.
@@ -114,6 +126,9 @@ func (c MisbehaviorReportManagerConfig) validate() error {
 	}
 	if c.SpamReportQueueSize == 0 {
 		return ErrSpamReportQueueSizeNotSet
+	}
+	if c.HeartBeatInterval == 0 {
+		return ErrHeartBeatIntervalNotSet
 	}
 	return nil
 }
@@ -139,26 +154,28 @@ func WithSpamRecordsCacheFactory(f SpamRecordCacheFactory) MisbehaviorReportMana
 
 // NewMisbehaviorReportManager creates a new instance of the MisbehaviorReportManager.
 // Args:
-//
-//	logger: the logger instance.
-//	metrics: the metrics instance.
-//	cache: the spam record cache instance.
+// cfg: the configuration for the MisbehaviorReportManager.
+// consumer: the consumer for the disallow-listing notifications. When the manager decides to disallow-list a node, it notifies the consumer to
+// perform the lower-level disallow-listing action at the networking layer.
+// All connections to the disallow-listed node are closed and the node is removed from the overlay, and
+// no further connections are established to the disallow-listed node, either inbound or outbound.
 //
 // Returns:
 //
 //		A new instance of the MisbehaviorReportManager.
 //	 An error if the config is invalid. The error is considered irrecoverable.
-func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...MisbehaviorReportManagerOption) (*MisbehaviorReportManager, error) {
+func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, consumer network.DisallowListNotificationConsumer) (*MisbehaviorReportManager, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration for MisbehaviorReportManager: %w", err)
 	}
 
 	lg := cfg.Logger.With().Str("module", "misbehavior_report_manager").Logger()
 	m := &MisbehaviorReportManager{
-		logger:         lg,
-		metrics:        cfg.AlspMetrics,
-		disablePenalty: cfg.DisablePenalty,
-		cacheFactory:   defaultSpamRecordCacheFactory(),
+		logger:                  lg,
+		metrics:                 cfg.AlspMetrics,
+		disablePenalty:          cfg.DisablePenalty,
+		disallowListingConsumer: consumer,
+		cacheFactory:            defaultSpamRecordCacheFactory(),
 	}
 
 	store := queue.NewHeroStore(
@@ -171,7 +188,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 		store,
 		m.processMisbehaviorReport).Build()
 
-	for _, opt := range opts {
+	for _, opt := range cfg.Opts {
 		opt(m)
 	}
 
@@ -181,6 +198,10 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, opts ...Mi
 		metrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory, cfg.NetworkType))
 
 	builder := component.NewComponentManagerBuilder()
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		ready()
+		m.heartbeatLoop(ctx, cfg.HeartBeatInterval) // blocking call
+	})
 	for i := 0; i < defaultMisbehaviorReportManagerWorkers; i++ {
 		builder.AddWorker(m.workerPool.WorkerLogic())
 	}
@@ -235,6 +256,128 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 	}
 
 	lg.Debug().Msg("misbehavior report submitted")
+}
+
+// heartbeatLoop starts the heartbeat ticks ticker to tick at the given intervals. It is a blocking function, and
+// should be called in a separate goroutine. It returns when the context is canceled. Hearbeats are recurring events that
+// are used to perform periodic tasks.
+// Args:
+//
+//	ctx: the context.
+//	interval: the interval between two ticks.
+//
+// Returns:
+//
+//	none.
+func (m *MisbehaviorReportManager) heartbeatLoop(ctx irrecoverable.SignalerContext, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	m.logger.Info().Dur("interval", interval).Msg("starting heartbeat ticks")
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			m.logger.Debug().Msg("heartbeat ticks stopped")
+			return
+		case <-ticker.C:
+			m.logger.Trace().Msg("new heartbeat ticked")
+			if err := m.onHeartbeat(); err != nil {
+				// any error returned from onHeartbeat is considered irrecoverable.
+				ctx.Throw(fmt.Errorf("failed to perform heartbeat: %w", err))
+			}
+		}
+	}
+}
+
+// onHeartbeat is called upon a heartbeatLoop. It encapsulates the recurring tasks that should be performed
+// during a heartbeat, which currently includes decay of the spam records.
+// Args:
+//
+//	none.
+//
+// Returns:
+//
+//		error: if an error occurs, it is returned. No error is expected during normal operation. Any returned error must
+//	 be considered as irrecoverable.
+func (m *MisbehaviorReportManager) onHeartbeat() error {
+	allIds := m.cache.Identities()
+
+	for _, id := range allIds {
+		penalty, err := m.cache.Adjust(id, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+			if record.Penalty > 0 {
+				// sanity check; this should never happen.
+				return record, fmt.Errorf("illegal state: spam record %x has positive penalty %f", id, record.Penalty)
+			}
+			if record.Decay <= 0 {
+				// sanity check; this should never happen.
+				return record, fmt.Errorf("illegal state: spam record %x has non-positive decay %f", id, record.Decay)
+			}
+
+			// TODO: this can be done in batch but at this stage let's send individual notifications.
+			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
+			// as long as record.Penalty is NOT below model.DisallowListingThreshold,
+			// the node is considered allow-listed and can conduct inbound and outbound connections.
+			// Once it falls below model.DisallowListingThreshold, it needs to be disallow listed.
+			if record.Penalty < model.DisallowListingThreshold && !record.DisallowListed {
+				// cutoff counter keeps track of how many times the penalty has been below the threshold.
+				record.CutoffCounter++
+				record.DisallowListed = true
+				m.logger.Warn().
+					Str("key", logging.KeySuspicious).
+					Hex("identifier", logging.ID(id)).
+					Uint64("cutoff_counter", record.CutoffCounter).
+					Float64("decay_speed", record.Decay).
+					Bool("disallow_listed", record.DisallowListed).
+					Msg("node penalty is below threshold, disallow listing")
+				m.disallowListingConsumer.OnDisallowListNotification(&network.DisallowListingUpdate{
+					FlowIds: flow.IdentifierList{id},
+					Cause:   network.DisallowListedCauseAlsp, // sets the ALSP disallow listing cause on node
+				})
+			}
+
+			// each time we decay the penalty by the decay speed, the penalty is a negative number, and the decay speed
+			// is a positive number. So the penalty is getting closer to zero.
+			// We use math.Min() to make sure the penalty is never positive.
+			record.Penalty = math.Min(record.Penalty+record.Decay, 0)
+
+			// TODO: this can be done in batch but at this stage let's send individual notifications.
+			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
+			if record.Penalty == float64(0) && record.DisallowListed {
+				record.DisallowListed = false
+				m.logger.Info().
+					Hex("identifier", logging.ID(id)).
+					Uint64("cutoff_counter", record.CutoffCounter).
+					Float64("decay_speed", record.Decay).
+					Bool("disallow_listed", record.DisallowListed).
+					Msg("allow-listing a node that was disallow listed")
+				// Penalty has fully decayed to zero and the node can be back in the allow list.
+				m.disallowListingConsumer.OnAllowListNotification(&network.AllowListingUpdate{
+					FlowIds: flow.IdentifierList{id},
+					Cause:   network.DisallowListedCauseAlsp, // clears the ALSP disallow listing cause from node
+				})
+			}
+
+			m.logger.Trace().
+				Hex("identifier", logging.ID(id)).
+				Uint64("cutoff_counter", record.CutoffCounter).
+				Float64("decay_speed", record.Decay).
+				Bool("disallow_listed", record.DisallowListed).
+				Msg("spam record decayed successfully")
+			return record, nil
+		})
+
+		// any error here is fatal because it indicates a bug in the cache. All ids being iterated over are in the cache,
+		// and adjust function above should not return an error unless there is a bug.
+		if err != nil {
+			return fmt.Errorf("failed to decay spam record %x: %w", id, err)
+		}
+
+		m.logger.Trace().
+			Hex("identifier", logging.ID(id)).
+			Float64("updated_penalty", penalty).
+			Msg("spam record decayed")
+	}
+
+	return nil
 }
 
 // processMisbehaviorReport is the worker function that processes the misbehavior reports.

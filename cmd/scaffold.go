@@ -374,7 +374,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.GossipSubRpcInspectorSuite,
 			&fnb.FlowConfig.NetworkConfig.ResourceManagerConfig,
 			uniCfg,
-			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig)
+			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,
+			&p2p.DisallowListCacheConfig{
+				MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
+				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
+			})
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
@@ -389,20 +393,12 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		return libp2pNode, nil
 	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		cf, err := conduit.NewDefaultConduitFactory(&alspmgr.MisbehaviorReportManagerConfig{
-			Logger:                  fnb.Logger,
-			SpamRecordCacheSize:     fnb.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
-			SpamReportQueueSize:     fnb.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
-			DisablePenalty:          fnb.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
-			AlspMetrics:             fnb.Metrics.Network,
-			HeroCacheMetricsFactory: fnb.HeroCacheMetricsFactory(),
-			NetworkType:             network.PrivateNetwork,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create default conduit factory: %w", err)
-		}
 		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
-		return fnb.InitFlowNetworkWithConduitFactory(node, cf, unicastRateLimiters, peerManagerFilters)
+		return fnb.InitFlowNetworkWithConduitFactory(
+			node,
+			conduit.NewDefaultConduitFactory(),
+			unicastRateLimiters,
+			peerManagerFilters)
 	})
 
 	fnb.Module("middleware dependency", func(node *NodeConfig) error {
@@ -427,8 +423,13 @@ func (fnb *FlowNodeBuilder) HeroCacheMetricsFactory() metrics.HeroCacheMetricsFa
 	return metrics.NewNoopHeroCacheMetricsFactory()
 }
 
-func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory, unicastRateLimiters *ratelimit.RateLimiters, peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
-	var mwOpts []middleware.MiddlewareOption
+func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
+	node *NodeConfig,
+	cf network.ConduitFactory,
+	unicastRateLimiters *ratelimit.RateLimiters,
+	peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
+
+	var mwOpts []middleware.OptionFn
 	if len(fnb.MsgValidators) > 0 {
 		mwOpts = append(mwOpts, middleware.WithMessageValidators(fnb.MsgValidators...))
 	}
@@ -447,18 +448,19 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	}
 
 	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
-	mw := middleware.NewMiddleware(
-		fnb.Logger,
-		fnb.LibP2PNode,
-		fnb.Me.NodeID(),
-		fnb.Metrics.Bitswap,
-		fnb.SporkID,
-		fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastMessageTimeout,
-		fnb.IDTranslator,
-		fnb.CodecFactory(),
-		slashingViolationsConsumer,
+	mw := middleware.NewMiddleware(&middleware.Config{
+		Logger:                     fnb.Logger,
+		Libp2pNode:                 fnb.LibP2PNode,
+		FlowId:                     fnb.Me.NodeID(),
+		BitSwapMetrics:             fnb.Metrics.Bitswap,
+		RootBlockID:                fnb.SporkID,
+		UnicastMessageTimeout:      fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastMessageTimeout,
+		IdTranslator:               fnb.IDTranslator,
+		Codec:                      fnb.CodecFactory(),
+		SlashingViolationsConsumer: slashingViolationsConsumer,
+	},
 		mwOpts...)
-	fnb.NodeDisallowListDistributor.AddConsumer(mw)
+
 	fnb.Middleware = mw
 
 	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
@@ -473,7 +475,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	}
 
 	// creates network instance
-	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
 		Logger:              fnb.Logger,
 		Codec:               fnb.CodecFactory(),
 		Me:                  fnb.Me,
@@ -484,6 +486,16 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		IdentityProvider:    fnb.IdentityProvider,
 		ReceiveCache:        receiveCache,
 		ConduitFactory:      cf,
+		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  fnb.Logger,
+			SpamRecordCacheSize:     fnb.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
+			SpamReportQueueSize:     fnb.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
+			DisablePenalty:          fnb.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
+			HeartBeatInterval:       fnb.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
+			AlspMetrics:             fnb.Metrics.Network,
+			HeroCacheMetricsFactory: fnb.HeroCacheMetricsFactory(),
+			NetworkType:             network.PrivateNetwork,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -1009,13 +1021,6 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 }
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
-	fnb.Component("disallow list notification distributor", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		// distributor is returned as a component to be started and stopped.
-		if fnb.NodeDisallowListDistributor == nil {
-			return nil, fmt.Errorf("disallow list notification distributor has not been set")
-		}
-		return fnb.NodeDisallowListDistributor, nil
-	})
 	fnb.Module("id providers", func(node *NodeConfig) error {
 		idCache, err := cache.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
@@ -1023,11 +1028,11 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		}
 		node.IDTranslator = idCache
 
-		fnb.NodeDisallowListDistributor = BuildDisallowListNotificationDisseminator(fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize, fnb.MetricsRegisterer, fnb.Logger, fnb.MetricsEnabled)
-
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
-		disallowListWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, fnb.NodeDisallowListDistributor)
+		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
+			return fnb.Middleware
+		})
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
 		}
@@ -1035,9 +1040,9 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		// register the disallow list wrapper for dynamic configuration via admin command
 		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
-			disallowListWrapper.GetBlocklist, disallowListWrapper.Update)
+			disallowListWrapper.GetDisallowList, disallowListWrapper.Update)
 		if err != nil {
-			return fmt.Errorf("failed to register blocklist with config manager: %w", err)
+			return fmt.Errorf("failed to register disallow-list wrapper with config manager: %w", err)
 		}
 
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
@@ -1150,7 +1155,22 @@ func (fnb *FlowNodeBuilder) initState() error {
 		}
 	}
 
+	lastFinalized, err := fnb.State.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not get last finalized block header: %w", err)
+	}
+	fnb.NodeConfig.LastFinalizedHeader = lastFinalized
+
+	lastSealed, err := fnb.State.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("could not get last sealed block header: %w", err)
+	}
+
 	fnb.Logger.Info().
+		Hex("last_finalized_block_id", logging.Entity(lastFinalized)).
+		Uint64("last_finalized_block_height", lastFinalized.Height).
+		Hex("last_sealed_block_id", logging.Entity(lastSealed)).
+		Uint64("last_sealed_block_height", lastSealed.Height).
 		Hex("finalized_root_block_id", logging.Entity(fnb.FinalizedRootBlock)).
 		Uint64("finalized_root_block_height", fnb.FinalizedRootBlock.Header.Height).
 		Hex("sealed_root_block_id", logging.Entity(fnb.SealedRootBlock)).
@@ -1738,6 +1758,8 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return common.NewListConfigCommand(config.ConfigManager)
 	}).AdminCommand("read-blocks", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadBlocksCommand(config.State, config.Storage.Blocks)
+	}).AdminCommand("read-range-blocks", func(conf *NodeConfig) commands.AdminCommand {
+		return storageCommands.NewReadRangeBlocksCommand(conf.Storage.Blocks)
 	}).AdminCommand("read-results", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadResultsCommand(config.State, config.Storage.Results)
 	}).AdminCommand("read-seals", func(config *NodeConfig) commands.AdminCommand {

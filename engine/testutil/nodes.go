@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -42,6 +43,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
@@ -551,6 +553,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results := storage.NewExecutionResults(node.Metrics, node.PublicDB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.PublicDB, results, storage.DefaultCacheSize)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.PublicDB, receipts)
+	versionBeacons := storage.NewVersionBeacons(node.PublicDB)
+
 	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return protocol.IsNodeAuthorizedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 	}
@@ -676,12 +680,27 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	followerDistributor := pubsub.NewFollowerDistributor()
-
-	latestExecutedHeight, _, err := execState.GetHighestExecutedBlockID(context.TODO())
 	require.NoError(t, err)
 
 	// disabled by default
 	uploader := uploader.NewManager(node.Tracer)
+
+	ver, err := build.SemverV2()
+	require.NoError(t, err, "failed to parse semver version from build info")
+
+	latestFinalizedBlock, err := node.State.Final().Head()
+	require.NoError(t, err)
+
+	stopControl := stop.NewStopControl(
+		node.Log,
+		execState,
+		node.Headers,
+		versionBeacons,
+		ver,
+		latestFinalizedBlock,
+		false,
+		true,
+	)
 
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
@@ -705,7 +724,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		checkAuthorizedAtBlock,
 		nil,
 		uploader,
-		ingestion.NewStopControl(node.Log.With().Str("compontent", "stop_control").Logger(), false, latestExecutedHeight),
+		stopControl,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
@@ -878,6 +897,7 @@ func createFollowerCore(
 	// creates a consensus follower with noop consumer as the notifier
 	followerCore, err := consensus.NewFollower(
 		node.Log,
+		node.Metrics,
 		node.Headers,
 		finalizer,
 		notifier,

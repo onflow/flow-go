@@ -19,7 +19,7 @@ func startNodesAndEnsureConnected(t *testing.T, ctx irrecoverable.SignalerContex
 	// prior to the test we should ensure that spammer and victim connect.
 	// this is vital as the spammer will circumvent the normal pubsub subscription mechanism and send iHAVE messages directly to the victim.
 	// without a prior connection established, directly spamming pubsub messages may cause a race condition in the pubsub implementation.
-	p2ptest.EnsureConnected(t, ctx, nodes)
+	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
 		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkID)
 		return unittest.ProposalFixture(), blockTopic
