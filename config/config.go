@@ -164,7 +164,7 @@ func LogConfig(logger *zerolog.Event, flags *pflag.FlagSet) map[string]struct{} 
 
 	if flags.Lookup(configFileFlagName).Changed {
 		for _, key := range conf.AllKeys() {
-			logger.Str(key, fmt.Sprintf("%v", conf.Get(key)))
+			logger.Str(key, fmt.Sprint(conf.Get(key)))
 			parts := strings.Split(key, ".")
 			if len(parts) == 2 {
 				keysToAvoid[parts[1]] = struct{}{}
