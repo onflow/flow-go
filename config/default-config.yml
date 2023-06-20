@@ -108,3 +108,4 @@ network-config:
   alsp-spam-record-cache-size: 10e3
   alsp-spam-report-queue-size: 10e4
   alsp-disable-penalty: false
+  alsp-heart-beat-interval: 1s

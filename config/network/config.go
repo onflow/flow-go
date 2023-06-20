@@ -65,6 +65,10 @@ type AlspConfig struct {
 	// This is useful for managing production incidents.
 	// Note: under normal circumstances, the ALSP module should not be disabled.
 	DisablePenalty bool `mapstructure:"alsp-disable-penalty"`
+
+	// HeartBeatInterval is the interval between heartbeats sent by the ALSP module. The heartbeats are recurring
+	// events that are used to perform critical ALSP tasks, such as updating the spam records cache.
+	HearBeatInterval time.Duration `mapstructure:"alsp-heart-beat-interval"`
 }
 
 // SetAliases this func sets an aliases for each CLI flag defined for network config overrides to it's corresponding
