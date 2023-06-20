@@ -128,6 +128,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		exemetrics.On("ExecutionTransactionExecuted",
 			mock.Anything, // duration
+			mock.Anything, // conflict retry count
 			mock.Anything, // computation used
 			mock.Anything, // memory used
 			mock.Anything, // number of events
@@ -1207,6 +1208,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	metrics.On("ExecutionTransactionExecuted",
 		mock.Anything, // duration
+		mock.Anything, // conflict retry count
 		mock.Anything, // computation used
 		mock.Anything, // memory used
 		expectedNumberOfEvents,
