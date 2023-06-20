@@ -648,7 +648,7 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		SetStreamCreationRetryInterval(builder.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay).
 		SetGossipSubTracer(meshTracer).
 		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
-		SetGossipSubRpcInspectorSuite(rpcInspectorSuite).
+		OverrideDefaultInspectorSuite(rpcInspectorSuite).
 		Build()
 
 	if err != nil {

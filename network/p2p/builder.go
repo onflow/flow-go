@@ -61,11 +61,6 @@ type GossipSubBuilder interface {
 	// If the routing system has already been set, a fatal error is logged.
 	SetRoutingSystem(routing.Routing)
 
-	// SetGossipSubRPCInspectorSuite sets the gossipsub rpc inspector suite of the builder. It contains the
-	// inspector function that is injected into the gossipsub rpc layer, as well as the notification distributors that
-	// are used to notify the app specific scoring mechanism of misbehaving peers.
-	SetGossipSubRPCInspectorSuite(GossipSubInspectorSuite)
-
 	// Build creates a new GossipSub pubsub system.
 	// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
 	//
@@ -111,7 +106,7 @@ type NodeBuilder interface {
 	SetRateLimiterDistributor(UnicastRateLimiterDistributor) NodeBuilder
 	SetGossipSubTracer(PubSubTracer) NodeBuilder
 	SetGossipSubScoreTracerInterval(time.Duration) NodeBuilder
-	SetGossipSubRpcInspectorSuite(GossipSubInspectorSuite) NodeBuilder
+	OverrideDefaultInspectorSuite(GossipSubInspectorSuite) NodeBuilder
 	Build() (LibP2PNode, error)
 }
 

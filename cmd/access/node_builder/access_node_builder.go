@@ -1244,7 +1244,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		SetStreamCreationRetryInterval(builder.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay).
 		SetGossipSubTracer(meshTracer).
 		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
-		SetGossipSubRpcInspectorSuite(rpcInspectorSuite).
+		OverrideDefaultInspectorSuite(rpcInspectorSuite).
 		Build()
 
 	if err != nil {

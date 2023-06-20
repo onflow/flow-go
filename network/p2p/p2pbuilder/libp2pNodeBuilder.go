@@ -188,7 +188,7 @@ func (builder *LibP2PNodeBuilder) SetGossipSubScoreTracerInterval(interval time.
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubRpcInspectorSuite(inspectorSuite p2p.GossipSubInspectorSuite) p2p.NodeBuilder {
+func (builder *LibP2PNodeBuilder) OverrideDefaultInspectorSuite(inspectorSuite p2p.GossipSubInspectorSuite) p2p.NodeBuilder {
 	builder.gossipSubBuilder.SetGossipSubRPCInspectorSuite(inspectorSuite)
 	return builder
 }
@@ -470,7 +470,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
 		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor).
-		SetGossipSubRpcInspectorSuite(rpcInspectorSuite)
+		OverrideDefaultInspectorSuite(rpcInspectorSuite)
 
 	if gossipCfg.PeerScoring {
 		// currently, we only enable peer scoring with default parameters. So, we set the score parameters to nil.

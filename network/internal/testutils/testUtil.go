@@ -518,7 +518,7 @@ func generateLibP2PNode(t *testing.T, logger zerolog.Logger, key crypto.PrivateK
 		SetConnectionManager(connManager).
 		SetResourceManager(NewResourceManager(t)).
 		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
-		SetGossipSubRpcInspectorSuite(rpcInspectorSuite)
+		OverrideDefaultInspectorSuite(rpcInspectorSuite)
 
 	for _, opt := range opts {
 		opt(builder)

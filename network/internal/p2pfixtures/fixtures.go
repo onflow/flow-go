@@ -129,7 +129,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
 		SetGossipSubTracer(meshTracer).
 		SetGossipSubScoreTracerInterval(defaultFlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
-		SetGossipSubRpcInspectorSuite(rpcInspectorSuite)
+		OverrideDefaultInspectorSuite(rpcInspectorSuite)
 
 	for _, opt := range opts {
 		opt(builder)
