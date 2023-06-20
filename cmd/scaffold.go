@@ -576,7 +576,7 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 	// parse configuration parameters
 	pflag.Parse()
 
-	err, configOverride := config.BindPFlags(&fnb.BaseConfig.FlowConfig, fnb.flags)
+	configOverride, err := config.BindPFlags(&fnb.BaseConfig.FlowConfig, fnb.flags)
 	if err != nil {
 		return err
 	}

@@ -30,9 +30,9 @@ type FlowConfig struct {
 	NetworkConfig *network.Config `mapstructure:"network-config"`
 }
 
-// Validate checks validity of the Flow config. Errors indicate that either the configuration is broken, 
-// incompatible with the node's internal state, or that the node's internal state is corrupted. In all 
-// cases, continuation is impossible. 
+// Validate checks validity of the Flow config. Errors indicate that either the configuration is broken,
+// incompatible with the node's internal state, or that the node's internal state is corrupted. In all
+// cases, continuation is impossible.
 func (fc *FlowConfig) Validate() error {
 	err := validate.Struct(fc)
 	if err != nil {
@@ -76,32 +76,32 @@ func DefaultConfig() (*FlowConfig, error) {
 //	bool: true if --config-file flag was set and config file was loaded, false otherwise.
 //
 // Note: As configuration management is improved, this func should accept the entire Flow config as the arg to unmarshall new config values into.
-func BindPFlags(c *FlowConfig, flags *pflag.FlagSet) (error, bool) {
+func BindPFlags(c *FlowConfig, flags *pflag.FlagSet) (bool, error) {
 	if !flags.Parsed() {
-		return fmt.Errorf("failed to bind flags to configuration values, pflags must be parsed before binding"), false
+		return false, fmt.Errorf("failed to bind flags to configuration values, pflags must be parsed before binding")
 	}
 
 	// update the config store values from config file if --config-file flag is set
 	// if config file provided we will use values from the file and skip binding pflags
-	err, overridden := overrideConfigFile(flags)
+	overridden, err := overrideConfigFile(flags)
 	if err != nil {
-		return err, false
+		return false, err
 	}
 
 	if !overridden {
 		err = conf.BindPFlags(flags)
 		if err != nil {
-			return fmt.Errorf("failed to bind pflag set: %w", err), false
+			return false, fmt.Errorf("failed to bind pflag set: %w", err)
 		}
 		setAliases()
 	}
 
 	err = Unmarshall(c)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshall the Flow config: %w", err), false
+		return false, fmt.Errorf("failed to unmarshall the Flow config: %w", err)
 	}
 
-	return nil, overridden
+	return overridden, nil
 }
 
 // Unmarshall unmarshalls the Flow configuration into the provided FlowConfig struct.
@@ -163,13 +163,13 @@ func setAliases() {
 }
 
 // overrideConfigFile overrides the default config file by reading in the config file at the path set
-// by the --config-file and --config-file-name flags in our viper config store.
+// by the --config-file flag in our viper config store.
 //
 // Returns:
 //
 //	error: if there is any error encountered while reading new config file, all errors are considered irrecoverable.
 //	bool: true if the config was overridden by the new config file, false otherwise or if an error is encountered reading the new config file.
-func overrideConfigFile(flags *pflag.FlagSet) (error, bool) {
+func overrideConfigFile(flags *pflag.FlagSet) (bool, error) {
 	configFileFlag := flags.Lookup(configFileFlagName)
 	if configFileFlag.Changed {
 		p := configFileFlag.Value.String()
@@ -178,11 +178,11 @@ func overrideConfigFile(flags *pflag.FlagSet) (error, bool) {
 		conf.SetConfigName(fileName)
 		err := conf.ReadInConfig()
 		if err != nil {
-			return fmt.Errorf("failed to read config file %s: %w", p, err), false
+			return false, fmt.Errorf("failed to read config file %s: %w", p, err)
 		}
-		return nil, true
+		return true, nil
 	}
-	return nil, false
+	return false, nil
 }
 
 // getConfigNameFromPath returns the directory and name of the config file from the provided path string.
