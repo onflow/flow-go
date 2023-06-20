@@ -11,6 +11,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
+	netconf "github.com/onflow/flow-go/config/network"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -54,8 +56,10 @@ var isNotProtected = fun{
 func TestConnectionManagerProtection(t *testing.T) {
 
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
 	noopMetrics := metrics.NewNoopCollector()
-	connManager, err := connection.NewConnManager(log, noopMetrics, connection.DefaultConnManagerConfig())
+	connManager, err := connection.NewConnManager(log, noopMetrics, &flowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 
 	testCases := [][]fun{
@@ -102,7 +106,7 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	defer cancel()
 
-	cfg := &connection.ManagerConfig{
+	cfg := &netconf.ConnectionManagerConfig{
 		HighWatermark: 4,                      // whenever the number of connections exceeds 4, connection manager prune connections.
 		LowWatermark:  2,                      // connection manager prune connections until the number of connections is 2.
 		GracePeriod:   500 * time.Millisecond, // extra connections will be pruned if they are older than a second (just for testing).
