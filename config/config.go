@@ -200,7 +200,6 @@ func setAliases() {
 func overrideConfigFile(flags *pflag.FlagSet) (bool, error) {
 	configFileFlag := flags.Lookup(configFileFlagName)
 	if configFileFlag.Changed {
-		fmt.Println(flags.Lookup(configFileFlagName).Value)
 		p := configFileFlag.Value.String()
 		dirPath, fileName := splitConfigPath(p)
 		conf.AddConfigPath(dirPath)
