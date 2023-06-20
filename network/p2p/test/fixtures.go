@@ -117,7 +117,7 @@ func NodeFixture(
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
 		SetStreamCreationRetryInterval(parameters.CreateStreamRetryDelay).
 		SetResourceManager(parameters.ResourceManager).
-		SetGossipSubRpcInspectorSuite(parameters.GossipSubRPCInspector)
+		OverrideDefaultInspectorSuite(parameters.GossipSubRPCInspector)
 
 	if parameters.ResourceManager != nil {
 		builder.SetResourceManager(parameters.ResourceManager)

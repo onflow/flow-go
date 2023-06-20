@@ -69,41 +69,13 @@ func (b *GossipSubInspectorBuilder) SetNetworkType(networkType network.Networkin
 
 // buildGossipSubMetricsInspector builds the gossipsub rpc metrics inspector.
 func (b *GossipSubInspectorBuilder) buildGossipSubMetricsInspector() p2p.GossipSubRPCInspector {
-	gossipSubMetrics := p2pnode.NewGossipSubControlMessageMetrics(b.metricsCfg.Metrics, b.logger)
-	metricsInspector := inspector.NewControlMsgMetricsInspector(
-		b.logger,
-		gossipSubMetrics,
-		b.inspectorsConfig.GossipSubRPCMetricsInspectorConfigs.NumberOfWorkers,
-		[]queue.HeroStoreConfigOption{
-			queue.WithHeroStoreSizeLimit(b.inspectorsConfig.GossipSubRPCMetricsInspectorConfigs.CacheSize),
-			queue.WithHeroStoreCollector(metrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType)),
-		}...)
+
 	return metricsInspector
 }
 
 // buildGossipSubValidationInspector builds the gossipsub rpc validation inspector.
 func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.GossipSubRPCInspector, *distributor.GossipSubInspectorNotifDistributor, error) {
-	notificationDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(
-		b.logger,
-		[]queue.HeroStoreConfigOption{
-			queue.WithHeroStoreSizeLimit(b.inspectorsConfig.GossipSubRPCInspectorNotificationCacheSize),
-			queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType))}...)
 
-	inspectMsgQueueCacheCollector := metrics.GossipSubRPCInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType)
-	clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType)
-	rpcValidationInspector, err := validation.NewControlMsgValidationInspector(
-		b.logger,
-		b.sporkID,
-		&b.inspectorsConfig.GossipSubRPCValidationInspectorConfigs,
-		notificationDistributor,
-		inspectMsgQueueCacheCollector,
-		clusterPrefixedCacheCollector,
-		b.idProvider,
-		b.inspectorMetrics,
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
-	}
 	return rpcValidationInspector, notificationDistributor, nil
 }
 
@@ -116,5 +88,5 @@ func (b *GossipSubInspectorBuilder) Build() (p2p.GossipSubInspectorSuite, error)
 	if err != nil {
 		return nil, err
 	}
-	return suite.NewGossipSubInspectorSuite([]p2p.GossipSubRPCInspector{metricsInspector, validationInspector}, notificationDistributor), nil
+	return , nil
 }

@@ -11,10 +11,19 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 
+	netconf "github.com/onflow/flow-go/config/network"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/mempool/queue"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/distributor"
+	"github.com/onflow/flow-go/network/p2p/inspector"
+	"github.com/onflow/flow-go/network/p2p/inspector/validation"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector/suite"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -23,8 +32,11 @@ import (
 
 // The Builder struct is used to configure and create a new GossipSub pubsub system.
 type Builder struct {
+	networkType                  network.NetworkingType
+	sporkId                      flow.Identifier
 	logger                       zerolog.Logger
 	metrics                      module.GossipSubMetrics
+	heroCacheMetricsFactory      metrics.HeroCacheMetricsFactory
 	h                            host.Host
 	subscriptionFilter           pubsub.SubscriptionFilter
 	gossipSubFactory             p2p.GossipSubFactoryFunc
@@ -139,21 +151,21 @@ func (g *Builder) SetAppSpecificScoreParams(f func(peer.ID) float64) {
 	g.scoreOptionConfig.SetAppSpecificScoreFunction(f)
 }
 
-// SetGossipSubRPCInspectorSuite sets the gossipsub rpc inspector suite of the builder. It contains the
-// inspector function that is injected into the gossipsub rpc layer, as well as the notification distributors that
-// are used to notify the app specific scoring mechanism of misbehaving peers..
-func (g *Builder) SetGossipSubRPCInspectorSuite(inspectorSuite p2p.GossipSubInspectorSuite) {
-	g.rpcInspectorSuite = inspectorSuite
-}
-
-func NewGossipSubBuilder(logger zerolog.Logger, metrics module.GossipSubMetrics) *Builder {
+func NewGossipSubBuilder(
+	logger zerolog.Logger,
+	metrics module.GossipSubMetrics,
+	networkType network.NetworkingType,
+	sporkId flow.Identifier) *Builder {
 	lg := logger.With().Str("component", "gossipsub").Logger()
 	return &Builder{
 		logger:              lg,
 		metrics:             metrics,
+		networkType:         networkType,
 		gossipSubFactory:    defaultGossipSubFactory(),
 		gossipSubConfigFunc: defaultGossipSubAdapterConfig(),
 		scoreOptionConfig:   scoring.NewScoreOptionConfig(lg),
+		sporkId:             sporkId,
+		rpcInspectorSuite:   defaultInspectorSuite(),
 	}
 }
 
@@ -166,6 +178,58 @@ func defaultGossipSubFactory() p2p.GossipSubFactoryFunc {
 func defaultGossipSubAdapterConfig() p2p.GossipSubAdapterConfigFunc {
 	return func(cfg *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
 		return p2pnode.NewGossipSubAdapterConfig(cfg)
+	}
+}
+
+type RpcInspectorSuiteFactoryFunc func(
+	zerolog.Logger,
+	flow.Identifier,
+	*netconf.GossipSubRPCInspectorsConfig,
+	module.GossipSubMetrics,
+	metrics.HeroCacheMetricsFactory,
+	network.NetworkingType,
+	module.IdentityProvider) (p2p.GossipSubInspectorSuite, error)
+
+func defaultInspectorSuite() RpcInspectorSuiteFactoryFunc {
+	return func(
+		logger zerolog.Logger,
+		sporkId flow.Identifier,
+		inspectorCfg *netconf.GossipSubRPCInspectorsConfig,
+		gossipSubMetrics module.GossipSubMetrics,
+		heroCacheMetricsFactory metrics.HeroCacheMetricsFactory,
+		networkType network.NetworkingType,
+		idProvider module.IdentityProvider) (p2p.GossipSubInspectorSuite, error) {
+		metricsInspector := inspector.NewControlMsgMetricsInspector(
+			logger,
+			p2pnode.NewGossipSubControlMessageMetrics(gossipSubMetrics, logger),
+			inspectorCfg.GossipSubRPCMetricsInspectorConfigs.NumberOfWorkers,
+			[]queue.HeroStoreConfigOption{
+				queue.WithHeroStoreSizeLimit(inspectorCfg.GossipSubRPCMetricsInspectorConfigs.CacheSize),
+				queue.WithHeroStoreCollector(metrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)),
+			}...)
+		notificationDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(
+			logger,
+			[]queue.HeroStoreConfigOption{
+				queue.WithHeroStoreSizeLimit(inspectorCfg.GossipSubRPCInspectorNotificationCacheSize),
+				queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(heroCacheMetricsFactory, networkType))}...)
+
+		inspectMsgQueueCacheCollector := metrics.GossipSubRPCInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)
+		clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(heroCacheMetricsFactory, networkType)
+		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(
+			logger,
+			sporkId,
+			&inspectorCfg.GossipSubRPCValidationInspectorConfigs,
+			notificationDistributor,
+			inspectMsgQueueCacheCollector,
+			clusterPrefixedCacheCollector,
+			idProvider,
+			gossipSubMetrics,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
+		}
+
+		return suite.NewGossipSubInspectorSuite([]p2p.GossipSubRPCInspector{metricsInspector, rpcValidationInspector}, notificationDistributor), nil
 	}
 }
 
@@ -194,17 +258,12 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 		gossipSubConfigs.WithSubscriptionFilter(g.subscriptionFilter)
 	}
 
-	if g.rpcInspectorSuite != nil {
-		gossipSubConfigs.WithInspectorSuite(g.rpcInspectorSuite)
-	}
+	gossipSubConfigs.WithInspectorSuite(g.rpcInspectorSuite)
 
 	var scoreOpt *scoring.ScoreOption
 	var scoreTracer p2p.PeerScoreTracer
 	if g.gossipSubPeerScoring {
-		if g.rpcInspectorSuite != nil {
-			g.scoreOptionConfig.SetRegisterNotificationConsumerFunc(g.rpcInspectorSuite.AddInvCtrlMsgNotifConsumer)
-		}
-
+		g.scoreOptionConfig.SetRegisterNotificationConsumerFunc(g.rpcInspectorSuite.AddInvCtrlMsgNotifConsumer)
 		scoreOpt = scoring.NewScoreOption(g.scoreOptionConfig)
 		gossipSubConfigs.WithScoreOption(scoreOpt)
 
