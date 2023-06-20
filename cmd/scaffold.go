@@ -13,6 +13,7 @@ import (
 
 	gcemd "cloud.google.com/go/compute/metadata"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v2/options"
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
@@ -898,6 +899,8 @@ func (fnb *FlowNodeBuilder) initDB() error {
 	opts := badger.
 		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
+		WithCompression(options.Snappy). // turn on snappy compression
+		// WithCompression(options.ZSTD). // TODO: to benchmark with Snappy, and pick a better one
 		WithLogger(log).
 
 		// the ValueLogFileSize option specifies how big the value of a
