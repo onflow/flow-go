@@ -73,7 +73,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		}
 
 		uniCfg := &p2pconfig.UnicastConfig{
-			StreamRetryInterval:    cnb.UnicastCreateStreamRetryDelay,
+			StreamRetryInterval:    cnb.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
 			RateLimiterDistributor: cnb.UnicastRateLimiterDistributor,
 		}
 
@@ -83,8 +83,8 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		}
 
 		peerManagerCfg := &p2pconfig.PeerManagerConfig{
-			ConnectionPruning: cnb.NetworkConnectionPruning,
-			UpdateInterval:    cnb.PeerUpdateInterval,
+			ConnectionPruning: cnb.FlowConfig.NetworkConfig.NetworkConnectionPruning,
+			UpdateInterval:    cnb.FlowConfig.NetworkConfig.PeerUpdateInterval,
 		}
 
 		// create default libp2p factory if corrupt node should enable the topic validator
@@ -102,9 +102,9 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			// run peer manager with the specified interval and let it also prune connections
 			peerManagerCfg,
 			uniCfg,
-			cnb.GossipSubConfig,
+			cnb.FlowConfig.NetworkConfig,
 			&p2p.DisallowListCacheConfig{
-				MaxSize: cnb.BaseConfig.NetworkConfig.DisallowListCacheSize,
+				MaxSize: cnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 				Metrics: metrics.DisallowListCacheMetricsFactory(cnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
 			},
 			cnb.TopicValidatorDisabled,

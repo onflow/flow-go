@@ -26,12 +26,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const (
-	// DefaultReceiveCacheSize represents size of receive cache that keeps hash of incoming messages
-	// for sake of deduplication.
-	DefaultReceiveCacheSize = 10e4
-)
-
 // NotEjectedFilter is an identity filter that, when applied to the identity
 // table at a given snapshot, returns all nodes that we should communicate with
 // over the networking layer.
