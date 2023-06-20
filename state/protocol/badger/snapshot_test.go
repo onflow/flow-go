@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/state/protocol/seed"
+	"github.com/onflow/flow-go/state/protocol/prg"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -940,7 +940,7 @@ func TestQuorumCertificate(t *testing.T) {
 			assert.NoError(t, err)
 			randomSeed, err := state.AtBlockID(head.ID()).RandomSource()
 			assert.NoError(t, err)
-			assert.Equal(t, len(randomSeed), seed.RandomSourceLength)
+			assert.Equal(t, len(randomSeed), prg.RandomSourceLength)
 		})
 	})
 

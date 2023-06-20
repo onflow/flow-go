@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -20,6 +21,7 @@ import (
 type FollowerLoop struct {
 	*component.ComponentManager
 	log             zerolog.Logger
+	mempoolMetrics  module.MempoolMetrics
 	certifiedBlocks chan *model.CertifiedBlock
 	forks           Forks
 }
@@ -28,17 +30,17 @@ var _ component.Component = (*FollowerLoop)(nil)
 var _ module.HotStuffFollower = (*FollowerLoop)(nil)
 
 // NewFollowerLoop creates an instance of HotStuffFollower
-func NewFollowerLoop(log zerolog.Logger, forks Forks) (*FollowerLoop, error) {
+func NewFollowerLoop(log zerolog.Logger, mempoolMetrics module.MempoolMetrics, forks Forks) (*FollowerLoop, error) {
 	// We can't afford to drop messages since it undermines liveness, but we also want to avoid blocking
 	// the compliance layer. Generally, the follower loop should be able to process inbound blocks faster
 	// than they pass through the compliance layer. Nevertheless, in the worst case we will fill the
 	// channel and block the compliance layer's workers. Though, that should happen only if compliance
 	// engine receives large number of blocks in short periods of time (e.g. when catching up).
-	// TODO(active-pacemaker) add metrics for length of inbound channels
 	certifiedBlocks := make(chan *model.CertifiedBlock, 1000)
 
 	fl := &FollowerLoop{
 		log:             log.With().Str("hotstuff", "FollowerLoop").Logger(),
+		mempoolMetrics:  mempoolMetrics,
 		certifiedBlocks: certifiedBlocks,
 		forks:           forks,
 	}
@@ -76,8 +78,12 @@ func (fl *FollowerLoop) AddCertifiedBlock(certifiedBlock *model.CertifiedBlock) 
 	// the busy duration is measured as how long it takes from a block being
 	// received to a block being handled by the event handler.
 	busyDuration := time.Since(received)
+
+	blocksQueued := uint(len(fl.certifiedBlocks))
+	fl.mempoolMetrics.MempoolEntries(metrics.ResourceFollowerLoopCertifiedBlocksChannel, blocksQueued)
 	fl.log.Debug().Hex("block_id", logging.ID(certifiedBlock.ID())).
 		Uint64("view", certifiedBlock.View()).
+		Uint("blocks_queued", blocksQueued).
 		Dur("wait_time", busyDuration).
 		Msg("wait time to queue inbound certified block")
 }

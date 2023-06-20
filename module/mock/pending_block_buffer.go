@@ -12,13 +12,13 @@ type PendingBlockBuffer struct {
 	mock.Mock
 }
 
-// Add provides a mock function with given fields: originID, block
-func (_m *PendingBlockBuffer) Add(originID flow.Identifier, block *flow.Block) bool {
-	ret := _m.Called(originID, block)
+// Add provides a mock function with given fields: block
+func (_m *PendingBlockBuffer) Add(block flow.Slashable[*flow.Block]) bool {
+	ret := _m.Called(block)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.Block) bool); ok {
-		r0 = rf(originID, block)
+	if rf, ok := ret.Get(0).(func(flow.Slashable[*flow.Block]) bool); ok {
+		r0 = rf(block)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
