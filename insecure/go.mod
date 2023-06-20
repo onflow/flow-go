@@ -69,10 +69,9 @@ require (
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/fxamacker/cbor/v2 v2.4.1-0.20220515183430-ad2eae63303f // indirect
-	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/fxamacker/cbor/v2 v2.4.1-0.20230228173756-c0c9f774e40c // indirect
 	github.com/fxamacker/circlehash v0.3.0 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/gammazero/deque v0.1.0 // indirect
 	github.com/gammazero/workerpool v1.1.2 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
@@ -82,6 +81,9 @@ require (
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
+	github.com/go-playground/locales v0.14.1 // indirect
+	github.com/go-playground/universal-translator v0.18.1 // indirect
+	github.com/go-playground/validator/v10 v10.14.1 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/go-test/deep v1.1.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
@@ -138,6 +140,7 @@ require (
 	github.com/klauspost/compress v1.15.13 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/koron/go-ssdp v0.0.3 // indirect
+	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/libp2p/go-addr-util v0.1.0 // indirect
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
@@ -156,9 +159,7 @@ require (
 	github.com/logrusorgru/aurora/v4 v4.0.0 // indirect
 	github.com/lucas-clemente/quic-go v0.31.1 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
-	github.com/m4ksio/wal v1.0.1-0.20221209164835-154a17396e4c // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
-	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/marten-seemann/qtls-go1-18 v0.1.3 // indirect
 	github.com/marten-seemann/qtls-go1-19 v0.1.1 // indirect
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
@@ -258,8 +259,6 @@ require (
 	golang.org/x/term v0.6.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/time v0.1.0 // indirect
-	golang.org/x/tools v0.6.0 // indirect
-	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
 	golang.org/x/tools v0.7.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/api v0.114.0 // indirect
