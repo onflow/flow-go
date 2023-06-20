@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	netconf "github.com/onflow/flow-go/config/network"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/queue"
@@ -26,7 +27,7 @@ import (
 type GossipSubInspectorBuilder struct {
 	logger           zerolog.Logger
 	sporkID          flow.Identifier
-	inspectorsConfig *GossipSubRPCInspectorsConfig
+	inspectorsConfig *netconf.GossipSubRPCInspectorsConfig
 	metricsCfg       *p2pconfig.MetricsConfig
 	idProvider       module.IdentityProvider
 	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics
@@ -34,7 +35,7 @@ type GossipSubInspectorBuilder struct {
 }
 
 // NewGossipSubInspectorBuilder returns new *GossipSubInspectorBuilder.
-func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier, inspectorsConfig *GossipSubRPCInspectorsConfig, provider module.IdentityProvider, inspectorMetrics module.GossipSubRpcValidationInspectorMetrics) *GossipSubInspectorBuilder {
+func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier, inspectorsConfig *netconf.GossipSubRPCInspectorsConfig, provider module.IdentityProvider, inspectorMetrics module.GossipSubRpcValidationInspectorMetrics) *GossipSubInspectorBuilder {
 	return &GossipSubInspectorBuilder{
 		logger:           logger,
 		sporkID:          sporkID,
@@ -72,64 +73,30 @@ func (b *GossipSubInspectorBuilder) buildGossipSubMetricsInspector() p2p.GossipS
 	metricsInspector := inspector.NewControlMsgMetricsInspector(
 		b.logger,
 		gossipSubMetrics,
-		b.inspectorsConfig.MetricsInspectorConfigs.NumberOfWorkers,
+		b.inspectorsConfig.GossipSubRPCMetricsInspectorConfigs.NumberOfWorkers,
 		[]queue.HeroStoreConfigOption{
-			queue.WithHeroStoreSizeLimit(b.inspectorsConfig.MetricsInspectorConfigs.CacheSize),
+			queue.WithHeroStoreSizeLimit(b.inspectorsConfig.GossipSubRPCMetricsInspectorConfigs.CacheSize),
 			queue.WithHeroStoreCollector(metrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType)),
 		}...)
 	return metricsInspector
 }
 
-// validationInspectorConfig returns a new inspector.ControlMsgValidationInspectorConfig using configuration provided by the node builder.
-func (b *GossipSubInspectorBuilder) validationInspectorConfig(validationConfigs *GossipSubRPCValidationInspectorConfigs) (*validation.ControlMsgValidationInspectorConfig, error) {
-	// setup rpc validation configuration for each control message type
-	graftValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgGraft, validationConfigs.GraftLimits)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
-	}
-	pruneValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgPrune, validationConfigs.PruneLimits)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
-	}
-	iHaveValidationCfg, err := validation.NewCtrlMsgValidationConfig(p2p.CtrlMsgIHave, validationConfigs.IHaveLimitsConfig.IHaveLimits, validationConfigs.IHaveLimitsConfig.IhaveConfigurationOpts()...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gossupsub RPC validation configuration: %w", err)
-	}
-	// setup gossip sub RPC control message inspector config
-	controlMsgRPCInspectorCfg := &validation.ControlMsgValidationInspectorConfig{
-		ClusterPrefixedMessageConfig: &validation.ClusterPrefixedMessageConfig{
-			ClusterPrefixHardThreshold:                   validationConfigs.ClusterPrefixHardThreshold,
-			ClusterPrefixedControlMsgsReceivedCacheSize:  validationConfigs.ClusterPrefixedControlMsgsReceivedCacheSize,
-			ClusterPrefixedControlMsgsReceivedCacheDecay: validationConfigs.ClusterPrefixedControlMsgsReceivedCacheDecay,
-		},
-		NumberOfWorkers: validationConfigs.NumberOfWorkers,
-		InspectMsgStoreOpts: []queue.HeroStoreConfigOption{
-			queue.WithHeroStoreSizeLimit(validationConfigs.CacheSize),
-			queue.WithHeroStoreCollector(metrics.GossipSubRPCInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType))},
-		GraftValidationCfg: graftValidationCfg,
-		PruneValidationCfg: pruneValidationCfg,
-		IHaveValidationCfg: iHaveValidationCfg,
-	}
-	return controlMsgRPCInspectorCfg, nil
-}
-
 // buildGossipSubValidationInspector builds the gossipsub rpc validation inspector.
 func (b *GossipSubInspectorBuilder) buildGossipSubValidationInspector() (p2p.GossipSubRPCInspector, *distributor.GossipSubInspectorNotifDistributor, error) {
-	controlMsgRPCInspectorCfg, err := b.validationInspectorConfig(b.inspectorsConfig.ValidationInspectorConfigs)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create gossipsub rpc inspector config: %w", err)
-	}
 	notificationDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(
 		b.logger,
 		[]queue.HeroStoreConfigOption{
 			queue.WithHeroStoreSizeLimit(b.inspectorsConfig.GossipSubRPCInspectorNotificationCacheSize),
 			queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType))}...)
+
+	inspectMsgQueueCacheCollector := metrics.GossipSubRPCInspectorQueueMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType)
 	clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(b.metricsCfg.HeroCacheFactory, b.networkType)
 	rpcValidationInspector, err := validation.NewControlMsgValidationInspector(
 		b.logger,
 		b.sporkID,
-		controlMsgRPCInspectorCfg,
+		&b.inspectorsConfig.GossipSubRPCValidationInspectorConfigs,
 		notificationDistributor,
+		inspectMsgQueueCacheCollector,
 		clusterPrefixedCacheCollector,
 		b.idProvider,
 		b.inspectorMetrics,

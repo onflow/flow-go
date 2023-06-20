@@ -363,7 +363,6 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, n int) S
 
 	timeout := 1200*time.Millisecond + collectionDelay
 	service.Command = append(service.Command,
-		fmt.Sprintf("--hotstuff-proposal-time=%s", collectionDelay),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		"--insecure-access-api=false",

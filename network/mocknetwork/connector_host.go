@@ -14,13 +14,13 @@ type ConnectorHost struct {
 	mock.Mock
 }
 
-// ClosePeer provides a mock function with given fields: id
-func (_m *ConnectorHost) ClosePeer(id peer.ID) error {
-	ret := _m.Called(id)
+// ClosePeer provides a mock function with given fields: peerId
+func (_m *ConnectorHost) ClosePeer(peerId peer.ID) error {
+	ret := _m.Called(peerId)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(peer.ID) error); ok {
-		r0 = rf(id)
+		r0 = rf(peerId)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -58,13 +58,13 @@ func (_m *ConnectorHost) ID() peer.ID {
 	return r0
 }
 
-// IsProtected provides a mock function with given fields: id
-func (_m *ConnectorHost) IsProtected(id peer.ID) bool {
-	ret := _m.Called(id)
+// IsConnectedTo provides a mock function with given fields: peerId
+func (_m *ConnectorHost) IsConnectedTo(peerId peer.ID) bool {
+	ret := _m.Called(peerId)
 
 	var r0 bool
 	if rf, ok := ret.Get(0).(func(peer.ID) bool); ok {
-		r0 = rf(id)
+		r0 = rf(peerId)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -72,13 +72,27 @@ func (_m *ConnectorHost) IsProtected(id peer.ID) bool {
 	return r0
 }
 
-// PeerInfo provides a mock function with given fields: id
-func (_m *ConnectorHost) PeerInfo(id peer.ID) peer.AddrInfo {
-	ret := _m.Called(id)
+// IsProtected provides a mock function with given fields: peerId
+func (_m *ConnectorHost) IsProtected(peerId peer.ID) bool {
+	ret := _m.Called(peerId)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(peer.ID) bool); ok {
+		r0 = rf(peerId)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// PeerInfo provides a mock function with given fields: peerId
+func (_m *ConnectorHost) PeerInfo(peerId peer.ID) peer.AddrInfo {
+	ret := _m.Called(peerId)
 
 	var r0 peer.AddrInfo
 	if rf, ok := ret.Get(0).(func(peer.ID) peer.AddrInfo); ok {
-		r0 = rf(id)
+		r0 = rf(peerId)
 	} else {
 		r0 = ret.Get(0).(peer.AddrInfo)
 	}

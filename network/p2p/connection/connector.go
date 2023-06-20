@@ -109,6 +109,10 @@ func (l *Libp2pConnector) connectToPeers(ctx context.Context, peerIDs peer.IDSli
 	}
 
 	for _, peerID := range peerIDs {
+		if l.host.IsConnectedTo(peerID) {
+			l.log.Trace().Str("peer_id", peerID.String()).Msg("already connected to peer, skipping connection")
+			continue
+		}
 		peerCh <- peer.AddrInfo{ID: peerID}
 	}
 
@@ -151,6 +155,11 @@ func (l *Libp2pConnector) pruneAllConnectionsExcept(peerIDs peer.IDSlice) {
 		flowStream := p2putils.FlowStream(conn)
 		if flowStream != nil {
 			lg = lg.With().Str("flow_stream", string(flowStream.Protocol())).Logger()
+		}
+		for _, stream := range conn.GetStreams() {
+			if err := stream.Close(); err != nil {
+				lg.Warn().Err(err).Msg("failed to close stream, when pruning connections")
+			}
 		}
 
 		// close the connection with the peer if it is not part of the current fanout

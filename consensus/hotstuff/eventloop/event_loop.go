@@ -32,6 +32,7 @@ type EventLoop struct {
 	log                      zerolog.Logger
 	eventHandler             hotstuff.EventHandler
 	metrics                  module.HotstuffMetrics
+	mempoolMetrics           module.MempoolMetrics
 	proposals                chan queuedProposal
 	newestSubmittedTc        *tracker.NewestTCTracker
 	newestSubmittedQc        *tracker.NewestQCTracker
@@ -46,19 +47,25 @@ var _ hotstuff.EventLoop = (*EventLoop)(nil)
 var _ component.Component = (*EventLoop)(nil)
 
 // NewEventLoop creates an instance of EventLoop.
-func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandler, startTime time.Time) (*EventLoop, error) {
+func NewEventLoop(
+	log zerolog.Logger,
+	metrics module.HotstuffMetrics,
+	mempoolMetrics module.MempoolMetrics,
+	eventHandler hotstuff.EventHandler,
+	startTime time.Time,
+) (*EventLoop, error) {
 	// we will use a buffered channel to avoid blocking of caller
 	// we can't afford to drop messages since it undermines liveness, but we also want to avoid blocking of compliance
 	// engine. We assume that we should be able to process proposals faster than compliance engine feeds them, worst case
 	// we will fill the buffer and block compliance engine worker but that should happen only if compliance engine receives
 	// large number of blocks in short period of time(when catching up for instance).
-	// TODO(active-pacemaker) add metrics for length of inbound channels
 	proposals := make(chan queuedProposal, 1000)
 
 	el := &EventLoop{
 		log:                      log,
 		eventHandler:             eventHandler,
 		metrics:                  metrics,
+		mempoolMetrics:           mempoolMetrics,
 		proposals:                proposals,
 		tcSubmittedNotifier:      engine.NewNotifier(),
 		qcSubmittedNotifier:      engine.NewNotifier(),
@@ -266,7 +273,7 @@ func (el *EventLoop) SubmitProposal(proposal *model.Proposal) {
 	case <-el.ComponentManager.ShutdownSignal():
 		return
 	}
-
+	el.mempoolMetrics.MempoolEntries(metrics.HotstuffEventTypeOnProposal, uint(len(el.proposals)))
 }
 
 // onTrustedQC pushes the received QC(which MUST be validated) to the quorumCertificates channel
