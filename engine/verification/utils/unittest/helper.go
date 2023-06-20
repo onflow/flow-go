@@ -591,10 +591,10 @@ func withConsumers(t *testing.T,
 	}
 
 	// verifies memory resources are cleaned up all over pipeline
-	assert.True(t, verNode.BlockConsumer.Size() == 0)
-	assert.True(t, verNode.ChunkConsumer.Size() == 0)
-	assert.True(t, verNode.ChunkStatuses.Size() == 0)
-	assert.True(t, verNode.ChunkRequests.Size() == 0)
+	assert.Equal(t, verNode.BlockConsumer.Size(), uint(0))
+	assert.Equal(t, verNode.ChunkConsumer.Size(), uint(0))
+	assert.Equal(t, verNode.ChunkStatuses.Size(), uint(0))
+	assert.Equal(t, verNode.ChunkRequests.Size(), uint(0))
 }
 
 // bootstrapSystem is a test helper that bootstraps a flow system with node of each main roles (except execution nodes that are two).

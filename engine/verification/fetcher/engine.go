@@ -526,8 +526,9 @@ func (e *Engine) pushToVerifier(chunk *flow.Chunk,
 	if err != nil {
 		return fmt.Errorf("could not get block: %w", err)
 	}
+	snapshot := e.state.AtBlockID(header.ID())
 
-	vchunk, err := e.makeVerifiableChunkData(chunk, header, result, chunkDataPack)
+	vchunk, err := e.makeVerifiableChunkData(chunk, header, snapshot, result, chunkDataPack)
 	if err != nil {
 		return fmt.Errorf("could not verify chunk: %w", err)
 	}
@@ -545,6 +546,7 @@ func (e *Engine) pushToVerifier(chunk *flow.Chunk,
 // chunk data to verify it.
 func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
 	header *flow.Header,
+	snapshot protocol.Snapshot,
 	result *flow.ExecutionResult,
 	chunkDataPack *flow.ChunkDataPack,
 ) (*verification.VerifiableChunkData, error) {
@@ -566,6 +568,7 @@ func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
 		IsSystemChunk:     isSystemChunk,
 		Chunk:             chunk,
 		Header:            header,
+		Snapshot:          snapshot,
 		Result:            result,
 		ChunkDataPack:     chunkDataPack,
 		EndState:          endState,

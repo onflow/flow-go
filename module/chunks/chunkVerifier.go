@@ -57,7 +57,9 @@ func (fcv *ChunkVerifier) Verify(
 	if vc.IsSystemChunk {
 		ctx = fvm.NewContextFromParent(
 			fcv.systemChunkCtx,
-			fvm.WithBlockHeader(vc.Header))
+			fvm.WithBlockHeader(vc.Header),
+			fvm.WithProtocolSnapshot(vc.Snapshot),
+		)
 
 		txBody, err := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain)
 		if err != nil {
@@ -70,7 +72,9 @@ func (fcv *ChunkVerifier) Verify(
 	} else {
 		ctx = fvm.NewContextFromParent(
 			fcv.vmCtx,
-			fvm.WithBlockHeader(vc.Header))
+			fvm.WithBlockHeader(vc.Header),
+			fvm.WithProtocolSnapshot(vc.Snapshot),
+		)
 
 		transactions = make(
 			[]*fvm.TransactionProcedure,

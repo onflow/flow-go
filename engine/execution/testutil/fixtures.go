@@ -633,8 +633,8 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 // by BlockComputer tests
 func ProtocolStateFixture() protocol.State {
 	snapshot := pmock.Snapshot{}
+	snapshot.On("RandomSource").Return(unittest.RandomBytes(48), nil)
 	state := pmock.State{}
 	state.On("AtBlockID", mock.Anything).Return(&snapshot)
-	snapshot.On("RandomSource").Return(unittest.RandomBytes(48), nil)
 	return &state
 }
