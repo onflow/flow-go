@@ -591,7 +591,7 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 
 	info := fnb.Logger.Info()
 
-	noPrint := config.Print(info, fnb.flags)
+	noPrint := config.LogConfig(info, fnb.flags)
 	fnb.flags.VisitAll(func(flag *pflag.Flag) {
 		if _, ok := noPrint[flag.Name]; !ok {
 			info.Str(flag.Name, fmt.Sprintf("%v", flag.Value))

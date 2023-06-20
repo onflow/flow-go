@@ -150,6 +150,33 @@ func Print(info *zerolog.Event, flags *pflag.FlagSet) map[string]struct{} {
 	return m
 }
 
+// LogConfig logs configuration keys and values if they were overridden with a config file.
+// It also returns a map of keys for which the values were set by a config file.
+//
+// Parameters:
+//   - logger: *zerolog.Event to which the configuration keys and values will be logged.
+//   - flags: *pflag.FlagSet containing the set flags.
+//
+// Returns:
+//   - map[string]struct{}: map of keys for which the values were set by a config file.
+func LogConfig(logger *zerolog.Event, flags *pflag.FlagSet) map[string]struct{} {
+	keysToAvoid := make(map[string]struct{})
+
+	if flags.Lookup(configFileFlagName).Changed {
+		for _, key := range conf.AllKeys() {
+			logger.Str(key, fmt.Sprintf("%v", conf.Get(key)))
+			parts := strings.Split(key, ".")
+			if len(parts) == 2 {
+				keysToAvoid[parts[1]] = struct{}{}
+			} else {
+				keysToAvoid[key] = struct{}{}
+			}
+		}
+	}
+
+	return keysToAvoid
+}
+
 // setAliases sets aliases for config sub packages. This should be done directly after pflags are bound to the configuration store.
 // Upon initialization the conf will be loaded with the default config values, those values are then used as the default values for
 // all the CLI flags, the CLI flags are then bound to the configuration store and at this point all aliases should be set if configuration
