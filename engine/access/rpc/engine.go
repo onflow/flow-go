@@ -175,6 +175,11 @@ func NewBuilder(log zerolog.Logger,
 		CircuitBreakerConfig:      config.CircuitBreakerConfig,
 	}
 
+	circuitBreakerEnabled := false
+	if config.CircuitBreakerConfig != nil {
+		circuitBreakerEnabled = config.CircuitBreakerConfig.Enabled
+	}
+
 	backend := backend.New(state,
 		collectionRPC,
 		historicalAccessNodes,
@@ -194,7 +199,7 @@ func NewBuilder(log zerolog.Logger,
 		log,
 		backend.DefaultSnapshotHistoryLimit,
 		config.ArchiveAddressList,
-		config.CircuitBreakerConfig.Enabled,
+		circuitBreakerEnabled,
 	)
 
 	finalizedCache, finalizedCacheWorker, err := events.NewFinalizedHeaderCache(state)

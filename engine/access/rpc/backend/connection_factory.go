@@ -261,7 +261,7 @@ func getGRPCAddress(address string, grpcPort uint) (string, error) {
 func (cf *ConnectionFactoryImpl) withChainUnaryInterceptor(timeout time.Duration) grpc.DialOption {
 	var clientInterceptors []grpc.UnaryClientInterceptor
 
-	if cf.CircuitBreakerConfig.Enabled {
+	if cf.CircuitBreakerConfig != nil && cf.CircuitBreakerConfig.Enabled {
 		circuitBreaker := gobreaker.NewCircuitBreaker(gobreaker.Settings{
 			// here restore timeout defined to automatically return circuit breaker to HalfClose state
 			Timeout: cf.CircuitBreakerConfig.RestoreTimeout,
