@@ -44,7 +44,7 @@ func (_m *Consumer) OnFinalizedBlock(_a0 *model.Block) {
 }
 
 // OnInvalidBlockDetected provides a mock function with given fields: err
-func (_m *Consumer) OnInvalidBlockDetected(err model.InvalidProposalError) {
+func (_m *Consumer) OnInvalidBlockDetected(err flow.Slashable[model.InvalidProposalError]) {
 	_m.Called(err)
 }
 

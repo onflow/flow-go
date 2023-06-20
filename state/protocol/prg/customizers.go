@@ -1,20 +1,25 @@
 package prg
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"fmt"
+	"math"
+)
 
-// list of customizers used for different sub-protocol PRGs.
+// List of customizers used for different sub-protocol PRGs.
 // These customizers help instantiate different PRGs from the
 // same source of randomness.
 //
 // Customizers used by the Flow protocol should not be equal or
-// prefixing each other to guarantee independant PRGs.
+// prefixing each other to guarantee independent PRGs. This
+// is enforced by test `TestProtocolConstants` in `./prg_test.go`
 
 var (
 	// ConsensusLeaderSelection is the customizer for consensus leader selection
 	ConsensusLeaderSelection = customizerFromIndices(0, 1, 1)
 	// VerificationChunkAssignment is the customizer for verification chunk assignment
 	VerificationChunkAssignment = customizerFromIndices(0, 2, 0)
-	// ExecutionEnvironment is the customizer for executing blocks
+	// ExecutionEnvironment is the customizer for Flow's transaction execution environment
 	ExecutionEnvironment = customizerFromIndices(1)
 	//
 	// clusterLeaderSelectionPrefix is the prefix used for CollectorClusterLeaderSelection
@@ -23,6 +28,10 @@ var (
 
 // CollectorClusterLeaderSelection returns the indices for the leader selection for the i-th collector cluster
 func CollectorClusterLeaderSelection(clusterIndex uint) []byte {
+	if uint(math.MaxUint16) < clusterIndex {
+		// sanity check to guarantee no overflows during type conversion -- this should never happen
+		panic(fmt.Sprintf("input cluster index (%d) exceeds max uint16 value %d", clusterIndex, math.MaxUint16))
+	}
 	indices := append(clusterLeaderSelectionPrefix, uint16(clusterIndex))
 	return customizerFromIndices(indices...)
 }

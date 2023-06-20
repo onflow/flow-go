@@ -96,7 +96,7 @@ func (gen *unsafeRandomGenerator) createRandomGenerator() (
 	//  - use the transaction ID as an extra diversifier of the CSPRG. Although this
 	//    does not add any extra entropy to the output, it allows creating an independent
 	//    PRG for each transaction.
-	csprg, err := prg.FromRandomSource(source, prg.ExecutionEnvironment, gen.txId[:])
+	csprg, err := prg.New(source, prg.ExecutionEnvironment, gen.txId[:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a CSPRG from source: %w", err)
 	}

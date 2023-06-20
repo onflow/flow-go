@@ -951,11 +951,10 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)
 
-	v, err := rt.ReadStored(
-		commonAddress,
-		cadence.NewPath("storage", "x"),
-	)
+	path, err := cadence.NewPath(common.PathDomainStorage, "x")
+	require.NoError(t, err)
 
+	v, err := rt.ReadStored(commonAddress, path)
 	// the save should not update account storage by writing the updates
 	// back to the snapshotTree
 	require.NoError(t, err)

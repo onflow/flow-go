@@ -35,8 +35,10 @@ func TestConstructor(t *testing.T) {
 	c, err = NewConfig(1200*time.Millisecond, 2000*time.Millisecond, 1.0, 3, 2000*time.Millisecond)
 	require.True(t, model.IsConfigurationError(err))
 
-	// should not allow maxRebroadcastInterval to be smaller than minReplicaTimeout
+	// should accept only positive values for maxRebroadcastInterval
 	c, err = NewConfig(1200*time.Millisecond, 2000*time.Millisecond, 1.5, 3, 0)
+	require.True(t, model.IsConfigurationError(err))
+	c, err = NewConfig(1200*time.Millisecond, 2000*time.Millisecond, 1.5, 3, -1000*time.Millisecond)
 	require.True(t, model.IsConfigurationError(err))
 }
 
