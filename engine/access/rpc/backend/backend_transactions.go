@@ -128,6 +128,7 @@ func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sa
 		return nil, fmt.Errorf("could not get local cluster by txID: %x", tx.ID())
 	}
 
+	// samples ony used when circuit breaker is disabled
 	if !b.circuitBreakerEnabled {
 		// select a random subset of collection nodes from the cluster to be tried in order
 		targetNodes = targetNodes.Sample(sampleSize)

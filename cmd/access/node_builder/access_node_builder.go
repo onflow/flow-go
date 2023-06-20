@@ -161,7 +161,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			FixedExecutionNodeIDs:     nil,
 			ArchiveAddressList:        nil,
 			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
-			CircuitBreakerConfig: backend.CircuitBreakerConfig{
+			CircuitBreakerConfig: &backend.CircuitBreakerConfig{
 				Enabled:        false,
 				RestoreTimeout: time.Duration(60) * time.Second,
 				MaxFailures:    5,

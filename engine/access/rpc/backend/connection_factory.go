@@ -62,7 +62,7 @@ type ConnectionFactoryImpl struct {
 	AccessMetrics             module.AccessMetrics
 	Log                       zerolog.Logger
 	mutex                     sync.Mutex
-	CircuitBreakerConfig      CircuitBreakerConfig
+	CircuitBreakerConfig      *CircuitBreakerConfig
 }
 
 type CircuitBreakerConfig struct {
@@ -263,8 +263,10 @@ func (cf *ConnectionFactoryImpl) withChainUnaryInterceptor(timeout time.Duration
 
 	if cf.CircuitBreakerConfig.Enabled {
 		circuitBreaker := gobreaker.NewCircuitBreaker(gobreaker.Settings{
+			// here restore timeout defined to automatically return circuit breaker to HalfClose state
 			Timeout: cf.CircuitBreakerConfig.RestoreTimeout,
 			ReadyToTrip: func(counts gobreaker.Counts) bool {
+				// here number of maximum failures will be checked, before circuit breaker go to Open state
 				return counts.ConsecutiveFailures >= cf.CircuitBreakerConfig.MaxFailures
 			},
 		})
@@ -278,6 +280,7 @@ func (cf *ConnectionFactoryImpl) withChainUnaryInterceptor(timeout time.Duration
 			invoker grpc.UnaryInvoker,
 			opts ...grpc.CallOption,
 		) error {
+			// The invoker should be called from circuit breaker execute, to catch each fails and react according to settings
 			_, err := circuitBreaker.Execute(func() (interface{}, error) {
 				err := invoker(ctx, method, req, reply, cc, opts...)
 

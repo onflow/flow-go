@@ -428,7 +428,7 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	// set the execution grpc client requestTimeout
 	connectionFactory.ExecutionNodeGRPCTimeout = requestTimeout
 	// set the configuration for circuit breaker
-	connectionFactory.CircuitBreakerConfig = CircuitBreakerConfig{
+	connectionFactory.CircuitBreakerConfig = &CircuitBreakerConfig{
 		Enabled:        true,
 		MaxFailures:    1,
 		RestoreTimeout: circuitBreakerRestoreTimeout,
@@ -498,7 +498,7 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	// set the collection grpc client requestTimeout
 	connectionFactory.CollectionNodeGRPCTimeout = requestTimeout
 	// set the configuration for circuit breaker
-	connectionFactory.CircuitBreakerConfig = CircuitBreakerConfig{
+	connectionFactory.CircuitBreakerConfig = &CircuitBreakerConfig{
 		Enabled:        true,
 		MaxFailures:    1,
 		RestoreTimeout: circuitBreakerRestoreTimeout,
