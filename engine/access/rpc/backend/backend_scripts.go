@@ -206,7 +206,7 @@ func (b *backendScripts) tryExecuteScript(ctx context.Context, executorAddress s
 
 	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable {
+		if status.Code(err) == codes.Unavailable && !b.circuitBreakerEnabled {
 			b.connFactory.InvalidateExecutionAPIClient(executorAddress)
 		}
 		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", executorAddress, err)
