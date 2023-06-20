@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -695,16 +696,30 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				unittest.EnsureEventsIndexSeq(t, output.Events, chain.ChainID())
 				require.NotEmpty(t, feeDeduction.Payload)
 
-				payload, err := jsoncdc.Decode(nil, feeDeduction.Payload)
+				payload, err := ccf.Decode(nil, feeDeduction.Payload)
 				require.NoError(t, err)
 
 				event := payload.(cadence.Event)
 
-				require.Equal(t, txFees, event.Fields[0].ToGoValue())
+				var actualTXFees any
+				var actualInclusionEffort any
+				var actualExecutionEffort any
+				for i, f := range event.EventType.Fields {
+					switch f.Identifier {
+					case "amount":
+						actualTXFees = event.Fields[i].ToGoValue()
+					case "executionEffort":
+						actualExecutionEffort = event.Fields[i].ToGoValue()
+					case "inclusionEffort":
+						actualInclusionEffort = event.Fields[i].ToGoValue()
+					}
+				}
+
+				require.Equal(t, txFees, actualTXFees)
 				// Inclusion effort should be equivalent to 1.0 UFix64
-				require.Equal(t, uint64(100_000_000), event.Fields[1].ToGoValue())
+				require.Equal(t, uint64(100_000_000), actualInclusionEffort)
 				// Execution effort should be non-0
-				require.Greater(t, event.Fields[2].ToGoValue(), uint64(0))
+				require.Greater(t, actualExecutionEffort, uint64(0))
 
 			},
 		},
@@ -935,7 +950,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			require.Len(t, accountCreatedEvents, 1)
 
 			// read the address of the account created (e.g. "0x01" and convert it to flow.address)
-			data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
+			data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 			require.NoError(t, err)
 			address := flow.ConvertAddress(
 				data.(cadence.Event).Fields[0].(cadence.Address))
@@ -1432,12 +1447,21 @@ func TestSettingExecutionWeights(t *testing.T) {
 			for _, event := range output.Events {
 				// the fee deduction event should only contain the max gas worth of execution effort.
 				if strings.Contains(string(event.Type), "FlowFees.FeesDeducted") {
-					ev, err := jsoncdc.Decode(nil, event.Payload)
+					v, err := ccf.Decode(nil, event.Payload)
 					require.NoError(t, err)
+
+					ev := v.(cadence.Event)
+					var actualExecutionEffort any
+					for i, f := range ev.Type().(*cadence.EventType).Fields {
+						if f.Identifier == "executionEffort" {
+							actualExecutionEffort = ev.Fields[i].ToGoValue()
+						}
+					}
+
 					require.Equal(
 						t,
 						maxExecutionEffort,
-						ev.(cadence.Event).Fields[2].ToGoValue().(uint64))
+						actualExecutionEffort)
 				}
 			}
 			unittest.EnsureEventsIndexSeq(t, output.Events, chain.ChainID())
@@ -2085,7 +2109,7 @@ func TestInteractionLimit(t *testing.T) {
 			accountCreatedEvents := filterAccountCreatedEvents(output.Events)
 
 			// read the address of the account created (e.g. "0x01" and convert it to flow.address)
-			data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
+			data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 			if err != nil {
 				return snapshotTree, err
 			}
@@ -2572,9 +2596,38 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 
 				contractB := fmt.Sprintf(`
 				    import A from %s
+
 				    pub contract B {
 						pub struct Bar : A.Foo {}
+
+						pub struct interface Foo2{}
 					}`,
+					accounts[0].HexWithPrefix(),
+				)
+
+				contractC := fmt.Sprintf(`
+				    import B from %s
+				    import A from %s
+
+				    pub contract C {
+						pub struct Bar : A.Foo, B.Foo2 {}
+
+						pub struct interface Foo3{}
+					}`,
+					accounts[0].HexWithPrefix(),
+					accounts[0].HexWithPrefix(),
+				)
+
+				contractD := fmt.Sprintf(`
+				    import C from %s
+				    import B from %s
+				    import A from %s
+
+				    pub contract D {
+						pub struct Bar : A.Foo, B.Foo2, C.Foo3 {}
+					}`,
+					accounts[0].HexWithPrefix(),
+					accounts[0].HexWithPrefix(),
 					accounts[0].HexWithPrefix(),
 				)
 
@@ -2616,25 +2669,46 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 					[]byte(contractB),
 				))
 
-				// Store values, including `B.Bar()`
+				// Deploy `C`
+				runTransaction(utils.DeploymentTransaction(
+					"C",
+					[]byte(contractC),
+				))
+
+				// Deploy `D`
+				runTransaction(utils.DeploymentTransaction(
+					"D",
+					[]byte(contractD),
+				))
+
+				// Store values
 				runTransaction([]byte(fmt.Sprintf(
 					`
+					import D from %s
+					import C from %s
 					import B from %s
+
 					transaction {
 						prepare(signer: AuthAccount) {
 							signer.save("Hello, World!", to: /storage/first)
 							signer.save(["one", "two", "three"], to: /storage/second)
-							signer.save(B.Bar(), to: /storage/third)
+							signer.save(D.Bar(), to: /storage/third)
+							signer.save(C.Bar(), to: /storage/fourth)
+							signer.save(B.Bar(), to: /storage/fifth)
 
 							signer.link<&String>(/private/a, target:/storage/first)
 							signer.link<&[String]>(/private/b, target:/storage/second)
-							signer.link<&B.Bar>(/private/c, target:/storage/third)
+							signer.link<&D.Bar>(/private/c, target:/storage/third)
+							signer.link<&C.Bar>(/private/d, target:/storage/fourth)
+							signer.link<&B.Bar>(/private/e, target:/storage/fifth)
 						}
 					}`,
 					accounts[0].HexWithPrefix(),
+					accounts[0].HexWithPrefix(),
+					accounts[0].HexWithPrefix(),
 				)))
 
-				// Update `A`, so that `B` is now broken.
+				// Update `A`. `B`, `C` and `D` are now broken.
 				runTransaction(utils.UpdateTransaction(
 					"A",
 					[]byte(updatedContractA),
@@ -2649,7 +2723,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 							account.forEachPrivate(fun (path: PrivatePath, type: Type): Bool {
 								account.getCapability<&AnyStruct>(path).borrow()!
 								total = total + 1
-                                return true
+                              return true
 							})
 
 							assert(total == 2, message:"found ".concat(total.toString()))

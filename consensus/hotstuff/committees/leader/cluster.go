@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/seed"
+	"github.com/onflow/flow-go/state/protocol/prg"
 )
 
 // SelectionForCluster pre-computes and returns leaders for the given cluster
@@ -27,7 +27,7 @@ func SelectionForCluster(cluster protocol.Cluster, epoch protocol.Epoch) (*Leade
 		return nil, fmt.Errorf("could not get leader selection seed for cluster (index: %v) at epoch: %v: %w", cluster.Index(), counter, err)
 	}
 	// create random number generator from the seed and customizer
-	rng, err := seed.PRGFromRandomSource(randomSeed, seed.ProtocolCollectorClusterLeaderSelection(cluster.Index()))
+	rng, err := prg.New(randomSeed, prg.CollectorClusterLeaderSelection(cluster.Index()), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create rng: %w", err)
 	}

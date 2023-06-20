@@ -73,7 +73,7 @@ func TestBandWidthRateLimiter_IsRateLimited(t *testing.T) {
 	burst := 1000
 
 	// setup bandwidth rate limiter
-	bandwidthRateLimiter := NewBandWidthRateLimiter(limit, burst, 1)
+	bandwidthRateLimiter := NewBandWidthRateLimiter(limit, burst, time.Second)
 
 	// for the duration of a simulated second we will send 3 messages. Each message is about
 	// 400 bytes, the 3rd message will put our limiter over the 1000 byte limit at 1200 bytes. Thus

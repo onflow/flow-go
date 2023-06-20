@@ -90,11 +90,11 @@ func (_m *NodeBuilder) SetBasicResolver(_a0 madns.BasicResolver) p2p.NodeBuilder
 }
 
 // SetConnectionGater provides a mock function with given fields: _a0
-func (_m *NodeBuilder) SetConnectionGater(_a0 connmgr.ConnectionGater) p2p.NodeBuilder {
+func (_m *NodeBuilder) SetConnectionGater(_a0 p2p.ConnectionGater) p2p.NodeBuilder {
 	ret := _m.Called(_a0)
 
 	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(connmgr.ConnectionGater) p2p.NodeBuilder); ok {
+	if rf, ok := ret.Get(0).(func(p2p.ConnectionGater) p2p.NodeBuilder); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
