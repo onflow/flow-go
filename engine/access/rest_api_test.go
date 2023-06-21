@@ -115,7 +115,12 @@ func (suite *RestAPITestSuite) SetupTest() {
 		UnsecureGRPCListenAddr: unittest.DefaultAddress,
 		SecureGRPCListenAddr:   unittest.DefaultAddress,
 		HTTPListenAddr:         unittest.DefaultAddress,
-		RESTListenAddr:         unittest.DefaultAddress,
+		RestConfig: rest.Config{
+			ListenAddress: unittest.DefaultAddress,
+			WriteTimeout:  rest.DefaultWriteTimeout,
+			ReadTimeout:   rest.DefaultReadTimeout,
+			IdleTimeout:   rest.DefaultIdleTimeout,
+		},
 	}
 
 	rpcEngBuilder, err := rpc.NewBuilder(
