@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -1625,77 +1624,4 @@ func TestDisallowListNotification(t *testing.T) {
 
 		return true
 	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
-}
-
-// misbehaviorReportFixture creates a mock misbehavior report for a single origin id.
-// Args:
-// - t: the testing.T instance
-// - originID: the origin id of the misbehavior report
-// Returns:
-// - network.MisbehaviorReport: the misbehavior report
-// Note: the penalty of the misbehavior report is randomly chosen between -1 and -10.
-func misbehaviorReportFixture(t *testing.T, originID flow.Identifier) network.MisbehaviorReport {
-	return misbehaviorReportFixtureWithPenalty(t, originID, math.Min(-1, float64(-1-rand.Intn(10))))
-}
-
-func misbehaviorReportFixtureWithDefaultPenalty(t *testing.T, originID flow.Identifier) network.MisbehaviorReport {
-	return misbehaviorReportFixtureWithPenalty(t, originID, model.DefaultPenaltyValue)
-}
-
-func misbehaviorReportFixtureWithPenalty(t *testing.T, originID flow.Identifier, penalty float64) network.MisbehaviorReport {
-	report := mocknetwork.NewMisbehaviorReport(t)
-	report.On("OriginId").Return(originID)
-	report.On("Reason").Return(alsp.AllMisbehaviorTypes()[rand.Intn(len(alsp.AllMisbehaviorTypes()))])
-	report.On("Penalty").Return(penalty)
-
-	return report
-}
-
-// createRandomMisbehaviorReportsForOriginId creates a slice of random misbehavior reports for a single origin id.
-// Args:
-// - t: the testing.T instance
-// - originID: the origin id of the misbehavior reports
-// - numReports: the number of misbehavior reports to create
-// Returns:
-// - []network.MisbehaviorReport: the slice of misbehavior reports
-// Note: the penalty of the misbehavior reports is randomly chosen between -1 and -10.
-func createRandomMisbehaviorReportsForOriginId(t *testing.T, originID flow.Identifier, numReports int) []network.MisbehaviorReport {
-	reports := make([]network.MisbehaviorReport, numReports)
-
-	for i := 0; i < numReports; i++ {
-		reports[i] = misbehaviorReportFixture(t, originID)
-	}
-
-	return reports
-}
-
-// createRandomMisbehaviorReports creates a slice of random misbehavior reports.
-// Args:
-// - t: the testing.T instance
-// - numReports: the number of misbehavior reports to create
-// Returns:
-// - []network.MisbehaviorReport: the slice of misbehavior reports
-// Note: the penalty of the misbehavior reports is randomly chosen between -1 and -10.
-func createRandomMisbehaviorReports(t *testing.T, numReports int) []network.MisbehaviorReport {
-	reports := make([]network.MisbehaviorReport, numReports)
-
-	for i := 0; i < numReports; i++ {
-		reports[i] = misbehaviorReportFixture(t, unittest.IdentifierFixture())
-	}
-
-	return reports
-}
-
-// managerCfgFixture creates a new MisbehaviorReportManagerConfig with default values for testing.
-func managerCfgFixture(t *testing.T) *alspmgr.MisbehaviorReportManagerConfig {
-	c, err := config.DefaultConfig()
-	require.NoError(t, err)
-	return &alspmgr.MisbehaviorReportManagerConfig{
-		Logger:                  unittest.Logger(),
-		SpamRecordCacheSize:     c.NetworkConfig.AlspConfig.SpamRecordCacheSize,
-		SpamReportQueueSize:     c.NetworkConfig.AlspConfig.SpamReportQueueSize,
-		HeartBeatInterval:       c.NetworkConfig.AlspConfig.HearBeatInterval,
-		AlspMetrics:             metrics.NewNoopCollector(),
-		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
-	}
 }
