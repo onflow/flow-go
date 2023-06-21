@@ -89,9 +89,6 @@ type MisbehaviorReportManager struct {
 	// workerPool is the worker pool for handling the misbehavior reports in a thread-safe and non-blocking manner.
 	workerPool *worker.Pool[internal.ReportedMisbehaviorWork]
 
-	// params is the ALSP module parameters used for penalties and decays.
-	penaltyParams model.PenaltyParams
-
 	// decayFunc is the function that calculates the decay of the spam record.
 	decayFunc SpamRecordDecayFunc
 }
@@ -167,14 +164,16 @@ func WithSpamRecordsCacheFactory(f SpamRecordCacheFactory) MisbehaviorReportMana
 	}
 }
 
-// WithPenaltyParams sets the penalty parameters for the MisbehaviorReportManager.
-// Useful for testing when tests need to override the default penalty parameters.
-func WithPenaltyParams(params model.PenaltyParams) MisbehaviorReportManagerOption {
-	return func(m *MisbehaviorReportManager) {
-		m.penaltyParams = params
-	}
-}
-
+// WithDecayFunc sets the decay function for the MisbehaviorReportManager. Useful for testing purposes to simulate the decay of the penalty without waiting for the actual decay.
+// Args:
+//
+//	f: the decay function.
+//
+// Returns:
+//
+//	a MisbehaviorReportManagerOption that sets the decay function for the MisbehaviorReportManager.
+//
+// Note: this option is useful primarily for testing purposes. The default decay function should be used for production.
 func WithDecayFunc(f SpamRecordDecayFunc) MisbehaviorReportManagerOption {
 	return func(m *MisbehaviorReportManager) {
 		m.decayFunc = f
@@ -205,7 +204,6 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, consumer n
 		disablePenalty:          cfg.DisablePenalty,
 		disallowListingConsumer: consumer,
 		cacheFactory:            defaultSpamRecordCacheFactory(),
-		penaltyParams:           model.DefaultParams(),
 		decayFunc:               defaultSpamRecordDecayFunc(),
 	}
 
@@ -350,7 +348,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			// the node is considered allow-listed and can conduct inbound and outbound connections.
 			// Once it falls below model.disallowListingThreshold, it needs to be disallow listed.
 			//if record.Penalty < model.disallowListingThreshold && !record.DisallowListed {
-			if record.Penalty < m.penaltyParams.DisallowListingThreshold && !record.DisallowListed {
+			if record.Penalty < model.DisallowListingThreshold && !record.DisallowListed {
 				// cutoff counter keeps track of how many times the penalty has been below the threshold.
 				record.CutoffCounter++
 				record.DisallowListed = true
