@@ -6,7 +6,12 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+type ObserverMetrics interface {
+	RecordRPC(handler, rpc string, code codes.Code)
+}
+
 type ObserverCollector struct {
+	ObserverMetrics
 	rpcs *prometheus.CounterVec
 }
 

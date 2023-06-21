@@ -30,9 +30,8 @@ const (
 func executeRequest(req *http.Request, restHandler RestServerApi) (*httptest.ResponseRecorder, error) {
 	var b bytes.Buffer
 	logger := zerolog.New(&b)
-	metrics := metrics.NewNoopCollector()
 
-	router, err := newRouter(restHandler, logger, flow.Testnet.Chain(), metrics)
+	router, err := newRouter(restHandler, logger, flow.Testnet.Chain(), metrics.NewNoopCollector())
 	if err != nil {
 		return nil, err
 	}
@@ -52,8 +51,7 @@ func newAccessRestHandler(backend *mock.API) RestServerApi {
 func newObserverRestHandler(backend *mock.API, restForwarder *restmock.RestServerApi) (RestServerApi, error) {
 	var b bytes.Buffer
 	logger := zerolog.New(&b)
-	observerCollector := metrics.NewObserverCollector() //TODO:
-	//metrics := metrics.NewNoopCollector()
+	observerCollector := metrics.NewNoopCollector()
 
 	return &RestRouter{
 		Logger:   logger,

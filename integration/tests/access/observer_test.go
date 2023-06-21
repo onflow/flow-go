@@ -2,21 +2,25 @@ package access
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"strings"
 	"testing"
 
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 func TestObserver(t *testing.T) {
@@ -25,9 +29,10 @@ func TestObserver(t *testing.T) {
 
 type ObserverSuite struct {
 	suite.Suite
-	net      *testnet.FlowNetwork
-	teardown func()
-	local    map[string]struct{}
+	net       *testnet.FlowNetwork
+	teardown  func()
+	localRpc  map[string]struct{}
+	localRest map[string]struct{}
 
 	cancel context.CancelFunc
 }
@@ -44,7 +49,7 @@ func (s *ObserverSuite) TearDownTest() {
 }
 
 func (s *ObserverSuite) SetupTest() {
-	s.local = map[string]struct{}{
+	s.localRpc = map[string]struct{}{
 		"Ping":                           {},
 		"GetLatestBlockHeader":           {},
 		"GetBlockHeaderByID":             {},
@@ -54,6 +59,14 @@ func (s *ObserverSuite) SetupTest() {
 		"GetBlockByHeight":               {},
 		"GetLatestProtocolStateSnapshot": {},
 		"GetNetworkParameters":           {},
+	}
+
+	s.localRest = map[string]struct{}{
+		"getBlocksByIDs":       {},
+		"getBlocksByHeight":    {},
+		"getBlockPayloadByID":  {},
+		"getNetworkParameters": {},
+		"getNodeVersionInfo":   {},
 	}
 
 	nodeConfigs := []testnet.NodeConfig{
@@ -90,11 +103,11 @@ func (s *ObserverSuite) SetupTest() {
 	s.net.Start(ctx)
 }
 
-// TestObserver runs the following tests:
+// TestObserverRPC runs the following tests:
 // 1. CompareRPCs: verifies that the observer client returns the same errors as the access client for rpcs proxied to the upstream AN
 // 2. HandledByUpstream: stops the upstream AN and verifies that the observer client returns errors for all rpcs handled by the upstream
 // 3. HandledByObserver: stops the upstream AN and verifies that the observer client handles all other queries
-func (s *ObserverSuite) TestObserver() {
+func (s *ObserverSuite) TestObserverRPC() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -111,7 +124,7 @@ func (s *ObserverSuite) TestObserver() {
 		// verify that both clients return the same errors for proxied rpcs
 		for _, rpc := range s.getRPCs() {
 			// skip rpcs handled locally by observer
-			if _, local := s.local[rpc.name]; local {
+			if _, local := s.localRpc[rpc.name]; local {
 				continue
 			}
 			t.Run(rpc.name, func(t *testing.T) {
@@ -129,7 +142,7 @@ func (s *ObserverSuite) TestObserver() {
 	t.Run("HandledByUpstream", func(t *testing.T) {
 		// verify that we receive Unavailable errors from all rpcs handled upstream
 		for _, rpc := range s.getRPCs() {
-			if _, local := s.local[rpc.name]; local {
+			if _, local := s.localRpc[rpc.name]; local {
 				continue
 			}
 			t.Run(rpc.name, func(t *testing.T) {
@@ -142,7 +155,7 @@ func (s *ObserverSuite) TestObserver() {
 	t.Run("HandledByObserver", func(t *testing.T) {
 		// verify that we receive NotFound or no error from all rpcs handled locally
 		for _, rpc := range s.getRPCs() {
-			if _, local := s.local[rpc.name]; !local {
+			if _, local := s.localRpc[rpc.name]; !local {
 				continue
 			}
 			t.Run(rpc.name, func(t *testing.T) {
@@ -154,7 +167,86 @@ func (s *ObserverSuite) TestObserver() {
 			})
 		}
 	})
+}
 
+// TestObserverRest runs the following tests:
+// 1. CompareRPCs: verifies that the observer client returns the same errors as the access client for rests proxied to the upstream AN
+// 2. HandledByUpstream: stops the upstream AN and verifies that the observer client returns errors for all rests handled by the upstream
+// 3. HandledByObserver: stops the upstream AN and verifies that the observer client handles all other queries
+func (s *ObserverSuite) TestObserverRest() {
+	t := s.T()
+
+	accessAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
+	observerAddr := s.net.ContainerByName("observer_1").Addr(testnet.RESTPort)
+
+	httpClient := http.DefaultClient
+	makeHttpCall := func(method string, url string) (*http.Response, error) {
+		switch method {
+		case http.MethodGet:
+			return httpClient.Get(url)
+		case http.MethodPost:
+			return httpClient.Post(url, "application/json", strings.NewReader("{}"))
+		}
+		panic("not supported")
+	}
+	makeObserverCall := func(method string, path string) (*http.Response, error) {
+		return makeHttpCall(method, "http://"+observerAddr+"/v1"+path)
+	}
+	makeAccessCall := func(method string, path string) (*http.Response, error) {
+		return makeHttpCall(method, "http://"+accessAddr+"/v1"+path)
+	}
+
+	t.Run("CompareEndpoints", func(t *testing.T) {
+		// verify that both clients return the same errors for proxied rests
+		for _, endpoint := range s.getRestEndpoints() {
+			// skip rest handled locally by observer
+			if _, local := s.localRest[endpoint.name]; local {
+				continue
+			}
+			t.Run(endpoint.name, func(t *testing.T) {
+				accessResp, accessErr := makeAccessCall(endpoint.method, endpoint.path)
+				observerResp, observerErr := makeObserverCall(endpoint.method, endpoint.path)
+				assert.NoError(t, accessErr)
+				assert.NoError(t, observerErr)
+				assert.Equal(t, accessResp.Status, observerResp.Status)
+			})
+		}
+	})
+
+	// stop the upstream access container
+	err := s.net.StopContainerByName(context.Background(), testnet.PrimaryAN)
+	require.NoError(t, err)
+
+	t.Run("HandledByUpstream", func(t *testing.T) {
+		// verify that we receive StatusInternalServerError, StatusServiceUnavailable, StatusBadRequest errors from all rests handled upstream
+		for _, endpoint := range s.getRestEndpoints() {
+			if _, local := s.localRest[endpoint.name]; local {
+				continue
+			}
+			t.Run(endpoint.name, func(t *testing.T) {
+				observerResp, observerErr := makeObserverCall(endpoint.method, endpoint.path)
+				require.NoError(t, observerErr)
+				assert.Contains(t, [...]int{
+					http.StatusInternalServerError,
+					http.StatusServiceUnavailable,
+					http.StatusBadRequest}, observerResp.StatusCode)
+			})
+		}
+	})
+
+	t.Run("HandledByObserver", func(t *testing.T) {
+		// verify that we receive NotFound or no error from all rests handled locally
+		for _, endpoint := range s.getRestEndpoints() {
+			if _, local := s.localRest[endpoint.name]; !local {
+				continue
+			}
+			t.Run(endpoint.name, func(t *testing.T) {
+				observerResp, observerErr := makeObserverCall(endpoint.method, endpoint.path)
+				require.NoError(t, observerErr)
+				assert.Contains(t, [...]int{http.StatusNotFound, http.StatusOK}, observerResp.StatusCode)
+			})
+		}
+	})
 }
 
 func (s *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, error) {
@@ -285,5 +377,93 @@ func (s *ObserverSuite) getRPCs() []RPCTest {
 			_, err := client.GetExecutionResultForBlockID(ctx, &accessproto.GetExecutionResultForBlockIDRequest{})
 			return err
 		}},
+	}
+}
+
+type RestEndpointTest struct {
+	name   string
+	method string
+	path   string
+}
+
+func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
+	transactionId := unittest.IdentifierFixture().String()
+	account, _ := unittest.AccountFixture()
+	block := unittest.BlockFixture()
+	executionResult := unittest.ExecutionResultFixture()
+	collection := unittest.CollectionFixture(2)
+	blockEvents := unittest.BlockEventsFixture(unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(2))), 2)
+
+	return []RestEndpointTest{
+		{
+			name:   "getTransactionByID",
+			method: http.MethodGet,
+			path:   "/transactions/" + transactionId,
+		},
+		{
+			name:   "createTransaction",
+			method: http.MethodPost,
+			path:   "/transactions",
+		},
+		{
+			name:   "getTransactionResultByID",
+			method: http.MethodGet,
+			path:   fmt.Sprintf("/transaction_results/%s?block_id=%s&collection_id=%s", transactionId, block.ID().String(), collection.ID().String()),
+		},
+		{
+			name:   "getBlocksByIDs",
+			method: http.MethodGet,
+			path:   "/blocks/" + block.ID().String(),
+		},
+		{
+			name:   "getBlocksByHeight",
+			method: http.MethodGet,
+			path:   "/blocks?height=0",
+		},
+		{
+			name:   "getBlockPayloadByID",
+			method: http.MethodGet,
+			path:   "/blocks/" + block.ID().String() + "/payload",
+		},
+		{
+			name:   "getExecutionResultByID",
+			method: http.MethodGet,
+			path:   "/execution_results/" + executionResult.ID().String(),
+		},
+		{
+			name:   "getExecutionResultByBlockID",
+			method: http.MethodGet,
+			path:   "/execution_results?block_id=" + block.ID().String(),
+		},
+		{
+			name:   "getCollectionByID",
+			method: http.MethodGet,
+			path:   "/collections/" + collection.ID().String(),
+		},
+		{
+			name:   "executeScript",
+			method: http.MethodPost,
+			path:   "/scripts",
+		},
+		{
+			name:   "getAccount",
+			method: http.MethodGet,
+			path:   "/accounts/" + account.Address.HexWithPrefix(),
+		},
+		{
+			name:   "getEvents",
+			method: http.MethodGet,
+			path:   fmt.Sprintf("/events?type=%s&start_height=%d&end_height=%d", blockEvents.Events[0].Type, 1, 3),
+		},
+		{
+			name:   "getNetworkParameters",
+			method: http.MethodGet,
+			path:   "/network/parameters",
+		},
+		{
+			name:   "getNodeVersionInfo",
+			method: http.MethodGet,
+			path:   "/node_version_info",
+		},
 	}
 }

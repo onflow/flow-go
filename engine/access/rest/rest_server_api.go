@@ -25,7 +25,7 @@ import (
 // It splits requests between a local and a remote rest service.
 type RestRouter struct {
 	Logger   zerolog.Logger
-	Metrics  *metrics.ObserverCollector
+	Metrics  metrics.ObserverMetrics
 	Upstream RestServerApi
 	Observer *RequestHandler
 }
@@ -427,7 +427,7 @@ func (h *RequestHandler) GetAccount(r request.GetAccount, context context.Contex
 
 	account, err := h.backend.GetAccountAtBlockHeight(context, r.Address, r.Height)
 	if err != nil {
-		return response, err
+		return response, NewNotFoundError("not found account at block height", err)
 	}
 
 	err = response.Build(account, link, expandFields)
@@ -906,7 +906,7 @@ func (f *RestForwarder) GetAccount(r request.GetAccount, context context.Context
 
 	accountResponse, err := upstream.GetAccountAtBlockHeight(context, getAccountAtBlockHeightRequest)
 	if err != nil {
-		return response, err
+		return response, NewNotFoundError("not found account at block height", err)
 	}
 
 	flowAccount, err := convert.MessageToAccount(accountResponse.Account)
