@@ -397,12 +397,15 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 func testInitialization(t *testing.T, pool *Pool, _ []*unittest.MockEntity) {
 	// "used" linked-list must have a zero size, since we have no elements in the list.
 	require.True(t, pool.used.size == 0)
+	require.Equal(t, pool.used.head, InvalidIndex)
+	require.Equal(t, pool.used.tail, InvalidIndex)
 
 	for i := 0; i < len(pool.poolEntities); i++ {
 		if i == 0 {
-			// head of "free" linked-list should point to index 0 of entities slice.
-			// previous element of head must is always undefined by convention and may hold any value.
+			// head of "free" linked-list should point to InvalidIndex of entities slice.
 			require.Equal(t, EIndex(i), pool.free.head)
+			// previous element of head must be undefined (linked-list head feature).
+			require.Equal(t, pool.poolEntities[i].node.prev, InvalidIndex)
 		}
 
 		if i != 0 {
@@ -417,8 +420,9 @@ func testInitialization(t *testing.T, pool *Pool, _ []*unittest.MockEntity) {
 
 		if i == len(pool.poolEntities)-1 {
 			// tail of "free" linked-list should point to the last index in entities slice.
-			// next element of tail is always undefined by convention and may hold any value.
 			require.Equal(t, EIndex(i), pool.free.tail)
+			// next element of tail must be undefined.
+			require.Equal(t, pool.poolEntities[i].node.next, InvalidIndex)
 		}
 	}
 }
@@ -672,6 +676,8 @@ func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 		require.NotEqual(t, tailSliceIndex, index, "tail visited in less expected steps (potential inconsistency)", i, steps)
 		_, ok := seen[index]
 		require.False(t, ok, "duplicate identifiers found")
+
+		require.NotEqual(t, pool.poolEntities[index].node.next, InvalidIndex, "tail not found, and reached end of list")
 		index = pool.poolEntities[index].node.next
 	}
 }
