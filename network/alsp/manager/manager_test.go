@@ -308,7 +308,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 			victimSpamRecordCacheCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return victimSpamRecordCacheCache
 		}),
-		alspmgr.WithDecayFunc(decayFuc),
+		WithDecayFunc(decayFuc),
 	}
 
 	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
