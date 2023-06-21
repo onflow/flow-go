@@ -9,7 +9,7 @@ type link struct {
 }
 
 // state represents a doubly linked-list by its head and tail pool indices.
-// If state has 0 size, its tail's and head's prev and next are treated as invalid and should hold InvalidIndex values.
+// If state has 0 size, its tail's and head's prev and next are invalid and should hold InvalidIndex values.
 type state struct {
 	head EIndex
 	tail EIndex
