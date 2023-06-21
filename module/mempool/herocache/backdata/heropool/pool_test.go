@@ -303,6 +303,7 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			require.Equal(t, pool.used.tail, InvalidIndex)
 			require.Equal(t, pool.used.head, InvalidIndex)
 		}
+		checkEachEntityIsInFreeOrUsedState(t, pool)
 	}
 }
 
@@ -390,6 +391,7 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			require.Equal(t, pool.used.head, InvalidIndex)
 			require.Equal(t, pool.used.tail, InvalidIndex)
 		}
+		checkEachEntityIsInFreeOrUsedState(t, pool)
 	}
 }
 
@@ -609,8 +611,9 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			pool.free.tail,
 			pool,
 			freeTraverseStep)
+
+		checkEachEntityIsInFreeOrUsedState(t, pool)
 	}
-	checkEachEntityIsInFreeOrUsedState(t, pool)
 }
 
 // testRetrievingEntitiesFrom evaluates that all entities starting from given index are retrievable from pool.
