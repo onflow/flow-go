@@ -3,6 +3,16 @@ package access
 import (
 	"context"
 	"fmt"
+	"testing"
+	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/templates"
@@ -10,14 +20,6 @@ import (
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"testing"
-	"time"
 )
 
 func TestAccessCircuitBreaker(t *testing.T) {
@@ -36,8 +38,8 @@ type AccessCircuitBreakerSuite struct {
 	net *testnet.FlowNetwork
 }
 
-var requestTimeout = 3*time.Second
-var cbRestoreTimeout = 6*time.Second
+var requestTimeout = 3 * time.Second
+var cbRestoreTimeout = 6 * time.Second
 
 func (s *AccessCircuitBreakerSuite) TearDownTest() {
 	s.log.Info().Msg("================> Start TearDownTest")
@@ -45,7 +47,6 @@ func (s *AccessCircuitBreakerSuite) TearDownTest() {
 	s.cancel()
 	s.log.Info().Msg("================> Finish TearDownTest")
 }
-
 
 func (s *AccessCircuitBreakerSuite) SetupTest() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
@@ -103,7 +104,6 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 
 	// 1. Get collection node
 	collectionContainer := s.net.ContainerByName("collection_1")
-
 
 	// 2. Get Access Node container and client
 	accessContainer := s.net.ContainerByName(testnet.PrimaryAN)
