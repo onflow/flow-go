@@ -704,9 +704,13 @@ type ExecutionMetrics interface {
 	ExecutionCollectionExecuted(dur time.Duration, stats ExecutionResultStats)
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
-	ExecutionTransactionExecuted(dur time.Duration,
-		compUsed, memoryUsed uint64,
-		eventCounts, eventSize int,
+	ExecutionTransactionExecuted(
+		dur time.Duration,
+		numTxnConflictRetries int,
+		compUsed uint64,
+		memoryUsed uint64,
+		eventCounts int,
+		eventSize int,
 		failed bool)
 
 	// ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
