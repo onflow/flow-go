@@ -285,7 +285,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 // TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integration implements an end-to-end integration test for the
 // handling of repeated reported misbehavior and disallow listing.
 func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integration(t *testing.T) {
-	cfg := managerCfgFixture()
+	cfg := managerCfgFixture(t)
 	resetZero := false
 	decayFuc := func(record model.ProtocolSpamRecord) float64 {
 		t.Logf("decayFuc called with record: %+v", record)
@@ -415,13 +415,13 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
 
-	// despite disallow-listing spammer, ensure that (victim and honest) and (honest and spammer) are still connected.
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[honestIndex]}, 1*time.Millisecond, 100*time.Millisecond)
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
-
 	// while the spammer node is disallow-listed, it cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the spammer node, unless
 	// it is allow-listed again.
 	p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]}, 100*time.Millisecond, 2*time.Second)
+
+	// despite disallow-listing spammer, ensure that (victim and honest) and (honest and spammer) are still connected.
+	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[honestIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
 
 	// decay the disallow-listing penalty of the spammer node to zero.
 	t.Logf("about to decay the disallow-listing penalty of the spammer node to zero (2nd time)")

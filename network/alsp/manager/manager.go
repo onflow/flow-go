@@ -181,14 +181,6 @@ func WithDecayFunc(f SpamRecordDecayFunc) MisbehaviorReportManagerOption {
 	}
 }
 
-// WithDefaults sets the default values for the MisbehaviorReportManager.
-//func WithDefaults() MisbehaviorReportManagerOption {
-//	return func(m *MisbehaviorReportManager) {
-//		m.cacheFactory = defaultSpamRecordCacheFactory()
-//		m.disablePenalty = false
-//	}
-//}
-
 // NewMisbehaviorReportManager creates a new instance of the MisbehaviorReportManager.
 // Args:
 // cfg: the configuration for the MisbehaviorReportManager.
