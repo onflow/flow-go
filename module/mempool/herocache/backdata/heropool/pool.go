@@ -58,13 +58,13 @@ type Pool struct {
 func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode) *Pool {
 	l := &Pool{
 		free: state{
-			head: 0,
-			tail: 0,
+			head: InvalidIndex,
+			tail: InvalidIndex,
 			size: 0,
 		},
 		used: state{
-			head: 0,
-			tail: 0,
+			head: InvalidIndex,
+			tail: InvalidIndex,
 			size: 0,
 		},
 		poolEntities: make([]poolEntity, sizeLimit),
