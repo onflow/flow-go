@@ -610,6 +610,7 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			pool,
 			freeTraverseStep)
 	}
+	checkEachEntityIsInFreeOrUsedState(t, pool)
 }
 
 // testRetrievingEntitiesFrom evaluates that all entities starting from given index are retrievable from pool.
@@ -699,4 +700,27 @@ func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 
 		index = pool.poolEntities[index].node.prev
 	}
+}
+
+func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool) {
+	pool_capacity := len(pool.poolEntities)
+	// check size
+	require.Equal(t, int(pool.free.size+pool.used.size), pool_capacity, "Pool capacity is not equal to the sum of used and free sizes")
+	// check elelments
+	nodesInFree := discoverNodesBelongingToStateList(t, pool, &pool.free)
+	nodesInUsed := discoverNodesBelongingToStateList(t, pool, &pool.used)
+	for i := 0; i < pool_capacity; i++ {
+		require.False(t, !nodesInFree[i] && !nodesInUsed[i], "Node is not in any state list")
+		require.False(t, nodesInFree[i] && nodesInUsed[i], "Node is in two state lists at the same time")
+	}
+}
+
+func discoverNodesBelongingToStateList(t *testing.T, pool *Pool, s *state) []bool {
+	result := make([]bool, len(pool.poolEntities))
+	for node_index := s.head; node_index != InvalidIndex; {
+		require.False(t, result[node_index], "A node is present two times in the same state list")
+		result[node_index] = true
+		node_index = pool.poolEntities[node_index].node.next
+	}
+	return result
 }
