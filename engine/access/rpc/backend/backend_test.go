@@ -2160,13 +2160,22 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		if fixedENs != nil {
 			fixedENIdentifiers = fixedENs.NodeIDs()
 		}
-		actualList, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
-		require.NoError(suite.T(), err)
-		actualList = actualList.Sample(maxExecutionNodesCnt)
 
 		if expectedENs == nil {
 			expectedENs = flow.IdentityList{}
 		}
+
+		allExecNodes, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
+		require.NoError(suite.T(), err)
+
+		execIteratorFactory := ExecutionNodeIteratorFactory{circuitBreakerEnabled: false}
+		execIterator := execIteratorFactory.CreateNodeIterator(allExecNodes)
+
+		actualList := flow.IdentityList{}
+		for actual := execIterator.Next(); actual != nil; actual = execIterator.Next() {
+			actualList = append(actualList, actual)
+		}
+
 		if len(expectedENs) > maxExecutionNodesCnt {
 			for _, actual := range actualList {
 				require.Contains(suite.T(), expectedENs, actual)
@@ -2182,9 +2191,18 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		attempt2Receipts = flow.ExecutionReceiptList{}
 		attempt3Receipts = flow.ExecutionReceiptList{}
 		suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
-		actualList, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
-		actualList = actualList.Sample(maxExecutionNodesCnt)
+
+		allExecNodes, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
 		require.NoError(suite.T(), err)
+
+		execIteratorFactory := ExecutionNodeIteratorFactory{circuitBreakerEnabled: false}
+		execIterator := execIteratorFactory.CreateNodeIterator(allExecNodes)
+
+		actualList := flow.IdentityList{}
+		for actual := execIterator.Next(); actual != nil; actual = execIterator.Next() {
+			actualList = append(actualList, actual)
+		}
+
 		require.Equal(suite.T(), len(actualList), maxExecutionNodesCnt)
 	})
 

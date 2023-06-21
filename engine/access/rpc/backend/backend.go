@@ -22,9 +22,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
-const maxExecutionNodesCnt = 3
-
 // minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
 const minExecutionNodesCnt = 2
 
@@ -109,44 +106,48 @@ func New(
 		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}
 
+	collIteratorFactory := CollectionNodeIteratorFactory{circuitBreakerEnabled: circuitBreakerEnabled}
+	execIteratorFactory := ExecutionNodeIteratorFactory{circuitBreakerEnabled: circuitBreakerEnabled}
+
 	b := &Backend{
 		state: state,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:               headers,
-			executionReceipts:     executionReceipts,
-			connFactory:           connFactory,
-			state:                 state,
-			log:                   log,
-			metrics:               accessMetrics,
-			loggedScripts:         loggedScripts,
-			archiveAddressList:    archiveAddressList,
-			circuitBreakerEnabled: circuitBreakerEnabled,
+			headers:             headers,
+			executionReceipts:   executionReceipts,
+			connFactory:         connFactory,
+			state:               state,
+			log:                 log,
+			metrics:             accessMetrics,
+			loggedScripts:       loggedScripts,
+			archiveAddressList:  archiveAddressList,
+			execIteratorFactory: execIteratorFactory,
 		},
 		backendTransactions: backendTransactions{
-			staticCollectionRPC:   collectionRPC,
-			state:                 state,
-			chainID:               chainID,
-			collections:           collections,
-			blocks:                blocks,
-			transactions:          transactions,
-			executionReceipts:     executionReceipts,
-			transactionValidator:  configureTransactionValidator(state, chainID),
-			transactionMetrics:    accessMetrics,
-			retry:                 retry,
-			connFactory:           connFactory,
-			previousAccessNodes:   historicalAccessNodes,
-			log:                   log,
-			circuitBreakerEnabled: circuitBreakerEnabled,
+			staticCollectionRPC:  collectionRPC,
+			state:                state,
+			chainID:              chainID,
+			collections:          collections,
+			blocks:               blocks,
+			transactions:         transactions,
+			executionReceipts:    executionReceipts,
+			transactionValidator: configureTransactionValidator(state, chainID),
+			transactionMetrics:   accessMetrics,
+			retry:                retry,
+			connFactory:          connFactory,
+			previousAccessNodes:  historicalAccessNodes,
+			log:                  log,
+			collIteratorFactory:  collIteratorFactory,
+			execIteratorFactory:  execIteratorFactory,
 		},
 		backendEvents: backendEvents{
-			state:                 state,
-			headers:               headers,
-			executionReceipts:     executionReceipts,
-			connFactory:           connFactory,
-			log:                   log,
-			maxHeightRange:        maxHeightRange,
-			circuitBreakerEnabled: circuitBreakerEnabled,
+			state:               state,
+			headers:             headers,
+			executionReceipts:   executionReceipts,
+			connFactory:         connFactory,
+			log:                 log,
+			maxHeightRange:      maxHeightRange,
+			execIteratorFactory: execIteratorFactory,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: headers,
@@ -157,12 +158,12 @@ func New(
 			state:  state,
 		},
 		backendAccounts: backendAccounts{
-			state:                 state,
-			headers:               headers,
-			executionReceipts:     executionReceipts,
-			connFactory:           connFactory,
-			log:                   log,
-			circuitBreakerEnabled: circuitBreakerEnabled,
+			state:               state,
+			headers:             headers,
+			executionReceipts:   executionReceipts,
+			connFactory:         connFactory,
+			log:                 log,
+			execIteratorFactory: execIteratorFactory,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: executionResults,

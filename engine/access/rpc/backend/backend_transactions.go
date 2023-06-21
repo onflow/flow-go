@@ -24,23 +24,22 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-const collectionNodesToTry uint = 3
-
 type backendTransactions struct {
-	staticCollectionRPC   accessproto.AccessAPIClient // rpc client tied to a fixed collection node
-	transactions          storage.Transactions
-	executionReceipts     storage.ExecutionReceipts
-	collections           storage.Collections
-	blocks                storage.Blocks
-	state                 protocol.State
-	chainID               flow.ChainID
-	transactionMetrics    module.TransactionMetrics
-	transactionValidator  *access.TransactionValidator
-	retry                 *Retry
-	connFactory           ConnectionFactory
-	previousAccessNodes   []accessproto.AccessAPIClient
-	log                   zerolog.Logger
-	circuitBreakerEnabled bool
+	staticCollectionRPC  accessproto.AccessAPIClient // rpc client tied to a fixed collection node
+	transactions         storage.Transactions
+	executionReceipts    storage.ExecutionReceipts
+	collections          storage.Collections
+	blocks               storage.Blocks
+	state                protocol.State
+	chainID              flow.ChainID
+	transactionMetrics   module.TransactionMetrics
+	transactionValidator *access.TransactionValidator
+	retry                *Retry
+	connFactory          ConnectionFactory
+	previousAccessNodes  []accessproto.AccessAPIClient
+	log                  zerolog.Logger
+	collIteratorFactory  CollectionNodeIteratorFactory
+	execIteratorFactory  ExecutionNodeIteratorFactory
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -85,8 +84,8 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 		return b.grpcTxSend(ctx, b.staticCollectionRPC, tx)
 	}
 
-	// otherwise choose a random set of collections nodes to try
-	collAddrs, err := b.chooseCollectionNodes(tx, collectionNodesToTry)
+	// otherwise choose all collection nodes to try
+	collNodes, err := b.chooseCollectionNodes(tx)
 	if err != nil {
 		return fmt.Errorf("failed to determine collection node for tx %x: %w", tx, err)
 	}
@@ -100,9 +99,11 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 	}
 	defer logAnyError()
 
+	collNodeIter := b.collIteratorFactory.CreateNodeIterator(collNodes)
+
 	// try sending the transaction to one of the chosen collection nodes
-	for _, addr := range collAddrs {
-		err = b.sendTransactionToCollector(ctx, tx, addr)
+	for colNode := collNodeIter.Next(); colNode != nil; colNode = collNodeIter.Next() {
+		err = b.sendTransactionToCollector(ctx, tx, colNode.Address)
 		if err == nil {
 			return nil
 		}
@@ -114,7 +115,7 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
 // collection node cluster responsible for the given tx
-func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sampleSize uint) ([]string, error) {
+func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody) (flow.IdentityList, error) {
 
 	// retrieve the set of collector clusters
 	clusters, err := b.state.Final().Epochs().Current().Clustering()
@@ -128,19 +129,7 @@ func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sa
 		return nil, fmt.Errorf("could not get local cluster by txID: %x", tx.ID())
 	}
 
-	// samples ony used when circuit breaker is disabled
-	if !b.circuitBreakerEnabled {
-		// select a random subset of collection nodes from the cluster to be tried in order
-		targetNodes = targetNodes.Sample(sampleSize)
-	}
-
-	// collect the addresses of all the chosen collection nodes
-	var targetAddrs = make([]string, len(targetNodes))
-	for i, id := range targetNodes {
-		targetAddrs[i] = id.Address
-	}
-
-	return targetAddrs, nil
+	return targetNodes, nil
 }
 
 // sendTransactionToCollection sends the transaction to the given collection node via grpc
@@ -780,10 +769,6 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 	execNodes flow.IdentityList,
 	req *execproto.GetTransactionResultRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
-	if !b.circuitBreakerEnabled {
-		execNodes = execNodes.Sample(maxExecutionNodesCnt)
-	}
-
 	var errs *multierror.Error
 	logAnyError := func() {
 		errToReturn := errs.ErrorOrNil()
@@ -792,8 +777,11 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 		}
 	}
 	defer logAnyError()
+
+	execNodeIter := b.execIteratorFactory.CreateNodeIterator(execNodes)
+
 	// try to execute the script on one of the execution nodes
-	for _, execNode := range execNodes {
+	for execNode := execNodeIter.Next(); execNode != nil; execNode = execNodeIter.Next() {
 		resp, err := b.tryGetTransactionResult(ctx, execNode, req)
 		if err == nil {
 			b.log.Debug().
@@ -836,10 +824,6 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	execNodes flow.IdentityList,
 	req *execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
-	if !b.circuitBreakerEnabled {
-		execNodes = execNodes.Sample(maxExecutionNodesCnt)
-	}
-
 	var errs *multierror.Error
 
 	defer func() {
@@ -854,7 +838,9 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 		return nil, errors.New("zero execution nodes")
 	}
 
-	for _, execNode := range execNodes {
+	execNodeIter := b.execIteratorFactory.CreateNodeIterator(execNodes)
+
+	for execNode := execNodeIter.Next(); execNode != nil; execNode = execNodeIter.Next() {
 		resp, err := b.tryGetTransactionResultsByBlockID(ctx, execNode, req)
 		if err == nil {
 			b.log.Debug().
@@ -896,10 +882,6 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 	execNodes flow.IdentityList,
 	req *execproto.GetTransactionByIndexRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
-	if !b.circuitBreakerEnabled {
-		execNodes = execNodes.Sample(maxExecutionNodesCnt)
-	}
-
 	var errs *multierror.Error
 	logAnyError := func() {
 		errToReturn := errs.ErrorOrNil()
@@ -913,8 +895,10 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 		return nil, errors.New("zero execution nodes provided")
 	}
 
+	execNodeIter := b.execIteratorFactory.CreateNodeIterator(execNodes)
+
 	// try to execute the script on one of the execution nodes
-	for _, execNode := range execNodes {
+	for execNode := execNodeIter.Next(); execNode != nil; execNode = execNodeIter.Next() {
 		resp, err := b.tryGetTransactionResultByIndex(ctx, execNode, req)
 		if err == nil {
 			b.log.Debug().

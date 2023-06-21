@@ -18,12 +18,12 @@ import (
 )
 
 type backendAccounts struct {
-	state                 protocol.State
-	headers               storage.Headers
-	executionReceipts     storage.ExecutionReceipts
-	connFactory           ConnectionFactory
-	log                   zerolog.Logger
-	circuitBreakerEnabled bool
+	state               protocol.State
+	headers             storage.Headers
+	executionReceipts   storage.ExecutionReceipts
+	connFactory         ConnectionFactory
+	log                 zerolog.Logger
+	execIteratorFactory ExecutionNodeIteratorFactory
 }
 
 func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
@@ -108,13 +108,11 @@ func (b *backendAccounts) getAccountAtBlockID(
 // other ENs are logged and swallowed. If all ENs fail to return a valid response, then an
 // error aggregating all failures is returned.
 func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
-	if !b.circuitBreakerEnabled {
-		execNodes = execNodes.Sample(maxExecutionNodesCnt)
-	}
-
 	var errors *multierror.Error
 
-	for _, execNode := range execNodes {
+	execNodeIter := b.execIteratorFactory.CreateNodeIterator(execNodes)
+
+	for execNode := execNodeIter.Next(); execNode != nil; execNode = execNodeIter.Next() {
 		// TODO: use the GRPC Client interceptor
 		start := time.Now()
 

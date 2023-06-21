@@ -21,13 +21,13 @@ import (
 )
 
 type backendEvents struct {
-	headers               storage.Headers
-	executionReceipts     storage.ExecutionReceipts
-	state                 protocol.State
-	connFactory           ConnectionFactory
-	log                   zerolog.Logger
-	maxHeightRange        uint
-	circuitBreakerEnabled bool
+	headers             storage.Headers
+	executionReceipts   storage.ExecutionReceipts
+	state               protocol.State
+	connFactory         ConnectionFactory
+	log                 zerolog.Logger
+	maxHeightRange      uint
+	execIteratorFactory ExecutionNodeIteratorFactory
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
@@ -210,13 +210,12 @@ func verifyAndConvertToAccessEvents(
 func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 	execNodes flow.IdentityList,
 	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, *flow.Identity, error) {
-	if !b.circuitBreakerEnabled {
-		execNodes = execNodes.Sample(maxExecutionNodesCnt)
-	}
-
 	var errors *multierror.Error
+
+	execNodeIter := b.execIteratorFactory.CreateNodeIterator(execNodes)
+
 	// try to get events from one of the execution nodes
-	for _, execNode := range execNodes {
+	for execNode := execNodeIter.Next(); execNode != nil; execNode = execNodeIter.Next() {
 		start := time.Now()
 		resp, err := b.tryGetEvents(ctx, execNode, req)
 		duration := time.Since(start)

@@ -24,15 +24,15 @@ import (
 const uniqueScriptLoggingTimeWindow = 10 * time.Minute
 
 type backendScripts struct {
-	headers               storage.Headers
-	executionReceipts     storage.ExecutionReceipts
-	state                 protocol.State
-	connFactory           ConnectionFactory
-	log                   zerolog.Logger
-	metrics               module.BackendScriptsMetrics
-	loggedScripts         *lru.Cache
-	archiveAddressList    []string
-	circuitBreakerEnabled bool
+	headers             storage.Headers
+	executionReceipts   storage.ExecutionReceipts
+	state               protocol.State
+	connFactory         ConnectionFactory
+	log                 zerolog.Logger
+	metrics             module.BackendScriptsMetrics
+	loggedScripts       *lru.Cache
+	archiveAddressList  []string
+	execIteratorFactory ExecutionNodeIteratorFactory
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -100,12 +100,11 @@ func (b *backendScripts) findScriptExecutors(
 		return nil, err
 	}
 
-	if !b.circuitBreakerEnabled {
-		executors = executors.Sample(maxExecutionNodesCnt)
-	}
-
 	executorAddrs := make([]string, 0, len(executors))
-	for _, executor := range executors {
+	execNodeIter := b.execIteratorFactory.CreateNodeIterator(executors)
+
+	// try to get events from one of the execution nodes
+	for executor := execNodeIter.Next(); executor != nil; executor = execNodeIter.Next() {
 		executorAddrs = append(executorAddrs, executor.Address)
 	}
 	return executorAddrs, nil
