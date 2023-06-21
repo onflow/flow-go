@@ -95,7 +95,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.WithPeerScoringEnabled(idProvider),
-		p2ptest.WithGossipSubRpcInspectorSuite(inspectorSuite1))
+		p2ptest.OverrideGossipSubRpcInspectorSuiteFactory(inspectorSuite1))
 
 	node2, id2 := p2ptest.NodeFixture(
 		t,

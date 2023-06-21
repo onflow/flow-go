@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 )
 
 // InitCorruptLibp2pNode initializes and returns a corrupt libp2p node that should only be used for BFT testing in
@@ -74,17 +73,10 @@ func InitCorruptLibp2pNode(
 		Metrics:          metricsCfg,
 	}
 
-	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, &netConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, idProvider, metricsCfg).
-		SetNetworkType(network.PrivateNetwork).
-		SetMetrics(metCfg).
-		Build()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for default libp2p node: %w", err)
-	}
-
 	builder, err := p2pbuilder.DefaultNodeBuilder(
 		log,
 		address,
+		network.PrivateNetwork,
 		flowKey,
 		sporkId,
 		idProvider,
@@ -94,7 +86,7 @@ func InitCorruptLibp2pNode(
 		connGaterCfg,
 		peerManagerCfg,
 		&netConfig.GossipSubConfig,
-		rpcInspectorSuite,
+		&netConfig.GossipSubRPCInspectorsConfig,
 		&netConfig.ResourceManagerConfig,
 		uniCfg,
 		&netConfig.ConnectionManagerConfig,

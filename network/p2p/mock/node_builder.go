@@ -154,7 +154,7 @@ func (_m *NodeBuilder) SetGossipSubFactory(_a0 p2p.GossipSubFactoryFunc, _a1 p2p
 }
 
 // SetGossipSubRpcInspectorSuite provides a mock function with given fields: _a0
-func (_m *NodeBuilder) OverrideDefaultInspectorSuite(_a0 p2p.GossipSubInspectorSuite) p2p.NodeBuilder {
+func (_m *NodeBuilder) OverrideDefaultRpcInspectorSuiteFactory(_a0 p2p.GossipSubInspectorSuite) p2p.NodeBuilder {
 	ret := _m.Called(_a0)
 
 	var r0 p2p.NodeBuilder
