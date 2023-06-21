@@ -8,6 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
@@ -23,6 +26,13 @@ import (
 
 // DefaultClientTimeout is used when making a GRPC request to a collection node or an execution node
 const DefaultClientTimeout = 3 * time.Second
+
+type clientType int
+
+const (
+	AccessClient clientType = iota
+	ExecutionClient
+)
 
 // ConnectionFactory is used to create an access api client
 type ConnectionFactory interface {
@@ -79,7 +89,7 @@ type CachedClient struct {
 }
 
 // createConnection creates new gRPC connections to remote node
-func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.Duration) (*grpc.ClientConn, error) {
+func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.Duration, clientType clientType) (*grpc.ClientConn, error) {
 
 	if timeout == 0 {
 		timeout = DefaultClientTimeout
@@ -93,10 +103,17 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 	}
 
 	var connInterceptors []grpc.UnaryClientInterceptor
+
 	cbInterceptor := cf.withCircuitBreakerInterceptor()
 	if cbInterceptor != nil {
 		connInterceptors = append(connInterceptors, cbInterceptor)
 	}
+
+	ciInterceptor := cf.withClientInvalidationInterceptor(address, clientType)
+	if ciInterceptor != nil {
+		connInterceptors = append(connInterceptors, ciInterceptor)
+	}
+
 	connInterceptors = append(connInterceptors, WithClientTimeoutInterceptor(timeout))
 
 	// ClientConn's default KeepAlive on connections is indefinite, assuming the timeout isn't reached
@@ -116,7 +133,7 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 	return conn, nil
 }
 
-func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout time.Duration) (*grpc.ClientConn, error) {
+func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout time.Duration, clientType clientType) (*grpc.ClientConn, error) {
 	var conn *grpc.ClientConn
 	var store *CachedClient
 	cacheHit := false
@@ -143,7 +160,7 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 
 	if conn == nil || conn.GetState() == connectivity.Shutdown {
 		var err error
-		conn, err = cf.createConnection(grpcAddress, timeout)
+		conn, err = cf.createConnection(grpcAddress, timeout, clientType)
 		if err != nil {
 			return nil, err
 		}
@@ -170,14 +187,14 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.Acce
 
 	var conn *grpc.ClientConn
 	if cf.ConnectionsCache != nil {
-		conn, err = cf.retrieveConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
+		conn, err = cf.retrieveConnection(grpcAddress, cf.CollectionNodeGRPCTimeout, AccessClient)
 		if err != nil {
 			return nil, nil, err
 		}
 		return access.NewAccessAPIClient(conn), &noopCloser{}, err
 	}
 
-	conn, err = cf.createConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
+	conn, err = cf.createConnection(grpcAddress, cf.CollectionNodeGRPCTimeout, AccessClient)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -203,14 +220,14 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 
 	var conn *grpc.ClientConn
 	if cf.ConnectionsCache != nil {
-		conn, err = cf.retrieveConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
+		conn, err = cf.retrieveConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout, ExecutionClient)
 		if err != nil {
 			return nil, nil, err
 		}
 		return execution.NewExecutionAPIClient(conn), &noopCloser{}, nil
 	}
 
-	conn, err = cf.createConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
+	conn, err = cf.createConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout, ExecutionClient)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -263,6 +280,37 @@ func getGRPCAddress(address string, grpcPort uint) (string, error) {
 	grpcAddress := fmt.Sprintf("%s:%d", hostnameOrIP, grpcPort)
 
 	return grpcAddress, nil
+}
+
+func (cf *ConnectionFactoryImpl) withClientInvalidationInterceptor(address string, clientType clientType) grpc.UnaryClientInterceptor {
+	if cf.CircuitBreakerConfig == nil || !cf.CircuitBreakerConfig.Enabled {
+		clientInvalidationInterceptor := func(
+			ctx context.Context,
+			method string,
+			req interface{},
+			reply interface{},
+			cc *grpc.ClientConn,
+			invoker grpc.UnaryInvoker,
+			opts ...grpc.CallOption,
+		) error {
+			fmt.Println("!!! clientInvalidationInterceptor")
+			err := invoker(ctx, method, req, reply, cc, opts...)
+			if status.Code(err) == codes.Unavailable {
+				switch clientType {
+				case AccessClient:
+					cf.InvalidateAccessAPIClient(address)
+				case ExecutionClient:
+					cf.InvalidateExecutionAPIClient(address)
+				}
+			}
+
+			return err
+		}
+
+		return clientInvalidationInterceptor
+	}
+
+	return nil
 }
 
 func (cf *ConnectionFactoryImpl) withCircuitBreakerInterceptor() grpc.UnaryClientInterceptor {

@@ -156,9 +156,6 @@ func (b *backendTransactions) sendTransactionToCollector(ctx context.Context,
 
 	err = b.grpcTxSend(ctx, collectionRPC, tx)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable && !b.circuitBreakerEnabled {
-			b.connFactory.InvalidateAccessAPIClient(collectionNodeAddr)
-		}
 		return fmt.Errorf("failed to send transaction to collection node at %s: %w", collectionNodeAddr, err)
 	}
 	return nil
@@ -828,9 +825,6 @@ func (b *backendTransactions) tryGetTransactionResult(
 
 	resp, err := execRPCClient.GetTransactionResult(ctx, req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable && !b.circuitBreakerEnabled {
-			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
-		}
 		return nil, err
 	}
 
@@ -891,9 +885,6 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 
 	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable && !b.circuitBreakerEnabled {
-			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
-		}
 		return nil, err
 	}
 
@@ -955,9 +946,6 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 
 	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable && !b.circuitBreakerEnabled {
-			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
-		}
 		return nil, err
 	}
 

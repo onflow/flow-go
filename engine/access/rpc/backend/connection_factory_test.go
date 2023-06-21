@@ -536,7 +536,7 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	assert.Equal(t, gobreaker.ErrOpenState, err)
 	assert.Greater(t, requestTimeout, duration)
 
-	//cn.handler.On("Ping", testifymock.Anything, req).Unset()
+	cn.handler.On("Ping", testifymock.Anything, req).Unset()
 	cn.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
 
 	//Wait until Circuit breaker go to Half-open state
