@@ -300,6 +300,8 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			require.Nil(t, usedHead)
 			require.Nil(t, usedTail)
 			require.True(t, pool.used.size == 0)
+			require.Equal(t, pool.used.tail, InvalidIndex)
+			require.Equal(t, pool.used.head, InvalidIndex)
 		}
 	}
 }
@@ -385,7 +387,8 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			require.Nil(t, usedHead)
 			require.Nil(t, usedTail)
 			require.True(t, pool.used.size == 0)
-			//require.True(t, pool.used.head.isUndefined())
+			require.Equal(t, pool.used.head, InvalidIndex)
+			require.Equal(t, pool.used.tail, InvalidIndex)
 		}
 	}
 }
@@ -488,7 +491,7 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			if i >= len(pool.poolEntities) {
 				require.False(t, slotAvailable)
 				require.Nil(t, ejectedEntity)
-				require.Equal(t, entityIndex, EIndex(0))
+				require.Equal(t, entityIndex, InvalidIndex)
 
 				// when pool is full and with NoEjection, the head must keep pointing to the first added element.
 				headEntity, headExists := pool.Head()
@@ -511,16 +514,14 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			}
 			require.Equal(t, pool.poolEntities[expectedUsedHead].entity, usedHead.entity)
 			// head must be healthy and point back to undefined.
-			// This is not needed anymore as head's prev is now ignored
-			//require.True(t, usedHead.node.prev.isUndefined())
+			require.Equal(t, usedHead.node.prev, InvalidIndex)
 		}
 
 		if ejectionMode != NoEjection || i < len(pool.poolEntities) {
 			// new entity must be successfully added to tail of used linked-list
 			require.Equal(t, entitiesToBeAdded[i], usedTail.entity)
 			// used tail must be healthy and point back to undefined.
-			// This is not needed anymore as tail's next is now ignored
-			//require.True(t, usedTail.node.next.isUndefined())
+			require.Equal(t, usedTail.node.next, InvalidIndex)
 		}
 
 		if ejectionMode == NoEjection && i >= len(pool.poolEntities) {
@@ -528,7 +529,7 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			require.Equal(t, entitiesToBeAdded[len(pool.poolEntities)-1], usedTail.entity)
 			// used tail must be healthy and point back to undefined.
 			// This is not needed anymore as tail's next is now ignored
-			//require.True(t, usedTail.node.next.isUndefined())
+			require.Equal(t, usedTail.node.next, InvalidIndex)
 		}
 
 		// free head
@@ -537,8 +538,7 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			// should move to i+1 element.
 			require.Equal(t, EIndex(i+1), pool.free.head)
 			// head must be healthy and point back to undefined.
-			// This is not needed anymore as head's prev is now ignored
-			//require.True(t, freeHead.node.prev.isUndefined())
+			require.Equal(t, freeHead.node.prev, InvalidIndex)
 		} else {
 			// once we go beyond limit,
 			// we run out of free slots,
@@ -554,8 +554,7 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			// updated).
 			require.Equal(t, EIndex(len(pool.poolEntities)-1), pool.free.tail)
 			// head tail be healthy and point next to undefined.
-			// This is not needed anymore as tail's next is now ignored
-			//require.True(t, freeTail.node.next.isUndefined())
+			require.Equal(t, freeTail.node.next, InvalidIndex)
 		} else {
 			// once we go beyond limit, we run out of free slots, and
 			// free tail must be kept at undefined.
