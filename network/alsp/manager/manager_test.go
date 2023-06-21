@@ -285,16 +285,16 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 // handling of repeated reported misbehavior and disallow listing.
 func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integration(t *testing.T) {
 	cfg := managerCfgFixture(t)
-	resetZero := false
-	decayFuc := func(record model.ProtocolSpamRecord) float64 {
+	fastDecay := false
+	fastDecayFunc := func(record model.ProtocolSpamRecord) float64 {
 		t.Logf("decayFuc called with record: %+v", record)
-		if resetZero {
+		if fastDecay {
 			// decay to zero in a single heart beat
-			t.Logf("resetZero is true, so decay to zero")
+			t.Logf("fastDecay is true, so decay to zero")
 			return 0
 		} else {
 			// decay as usual
-			t.Logf("resetZero is false, so decay as usual")
+			t.Logf("fastDecay is false, so decay as usual")
 			return math.Min(record.Penalty+record.Decay, 0)
 		}
 	}
@@ -302,13 +302,13 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	// this test is assessing the integration of the ALSP manager with the network. As the ALSP manager is an attribute
 	// of the network, we need to configure the ALSP manager via the network configuration, and let the network create
 	// the ALSP manager.
-	var victimSpamRecordCacheCache alsp.SpamRecordCache
+	var victimSpamRecordCache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
 		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
-			victimSpamRecordCacheCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
-			return victimSpamRecordCacheCache
+			victimSpamRecordCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return victimSpamRecordCache
 		}),
-		WithDecayFunc(decayFuc),
+		WithDecayFunc(fastDecayFunc),
 	}
 
 	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
@@ -366,8 +366,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
 
 	// ensures that the spammer is disallow-listed by the victim
-	//victimSpamRecordCacheCache.Get(ids[spammerIndex].NodeID)
-	record, ok := victimSpamRecordCacheCache.Get(ids[spammerIndex].NodeID)
+	record, ok := victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
 	require.True(t, ok)
 	require.NotNil(t, record)
 
@@ -382,7 +381,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 
 	// decay the disallow-listing penalty of the spammer node to zero.
 	t.Logf("about to decay the disallow-listing penalty of the spammer node to zero")
-	resetZero = true
+	fastDecay = true
 	t.Logf("decayed the disallow-listing penalty of the spammer node to zero")
 
 	// after serving the disallow-listing period, the spammer should be able to connect to the victim node again.
@@ -392,7 +391,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
 
 	// go back to regular decay to prepare for the next set of misbehavior reports.
-	resetZero = false
+	fastDecay = false
 	t.Logf("about to report misbehavior again")
 
 	// simulates the victim node reporting the spammer node misbehavior 120 times
@@ -424,7 +423,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 
 	// decay the disallow-listing penalty of the spammer node to zero.
 	t.Logf("about to decay the disallow-listing penalty of the spammer node to zero (2nd time)")
-	resetZero = true
+	fastDecay = true
 	t.Logf("decayed the disallow-listing penalty of the spammer node to zero (2nd time)")
 
 	// after serving the disallow-listing period, the spammer should be able to connect to the victim node again.
