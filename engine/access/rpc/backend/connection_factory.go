@@ -92,6 +92,13 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 		Timeout: timeout,
 	}
 
+	var connInterceptors []grpc.UnaryClientInterceptor
+	cbInterceptor := cf.withCircuitBreakerInterceptor()
+	if cbInterceptor != nil {
+		connInterceptors = append(connInterceptors, cbInterceptor)
+	}
+	connInterceptors = append(connInterceptors, WithClientTimeoutInterceptor(timeout))
+
 	// ClientConn's default KeepAlive on connections is indefinite, assuming the timeout isn't reached
 	// The connections should be safe to be persisted and reused
 	// https://pkg.go.dev/google.golang.org/grpc#WithKeepaliveParams
@@ -101,7 +108,7 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(cf.MaxMsgSize))),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithKeepaliveParams(keepaliveParams),
-		cf.withChainUnaryInterceptor(timeout),
+		grpc.WithChainUnaryInterceptor(connInterceptors...),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to address %s: %w", address, err)
@@ -258,9 +265,7 @@ func getGRPCAddress(address string, grpcPort uint) (string, error) {
 	return grpcAddress, nil
 }
 
-func (cf *ConnectionFactoryImpl) withChainUnaryInterceptor(timeout time.Duration) grpc.DialOption {
-	var clientInterceptors []grpc.UnaryClientInterceptor
-
+func (cf *ConnectionFactoryImpl) withCircuitBreakerInterceptor() grpc.UnaryClientInterceptor {
 	if cf.CircuitBreakerConfig != nil && cf.CircuitBreakerConfig.Enabled {
 		circuitBreaker := gobreaker.NewCircuitBreaker(gobreaker.Settings{
 			// here restore timeout defined to automatically return circuit breaker to HalfClose state
@@ -271,7 +276,7 @@ func (cf *ConnectionFactoryImpl) withChainUnaryInterceptor(timeout time.Duration
 			},
 		})
 
-		interceptor := func(
+		circuitBreakerInterceptor := func(
 			ctx context.Context,
 			method string,
 			req interface{},
@@ -280,6 +285,7 @@ func (cf *ConnectionFactoryImpl) withChainUnaryInterceptor(timeout time.Duration
 			invoker grpc.UnaryInvoker,
 			opts ...grpc.CallOption,
 		) error {
+			fmt.Println("!!! circuitBreakerInterceptor")
 			// The invoker should be called from circuit breaker execute, to catch each fails and react according to settings
 			_, err := circuitBreaker.Execute(func() (interface{}, error) {
 				err := invoker(ctx, method, req, reply, cc, opts...)
@@ -288,15 +294,14 @@ func (cf *ConnectionFactoryImpl) withChainUnaryInterceptor(timeout time.Duration
 			})
 			return err
 		}
-		clientInterceptors = append(clientInterceptors, interceptor)
+
+		return circuitBreakerInterceptor
 	}
 
-	clientInterceptors = append(clientInterceptors, WithClientUnaryInterceptor(timeout))
-
-	return grpc.WithChainUnaryInterceptor(clientInterceptors...)
+	return nil
 }
 
-func WithClientUnaryInterceptor(timeout time.Duration) grpc.UnaryClientInterceptor {
+func WithClientTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInterceptor {
 	clientTimeoutInterceptor := func(
 		ctx context.Context,
 		method string,
@@ -310,7 +315,7 @@ func WithClientUnaryInterceptor(timeout time.Duration) grpc.UnaryClientIntercept
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 
 		defer cancel()
-
+		fmt.Println("!!! clientTimeoutInterceptor")
 		// call the remote GRPC using the short context
 		err := invoker(ctxWithTimeout, method, req, reply, cc, opts...)
 
@@ -318,4 +323,8 @@ func WithClientUnaryInterceptor(timeout time.Duration) grpc.UnaryClientIntercept
 	}
 
 	return clientTimeoutInterceptor
+}
+
+func WithClientTimeoutOption(timeout time.Duration) grpc.DialOption {
+	return grpc.WithUnaryInterceptor(WithClientTimeoutInterceptor(timeout))
 }
