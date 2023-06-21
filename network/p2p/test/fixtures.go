@@ -19,11 +19,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/config"
+	netconf "github.com/onflow/flow-go/config/network"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/testutils"
@@ -31,7 +33,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -61,23 +63,22 @@ func NodeFixture(
 	require.NoError(t, err)
 
 	logger := unittest.Logger().Level(zerolog.WarnLevel)
-
-	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, &defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, idProvider, metrics.NewNoopCollector()).
-		Build()
-	require.NoError(t, err)
-
 	parameters := &NodeFixtureParameters{
-		HandlerFunc:                      func(network.Stream) {},
-		Unicasts:                         nil,
-		Key:                              NetworkingKeyFixtures(t),
-		Address:                          unittest.DefaultAddress,
-		Logger:                           logger,
-		Role:                             flow.RoleCollection,
-		CreateStreamRetryDelay:           unicast.DefaultRetryDelay,
-		Metrics:                          metrics.NewNoopCollector(),
+		NetworkingType:         flownet.PrivateNetwork,
+		HandlerFunc:            func(network.Stream) {},
+		Unicasts:               nil,
+		Key:                    NetworkingKeyFixtures(t),
+		Address:                unittest.DefaultAddress,
+		Logger:                 logger,
+		Role:                   flow.RoleCollection,
+		CreateStreamRetryDelay: unicast.DefaultRetryDelay,
+		MetricsCfg: &p2pconfig.MetricsConfig{
+			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+			Metrics:          metrics.NewNoopCollector(),
+		},
 		ResourceManager:                  testutils.NewResourceManager(t),
 		GossipSubPeerScoreTracerInterval: 0, // disabled by default
-		GossipSubRPCInspector:            rpcInspectorSuite,
+		GossipSubRPCInspectorCfg:         GossipSubRpcValidationInspectorConfigFixture(t),
 	}
 
 	for _, opt := range opts {
@@ -91,16 +92,19 @@ func NodeFixture(
 
 	logger = parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
-	connManager, err := connection.NewConnManager(logger, parameters.Metrics, &defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
+	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
-		parameters.Metrics,
+		parameters.MetricsCfg,
+		parameters.NetworkingType,
 		parameters.Address,
 		parameters.Key,
 		sporkID,
+		parameters.IdProvider,
 		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
+		parameters.GossipSubRPCInspectorCfg,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
@@ -110,14 +114,17 @@ func NodeFixture(
 			return p2pdht.NewDHT(c, h,
 				protocol.ID(protocols.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
 				logger,
-				parameters.Metrics,
+				parameters.MetricsCfg.Metrics,
 				parameters.DhtOptions...,
 			)
 		}).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
 		SetStreamCreationRetryInterval(parameters.CreateStreamRetryDelay).
-		SetResourceManager(parameters.ResourceManager).
-		OverrideDefaultInspectorSuite(parameters.GossipSubRPCInspector)
+		SetResourceManager(parameters.ResourceManager)
+
+	if parameters.GossipSubRpcInspectorSuiteFactory != nil {
+		builder.OverrideDefaultRpcInspectorSuiteFactory(parameters.GossipSubRpcInspectorSuiteFactory)
+	}
 
 	if parameters.ResourceManager != nil {
 		builder.SetResourceManager(parameters.ResourceManager)
@@ -171,34 +178,42 @@ func NodeFixture(
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
-	HandlerFunc                      network.StreamHandler
-	Unicasts                         []protocols.ProtocolName
-	Key                              crypto.PrivateKey
-	Address                          string
-	DhtOptions                       []dht.Option
-	Role                             flow.Role
-	Logger                           zerolog.Logger
-	PeerScoringEnabled               bool
-	IdProvider                       module.IdentityProvider
-	PeerScoreConfig                  *p2p.PeerScoringConfig
-	ConnectionPruning                bool              // peer manager parameter
-	UpdateInterval                   time.Duration     // peer manager parameter
-	PeerProvider                     p2p.PeersProvider // peer manager parameter
-	ConnGater                        p2p.ConnectionGater
-	ConnManager                      connmgr.ConnManager
-	GossipSubFactory                 p2p.GossipSubFactoryFunc
-	GossipSubConfig                  p2p.GossipSubAdapterConfigFunc
-	Metrics                          module.LibP2PMetrics
-	ResourceManager                  network.ResourceManager
-	PubSubTracer                     p2p.PubSubTracer
-	GossipSubPeerScoreTracerInterval time.Duration // intervals at which the peer score is updated and logged.
-	CreateStreamRetryDelay           time.Duration
-	GossipSubRPCInspector            p2p.GossipSubInspectorSuite
+	HandlerFunc                       network.StreamHandler
+	NetworkingType                    flownet.NetworkingType
+	Unicasts                          []protocols.ProtocolName
+	Key                               crypto.PrivateKey
+	Address                           string
+	DhtOptions                        []dht.Option
+	Role                              flow.Role
+	Logger                            zerolog.Logger
+	PeerScoringEnabled                bool
+	IdProvider                        module.IdentityProvider
+	PeerScoreConfig                   *p2p.PeerScoringConfig
+	ConnectionPruning                 bool              // peer manager parameter
+	UpdateInterval                    time.Duration     // peer manager parameter
+	PeerProvider                      p2p.PeersProvider // peer manager parameter
+	ConnGater                         p2p.ConnectionGater
+	ConnManager                       connmgr.ConnManager
+	GossipSubFactory                  p2p.GossipSubFactoryFunc
+	GossipSubConfig                   p2p.GossipSubAdapterConfigFunc
+	MetricsCfg                        *p2pconfig.MetricsConfig
+	ResourceManager                   network.ResourceManager
+	PubSubTracer                      p2p.PubSubTracer
+	GossipSubPeerScoreTracerInterval  time.Duration // intervals at which the peer score is updated and logged.
+	CreateStreamRetryDelay            time.Duration
+	GossipSubRPCInspectorCfg          *netconf.GossipSubRPCInspectorsConfig
+	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
 }
 
-func WithGossipSubRpcInspectorSuite(inspectorSuite p2p.GossipSubInspectorSuite) NodeFixtureParameterOption {
+func OverrideGossipSubRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspectorSuiteFactoryFunc) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.GossipSubRPCInspector = inspectorSuite
+		p.GossipSubRpcInspectorSuiteFactory = factory
+	}
+}
+
+func OverrideGossipSubRpcInspectorConfig(cfg *netconf.GossipSubRPCInspectorsConfig) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.GossipSubRPCInspectorCfg = cfg
 	}
 }
 
@@ -291,7 +306,7 @@ func WithLogger(logger zerolog.Logger) NodeFixtureParameterOption {
 
 func WithMetricsCollector(metrics module.NetworkMetrics) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.Metrics = metrics
+		p.MetricsCfg.Metrics = metrics
 	}
 }
 
@@ -588,4 +603,61 @@ func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
 		ids[i] = PeerIdFixture(t)
 	}
 	return ids
+}
+
+// GossipSubRpcValidationInspectorConfigFixture returns a GossipSubRPCValidationInspectorConfigs instance for testing.
+// Args:
+// - t: *testing.T instance - to indicate that this is a test fixture.
+// Returns:
+// - *netconf.GossipSubRPCValidationInspectorConfigs: GossipSubRPCValidationInspectorConfigs instance.
+// Note: the parameters in this fixture are INTENTIONALLY independent of the default values in the config file.
+// This is to allow test parameters to be changed without affecting the default values in the config file.
+func GossipSubRpcValidationInspectorConfigFixture(_ *testing.T) *netconf.GossipSubRPCInspectorsConfig {
+	return &netconf.GossipSubRPCInspectorsConfig{
+		GossipSubRPCValidationInspectorConfigs: netconf.GossipSubRPCValidationInspectorConfigs{
+			ClusterPrefixedMessageConfig: netconf.ClusterPrefixedMessageConfig{
+				ClusterPrefixHardThreshold:                   100,
+				ClusterPrefixedControlMsgsReceivedCacheSize:  100,
+				ClusterPrefixedControlMsgsReceivedCacheDecay: .99,
+			},
+			NumberOfWorkers: 5,
+			CacheSize:       10_000,
+			GraftLimits: struct {
+				HardThreshold   uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-graft-hard-threshold"`
+				SafetyThreshold uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-graft-safety-threshold"`
+				RateLimit       int    `validate:"gte=0" mapstructure:"gossipsub-rpc-graft-rate-limit"`
+			}{
+				HardThreshold:   30,
+				SafetyThreshold: 15,
+				RateLimit:       30,
+			},
+			PruneLimits: struct {
+				HardThreshold   uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-prune-hard-threshold"`
+				SafetyThreshold uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-prune-safety-threshold"`
+				RateLimit       int    `validate:"gte=0" mapstructure:"gossipsub-rpc-prune-rate-limit"`
+			}{
+				HardThreshold:   30,
+				SafetyThreshold: 15,
+				RateLimit:       30,
+			},
+			IHaveLimits: struct {
+				HardThreshold   uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-ihave-hard-threshold"`
+				SafetyThreshold uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-ihave-safety-threshold"`
+				RateLimit       int    `validate:"gte=0" mapstructure:"gossipsub-rpc-ihave-rate-limit"`
+			}{
+				HardThreshold:   100,
+				SafetyThreshold: 50,
+				RateLimit:       0,
+			},
+			IHaveSyncInspectSampleSizePercentage:  .25,
+			IHaveAsyncInspectSampleSizePercentage: .10,
+			IHaveInspectionMaxSampleSize:          100,
+		},
+		GossipSubRPCMetricsInspectorConfigs: netconf.GossipSubRPCMetricsInspectorConfigs{
+			NumberOfWorkers: 1,
+			CacheSize:       100,
+		},
+		GossipSubRPCInspectorNotificationCacheSize: 10_000,
+	}
+
 }
