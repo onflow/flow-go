@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/alsp"
-	"github.com/onflow/flow-go/network/alsp/manager"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	"github.com/onflow/flow-go/network/alsp/model"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
