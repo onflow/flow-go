@@ -866,7 +866,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			0,
 			0,
 			false,
-			config.MaxHeightRange,
+			config.MaxMsgSize,
 			config.ExecutionClientTimeout,
 			config.CollectionClientTimeout,
 			config.ConnectionPoolSize,

@@ -1007,7 +1007,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.collectionGRPCPort,
 				builder.executionGRPCPort,
 				builder.retryEnabled,
-				config.MaxHeightRange,
+				config.MaxMsgSize,
 				config.ExecutionClientTimeout,
 				config.CollectionClientTimeout,
 				config.ConnectionPoolSize,
