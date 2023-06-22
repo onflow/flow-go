@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/time/rate"
 
-	netconf "github.com/onflow/flow-go/config/network"
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -20,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	netconf "github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/cache"
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/ratelimit"
 	"github.com/onflow/flow-go/state/protocol"
