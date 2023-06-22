@@ -110,7 +110,7 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 	// the ALSP manager.
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),
@@ -209,7 +209,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 	// the ALSP manager.
 	var victimSpamRecordCacheCache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			victimSpamRecordCacheCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return victimSpamRecordCacheCache
 		}),
@@ -304,7 +304,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	// the ALSP manager.
 	var victimSpamRecordCache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			victimSpamRecordCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return victimSpamRecordCache
 		}),
@@ -366,11 +366,6 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
 
 	// ensures that the spammer is disallow-listed by the victim
-	record, ok := victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
-	require.True(t, ok)
-	require.NotNil(t, record)
-
-	// ensures that the spammer is disallow-listed by the victim
 	// while the spammer node is disallow-listed, it cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the spammer node, unless
 	// it is allow-listed again.
 	p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]}, 100*time.Millisecond, 3*time.Second)
@@ -378,6 +373,17 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	// despite disallow-listing spammer, ensure that (victim and honest) and (honest and spammer) are still connected.
 	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[honestIndex]}, 1*time.Millisecond, 100*time.Millisecond)
 	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+
+	record, ok := victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
+	require.True(t, ok)
+	require.NotNil(t, record)
+
+	// check the penalty of the spammer node. It should be equal to the disallow-listing penalty.
+
+	require.Greater(t, float64(model.DisallowListingThreshold), record.Penalty)
+	require.Equal(t, float64(1000), record.Decay)
+	require.Equal(t, true, record.DisallowListed)
+	require.Equal(t, uint64(1), record.CutoffCounter)
 
 	// decay the disallow-listing penalty of the spammer node to zero.
 	t.Logf("about to decay the disallow-listing penalty of the spammer node to zero")
@@ -389,6 +395,11 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 
 	// all the nodes should be able to connect to each other again.
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
+
+	require.Greater(t, float64(model.DisallowListingThreshold), record.Penalty)
+	require.Equal(t, float64(1000), record.Decay)
+	assert.Equal(t, false, record.DisallowListed)
+	require.Equal(t, uint64(1), record.CutoffCounter)
 
 	// go back to regular decay to prepare for the next set of misbehavior reports.
 	fastDecay = false
@@ -421,6 +432,11 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[honestIndex]}, 1*time.Millisecond, 100*time.Millisecond)
 	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
 
+	require.Greater(t, float64(model.DisallowListingThreshold), record.Penalty)
+	require.Equal(t, float64(1000), record.Decay)
+	require.Equal(t, true, record.DisallowListed)
+	assert.Equal(t, uint64(2), record.CutoffCounter)
+
 	// decay the disallow-listing penalty of the spammer node to zero.
 	t.Logf("about to decay the disallow-listing penalty of the spammer node to zero (2nd time)")
 	fastDecay = true
@@ -431,6 +447,11 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 
 	// all the nodes should be able to connect to each other again.
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
+
+	require.Greater(t, float64(model.DisallowListingThreshold), record.Penalty)
+	require.Equal(t, float64(1000), record.Decay)
+	assert.Equal(t, false, record.DisallowListed)
+	assert.Equal(t, 2, record.CutoffCounter)
 }
 
 // TestMisbehaviorReportMetrics tests the recording of misbehavior report metrics.
@@ -534,7 +555,7 @@ func TestNewMisbehaviorReportManager(t *testing.T) {
 	consumer := mocknetwork.NewDisallowListNotificationConsumer(t)
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),
@@ -605,7 +626,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport(t *testing.T) {
 	// create a new MisbehaviorReportManager
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),
@@ -665,7 +686,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReport_PenaltyDisable(t *testing.T
 	// we use a mock cache but we do not expect any calls to the cache, since the penalty is disabled.
 	var cache *mockalsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = mockalsp.NewSpamRecordCache(t)
 			return cache
 		}),
@@ -720,7 +741,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Sequentiall
 	// create a new MisbehaviorReportManager
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),
@@ -782,7 +803,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForSinglePeer_Concurrentl
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),
@@ -853,7 +874,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Sequential
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),
@@ -913,7 +934,7 @@ func TestHandleMisbehaviorReport_SinglePenaltyReportsForMultiplePeers_Concurrent
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),
@@ -983,7 +1004,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Sequenti
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),
@@ -1064,7 +1085,7 @@ func TestHandleMisbehaviorReport_MultiplePenaltyReportsForMultiplePeers_Concurre
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),
@@ -1139,7 +1160,7 @@ func TestHandleMisbehaviorReport_DuplicateReportsForSinglePeer_Concurrently(t *t
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),
@@ -1207,7 +1228,7 @@ func TestDecayMisbehaviorPenalty_SingleHeartbeat(t *testing.T) {
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),
@@ -1297,7 +1318,7 @@ func TestDecayMisbehaviorPenalty_MultipleHeartbeats(t *testing.T) {
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),
@@ -1387,7 +1408,7 @@ func TestDecayMisbehaviorPenalty_DecayToZero(t *testing.T) {
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),
@@ -1472,7 +1493,7 @@ func TestDecayMisbehaviorPenalty_DecayToZero_AllowListing(t *testing.T) {
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),
@@ -1552,7 +1573,7 @@ func TestDisallowListNotification(t *testing.T) {
 
 	var cache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+		WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
 			cache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return cache
 		}),

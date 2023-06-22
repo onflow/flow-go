@@ -108,3 +108,19 @@ func WithDecayFunc(f alspmgr.SpamRecordDecayFunc) alspmgr.MisbehaviorReportManag
 		m.DecayFunc = f
 	}
 }
+
+// WithSpamRecordsCacheFactory sets the spam record cache factory for the MisbehaviorReportManager.
+// Args:
+//
+//	f: the spam record cache factory.
+//
+// Returns:
+//
+//	a MisbehaviorReportManagerOption that sets the spam record cache for the MisbehaviorReportManager.
+//
+// Note: this option is useful primarily for testing purposes. The default factory should be sufficient for production.
+func WithSpamRecordsCacheFactory(f alspmgr.SpamRecordCacheFactory) alspmgr.MisbehaviorReportManagerOption {
+	return func(m *alspmgr.MisbehaviorReportManager) {
+		m.CacheFactory = f
+	}
+}
