@@ -214,7 +214,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "block_execution_time_milliseconds",
 		Help:      "the total time spent on block execution in milliseconds",
-		Buckets:   []float64{100, 500, 1000, 1500, 2000, 2500, 3000, 6000},
+		Buckets:   []float64{50, 100, 200, 300, 400, 1000, 2000, 6000},
 	})
 
 	blockComputationUsed := promauto.NewHistogram(prometheus.HistogramOpts{
