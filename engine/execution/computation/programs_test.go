@@ -138,11 +138,8 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		me,
 		prov,
 		nil,
-<<<<<<< HEAD
-		testutil.ProtocolStateFixture())
-=======
+		testutil.ProtocolStateFixture(),
 		testMaxConcurrency)
->>>>>>> master
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
