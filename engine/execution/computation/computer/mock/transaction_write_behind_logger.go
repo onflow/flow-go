@@ -18,9 +18,9 @@ type TransactionWriteBehindLogger struct {
 	mock.Mock
 }
 
-// AddTransactionResult provides a mock function with given fields: txn, _a1, output, timeSpent
-func (_m *TransactionWriteBehindLogger) AddTransactionResult(txn computer.TransactionRequest, _a1 *snapshot.ExecutionSnapshot, output fvm.ProcedureOutput, timeSpent time.Duration) {
-	_m.Called(txn, _a1, output, timeSpent)
+// AddTransactionResult provides a mock function with given fields: txn, _a1, output, timeSpent, numTxnConflictRetries
+func (_m *TransactionWriteBehindLogger) AddTransactionResult(txn computer.TransactionRequest, _a1 *snapshot.ExecutionSnapshot, output fvm.ProcedureOutput, timeSpent time.Duration, numTxnConflictRetries int) {
+	_m.Called(txn, _a1, output, timeSpent, numTxnConflictRetries)
 }
 
 type mockConstructorTestingTNewTransactionWriteBehindLogger interface {
