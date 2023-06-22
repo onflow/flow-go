@@ -20,8 +20,9 @@ import (
 // that implements the PubSubAdapter interface for the Flow network.
 type GossipSubAdapter struct {
 	component.Component
-	gossipSub *pubsub.PubSub
-	logger    zerolog.Logger
+	gossipSub             *pubsub.PubSub
+	logger                zerolog.Logger
+	clusterChangeConsumer p2p.CollectionClusterChangesConsumer
 }
 
 var _ p2p.PubSubAdapter = (*GossipSubAdapter)(nil)
