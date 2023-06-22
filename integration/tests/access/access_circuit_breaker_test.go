@@ -98,14 +98,20 @@ func (s *AccessCircuitBreakerSuite) SetupTest() {
 	s.net.Start(s.ctx)
 }
 
+// TestCircuitBreaker tests the behavior of the circuit breaker. It verifies the circuit breaker's ability to open,
+// prevent further requests, and restore after a timeout. It is done in a few steps:
+// 1. Get the collection node and disconnect it from the network.
+// 2. Try to send a transaction multiple times to observe the decrease in waiting time for a failed response.
+// 3. Connect the collection node to the network and wait for the circuit breaker restore time.
+// 4. Successfully send a transaction.
 func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 	ctx, cancel := context.WithCancel(s.ctx)
 	defer cancel()
 
-	// 1. Get collection node
+	// 1. Get the collection node
 	collectionContainer := s.net.ContainerByName("collection_1")
 
-	// 2. Get Access Node container and client
+	// 2. Get the Access Node container and client
 	accessContainer := s.net.ContainerByName(testnet.PrimaryAN)
 
 	// Check if access node was created with circuit breaker flags
@@ -119,7 +125,7 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 	latestBlockID, err := accessClient.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	// create new account to deploy Counter to
+	// Create a new account to deploy Counter to
 	accountPrivateKey := lib.RandomPrivateKey()
 
 	accountKey := sdk.NewAccountKey().
@@ -146,18 +152,17 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 		SetPayer(serviceAddress).
 		SetGasLimit(9999)
 
-	// sign transaction
-
+	// Sign the transaction
 	childCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	signedTx, err := accessClient.SignTransaction(createAccountTx)
 	require.NoError(s.T(), err)
 	cancel()
 
-	// 3. Disconnect collection node from network to activate Circuit Breaker
+	// 3. Disconnect the collection node from the network to activate the Circuit Breaker
 	err = collectionContainer.Disconnect()
 	require.NoError(s.T(), err, "failed to pause connection node")
 
-	//4. Send couple transactions to proof circuit breaker opens correctly
+	// 4. Send a couple of transactions to test if the circuit breaker opens correctly
 	sendTransaction := func(ctx context.Context, tx *sdk.Transaction) (time.Duration, error) {
 		childCtx, cancel = context.WithTimeout(ctx, time.Second*10)
 		start := time.Now()
@@ -168,23 +173,25 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 		return duration, err
 	}
 
-	// try to send transaction first time. Should wait at least timeout time and return Unknown error
+	// Try to send the transaction for the first time. It should wait at least the timeout time and return Unknown error
 	duration, err := sendTransaction(ctx, signedTx)
 	assert.Equal(s.T(), codes.Unknown, status.Code(err))
 	assert.GreaterOrEqual(s.T(), requestTimeout, duration)
 
-	// try to send transaction second time. Should wait less then a second cause CB configured to break after firs fail
+	// Try to send the transaction for the second time. It should wait less than a second because the circuit breaker
+	// is configured to break after the first failure
 	duration, err = sendTransaction(ctx, signedTx)
 	assert.Equal(s.T(), codes.Unknown, status.Code(err))
 	assert.Greater(s.T(), time.Second, duration)
 
-	// connect again
+	// Reconnect the collection node
 	err = collectionContainer.Connect()
 	require.NoError(s.T(), err, "failed to start collection node")
-	// wait to restore circuit breaker
+
+	// Wait for the circuit breaker to restore
 	time.Sleep(cbRestoreTimeout)
 
-	// try to send transaction third time. Transaction should be send successful
+	// Try to send the transaction for the third time. The transaction should be sent successfully
 	_, err = sendTransaction(ctx, signedTx)
 	require.NoError(s.T(), err, "transaction should be sent")
 }
