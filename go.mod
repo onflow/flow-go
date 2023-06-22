@@ -51,7 +51,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.1
 	github.com/onflow/atree v0.6.0
-	github.com/onflow/cadence v0.39.9
+	github.com/onflow/cadence v0.39.12
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.3
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
@@ -278,5 +278,3 @@ require (
 	lukechampine.com/blake3 v1.1.7 // indirect
 	nhooyr.io/websocket v1.8.6 // indirect
 )
-
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.39.9-patch.1
