@@ -63,6 +63,11 @@ func (_m *GossipSubBuilder) Build(_a0 irrecoverable.SignalerContext) (p2p.PubSub
 	return r0, r1, r2
 }
 
+// OverrideDefaultRpcInspectorSuiteFactory provides a mock function with given fields: _a0
+func (_m *GossipSubBuilder) OverrideDefaultRpcInspectorSuiteFactory(_a0 p2p.GossipSubRpcInspectorSuiteFactoryFunc) {
+	_m.Called(_a0)
+}
+
 // SetAppSpecificScoreParams provides a mock function with given fields: _a0
 func (_m *GossipSubBuilder) SetAppSpecificScoreParams(_a0 func(peer.ID) float64) {
 	_m.Called(_a0)
@@ -80,11 +85,6 @@ func (_m *GossipSubBuilder) SetGossipSubFactory(_a0 p2p.GossipSubFactoryFunc) {
 
 // SetGossipSubPeerScoring provides a mock function with given fields: _a0
 func (_m *GossipSubBuilder) SetGossipSubPeerScoring(_a0 bool) {
-	_m.Called(_a0)
-}
-
-// SetGossipSubRPCInspectorSuite provides a mock function with given fields: _a0
-func (_m *GossipSubBuilder) SetGossipSubRPCInspectorSuite(_a0 p2p.GossipSubInspectorSuite) {
 	_m.Called(_a0)
 }
 
