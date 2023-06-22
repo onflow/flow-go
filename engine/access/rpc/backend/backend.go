@@ -106,6 +106,7 @@ func New(
 		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}
 
+	// create configured node selection factory to be used in sub-backend logic
 	nodeSelectorFactory := NodeSelectorFactory{circuitBreakerEnabled: circuitBreakerEnabled}
 
 	b := &Backend{

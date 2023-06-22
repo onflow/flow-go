@@ -291,7 +291,13 @@ func getGRPCAddress(address string, grpcPort uint) (string, error) {
 	return grpcAddress, nil
 }
 
-func (cf *ConnectionFactoryImpl) createClientInvalidationInterceptor(address string, clientType clientType) grpc.UnaryClientInterceptor {
+// createClientInvalidationInterceptor creates a client interceptor for client invalidation. It should only be created
+// if the circuit breaker is disabled. If the response from the server indicates an unavailable status, it invalidates
+// the corresponding client.
+func (cf *ConnectionFactoryImpl) createClientInvalidationInterceptor(
+	address string,
+	clientType clientType,
+) grpc.UnaryClientInterceptor {
 	if cf.CircuitBreakerConfig == nil || !cf.CircuitBreakerConfig.Enabled {
 		clientInvalidationInterceptor := func(
 			ctx context.Context,
@@ -321,13 +327,33 @@ func (cf *ConnectionFactoryImpl) createClientInvalidationInterceptor(address str
 	return nil
 }
 
+// The simplified representation and description of circuit breaker pattern, that used to handle node connectivity:
+//
+// Circuit Open --> Circuit Half-Open --> Circuit Closed
+//      ^                                      |
+//      |                                      |
+//      +--------------------------------------+
+//
+// The "Circuit Open" state represents the circuit being open, indicating that the node is not available.
+// This state is entered when the number of consecutive failures exceeds the maximum allowed failures.
+//
+// The "Circuit Half-Open" state represents the circuit transitioning from the open state to the half-open
+// state after a configured restore timeout. In this state, the circuit allows a limited number of requests
+// to test if the node has recovered.
+//
+// The "Circuit Closed" state represents the circuit being closed, indicating that the node is available.
+// This state is initial or entered when the test requests in the half-open state succeed.
+
+// createCircuitBreakerInterceptor creates a client interceptor for circuit breaker functionality. It should only be
+// created if the circuit breaker is enabled. All invocations will go through the circuit breaker to be tracked for
+// success or failure of the call.
 func (cf *ConnectionFactoryImpl) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor {
 	if cf.CircuitBreakerConfig != nil && cf.CircuitBreakerConfig.Enabled {
 		circuitBreaker := gobreaker.NewCircuitBreaker(gobreaker.Settings{
-			// here restore timeout defined to automatically return circuit breaker to HalfClose state
+			// The restore timeout is defined to automatically return the circuit breaker to the HalfClose state.
 			Timeout: cf.CircuitBreakerConfig.RestoreTimeout,
 			ReadyToTrip: func(counts gobreaker.Counts) bool {
-				// here number of maximum failures will be checked, before circuit breaker go to Open state
+				// The number of maximum failures is checked before the circuit breaker goes to the Open state.
 				return counts.ConsecutiveFailures >= cf.CircuitBreakerConfig.MaxFailures
 			},
 		})
@@ -341,7 +367,13 @@ func (cf *ConnectionFactoryImpl) createCircuitBreakerInterceptor() grpc.UnaryCli
 			invoker grpc.UnaryInvoker,
 			opts ...grpc.CallOption,
 		) error {
-			// The invoker should be called from circuit breaker execute, to catch each fails and react according to settings
+			// The circuit breaker integration occurs here, where all invoked calls to the node pass through the
+			// CircuitBreaker.Execute method. This method counts successful and failed invocations, and switches to the
+			// "StateOpen" when the maximum failure threshold is reached. When the circuit breaker is in the "StateOpen"
+			// it immediately rejects connections and returns without waiting for the call timeout. After the
+			// "RestoreTimeout" period elapses, the circuit breaker transitions to the "StateHalfOpen" and attempts the
+			// invocation again. If the invocation fails, it returns to the "StateOpen"; otherwise, it transitions to
+			// the "StateClosed" and handles invocations as usual.
 			_, err := circuitBreaker.Execute(func() (interface{}, error) {
 				err := invoker(ctx, method, req, reply, cc, opts...)
 
@@ -356,6 +388,7 @@ func (cf *ConnectionFactoryImpl) createCircuitBreakerInterceptor() grpc.UnaryCli
 	return nil
 }
 
+// createClientTimeoutInterceptor creates a client interceptor with a context that expires after the timeout.
 func createClientTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInterceptor {
 	clientTimeoutInterceptor := func(
 		ctx context.Context,
@@ -366,11 +399,11 @@ func createClientTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInter
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
-		// create a context that expires after timeout
+		// Create a context that expires after the specified timeout.
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
-
 		defer cancel()
-		// call the remote GRPC using the short context
+
+		// Call the remote GRPC using the short context.
 		err := invoker(ctxWithTimeout, method, req, reply, cc, opts...)
 
 		return err
@@ -379,6 +412,8 @@ func createClientTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInter
 	return clientTimeoutInterceptor
 }
 
+// WithClientTimeoutOption is a helper function to create a GRPC dial option
+// with the specified client timeout interceptor.
 func WithClientTimeoutOption(timeout time.Duration) grpc.DialOption {
 	return grpc.WithUnaryInterceptor(createClientTimeoutInterceptor(timeout))
 }
