@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"github.com/onflow/flow-go/engine/access/rest"
 	"net/http"
 
 	"github.com/slok/go-http-metrics/middleware"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/module"
 )
 
