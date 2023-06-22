@@ -293,7 +293,6 @@ func (cf *ConnectionFactoryImpl) withClientInvalidationInterceptor(address strin
 			invoker grpc.UnaryInvoker,
 			opts ...grpc.CallOption,
 		) error {
-			fmt.Println("!!! clientInvalidationInterceptor")
 			err := invoker(ctx, method, req, reply, cc, opts...)
 			if status.Code(err) == codes.Unavailable {
 				switch clientType {
@@ -333,7 +332,6 @@ func (cf *ConnectionFactoryImpl) withCircuitBreakerInterceptor() grpc.UnaryClien
 			invoker grpc.UnaryInvoker,
 			opts ...grpc.CallOption,
 		) error {
-			fmt.Println("!!! circuitBreakerInterceptor")
 			// The invoker should be called from circuit breaker execute, to catch each fails and react according to settings
 			_, err := circuitBreaker.Execute(func() (interface{}, error) {
 				err := invoker(ctx, method, req, reply, cc, opts...)
@@ -363,7 +361,6 @@ func WithClientTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInterce
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 
 		defer cancel()
-		fmt.Println("!!! clientTimeoutInterceptor")
 		// call the remote GRPC using the short context
 		err := invoker(ctxWithTimeout, method, req, reply, cc, opts...)
 
