@@ -343,8 +343,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
 
-		fnb.GossipSubRpcInspectorSuite = rpcInspectorSuite
-
 		builder, err := p2pbuilder.DefaultNodeBuilder(
 			fnb.Logger,
 			myAddr,

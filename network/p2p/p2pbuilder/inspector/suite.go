@@ -1,4 +1,4 @@
-package suite
+package inspector
 
 import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"

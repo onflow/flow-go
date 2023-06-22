@@ -1,4 +1,4 @@
-package suite
+package inspector
 
 import (
 	"github.com/hashicorp/go-multierror"
