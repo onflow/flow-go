@@ -778,7 +778,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 			DisablePenalty:          builder.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
 			HeartBeatInterval:       builder.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
 			AlspMetrics:             builder.Metrics.Network,
-			NetworkType:             p2p.PublicNetwork,
+			NetworkType:             network.PublicNetwork,
 			HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
 		},
 	})
@@ -1148,7 +1148,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 			top := topology.EmptyTopology{}
 			receiveCache := netcache.NewHeroReceiveCache(builder.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 				builder.Logger,
-				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork))
+				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork))
 
 			err := node.Metrics.Mempool.Register(metrics.PrependPublicPrefix(metrics.ResourceNetworkingReceiveCache), receiveCache.Size)
 			if err != nil {
@@ -1204,7 +1204,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 			Metrics:          networkMetrics,
 		},
-		p2p.PublicNetwork,
+		network.PublicNetwork,
 		bindAddress,
 		networkKey,
 		builder.SporkID,
@@ -1213,7 +1213,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
-			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork),
+			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		}).
 		SetBasicResolver(builder.Resolver).
 		SetSubscriptionFilter(

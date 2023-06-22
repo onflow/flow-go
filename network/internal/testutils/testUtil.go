@@ -505,7 +505,7 @@ func generateLibP2PNode(t *testing.T, logger zerolog.Logger, key crypto.PrivateK
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
 		},
-		p2p.PrivateNetwork,
+		network.PrivateNetwork,
 		unittest.DefaultAddress,
 		key,
 		sporkID,
