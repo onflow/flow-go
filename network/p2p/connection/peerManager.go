@@ -16,8 +16,9 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections
-var DefaultPeerUpdateInterval = 10 * time.Minute
+// DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections.
+// We set it to 1 second to be aligned with the heartbeat intervals of libp2p, alsp, and gossipsub.
+var DefaultPeerUpdateInterval = time.Second
 
 var _ p2p.PeerManager = (*PeerManager)(nil)
 var _ component.Component = (*PeerManager)(nil)

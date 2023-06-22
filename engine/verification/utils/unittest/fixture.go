@@ -39,6 +39,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const (
+	// TODO: enable parallel execution once cadence type equivalence check issue
+	// is resolved.
+	testMaxConcurrency = 1
+)
+
 // ExecutionReceiptData is a test helper struct that represents all data required
 // to verify the result of an execution receipt.
 type ExecutionReceiptData struct {
@@ -288,7 +294,8 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			committer,
 			me,
 			prov,
-			nil)
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)

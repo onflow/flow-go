@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/cadence/encoding/ccf"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -648,6 +651,16 @@ func AccountKeyToMessage(a flow.AccountPublicKey) (*entities.AccountKey, error) 
 	}, nil
 }
 
+func MessageToEvent(m *entities.Event) flow.Event {
+	return flow.Event{
+		Type:             flow.EventType(m.GetType()),
+		TransactionID:    flow.HashToID(m.GetTransactionId()),
+		TransactionIndex: m.GetTransactionIndex(),
+		EventIndex:       m.GetEventIndex(),
+		Payload:          m.GetPayload(),
+	}
+}
+
 func MessagesToEvents(l []*entities.Event) []flow.Event {
 	events := make([]flow.Event, len(l))
 
@@ -658,14 +671,65 @@ func MessagesToEvents(l []*entities.Event) []flow.Event {
 	return events
 }
 
-func MessageToEvent(m *entities.Event) flow.Event {
-	return flow.Event{
-		Type:             flow.EventType(m.GetType()),
-		TransactionID:    flow.HashToID(m.GetTransactionId()),
-		TransactionIndex: m.GetTransactionIndex(),
-		EventIndex:       m.GetEventIndex(),
-		Payload:          m.GetPayload(),
+func MessagesToEventsFromVersion(l []*entities.Event, version execproto.EventEncodingVersion) ([]flow.Event, error) {
+	events := make([]flow.Event, len(l))
+	for i, m := range l {
+		event, err := MessageToEventFromVersion(m, version)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert event at index %d from format %d: %w",
+				m.EventIndex, version, err)
+		}
+		events[i] = *event
 	}
+	return events, nil
+}
+
+func MessageToEventFromVersion(m *entities.Event, version execproto.EventEncodingVersion) (*flow.Event, error) {
+	switch version {
+	case execproto.EventEncodingVersion_CCF_V0:
+		convertedPayload, err := CcfPayloadToJsonPayload(m.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
+		}
+		return &flow.Event{
+			Type:             flow.EventType(m.GetType()),
+			TransactionID:    flow.HashToID(m.GetTransactionId()),
+			TransactionIndex: m.GetTransactionIndex(),
+			EventIndex:       m.GetEventIndex(),
+			Payload:          convertedPayload,
+		}, nil
+	case execproto.EventEncodingVersion_JSON_CDC_V0:
+		je := MessageToEvent(m)
+		return &je, nil
+	default:
+		return nil, fmt.Errorf("invalid encoding format %d", version)
+	}
+}
+
+func CcfPayloadToJsonPayload(p []byte) ([]byte, error) {
+	val, err := ccf.Decode(nil, p)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode from ccf format: %w", err)
+	}
+	res, err := jsoncdc.Encode(val)
+	if err != nil {
+		return nil, fmt.Errorf("unable to encode to json-cdc format: %w", err)
+	}
+	return res, nil
+}
+
+func CcfEventToJsonEvent(e flow.Event) (*flow.Event, error) {
+	convertedPayload, err := CcfPayloadToJsonPayload(e.Payload)
+	if err != nil {
+		return nil, err
+	}
+	return &flow.Event{
+		Type:             e.Type,
+		TransactionID:    e.TransactionID,
+		TransactionIndex: e.TransactionIndex,
+		EventIndex:       e.EventIndex,
+		Payload:          convertedPayload,
+	}, nil
 }
 
 func EventsToMessages(flowEvents []flow.Event) []*entities.Event {

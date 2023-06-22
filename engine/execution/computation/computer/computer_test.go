@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -51,6 +51,10 @@ import (
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+const (
+	testMaxConcurrency = 2
 )
 
 func incStateCommitment(startState flow.StateCommitment) flow.StateCommitment {
@@ -124,6 +128,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		exemetrics.On("ExecutionTransactionExecuted",
 			mock.Anything, // duration
+			mock.Anything, // conflict retry count
 			mock.Anything, // computation used
 			mock.Anything, // memory used
 			mock.Anything, // number of events
@@ -166,7 +171,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil)
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -299,7 +305,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil)
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		// create an empty block
@@ -395,7 +402,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			comm,
 			me,
 			prov,
-			nil)
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		// create an empty block
@@ -453,7 +461,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil)
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		collectionCount := 2
@@ -540,7 +549,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
 			require.NoError(t, err)
 
-			payload, err := json.Decode(nil, []byte(unittest.EpochSetupFixtureJSON))
+			payload, err := ccf.Decode(nil, unittest.EpochSetupFixtureCCF)
 			require.NoError(t, err)
 
 			serviceEventA, ok := payload.(cadence.Event)
@@ -551,7 +560,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 			serviceEventA.EventType.QualifiedIdentifier = serviceEvents.EpochSetup.QualifiedIdentifier()
 
-			payload, err = json.Decode(nil, []byte(unittest.EpochCommitFixtureJSON))
+			payload, err = ccf.Decode(nil, unittest.EpochCommitFixtureCCF)
 			require.NoError(t, err)
 
 			serviceEventB, ok := payload.(cadence.Event)
@@ -562,7 +571,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 			serviceEventB.EventType.QualifiedIdentifier = serviceEvents.EpochCommit.QualifiedIdentifier()
 
-			payload, err = json.Decode(nil, []byte(unittest.VersionBeaconFixtureJSON))
+			payload, err = ccf.Decode(nil, unittest.VersionBeaconFixtureCCF)
 			require.NoError(t, err)
 
 			serviceEventC, ok := payload.(cadence.Event)
@@ -669,7 +678,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				me,
 				prov,
 				nil,
-			)
+				testMaxConcurrency)
 			require.NoError(t, err)
 
 			result, err := exe.ExecuteBlock(
@@ -778,7 +787,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer.NewNoopViewCommitter(),
 			me,
 			prov,
-			nil)
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		const collectionCount = 2
@@ -889,7 +899,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer.NewNoopViewCommitter(),
 			me,
 			prov,
-			nil)
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		key := flow.AccountStatusRegisterID(
@@ -932,7 +943,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			committer,
 			me,
 			prov,
-			nil)
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		collectionCount := 5
@@ -1177,7 +1189,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	noopCollector := metrics.NewNoopCollector()
 
 	expectedNumberOfEvents := 3
-	expectedEventSize := 1721
+	expectedEventSize := 1435
 	// bootstrapping does not cache programs
 	expectedCachedPrograms := 0
 
@@ -1196,6 +1208,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	metrics.On("ExecutionTransactionExecuted",
 		mock.Anything, // duration
+		mock.Anything, // conflict retry count
 		mock.Anything, // computation used
 		mock.Anything, // memory used
 		expectedNumberOfEvents,
@@ -1249,7 +1262,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		committer,
 		me,
 		prov,
-		nil)
+		nil,
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	// create empty block, it will have system collection attached while executing
