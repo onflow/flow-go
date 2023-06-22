@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"github.com/onflow/flow-go/engine/access/rest"
 	"net/http"
 
 	"github.com/slok/go-http-metrics/middleware"
@@ -12,13 +13,16 @@ import (
 )
 
 func MetricsMiddleware(restCollector module.RestMetrics) mux.MiddlewareFunc {
-	cfg := middleware.Config{Recorder: restCollector}
-	serviceID := cfg.Service
-	metricsMiddleware := middleware.New(cfg)
+	metricsMiddleware := middleware.New(middleware.Config{Recorder: restCollector})
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			routeName, err := rest.URLToRoute(req.URL.Path)
+			if err != nil {
+				return
+			}
+
 			// This is a custom metric being called on every http request
-			restCollector.AddTotalRequests(req.Context(), serviceID, req.Method)
+			restCollector.AddTotalRequests(req.Context(), req.Method, routeName)
 
 			// Modify the writer
 			respWriter := &responseWriter{w, http.StatusOK}

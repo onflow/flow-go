@@ -605,7 +605,7 @@ type RestMetrics interface {
 	// Example recorder taken from:
 	// https://github.com/slok/go-http-metrics/blob/master/metrics/prometheus/prometheus.go
 	httpmetrics.Recorder
-	AddTotalRequests(ctx context.Context, serviceID string, method string)
+	AddTotalRequests(ctx context.Context, method string, routeName string)
 }
 
 type GRPCConnectionPoolMetrics interface {
