@@ -106,8 +106,7 @@ func New(
 		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}
 
-	collIteratorFactory := CollectionNodeIteratorFactory{circuitBreakerEnabled: circuitBreakerEnabled}
-	execIteratorFactory := ExecutionNodeIteratorFactory{circuitBreakerEnabled: circuitBreakerEnabled}
+	nodeSelectorFactory := NodeSelectorFactory{circuitBreakerEnabled: circuitBreakerEnabled}
 
 	b := &Backend{
 		state: state,
@@ -121,7 +120,7 @@ func New(
 			metrics:             accessMetrics,
 			loggedScripts:       loggedScripts,
 			archiveAddressList:  archiveAddressList,
-			execIteratorFactory: execIteratorFactory,
+			nodeSelectorFactory: nodeSelectorFactory,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
@@ -137,8 +136,7 @@ func New(
 			connFactory:          connFactory,
 			previousAccessNodes:  historicalAccessNodes,
 			log:                  log,
-			collIteratorFactory:  collIteratorFactory,
-			execIteratorFactory:  execIteratorFactory,
+			nodeSelectorFactory:  nodeSelectorFactory,
 		},
 		backendEvents: backendEvents{
 			state:               state,
@@ -147,7 +145,7 @@ func New(
 			connFactory:         connFactory,
 			log:                 log,
 			maxHeightRange:      maxHeightRange,
-			execIteratorFactory: execIteratorFactory,
+			nodeSelectorFactory: nodeSelectorFactory,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: headers,
@@ -163,7 +161,7 @@ func New(
 			executionReceipts:   executionReceipts,
 			connFactory:         connFactory,
 			log:                 log,
-			execIteratorFactory: execIteratorFactory,
+			nodeSelectorFactory: nodeSelectorFactory,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: executionResults,

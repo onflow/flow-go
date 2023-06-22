@@ -38,8 +38,7 @@ type backendTransactions struct {
 	connFactory          ConnectionFactory
 	previousAccessNodes  []accessproto.AccessAPIClient
 	log                  zerolog.Logger
-	collIteratorFactory  CollectionNodeIteratorFactory
-	execIteratorFactory  ExecutionNodeIteratorFactory
+	nodeSelectorFactory  NodeSelectorFactory
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -99,10 +98,10 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 	}
 	defer logAnyError()
 
-	collNodeIter := b.collIteratorFactory.CreateNodeIterator(collNodes)
+	collNodeSelector := b.nodeSelectorFactory.SelectCollectionNodes(collNodes)
 
 	// try sending the transaction to one of the chosen collection nodes
-	for colNode := collNodeIter.Next(); colNode != nil; colNode = collNodeIter.Next() {
+	for colNode := collNodeSelector.Next(); colNode != nil; colNode = collNodeSelector.Next() {
 		err = b.sendTransactionToCollector(ctx, tx, colNode.Address)
 		if err == nil {
 			return nil
@@ -778,10 +777,10 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 	}
 	defer logAnyError()
 
-	execNodeIter := b.execIteratorFactory.CreateNodeIterator(execNodes)
+	execNodeSelector := b.nodeSelectorFactory.SelectExecutionNodes(execNodes)
 
 	// try to execute the script on one of the execution nodes
-	for execNode := execNodeIter.Next(); execNode != nil; execNode = execNodeIter.Next() {
+	for execNode := execNodeSelector.Next(); execNode != nil; execNode = execNodeSelector.Next() {
 		resp, err := b.tryGetTransactionResult(ctx, execNode, req)
 		if err == nil {
 			b.log.Debug().
@@ -838,9 +837,9 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 		return nil, errors.New("zero execution nodes")
 	}
 
-	execNodeIter := b.execIteratorFactory.CreateNodeIterator(execNodes)
+	execNodeSelector := b.nodeSelectorFactory.SelectExecutionNodes(execNodes)
 
-	for execNode := execNodeIter.Next(); execNode != nil; execNode = execNodeIter.Next() {
+	for execNode := execNodeSelector.Next(); execNode != nil; execNode = execNodeSelector.Next() {
 		resp, err := b.tryGetTransactionResultsByBlockID(ctx, execNode, req)
 		if err == nil {
 			b.log.Debug().
@@ -895,10 +894,10 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 		return nil, errors.New("zero execution nodes provided")
 	}
 
-	execNodeIter := b.execIteratorFactory.CreateNodeIterator(execNodes)
+	execNodeSelector := b.nodeSelectorFactory.SelectExecutionNodes(execNodes)
 
 	// try to execute the script on one of the execution nodes
-	for execNode := execNodeIter.Next(); execNode != nil; execNode = execNodeIter.Next() {
+	for execNode := execNodeSelector.Next(); execNode != nil; execNode = execNodeSelector.Next() {
 		resp, err := b.tryGetTransactionResultByIndex(ctx, execNode, req)
 		if err == nil {
 			b.log.Debug().

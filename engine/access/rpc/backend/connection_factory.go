@@ -104,17 +104,17 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 
 	var connInterceptors []grpc.UnaryClientInterceptor
 
-	cbInterceptor := cf.withCircuitBreakerInterceptor()
+	cbInterceptor := cf.createCircuitBreakerInterceptor()
 	if cbInterceptor != nil {
 		connInterceptors = append(connInterceptors, cbInterceptor)
 	}
 
-	ciInterceptor := cf.withClientInvalidationInterceptor(address, clientType)
+	ciInterceptor := cf.createClientInvalidationInterceptor(address, clientType)
 	if ciInterceptor != nil {
 		connInterceptors = append(connInterceptors, ciInterceptor)
 	}
 
-	connInterceptors = append(connInterceptors, WithClientTimeoutInterceptor(timeout))
+	connInterceptors = append(connInterceptors, createClientTimeoutInterceptor(timeout))
 
 	// ClientConn's default KeepAlive on connections is indefinite, assuming the timeout isn't reached
 	// The connections should be safe to be persisted and reused
@@ -282,7 +282,7 @@ func getGRPCAddress(address string, grpcPort uint) (string, error) {
 	return grpcAddress, nil
 }
 
-func (cf *ConnectionFactoryImpl) withClientInvalidationInterceptor(address string, clientType clientType) grpc.UnaryClientInterceptor {
+func (cf *ConnectionFactoryImpl) createClientInvalidationInterceptor(address string, clientType clientType) grpc.UnaryClientInterceptor {
 	if cf.CircuitBreakerConfig == nil || !cf.CircuitBreakerConfig.Enabled {
 		clientInvalidationInterceptor := func(
 			ctx context.Context,
@@ -312,7 +312,7 @@ func (cf *ConnectionFactoryImpl) withClientInvalidationInterceptor(address strin
 	return nil
 }
 
-func (cf *ConnectionFactoryImpl) withCircuitBreakerInterceptor() grpc.UnaryClientInterceptor {
+func (cf *ConnectionFactoryImpl) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor {
 	if cf.CircuitBreakerConfig != nil && cf.CircuitBreakerConfig.Enabled {
 		circuitBreaker := gobreaker.NewCircuitBreaker(gobreaker.Settings{
 			// here restore timeout defined to automatically return circuit breaker to HalfClose state
@@ -347,7 +347,7 @@ func (cf *ConnectionFactoryImpl) withCircuitBreakerInterceptor() grpc.UnaryClien
 	return nil
 }
 
-func WithClientTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInterceptor {
+func createClientTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInterceptor {
 	clientTimeoutInterceptor := func(
 		ctx context.Context,
 		method string,
@@ -371,5 +371,5 @@ func WithClientTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInterce
 }
 
 func WithClientTimeoutOption(timeout time.Duration) grpc.DialOption {
-	return grpc.WithUnaryInterceptor(WithClientTimeoutInterceptor(timeout))
+	return grpc.WithUnaryInterceptor(createClientTimeoutInterceptor(timeout))
 }

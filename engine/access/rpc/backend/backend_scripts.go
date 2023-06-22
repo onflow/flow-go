@@ -32,7 +32,7 @@ type backendScripts struct {
 	metrics             module.BackendScriptsMetrics
 	loggedScripts       *lru.Cache
 	archiveAddressList  []string
-	execIteratorFactory ExecutionNodeIteratorFactory
+	nodeSelectorFactory NodeSelectorFactory
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -101,10 +101,10 @@ func (b *backendScripts) findScriptExecutors(
 	}
 
 	executorAddrs := make([]string, 0, len(executors))
-	execNodeIter := b.execIteratorFactory.CreateNodeIterator(executors)
+	execNodeSelector := b.nodeSelectorFactory.SelectExecutionNodes(executors)
 
 	// try to get events from one of the execution nodes
-	for executor := execNodeIter.Next(); executor != nil; executor = execNodeIter.Next() {
+	for executor := execNodeSelector.Next(); executor != nil; executor = execNodeSelector.Next() {
 		executorAddrs = append(executorAddrs, executor.Address)
 	}
 	return executorAddrs, nil

@@ -23,7 +23,7 @@ type backendAccounts struct {
 	executionReceipts   storage.ExecutionReceipts
 	connFactory         ConnectionFactory
 	log                 zerolog.Logger
-	execIteratorFactory ExecutionNodeIteratorFactory
+	nodeSelectorFactory NodeSelectorFactory
 }
 
 func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
@@ -110,9 +110,9 @@ func (b *backendAccounts) getAccountAtBlockID(
 func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
 	var errors *multierror.Error
 
-	execNodeIter := b.execIteratorFactory.CreateNodeIterator(execNodes)
+	execNodeSelector := b.nodeSelectorFactory.SelectExecutionNodes(execNodes)
 
-	for execNode := execNodeIter.Next(); execNode != nil; execNode = execNodeIter.Next() {
+	for execNode := execNodeSelector.Next(); execNode != nil; execNode = execNodeSelector.Next() {
 		// TODO: use the GRPC Client interceptor
 		start := time.Now()
 

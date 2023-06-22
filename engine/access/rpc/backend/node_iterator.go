@@ -7,25 +7,16 @@ const maxExecutionNodesCnt = 3
 
 const collectionNodesToTry = 3
 
-type NodeIterator interface {
+type NodeSelector interface {
 	Next() *flow.Identity
 }
 
-type NodeIteratorFactory interface {
-	CreateNodeIterator(nodes flow.IdentityList) NodeIterator
-}
-
-var _ NodeIteratorFactory = (*ExecutionNodeIteratorFactory)(nil)
-var _ NodeIterator = (*ExecutionNodeIterator)(nil)
-var _ NodeIteratorFactory = (*CollectionNodeIteratorFactory)(nil)
-var _ NodeIterator = (*CollectionNodeIterator)(nil)
-
-type ExecutionNodeIteratorFactory struct {
+type NodeSelectorFactory struct {
 	circuitBreakerEnabled bool
 }
 
-func (e *ExecutionNodeIteratorFactory) CreateNodeIterator(nodes flow.IdentityList) NodeIterator {
-	if !e.circuitBreakerEnabled {
+func (n *NodeSelectorFactory) SelectExecutionNodes(nodes flow.IdentityList) NodeSelector {
+	if !n.circuitBreakerEnabled {
 		nodes = nodes.Sample(maxExecutionNodesCnt)
 	}
 
@@ -34,6 +25,19 @@ func (e *ExecutionNodeIteratorFactory) CreateNodeIterator(nodes flow.IdentityLis
 		index: 0,
 	}
 }
+
+func (n *NodeSelectorFactory) SelectCollectionNodes(nodes flow.IdentityList) NodeSelector {
+	if !n.circuitBreakerEnabled {
+		nodes = nodes.Sample(collectionNodesToTry)
+	}
+
+	return &CollectionNodeIterator{
+		nodes: nodes,
+		index: 0,
+	}
+}
+
+var _ NodeSelector = (*ExecutionNodeIterator)(nil)
 
 type ExecutionNodeIterator struct {
 	nodes flow.IdentityList
@@ -49,20 +53,7 @@ func (e *ExecutionNodeIterator) Next() *flow.Identity {
 	return nil
 }
 
-type CollectionNodeIteratorFactory struct {
-	circuitBreakerEnabled bool
-}
-
-func (c *CollectionNodeIteratorFactory) CreateNodeIterator(nodes flow.IdentityList) NodeIterator {
-	if !c.circuitBreakerEnabled {
-		nodes = nodes.Sample(collectionNodesToTry)
-	}
-
-	return &CollectionNodeIterator{
-		nodes: nodes,
-		index: 0,
-	}
-}
+var _ NodeSelector = (*CollectionNodeIterator)(nil)
 
 type CollectionNodeIterator struct {
 	nodes flow.IdentityList

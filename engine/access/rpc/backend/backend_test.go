@@ -2168,11 +2168,11 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		allExecNodes, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
 		require.NoError(suite.T(), err)
 
-		execIteratorFactory := ExecutionNodeIteratorFactory{circuitBreakerEnabled: false}
-		execIterator := execIteratorFactory.CreateNodeIterator(allExecNodes)
+		execNodeSelectorFactory := NodeSelectorFactory{circuitBreakerEnabled: false}
+		execSelector := execNodeSelectorFactory.SelectExecutionNodes(allExecNodes)
 
 		actualList := flow.IdentityList{}
-		for actual := execIterator.Next(); actual != nil; actual = execIterator.Next() {
+		for actual := execSelector.Next(); actual != nil; actual = execSelector.Next() {
 			actualList = append(actualList, actual)
 		}
 
@@ -2195,11 +2195,11 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		allExecNodes, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
 		require.NoError(suite.T(), err)
 
-		execIteratorFactory := ExecutionNodeIteratorFactory{circuitBreakerEnabled: false}
-		execIterator := execIteratorFactory.CreateNodeIterator(allExecNodes)
+		execNodeSelectorFactory := NodeSelectorFactory{circuitBreakerEnabled: false}
+		execSelector := execNodeSelectorFactory.SelectExecutionNodes(allExecNodes)
 
 		actualList := flow.IdentityList{}
-		for actual := execIterator.Next(); actual != nil; actual = execIterator.Next() {
+		for actual := execSelector.Next(); actual != nil; actual = execSelector.Next() {
 			actualList = append(actualList, actual)
 		}
 

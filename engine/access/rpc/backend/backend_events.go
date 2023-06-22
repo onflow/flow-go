@@ -27,7 +27,7 @@ type backendEvents struct {
 	connFactory         ConnectionFactory
 	log                 zerolog.Logger
 	maxHeightRange      uint
-	execIteratorFactory ExecutionNodeIteratorFactory
+	nodeSelectorFactory NodeSelectorFactory
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
@@ -212,10 +212,10 @@ func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, *flow.Identity, error) {
 	var errors *multierror.Error
 
-	execNodeIter := b.execIteratorFactory.CreateNodeIterator(execNodes)
+	execNodeSelector := b.nodeSelectorFactory.SelectExecutionNodes(execNodes)
 
 	// try to get events from one of the execution nodes
-	for execNode := execNodeIter.Next(); execNode != nil; execNode = execNodeIter.Next() {
+	for execNode := execNodeSelector.Next(); execNode != nil; execNode = execNodeSelector.Next() {
 		start := time.Now()
 		resp, err := b.tryGetEvents(ctx, execNode, req)
 		duration := time.Since(start)

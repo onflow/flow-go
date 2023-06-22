@@ -163,7 +163,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
 			CircuitBreakerConfig: &backend.CircuitBreakerConfig{
 				Enabled:        false,
-				RestoreTimeout: time.Duration(60) * time.Second,
+				RestoreTimeout: 60 * time.Second,
 				MaxFailures:    5,
 			},
 		},
