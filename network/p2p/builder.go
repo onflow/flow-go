@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 )
 
@@ -116,7 +115,7 @@ type GossipSubRpcInspectorSuiteFactoryFunc func(
 	*netconf.GossipSubRPCInspectorsConfig,
 	module.GossipSubMetrics,
 	metrics.HeroCacheMetricsFactory,
-	flownet.NetworkingType,
+	NetworkingType,
 	module.IdentityProvider) (GossipSubInspectorSuite, error)
 
 // NodeBuilder is a builder pattern for creating a libp2p Node instance.

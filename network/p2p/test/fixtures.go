@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/testutils"
@@ -64,7 +63,7 @@ func NodeFixture(
 
 	logger := unittest.Logger().Level(zerolog.WarnLevel)
 	parameters := &NodeFixtureParameters{
-		NetworkingType:         flownet.PrivateNetwork,
+		NetworkingType:         p2p.PrivateNetwork,
 		HandlerFunc:            func(network.Stream) {},
 		Unicasts:               nil,
 		Key:                    NetworkingKeyFixtures(t),
@@ -179,7 +178,7 @@ type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
 	HandlerFunc                       network.StreamHandler
-	NetworkingType                    flownet.NetworkingType
+	NetworkingType                    p2p.NetworkingType
 	Unicasts                          []protocols.ProtocolName
 	Key                               crypto.PrivateKey
 	Address                           string
