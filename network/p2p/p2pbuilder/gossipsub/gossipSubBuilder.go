@@ -274,6 +274,9 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 		g.networkType,
 		g.idProvider)
 	gossipSubConfigs.WithInspectorSuite(inspectorSuite)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not create gossipsub inspector suite: %w", err)
+	}
 
 	var scoreOpt *scoring.ScoreOption
 	var scoreTracer p2p.PeerScoreTracer
