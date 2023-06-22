@@ -3,6 +3,7 @@ package heropool
 import (
 	"github.com/rs/zerolog"
 
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/rand"
 )
@@ -16,9 +17,9 @@ const (
 )
 
 // EIndex is data type representing an entity index in Pool.
-type EIndex int64
+type EIndex uint32
 
-const InvalidIndex EIndex = -1
+const InvalidIndex EIndex = math.MaxUint32
 
 // poolEntity represents the data type that is maintained by
 type poolEntity struct {
@@ -277,15 +278,18 @@ func (p *Pool) isInvalidated(sliceIndex EIndex) bool {
 }
 
 // utility method that removes an entity from one of the states.
-// NOTE: removed entity has to be added to another state.
+// NOTE: a removed entity has to be added to another state.
 func (p *Pool) removeEntity(s *state, entityIndex EIndex) {
 	if s.size == 0 {
 		panic("Removing an entity from the empty list")
 	}
 	if s.size == 1 {
+		// here set to InvalidIndex
 		s.head = InvalidIndex
 		s.tail = InvalidIndex
 		s.size--
+		p.poolEntities[entityIndex].node.next = InvalidIndex
+		p.poolEntities[entityIndex].node.prev = InvalidIndex
 		return
 	}
 	node := p.poolEntities[entityIndex].node
@@ -307,6 +311,8 @@ func (p *Pool) removeEntity(s *state, entityIndex EIndex) {
 		p.poolEntities[s.tail].node.next = InvalidIndex
 	}
 	s.size--
+	p.poolEntities[entityIndex].node.next = InvalidIndex
+	p.poolEntities[entityIndex].node.prev = InvalidIndex
 }
 
 // appends an entity to the tail of the state or creates a first element.
