@@ -167,7 +167,10 @@ func (s *CoreSuite) TestProcessingInvalidBlock() {
 	invalidProposal := model.ProposalFromFlow(blocks[len(blocks)-1].Header)
 	sentinelError := model.NewInvalidProposalErrorf(invalidProposal, "")
 	s.validator.On("ValidateProposal", invalidProposal).Return(sentinelError).Once()
-	s.followerConsumer.On("OnInvalidBlockDetected", sentinelError).Return().Once()
+	s.followerConsumer.On("OnInvalidBlockDetected", flow.Slashable[model.InvalidProposalError]{
+		OriginID: s.originID,
+		Message:  sentinelError.(model.InvalidProposalError),
+	}).Return().Once()
 	err := s.core.OnBlockRange(s.originID, blocks)
 	require.NoError(s.T(), err, "sentinel error has to be handled internally")
 

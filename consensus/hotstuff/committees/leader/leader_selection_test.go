@@ -24,7 +24,7 @@ var someSeed = []uint8{0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
 func TestSingleConsensusNode(t *testing.T) {
 
 	identity := unittest.IdentityFixture(unittest.WithWeight(8))
-	rng := prg(t, someSeed)
+	rng := getPRG(t, someSeed)
 	selection, err := ComputeLeaderSelection(0, rng, 10, []*flow.Identity{identity})
 	require.NoError(t, err)
 	for i := uint64(0); i < 10; i++ {
@@ -114,7 +114,7 @@ func bruteSearch(value uint64, arr []uint64) (int, error) {
 	return 0, fmt.Errorf("not found")
 }
 
-func prg(t testing.TB, seed []byte) random.Rand {
+func getPRG(t testing.TB, seed []byte) random.Rand {
 	rng, err := random.NewChacha20PRG(seed, []byte("random"))
 	require.NoError(t, err)
 	return rng
@@ -130,12 +130,12 @@ func TestDeterministic(t *testing.T) {
 	for i, identity := range identities {
 		identity.Weight = uint64(i + 1)
 	}
-	rng := prg(t, someSeed)
+	rng := getPRG(t, someSeed)
 
 	leaders1, err := ComputeLeaderSelection(0, rng, N_VIEWS, identities)
 	require.NoError(t, err)
 
-	rng = prg(t, someSeed)
+	rng = getPRG(t, someSeed)
 
 	leaders2, err := ComputeLeaderSelection(0, rng, N_VIEWS, identities)
 	require.NoError(t, err)
@@ -153,7 +153,7 @@ func TestDeterministic(t *testing.T) {
 
 func TestInputValidation(t *testing.T) {
 
-	rng := prg(t, someSeed)
+	rng := getPRG(t, someSeed)
 
 	// should return an error if we request to compute leader selection for <1 views
 	t.Run("epoch containing no views", func(t *testing.T) {
@@ -176,7 +176,7 @@ func TestInputValidation(t *testing.T) {
 // test that requesting a view outside the given range returns an error
 func TestViewOutOfRange(t *testing.T) {
 
-	rng := prg(t, someSeed)
+	rng := getPRG(t, someSeed)
 
 	firstView := uint64(100)
 	finalView := uint64(200)
@@ -230,11 +230,11 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 		identity.Weight = uint64(i)
 	}
 
-	rng1 := prg(t, someSeed)
+	rng1 := getPRG(t, someSeed)
 
 	seed2 := make([]byte, 32)
 	seed2[0] = 8
-	rng2 := prg(t, seed2)
+	rng2 := getPRG(t, seed2)
 
 	leaders1, err := ComputeLeaderSelection(0, rng1, N_VIEWS, identities)
 	require.NoError(t, err)
@@ -262,7 +262,7 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 // The number of time being selected as leader might not exactly match their weight, but also
 // won't go too far from that.
 func TestLeaderSelectionAreWeighted(t *testing.T) {
-	rng := prg(t, someSeed)
+	rng := getPRG(t, someSeed)
 
 	const N_VIEWS = 100000
 	const N_NODES = 4
@@ -311,7 +311,7 @@ func BenchmarkLeaderSelection(b *testing.B) {
 	for i := 0; i < N_NODES; i++ {
 		identities = append(identities, unittest.IdentityFixture(unittest.WithWeight(uint64(i))))
 	}
-	rng := prg(b, someSeed)
+	rng := getPRG(b, someSeed)
 
 	for n := 0; n < b.N; n++ {
 		_, err := ComputeLeaderSelection(0, rng, N_VIEWS, identities)
@@ -321,7 +321,7 @@ func BenchmarkLeaderSelection(b *testing.B) {
 }
 
 func TestInvalidTotalWeight(t *testing.T) {
-	rng := prg(t, someSeed)
+	rng := getPRG(t, someSeed)
 	identities := unittest.IdentityListFixture(4, unittest.WithWeight(0))
 	_, err := ComputeLeaderSelection(0, rng, 10, identities)
 	require.Error(t, err)
@@ -330,8 +330,8 @@ func TestInvalidTotalWeight(t *testing.T) {
 func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 
 	// create 2 RNGs from the same seed
-	rng := prg(t, someSeed)
-	rng_copy := prg(t, someSeed)
+	rng := getPRG(t, someSeed)
+	rng_copy := getPRG(t, someSeed)
 
 	// check that if there is some node with 0 weight, the selections for each view should be the same as
 	// with no zero-weight nodes.
@@ -365,7 +365,7 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 	})
 
 	t.Run("fuzzy set", func(t *testing.T) {
-		toolRng := prg(t, someSeed)
+		toolRng := getPRG(t, someSeed)
 
 		// create 1002 nodes with all 0 weight
 		identities := unittest.IdentityListFixture(1002, unittest.WithWeight(0))
@@ -399,7 +399,7 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 		}
 
 		t.Run("if there is only 1 node has weight, then it will be always be the leader and the only leader", func(t *testing.T) {
-			toolRng := prg(t, someSeed)
+			toolRng := getPRG(t, someSeed)
 
 			identities := unittest.IdentityListFixture(1000, unittest.WithWeight(0))
 

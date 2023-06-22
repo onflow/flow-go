@@ -106,6 +106,7 @@ func (db *testCoordinator) AddTransactionResult(
 	snapshot *snapshot.ExecutionSnapshot,
 	output fvm.ProcedureOutput,
 	timeSpent time.Duration,
+	numConflictRetries int,
 ) {
 	db.committed = append(db.committed, output.ComputationUsed)
 }
@@ -121,7 +122,8 @@ func (db *testCoordinator) newTransaction(txnIndex uint32) (
 			zerolog.Nop(),
 			txnIndex,
 			&flow.TransactionBody{},
-			false))
+			false),
+		0)
 }
 
 type testWaitValues struct {

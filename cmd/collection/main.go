@@ -8,6 +8,8 @@ import (
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/admin/commands"
+	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
@@ -46,11 +48,11 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -158,14 +160,8 @@ func main() {
 		flags.StringToIntVar(&apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,SendTransaction=500 etc. note limits apply globally to all clients.")
 		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,SendTransaction=100 etc. note limits apply globally to all clients.")
 
-		// gossipsub rpc validation inspector cluster prefixed control messages received flags
-		flags.Uint32Var(&nodeBuilder.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.ClusterPrefixedControlMsgsReceivedCacheSize, "gossipsub-cluster-prefix-tracker-cache-size", validation.DefaultClusterPrefixedControlMsgsReceivedCacheSize, "cache size for gossipsub RPC validation inspector cluster prefix received tracker.")
-		flags.Float64Var(&nodeBuilder.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.ClusterPrefixedControlMsgsReceivedCacheDecay, "gossipsub-cluster-prefix-tracker-cache-decay", validation.DefaultClusterPrefixedControlMsgsReceivedCacheDecay, "the decay value used to decay cluster prefix received topics received cached counters.")
-		flags.Float64Var(&nodeBuilder.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.ClusterPrefixHardThreshold, "gossipsub-rpc-cluster-prefixed-hard-threshold", validation.DefaultClusterPrefixedMsgDropThreshold, "the maximum number of cluster-prefixed control messages allowed to be processed when the active cluster id is unset or a mismatch is detected, exceeding this threshold will result in node penalization by gossipsub.")
-
 		// deprecated flags
-		flags.DurationVar(&deprecatedFlagBlockRateDelay, "block-rate-delay", 0,
-			"the delay to broadcast block proposal in order to control block production rate")
+		flags.DurationVar(&deprecatedFlagBlockRateDelay, "block-rate-delay", 0, "the delay to broadcast block proposal in order to control block production rate")
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
 			t, err := time.Parse(time.RFC3339, startupTimeString)
@@ -186,6 +182,14 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
+		AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
+			clusterPayloads := badger.NewClusterPayloads(&metrics.NoopCollector{}, conf.DB)
+			headers, ok := conf.Storage.Headers.(*badger.Headers)
+			if !ok {
+				panic("fail to initialize admin tool, conf.Storage.Headers can not be casted as badger headers")
+			}
+			return storageCommands.NewReadRangeClusterBlocksCommand(conf.DB, headers, clusterPayloads)
+		}).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
 			followerDistributor = pubsub.NewFollowerDistributor()
 			followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
@@ -292,6 +296,7 @@ func main() {
 			// creates a consensus follower with noop consumer as the notifier
 			followerCore, err = consensus.NewFollower(
 				node.Logger,
+				node.Metrics.Mempool,
 				node.Storage.Headers,
 				finalizer,
 				followerDistributor,
