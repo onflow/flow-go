@@ -13,6 +13,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"github.com/onflow/flow-go/network/netconf"
 )
 
 var (
@@ -25,8 +27,8 @@ var (
 // FlowConfig Flow configuration.
 type FlowConfig struct {
 	// ConfigFile used to set a path to a config.yml file used to override the default-config.yml file.
-	ConfigFile    string         `validate:"filepath" mapstructure:"config-file"`
-	NetworkConfig *config.Config `mapstructure:"network-config"`
+	ConfigFile    string          `validate:"filepath" mapstructure:"config-file"`
+	NetworkConfig *netconf.Config `mapstructure:"network-config"`
 }
 
 // Validate checks validity of the Flow config. Errors indicate that either the configuration is broken,
