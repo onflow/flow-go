@@ -147,20 +147,22 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		collectionGRPCPort: 9000,
 		executionGRPCPort:  9000,
 		rpcConf: rpc.Config{
-			UnsecureGRPCListenAddr:    "0.0.0.0:9000",
-			SecureGRPCListenAddr:      "0.0.0.0:9001",
-			HTTPListenAddr:            "0.0.0.0:8000",
-			RESTListenAddr:            "",
-			CollectionAddr:            "",
-			HistoricalAccessAddrs:     "",
-			CollectionClientTimeout:   3 * time.Second,
-			ExecutionClientTimeout:    3 * time.Second,
-			ConnectionPoolSize:        backend.DefaultConnectionPoolSize,
-			MaxHeightRange:            backend.DefaultMaxHeightRange,
-			PreferredExecutionNodeIDs: nil,
-			FixedExecutionNodeIDs:     nil,
-			ArchiveAddressList:        nil,
-			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
+			UnsecureGRPCListenAddr: "0.0.0.0:9000",
+			SecureGRPCListenAddr:   "0.0.0.0:9001",
+			HTTPListenAddr:         "0.0.0.0:8000",
+			RESTListenAddr:         "",
+			CollectionAddr:         "",
+			HistoricalAccessAddrs:  "",
+			BackendConfig: backend.Config{
+				CollectionClientTimeout:   3 * time.Second,
+				ExecutionClientTimeout:    3 * time.Second,
+				ConnectionPoolSize:        backend.DefaultConnectionPoolSize,
+				MaxHeightRange:            backend.DefaultMaxHeightRange,
+				PreferredExecutionNodeIDs: nil,
+				FixedExecutionNodeIDs:     nil,
+				ArchiveAddressList:        nil,
+			},
+			MaxMsgSize: grpcutils.DefaultMaxMsgSize,
 		},
 		stateStreamConf: state_stream.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -662,15 +664,15 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.rpcConf.RESTListenAddr, "rest-addr", defaultConfig.rpcConf.RESTListenAddr, "the address the REST server listens on (if empty the REST server will not be started)")
 		flags.StringVarP(&builder.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", defaultConfig.rpcConf.CollectionAddr, "the address (of the collection node) to send transactions to")
 		flags.StringVarP(&builder.ExecutionNodeAddress, "script-addr", "s", defaultConfig.ExecutionNodeAddress, "the address (of the execution node) forward the script to")
-		flags.StringSliceVar(&builder.rpcConf.ArchiveAddressList, "archive-address-list", defaultConfig.rpcConf.ArchiveAddressList, "the list of address of the archive node to forward the script queries to")
+		flags.StringSliceVar(&builder.rpcConf.BackendConfig.ArchiveAddressList, "archive-address-list", defaultConfig.rpcConf.BackendConfig.ArchiveAddressList, "the list of address of the archive node to forward the script queries to")
 		flags.StringVarP(&builder.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", defaultConfig.rpcConf.HistoricalAccessAddrs, "comma separated rpc addresses for historical access nodes")
-		flags.DurationVar(&builder.rpcConf.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.CollectionClientTimeout, "grpc client timeout for a collection node")
-		flags.DurationVar(&builder.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
-		flags.UintVar(&builder.rpcConf.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.ConnectionPoolSize, "maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
+		flags.DurationVar(&builder.rpcConf.BackendConfig.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.BackendConfig.CollectionClientTimeout, "grpc client timeout for a collection node")
+		flags.DurationVar(&builder.rpcConf.BackendConfig.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.BackendConfig.ExecutionClientTimeout, "grpc client timeout for an execution node")
+		flags.UintVar(&builder.rpcConf.BackendConfig.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.BackendConfig.ConnectionPoolSize, "maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
 		flags.UintVar(&builder.rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
-		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
-		flags.StringSliceVar(&builder.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-		flags.StringSliceVar(&builder.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
+		flags.UintVar(&builder.rpcConf.BackendConfig.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.BackendConfig.MaxHeightRange, "maximum size for height range requests")
+		flags.StringSliceVar(&builder.rpcConf.BackendConfig.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.BackendConfig.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
+		flags.StringSliceVar(&builder.rpcConf.BackendConfig.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.BackendConfig.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.BoolVar(&builder.logTxTimeToFinalized, "log-tx-time-to-finalized", defaultConfig.logTxTimeToFinalized, "log transaction time to finalized")
 		flags.BoolVar(&builder.logTxTimeToExecuted, "log-tx-time-to-executed", defaultConfig.logTxTimeToExecuted, "log transaction time to executed")
 		flags.BoolVar(&builder.logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", defaultConfig.logTxTimeToFinalizedExecuted, "log transaction time to finalized and executed")
@@ -910,7 +912,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcConf.CollectionAddr,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(builder.rpcConf.MaxMsgSize))),
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
-				backend.WithClientUnaryInterceptor(builder.rpcConf.CollectionClientTimeout))
+				backend.WithClientUnaryInterceptor(builder.rpcConf.BackendConfig.CollectionClientTimeout))
 			if err != nil {
 				return err
 			}
@@ -989,6 +991,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
+
 			backend, err := backend.NewBackend(node.Logger,
 				node.State,
 				builder.CollectionRPC,
@@ -1005,13 +1008,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.executionGRPCPort,
 				builder.retryEnabled,
 				config.MaxMsgSize,
-				config.ExecutionClientTimeout,
-				config.CollectionClientTimeout,
-				config.ConnectionPoolSize,
-				config.MaxHeightRange,
-				config.PreferredExecutionNodeIDs,
-				config.FixedExecutionNodeIDs,
-				config.ArchiveAddressList)
+				builder.rpcConf.BackendConfig)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
 			}

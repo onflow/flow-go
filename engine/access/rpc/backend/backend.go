@@ -9,7 +9,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	lru "github.com/hashicorp/golang-lru"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
@@ -21,6 +20,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 // maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
@@ -76,6 +77,17 @@ type Backend struct {
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
 	connFactory       ConnectionFactory
+}
+
+// Config defines the configurable options for creating Backend
+type Config struct {
+	ExecutionClientTimeout    time.Duration // execution API GRPC client timeout
+	CollectionClientTimeout   time.Duration // collection API GRPC client timeout
+	ConnectionPoolSize        uint          // size of the cache for storing collection and execution connections
+	MaxHeightRange            uint          // max size of height range requests
+	PreferredExecutionNodeIDs []string      // preferred list of upstream execution node IDs
+	FixedExecutionNodeIDs     []string      // fixed list of execution node IDs to choose from if no node ID can be chosen from the PreferredExecutionNodeIDs
+	ArchiveAddressList        []string      // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
 }
 
 func New(
@@ -206,17 +218,11 @@ func NewBackend(
 	executionGRPCPort uint,
 	retryEnabled bool,
 	maxMsgSize uint,
-	executionClientTimeout time.Duration,
-	collectionClientTimeout time.Duration,
-	connectionPoolSize uint,
-	maxHeightRange uint,
-	preferredExecutionNodeIDs []string,
-	fixedExecutionNodeIDs,
-	archiveAddressList []string,
+	config Config,
 ) (*Backend, error) {
 
 	var cache *lru.Cache
-	cacheSize := connectionPoolSize
+	cacheSize := config.ConnectionPoolSize
 	if cacheSize > 0 {
 		// TODO: remove this fallback after fixing issues with evictions
 		// It was observed that evictions cause connection errors for in flight requests. This works around
@@ -242,8 +248,8 @@ func NewBackend(
 	connectionFactory := &ConnectionFactoryImpl{
 		CollectionGRPCPort:        collectionGRPCPort,
 		ExecutionGRPCPort:         executionGRPCPort,
-		CollectionNodeGRPCTimeout: collectionClientTimeout,
-		ExecutionNodeGRPCTimeout:  executionClientTimeout,
+		CollectionNodeGRPCTimeout: config.CollectionClientTimeout,
+		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
 		ConnectionsCache:          cache,
 		CacheSize:                 cacheSize,
 		MaxMsgSize:                maxMsgSize,
@@ -264,12 +270,12 @@ func NewBackend(
 		accessMetrics,
 		connectionFactory,
 		retryEnabled,
-		maxHeightRange,
-		preferredExecutionNodeIDs,
-		fixedExecutionNodeIDs,
+		config.MaxHeightRange,
+		config.PreferredExecutionNodeIDs,
+		config.FixedExecutionNodeIDs,
 		log,
 		DefaultSnapshotHistoryLimit,
-		archiveAddressList,
+		config.ArchiveAddressList,
 	), nil
 }
 

@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"sync"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -32,21 +31,23 @@ import (
 // A secure GRPC server here implies a server that presents a self-signed TLS certificate and a client that authenticates
 // the server via a pre-shared public key
 type Config struct {
-	UnsecureGRPCListenAddr    string                           // the non-secure GRPC server address as ip:port
-	SecureGRPCListenAddr      string                           // the secure GRPC server address as ip:port
-	TransportCredentials      credentials.TransportCredentials // the secure GRPC credentials
-	HTTPListenAddr            string                           // the HTTP web proxy address as ip:port
-	RESTListenAddr            string                           // the REST server address as ip:port (if empty the REST server will not be started)
-	CollectionAddr            string                           // the address of the upstream collection node
-	HistoricalAccessAddrs     string                           // the list of all access nodes from previous spork
-	MaxMsgSize                uint                             // GRPC max message size
-	ExecutionClientTimeout    time.Duration                    // execution API GRPC client timeout
-	CollectionClientTimeout   time.Duration                    // collection API GRPC client timeout
-	ConnectionPoolSize        uint                             // size of the cache for storing collection and execution connections
-	MaxHeightRange            uint                             // max size of height range requests
-	PreferredExecutionNodeIDs []string                         // preferred list of upstream execution node IDs
-	FixedExecutionNodeIDs     []string                         // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
-	ArchiveAddressList        []string                         // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
+	UnsecureGRPCListenAddr string                           // the non-secure GRPC server address as ip:port
+	SecureGRPCListenAddr   string                           // the secure GRPC server address as ip:port
+	TransportCredentials   credentials.TransportCredentials // the secure GRPC credentials
+	HTTPListenAddr         string                           // the HTTP web proxy address as ip:port
+	RESTListenAddr         string                           // the REST server address as ip:port (if empty the REST server will not be started)
+	CollectionAddr         string                           // the address of the upstream collection node
+	HistoricalAccessAddrs  string                           // the list of all access nodes from previous spork
+
+	BackendConfig backend.Config // configurable options for creating Backend
+	MaxMsgSize    uint           // GRPC max message size
+	//ExecutionClientTimeout    time.Duration                    // execution API GRPC client timeout
+	//CollectionClientTimeout   time.Duration                    // collection API GRPC client timeout
+	//ConnectionPoolSize        uint                             // size of the cache for storing collection and execution connections
+	//MaxHeightRange            uint                             // max size of height range requests
+	//PreferredExecutionNodeIDs []string                         // preferred list of upstream execution node IDs
+	//FixedExecutionNodeIDs     []string                         // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
+	//ArchiveAddressList        []string                         // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
 }
 
 // Engine exposes the server with a simplified version of the Access API.

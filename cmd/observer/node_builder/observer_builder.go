@@ -113,19 +113,22 @@ type ObserverServiceConfig struct {
 func DefaultObserverServiceConfig() *ObserverServiceConfig {
 	return &ObserverServiceConfig{
 		rpcConf: rpc.Config{
-			UnsecureGRPCListenAddr:    "0.0.0.0:9000",
-			SecureGRPCListenAddr:      "0.0.0.0:9001",
-			HTTPListenAddr:            "0.0.0.0:8000",
-			RESTListenAddr:            "",
-			CollectionAddr:            "",
-			HistoricalAccessAddrs:     "",
-			CollectionClientTimeout:   3 * time.Second,
-			ExecutionClientTimeout:    3 * time.Second,
-			MaxHeightRange:            backend.DefaultMaxHeightRange,
-			PreferredExecutionNodeIDs: nil,
-			FixedExecutionNodeIDs:     nil,
-			ArchiveAddressList:        nil,
-			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
+			UnsecureGRPCListenAddr: "0.0.0.0:9000",
+			SecureGRPCListenAddr:   "0.0.0.0:9001",
+			HTTPListenAddr:         "0.0.0.0:8000",
+			RESTListenAddr:         "",
+			CollectionAddr:         "",
+			HistoricalAccessAddrs:  "",
+			BackendConfig: backend.Config{
+				CollectionClientTimeout:   3 * time.Second,
+				ExecutionClientTimeout:    3 * time.Second,
+				ConnectionPoolSize:        backend.DefaultConnectionPoolSize,
+				MaxHeightRange:            backend.DefaultMaxHeightRange,
+				PreferredExecutionNodeIDs: nil,
+				FixedExecutionNodeIDs:     nil,
+				ArchiveAddressList:        nil,
+			},
+			MaxMsgSize: grpcutils.DefaultMaxMsgSize,
 		},
 		rpcMetricsEnabled:         false,
 		apiRatelimits:             nil,
@@ -450,7 +453,7 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
 		flags.StringVar(&builder.rpcConf.RESTListenAddr, "rest-addr", defaultConfig.rpcConf.RESTListenAddr, "the address the REST server listens on (if empty the REST server will not be started)")
 		flags.UintVar(&builder.rpcConf.MaxMsgSize, "rpc-max-message-size", defaultConfig.rpcConf.MaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
-		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
+		flags.UintVar(&builder.rpcConf.BackendConfig.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.BackendConfig.MaxHeightRange, "maximum size for height range requests")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
@@ -867,13 +870,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			0,
 			false,
 			config.MaxMsgSize,
-			config.ExecutionClientTimeout,
-			config.CollectionClientTimeout,
-			config.ConnectionPoolSize,
-			config.MaxHeightRange,
-			config.PreferredExecutionNodeIDs,
-			config.FixedExecutionNodeIDs,
-			config.ArchiveAddressList)
+			builder.rpcConf.BackendConfig)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize backend: %w", err)

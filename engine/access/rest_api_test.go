@@ -136,13 +136,8 @@ func (suite *RestAPITestSuite) SetupTest() {
 		0,
 		false,
 		0,
-		0,
-		0,
-		0,
-		0,
-		nil,
-		nil,
-		nil)
+		config.BackendConfig,
+	)
 
 	require.NoError(suite.T(), err)
 
