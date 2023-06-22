@@ -348,7 +348,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		builder, err := p2pbuilder.DefaultNodeBuilder(
 			fnb.Logger,
 			myAddr,
-			p2p.PrivateNetwork,
+			network.PrivateNetwork,
 			fnb.NetworkKey,
 			fnb.SporkID,
 			fnb.IdentityProvider,
@@ -367,7 +367,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,
 			&p2p.DisallowListCacheConfig{
 				MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
-				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), p2p.PrivateNetwork),
+				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
 			})
 
 		if err != nil {
@@ -457,7 +457,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 
 	receiveCache := netcache.NewHeroReceiveCache(fnb.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 		fnb.Logger,
-		metrics.NetworkReceiveCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), p2p.PrivateNetwork))
+		metrics.NetworkReceiveCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork))
 
 	err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
 	if err != nil {
@@ -484,7 +484,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 			HeartBeatInterval:       fnb.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
 			AlspMetrics:             fnb.Metrics.Network,
 			HeroCacheMetricsFactory: fnb.HeroCacheMetricsFactory(),
-			NetworkType:             p2p.PrivateNetwork,
+			NetworkType:             network.PrivateNetwork,
 		},
 	})
 	if err != nil {
