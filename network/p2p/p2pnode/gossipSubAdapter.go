@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
@@ -133,4 +134,8 @@ func (g *GossipSubAdapter) GetTopics() []string {
 
 func (g *GossipSubAdapter) ListPeers(topic string) []peer.ID {
 	return g.gossipSub.ListPeers(topic)
+}
+
+func (g *GossipSubAdapter) ActiveClustersChanged(lst flow.ChainIDList) {
+	g.clusterChangeConsumer.ActiveClustersChanged(lst)
 }

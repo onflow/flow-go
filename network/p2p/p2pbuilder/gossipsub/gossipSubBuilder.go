@@ -181,8 +181,13 @@ func NewGossipSubBuilder(
 }
 
 func defaultGossipSubFactory() p2p.GossipSubFactoryFunc {
-	return func(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
-		return p2pnode.NewGossipSubAdapter(ctx, logger, h, cfg)
+	return func(
+		ctx context.Context,
+		logger zerolog.Logger,
+		h host.Host,
+		cfg p2p.PubSubAdapterConfig,
+		clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, error) {
+		return p2pnode.NewGossipSubAdapter(ctx, logger, h, cfg, clusterChangeConsumer)
 	}
 }
 
