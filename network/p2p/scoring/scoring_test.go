@@ -22,8 +22,8 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
-	netconf "github.com/onflow/flow-go/network/p2p/config"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )

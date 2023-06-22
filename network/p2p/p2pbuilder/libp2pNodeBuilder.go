@@ -29,7 +29,6 @@ import (
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
-	config2 "github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
@@ -61,7 +60,7 @@ type LibP2PNodeBuilder struct {
 	basicResolver    madns.BasicResolver
 
 	resourceManager           network.ResourceManager
-	resourceManagerCfg        *config2.ResourceManagerConfig
+	resourceManagerCfg        *netconf.ResourceManagerConfig
 	connManager               connmgr.ConnManager
 	connGater                 p2p.ConnectionGater
 	routingFactory            func(context.Context, host.Host) (routing.Routing, error)
@@ -82,8 +81,8 @@ func NewNodeBuilder(
 	networkKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	rCfg *config2.ResourceManagerConfig,
-	rpcInspectorCfg *config2.GossipSubRPCInspectorsConfig,
+	rCfg *netconf.ResourceManagerConfig,
+	rpcInspectorCfg *netconf.GossipSubRPCInspectorsConfig,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:               logger,
@@ -454,9 +453,9 @@ func DefaultNodeBuilder(
 	role string,
 	connGaterCfg *p2pconfig.ConnectionGaterConfig,
 	peerManagerCfg *p2pconfig.PeerManagerConfig,
-	gossipCfg *config2.GossipSubConfig,
-	rpcInspectorCfg *config2.GossipSubRPCInspectorsConfig,
-	rCfg *config2.ResourceManagerConfig,
+	gossipCfg *netconf.GossipSubConfig,
+	rpcInspectorCfg *netconf.GossipSubRPCInspectorsConfig,
+	rCfg *netconf.ResourceManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig,
 	connMgrConfig *netconf.ConnectionManagerConfig,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig) (p2p.NodeBuilder, error) {

@@ -1,4 +1,4 @@
-package config
+package netconf
 
 import (
 	"time"
