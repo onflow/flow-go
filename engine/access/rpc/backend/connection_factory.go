@@ -75,6 +75,15 @@ type ConnectionFactoryImpl struct {
 	CircuitBreakerConfig      *CircuitBreakerConfig
 }
 
+// CircuitBreakerConfig is a configuration struct for the circuit breaker.
+//
+// Enabled specifies whether the circuit breaker is enabled for collection and execution API clients.
+//
+// RestoreTimeout specifies the duration after which the circuit breaker will restore the connection to the client
+// after closing it due to failures.
+//
+// MaxFailures specifies the maximum number of failed calls to the client that will cause the circuit breaker
+// to close the connection.
 type CircuitBreakerConfig struct {
 	Enabled        bool
 	RestoreTimeout time.Duration

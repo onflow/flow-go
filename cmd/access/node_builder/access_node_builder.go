@@ -687,9 +687,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&builder.supportsObserver, "supports-observer", defaultConfig.supportsObserver, "true if this staked access node supports observer or follower connections")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
-		flags.BoolVar(&builder.rpcConf.CircuitBreakerConfig.Enabled, "circuit-breaker-enabled", defaultConfig.rpcConf.CircuitBreakerConfig.Enabled, "whether to enable the circuit breaker for collection and execution node connections")
-		flags.DurationVar(&builder.rpcConf.CircuitBreakerConfig.RestoreTimeout, "circuit-breaker-restore-timeout", defaultConfig.rpcConf.CircuitBreakerConfig.RestoreTimeout, "initial timeout for circuit breaker to try connect again. Default value is 60s")
-		flags.Uint32Var(&builder.rpcConf.CircuitBreakerConfig.MaxFailures, "circuit-breaker-max-failures", defaultConfig.rpcConf.CircuitBreakerConfig.MaxFailures, "number of consecutive failures to break connection. Default value is 5")
+		flags.BoolVar(&builder.rpcConf.CircuitBreakerConfig.Enabled, "circuit-breaker-enabled", defaultConfig.rpcConf.CircuitBreakerConfig.Enabled, "specifies whether the circuit breaker is enabled for collection and execution API clients.")
+		flags.DurationVar(&builder.rpcConf.CircuitBreakerConfig.RestoreTimeout, "circuit-breaker-restore-timeout", defaultConfig.rpcConf.CircuitBreakerConfig.RestoreTimeout, "duration after which the circuit breaker will restore the connection to the client after closing it due to failures. Default value is 60s")
+		flags.Uint32Var(&builder.rpcConf.CircuitBreakerConfig.MaxFailures, "circuit-breaker-max-failures", defaultConfig.rpcConf.CircuitBreakerConfig.MaxFailures, "maximum number of failed calls to the client that will cause the circuit breaker to close the connection. Default value is 5")
 
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
@@ -756,7 +756,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		}
 		if builder.rpcConf.CircuitBreakerConfig.Enabled {
 			if builder.rpcConf.CircuitBreakerConfig.MaxFailures == 0 {
-				return errors.New("circuit-breaker-max-request-to-break must be greater than 0")
+				return errors.New("circuit-breaker-max-failures must be greater than 0")
 			}
 		}
 
