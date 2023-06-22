@@ -1,23 +1,15 @@
 package inspector
 
 import (
-	"fmt"
-
 	"github.com/rs/zerolog"
 
 	netconf "github.com/onflow/flow-go/config/network"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
-	"github.com/onflow/flow-go/network/p2p/inspector"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector/suite"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 )
 
 // GossipSubInspectorBuilder builder that constructs all rpc inspectors used by gossip sub. The following
@@ -31,7 +23,7 @@ type GossipSubInspectorBuilder struct {
 	metricsCfg       *p2pconfig.MetricsConfig
 	idProvider       module.IdentityProvider
 	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics
-	networkType      network.NetworkingType
+	networkType      p2p.NetworkingType
 }
 
 // NewGossipSubInspectorBuilder returns new *GossipSubInspectorBuilder.
@@ -46,7 +38,7 @@ func NewGossipSubInspectorBuilder(logger zerolog.Logger, sporkID flow.Identifier
 		},
 		idProvider:       provider,
 		inspectorMetrics: inspectorMetrics,
-		networkType:      network.PublicNetwork,
+		networkType:      p2p.PublicNetwork,
 	}
 }
 
@@ -62,7 +54,7 @@ func (b *GossipSubInspectorBuilder) SetMetrics(metricsCfg *p2pconfig.MetricsConf
 // - networkType: the network type.
 // Returns:
 // - *GossipSubInspectorBuilder: the builder.
-func (b *GossipSubInspectorBuilder) SetNetworkType(networkType network.NetworkingType) *GossipSubInspectorBuilder {
+func (b *GossipSubInspectorBuilder) SetNetworkType(networkType p2p.NetworkingType) *GossipSubInspectorBuilder {
 	b.networkType = networkType
 	return b
 }

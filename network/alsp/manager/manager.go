@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/alsp/internal"
 	"github.com/onflow/flow-go/network/alsp/model"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -103,7 +104,7 @@ type MisbehaviorReportManagerConfig struct {
 	DisablePenalty bool
 	// NetworkType is the type of the network it is used to determine whether the ALSP module is utilized in the
 	// public (unstaked) or private (staked) network.
-	NetworkType network.NetworkingType
+	NetworkType p2p.NetworkingType
 	// HeartBeatInterval is the interval between the heartbeats. Heartbeat is a recurring event that is used to
 	// apply recurring actions, e.g., decay the penalty of the misbehaving nodes.
 	HeartBeatInterval time.Duration

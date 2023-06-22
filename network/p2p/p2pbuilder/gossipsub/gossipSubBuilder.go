@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
@@ -33,7 +32,7 @@ import (
 
 // The Builder struct is used to configure and create a new GossipSub pubsub system.
 type Builder struct {
-	networkType                  network.NetworkingType
+	networkType                  p2p.NetworkingType
 	sporkId                      flow.Identifier
 	logger                       zerolog.Logger
 	metricsCfg                   *p2pconfig.MetricsConfig
@@ -160,7 +159,7 @@ func (g *Builder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubR
 func NewGossipSubBuilder(
 	logger zerolog.Logger,
 	metricsCfg *p2pconfig.MetricsConfig,
-	networkType network.NetworkingType,
+	networkType p2p.NetworkingType,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
 	rpcInspectorConfig *netconf.GossipSubRPCInspectorsConfig,
@@ -204,7 +203,7 @@ func defaultInspectorSuite() p2p.GossipSubRpcInspectorSuiteFactoryFunc {
 		inspectorCfg *netconf.GossipSubRPCInspectorsConfig,
 		gossipSubMetrics module.GossipSubMetrics,
 		heroCacheMetricsFactory metrics.HeroCacheMetricsFactory,
-		networkType network.NetworkingType,
+		networkType p2p.NetworkingType,
 		idProvider module.IdentityProvider) (p2p.GossipSubInspectorSuite, error) {
 		metricsInspector := inspector.NewControlMsgMetricsInspector(
 			logger,

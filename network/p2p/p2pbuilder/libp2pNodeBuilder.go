@@ -27,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
@@ -76,7 +75,7 @@ type LibP2PNodeBuilder struct {
 func NewNodeBuilder(
 	logger zerolog.Logger,
 	metricsConfig *p2pconfig.MetricsConfig,
-	networkingType flownet.NetworkingType,
+	networkingType p2p.NetworkingType,
 	address string,
 	networkKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
@@ -444,7 +443,7 @@ func DefaultCreateNodeFunc(logger zerolog.Logger,
 func DefaultNodeBuilder(
 	logger zerolog.Logger,
 	address string,
-	networkingType flownet.NetworkingType,
+	networkingType p2p.NetworkingType,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,

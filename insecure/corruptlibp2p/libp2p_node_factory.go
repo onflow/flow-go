@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
@@ -76,7 +75,7 @@ func InitCorruptLibp2pNode(
 	builder, err := p2pbuilder.DefaultNodeBuilder(
 		log,
 		address,
-		network.PrivateNetwork,
+		p2p.PrivateNetwork,
 		flowKey,
 		sporkId,
 		idProvider,

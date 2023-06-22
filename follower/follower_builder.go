@@ -51,7 +51,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
@@ -390,7 +389,7 @@ func (builder *FollowerServiceBuilder) initNetwork(nodeID module.Local,
 			HeartBeatInterval:       builder.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
 			AlspMetrics:             builder.Metrics.Network,
 			HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
-			NetworkType:             network.PublicNetwork,
+			NetworkType:             p2p.PublicNetwork,
 		},
 	})
 	if err != nil {
@@ -618,7 +617,7 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 			Metrics:          builder.Metrics.Network,
 		},
-		network.PublicNetwork,
+		p2p.PublicNetwork,
 		builder.BaseConfig.BindAddr,
 		networkKey,
 		builder.SporkID,
@@ -627,7 +626,7 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
-			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
+			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork),
 		}).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
@@ -703,7 +702,7 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			receiveCache := netcache.NewHeroReceiveCache(builder.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 				builder.Logger,
-				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork))
+				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), p2p.PublicNetwork))
 
 			err := node.Metrics.Mempool.Register(metrics.PrependPublicPrefix(metrics.ResourceNetworkingReceiveCache), receiveCache.Size)
 			if err != nil {
