@@ -66,8 +66,8 @@ jobs:
           cache: true
       - name: Run tidy
         run: make tidy
-      - name: Emulator no relic check
-        run: make emulator-norelic-check
+      - name: code sanity check
+        run: make code-sanity-check
 
   shell-check:
     name: ShellCheck
