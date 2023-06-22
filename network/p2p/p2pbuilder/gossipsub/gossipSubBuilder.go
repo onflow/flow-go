@@ -278,7 +278,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 	var scoreOpt *scoring.ScoreOption
 	var scoreTracer p2p.PeerScoreTracer
 	if g.gossipSubPeerScoring {
-		g.scoreOptionConfig.SetRegisterNotificationConsumerFunc(inspectorSuite.AddInvCtrlMsgNotifConsumer)
+		g.scoreOptionConfig.SetRegisterNotificationConsumerFunc(inspectorSuite.AddInvalidControlMessageConsumer)
 		scoreOpt = scoring.NewScoreOption(g.scoreOptionConfig)
 		gossipSubConfigs.WithScoreOption(scoreOpt)
 
@@ -301,7 +301,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, p
 		return nil, nil, fmt.Errorf("could not create gossipsub: host is nil")
 	}
 
-	gossipSub, err := g.gossipSubFactory(ctx, g.logger, g.h, gossipSubConfigs)
+	gossipSub, err := g.gossipSubFactory(ctx, g.logger, g.h, gossipSubConfigs, inspectorSuite)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create gossipsub: %w", err)
 	}

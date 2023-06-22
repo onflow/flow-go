@@ -80,6 +80,7 @@ type GossipSubInvCtrlMsgNotifConsumer interface {
 // It encapsulates the rpc inspectors and the notification distributors.
 type GossipSubInspectorSuite interface {
 	component.Component
+	CollectionClusterChangesConsumer
 	// InspectFunc returns the inspect function that is used to inspect the gossipsub rpc messages.
 	// This function follows a dependency injection pattern, where the inspect function is injected into the gossipsu, and
 	// is called whenever a gossipsub rpc message is received.
@@ -89,7 +90,5 @@ type GossipSubInspectorSuite interface {
 	// This consumer is notified when a misbehaving peer regarding gossipsub control messages is detected. This follows a pub/sub
 	// pattern where the consumer is notified when a new notification is published.
 	// A consumer is only notified once for each notification, and only receives notifications that were published after it was added.
-	AddInvCtrlMsgNotifConsumer(GossipSubInvCtrlMsgNotifConsumer)
-	// Inspectors returns all inspectors in the inspector suite.
-	Inspectors() []GossipSubRPCInspector
+	AddInvalidControlMessageConsumer(GossipSubInvCtrlMsgNotifConsumer)
 }

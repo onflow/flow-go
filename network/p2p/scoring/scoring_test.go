@@ -9,16 +9,21 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/rs/zerolog"
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	netconf "github.com/onflow/flow-go/network/p2p/config"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -33,6 +38,14 @@ type mockInspectorSuite struct {
 
 // ensures that mockInspectorSuite implements the GossipSubInspectorSuite interface.
 var _ p2p.GossipSubInspectorSuite = (*mockInspectorSuite)(nil)
+
+func (m *mockInspectorSuite) AddInvalidControlMessageConsumer(consumer p2p.GossipSubInvCtrlMsgNotifConsumer) {
+	require.Nil(m.t, m.consumer)
+	m.consumer = consumer
+}
+func (m *mockInspectorSuite) ActiveClustersChanged(_ flow.ChainIDList) {
+	// no-op
+}
 
 // newMockInspectorSuite creates a new mockInspectorSuite.
 // Args:
@@ -60,22 +73,6 @@ func (m *mockInspectorSuite) InspectFunc() func(peer.ID, *pubsub.RPC) error {
 	return nil
 }
 
-// AddInvCtrlMsgNotifConsumer adds a consumer for invalid control message notifications.
-// In this mock implementation, the consumer is stored in the mockInspectorSuite, and is used to simulate the reception of invalid control messages.
-// Args:
-// - c: the consumer to add.
-// Returns:
-// - nil.
-// Note: this function will fail the test if the consumer is already set.
-func (m *mockInspectorSuite) AddInvCtrlMsgNotifConsumer(c p2p.GossipSubInvCtrlMsgNotifConsumer) {
-	require.Nil(m.t, m.consumer)
-	m.consumer = c
-}
-
-func (m *mockInspectorSuite) Inspectors() []p2p.GossipSubRPCInspector {
-	return []p2p.GossipSubRPCInspector{}
-}
-
 // TestInvalidCtrlMsgScoringIntegration tests the impact of invalid control messages on the scoring and connectivity of nodes in a network.
 // It creates a network of 2 nodes, and sends a set of control messages with invalid topic IDs to one of the nodes.
 // It then checks that the node receiving the invalid control messages decreases its score for the peer spamming the invalid messages, and
@@ -95,7 +92,16 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.WithPeerScoringEnabled(idProvider),
-		p2ptest.OverrideGossipSubRpcInspectorSuiteFactory(inspectorSuite1))
+		p2ptest.OverrideGossipSubRpcInspectorSuiteFactory(func(zerolog.Logger,
+			flow.Identifier,
+			*netconf.GossipSubRPCInspectorsConfig,
+			module.GossipSubMetrics,
+			metrics.HeroCacheMetricsFactory,
+			flownet.NetworkingType,
+			module.IdentityProvider) (p2p.GossipSubInspectorSuite, error) {
+			// override the gossipsub rpc inspector suite factory to return the mock inspector suite
+			return inspectorSuite1, nil
+		}))
 
 	node2, id2 := p2ptest.NodeFixture(
 		t,
