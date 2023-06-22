@@ -5,25 +5,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/module/component"
-)
-
-// ControlMessageType is the type of control message, as defined in the libp2p pubsub spec.
-type ControlMessageType string
-
-func (c ControlMessageType) String() string {
-	return string(c)
-}
-
-const (
-	CtrlMsgIHave ControlMessageType = "IHAVE"
-	CtrlMsgIWant ControlMessageType = "IWANT"
-	CtrlMsgGraft ControlMessageType = "GRAFT"
-	CtrlMsgPrune ControlMessageType = "PRUNE"
+	"github.com/onflow/flow-go/network/netconf"
 )
 
 // ControlMessageTypes returns list of all libp2p control message types.
-func ControlMessageTypes() []ControlMessageType {
-	return []ControlMessageType{CtrlMsgIHave, CtrlMsgIWant, CtrlMsgGraft, CtrlMsgPrune}
+func ControlMessageTypes() []netconf.ControlMessageType {
+	return []netconf.ControlMessageType{netconf.CtrlMsgIHave, netconf.CtrlMsgIWant, netconf.CtrlMsgGraft, netconf.CtrlMsgPrune}
 }
 
 // GossipSubInspectorNotifDistributor is the interface for the distributor that distributes gossip sub inspector notifications.
@@ -48,7 +35,7 @@ type InvCtrlMsgNotif struct {
 	// PeerID is the ID of the peer that sent the invalid control message.
 	PeerID peer.ID
 	// MsgType is the type of control message that was received.
-	MsgType ControlMessageType
+	MsgType netconf.ControlMessageType
 	// Count is the number of invalid control messages received from the peer that is reported in this notification.
 	Count uint64
 	// Err any error associated with the invalid control message.
@@ -56,7 +43,7 @@ type InvCtrlMsgNotif struct {
 }
 
 // NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
-func NewInvalidControlMessageNotification(peerID peer.ID, msgType ControlMessageType, count uint64, err error) *InvCtrlMsgNotif {
+func NewInvalidControlMessageNotification(peerID peer.ID, msgType netconf.ControlMessageType, count uint64, err error) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: msgType,

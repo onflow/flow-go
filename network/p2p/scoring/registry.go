@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/utils/logging"
@@ -253,13 +254,13 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 
 	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		switch notification.MsgType {
-		case p2p.CtrlMsgGraft:
+		case netconf.CtrlMsgGraft:
 			record.Penalty += r.penalty.Graft
-		case p2p.CtrlMsgPrune:
+		case netconf.CtrlMsgPrune:
 			record.Penalty += r.penalty.Prune
-		case p2p.CtrlMsgIHave:
+		case netconf.CtrlMsgIHave:
 			record.Penalty += r.penalty.IHave
-		case p2p.CtrlMsgIWant:
+		case netconf.CtrlMsgIWant:
 			record.Penalty += r.penalty.IWant
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.

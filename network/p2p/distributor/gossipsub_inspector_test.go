@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
@@ -94,7 +95,7 @@ func invalidControlMessageNotificationListFixture(t *testing.T, n int) []*p2p.In
 func invalidControlMessageNotificationFixture(t *testing.T) *p2p.InvCtrlMsgNotif {
 	return &p2p.InvCtrlMsgNotif{
 		PeerID:  p2ptest.PeerIdFixture(t),
-		MsgType: []p2p.ControlMessageType{p2p.CtrlMsgGraft, p2p.CtrlMsgPrune, p2p.CtrlMsgIHave, p2p.CtrlMsgIWant}[rand.Intn(4)],
+		MsgType: []netconf.ControlMessageType{netconf.CtrlMsgGraft, netconf.CtrlMsgPrune, netconf.CtrlMsgIHave, netconf.CtrlMsgIWant}[rand.Intn(4)],
 		Count:   rand.Uint64(),
 	}
 }
