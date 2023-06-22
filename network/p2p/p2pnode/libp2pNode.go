@@ -18,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	flownet "github.com/onflow/flow-go/network"
@@ -534,4 +535,9 @@ func (n *Node) OnAllowListNotification(peerId peer.ID, cause flownet.DisallowLis
 // - bool: true if the peer is disallow-listed for any reason, false otherwise.
 func (n *Node) IsDisallowListed(peerId peer.ID) ([]flownet.DisallowListedCause, bool) {
 	return n.disallowListedCache.IsDisallowListed(peerId)
+}
+
+func (n *Node) ActiveClustersChanged(list flow.ChainIDList) {
+	//TODO implement me
+	panic("implement me")
 }
