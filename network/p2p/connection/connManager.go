@@ -10,8 +10,8 @@ import (
 	libp2pconnmgr "github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/rs/zerolog"
 
-	netconf "github.com/onflow/flow-go/config/network"
 	"github.com/onflow/flow-go/module"
+	netconf "github.com/onflow/flow-go/network/network"
 	"github.com/onflow/flow-go/network/p2p/connection/internal"
 )
 

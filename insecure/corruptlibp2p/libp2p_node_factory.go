@@ -10,12 +10,12 @@ import (
 	"github.com/rs/zerolog"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
-	netconf "github.com/onflow/flow-go/config/network"
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	netconf "github.com/onflow/flow-go/network/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"

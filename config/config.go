@@ -13,8 +13,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-
-	"github.com/onflow/flow-go/config/network"
 )
 
 var (
@@ -27,8 +25,8 @@ var (
 // FlowConfig Flow configuration.
 type FlowConfig struct {
 	// ConfigFile used to set a path to a config.yml file used to override the default-config.yml file.
-	ConfigFile    string          `validate:"filepath" mapstructure:"config-file"`
-	NetworkConfig *network.Config `mapstructure:"network-config"`
+	ConfigFile    string         `validate:"filepath" mapstructure:"config-file"`
+	NetworkConfig *config.Config `mapstructure:"network-config"`
 }
 
 // Validate checks validity of the Flow config. Errors indicate that either the configuration is broken,
@@ -184,7 +182,7 @@ func LogConfig(logger *zerolog.Event, flags *pflag.FlagSet) map[string]struct{} 
 // keys do not match the CLI flags 1:1. ie: networking-connection-pruning -> network-config.networking-connection-pruning. After aliases
 // are set the conf store will override values with any CLI flag values that are set as expected.
 func setAliases() {
-	err := network.SetAliases(conf)
+	err := config.SetAliases(conf)
 	if err != nil {
 		panic(fmt.Errorf("failed to set network aliases: %w", err))
 	}

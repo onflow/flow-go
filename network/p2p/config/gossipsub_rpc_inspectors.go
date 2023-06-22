@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/config/network"
 	"github.com/onflow/flow-go/network/p2p"
 )
 
@@ -135,11 +134,11 @@ func (c *CtrlMsgValidationConfig) Validate() error {
 	// check common config values used by all control message types
 	switch {
 	case c.RateLimit < 0:
-		return network.NewInvalidLimitConfigErr(c.ControlMsg, fmt.Errorf("invalid rate limit value %d must be greater than 0", c.RateLimit))
+		return config.NewInvalidLimitConfigErr(c.ControlMsg, fmt.Errorf("invalid rate limit value %d must be greater than 0", c.RateLimit))
 	case c.HardThreshold <= 0:
-		return network.NewInvalidLimitConfigErr(c.ControlMsg, fmt.Errorf("invalid hard threshold value %d must be greater than 0", c.HardThreshold))
+		return config.NewInvalidLimitConfigErr(c.ControlMsg, fmt.Errorf("invalid hard threshold value %d must be greater than 0", c.HardThreshold))
 	case c.SafetyThreshold <= 0:
-		return network.NewInvalidLimitConfigErr(c.ControlMsg, fmt.Errorf("invalid safety threshold value %d must be greater than 0", c.SafetyThreshold))
+		return config.NewInvalidLimitConfigErr(c.ControlMsg, fmt.Errorf("invalid safety threshold value %d must be greater than 0", c.SafetyThreshold))
 	}
 	return nil
 }
