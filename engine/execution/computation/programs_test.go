@@ -35,6 +35,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const (
+	testMaxConcurrency = 2
+)
+
 func TestPrograms_TestContractUpdates(t *testing.T) {
 	chain := flow.Mainnet.Chain()
 	vm := fvm.NewVirtualMachine()
@@ -134,7 +138,11 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		me,
 		prov,
 		nil,
+<<<<<<< HEAD
 		testutil.ProtocolStateFixture())
+=======
+		testMaxConcurrency)
+>>>>>>> master
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -245,7 +253,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		me,
 		prov,
 		nil,
-		testutil.ProtocolStateFixture())
+		testutil.ProtocolStateFixture(),
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)

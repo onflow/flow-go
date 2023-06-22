@@ -225,7 +225,8 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		me,
 		prov,
 		nil,
-		nil)
+		nil,
+		1) // We're interested in fvm's serial execution time
 	require.NoError(tb, err)
 
 	activeSnapshot := snapshot.NewSnapshotTree(

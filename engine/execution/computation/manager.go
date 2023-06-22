@@ -64,6 +64,7 @@ type ComputationConfig struct {
 	CadenceTracing       bool
 	ExtensiveTracing     bool
 	DerivedDataCacheSize uint
+	MaxConcurrency       int
 
 	// When NewCustomVirtualMachine is nil, the manager will create a standard
 	// fvm virtual machine via fvm.NewVirtualMachine.  Otherwise, the manager
@@ -137,6 +138,7 @@ func New(
 		executionDataProvider,
 		nil, // TODO(ramtin): update me with proper consumers
 		protoState,
+		params.MaxConcurrency,
 	)
 
 	if err != nil {
