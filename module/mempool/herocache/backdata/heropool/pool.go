@@ -123,12 +123,12 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 }
 
 // Get returns entity corresponding to the entity index from the underlying list.
-func (p Pool) Get(entityIndex EIndex) (flow.Identifier, flow.Entity, uint64) {
+func (p *Pool) Get(entityIndex EIndex) (flow.Identifier, flow.Entity, uint64) {
 	return p.poolEntities[entityIndex].id, p.poolEntities[entityIndex].entity, p.poolEntities[entityIndex].owner
 }
 
 // All returns all stored entities in this pool.
-func (p Pool) All() []PoolEntity {
+func (p *Pool) All() []PoolEntity {
 	all := make([]PoolEntity, p.size)
 	next := p.used.head
 
@@ -143,7 +143,7 @@ func (p Pool) All() []PoolEntity {
 
 // Head returns the head of used items. Assuming no ejection happened and pool never goes beyond limit, Head returns
 // the first inserted element.
-func (p Pool) Head() (flow.Entity, bool) {
+func (p *Pool) Head() (flow.Entity, bool) {
 	if p.used.head.isUndefined() {
 		return nil, false
 	}
@@ -183,12 +183,12 @@ func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedEn
 }
 
 // Size returns total number of entities that this list maintains.
-func (p Pool) Size() uint32 {
+func (p *Pool) Size() uint32 {
 	return p.size
 }
 
 // getHeads returns entities corresponding to the used and free heads.
-func (p Pool) getHeads() (*poolEntity, *poolEntity) {
+func (p *Pool) getHeads() (*poolEntity, *poolEntity) {
 	var usedHead, freeHead *poolEntity
 	if !p.used.head.isUndefined() {
 		usedHead = &p.poolEntities[p.used.head.getSliceIndex()]
@@ -202,7 +202,7 @@ func (p Pool) getHeads() (*poolEntity, *poolEntity) {
 }
 
 // getTails returns entities corresponding to the used and free tails.
-func (p Pool) getTails() (*poolEntity, *poolEntity) {
+func (p *Pool) getTails() (*poolEntity, *poolEntity) {
 	var usedTail, freeTail *poolEntity
 	if !p.used.tail.isUndefined() {
 		usedTail = &p.poolEntities[p.used.tail.getSliceIndex()]
@@ -333,7 +333,7 @@ func (p *Pool) appendToFreeList(sliceIndex EIndex) {
 
 // isInvalidated returns true if linked-list node represented by getSliceIndex does not contain
 // a valid entity.
-func (p Pool) isInvalidated(sliceIndex EIndex) bool {
+func (p *Pool) isInvalidated(sliceIndex EIndex) bool {
 	if p.poolEntities[sliceIndex].id != flow.ZeroID {
 		return false
 	}
