@@ -3,7 +3,7 @@ package p2pconf
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/network/p2p/message"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 // GossipSubRPCInspectorsConfig encompasses configuration related to gossipsub RPC message inspectors.

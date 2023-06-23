@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/network/p2p/message"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 // InvalidLimitConfigError indicates the validation limit is < 0.

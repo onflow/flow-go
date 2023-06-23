@@ -5,7 +5,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/network/p2p/message"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 // GossipSubInspectorNotifDistributor is the interface for the distributor that distributes gossip sub inspector notifications.
