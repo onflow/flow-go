@@ -122,18 +122,6 @@ func (g *Builder) SetGossipSubTracer(gossipSubTracer p2p.PubSubTracer) {
 	g.gossipSubTracer = gossipSubTracer
 }
 
-// SetIDProvider sets the identity provider of the builder.
-// If the identity provider has already been set, a fatal error is logged.
-func (g *Builder) SetIDProvider(idProvider module.IdentityProvider) {
-	if g.idProvider != nil {
-		g.logger.Fatal().Msg("id provider has already been set")
-		return
-	}
-
-	g.idProvider = idProvider
-	g.scoreOptionConfig.SetProvider(idProvider)
-}
-
 // SetRoutingSystem sets the routing system of the builder.
 // If the routing system has already been set, a fatal error is logged.
 func (g *Builder) SetRoutingSystem(routingSystem routing.Routing) {
@@ -166,7 +154,7 @@ func NewGossipSubBuilder(
 	rpcInspectorConfig *netconf.GossipSubRPCInspectorsConfig,
 ) *Builder {
 	lg := logger.With().Str("component", "gossipsub").Logger()
-	return &Builder{
+	b := &Builder{
 		logger:                   lg,
 		metricsCfg:               metricsCfg,
 		sporkId:                  sporkId,
@@ -174,10 +162,11 @@ func NewGossipSubBuilder(
 		idProvider:               idProvider,
 		gossipSubFactory:         defaultGossipSubFactory(),
 		gossipSubConfigFunc:      defaultGossipSubAdapterConfig(),
-		scoreOptionConfig:        scoring.NewScoreOptionConfig(lg),
+		scoreOptionConfig:        scoring.NewScoreOptionConfig(lg, idProvider),
 		rpcInspectorConfig:       rpcInspectorConfig,
 		rpcInspectorSuiteFactory: defaultInspectorSuite(),
 	}
+	return b
 }
 
 func defaultGossipSubFactory() p2p.GossipSubFactoryFunc {

@@ -149,11 +149,9 @@ func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf p2p.GossipSubFactoryFun
 
 // EnableGossipSubPeerScoring enables peer scoring for the GossipSub pubsub system.
 // Arguments:
-// - module.IdentityProvider: the identity provider for the node (must be set before calling this method).
 // - *PeerScoringConfig: the peer scoring configuration for the GossipSub pubsub system. If nil, the default configuration is used.
-func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.IdentityProvider, config *p2p.PeerScoringConfig) p2p.NodeBuilder {
+func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(config *p2p.PeerScoringConfig) p2p.NodeBuilder {
 	builder.gossipSubBuilder.SetGossipSubPeerScoring(true)
-	builder.gossipSubBuilder.SetIDProvider(provider)
 	if config != nil {
 		if config.AppSpecificScoreParams != nil {
 			builder.gossipSubBuilder.SetAppSpecificScoreParams(config.AppSpecificScoreParams)
@@ -498,7 +496,7 @@ func DefaultNodeBuilder(
 
 	if gossipCfg.PeerScoring {
 		// currently, we only enable peer scoring with default parameters. So, we set the score parameters to nil.
-		builder.EnableGossipSubPeerScoring(idProvider, nil)
+		builder.EnableGossipSubPeerScoring(nil)
 	}
 
 	meshTracer := tracer.NewGossipSubMeshTracer(logger, metricsCfg.Metrics, idProvider, gossipCfg.LocalMeshLogInterval)

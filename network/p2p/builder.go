@@ -57,10 +57,6 @@ type GossipSubBuilder interface {
 	// If the gossipsub tracer has already been set, a fatal error is logged.
 	SetGossipSubTracer(PubSubTracer)
 
-	// SetIDProvider sets the identity provider of the builder.
-	// If the identity provider has already been set, a fatal error is logged.
-	SetIDProvider(module.IdentityProvider)
-
 	// SetRoutingSystem sets the routing system of the builder.
 	// If the routing system has already been set, a fatal error is logged.
 	SetRoutingSystem(routing.Routing)
@@ -133,7 +129,7 @@ type NodeBuilder interface {
 	// Arguments:
 	// - module.IdentityProvider: the identity provider for the node (must be set before calling this method).
 	// - *PeerScoringConfig: the peer scoring configuration for the GossipSub pubsub system. If nil, the default configuration is used.
-	EnableGossipSubPeerScoring(module.IdentityProvider, *PeerScoringConfig) NodeBuilder
+	EnableGossipSubPeerScoring(*PeerScoringConfig) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
 	SetStreamCreationRetryInterval(time.Duration) NodeBuilder

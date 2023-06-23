@@ -58,7 +58,7 @@ func (_m *NodeBuilder) Build() (p2p.LibP2PNode, error) {
 }
 
 // EnableGossipSubPeerScoring provides a mock function with given fields: _a0, _a1
-func (_m *NodeBuilder) EnableGossipSubPeerScoring(_a0 module.IdentityProvider, _a1 *p2p.PeerScoringConfig) p2p.NodeBuilder {
+func (_m *NodeBuilder) EnableGossipSubPeerScoring(_a1 *p2p.PeerScoringConfig) p2p.NodeBuilder {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 p2p.NodeBuilder

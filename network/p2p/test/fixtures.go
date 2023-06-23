@@ -135,7 +135,7 @@ func NodeFixture(
 	}
 
 	if parameters.PeerScoringEnabled {
-		builder.EnableGossipSubPeerScoring(parameters.IdProvider, parameters.PeerScoreConfig)
+		builder.EnableGossipSubPeerScoring(parameters.PeerScoreConfig)
 	}
 
 	if parameters.UpdateInterval != 0 {
