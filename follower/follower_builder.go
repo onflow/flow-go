@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -383,10 +384,10 @@ func (builder *FollowerServiceBuilder) initNetwork(nodeID module.Local,
 		ConduitFactory:      conduit.NewDefaultConduitFactory(),
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  builder.Logger,
-			SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
-			SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
-			DisablePenalty:          builder.AlspConfig.DisablePenalty,
-			HeartBeatInterval:       builder.AlspConfig.HearBeatInterval,
+			SpamRecordCacheSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
+			SpamReportQueueSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
+			DisablePenalty:          builder.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
+			HeartBeatInterval:       builder.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
 			AlspMetrics:             builder.Metrics.Network,
 			HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
 			NetworkType:             network.PublicNetwork,
@@ -522,6 +523,11 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 }
 
 func (builder *FollowerServiceBuilder) Initialize() error {
+	// initialize default flow configuration
+	if err := config.Unmarshall(&builder.FlowConfig); err != nil {
+		return fmt.Errorf("failed to initialize flow config for follower builder: %w", err)
+	}
+
 	if err := builder.deriveBootstrapPeerIdentities(); err != nil {
 		return err
 	}
@@ -604,9 +610,8 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		builder.Logger,
 		builder.Metrics.Network,
 		builder.IdentityProvider,
-		builder.GossipSubConfig.LocalMeshLogInterval)
-
-	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector, builder.IdentityProvider, builder.Metrics.Network).
+		builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval)
+	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, &builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, builder.IdentityProvider, builder.Metrics.Network).
 		SetNetworkType(network.PublicNetwork).
 		SetMetrics(&p2pconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
@@ -622,9 +627,9 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		builder.BaseConfig.BindAddr,
 		networkKey,
 		builder.SporkID,
-		builder.LibP2PResourceManagerConfig,
+		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
 		&p2p.DisallowListCacheConfig{
-			MaxSize: builder.BaseConfig.NetworkConfig.DisallowListCacheSize,
+			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		}).
 		SetSubscriptionFilter(
@@ -640,9 +645,9 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 				dht.BootstrapPeers(pis...),
 			)
 		}).
-		SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
+		SetStreamCreationRetryInterval(builder.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay).
 		SetGossipSubTracer(meshTracer).
-		SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
+		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
 		SetGossipSubRpcInspectorSuite(rpcInspectorSuite).
 		Build()
 
@@ -699,7 +704,7 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 			return publicLibp2pNode, nil
 		}).
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
+			receiveCache := netcache.NewHeroReceiveCache(builder.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 				builder.Logger,
 				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork))
 

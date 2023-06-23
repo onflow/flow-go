@@ -39,7 +39,7 @@ func NewRateLimiter(limit rate.Limit, burst int, lockoutDuration time.Duration, 
 		limiterMap:               internal.NewLimiterMap(rateLimiterTTL, cleanUpTickInterval),
 		limit:                    limit,
 		burst:                    burst,
-		rateLimitLockoutDuration: lockoutDuration * time.Second,
+		rateLimitLockoutDuration: lockoutDuration,
 	}
 
 	for _, opt := range opts {

@@ -11,7 +11,7 @@ import (
 	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	protocolMock "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/state/protocol/seed"
+	"github.com/onflow/flow-go/state/protocol/prg"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -361,7 +361,7 @@ func (a *PublicAssignmentTestSuite) CreateResult(head *flow.Header, num int, t *
 }
 
 func (a *PublicAssignmentTestSuite) GetSeed(t *testing.T) []byte {
-	seed := make([]byte, seed.RandomSourceLength)
+	seed := make([]byte, prg.RandomSourceLength)
 	_, err := rand.Read(seed)
 	require.NoError(t, err)
 	return seed
