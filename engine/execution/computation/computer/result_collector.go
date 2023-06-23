@@ -44,7 +44,8 @@ type transactionResult struct {
 	TransactionRequest
 	*snapshot.ExecutionSnapshot
 	fvm.ProcedureOutput
-	timeSpent time.Duration
+	timeSpent          time.Duration
+	numConflictRetries int
 }
 
 // TODO(ramtin): move committer and other folks to consumers layer
@@ -220,6 +221,7 @@ func (collector *resultCollector) processTransactionResult(
 	txnExecutionSnapshot *snapshot.ExecutionSnapshot,
 	output fvm.ProcedureOutput,
 	timeSpent time.Duration,
+	numConflictRetries int,
 ) error {
 	logger := txn.ctx.Logger.With().
 		Uint64("computation_used", output.ComputationUsed).
@@ -251,6 +253,7 @@ func (collector *resultCollector) processTransactionResult(
 
 	collector.metrics.ExecutionTransactionExecuted(
 		timeSpent,
+		numConflictRetries,
 		output.ComputationUsed,
 		output.MemoryEstimate,
 		len(output.Events),
@@ -300,12 +303,14 @@ func (collector *resultCollector) AddTransactionResult(
 	snapshot *snapshot.ExecutionSnapshot,
 	output fvm.ProcedureOutput,
 	timeSpent time.Duration,
+	numConflictRetries int,
 ) {
 	result := transactionResult{
 		TransactionRequest: request,
 		ExecutionSnapshot:  snapshot,
 		ProcedureOutput:    output,
 		timeSpent:          timeSpent,
+		numConflictRetries: numConflictRetries,
 	}
 
 	select {
@@ -324,7 +329,8 @@ func (collector *resultCollector) runResultProcessor() {
 			result.TransactionRequest,
 			result.ExecutionSnapshot,
 			result.ProcedureOutput,
-			result.timeSpent)
+			result.timeSpent,
+			result.numConflictRetries)
 		if err != nil {
 			collector.processorError = err
 			return

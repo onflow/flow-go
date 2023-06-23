@@ -96,9 +96,9 @@ func (_m *ExecutionMetrics) ExecutionSync(syncing bool) {
 	_m.Called(syncing)
 }
 
-// ExecutionTransactionExecuted provides a mock function with given fields: dur, compUsed, memoryUsed, eventCounts, eventSize, failed
-func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, memoryUsed uint64, eventCounts int, eventSize int, failed bool) {
-	_m.Called(dur, compUsed, memoryUsed, eventCounts, eventSize, failed)
+// ExecutionTransactionExecuted provides a mock function with given fields: dur, numTxnConflictRetries, compUsed, memoryUsed, eventCounts, eventSize, failed
+func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, numTxnConflictRetries int, compUsed uint64, memoryUsed uint64, eventCounts int, eventSize int, failed bool) {
+	_m.Called(dur, numTxnConflictRetries, compUsed, memoryUsed, eventCounts, eventSize, failed)
 }
 
 // FinishBlockReceivedToExecuted provides a mock function with given fields: blockID
