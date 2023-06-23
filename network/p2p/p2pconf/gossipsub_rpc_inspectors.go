@@ -2,20 +2,8 @@ package p2pconf
 
 import (
 	"fmt"
-)
 
-// ControlMessageType is the type of control message, as defined in the libp2p pubsub spec.
-type ControlMessageType string
-
-func (c ControlMessageType) String() string {
-	return string(c)
-}
-
-const (
-	CtrlMsgIHave ControlMessageType = "IHAVE"
-	CtrlMsgIWant ControlMessageType = "IWANT"
-	CtrlMsgGraft ControlMessageType = "GRAFT"
-	CtrlMsgPrune ControlMessageType = "PRUNE"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // GossipSubRPCInspectorsConfig encompasses configuration related to gossipsub RPC message inspectors.
@@ -74,25 +62,25 @@ type GossipSubRPCValidationInspectorConfigs struct {
 }
 
 // GetCtrlMsgValidationConfig returns the CtrlMsgValidationConfig for the specified p2p.ControlMessageType.
-func (conf *GossipSubRPCValidationInspectorConfigs) GetCtrlMsgValidationConfig(controlMsg ControlMessageType) (*CtrlMsgValidationConfig, bool) {
+func (conf *GossipSubRPCValidationInspectorConfigs) GetCtrlMsgValidationConfig(controlMsg p2p.ControlMessageType) (*CtrlMsgValidationConfig, bool) {
 	switch controlMsg {
-	case CtrlMsgGraft:
+	case p2p.CtrlMsgGraft:
 		return &CtrlMsgValidationConfig{
-			ControlMsg:      CtrlMsgGraft,
+			ControlMsg:      p2p.CtrlMsgGraft,
 			HardThreshold:   conf.GraftLimits.HardThreshold,
 			SafetyThreshold: conf.GraftLimits.SafetyThreshold,
 			RateLimit:       conf.GraftLimits.RateLimit,
 		}, true
-	case CtrlMsgPrune:
+	case p2p.CtrlMsgPrune:
 		return &CtrlMsgValidationConfig{
-			ControlMsg:      CtrlMsgPrune,
+			ControlMsg:      p2p.CtrlMsgPrune,
 			HardThreshold:   conf.PruneLimits.HardThreshold,
 			SafetyThreshold: conf.PruneLimits.SafetyThreshold,
 			RateLimit:       conf.PruneLimits.RateLimit,
 		}, true
-	case CtrlMsgIHave:
+	case p2p.CtrlMsgIHave:
 		return &CtrlMsgValidationConfig{
-			ControlMsg:      CtrlMsgIHave,
+			ControlMsg:      p2p.CtrlMsgIHave,
 			HardThreshold:   conf.IHaveLimits.HardThreshold,
 			SafetyThreshold: conf.IHaveLimits.SafetyThreshold,
 			RateLimit:       conf.IHaveLimits.RateLimit,
@@ -105,17 +93,17 @@ func (conf *GossipSubRPCValidationInspectorConfigs) GetCtrlMsgValidationConfig(c
 // AllCtrlMsgValidationConfig returns all control message validation configs in a list.
 func (conf *GossipSubRPCValidationInspectorConfigs) AllCtrlMsgValidationConfig() CtrlMsgValidationConfigs {
 	return CtrlMsgValidationConfigs{&CtrlMsgValidationConfig{
-		ControlMsg:      CtrlMsgGraft,
+		ControlMsg:      p2p.CtrlMsgGraft,
 		HardThreshold:   conf.GraftLimits.HardThreshold,
 		SafetyThreshold: conf.GraftLimits.SafetyThreshold,
 		RateLimit:       conf.GraftLimits.RateLimit,
 	}, &CtrlMsgValidationConfig{
-		ControlMsg:      CtrlMsgPrune,
+		ControlMsg:      p2p.CtrlMsgPrune,
 		HardThreshold:   conf.PruneLimits.HardThreshold,
 		SafetyThreshold: conf.PruneLimits.SafetyThreshold,
 		RateLimit:       conf.PruneLimits.RateLimit,
 	}, &CtrlMsgValidationConfig{
-		ControlMsg:      CtrlMsgIHave,
+		ControlMsg:      p2p.CtrlMsgIHave,
 		HardThreshold:   conf.IHaveLimits.HardThreshold,
 		SafetyThreshold: conf.IHaveLimits.SafetyThreshold,
 		RateLimit:       conf.IHaveLimits.RateLimit,
@@ -128,7 +116,7 @@ type CtrlMsgValidationConfigs []*CtrlMsgValidationConfig
 // CtrlMsgValidationConfig configuration values for upper, lower threshold and rate limit.
 type CtrlMsgValidationConfig struct {
 	// ControlMsg the type of RPC control message.
-	ControlMsg ControlMessageType
+	ControlMsg p2p.ControlMessageType
 	// HardThreshold specifies the hard limit for the size of an RPC control message.
 	// While it is generally expected that RPC messages with a size greater than HardThreshold should be dropped,
 	// there are exceptions. For instance, if the message is an 'iHave', blocking processing is performed

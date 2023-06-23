@@ -7,11 +7,6 @@ import (
 	"github.com/onflow/flow-go/module/component"
 )
 
-// ControlMessageTypes returns list of all libp2p control message types.
-func ControlMessageTypes() []p2pconf.ControlMessageType {
-	return []p2pconf.ControlMessageType{p2pconf.CtrlMsgIHave, p2pconf.CtrlMsgIWant, p2pconf.CtrlMsgGraft, p2pconf.CtrlMsgPrune}
-}
-
 // GossipSubInspectorNotifDistributor is the interface for the distributor that distributes gossip sub inspector notifications.
 // It is used to distribute notifications to the consumers in an asynchronous manner and non-blocking manner.
 // The implementation should guarantee that all registered consumers are called upon distribution of a new event.
@@ -34,7 +29,7 @@ type InvCtrlMsgNotif struct {
 	// PeerID is the ID of the peer that sent the invalid control message.
 	PeerID peer.ID
 	// MsgType is the type of control message that was received.
-	MsgType p2pconf.ControlMessageType
+	MsgType ControlMessageType
 	// Count is the number of invalid control messages received from the peer that is reported in this notification.
 	Count uint64
 	// Err any error associated with the invalid control message.
@@ -42,7 +37,7 @@ type InvCtrlMsgNotif struct {
 }
 
 // NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
-func NewInvalidControlMessageNotification(peerID peer.ID, msgType p2pconf.ControlMessageType, count uint64, err error) *InvCtrlMsgNotif {
+func NewInvalidControlMessageNotification(peerID peer.ID, msgType ControlMessageType, count uint64, err error) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: msgType,

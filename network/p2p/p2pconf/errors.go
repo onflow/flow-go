@@ -3,6 +3,8 @@ package p2pconf
 import (
 	"errors"
 	"fmt"
+
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // InvalidLimitConfigError indicates the validation limit is < 0.
@@ -19,7 +21,7 @@ func (e InvalidLimitConfigError) Unwrap() error {
 }
 
 // NewInvalidLimitConfigErr returns a new ErrValidationLimit.
-func NewInvalidLimitConfigErr(controlMsg ControlMessageType, err error) InvalidLimitConfigError {
+func NewInvalidLimitConfigErr(controlMsg p2p.ControlMessageType, err error) InvalidLimitConfigError {
 	return InvalidLimitConfigError{fmt.Errorf("invalid rpc control message %s validation limit configuration: %w", controlMsg, err)}
 }
 
