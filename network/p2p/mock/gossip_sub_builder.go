@@ -10,8 +10,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	module "github.com/onflow/flow-go/module"
-
 	p2p "github.com/onflow/flow-go/network/p2p"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -100,11 +98,6 @@ func (_m *GossipSubBuilder) SetGossipSubTracer(_a0 p2p.PubSubTracer) {
 
 // SetHost provides a mock function with given fields: _a0
 func (_m *GossipSubBuilder) SetHost(_a0 host.Host) {
-	_m.Called(_a0)
-}
-
-// SetIDProvider provides a mock function with given fields: _a0
-func (_m *GossipSubBuilder) SetIDProvider(_a0 module.IdentityProvider) {
 	_m.Called(_a0)
 }
 
