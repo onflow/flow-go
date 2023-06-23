@@ -114,7 +114,7 @@ func TestSpamRecord_With_UnknownIdentity(t *testing.T) {
 
 // testSpamRecordWithUnknownIdentity tests the app specific penalty computation of the node when there is a spam record for the peer id and
 // the peer id has an unknown identity.
-func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pconf.ControlMessageType, expectedPenalty float64) {
+func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
 	peerID := peer.ID("peer-1")
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
@@ -165,7 +165,7 @@ func TestSpamRecord_With_SubscriptionPenalty(t *testing.T) {
 
 // testSpamRecordWithUnknownIdentity tests the app specific penalty computation of the node when there is a spam record for the peer id and
 // the peer id has an invalid subscription as well.
-func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pconf.ControlMessageType, expectedPenalty float64) {
+func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
 	peerID := peer.ID("peer-1")
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
