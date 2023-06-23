@@ -228,12 +228,13 @@ func (b *backendScripts) tryExecuteScriptOnExecutionNode(
 	}
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(executorAddress)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v", executorAddress, err)
+		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v",
+			executorAddress, err)
 	}
 	defer func(closer io.Closer) {
 		err := closer.Close()
 		if err != nil {
-			b.log.Error().Err(err)
+			b.log.Error().Err(err).Msg("failed to close execution client")
 		}
 	}(closer)
 
@@ -242,7 +243,8 @@ func (b *backendScripts) tryExecuteScriptOnExecutionNode(
 		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateExecutionAPIClient(executorAddress)
 		}
-		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", executorAddress, err)
+		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v",
+			executorAddress, err)
 	}
 	return execResp.GetValue(), nil
 }
@@ -269,7 +271,12 @@ func (b *backendScripts) tryExecuteScriptOnArchiveNode(
 		return nil, status.Errorf(codes.Internal, "failed to create client for archive node %s: %v",
 			executorAddress, err)
 	}
-	defer closer.Close()
+	defer func(closer io.Closer) {
+		err := closer.Close()
+		if err != nil {
+			b.log.Error().Err(err).Msg("failed to close archive client")
+		}
+	}(closer)
 	resp, err := archiveClient.ExecuteScriptAtBlockID(ctx, req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
@@ -282,9 +289,10 @@ func (b *backendScripts) tryExecuteScriptOnArchiveNode(
 }
 
 func findPortFromAddress(address string) (uint, error) {
+	// Todo: make this part of the backendScripts state
 	_, portStr, err := net.SplitHostPort(address)
 	if err != nil {
-		return 0, fmt.Errorf("fail to extract port from archive address %v: %w", address, err)
+		return 0, fmt.Errorf("fail to extract port from address %v: %w", address, err)
 	}
 
 	port, err := strconv.Atoi(portStr)
