@@ -94,11 +94,10 @@ go-math-rand-check:
 	# If this check fails, try updating your code by using:
 	#   - "crypto/rand" or "flow-go/utils/rand" for non-deterministic randomness
 	#   - "flow-go/crypto/random" for deterministic randomness 
-	grep --include=\*.go --exclude={*test*,*helper*,*example*,*fixture*,*benchmark*,*profiler*} -rnw '"math/rand"'; \
-    if [ $$? -ne 1 ]; \
-    then \
-        echo "[Error] Go production code should not use math/rand package"; \
-        exit 1; \
+	grep --include=\*.go --exclude=*{test,helper,example,fixture,benchmark,profiler}* \
+		--exclude-dir=*{test,helper,example,fixture,benchmark,profiler}* -rnw '"math/rand"'; \
+    if [ $$? -ne 1 ]; then \
+       echo "[Error] Go production code should not use math/rand package"; exit 1; \
     fi
 
 .PHONY: code-sanity-check
