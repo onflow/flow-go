@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ServerRequestHandler is a structure that represents local requests
+// ServerRequestHandler is a structure that represents handling local requests.
 type ServerRequestHandler struct {
 	log     zerolog.Logger
 	backend access.API

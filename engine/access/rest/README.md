@@ -6,10 +6,15 @@ available on our [docs site](https://docs.onflow.org/http-api/).
 
 ## Packages
 
-- `rest`: The HTTP handlers for all the request, server generator and the select filter.
+- `rest`: The HTTP handlers for the server generator and the select filter, implementation of handling local requests.
 - `middleware`: The common [middlewares](https://github.com/gorilla/mux#middleware) that all request pass through.
 - `models`: The generated models using openapi generators and implementation of model builders.
 - `request`: Implementation of API requests that provide validation for input data and build request models.
+- `routes`: The common HTTP handlers for all the requests.
+- `api`: The server API interface for REST service.
+- `apiproxy`: Implementation of proxy router which splits requests for observer node between local and request 
+forwarding to upstream, implementation of handling request forwarding to an upstream access node using gRPC API.
+- `tests`: Test for each request.
 
 ## Request lifecycle
 
@@ -37,17 +42,19 @@ make generate-openapi
 
 ### Adding New API Endpoints
 
-A new endpoint can be added by first implementing a new request handler, a request handle is a function in the rest
+A new endpoint can be added by first implementing a new request handler, a request handle is a function in the routes
 package that complies with function interfaced defined as:
 
 ```go
 type ApiHandlerFunc func (
 r *request.Request,
-backend access.API,
+srv api.RestServerApi,
 generator models.LinkGenerator,
 ) (interface{}, error)
 ```
 
-That handler implementation needs to be added to the `router.go` with corresponding API endpoint and method. Adding a
-new API endpoint also requires for a new request builder to be implemented and added in request package. Make sure to
-not forget about adding tests for each of the API handler.
+That handler implementation needs to be added to the `router.go` with corresponding API endpoint and method. Then needs 
+to be added new request to `RestServerApi` interface and implemented it for local API service to the `RequestHandler` and for 
+request forwarding to the `RestForwarder`. After that new function needs to be added to the `RestRouter` for representing
+the routing proxy algorithm. Adding a new API endpoint also requires for a new request builder to be implemented and added 
+in request package. Make sure to not forget about adding tests for each of the API handler.
