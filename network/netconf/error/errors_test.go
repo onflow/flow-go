@@ -1,4 +1,4 @@
-package netconf
+package error
 
 import (
 	"fmt"
