@@ -1,6 +1,9 @@
 package queue
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -165,4 +168,19 @@ func (q *Queue) Dismount() (Blockify, []*Queue) {
 		}
 	}
 	return q.Head.Item, queues
+}
+
+func (q *Queue) String() string {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("Header: %v\n", q.Head.Item.ID()))
+	builder.WriteString(fmt.Sprintf("Highest: %v\n", q.Highest.Item.ID()))
+	builder.WriteString(fmt.Sprintf("Size: %v, Height: %v\n", q.Size(), q.Height()))
+	for _, node := range q.Nodes {
+		builder.WriteString(fmt.Sprintf("Node(height: %v): %v (children: %v)\n",
+			node.Item.Height(),
+			node.Item.ID(),
+			len(node.Children),
+		))
+	}
+	return builder.String()
 }

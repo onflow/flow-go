@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 )
 
 type testInvalidator struct {
@@ -22,7 +22,7 @@ func (invalidator testInvalidator) ShouldInvalidateEntries() bool {
 func (invalidator *testInvalidator) ShouldInvalidateEntry(
 	key string,
 	value *string,
-	snapshot *state.ExecutionSnapshot,
+	snapshot *snapshot.ExecutionSnapshot,
 ) bool {
 	invalidator.callCount += 1
 	return invalidator.invalidateAll ||

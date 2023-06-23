@@ -14,21 +14,6 @@ type TransactionMetrics struct {
 	mock.Mock
 }
 
-// ScriptExecuted provides a mock function with given fields: dur, size
-func (_m *TransactionMetrics) ScriptExecuted(dur time.Duration, size int) {
-	_m.Called(dur, size)
-}
-
-// ScriptExecutionErrorOnArchiveNode provides a mock function with given fields: blockID, scriptHash
-func (_m *TransactionMetrics) ScriptExecutionErrorOnArchiveNode(blockID flow.Identifier, scriptHash string) {
-	_m.Called(blockID, scriptHash)
-}
-
-// ScriptExecutionErrorOnExecutionNode provides a mock function with given fields: blockID, scriptHash
-func (_m *TransactionMetrics) ScriptExecutionErrorOnExecutionNode(blockID flow.Identifier, scriptHash string) {
-	_m.Called(blockID, scriptHash)
-}
-
 // TransactionExecuted provides a mock function with given fields: txID, when
 func (_m *TransactionMetrics) TransactionExecuted(txID flow.Identifier, when time.Time) {
 	_m.Called(txID, when)
@@ -57,11 +42,6 @@ func (_m *TransactionMetrics) TransactionResultFetched(dur time.Duration, size i
 // TransactionSubmissionFailed provides a mock function with given fields:
 func (_m *TransactionMetrics) TransactionSubmissionFailed() {
 	_m.Called()
-}
-
-// UpdateExecutionReceiptMaxHeight provides a mock function with given fields: height
-func (_m *TransactionMetrics) UpdateExecutionReceiptMaxHeight(height uint64) {
-	_m.Called(height)
 }
 
 type mockConstructorTestingTNewTransactionMetrics interface {

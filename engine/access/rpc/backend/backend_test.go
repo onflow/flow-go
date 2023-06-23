@@ -3,9 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -58,13 +56,12 @@ func TestHandler(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-	rand.Seed(time.Now().UnixNano())
 	suite.log = zerolog.New(zerolog.NewConsoleWriter())
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	header := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
-	params.On("Root").Return(header, nil)
+	params.On("FinalizedRoot").Return(header, nil)
 	params.On("SporkRootBlockHeight").Return(header.Height, nil)
 	suite.state.On("Params").Return(params).Maybe()
 	suite.blocks = new(storagemock.Blocks)
@@ -757,12 +754,17 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	block.Header.Height = 2
 	headBlock := unittest.BlockFixture()
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
+	block.SetPayload(
+		unittest.PayloadFixture(
+			unittest.WithGuarantees(
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
 
 	suite.snapshot.
 		On("Head").
 		Return(headBlock.Header, nil)
 
 	light := collection.Light()
+	suite.collections.On("LightByID", light.ID()).Return(&light, nil)
 
 	// transaction storage returns the corresponding transaction
 	suite.transactions.
@@ -828,7 +830,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		Once()
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := backend.GetTransactionResult(ctx, txID)
+	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be finalized since the sealed blocks is smaller in height
@@ -843,7 +845,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		Return(exeEventResp, nil)
 
 	// second call - when block under test's height is greater height than the sealed head
-	result, err = backend.GetTransactionResult(ctx, txID)
+	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be executed since no `NotFound` error in the `GetTransactionResult` call
@@ -853,7 +855,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	headBlock.Header.Height = block.Header.Height + 1
 
 	// third call - when block under test's height is less than sealed head's height
-	result, err = backend.GetTransactionResult(ctx, txID)
+	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be sealed since the sealed blocks is greater in height
@@ -864,7 +866,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// fourth call - when block under test's height so much less than the head's height that it's considered expired,
 	// but since there is a execution result, means it should retain it's sealed status
-	result, err = backend.GetTransactionResult(ctx, txID)
+	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be expired since
@@ -944,7 +946,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	// should return pending status when we have not observed an expiry block
 	suite.Run("pending", func() {
 		// referenced block isn't known yet, so should return pending status
-		result, err := backend.GetTransactionResult(ctx, txID)
+		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 		suite.checkResponse(result, err)
 
 		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
@@ -960,7 +962,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			// we have NOT observed all intermediary collections
 			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry/2
 
-			result, err := backend.GetTransactionResult(ctx, txID)
+			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 			suite.checkResponse(result, err)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		})
@@ -970,7 +972,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			// we have observed all intermediary collections
 			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
 
-			result, err := backend.GetTransactionResult(ctx, txID)
+			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 			suite.checkResponse(result, err)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		})
@@ -985,7 +987,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		// we have observed all intermediary collections
 		fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
 
-		result, err := backend.GetTransactionResult(ctx, txID)
+		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 		suite.checkResponse(result, err)
 		suite.Assert().Equal(flow.TransactionStatusExpired, result.Status)
 	})
@@ -1001,7 +1003,12 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	transactionBody := collection.Transactions[0]
 	// block which will eventually contain the transaction
 	block := unittest.BlockFixture()
+	block.SetPayload(
+		unittest.PayloadFixture(
+			unittest.WithGuarantees(
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
 	blockID := block.ID()
+
 	// reference block to which the transaction points to
 	refBlock := unittest.BlockFixture()
 	refBlockID := refBlock.ID()
@@ -1052,6 +1059,9 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 				}
 				return nil
 			})
+
+	light := collection.Light()
+	suite.collections.On("LightByID", mock.Anything).Return(&light, nil)
 
 	// refBlock storage returns the corresponding refBlock
 	suite.blocks.
@@ -1105,18 +1115,18 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	// should return pending status when we have not observed collection for the transaction
 	suite.Run("pending", func() {
 		currentState = flow.TransactionStatusPending
-		result, err := backend.GetTransactionResult(ctx, txID)
+		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 		suite.checkResponse(result, err)
 		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		// assert that no call to an execution node is made
 		suite.execClient.AssertNotCalled(suite.T(), "GetTransactionResult", mock.Anything, mock.Anything)
 	})
 
-	// should return finalized status when we have have observed collection for the transaction (after observing the
-	// a preceding sealed refBlock)
+	// should return finalized status when we have observed collection for the transaction (after observing the
+	// preceding sealed refBlock)
 	suite.Run("finalized", func() {
 		currentState = flow.TransactionStatusFinalized
-		result, err := backend.GetTransactionResult(ctx, txID)
+		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 		suite.checkResponse(result, err)
 		suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
 	})
@@ -1159,7 +1169,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 	)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := backend.GetTransactionResult(ctx, txID)
+	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be reported as unknown
@@ -1587,7 +1597,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 	rootHeader := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
-	params.On("Root").Return(rootHeader, nil)
+	params.On("FinalizedRoot").Return(rootHeader, nil)
 	state.On("Params").Return(params).Maybe()
 
 	// mock snapshot to return head backend

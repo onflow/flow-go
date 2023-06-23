@@ -6,9 +6,11 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 )
@@ -17,8 +19,6 @@ var (
 	ErrDisconnectedBatch = errors.New("batch must be a sequence of connected blocks")
 )
 
-// OnEquivocation is a callback to report observing two different blocks with the same view.
-type OnEquivocation func(first *flow.Block, other *flow.Block)
 type BlocksByID map[flow.Identifier]*flow.Block
 
 // batchContext contains contextual data for batch of blocks. Per convention, a batch is
@@ -30,6 +30,10 @@ type batchContext struct {
 	// equivocatingBlocks holds the list of equivocations that the batch contained, when comparing to the
 	// cached blocks. An equivocation are two blocks for the same view that have different block IDs.
 	equivocatingBlocks [][2]*flow.Block
+
+	// redundant marks if ALL blocks in batch are already stored in cache, meaning that
+	// such input is identical to what was previously processed.
+	redundant bool
 }
 
 // Cache stores pending blocks received from other replicas, caches blocks by blockID, and maintains
@@ -45,8 +49,8 @@ type Cache struct {
 	byView   map[uint64]BlocksByID          // lookup of blocks by their respective view; used to detect equivocation
 	byParent map[flow.Identifier]BlocksByID // lookup of blocks by their parentID, for finding a block's known children
 
-	onEquivocation OnEquivocation                   // when message equivocation has been detected report it using this callback
-	lowestView     counters.StrictMonotonousCounter // lowest view that the cache accepts blocks for
+	notifier   hotstuff.ProposalViolationConsumer // equivocations will be reported using this notifier
+	lowestView counters.StrictMonotonousCounter   // lowest view that the cache accepts blocks for
 }
 
 // Peek performs lookup of cached block by blockID.
@@ -62,7 +66,7 @@ func (c *Cache) Peek(blockID flow.Identifier) *flow.Block {
 }
 
 // NewCache creates new instance of Cache
-func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetrics, onEquivocation OnEquivocation) *Cache {
+func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetrics, notifier hotstuff.ProposalViolationConsumer) *Cache {
 	// We consume ejection event from HeroCache to here to drop ejected blocks from our secondary indices.
 	distributor := NewDistributor()
 	cache := &Cache{
@@ -74,9 +78,9 @@ func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetric
 			collector,
 			herocache.WithTracer(distributor),
 		),
-		byView:         make(map[uint64]BlocksByID),
-		byParent:       make(map[flow.Identifier]BlocksByID),
-		onEquivocation: onEquivocation,
+		byView:   make(map[uint64]BlocksByID),
+		byParent: make(map[flow.Identifier]BlocksByID),
+		notifier: notifier,
 	}
 	distributor.AddConsumer(cache.handleEjectedEntity)
 	return cache
@@ -151,7 +155,12 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 	//    (result stored in `batchContext.batchParent`)
 	//  * check whether last block in batch has a child already in the cache
 	//    (result stored in `batchContext.batchChild`)
+	//  * check if input is redundant (indicated by `batchContext.redundant`), i.e. ALL blocks
+	//    are already known: then skip further processing
 	bc := c.unsafeAtomicAdd(blockIDs, batch)
+	if bc.redundant {
+		return nil, nil, nil
+	}
 
 	// If there exists a child of the last block in the batch, then the entire batch is certified.
 	// Otherwise, all blocks in the batch _except_ for the last one are certified
@@ -174,7 +183,7 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 
 	// report equivocations
 	for _, pair := range bc.equivocatingBlocks {
-		c.onEquivocation(pair[0], pair[1])
+		c.notifier.OnDoubleProposeDetected(model.BlockFromFlow(pair[0].Header), model.BlockFromFlow(pair[1].Header))
 	}
 
 	if len(certifiedBatch) < 1 {
@@ -241,6 +250,7 @@ func (c *Cache) removeByView(view uint64, blocks BlocksByID) {
 //   - check for equivocating blocks
 //   - check whether first block in batch (index 0) has a parent already in the cache
 //   - check whether last block in batch has a child already in the cache
+//   - check whether all blocks were previously stored in the cache
 //
 // Concurrency SAFE.
 //
@@ -272,12 +282,17 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.B
 	}
 
 	// add blocks to underlying cache, check for equivocation and report if detected
+	storedBlocks := uint64(0)
 	for i, block := range fullBlocks {
-		equivocation := c.cache(blockIDs[i], block)
+		equivocation, cached := c.cache(blockIDs[i], block)
 		if equivocation != nil {
 			bc.equivocatingBlocks = append(bc.equivocatingBlocks, [2]*flow.Block{equivocation, block})
 		}
+		if cached {
+			storedBlocks++
+		}
 	}
+	bc.redundant = storedBlocks < 1
 
 	return bc
 }
@@ -286,23 +301,26 @@ func (c *Cache) unsafeAtomicAdd(blockIDs []flow.Identifier, fullBlocks []*flow.B
 // equivocation. The first return value contains the already-cached equivocating block or `nil` otherwise.
 // Repeated calls with the same block are no-ops.
 // CAUTION: not concurrency safe: execute within Cache's lock.
-func (c *Cache) cache(blockID flow.Identifier, block *flow.Block) (equivocation *flow.Block) {
+func (c *Cache) cache(blockID flow.Identifier, block *flow.Block) (equivocation *flow.Block, stored bool) {
 	cachedBlocksAtView, haveCachedBlocksAtView := c.byView[block.Header.View]
 	// Check whether there is a block with the same view already in the cache.
-	// During happy-path operations `cachedBlocksAtView` contains usually zero blocks or exactly one block
-	// which is `fullBlock` (duplicate). Larger sets of blocks can only be caused by slashable byzantine actions.
+	// During happy-path operations `cachedBlocksAtView` contains usually zero blocks or exactly one block, which
+	// is our input `block` (duplicate). Larger sets of blocks can only be caused by slashable byzantine actions.
 	for otherBlockID, otherBlock := range cachedBlocksAtView {
 		if otherBlockID == blockID {
-			return nil // already stored
+			return nil, false // already stored
 		}
 		// have two blocks for the same view but with different IDs => equivocation!
 		equivocation = otherBlock
-		break // we care whether the
+		break // we care whether we find an equivocation, but don't need to enumerate all equivocations
 	}
+	// Note: Even if this node detects an equivocation, we still have to process the block. This is because
+	// the node might be the only one seeing the equivocation, and other nodes might certify the block,
+	// in which case also this node needs to process the block to continue following consensus.
 
 	// block is not a duplicate: store in the underlying HeroCache and add it to secondary indices
-	added := c.backend.Add(blockID, block)
-	if !added { // future proofing code: we allow an overflowing HeroCache to potentially eject the newly added element.
+	stored = c.backend.Add(blockID, block)
+	if !stored { // future proofing code: we allow an overflowing HeroCache to potentially eject the newly added element.
 		return
 	}
 

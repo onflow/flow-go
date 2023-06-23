@@ -114,6 +114,7 @@ type GossipSubMetrics interface {
 	GossipSubScoringMetrics
 	GossipSubRouterMetrics
 	GossipSubLocalMeshMetrics
+	GossipSubRpcValidationInspectorMetrics
 }
 
 type LibP2PMetrics interface {

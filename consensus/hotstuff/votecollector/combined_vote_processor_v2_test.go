@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -30,7 +29,6 @@ import (
 	modulemock "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/state/protocol/seed"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -597,7 +595,6 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		}
 
 		// shuffle votes in random order
-		rand.Seed(time.Now().UnixNano())
 		rand.Shuffle(len(votes), func(i, j int) {
 			votes[i], votes[j] = votes[j], votes[i]
 		})
@@ -745,7 +742,6 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		}
 
 		// shuffle votes in random order
-		rand.Seed(time.Now().UnixNano())
 		rand.Shuffle(len(votes), func(i, j int) {
 			votes[i], votes[j] = votes[j], votes[i]
 		})
@@ -789,7 +785,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
 
 	// all committee members run DKG
-	dkgData, err := bootstrapDKG.RunFastKG(11, unittest.RandomBytes(32))
+	dkgData, err := bootstrapDKG.RandomBeaconKG(11, unittest.RandomBytes(32))
 	require.NoError(t, err)
 
 	// signers hold objects that are created with private key and can sign votes and proposals
@@ -948,10 +944,10 @@ func TestReadRandomSourceFromPackedQCV2(t *testing.T) {
 	qc, err := buildQCWithPackerAndSigData(packer, block, blockSigData)
 	require.NoError(t, err)
 
-	randomSource, err := seed.FromParentQCSignature(qc.SigData)
+	randomSource, err := model.BeaconSignature(qc)
 	require.NoError(t, err)
 
-	randomSourceAgain, err := seed.FromParentQCSignature(qc.SigData)
+	randomSourceAgain, err := model.BeaconSignature(qc)
 	require.NoError(t, err)
 
 	// verify the random source is deterministic

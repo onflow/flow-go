@@ -213,6 +213,32 @@ func (_m *API) GetNetworkParameters(ctx context.Context) access.NetworkParameter
 	return r0
 }
 
+// GetNodeVersionInfo provides a mock function with given fields: ctx
+func (_m *API) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error) {
+	ret := _m.Called(ctx)
+
+	var r0 *access.NodeVersionInfo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (*access.NodeVersionInfo, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) *access.NodeVersionInfo); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.NodeVersionInfo)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 type mockConstructorTestingTNewAPI interface {
 	mock.TestingT
 	Cleanup(func())

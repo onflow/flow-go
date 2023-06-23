@@ -25,15 +25,11 @@ func (p *Proposal) ProposerVote() *Vote {
 
 // ProposalFromFlow turns a flow header into a hotstuff block type.
 func ProposalFromFlow(header *flow.Header) *Proposal {
-
-	block := BlockFromFlow(header)
-
 	proposal := Proposal{
-		Block:      block,
+		Block:      BlockFromFlow(header),
 		SigData:    header.ProposerSigData,
 		LastViewTC: header.LastViewTC,
 	}
-
 	return &proposal
 }
 

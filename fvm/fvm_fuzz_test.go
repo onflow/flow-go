@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
@@ -15,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -32,7 +33,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 
 		tt := fuzzTransactionTypes[transactionType]
 
-		vmt.run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+		vmt.run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// create the transaction
 			txBody := tt.createTxBody(t, tctx)
 			// set the computation limit
@@ -223,7 +224,7 @@ func getDeductedFees(tb testing.TB, tctx transactionTypeContext, results fuzzRes
 	var feesDeductedEvent cadence.Event
 	for _, e := range results.output.Events {
 		if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", environment.FlowFeesAddress(tctx.chain)) {
-			data, err := jsoncdc.Decode(nil, e.Payload)
+			data, err := ccf.Decode(nil, e.Payload)
 			require.NoError(tb, err)
 			feesDeductedEvent, ok = data.(cadence.Event)
 			require.True(tb, ok, "Event payload should be of type cadence event.")
@@ -232,8 +233,15 @@ func getDeductedFees(tb testing.TB, tctx transactionTypeContext, results fuzzRes
 	if feesDeductedEvent.Type() == nil {
 		return 0, false
 	}
-	fees, ok = feesDeductedEvent.Fields[0].(cadence.UFix64)
-	require.True(tb, ok, "FeesDeducted[0] event should be of type cadence.UFix64.")
+
+	for i, f := range feesDeductedEvent.Type().(*cadence.EventType).Fields {
+		if f.Identifier == "amount" {
+			fees, ok = feesDeductedEvent.Fields[i].(cadence.UFix64)
+			require.True(tb, ok, "FeesDeducted event amount field should be of type cadence.UFix64.")
+			break
+		}
+	}
+
 	return fees, true
 }
 
@@ -254,7 +262,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 	).withContextOptions(
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
-	).bootstrapWith(func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) (storage.SnapshotTree, error) {
+	).bootstrapWith(func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) (snapshot.SnapshotTree, error) {
 		// ==== Create an account ====
 		var txBody *flow.TransactionBody
 		privateKey, txBody = testutil.CreateAccountCreationTransaction(tb, chain)
@@ -276,7 +284,7 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		accountCreatedEvents := filterAccountCreatedEvents(output.Events)
 
 		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
-		data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
+		data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(tb, err)
 
 		address = flow.ConvertAddress(

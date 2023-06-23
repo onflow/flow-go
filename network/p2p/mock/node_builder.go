@@ -90,11 +90,11 @@ func (_m *NodeBuilder) SetBasicResolver(_a0 madns.BasicResolver) p2p.NodeBuilder
 }
 
 // SetConnectionGater provides a mock function with given fields: _a0
-func (_m *NodeBuilder) SetConnectionGater(_a0 connmgr.ConnectionGater) p2p.NodeBuilder {
+func (_m *NodeBuilder) SetConnectionGater(_a0 p2p.ConnectionGater) p2p.NodeBuilder {
 	ret := _m.Called(_a0)
 
 	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(connmgr.ConnectionGater) p2p.NodeBuilder); ok {
+	if rf, ok := ret.Get(0).(func(p2p.ConnectionGater) p2p.NodeBuilder); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
@@ -153,19 +153,13 @@ func (_m *NodeBuilder) SetGossipSubFactory(_a0 p2p.GossipSubFactoryFunc, _a1 p2p
 	return r0
 }
 
-// SetGossipSubRPCInspectors provides a mock function with given fields: inspectors
-func (_m *NodeBuilder) SetGossipSubRPCInspectors(inspectors ...p2p.GossipSubRPCInspector) p2p.NodeBuilder {
-	_va := make([]interface{}, len(inspectors))
-	for _i := range inspectors {
-		_va[_i] = inspectors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
+// SetGossipSubRpcInspectorSuite provides a mock function with given fields: _a0
+func (_m *NodeBuilder) SetGossipSubRpcInspectorSuite(_a0 p2p.GossipSubInspectorSuite) p2p.NodeBuilder {
+	ret := _m.Called(_a0)
 
 	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(...p2p.GossipSubRPCInspector) p2p.NodeBuilder); ok {
-		r0 = rf(inspectors...)
+	if rf, ok := ret.Get(0).(func(p2p.GossipSubInspectorSuite) p2p.NodeBuilder); ok {
+		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(p2p.NodeBuilder)

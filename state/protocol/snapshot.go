@@ -136,4 +136,12 @@ type Snapshot interface {
 	// Params returns global parameters of the state this snapshot is taken from.
 	// Returns invalid.Params with state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
 	Params() GlobalParams
+
+	// VersionBeacon returns the latest sealed version beacon.
+	// If no version beacon has been sealed so far during the current spork, returns nil.
+	// The latest VersionBeacon is only updated for finalized blocks. This means that, when
+	// querying an un-finalized fork, `VersionBeacon` will have the same value as querying
+	// the snapshot for the latest finalized block, even if a newer version beacon is included
+	// in a seal along the un-finalized fork.
+	VersionBeacon() (*flow.SealedVersionBeacon, error)
 }

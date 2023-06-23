@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/hex"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -17,8 +16,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
-	"collecting partner network and staking keys" +
+const finalizeHappyPathLogs = "collecting partner network and staking keys" +
 	`read \d+ partner node configuration files` +
 	`read \d+ weights for partner nodes` +
 	"generating internal private networking and staking keys" +
@@ -52,7 +50,6 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 var finalizeHappyPathRegex = regexp.MustCompile(finalizeHappyPathLogs)
 
 func TestFinalize_HappyPath(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
@@ -68,13 +65,9 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
-		flagFastKG = true
 		flagRootChain = chainName
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootHeight = rootHeight
-
-		// set deterministic bootstrapping seed
-		flagBootstrapRandomSeed = deterministicSeed
 
 		// rootBlock will generate DKG and place it into bootDir/public-root-information
 		rootBlock(nil, nil)
@@ -102,232 +95,47 @@ func TestFinalize_HappyPath(t *testing.T) {
 	})
 }
 
-func TestFinalize_Deterministic(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
-	rootCommit := unittest.StateCommitmentFixture()
-	rootParent := unittest.StateCommitmentFixture()
-	chainName := "main"
-	rootHeight := uint64(1000)
-	epochCounter := uint64(0)
+func TestClusterAssignment(t *testing.T) {
+	tmp := flagCollectionClusters
+	flagCollectionClusters = 5
+	// Happy path (limit set-up, can't have one less internal node)
+	partnersLen := 7
+	internalLen := 22
+	partners := unittest.NodeInfosFixture(partnersLen, unittest.WithRole(flow.RoleCollection))
+	internals := unittest.NodeInfosFixture(internalLen, unittest.WithRole(flow.RoleCollection))
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
-
-		flagOutdir = bootDir
-
-		flagConfig = configPath
-		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerWeights = partnerWeights
-		flagInternalNodePrivInfoDir = internalPrivDir
-
-		flagFastKG = true
-
-		flagRootCommit = hex.EncodeToString(rootCommit[:])
-		flagRootParent = hex.EncodeToString(rootParent[:])
-		flagRootChain = chainName
-		flagRootHeight = rootHeight
-		flagEpochCounter = epochCounter
-		flagNumViewsInEpoch = 100_000
-		flagNumViewsInStakingAuction = 50_000
-		flagNumViewsInDKGPhase = 2_000
-		flagEpochCommitSafetyThreshold = 1_000
-
-		// set deterministic bootstrapping seed
-		flagBootstrapRandomSeed = deterministicSeed
-
-		// rootBlock will generate DKG and place it into model.PathRootDKGData
-		rootBlock(nil, nil)
-
-		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
-		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
-		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
-
-		hook := zeroLoggerHook{logs: &strings.Builder{}}
-		log = log.Hook(hook)
-
-		finalize(nil, nil)
-		require.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
-		hook.logs.Reset()
-
-		// check if root protocol snapshot exists
-		snapshotPath := filepath.Join(bootDir, model.PathRootProtocolStateSnapshot)
-		assert.FileExists(t, snapshotPath)
-
-		// read snapshot
-		_, err := utils.ReadRootProtocolSnapshot(bootDir)
-		require.NoError(t, err)
-
-		// delete snapshot file
-		err = os.Remove(snapshotPath)
-		require.NoError(t, err)
-
-		finalize(nil, nil)
-		require.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
-		hook.logs.Reset()
-
-		// check if root protocol snapshot exists
-		assert.FileExists(t, snapshotPath)
-
-		// read snapshot
-		_, err = utils.ReadRootProtocolSnapshot(bootDir)
-		require.NoError(t, err)
-
-		// ATTENTION: we can't use next statement because QC generation is not deterministic
-		// assert.Equal(t, firstSnapshot, secondSnapshot)
-		// Meaning we don't have a guarantee that with same input arguments we will get same QC.
-		// This doesn't mean that QC is invalid, but it will result in different structures,
-		// different QC => different service events => different result => different seal
-		// We need to use a different mechanism for comparing.
-		// ToDo: Revisit if this test case is valid at all.
-	})
-}
-
-func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
-	rootCommit := unittest.StateCommitmentFixture()
-	rootParent := unittest.StateCommitmentFixture()
-	chainName := "main"
-	rootHeight := uint64(1000)
-	epochCounter := uint64(0)
-
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
-
-		flagOutdir = bootDir
-
-		flagConfig = configPath
-		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerWeights = partnerWeights
-		flagInternalNodePrivInfoDir = internalPrivDir
-
-		flagFastKG = true
-
-		flagRootCommit = hex.EncodeToString(rootCommit[:])
-		flagRootParent = hex.EncodeToString(rootParent[:])
-		flagRootChain = chainName
-		flagRootHeight = rootHeight
-		flagEpochCounter = epochCounter
-		flagNumViewsInEpoch = 100_000
-		flagNumViewsInStakingAuction = 50_000
-		flagNumViewsInDKGPhase = 2_000
-		flagEpochCommitSafetyThreshold = 1_000
-
-		// set deterministic bootstrapping seed
-		flagBootstrapRandomSeed = deterministicSeed
-
-		// rootBlock will generate DKG and place it into bootDir/public-root-information
-		rootBlock(nil, nil)
-
-		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
-		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
-		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
-
-		hook := zeroLoggerHook{logs: &strings.Builder{}}
-		log = log.Hook(hook)
-
-		finalize(nil, nil)
-		require.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
-		hook.logs.Reset()
-
-		// check if root protocol snapshot exists
-		snapshotPath := filepath.Join(bootDir, model.PathRootProtocolStateSnapshot)
-		assert.FileExists(t, snapshotPath)
-
-		// read snapshot
-		snapshot1, err := utils.ReadRootProtocolSnapshot(bootDir)
-		require.NoError(t, err)
-
-		// delete snapshot file
-		err = os.Remove(snapshotPath)
-		require.NoError(t, err)
-
-		// change input state commitments
-		rootCommit2 := unittest.StateCommitmentFixture()
-		rootParent2 := unittest.StateCommitmentFixture()
-		flagRootCommit = hex.EncodeToString(rootCommit2[:])
-		flagRootParent = hex.EncodeToString(rootParent2[:])
-
-		finalize(nil, nil)
-		require.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
-		hook.logs.Reset()
-
-		// check if root protocol snapshot exists
-		assert.FileExists(t, snapshotPath)
-
-		// read snapshot
-		snapshot2, err := utils.ReadRootProtocolSnapshot(bootDir)
-		require.NoError(t, err)
-
-		// current epochs
-		currentEpoch1 := snapshot1.Epochs().Current()
-		currentEpoch2 := snapshot2.Epochs().Current()
-
-		// check dkg
-		dkg1, err := currentEpoch1.DKG()
-		require.NoError(t, err)
-		dkg2, err := currentEpoch2.DKG()
-		require.NoError(t, err)
-		assert.Equal(t, dkg1, dkg2)
-
-		// check clustering
-		clustering1, err := currentEpoch1.Clustering()
-		require.NoError(t, err)
-		clustering2, err := currentEpoch2.Clustering()
-		require.NoError(t, err)
-		assert.Equal(t, clustering1, clustering2)
-
-		// verify random sources are same
-		randomSource1, err := currentEpoch1.RandomSource()
-		require.NoError(t, err)
-		randomSource2, err := currentEpoch2.RandomSource()
-		require.NoError(t, err)
-		assert.Equal(t, randomSource1, randomSource2)
-		assert.Equal(t, randomSource1, deterministicSeed)
-		assert.Equal(t, flow.EpochSetupRandomSourceLength, len(randomSource1))
-	})
-}
-
-func TestFinalize_InvalidRandomSeedLength(t *testing.T) {
-	rootCommit := unittest.StateCommitmentFixture()
-	rootParent := unittest.StateCommitmentFixture()
-	chainName := "main"
-	rootHeight := uint64(12332)
-	epochCounter := uint64(2)
-
-	// set random seed with smaller length
-	deterministicSeed, err := hex.DecodeString("a12354a343234aa44bbb43")
+	// should not error
+	_, clusters, err := constructClusterAssignment(partners, internals)
 	require.NoError(t, err)
+	require.True(t, checkClusterConstraint(clusters, partners, internals))
 
-	// invalid length execution logs
-	expectedLogs := regexp.MustCompile("random seed provided length is not valid")
+	// unhappy Path
+	internals = internals[:21] // reduce one internal node
+	// should error
+	_, _, err = constructClusterAssignment(partners, internals)
+	require.Error(t, err)
+	// revert the flag value
+	flagCollectionClusters = tmp
+}
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
-
-		flagOutdir = bootDir
-
-		flagConfig = configPath
-		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerWeights = partnerWeights
-		flagInternalNodePrivInfoDir = internalPrivDir
-
-		flagFastKG = true
-
-		flagRootCommit = hex.EncodeToString(rootCommit[:])
-		flagRootParent = hex.EncodeToString(rootParent[:])
-		flagRootChain = chainName
-		flagRootHeight = rootHeight
-		flagEpochCounter = epochCounter
-		flagNumViewsInEpoch = 100_000
-		flagNumViewsInStakingAuction = 50_000
-		flagNumViewsInDKGPhase = 2_000
-		flagEpochCommitSafetyThreshold = 1_000
-
-		// set deterministic bootstrapping seed
-		flagBootstrapRandomSeed = deterministicSeed
-
-		hook := zeroLoggerHook{logs: &strings.Builder{}}
-		log = log.Hook(hook)
-
-		finalize(nil, nil)
-		assert.Regexp(t, expectedLogs, hook.logs.String())
-		hook.logs.Reset()
-	})
+// Check about the number of internal/partner nodes in each cluster. The identites
+// in each cluster do not matter for this check.
+func checkClusterConstraint(clusters flow.ClusterList, partnersInfo []model.NodeInfo, internalsInfo []model.NodeInfo) bool {
+	partners := model.ToIdentityList(partnersInfo)
+	internals := model.ToIdentityList(internalsInfo)
+	for _, cluster := range clusters {
+		var clusterPartnerCount, clusterInternalCount int
+		for _, node := range cluster {
+			if _, exists := partners.ByNodeID(node.NodeID); exists {
+				clusterPartnerCount++
+			}
+			if _, exists := internals.ByNodeID(node.NodeID); exists {
+				clusterInternalCount++
+			}
+		}
+		if clusterInternalCount <= clusterPartnerCount*2 {
+			return false
+		}
+	}
+	return true
 }

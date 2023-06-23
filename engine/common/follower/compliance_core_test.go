@@ -3,7 +3,6 @@ package follower
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -34,13 +33,13 @@ func TestFollowerCore(t *testing.T) {
 type CoreSuite struct {
 	suite.Suite
 
-	originID             flow.Identifier
-	finalizedBlock       *flow.Header
-	state                *protocol.FollowerState
-	follower             *module.HotStuffFollower
-	sync                 *module.BlockRequester
-	validator            *hotstuff.Validator
-	finalizationConsumer *hotstuff.FinalizationConsumer
+	originID         flow.Identifier
+	finalizedBlock   *flow.Header
+	state            *protocol.FollowerState
+	follower         *module.HotStuffFollower
+	sync             *module.BlockRequester
+	validator        *hotstuff.Validator
+	followerConsumer *hotstuff.FollowerConsumer
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -53,7 +52,7 @@ func (s *CoreSuite) SetupTest() {
 	s.follower = module.NewHotStuffFollower(s.T())
 	s.validator = hotstuff.NewValidator(s.T())
 	s.sync = module.NewBlockRequester(s.T())
-	s.finalizationConsumer = hotstuff.NewFinalizationConsumer(s.T())
+	s.followerConsumer = hotstuff.NewFollowerConsumer(s.T())
 
 	s.originID = unittest.IdentifierFixture()
 	s.finalizedBlock = unittest.BlockHeaderFixture()
@@ -67,7 +66,7 @@ func (s *CoreSuite) SetupTest() {
 		unittest.Logger(),
 		metrics,
 		metrics,
-		s.finalizationConsumer,
+		s.followerConsumer,
 		s.state,
 		s.follower,
 		s.validator,
@@ -137,7 +136,7 @@ func (s *CoreSuite) TestProcessingRangeHappyPath() {
 	wg.Add(len(blocks) - 1)
 	for i := 1; i < len(blocks); i++ {
 		s.state.On("ExtendCertified", mock.Anything, blocks[i-1], blocks[i].Header.QuorumCertificate()).Return(nil).Once()
-		s.follower.On("SubmitProposal", model.ProposalFromFlow(blocks[i-1].Header)).Run(func(args mock.Arguments) {
+		s.follower.On("AddCertifiedBlock", blockWithID(blocks[i-1].ID())).Run(func(args mock.Arguments) {
 			wg.Done()
 		}).Return().Once()
 	}
@@ -165,12 +164,18 @@ func (s *CoreSuite) TestProcessingNotOrderedBatch() {
 func (s *CoreSuite) TestProcessingInvalidBlock() {
 	blocks := unittest.ChainFixtureFrom(10, s.finalizedBlock)
 
-	s.validator.On("ValidateProposal", model.ProposalFromFlow(blocks[len(blocks)-1].Header)).Return(model.InvalidBlockError{Err: fmt.Errorf("")}).Once()
+	invalidProposal := model.ProposalFromFlow(blocks[len(blocks)-1].Header)
+	sentinelError := model.NewInvalidProposalErrorf(invalidProposal, "")
+	s.validator.On("ValidateProposal", invalidProposal).Return(sentinelError).Once()
+	s.followerConsumer.On("OnInvalidBlockDetected", flow.Slashable[model.InvalidProposalError]{
+		OriginID: s.originID,
+		Message:  sentinelError.(model.InvalidProposalError),
+	}).Return().Once()
 	err := s.core.OnBlockRange(s.originID, blocks)
 	require.NoError(s.T(), err, "sentinel error has to be handled internally")
 
 	exception := errors.New("validate-proposal-exception")
-	s.validator.On("ValidateProposal", model.ProposalFromFlow(blocks[len(blocks)-1].Header)).Return(exception).Once()
+	s.validator.On("ValidateProposal", invalidProposal).Return(exception).Once()
 	err = s.core.OnBlockRange(s.originID, blocks)
 	require.ErrorIs(s.T(), err, exception, "exception has to be propagated")
 }
@@ -204,7 +209,7 @@ func (s *CoreSuite) TestProcessingConnectedRangesOutOfOrder() {
 	var wg sync.WaitGroup
 	wg.Add(len(blocks) - 1)
 	for _, block := range blocks[:len(blocks)-1] {
-		s.follower.On("SubmitProposal", model.ProposalFromFlow(block.Header)).Return().Run(func(args mock.Arguments) {
+		s.follower.On("AddCertifiedBlock", blockWithID(block.ID())).Return().Run(func(args mock.Arguments) {
 			wg.Done()
 		}).Once()
 	}
@@ -234,7 +239,7 @@ func (s *CoreSuite) TestDetectingProposalEquivocation() {
 	otherBlock.Header.View = block.Header.View
 
 	s.validator.On("ValidateProposal", mock.Anything).Return(nil).Times(2)
-	s.finalizationConsumer.On("OnDoubleProposeDetected", mock.Anything, mock.Anything).Return().Once()
+	s.followerConsumer.On("OnDoubleProposeDetected", mock.Anything, mock.Anything).Return().Once()
 
 	err := s.core.OnBlockRange(s.originID, []*flow.Block{block})
 	require.NoError(s.T(), err)
@@ -266,10 +271,10 @@ func (s *CoreSuite) TestConcurrentAdd() {
 	s.validator.On("ValidateProposal", mock.Anything).Return(nil) // any proposal is valid
 	done := make(chan struct{})
 
-	s.follower.On("SubmitProposal", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+	s.follower.On("AddCertifiedBlock", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		// ensure that proposals are submitted in-order
-		proposal := args.Get(0).(*model.Proposal)
-		if proposal.Block.BlockID == targetSubmittedBlockID {
+		block := args.Get(0).(*model.CertifiedBlock)
+		if block.ID() == targetSubmittedBlockID {
 			close(done)
 		}
 	}).Return().Times(len(blocks) - 1) // all proposals have to be submitted
@@ -300,4 +305,9 @@ func (s *CoreSuite) TestConcurrentAdd() {
 
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "should submit blocks before timeout")
 	unittest.AssertClosesBefore(s.T(), done, time.Millisecond*500, "should process all blocks before timeout")
+}
+
+// blockWithID returns a testify `argumentMatcher` that only accepts blocks with the given ID
+func blockWithID(expectedBlockID flow.Identifier) interface{} {
+	return mock.MatchedBy(func(block *model.CertifiedBlock) bool { return expectedBlockID == block.ID() })
 }

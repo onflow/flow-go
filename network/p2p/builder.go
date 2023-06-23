@@ -18,10 +18,8 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 )
 
-// LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
-type LibP2PFactoryFunc func() (LibP2PNode, error)
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSubAdapterConfig) (PubSubAdapter, error)
-type CreateNodeFunc func(zerolog.Logger, host.Host, ProtocolPeerCache, PeerManager) LibP2PNode
+type CreateNodeFunc func(zerolog.Logger, host.Host, ProtocolPeerCache, PeerManager, *DisallowListCacheConfig) LibP2PNode
 type GossipSubAdapterConfigFunc func(*BasePubSubAdapterConfig) PubSubAdapterConfig
 
 // GossipSubBuilder provides a builder pattern for creating a GossipSub pubsub system.
@@ -63,8 +61,10 @@ type GossipSubBuilder interface {
 	// If the routing system has already been set, a fatal error is logged.
 	SetRoutingSystem(routing.Routing)
 
-	// SetGossipSubRPCInspectors sets the gossipsub rpc inspectors.
-	SetGossipSubRPCInspectors(inspectors ...GossipSubRPCInspector)
+	// SetGossipSubRPCInspectorSuite sets the gossipsub rpc inspector suite of the builder. It contains the
+	// inspector function that is injected into the gossipsub rpc layer, as well as the notification distributors that
+	// are used to notify the app specific scoring mechanism of misbehaving peers.
+	SetGossipSubRPCInspectorSuite(GossipSubInspectorSuite)
 
 	// Build creates a new GossipSub pubsub system.
 	// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
@@ -96,7 +96,7 @@ type NodeBuilder interface {
 	SetSubscriptionFilter(pubsub.SubscriptionFilter) NodeBuilder
 	SetResourceManager(network.ResourceManager) NodeBuilder
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
-	SetConnectionGater(connmgr.ConnectionGater) NodeBuilder
+	SetConnectionGater(ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
 	SetPeerManagerOptions(bool, time.Duration) NodeBuilder
 
@@ -111,8 +111,7 @@ type NodeBuilder interface {
 	SetRateLimiterDistributor(UnicastRateLimiterDistributor) NodeBuilder
 	SetGossipSubTracer(PubSubTracer) NodeBuilder
 	SetGossipSubScoreTracerInterval(time.Duration) NodeBuilder
-	// SetGossipSubRPCInspectors sets the gossipsub rpc inspectors.
-	SetGossipSubRPCInspectors(inspectors ...GossipSubRPCInspector) NodeBuilder
+	SetGossipSubRpcInspectorSuite(GossipSubInspectorSuite) NodeBuilder
 	Build() (LibP2PNode, error)
 }
 

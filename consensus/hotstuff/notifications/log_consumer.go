@@ -18,7 +18,8 @@ type LogConsumer struct {
 }
 
 var _ hotstuff.Consumer = (*LogConsumer)(nil)
-var _ hotstuff.TimeoutCollectorConsumer = (*LogConsumer)(nil)
+var _ hotstuff.TimeoutAggregationConsumer = (*LogConsumer)(nil)
+var _ hotstuff.VoteAggregationConsumer = (*LogConsumer)(nil)
 
 func NewLogConsumer(log zerolog.Logger) *LogConsumer {
 	lc := &LogConsumer{
@@ -45,8 +46,22 @@ func (lc *LogConsumer) OnFinalizedBlock(block *model.Block) {
 		Msg("block finalized")
 }
 
+func (lc *LogConsumer) OnInvalidBlockDetected(err flow.Slashable[model.InvalidProposalError]) {
+	invalidBlock := err.Message.InvalidProposal.Block
+	lc.log.Warn().
+		Str(logging.KeySuspicious, "true").
+		Hex("origin_id", err.OriginID[:]).
+		Uint64("block_view", invalidBlock.View).
+		Hex("proposer_id", invalidBlock.ProposerID[:]).
+		Hex("block_id", invalidBlock.BlockID[:]).
+		Uint64("qc_block_view", invalidBlock.QC.View).
+		Hex("qc_block_id", invalidBlock.QC.BlockID[:]).
+		Msgf("invalid block detected: %s", err.Message.Error())
+}
+
 func (lc *LogConsumer) OnDoubleProposeDetected(block *model.Block, alt *model.Block) {
 	lc.log.Warn().
+		Str(logging.KeySuspicious, "true").
 		Uint64("block_view", block.View).
 		Hex("block_id", block.BlockID[:]).
 		Hex("alt_id", alt.BlockID[:]).
@@ -165,6 +180,7 @@ func (lc *LogConsumer) OnCurrentViewDetails(currentView, finalizedView uint64, c
 
 func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote) {
 	lc.log.Warn().
+		Str(logging.KeySuspicious, "true").
 		Uint64("vote_view", vote.View).
 		Hex("voted_block_id", vote.BlockID[:]).
 		Hex("alt_id", alt.BlockID[:]).
@@ -174,6 +190,7 @@ func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote)
 
 func (lc *LogConsumer) OnInvalidVoteDetected(err model.InvalidVoteError) {
 	lc.log.Warn().
+		Str(logging.KeySuspicious, "true").
 		Uint64("vote_view", err.Vote.View).
 		Hex("voted_block_id", err.Vote.BlockID[:]).
 		Hex("voter_id", err.Vote.SignerID[:]).
@@ -182,6 +199,7 @@ func (lc *LogConsumer) OnInvalidVoteDetected(err model.InvalidVoteError) {
 
 func (lc *LogConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal *model.Proposal) {
 	lc.log.Warn().
+		Str(logging.KeySuspicious, "true").
 		Uint64("vote_view", vote.View).
 		Hex("voted_block_id", vote.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
@@ -191,6 +209,7 @@ func (lc *LogConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal 
 
 func (lc *LogConsumer) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, alt *model.TimeoutObject) {
 	lc.log.Warn().
+		Str(logging.KeySuspicious, "true").
 		Uint64("timeout_view", timeout.View).
 		Hex("signer_id", logging.ID(timeout.SignerID)).
 		Hex("timeout_id", logging.ID(timeout.ID())).
@@ -200,7 +219,9 @@ func (lc *LogConsumer) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, alt
 
 func (lc *LogConsumer) OnInvalidTimeoutDetected(err model.InvalidTimeoutError) {
 	log := err.Timeout.LogContext(lc.log).Logger()
-	log.Warn().Msgf("invalid timeout detected: %s", err.Error())
+	log.Warn().
+		Str(logging.KeySuspicious, "true").
+		Msgf("invalid timeout detected: %s", err.Error())
 }
 
 func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *model.Block) *zerolog.Event {
@@ -272,4 +293,11 @@ func (lc *LogConsumer) OnOwnProposal(header *flow.Header, targetPublicationTime 
 		Hex("parent_signer_indices", header.ParentVoterIndices).
 		Time("target_publication_time", targetPublicationTime).
 		Msg("publishing HotStuff block proposal")
+}
+
+func (lc *LogConsumer) OnQcConstructedFromVotes(qc *flow.QuorumCertificate) {
+	lc.log.Info().
+		Uint64("view", qc.View).
+		Hex("block_id", qc.BlockID[:]).
+		Msg("QC constructed from votes")
 }

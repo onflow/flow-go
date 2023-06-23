@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
-	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -94,15 +93,14 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		processedBlockHeight *badger.ConsumerProgress // used in block consumer
 		chunkQueue           *badger.ChunksQueue      // used in chunk consumer
 
-		syncCore                *chainsync.Core   // used in follower engine
-		assignerEngine          *assigner.Engine  // the assigner engine
-		fetcherEngine           *fetcher.Engine   // the fetcher engine
-		requesterEngine         *requester.Engine // the requester engine
-		verifierEng             *verifier.Engine  // the verifier engine
-		chunkConsumer           *chunkconsumer.ChunkConsumer
-		blockConsumer           *blockconsumer.BlockConsumer
-		finalizationDistributor *pubsub.FinalizationDistributor
-		finalizedHeader         *commonsync.FinalizedHeaderCache
+		syncCore            *chainsync.Core   // used in follower engine
+		assignerEngine      *assigner.Engine  // the assigner engine
+		fetcherEngine       *fetcher.Engine   // the fetcher engine
+		requesterEngine     *requester.Engine // the requester engine
+		verifierEng         *verifier.Engine  // the verifier engine
+		chunkConsumer       *chunkconsumer.ChunkConsumer
+		blockConsumer       *blockconsumer.BlockConsumer
+		followerDistributor *pubsub.FollowerDistributor
 
 		committee    *committees.Consensus
 		followerCore *hotstuff.FollowerLoop     // follower hotstuff logic
@@ -177,9 +175,9 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			return nil
 		}).
-		Module("finalization distributor", func(node *NodeConfig) error {
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
-			finalizationDistributor.AddConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
+		Module("follower distributor", func(node *NodeConfig) error {
+			followerDistributor = pubsub.NewFollowerDistributor()
+			followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
 			return nil
 		}).
 		Module("sync core", func(node *NodeConfig) error {
@@ -313,15 +311,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			return blockConsumer, nil
 		}).
-		Component("finalized snapshot", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			var err error
-			finalizedHeader, err = commonsync.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
-			if err != nil {
-				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-			}
-
-			return finalizedHeader, nil
-		}).
 		Component("consensus committee", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
@@ -332,32 +321,26 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return committee, err
 		}).
 		Component("follower core", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
 			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
-
-			packer := hotsignature.NewConsensusSigDataPacker(committee)
-			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(committee, packer)
 
 			finalized, pending, err := recoveryprotocol.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
-			finalizationDistributor.AddConsumer(blockConsumer)
+			followerDistributor.AddOnBlockFinalizedConsumer(blockConsumer.OnFinalizedBlock)
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
 			followerCore, err = flowconsensus.NewFollower(
 				node.Logger,
-				committee,
+				node.Metrics.Mempool,
 				node.Storage.Headers,
 				final,
-				verifier,
-				finalizationDistributor,
-				node.RootBlock.Header,
+				followerDistributor,
+				node.FinalizedRootBlock.Header,
 				node.RootQC,
 				finalized,
 				pending,
@@ -383,7 +366,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Logger,
 				node.Metrics.Mempool,
 				heroCacheCollector,
-				finalizationDistributor,
+				followerDistributor,
 				followerState,
 				followerCore,
 				validator,
@@ -400,13 +383,14 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
-				finalizedHeader.Get(),
+				node.LastFinalizedHeader,
 				core,
-				followereng.WithComplianceConfigOpt(modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
+				node.ComplianceConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
+			followerDistributor.AddOnBlockFinalizedConsumer(followerEng.OnFinalizedBlock)
 
 			return followerEng, nil
 		}).
@@ -416,15 +400,17 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
+				node.State,
 				node.Storage.Blocks,
 				followerEng,
 				syncCore,
-				finalizedHeader,
 				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
+			followerDistributor.AddFinalizationConsumer(sync)
+
 			return sync, nil
 		})
 }

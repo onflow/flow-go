@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 const (
@@ -28,7 +29,8 @@ const (
 func executeRequest(req *http.Request, backend *mock.API) (*httptest.ResponseRecorder, error) {
 	var b bytes.Buffer
 	logger := zerolog.New(&b)
-	router, err := newRouter(backend, logger, flow.Testnet.Chain())
+	restCollector := metrics.NewNoopCollector()
+	router, err := newRouter(backend, logger, flow.Testnet.Chain(), restCollector)
 	if err != nil {
 		return nil, err
 	}

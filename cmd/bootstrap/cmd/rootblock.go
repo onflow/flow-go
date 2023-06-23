@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/hex"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -12,7 +11,6 @@ import (
 )
 
 var (
-	flagFastKG        bool
 	flagRootChain     string
 	flagRootParent    string
 	flagRootHeight    uint64
@@ -23,7 +21,7 @@ var (
 var rootBlockCmd = &cobra.Command{
 	Use:   "rootblock",
 	Short: "Generate root block data",
-	Long:  `Run DKG, generate root block and votes for root block needed for constructing QC. Serialize all info into file`,
+	Long:  `Run Beacon KeyGen, generate root block and votes for root block needed for constructing QC. Serialize all info into file`,
 	Run:   rootBlock,
 }
 
@@ -59,11 +57,6 @@ func addRootBlockCmdFlags() {
 	cmd.MarkFlagRequired(rootBlockCmd, "root-chain")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-height")
-
-	rootBlockCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", GenerateRandomSeed(flow.EpochSetupRandomSourceLength), "The seed used to for DKG, Clustering and Cluster QC generation")
-
-	// optional parameters to influence various aspects of identity generation
-	rootBlockCmd.Flags().BoolVar(&flagFastKG, "fast-kg", false, "use fast (centralized) random beacon key generation instead of DKG")
 }
 
 func rootBlock(cmd *cobra.Command, args []string) {
@@ -77,14 +70,6 @@ func rootBlock(cmd *cobra.Command, args []string) {
 			log.Fatal().Msg("cannot use both --partner-stakes and --partner-weights flags (use only --partner-weights)")
 		}
 	}
-
-	if len(flagBootstrapRandomSeed) != flow.EpochSetupRandomSourceLength {
-		log.Error().Int("expected", flow.EpochSetupRandomSourceLength).Int("actual", len(flagBootstrapRandomSeed)).Msg("random seed provided length is not valid")
-		return
-	}
-
-	log.Info().Str("seed", hex.EncodeToString(flagBootstrapRandomSeed)).Msg("deterministic bootstrapping random seed")
-	log.Info().Msg("")
 
 	log.Info().Msg("collecting partner network and staking keys")
 	partnerNodes := readPartnerNodeInfos()
@@ -104,7 +89,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("running DKG for consensus nodes")
-	dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
+	dkgData := runBeaconKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root block")

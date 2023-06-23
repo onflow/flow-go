@@ -75,13 +75,13 @@ func (f *HotStuffFactory) CreateModules(
 	// setup metrics/logging with the new chain ID
 	log := f.createLogger(cluster)
 	metrics := f.createMetrics(cluster.ChainID())
+	telemetryConsumer := notifications.NewTelemetryConsumer(log)
+	slashingConsumer := notifications.NewSlashingViolationsConsumer(log)
 	notifier := pubsub.NewDistributor()
-	finalizationDistributor := pubsub.NewFinalizationDistributor()
-	notifier.AddConsumer(finalizationDistributor)
 	notifier.AddConsumer(notifications.NewLogConsumer(log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
-	notifier.AddConsumer(notifications.NewTelemetryConsumer(log))
-	notifier.AddConsumer(notifications.NewSlashingViolationsConsumer(log))
+	notifier.AddParticipantConsumer(telemetryConsumer)
+	notifier.AddProposalViolationConsumer(slashingConsumer)
 
 	var (
 		err       error
@@ -114,11 +114,13 @@ func (f *HotStuffFactory) CreateModules(
 		return nil, nil, err
 	}
 
-	qcDistributor := pubsub.NewQCCreatedDistributor()
+	voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
+	voteAggregationDistributor.AddVoteCollectorConsumer(telemetryConsumer)
+	voteAggregationDistributor.AddVoteAggregationViolationConsumer(slashingConsumer)
 
 	verifier := verification.NewStakingVerifier()
 	validator := validatorImpl.NewMetricsWrapper(validatorImpl.New(committee, verifier), metrics)
-	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
+	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, voteAggregationDistributor.OnQcConstructedFromVotes)
 	voteAggregator, err := consensus.NewVoteAggregator(
 		log,
 		metrics,
@@ -127,17 +129,19 @@ func (f *HotStuffFactory) CreateModules(
 		// since we don't want to aggregate votes for finalized view,
 		// the lowest retained view starts with the next view of the last finalized view.
 		finalizedBlock.View+1,
-		notifier,
+		voteAggregationDistributor,
 		voteProcessorFactory,
-		finalizationDistributor,
+		notifier.FollowerDistributor,
 	)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
-	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(log, timeoutCollectorDistributor, committee, validator, msig.CollectorTimeoutTag)
+	timeoutCollectorDistributor := pubsub.NewTimeoutAggregationDistributor()
+	timeoutCollectorDistributor.AddTimeoutCollectorConsumer(telemetryConsumer)
+	timeoutCollectorDistributor.AddTimeoutAggregationViolationConsumer(slashingConsumer)
 
+	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(log, timeoutCollectorDistributor, committee, validator, msig.CollectorTimeoutTag)
 	timeoutAggregator, err := consensus.NewTimeoutAggregator(
 		log,
 		metrics,
@@ -161,9 +165,8 @@ func (f *HotStuffFactory) CreateModules(
 		Persist:                     persister.New(f.db, cluster.ChainID()),
 		VoteAggregator:              voteAggregator,
 		TimeoutAggregator:           timeoutAggregator,
-		QCCreatedDistributor:        qcDistributor,
-		TimeoutCollectorDistributor: timeoutCollectorDistributor,
-		FinalizationDistributor:     finalizationDistributor,
+		VoteCollectorDistributor:    voteAggregationDistributor.VoteCollectorDistributor,
+		TimeoutCollectorDistributor: timeoutCollectorDistributor.TimeoutCollectorDistributor,
 	}, metrics, nil
 }
 
@@ -188,6 +191,7 @@ func (f *HotStuffFactory) Create(
 	participant, err := consensus.NewParticipant(
 		log,
 		metrics,
+		f.mempoolMetrics,
 		builder,
 		finalizedBlock,
 		pendingBlocks,

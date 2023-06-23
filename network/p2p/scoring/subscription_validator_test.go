@@ -33,7 +33,7 @@ func TestSubscriptionValidator_NoSubscribedTopic(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
 
 	sv := scoring.NewSubscriptionValidator()
-	sv.RegisterSubscriptionProvider(sp)
+	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	// mocks peer 1 not subscribed to any topic.
 	peer1 := p2pfixtures.PeerIdFixture(t)
@@ -51,7 +51,7 @@ func TestSubscriptionValidator_NoSubscribedTopic(t *testing.T) {
 func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
 	sv := scoring.NewSubscriptionValidator()
-	sv.RegisterSubscriptionProvider(sp)
+	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	// mocks peer 1 not subscribed to an unknown topic.
 	peer1 := p2pfixtures.PeerIdFixture(t)
@@ -62,7 +62,7 @@ func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 	for _, role := range flow.Roles() {
 		err := sv.CheckSubscribedToAllowedTopics(peer1, role)
 		require.Error(t, err)
-		require.True(t, scoring.IsInvalidSubscriptionError(err))
+		require.True(t, p2p.IsInvalidSubscriptionError(err))
 	}
 }
 
@@ -71,7 +71,7 @@ func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
 	sv := scoring.NewSubscriptionValidator()
-	sv.RegisterSubscriptionProvider(sp)
+	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	for _, role := range flow.Roles() {
 		peerId := p2pfixtures.PeerIdFixture(t)
@@ -102,7 +102,7 @@ func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
 	sv := scoring.NewSubscriptionValidator()
-	sv.RegisterSubscriptionProvider(sp)
+	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	allChannels := channels.Channels().ExcludePattern(regexp.MustCompile("^(test).*"))
 	sporkID := unittest.IdentifierFixture()
@@ -116,7 +116,7 @@ func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 		sp.On("GetSubscribedTopics", peerId).Return(allTopics)
 		err := sv.CheckSubscribedToAllowedTopics(peerId, role)
 		require.Error(t, err, role)
-		require.True(t, scoring.IsInvalidSubscriptionError(err), role)
+		require.True(t, p2p.IsInvalidSubscriptionError(err), role)
 	}
 }
 
@@ -125,7 +125,7 @@ func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
 	sv := scoring.NewSubscriptionValidator()
-	sv.RegisterSubscriptionProvider(sp)
+	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	for _, role := range flow.Roles() {
 		peerId := p2pfixtures.PeerIdFixture(t)
@@ -144,7 +144,7 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 			sp.On("GetSubscribedTopics", peerId).Return(unauthorizedTopics[:i+1])
 			err := sv.CheckSubscribedToAllowedTopics(peerId, role)
 			require.Error(t, err, role)
-			require.True(t, scoring.IsInvalidSubscriptionError(err), role)
+			require.True(t, p2p.IsInvalidSubscriptionError(err), role)
 		}
 	}
 }
@@ -176,17 +176,20 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	idProvider := mock.NewIdentityProvider(t)
 	// one consensus node.
 	conNode, conId := p2ptest.NodeFixture(t, sporkId, t.Name(),
+		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
 		p2ptest.WithPeerScoringEnabled(idProvider),
 		p2ptest.WithRole(flow.RoleConsensus))
 
 	// two verification node.
 	verNode1, verId1 := p2ptest.NodeFixture(t, sporkId, t.Name(),
+		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
 		p2ptest.WithPeerScoringEnabled(idProvider),
 		p2ptest.WithRole(flow.RoleVerification))
 
 	verNode2, verId2 := p2ptest.NodeFixture(t, sporkId, t.Name(),
+		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
 		p2ptest.WithPeerScoringEnabled(idProvider),
 		p2ptest.WithRole(flow.RoleVerification))
