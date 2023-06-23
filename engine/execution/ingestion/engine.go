@@ -63,6 +63,7 @@ type Engine struct {
 }
 
 func New(
+	unit *engine.Unit,
 	logger zerolog.Logger,
 	net network.Network,
 	me module.Local,
@@ -90,7 +91,7 @@ func New(
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:                   engine.NewUnit(),
+		unit:                   unit,
 		log:                    log,
 		me:                     me,
 		request:                request,
