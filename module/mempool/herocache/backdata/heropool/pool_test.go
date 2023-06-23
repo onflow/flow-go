@@ -266,7 +266,8 @@ func TestAddAndRemoveEntities(t *testing.T) {
 
 // testAddRemoveEntities allows to add or remove entities in an order given by operationsIndexes. Each OperationAndIndex consists of an operaton to perform
 // on an entity stored under a corresponding index.
-func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, ejectionMode EjectionMode, operationsIndexes []OperationAndIndex, finalEntitiesinThePool []uint) {
+func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, ejectionMode EjectionMode, operationsAndIndexes []OperationAndIndex, finalEntitiesinThePool []uint) {
+
 	pool := NewHeroPool(limit, ejectionMode)
 
 	entities := unittest.EntityListFixture(uint(entityCount))
@@ -275,7 +276,7 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 	var insertedEntities map[flow.Identifier]EIndex
 	insertedEntities = make(map[flow.Identifier]EIndex)
 
-	for _, operationAndIndex := range operationsIndexes {
+	for _, operationAndIndex := range operationsAndIndexes {
 		operation := operationAndIndex.operation
 		index := operationAndIndex.index
 		switch operation {
@@ -301,7 +302,7 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 		}
 		checkEachEntityIsInFreeOrUsedState(t, pool)
 	}
-	require.Equal(t, uint32(len(insertedEntities)), pool.Size(), "Pool size doesnt correspond to a number of inserted entities")
+	require.Equal(t, uint32(len(insertedEntities)), pool.Size(), "Pool size doesn't correspond to a number of inserted entities")
 	for id, indexInThePool := range insertedEntities {
 		flowIndentifier, _, _ := pool.Get(indexInThePool)
 		require.Equal(t, flowIndentifier, id, "Pool contains an unexpected entity")
