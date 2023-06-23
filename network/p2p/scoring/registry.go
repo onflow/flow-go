@@ -258,9 +258,9 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 			record.Penalty += r.penalty.Graft
 		case p2pmsg.CtrlMsgPrune:
 			record.Penalty += r.penalty.Prune
-		case p2pconf.CtrlMsgIHave:
+		case p2pmsg.CtrlMsgIHave:
 			record.Penalty += r.penalty.IHave
-		case p2pconf.CtrlMsgIWant:
+		case p2pmsg.CtrlMsgIWant:
 			record.Penalty += r.penalty.IWant
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
