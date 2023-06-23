@@ -10,6 +10,18 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+type OperatioType int
+
+const (
+	Add OperatioType = iota
+	Remove
+)
+
+type OperationAndIndex struct {
+	operation OperatioType
+	index     uint
+}
+
 // TestStoreAndRetrieval_BelowLimit checks health of heroPool for storing and retrieval scenarios that
 // do not involve ejection.
 // The test involves cases for testing the pool below its limit, and also up to its limit. However, it never gets beyond
@@ -212,6 +224,94 @@ func TestInvalidateEntity(t *testing.T) {
 				},
 			}...)
 		})
+	}
+}
+
+// TestAddAndRemoveEntities checks health of heroPool for storing and removing scenarios. LRU, NoEjection and RandomEjection are tested.
+func TestAddAndRemoveEntities(t *testing.T) {
+	for _, tc := range []struct {
+		limit                  uint32              // capacity of pool
+		entityCount            uint32              // total entities to be stored
+		ejectionMode           EjectionMode        // ejection mode
+		operationsIndexes      []OperationAndIndex // operation to perform on an entity stored by index
+		finalEntitiesinThePool []uint              // indexes of entities residing in the pool at the end of the test
+	}{
+		{
+			limit:                  2,
+			entityCount:            5,
+			ejectionMode:           LRUEjection,
+			operationsIndexes:      []OperationAndIndex{{Add, 0}, {Add, 0}, {Add, 1}, {Add, 2}, {Add, 3}, {Remove, 2}, {Add, 2}, {Remove, 2}},
+			finalEntitiesinThePool: []uint{3},
+		},
+		{
+			limit:                  2,
+			entityCount:            5,
+			ejectionMode:           NoEjection,
+			operationsIndexes:      []OperationAndIndex{{Add, 0}, {Add, 1}, {Add, 2}, {Add, 3}, {Remove, 0}, {Remove, 1}, {Add, 4}, {Add, 3}},
+			finalEntitiesinThePool: []uint{3, 4},
+		},
+		{
+			limit:                  5,
+			entityCount:            6,
+			ejectionMode:           RandomEjection,
+			operationsIndexes:      []OperationAndIndex{{Add, 0}, {Add, 1}, {Remove, 1}, {Add, 2}, {Remove, 0}, {Add, 5}, {Add, 4}, {Add, 1}, {Add, 3}, {Add, 0}},
+			finalEntitiesinThePool: nil,
+		},
+	} {
+		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
+			testAddRemoveEntities(t, tc.limit, tc.entityCount, tc.ejectionMode, tc.operationsIndexes, tc.finalEntitiesinThePool)
+		})
+	}
+}
+
+// testAddRemoveEntities allows to add or remove entities in an order given by operationsIndexes. Each OperationAndIndex consists of an operaton to perform
+// on an entity stored under a corresponding index.
+func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, ejectionMode EjectionMode, operationsIndexes []OperationAndIndex, finalEntitiesinThePool []uint) {
+	pool := NewHeroPool(limit, ejectionMode)
+
+	entities := unittest.EntityListFixture(uint(entityCount))
+
+	// this map maintains entities inserted into the pool
+	var insertedEntities map[flow.Identifier]EIndex
+	insertedEntities = make(map[flow.Identifier]EIndex)
+
+	for _, operationAndIndex := range operationsIndexes {
+		operation := operationAndIndex.operation
+		index := operationAndIndex.index
+		switch operation {
+		case Add:
+			indexInThePool, _, ejectedEntity := pool.Add(entities[index].ID(), entities[index], uint64(index))
+			if indexInThePool != InvalidIndex {
+				insertedEntities[entities[index].ID()] = indexInThePool
+			}
+			if ejectedEntity != nil {
+				delete(insertedEntities, ejectedEntity.ID())
+			}
+		case Remove:
+			indexInPool, found := insertedEntities[entities[index].ID()]
+			if found {
+				removedEntity := pool.Remove(indexInPool)
+				require.Equal(t, entities[index].ID(), removedEntity.ID(), "Removed wrong entity")
+				delete(insertedEntities, entities[index].ID())
+			} else {
+				panic("Ill constructed test, trying to remove an element that has not been inserted")
+			}
+		default:
+			panic("Unknown pool operation")
+		}
+		checkEachEntityIsInFreeOrUsedState(t, pool)
+	}
+	require.Equal(t, uint32(len(insertedEntities)), pool.Size(), "Pool size doesnt correspond to a number of inserted entities")
+	for id, indexInThePool := range insertedEntities {
+		flowIndentifier, _, _ := pool.Get(indexInThePool)
+		require.Equal(t, flowIndentifier, id, "Pool contains an unexpected entity")
+	}
+	if finalEntitiesinThePool != nil {
+		for _, idInEntities := range finalEntitiesinThePool {
+			flowIndentifier, _, owner := pool.Get(insertedEntities[entities[idInEntities].ID()])
+			require.Equal(t, flowIndentifier, entities[idInEntities].ID(), "Pool contains an unexpected entity")
+			require.Equal(t, uint64(idInEntities), owner, "Entity is stored with a wrong owner")
+		}
 	}
 }
 

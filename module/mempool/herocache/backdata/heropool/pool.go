@@ -78,9 +78,18 @@ func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode, logger zerolog.Log
 		logger:       logger,
 	}
 
+	l.setDefaultNodeLinkValues()
 	l.initFreeEntities()
 
 	return l
+}
+
+// setDefaultNodeLinkValues sets nodes prev and nextt to InvalidIndex for all cached entity poolEntities.
+func (p *Pool) setDefaultNodeLinkValues() {
+	for i := 0; i < len(p.poolEntities); i++ {
+		p.poolEntities[i].node.next = InvalidIndex
+		p.poolEntities[i].node.prev = InvalidIndex
+	}
 }
 
 // initFreeEntities initializes the free double linked-list with the indices of all cached entity poolEntities.
