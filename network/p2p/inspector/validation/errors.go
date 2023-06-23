@@ -5,13 +5,13 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/netconf"
+	"github.com/onflow/flow-go/network/p2p/conf"
 )
 
 // ErrHardThreshold indicates that the amount of RPC messages received exceeds hard threshold.
 type ErrHardThreshold struct {
 	// controlMsg the control message type.
-	controlMsg netconf.ControlMessageType
+	controlMsg conf.ControlMessageType
 	// amount the amount of control messages.
 	amount uint64
 	// hardThreshold configured hard threshold.
@@ -23,7 +23,7 @@ func (e ErrHardThreshold) Error() string {
 }
 
 // NewHardThresholdErr returns a new ErrHardThreshold.
-func NewHardThresholdErr(controlMsg netconf.ControlMessageType, amount, hardThreshold uint64) ErrHardThreshold {
+func NewHardThresholdErr(controlMsg conf.ControlMessageType, amount, hardThreshold uint64) ErrHardThreshold {
 	return ErrHardThreshold{controlMsg: controlMsg, amount: amount, hardThreshold: hardThreshold}
 }
 
@@ -35,7 +35,7 @@ func IsErrHardThreshold(err error) bool {
 
 // ErrRateLimitedControlMsg indicates the specified RPC control message is rate limited for the specified peer.
 type ErrRateLimitedControlMsg struct {
-	controlMsg netconf.ControlMessageType
+	controlMsg conf.ControlMessageType
 }
 
 func (e ErrRateLimitedControlMsg) Error() string {
@@ -43,7 +43,7 @@ func (e ErrRateLimitedControlMsg) Error() string {
 }
 
 // NewRateLimitedControlMsgErr returns a new ErrValidationLimit.
-func NewRateLimitedControlMsgErr(controlMsg netconf.ControlMessageType) ErrRateLimitedControlMsg {
+func NewRateLimitedControlMsgErr(controlMsg conf.ControlMessageType) ErrRateLimitedControlMsg {
 	return ErrRateLimitedControlMsg{controlMsg: controlMsg}
 }
 

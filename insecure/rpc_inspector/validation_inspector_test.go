@@ -23,8 +23,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/conf"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -48,9 +48,9 @@ func TestValidationInspector_SafetyThreshold(t *testing.T) {
 	inspectorConfig.PruneLimits.SafetyThreshold = safetyThreshold
 
 	// expected log message logged when valid number GRAFT control messages spammed under safety threshold
-	graftExpectedMessageStr := fmt.Sprintf("control message %s inspection passed 5 is below configured safety threshold", netconf.CtrlMsgGraft)
+	graftExpectedMessageStr := fmt.Sprintf("control message %s inspection passed 5 is below configured safety threshold", conf.CtrlMsgGraft)
 	// expected log message logged when valid number PRUNE control messages spammed under safety threshold
-	pruneExpectedMessageStr := fmt.Sprintf("control message %s inspection passed 5 is below configured safety threshold", netconf.CtrlMsgGraft)
+	pruneExpectedMessageStr := fmt.Sprintf("control message %s inspection passed 5 is below configured safety threshold", conf.CtrlMsgGraft)
 	graftInfoLogsReceived := atomic.NewInt64(0)
 	pruneInfoLogsReceived := atomic.NewInt64(0)
 	// setup logger hook, we expect info log validation is skipped
@@ -126,9 +126,9 @@ func TestValidationInspector_HardThreshold_Detection(t *testing.T) {
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.Equal(t, uint64(messageCount), notification.Count)
 			switch notification.MsgType {
-			case netconf.CtrlMsgGraft:
+			case conf.CtrlMsgGraft:
 				invGraftNotifCount.Inc()
-			case netconf.CtrlMsgPrune:
+			case conf.CtrlMsgPrune:
 				invPruneNotifCount.Inc()
 			default:
 				require.Fail(t, "unexpected control message type")
@@ -194,7 +194,7 @@ func TestValidationInspector_HardThresholdIHave_Detection(t *testing.T) {
 			require.Equal(t, uint64(messageCount), notification.Count)
 			require.True(t, channels.IsInvalidTopicErr(notification.Err))
 			switch notification.MsgType {
-			case netconf.CtrlMsgIHave:
+			case conf.CtrlMsgIHave:
 				invIhaveNotifCount.Inc()
 			default:
 				require.Fail(t, "unexpected control message type")
@@ -257,9 +257,9 @@ func TestValidationInspector_RateLimitedPeer_Detection(t *testing.T) {
 			require.True(t, validation.IsErrRateLimitedControlMsg(notification.Err))
 			require.Equal(t, uint64(messageCount), notification.Count)
 			switch notification.MsgType {
-			case netconf.CtrlMsgGraft:
+			case conf.CtrlMsgGraft:
 				invGraftNotifCount.Inc()
-			case netconf.CtrlMsgPrune:
+			case conf.CtrlMsgPrune:
 				invPruneNotifCount.Inc()
 			default:
 				require.Fail(t, "unexpected control message type")
@@ -353,13 +353,13 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			require.True(t, channels.IsInvalidTopicErr(notification.Err))
 			switch notification.MsgType {
-			case netconf.CtrlMsgGraft:
+			case conf.CtrlMsgGraft:
 				invGraftNotifCount.Inc()
 				require.Equal(t, messageCount, notification.Count)
-			case netconf.CtrlMsgPrune:
+			case conf.CtrlMsgPrune:
 				invPruneNotifCount.Inc()
 				require.Equal(t, messageCount, notification.Count)
-			case netconf.CtrlMsgIHave:
+			case conf.CtrlMsgIHave:
 				require.Equal(t, uint64(ihaveMessageCount), notification.Count)
 				invIHaveNotifCount.Inc()
 			default:
@@ -461,9 +461,9 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 			require.True(t, validation.IsErrDuplicateTopic(notification.Err))
 			require.Equal(t, messageCount, notification.Count)
 			switch notification.MsgType {
-			case netconf.CtrlMsgGraft:
+			case conf.CtrlMsgGraft:
 				invGraftNotifCount.Inc()
-			case netconf.CtrlMsgPrune:
+			case conf.CtrlMsgPrune:
 				invPruneNotifCount.Inc()
 			default:
 				require.Fail(t, "unexpected control message type")
@@ -538,9 +538,9 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 			require.True(t, channels.IsUnknownClusterIDErr(notification.Err))
 			require.Equal(t, messageCount, notification.Count)
 			switch notification.MsgType {
-			case netconf.CtrlMsgGraft:
+			case conf.CtrlMsgGraft:
 				invGraftNotifCount.Inc()
-			case netconf.CtrlMsgPrune:
+			case conf.CtrlMsgPrune:
 				invPruneNotifCount.Inc()
 			default:
 				require.Fail(t, "unexpected control message type")
@@ -608,7 +608,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 			require.True(t, validation.IsErrActiveClusterIDsNotSet(notification.Err))
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			switch notification.MsgType {
-			case netconf.CtrlMsgGraft:
+			case conf.CtrlMsgGraft:
 				invGraftNotifCount.Inc()
 			default:
 				require.Fail(t, "unexpected control message type")
@@ -672,7 +672,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 			require.True(t, validation.IsErrActiveClusterIDsNotSet(notification.Err))
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
 			switch notification.MsgType {
-			case netconf.CtrlMsgPrune:
+			case conf.CtrlMsgPrune:
 				invPruneNotifCount.Inc()
 			default:
 				require.Fail(t, "unexpected control message type")
@@ -745,9 +745,9 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 			require.True(t, validation.IsErrUnstakedPeer(notification.Err))
 			require.Equal(t, messageCount, notification.Count)
 			switch notification.MsgType {
-			case netconf.CtrlMsgGraft:
+			case conf.CtrlMsgGraft:
 				invGraftNotifCount.Inc()
-			case netconf.CtrlMsgPrune:
+			case conf.CtrlMsgPrune:
 				invPruneNotifCount.Inc()
 			default:
 				require.Fail(t, "unexpected control message type")
@@ -805,7 +805,7 @@ func withExpectedNotificationDissemination(expectedNumOfTotalNotif int, f onNoti
 }
 
 // setupTest sets up common components of RPC inspector test.
-func setupTest(t *testing.T, logger zerolog.Logger, role flow.Role, sporkID flow.Identifier, inspectorConfig *netconf.GossipSubRPCValidationInspectorConfigs, mockDistributorOpts ...mockDistributorOption) (*irrecoverable.MockSignalerContext, context.CancelFunc, *corruptlibp2p.GossipSubRouterSpammer, p2p.LibP2PNode, flow.Identity, *mockp2p.GossipSubInspectorNotificationDistributor, *validation.ControlMsgValidationInspector, *mock.IdentityProvider) {
+func setupTest(t *testing.T, logger zerolog.Logger, role flow.Role, sporkID flow.Identifier, inspectorConfig *conf.GossipSubRPCValidationInspectorConfigs, mockDistributorOpts ...mockDistributorOption) (*irrecoverable.MockSignalerContext, context.CancelFunc, *corruptlibp2p.GossipSubRouterSpammer, p2p.LibP2PNode, flow.Identity, *mockp2p.GossipSubInspectorNotificationDistributor, *validation.ControlMsgValidationInspector, *mock.IdentityProvider) {
 	idProvider := mock.NewIdentityProvider(t)
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
 	ctx, cancel := context.WithCancel(context.Background())

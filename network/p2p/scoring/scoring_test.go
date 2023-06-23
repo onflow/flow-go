@@ -22,8 +22,8 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/conf"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -94,7 +94,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		p2ptest.WithPeerScoringEnabled(idProvider),
 		p2ptest.OverrideGossipSubRpcInspectorSuiteFactory(func(zerolog.Logger,
 			flow.Identifier,
-			*netconf.GossipSubRPCInspectorsConfig,
+			*conf.GossipSubRPCInspectorsConfig,
 			module.GossipSubMetrics,
 			metrics.HeroCacheMetricsFactory,
 			flownet.NetworkingType,

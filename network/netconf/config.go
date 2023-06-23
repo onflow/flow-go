@@ -2,17 +2,19 @@ package netconf
 
 import (
 	"time"
+
+	"github.com/onflow/flow-go/network/p2p/conf"
 )
 
 // Config encapsulation of configuration structs for all components related to the Flow network.
 type Config struct {
 	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
-	UnicastRateLimitersConfig `mapstructure:",squash"`
-	ResourceManagerConfig     `mapstructure:",squash"`
-	ConnectionManagerConfig   `mapstructure:",squash"`
+	UnicastRateLimitersConfig  `mapstructure:",squash"`
+	conf.ResourceManagerConfig `mapstructure:",squash"`
+	ConnectionManagerConfig    `mapstructure:",squash"`
 	// GossipSubConfig core gossipsub configuration.
-	GossipSubConfig `mapstructure:",squash"`
-	AlspConfig      `mapstructure:",squash"`
+	conf.GossipSubConfig `mapstructure:",squash"`
+	AlspConfig           `mapstructure:",squash"`
 
 	// NetworkConnectionPruning determines whether connections to nodes
 	// that are not part of protocol state should be trimmed

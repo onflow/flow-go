@@ -5,12 +5,11 @@ package mockp2p
 import (
 	flow "github.com/onflow/flow-go/model/flow"
 	metrics "github.com/onflow/flow-go/module/metrics"
+	netconf "github.com/onflow/flow-go/network/p2p/conf"
 
 	mock "github.com/stretchr/testify/mock"
 
 	module "github.com/onflow/flow-go/module"
-
-	netconf "github.com/onflow/flow-go/network/netconf"
 
 	network "github.com/onflow/flow-go/network"
 

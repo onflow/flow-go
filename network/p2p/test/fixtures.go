@@ -28,8 +28,8 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/testutils"
-	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/conf"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
@@ -201,7 +201,7 @@ type NodeFixtureParameters struct {
 	PubSubTracer                      p2p.PubSubTracer
 	GossipSubPeerScoreTracerInterval  time.Duration // intervals at which the peer score is updated and logged.
 	CreateStreamRetryDelay            time.Duration
-	GossipSubRPCInspectorCfg          *netconf.GossipSubRPCInspectorsConfig
+	GossipSubRPCInspectorCfg          *conf.GossipSubRPCInspectorsConfig
 	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
 }
 
@@ -211,7 +211,7 @@ func OverrideGossipSubRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspector
 	}
 }
 
-func OverrideGossipSubRpcInspectorConfig(cfg *netconf.GossipSubRPCInspectorsConfig) NodeFixtureParameterOption {
+func OverrideGossipSubRpcInspectorConfig(cfg *conf.GossipSubRPCInspectorsConfig) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.GossipSubRPCInspectorCfg = cfg
 	}
@@ -612,10 +612,10 @@ func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
 // - *netconf.GossipSubRPCValidationInspectorConfigs: GossipSubRPCValidationInspectorConfigs instance.
 // Note: the parameters in this fixture are INTENTIONALLY independent of the default values in the config file.
 // This is to allow test parameters to be changed without affecting the default values in the config file.
-func GossipSubRpcValidationInspectorConfigFixture(_ *testing.T) *netconf.GossipSubRPCInspectorsConfig {
-	return &netconf.GossipSubRPCInspectorsConfig{
-		GossipSubRPCValidationInspectorConfigs: netconf.GossipSubRPCValidationInspectorConfigs{
-			ClusterPrefixedMessageConfig: netconf.ClusterPrefixedMessageConfig{
+func GossipSubRpcValidationInspectorConfigFixture(_ *testing.T) *conf.GossipSubRPCInspectorsConfig {
+	return &conf.GossipSubRPCInspectorsConfig{
+		GossipSubRPCValidationInspectorConfigs: conf.GossipSubRPCValidationInspectorConfigs{
+			ClusterPrefixedMessageConfig: conf.ClusterPrefixedMessageConfig{
 				ClusterPrefixHardThreshold:                   100,
 				ClusterPrefixedControlMsgsReceivedCacheSize:  100,
 				ClusterPrefixedControlMsgsReceivedCacheDecay: .99,
@@ -653,7 +653,7 @@ func GossipSubRpcValidationInspectorConfigFixture(_ *testing.T) *netconf.GossipS
 			IHaveAsyncInspectSampleSizePercentage: .10,
 			IHaveInspectionMaxSampleSize:          100,
 		},
-		GossipSubRPCMetricsInspectorConfigs: netconf.GossipSubRPCMetricsInspectorConfigs{
+		GossipSubRPCMetricsInspectorConfigs: conf.GossipSubRPCMetricsInspectorConfigs{
 			NumberOfWorkers: 1,
 			CacheSize:       100,
 		},

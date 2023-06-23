@@ -13,9 +13,9 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/network/p2p/conf"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -49,20 +49,20 @@ func TestNoPenaltyRecord(t *testing.T) {
 // penalty value as the app specific score.
 func TestPeerWithSpamRecord(t *testing.T) {
 	t.Run("graft", func(t *testing.T) {
-		testPeerWithSpamRecord(t, netconf.CtrlMsgGraft, penaltyValueFixtures().Graft)
+		testPeerWithSpamRecord(t, conf.CtrlMsgGraft, penaltyValueFixtures().Graft)
 	})
 	t.Run("prune", func(t *testing.T) {
-		testPeerWithSpamRecord(t, netconf.CtrlMsgPrune, penaltyValueFixtures().Prune)
+		testPeerWithSpamRecord(t, conf.CtrlMsgPrune, penaltyValueFixtures().Prune)
 	})
 	t.Run("ihave", func(t *testing.T) {
-		testPeerWithSpamRecord(t, netconf.CtrlMsgIHave, penaltyValueFixtures().IHave)
+		testPeerWithSpamRecord(t, conf.CtrlMsgIHave, penaltyValueFixtures().IHave)
 	})
 	t.Run("iwant", func(t *testing.T) {
-		testPeerWithSpamRecord(t, netconf.CtrlMsgIWant, penaltyValueFixtures().IWant)
+		testPeerWithSpamRecord(t, conf.CtrlMsgIWant, penaltyValueFixtures().IWant)
 	})
 }
 
-func testPeerWithSpamRecord(t *testing.T, messageType netconf.ControlMessageType, expectedPenalty float64) {
+func testPeerWithSpamRecord(t *testing.T, messageType conf.ControlMessageType, expectedPenalty float64) {
 	peerID := peer.ID("peer-1")
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
@@ -99,22 +99,22 @@ func testPeerWithSpamRecord(t *testing.T, messageType netconf.ControlMessageType
 
 func TestSpamRecord_With_UnknownIdentity(t *testing.T) {
 	t.Run("graft", func(t *testing.T) {
-		testSpamRecordWithUnknownIdentity(t, netconf.CtrlMsgGraft, penaltyValueFixtures().Graft)
+		testSpamRecordWithUnknownIdentity(t, conf.CtrlMsgGraft, penaltyValueFixtures().Graft)
 	})
 	t.Run("prune", func(t *testing.T) {
-		testSpamRecordWithUnknownIdentity(t, netconf.CtrlMsgPrune, penaltyValueFixtures().Prune)
+		testSpamRecordWithUnknownIdentity(t, conf.CtrlMsgPrune, penaltyValueFixtures().Prune)
 	})
 	t.Run("ihave", func(t *testing.T) {
-		testSpamRecordWithUnknownIdentity(t, netconf.CtrlMsgIHave, penaltyValueFixtures().IHave)
+		testSpamRecordWithUnknownIdentity(t, conf.CtrlMsgIHave, penaltyValueFixtures().IHave)
 	})
 	t.Run("iwant", func(t *testing.T) {
-		testSpamRecordWithUnknownIdentity(t, netconf.CtrlMsgIWant, penaltyValueFixtures().IWant)
+		testSpamRecordWithUnknownIdentity(t, conf.CtrlMsgIWant, penaltyValueFixtures().IWant)
 	})
 }
 
 // testSpamRecordWithUnknownIdentity tests the app specific penalty computation of the node when there is a spam record for the peer id and
 // the peer id has an unknown identity.
-func testSpamRecordWithUnknownIdentity(t *testing.T, messageType netconf.ControlMessageType, expectedPenalty float64) {
+func testSpamRecordWithUnknownIdentity(t *testing.T, messageType conf.ControlMessageType, expectedPenalty float64) {
 	peerID := peer.ID("peer-1")
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
@@ -150,22 +150,22 @@ func testSpamRecordWithUnknownIdentity(t *testing.T, messageType netconf.Control
 
 func TestSpamRecord_With_SubscriptionPenalty(t *testing.T) {
 	t.Run("graft", func(t *testing.T) {
-		testSpamRecordWithSubscriptionPenalty(t, netconf.CtrlMsgGraft, penaltyValueFixtures().Graft)
+		testSpamRecordWithSubscriptionPenalty(t, conf.CtrlMsgGraft, penaltyValueFixtures().Graft)
 	})
 	t.Run("prune", func(t *testing.T) {
-		testSpamRecordWithSubscriptionPenalty(t, netconf.CtrlMsgPrune, penaltyValueFixtures().Prune)
+		testSpamRecordWithSubscriptionPenalty(t, conf.CtrlMsgPrune, penaltyValueFixtures().Prune)
 	})
 	t.Run("ihave", func(t *testing.T) {
-		testSpamRecordWithSubscriptionPenalty(t, netconf.CtrlMsgIHave, penaltyValueFixtures().IHave)
+		testSpamRecordWithSubscriptionPenalty(t, conf.CtrlMsgIHave, penaltyValueFixtures().IHave)
 	})
 	t.Run("iwant", func(t *testing.T) {
-		testSpamRecordWithSubscriptionPenalty(t, netconf.CtrlMsgIWant, penaltyValueFixtures().IWant)
+		testSpamRecordWithSubscriptionPenalty(t, conf.CtrlMsgIWant, penaltyValueFixtures().IWant)
 	})
 }
 
 // testSpamRecordWithUnknownIdentity tests the app specific penalty computation of the node when there is a spam record for the peer id and
 // the peer id has an invalid subscription as well.
-func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType netconf.ControlMessageType, expectedPenalty float64) {
+func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType conf.ControlMessageType, expectedPenalty float64) {
 	peerID := peer.ID("peer-1")
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
@@ -209,7 +209,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
-		MsgType: netconf.CtrlMsgPrune,
+		MsgType: conf.CtrlMsgPrune,
 		Count:   1,
 	})
 
@@ -217,7 +217,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
-		MsgType: netconf.CtrlMsgGraft,
+		MsgType: conf.CtrlMsgGraft,
 		Count:   1,
 	})
 
@@ -225,7 +225,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
-		MsgType: netconf.CtrlMsgIHave,
+		MsgType: conf.CtrlMsgIHave,
 		Count:   1,
 	})
 
@@ -233,7 +233,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
-		MsgType: netconf.CtrlMsgIWant,
+		MsgType: conf.CtrlMsgIWant,
 		Count:   1,
 	})
 
@@ -275,7 +275,7 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
-		MsgType: netconf.CtrlMsgGraft,
+		MsgType: conf.CtrlMsgGraft,
 		Count:   1,
 	})
 
@@ -325,7 +325,7 @@ func TestPersistingUnknownIdentityPenalty(t *testing.T) {
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
-		MsgType: netconf.CtrlMsgGraft,
+		MsgType: conf.CtrlMsgGraft,
 		Count:   1,
 	})
 
@@ -378,7 +378,7 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
-		MsgType: netconf.CtrlMsgGraft,
+		MsgType: conf.CtrlMsgGraft,
 		Count:   1,
 	})
 
