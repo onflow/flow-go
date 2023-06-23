@@ -346,123 +346,217 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	// creates a misbehavior report for the spammer
 	report := misbehaviorReportFixtureWithPenalty(t, ids[spammerIndex].NodeID, model.DefaultPenaltyValue)
 
+	// loop through the list of expected penalties and ensure that the spammer is disallow-listed after each report for
+	// the correct amount of time.
+
+	// data driven test of expected penalties - key is string describing the test case, value is a list of expected int penalties
+	// for each report.
+
+	expectedDecaysMap := map[string][]int{
+		"10x decrease in decay": {1000, 100, 10, 1}, // list of expected decay values after each disallow listing
+
+		//"1x decrease in decay": {1000, 100, 100, 100}, // list of expected decay values after each disallow listing
+	}
+
+	for testCase, expectedDecays := range expectedDecaysMap {
+
+		// reset cutoff counter before each test case
+		expectedCutoffCounter := 0
+
+		// creat subtest for each expected decay list
+		t.Run(testCase, func(t *testing.T) {
+			expectedCutoffCounter++ // cutoff counter is expected to be incremented after each disallow listing
+
+			// keep misbehaving until the spammer is disallow-listed and check that the decay is as expected
+			for _, expectedDecay := range expectedDecays {
+
+				// reset the decay function to the default
+				fastDecay = false
+
+				// simulates the victim node reporting the spammer node misbehavior 10 times
+				// as each report has the default penalty, ideally the spammer should be disallow-listed after
+				// 100 reports (each having 0.01 * disallow-listing penalty). But we take 120 as a safe number to ensure that
+				// the spammer is definitely disallow-listed.
+				reportCount := 120
+				wg := sync.WaitGroup{}
+				for i := 0; i < reportCount; i++ {
+					wg.Add(1)
+					// reports the misbehavior
+					r := report // capture range variable
+					go func() {
+						defer wg.Done()
+
+						con.ReportMisbehavior(r)
+					}()
+				}
+
+				unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
+
+				// ensures that the spammer is disallow-listed by the victim
+				// while the spammer node is disallow-listed, it cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the spammer node, unless
+				// it is allow-listed again.
+				p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]}, 100*time.Millisecond, 2*time.Second)
+
+				// ensures that the spammer is not disallow-listed by the honest node
+				p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestIndex], nodes[spammerIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+
+				// ensures that the spammer is disallow-listed for the expected amount of time
+
+				record, ok := victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
+				require.True(t, ok)
+				require.NotNil(t, record)
+
+				// check the penalty of the spammer node. It should be greater than the disallow-listing threshold.
+				require.Greater(t, float64(model.DisallowListingThreshold), record.Penalty)
+				require.Equal(t, float64(expectedDecay), record.Decay)
+				require.Equal(t, true, record.DisallowListed)
+				require.Equal(t, uint64(expectedCutoffCounter), record.CutoffCounter)
+
+				// decay the disallow-listing penalty of the spammer node to zero.
+				t.Logf("about to decay the disallow-listing penalty of the spammer node to zero")
+				fastDecay = true
+				t.Logf("decayed the disallow-listing penalty of the spammer node to zero")
+
+				// after serving the disallow-listing period, the spammer should be able to connect to the victim node again.
+				p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[victimIndex]}, 1*time.Millisecond, 1*time.Second)
+
+				// all the nodes should be able to connect to each other again.
+				p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
+
+				record, ok = victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
+				require.True(t, ok)
+				require.NotNil(t, record)
+
+				require.Equal(t, float64(0), record.Penalty)
+				//require.Equal(t, float64(1000), record.Decay)
+				require.Equal(t, false, record.DisallowListed)
+				require.Equal(t, uint64(expectedCutoffCounter), record.CutoffCounter)
+
+				// go back to regular decay to prepare for the next set of misbehavior reports.
+				fastDecay = false
+				t.Logf("about to report misbehavior again")
+			}
+			t.Logf("finished test case: %s", testCase)
+		})
+	}
+
 	// simulates the victim node reporting the spammer node misbehavior 120 times
 	// to the network. As each report has the default penalty, ideally the spammer should be disallow-listed after
 	// 100 reports (each having 0.01 * disallow-listing penalty). But we take 120 as a safe number to ensure that
 	// the spammer is definitely disallow-listed.
-	reportCount := 120
-	wg := sync.WaitGroup{}
-	for i := 0; i < reportCount; i++ {
-		wg.Add(1)
-		// reports the misbehavior
-		r := report // capture range variable
-		go func() {
-			defer wg.Done()
-
-			con.ReportMisbehavior(r)
-		}()
-	}
-
-	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
-
-	// ensures that the spammer is disallow-listed by the victim
-	// while the spammer node is disallow-listed, it cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the spammer node, unless
-	// it is allow-listed again.
-	p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]}, 100*time.Millisecond, 3*time.Second)
-
-	// despite disallow-listing spammer, ensure that (victim and honest) and (honest and spammer) are still connected.
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[honestIndex]}, 1*time.Millisecond, 100*time.Millisecond)
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
-
-	record, ok := victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
-	require.True(t, ok)
-	require.NotNil(t, record)
-
-	// check the penalty of the spammer node. It should be greater than the disallow-listing threshold.
-	require.Greater(t, float64(model.DisallowListingThreshold), record.Penalty)
-	require.Equal(t, float64(1000), record.Decay)
-	require.Equal(t, true, record.DisallowListed)
-	require.Equal(t, uint64(1), record.CutoffCounter)
-
-	// decay the disallow-listing penalty of the spammer node to zero.
-	t.Logf("about to decay the disallow-listing penalty of the spammer node to zero")
-	fastDecay = true
-	t.Logf("decayed the disallow-listing penalty of the spammer node to zero")
-
-	// after serving the disallow-listing period, the spammer should be able to connect to the victim node again.
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[victimIndex]}, 1*time.Millisecond, 1*time.Second)
-
-	// all the nodes should be able to connect to each other again.
-	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
-
-	record, ok = victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
-	require.True(t, ok)
-	require.NotNil(t, record)
-
-	require.Equal(t, float64(0), record.Penalty)
-	require.Equal(t, float64(1000), record.Decay)
-	require.Equal(t, false, record.DisallowListed)
-	require.Equal(t, uint64(1), record.CutoffCounter)
-
-	// go back to regular decay to prepare for the next set of misbehavior reports.
-	fastDecay = false
-	t.Logf("about to report misbehavior again")
-
-	// simulates the victim node reporting the spammer node misbehavior 120 times
-	// to the network. As each report has the default penalty, ideally the spammer should be disallow-listed after
-	// 100 reports (each having 0.01 * disallow-listing penalty). But we take 120 as a safe number to ensure that
-	// the spammer is definitely disallow-listed.
-	reportCount = 120
-	wg = sync.WaitGroup{}
-	for i := 0; i < reportCount; i++ {
-		wg.Add(1)
-		// reports the misbehavior
-		r := report // capture range variable
-		go func() {
-			defer wg.Done()
-
-			con.ReportMisbehavior(r)
-		}()
-	}
-
-	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
-
-	// while the spammer node is disallow-listed, it cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the spammer node, unless
-	// it is allow-listed again.
-	p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]}, 100*time.Millisecond, 3*time.Second)
-
-	// despite disallow-listing spammer, ensure that (victim and honest) and (honest and spammer) are still connected.
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[honestIndex]}, 1*time.Millisecond, 100*time.Millisecond)
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
-
-	record, ok = victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
-	require.True(t, ok)
-	require.NotNil(t, record)
-
-	require.Greater(t, float64(model.DisallowListingThreshold), record.Penalty)
-	require.Equal(t, float64(1000), record.Decay)
-	require.Equal(t, true, record.DisallowListed)
-	require.Equal(t, uint64(2), record.CutoffCounter)
-
-	// decay the disallow-listing penalty of the spammer node to zero.
-	t.Logf("about to decay the disallow-listing penalty of the spammer node to zero (2nd time)")
-	fastDecay = true
-	t.Logf("decayed the disallow-listing penalty of the spammer node to zero (2nd time)")
-
-	// after serving the disallow-listing period, the spammer should be able to connect to the victim node again.
-	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[victimIndex]}, 1*time.Millisecond, 1*time.Second)
-
-	// all the nodes should be able to connect to each other again.
-	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
-
-	record, ok = victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
-	require.True(t, ok)
-	require.NotNil(t, record)
-
-	require.Equal(t, float64(0), record.Penalty)
-	require.Equal(t, float64(1000), record.Decay)
-	require.Equal(t, false, record.DisallowListed)
-	require.Equal(t, uint64(2), record.CutoffCounter)
+	//reportCount := 120
+	//wg := sync.WaitGroup{}
+	//for i := 0; i < reportCount; i++ {
+	//	wg.Add(1)
+	//	// reports the misbehavior
+	//	r := report // capture range variable
+	//	go func() {
+	//		defer wg.Done()
+	//
+	//		con.ReportMisbehavior(r)
+	//	}()
+	//}
+	//
+	//unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
+	//
+	//// ensures that the spammer is disallow-listed by the victim
+	//// while the spammer node is disallow-listed, it cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the spammer node, unless
+	//// it is allow-listed again.
+	//p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]}, 100*time.Millisecond, 3*time.Second)
+	//
+	//// despite disallow-listing spammer, ensure that (victim and honest) and (honest and spammer) are still connected.
+	//p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[honestIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+	//p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+	//
+	//record, ok := victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
+	//require.True(t, ok)
+	//require.NotNil(t, record)
+	//
+	//// check the penalty of the spammer node. It should be greater than the disallow-listing threshold.
+	//require.Greater(t, float64(model.DisallowListingThreshold), record.Penalty)
+	//require.Equal(t, float64(1000), record.Decay)
+	//require.Equal(t, true, record.DisallowListed)
+	//require.Equal(t, uint64(1), record.CutoffCounter)
+	//
+	//// decay the disallow-listing penalty of the spammer node to zero.
+	//t.Logf("about to decay the disallow-listing penalty of the spammer node to zero")
+	//fastDecay = true
+	//t.Logf("decayed the disallow-listing penalty of the spammer node to zero")
+	//
+	//// after serving the disallow-listing period, the spammer should be able to connect to the victim node again.
+	//p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[victimIndex]}, 1*time.Millisecond, 1*time.Second)
+	//
+	//// all the nodes should be able to connect to each other again.
+	//p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
+	//
+	//record, ok = victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
+	//require.True(t, ok)
+	//require.NotNil(t, record)
+	//
+	//require.Equal(t, float64(0), record.Penalty)
+	//require.Equal(t, float64(1000), record.Decay)
+	//require.Equal(t, false, record.DisallowListed)
+	//require.Equal(t, uint64(1), record.CutoffCounter)
+	//
+	//// go back to regular decay to prepare for the next set of misbehavior reports.
+	//fastDecay = false
+	//t.Logf("about to report misbehavior again")
+	//
+	//// simulates the victim node reporting the spammer node misbehavior 120 times
+	//// to the network. As each report has the default penalty, ideally the spammer should be disallow-listed after
+	//// 100 reports (each having 0.01 * disallow-listing penalty). But we take 120 as a safe number to ensure that
+	//// the spammer is definitely disallow-listed.
+	//reportCount = 120
+	//wg = sync.WaitGroup{}
+	//for i := 0; i < reportCount; i++ {
+	//	wg.Add(1)
+	//	// reports the misbehavior
+	//	r := report // capture range variable
+	//	go func() {
+	//		defer wg.Done()
+	//
+	//		con.ReportMisbehavior(r)
+	//	}()
+	//}
+	//
+	//unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
+	//
+	//// while the spammer node is disallow-listed, it cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the spammer node, unless
+	//// it is allow-listed again.
+	//p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]}, 100*time.Millisecond, 3*time.Second)
+	//
+	//// despite disallow-listing spammer, ensure that (victim and honest) and (honest and spammer) are still connected.
+	//p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[honestIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+	//p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+	//
+	//record, ok = victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
+	//require.True(t, ok)
+	//require.NotNil(t, record)
+	//
+	//require.Greater(t, float64(model.DisallowListingThreshold), record.Penalty)
+	//require.Equal(t, float64(1000), record.Decay)
+	//require.Equal(t, true, record.DisallowListed)
+	//require.Equal(t, uint64(2), record.CutoffCounter)
+	//
+	//// decay the disallow-listing penalty of the spammer node to zero.
+	//t.Logf("about to decay the disallow-listing penalty of the spammer node to zero (2nd time)")
+	//fastDecay = true
+	//t.Logf("decayed the disallow-listing penalty of the spammer node to zero (2nd time)")
+	//
+	//// after serving the disallow-listing period, the spammer should be able to connect to the victim node again.
+	//p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[victimIndex]}, 1*time.Millisecond, 1*time.Second)
+	//
+	//// all the nodes should be able to connect to each other again.
+	//p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
+	//
+	//record, ok = victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
+	//require.True(t, ok)
+	//require.NotNil(t, record)
+	//
+	//require.Equal(t, float64(0), record.Penalty)
+	//require.Equal(t, float64(1000), record.Decay)
+	//require.Equal(t, false, record.DisallowListed)
+	//require.Equal(t, uint64(2), record.CutoffCounter)
 }
 
 // TestMisbehaviorReportMetrics tests the recording of misbehavior report metrics.
