@@ -78,7 +78,7 @@ func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode) *Pool {
 	return l
 }
 
-// setDefaultNodeLinkValues sets nodes prev and nextt to InvalidIndex for all cached entity poolEntities.
+// setDefaultNodeLinkValues sets nodes prev and next to InvalidIndex for all cached entity poolEntities.
 func (p *Pool) setDefaultNodeLinkValues() {
 	for i := 0; i < len(p.poolEntities); i++ {
 		p.poolEntities[i].node.next = InvalidIndex

@@ -20,7 +20,7 @@ const (
 	Remove
 )
 
-// OperationAndIndex contains an operation to be perfomed on an antity stored under the specified index of an array of entities.
+// OperationAndIndex contains an operation to be perfomed on an entity stored under the specified index of an array of entities.
 type OperationAndIndex struct {
 	operation OperatioType
 	index     uint
@@ -231,52 +231,54 @@ func TestInvalidateEntity(t *testing.T) {
 	}
 }
 
-// TestAddAndRemoveEntities checks health of heroPool for storing and removing scenarios. LRU, NoEjection and RandomEjection are tested.
+// TestAddAndRemoveEntities checks health of heroPool for scenario where entitites are stored and removed in a predetermined order.
+// LRUEjection, NoEjection and RandomEjection are tested. RandomEjection doesn't allow to provide a final state of the pool to check.
 func TestAddAndRemoveEntities(t *testing.T) {
 	for _, tc := range []struct {
-		limit                  uint32              // capacity of pool
-		entityCount            uint32              // total entities to be stored
-		ejectionMode           EjectionMode        // ejection mode
-		operationsIndexes      []OperationAndIndex // operation to perform on an entity stored by index
-		finalEntitiesinThePool []uint              // indexes of entities residing in the pool at the end of the test
+		limit             uint32              // capacity of the pool
+		entityCount       uint32              // total entities to be stored
+		ejectionMode      EjectionMode        // ejection mode
+		operationsIndexes []OperationAndIndex // operation to perform on an entity stored under the given index,
+		// where index ranges from 0 to entityCount
+		finalEntitiesInThePool []uint // indexes of entities residing in the pool at the end of the test
 	}{
 		{
 			limit:                  2,
 			entityCount:            5,
 			ejectionMode:           LRUEjection,
 			operationsIndexes:      []OperationAndIndex{{Add, 0}, {Add, 0}, {Add, 1}, {Add, 2}, {Add, 3}, {Remove, 2}, {Add, 2}, {Remove, 2}},
-			finalEntitiesinThePool: []uint{3},
+			finalEntitiesInThePool: []uint{3},
 		},
 		{
 			limit:                  2,
 			entityCount:            5,
 			ejectionMode:           NoEjection,
 			operationsIndexes:      []OperationAndIndex{{Add, 0}, {Add, 1}, {Add, 2}, {Add, 3}, {Remove, 0}, {Remove, 1}, {Add, 4}, {Add, 3}},
-			finalEntitiesinThePool: []uint{3, 4},
+			finalEntitiesInThePool: []uint{3, 4},
 		},
 		{
 			limit:                  5,
 			entityCount:            6,
 			ejectionMode:           RandomEjection,
 			operationsIndexes:      []OperationAndIndex{{Add, 0}, {Add, 1}, {Remove, 1}, {Add, 2}, {Remove, 0}, {Add, 5}, {Add, 4}, {Add, 1}, {Add, 3}, {Add, 0}},
-			finalEntitiesinThePool: nil,
+			finalEntitiesInThePool: nil,
 		},
 	} {
 		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			testAddRemoveEntities(t, tc.limit, tc.entityCount, tc.ejectionMode, tc.operationsIndexes, tc.finalEntitiesinThePool)
+			testAddRemoveEntities(t, tc.limit, tc.entityCount, tc.ejectionMode, tc.operationsIndexes, tc.finalEntitiesInThePool)
 		})
 	}
 }
 
 // testAddRemoveEntities allows to add or remove entities in an order given by operationsIndexes. Each OperationAndIndex consists of an operaton to perform
-// on an entity stored under a corresponding index.
-func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, ejectionMode EjectionMode, operationsAndIndexes []OperationAndIndex, finalEntitiesinThePool []uint) {
+// on an entity stored under a corresponding index. Index range from 0 to entityCount.
+func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, ejectionMode EjectionMode, operationsAndIndexes []OperationAndIndex, finalEntitiesInThePool []uint) {
 
 	pool := NewHeroPool(limit, ejectionMode)
 
 	entities := unittest.EntityListFixture(uint(entityCount))
 
-	// this map maintains entities inserted into the pool
+	// this map maintains entities currently stored in the pool
 	var insertedEntities map[flow.Identifier]EIndex
 	insertedEntities = make(map[flow.Identifier]EIndex)
 
@@ -311,8 +313,8 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 		flowIndentifier, _, _ := pool.Get(indexInThePool)
 		require.Equal(t, flowIndentifier, id, "Pool contains an unexpected entity")
 	}
-	if finalEntitiesinThePool != nil {
-		for _, idInEntities := range finalEntitiesinThePool {
+	if finalEntitiesInThePool != nil {
+		for _, idInEntities := range finalEntitiesInThePool {
 			flowIndentifier, _, owner := pool.Get(insertedEntities[entities[idInEntities].ID()])
 			require.Equal(t, flowIndentifier, entities[idInEntities].ID(), "Pool contains an unexpected entity")
 			require.Equal(t, uint64(idInEntities), owner, "Entity is stored with a wrong owner")
@@ -810,7 +812,7 @@ func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 	}
 }
 
-// checks if each entity in the pool belongs exactly to one of the sate lists
+// checkEachEntityIsInFreeOrUsedState checks if each entity in the pool belongs exactly to one of the state lists.
 func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool) {
 	pool_capacity := len(pool.poolEntities)
 	// check size
@@ -824,7 +826,7 @@ func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool) {
 	}
 }
 
-// discovers all entities in the pool that belong to the given list
+// discoverEntitiesBelongingToStateList discovers all entities in the pool that belong to the given list.
 func discoverEntitiesBelongingToStateList(t *testing.T, pool *Pool, s *state) []bool {
 	result := make([]bool, len(pool.poolEntities))
 	for node_index := s.head; node_index != InvalidIndex; {
