@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	mathRand "math/rand"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
+	enginePkg "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
@@ -203,7 +203,10 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
+	unit := enginePkg.NewUnit()
 	stopControl := stop.NewStopControl(
+		unit,
+		time.Second,
 		zerolog.Nop(),
 		executionState,
 		headers,
@@ -217,6 +220,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
 	engine, err = New(
+		unit,
 		log,
 		net,
 		me,
@@ -1315,73 +1319,6 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	execState.AssertExpectations(t)
 }
 
-func TestExecuteScriptAtBlockID(t *testing.T) {
-	t.Run("happy path", func(t *testing.T) {
-		runWithEngine(t, func(ctx testingContext) {
-			// Meaningless script
-			script := []byte{1, 1, 2, 3, 5, 8, 11}
-			scriptResult := []byte{1}
-
-			// Ensure block we're about to query against is executable
-			blockA := unittest.ExecutableBlockFixture(nil, unittest.StateCommitmentPointerFixture())
-
-			snapshot := new(protocol.Snapshot)
-			snapshot.On("Head").Return(blockA.Block.Header, nil)
-
-			commits := make(map[flow.Identifier]flow.StateCommitment)
-			commits[blockA.ID()] = *blockA.StartState
-
-			ctx.stateCommitmentExist(blockA.ID(), *blockA.StartState)
-
-			ctx.state.On("AtBlockID", blockA.Block.ID()).Return(snapshot)
-			ctx.executionState.On("NewStorageSnapshot", *blockA.StartState).Return(nil)
-
-			ctx.executionState.On("HasState", *blockA.StartState).Return(true)
-
-			// Successful call to computation manager
-			ctx.computationManager.
-				On("ExecuteScript", mock.Anything, script, [][]byte(nil), blockA.Block.Header, nil).
-				Return(scriptResult, nil)
-
-			// Execute our script and expect no error
-			res, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, blockA.Block.ID())
-			assert.NoError(t, err)
-			assert.Equal(t, scriptResult, res)
-
-			// Assert other components were called as expected
-			ctx.computationManager.AssertExpectations(t)
-			ctx.executionState.AssertExpectations(t)
-			ctx.state.AssertExpectations(t)
-		})
-	})
-
-	t.Run("return early when state commitment not exist", func(t *testing.T) {
-		runWithEngine(t, func(ctx testingContext) {
-			// Meaningless script
-			script := []byte{1, 1, 2, 3, 5, 8, 11}
-
-			// Ensure block we're about to query against is executable
-			blockA := unittest.ExecutableBlockFixture(nil, unittest.StateCommitmentPointerFixture())
-
-			// make sure blockID to state commitment mapping exist
-			ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, blockA.ID()).Return(*blockA.StartState, nil)
-
-			// but the state commitment does not exist (e.g. purged)
-			ctx.executionState.On("HasState", *blockA.StartState).Return(false)
-
-			// Execute our script and expect no error
-			_, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, blockA.Block.ID())
-			assert.Error(t, err)
-			assert.True(t, strings.Contains(err.Error(), "state commitment not found"))
-
-			// Assert other components were called as expected
-			ctx.executionState.AssertExpectations(t)
-			ctx.state.AssertExpectations(t)
-		})
-	})
-
-}
-
 func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
@@ -1560,7 +1497,9 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		return stateProtocol.IsNodeAuthorizedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
+	unit := enginePkg.NewUnit()
 	engine, err = New(
+		unit,
 		log,
 		net,
 		me,
@@ -1582,6 +1521,8 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		nil,
 		nil,
 		stop.NewStopControl(
+			unit,
+			time.Second,
 			zerolog.Nop(),
 			nil,
 			headers,

@@ -51,7 +51,12 @@ func (n *CorruptP2PNode) Subscribe(topic channels.Topic, _ p2p.TopicValidatorFun
 }
 
 // NewCorruptLibP2PNode returns corrupted libP2PNode that will subscribe to topics using the AcceptAllTopicValidator.
-func NewCorruptLibP2PNode(logger zerolog.Logger, host host.Host, pCache p2p.ProtocolPeerCache, peerManager p2p.PeerManager) p2p.LibP2PNode {
-	node := p2pnode.NewNode(logger, host, pCache, peerManager)
+func NewCorruptLibP2PNode(
+	logger zerolog.Logger,
+	host host.Host,
+	pCache p2p.ProtocolPeerCache,
+	peerManager p2p.PeerManager,
+	disallowListCacheCfg *p2p.DisallowListCacheConfig) p2p.LibP2PNode {
+	node := p2pnode.NewNode(logger, host, pCache, peerManager, disallowListCacheCfg)
 	return &CorruptP2PNode{Node: node, logger: logger, codec: cbor.NewCodec()}
 }

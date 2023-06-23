@@ -33,31 +33,6 @@ func IsErrHardThreshold(err error) bool {
 	return errors.As(err, &e)
 }
 
-// ErrInvalidLimitConfig indicates the validation limit is < 0.
-type ErrInvalidLimitConfig struct {
-	// controlMsg the control message type.
-	controlMsg p2p.ControlMessageType
-	// limit the value of the configuration limit.
-	limit uint64
-	// limitStr the string representation of the config limit.
-	limitStr string
-}
-
-func (e ErrInvalidLimitConfig) Error() string {
-	return fmt.Sprintf("invalid rpc control message %s validation limit %s configuration value must be greater than 0:%d", e.controlMsg, e.limitStr, e.limit)
-}
-
-// NewInvalidLimitConfigErr returns a new ErrValidationLimit.
-func NewInvalidLimitConfigErr(controlMsg p2p.ControlMessageType, limitStr string, limit uint64) ErrInvalidLimitConfig {
-	return ErrInvalidLimitConfig{controlMsg: controlMsg, limit: limit, limitStr: limitStr}
-}
-
-// IsErrInvalidLimitConfig returns whether an error is ErrInvalidLimitConfig.
-func IsErrInvalidLimitConfig(err error) bool {
-	var e ErrInvalidLimitConfig
-	return errors.As(err, &e)
-}
-
 // ErrRateLimitedControlMsg indicates the specified RPC control message is rate limited for the specified peer.
 type ErrRateLimitedControlMsg struct {
 	controlMsg p2p.ControlMessageType

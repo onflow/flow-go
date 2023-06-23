@@ -17,6 +17,7 @@ type TransactionWriteBehindLogger interface {
 		snapshot *snapshot.ExecutionSnapshot,
 		output fvm.ProcedureOutput,
 		timeSpent time.Duration,
+		numTxnConflictRetries int,
 	)
 }
 
@@ -38,7 +39,8 @@ type transactionCoordinator struct {
 }
 
 type transaction struct {
-	request TransactionRequest
+	request            TransactionRequest
+	numConflictRetries int
 
 	coordinator *transactionCoordinator
 
@@ -102,6 +104,7 @@ func (coordinator *transactionCoordinator) AbortAllOutstandingTransactions(
 
 func (coordinator *transactionCoordinator) NewTransaction(
 	request TransactionRequest,
+	attempt int,
 ) (
 	*transaction,
 	error,
@@ -119,10 +122,11 @@ func (coordinator *transactionCoordinator) NewTransaction(
 	}
 
 	return &transaction{
-		request:     request,
-		coordinator: coordinator,
-		startedAt:   time.Now(),
-		Transaction: txn,
+		request:            request,
+		coordinator:        coordinator,
+		numConflictRetries: attempt,
+		startedAt:          time.Now(),
+		Transaction:        txn,
 		ProcedureExecutor: coordinator.vm.NewExecutor(
 			request.ctx,
 			request.TransactionProcedure,
@@ -147,7 +151,8 @@ func (coordinator *transactionCoordinator) commit(txn *transaction) error {
 		txn.request,
 		executionSnapshot,
 		txn.Output(),
-		time.Since(txn.startedAt))
+		time.Since(txn.startedAt),
+		txn.numConflictRetries)
 
 	// Commit advances the database's snapshot.
 	coordinator.snapshotTime += 1
