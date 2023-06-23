@@ -132,19 +132,39 @@ func (g *Builder) SetRoutingSystem(routingSystem routing.Routing) {
 	g.routingSystem = routingSystem
 }
 
+// SetTopicScoreParams sets the topic score params of the builder.
+// There is a default topic score parameters that is used if this function is not called for a topic.
+// However, if this function is called multiple times for a topic, the last topic score params will be used.
+// Note: calling this function will override the default topic score params for the topic. Don't call this function
+// unless you know what you are doing.
 func (g *Builder) SetTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) {
 	g.scoreOptionConfig.SetTopicScoreParams(topic, topicScoreParams)
 }
 
+// SetAppSpecificScoreParams sets the app specific score params of the builder.
+// There is no default app specific score function. However, if this function is called multiple times, the last function will be used.
 func (g *Builder) SetAppSpecificScoreParams(f func(peer.ID) float64) {
 	g.scoreOptionConfig.SetAppSpecificScoreFunction(f)
 }
 
+// OverrideDefaultRpcInspectorSuiteFactory overrides the default rpc inspector suite factory.
+// Note: this function should only be used for testing purposes. Never override the default rpc inspector suite factory unless you know what you are doing.
 func (g *Builder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspectorSuiteFactoryFunc) {
 	g.logger.Warn().Msg("overriding default rpc inspector suite factory")
 	g.rpcInspectorSuiteFactory = factory
 }
 
+// NewGossipSubBuilder returns a new gossipsub builder.
+// Args:
+// - logger: the logger of the node.
+// - metricsCfg: the metrics config of the node.
+// - networkType: the network type of the node.
+// - sporkId: the spork id of the node.
+// - idProvider: the identity provider of the node.
+// - rpcInspectorConfig: the rpc inspector config of the node.
+// Returns:
+// - a new gossipsub builder.
+// Note: the builder is not thread-safe. It should only be used in the main thread.
 func NewGossipSubBuilder(
 	logger zerolog.Logger,
 	metricsCfg *p2pconfig.MetricsConfig,
@@ -169,6 +189,8 @@ func NewGossipSubBuilder(
 	return b
 }
 
+// defaultGossipSubFactory returns the default gossipsub factory function. It is used to create the default gossipsub factory.
+// Note: always use the default gossipsub factory function to create the gossipsub factory (unless you know what you are doing).
 func defaultGossipSubFactory() p2p.GossipSubFactoryFunc {
 	return func(
 		ctx context.Context,
@@ -180,12 +202,17 @@ func defaultGossipSubFactory() p2p.GossipSubFactoryFunc {
 	}
 }
 
+// defaultGossipSubAdapterConfig returns the default gossipsub config function. It is used to create the default gossipsub config.
+// Note: always use the default gossipsub config function to create the gossipsub config (unless you know what you are doing).
 func defaultGossipSubAdapterConfig() p2p.GossipSubAdapterConfigFunc {
 	return func(cfg *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
 		return p2pnode.NewGossipSubAdapterConfig(cfg)
 	}
 }
 
+// defaultInspectorSuite returns the default inspector suite factory function. It is used to create the default inspector suite.
+// Inspector suite is utilized to inspect the incoming gossipsub rpc messages from different perspectives.
+// Note: always use the default inspector suite factory function to create the inspector suite (unless you know what you are doing).
 func defaultInspectorSuite() p2p.GossipSubRpcInspectorSuiteFactoryFunc {
 	return func(
 		logger zerolog.Logger,
