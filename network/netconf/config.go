@@ -2,6 +2,8 @@ package netconf
 
 import (
 	"time"
+
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 )
 
 // Config encapsulation of configuration structs for all components related to the Flow network.
