@@ -7,6 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/network/p2p/inspector/internal"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 )
 
 // InspectMsgRequest represents a short digest of an RPC control message. It is used for further message inspection by component workers.

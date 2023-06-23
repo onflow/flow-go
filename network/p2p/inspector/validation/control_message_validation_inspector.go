@@ -96,7 +96,7 @@ func NewControlMsgValidationInspector(
 		tracker:      tracker,
 		idProvider:   idProvider,
 		metrics:      inspectorMetrics,
-		rateLimiters: make(map[p2pconf.ControlMessageType]p2p.BasicRateLimiter),
+		rateLimiters: make(map[p2pmsg.ControlMessageType]p2p.BasicRateLimiter),
 	}
 
 	store := queue.NewHeroStore(config.CacheSize, logger, inspectMsgQueueCacheCollector)
@@ -159,7 +159,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 		}
 
 		switch ctrlMsgType {
-		case p2pconf.CtrlMsgGraft, p2pconf.CtrlMsgPrune:
+		case p2pmsg.CtrlMsgGraft, p2pmsg.CtrlMsgPrune:
 			// normal pre-processing
 			err := c.blockingPreprocessingRpc(from, validationConfig, control)
 			if err != nil {
@@ -168,7 +168,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 					Msg("could not pre-process rpc, aborting")
 				return fmt.Errorf("could not pre-process rpc, aborting: %w", err)
 			}
-		case p2pconf.CtrlMsgIHave:
+		case p2pmsg.CtrlMsgIHave:
 			// iHave specific pre-processing
 			sampleSize := util.SampleN(len(control.GetIhave()), c.config.IHaveInspectionMaxSampleSize, c.config.IHaveSyncInspectSampleSizePercentage)
 			err := c.blockingIHaveSamplePreprocessing(from, validationConfig, control, sampleSize)
@@ -212,8 +212,8 @@ func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow
 //
 // blockingPreprocessingRpc generic pre-processing validation func that ensures the RPC control message count does not exceed the configured hard threshold.
 func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, validationConfig *p2pconf.CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
-	if validationConfig.ControlMsg != p2pconf.CtrlMsgGraft && validationConfig.ControlMsg != p2pconf.CtrlMsgPrune {
-		return fmt.Errorf("unexpected control message type %s encountered during blocking pre-processing rpc, expected %s or %s", validationConfig.ControlMsg, p2pconf.CtrlMsgGraft, p2pconf.CtrlMsgPrune)
+	if validationConfig.ControlMsg != p2pmsg.CtrlMsgGraft && validationConfig.ControlMsg != p2pmsg.CtrlMsgPrune {
+		return fmt.Errorf("unexpected control message type %s encountered during blocking pre-processing rpc, expected %s or %s", validationConfig.ControlMsg, p2pmsg.CtrlMsgGraft, p2pmsg.CtrlMsgPrune)
 	}
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
@@ -251,10 +251,10 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 
 // blockingPreprocessingSampleRpc blocking pre-processing of a sample of iHave control messages.
 func (c *ControlMsgValidationInspector) blockingIHaveSamplePreprocessing(from peer.ID, validationConfig *p2pconf.CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
-	c.metrics.BlockingPreProcessingStarted(p2pconf.CtrlMsgIHave.String(), sampleSize)
+	c.metrics.BlockingPreProcessingStarted(p2pmsg.CtrlMsgIHave.String(), sampleSize)
 	start := time.Now()
 	defer func() {
-		c.metrics.BlockingPreProcessingFinished(p2pconf.CtrlMsgIHave.String(), sampleSize, time.Since(start))
+		c.metrics.BlockingPreProcessingFinished(p2pmsg.CtrlMsgIHave.String(), sampleSize, time.Since(start))
 	}()
 	err := c.blockingPreprocessingSampleRpc(from, validationConfig, controlMessage, sampleSize)
 	if err != nil {
@@ -267,8 +267,8 @@ func (c *ControlMsgValidationInspector) blockingIHaveSamplePreprocessing(from pe
 // If the RPC control message count exceeds the configured hard threshold we perform synchronous topic validation on a subset
 // of the control messages. This is used for control message types that do not have an upper bound on the amount of messages a node can send.
 func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer.ID, validationConfig *p2pconf.CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
-	if validationConfig.ControlMsg != p2pconf.CtrlMsgIHave && validationConfig.ControlMsg != p2pconf.CtrlMsgIWant {
-		return fmt.Errorf("unexpected control message type %s encountered during blocking pre-processing sample rpc, expected %s or %s", validationConfig.ControlMsg, p2pconf.CtrlMsgIHave, p2pconf.CtrlMsgIWant)
+	if validationConfig.ControlMsg != p2pmsg.CtrlMsgIHave && validationConfig.ControlMsg != p2pmsg.CtrlMsgIWant {
+		return fmt.Errorf("unexpected control message type %s encountered during blocking pre-processing sample rpc, expected %s or %s", validationConfig.ControlMsg, p2pmsg.CtrlMsgIHave, p2pmsg.CtrlMsgIWant)
 	}
 	activeClusterIDS := c.tracker.GetActiveClusterIds()
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
@@ -280,7 +280,7 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 	if count > validationConfig.HardThreshold {
 		// for iHave control message topic validation we only validate a random subset of the messages
 		// shuffle the ihave messages to perform random validation on a subset of size sampleSize
-		err := c.sampleCtrlMessages(p2pconf.CtrlMsgIHave, controlMessage, sampleSize)
+		err := c.sampleCtrlMessages(p2pmsg.CtrlMsgIHave, controlMessage, sampleSize)
 		if err != nil {
 			return fmt.Errorf("failed to sample ihave messages: %w", err)
 		}
@@ -306,7 +306,7 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 	// to randomize async validation to avoid data race that can occur when
 	// performing the sampling asynchronously.
 	// for iHave control message topic validation we only validate a random subset of the messages
-	err := c.sampleCtrlMessages(p2pconf.CtrlMsgIHave, controlMessage, sampleSize)
+	err := c.sampleCtrlMessages(p2pmsg.CtrlMsgIHave, controlMessage, sampleSize)
 	if err != nil {
 		return fmt.Errorf("failed to sample ihave messages: %w", err)
 	}
@@ -315,9 +315,9 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 
 // sampleCtrlMessages performs sampling on the specified control message that will randomize
 // the items in the control message slice up to index sampleSize-1.
-func (c *ControlMsgValidationInspector) sampleCtrlMessages(ctrlMsgType p2pconf.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage, sampleSize uint) error {
+func (c *ControlMsgValidationInspector) sampleCtrlMessages(ctrlMsgType p2pmsg.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage, sampleSize uint) error {
 	switch ctrlMsgType {
-	case p2pconf.CtrlMsgIHave:
+	case p2pmsg.CtrlMsgIHave:
 		iHaves := ctrlMsg.GetIhave()
 		swap := func(i, j uint) {
 			iHaves[i], iHaves[j] = iHaves[j], iHaves[i]
@@ -376,13 +376,13 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 }
 
 // getCtrlMsgCount returns the amount of specified control message type in the rpc ControlMessage.
-func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2pconf.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) uint64 {
+func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2pmsg.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) uint64 {
 	switch ctrlMsgType {
-	case p2pconf.CtrlMsgGraft:
+	case p2pmsg.CtrlMsgGraft:
 		return uint64(len(ctrlMsg.GetGraft()))
-	case p2pconf.CtrlMsgPrune:
+	case p2pmsg.CtrlMsgPrune:
 		return uint64(len(ctrlMsg.GetPrune()))
-	case p2pconf.CtrlMsgIHave:
+	case p2pmsg.CtrlMsgIHave:
 		return uint64(len(ctrlMsg.GetIhave()))
 	default:
 		return 0
@@ -396,17 +396,17 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2pconf.Cont
 func (c *ControlMsgValidationInspector) validateTopics(from peer.ID, validationConfig *p2pconf.CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) error {
 	activeClusterIDS := c.tracker.GetActiveClusterIds()
 	switch validationConfig.ControlMsg {
-	case p2pconf.CtrlMsgGraft:
+	case p2pmsg.CtrlMsgGraft:
 		return c.validateGrafts(from, ctrlMsg, activeClusterIDS)
-	case p2pconf.CtrlMsgPrune:
+	case p2pmsg.CtrlMsgPrune:
 		return c.validatePrunes(from, ctrlMsg, activeClusterIDS)
-	case p2pconf.CtrlMsgIHave:
+	case p2pmsg.CtrlMsgIHave:
 		return c.validateIhaves(from, validationConfig, ctrlMsg, activeClusterIDS)
 	default:
 		// sanity check
 		// This should never happen validateTopics is only used to validate GRAFT and PRUNE control message types
 		// if any other control message type is encountered here this indicates invalid state irrecoverable error.
-		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics expected %s, %s or %s got %s", p2pconf.CtrlMsgGraft, p2pconf.CtrlMsgPrune, p2pconf.CtrlMsgIHave, validationConfig.ControlMsg))
+		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics expected %s, %s or %s got %s", p2pmsg.CtrlMsgGraft, p2pmsg.CtrlMsgPrune, p2pmsg.CtrlMsgIHave, validationConfig.ControlMsg))
 	}
 	return nil
 }
@@ -457,7 +457,7 @@ func (c *ControlMsgValidationInspector) validateIhaves(from peer.ID, validationC
 func (c *ControlMsgValidationInspector) validateTopicsSample(from peer.ID, validationConfig *p2pconf.CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage, activeClusterIDS flow.ChainIDList, sampleSize uint) error {
 	tracker := make(duplicateTopicTracker)
 	switch validationConfig.ControlMsg {
-	case p2pconf.CtrlMsgIHave:
+	case p2pmsg.CtrlMsgIHave:
 		for i := uint(0); i < sampleSize; i++ {
 			topic := channels.Topic(ctrlMsg.Ihave[i].GetTopicID())
 			if tracker.isDuplicate(topic) {
@@ -473,7 +473,7 @@ func (c *ControlMsgValidationInspector) validateTopicsSample(from peer.ID, valid
 		// sanity check
 		// This should never happen validateTopicsSample is only used to validate IHAVE control message types
 		// if any other control message type is encountered here this indicates invalid state irrecoverable error.
-		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics sample expected %s got %s", p2pconf.CtrlMsgIHave, validationConfig.ControlMsg))
+		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics sample expected %s got %s", p2pmsg.CtrlMsgIHave, validationConfig.ControlMsg))
 	}
 	return nil
 }
