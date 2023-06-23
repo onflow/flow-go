@@ -36,6 +36,14 @@ func accountURL(t *testing.T, address string, height string) string {
 	return u.String()
 }
 
+// TestAccessGetAccount tests local getAccount request.
+//
+//	Runs the following tests:
+//	1. Get account by address at latest sealed block.
+//	2. Get account by address at latest finalized block.
+//	3. Get account by address at height.
+//	4. Get account by address at height condensed.
+//	5. Get invalid account.
 func TestAccessGetAccount(t *testing.T) {
 	backend := &mock.API{}
 	restHandler := newAccessRestHandler(backend)
@@ -131,7 +139,14 @@ func TestAccessGetAccount(t *testing.T) {
 	})
 }
 
-// TestObserverGetAccount tests the get account from observer node
+// TestObserverGetAccount tests the get account request forwarding to an upstream.
+//
+//	Runs the following tests:
+//	1. Get account by address at latest sealed block.
+//	2. Get account by address at latest finalized block.
+//	3. Get account by address at height.
+//	4. Get account by address at height condensed.
+//	5. Get invalid account.
 func TestObserverGetAccount(t *testing.T) {
 	backend := &mock.API{}
 	restForwarder := &restmock.RestServerApi{}

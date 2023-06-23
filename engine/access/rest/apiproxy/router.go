@@ -15,7 +15,7 @@ import (
 )
 
 // RestRouter is a structure that represents the routing proxy algorithm for observer node.
-// It splits requests between a local requests and request forwarding to upstream service.
+// It splits requests between a local requests and forward requests which can't be handled locally to an upstream access node.
 type RestRouter struct {
 	Logger   zerolog.Logger
 	Metrics  metrics.ObserverMetrics

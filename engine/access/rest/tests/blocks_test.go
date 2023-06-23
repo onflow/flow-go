@@ -141,7 +141,7 @@ func prepareTestVectors(t *testing.T,
 	return testVectors
 }
 
-// TestGetBlocks tests the get blocks by ID and get blocks by heights API from access node
+// TestGetBlocks tests local get blocks by ID and get blocks by heights API
 func TestAccessGetBlocks(t *testing.T) {
 	backend := &mock.API{}
 
@@ -159,12 +159,27 @@ func TestAccessGetBlocks(t *testing.T) {
 	}
 }
 
-// TestObserverGetBlocks tests the get blocks by ID and get blocks by heights API from observer node
+// TestObserverGetBlocks tests requests forwarding for get blocks by ID and get blocks by heights.
+//
+// Check the following cases:
+// 1. Get single expanded block by ID.
+// 2. Get multiple expanded blocks by IDs
+// 3. Get single condensed block by ID.
+// 4. Get multiple condensed blocks by IDs.
+// 5. Get single expanded block by height.
+// 6. Get multiple expanded blocks by heights.
+// 7. Get multiple expanded blocks by start and end height.
+// 8. Get block by ID not found.
+// 9. Get block by height not found.
+// 10. Get block by end height less than start height.
+// 11. Get block by both heights and start and end height.
+// 12. Get block with missing height param.
+// 13. Get block with missing height values.
+// 14. Get block by more than maximum permissible number of IDs.
 func TestObserverGetBlocks(t *testing.T) {
 	backend := &mock.API{}
 	restForwarder := &restmock.RestServerApi{}
 
-	// Bring up upstream server
 	blkCnt := 10
 	blockIDs, heights, blocks, executionResults := generateMocks(backend, blkCnt)
 

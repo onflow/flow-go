@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
-// RestForwarder handles the request forwarding to upstream
+// RestForwarder - structure which handles requests to an upstream access node using gRPC API.
 type RestForwarder struct {
 	log zerolog.Logger
 	*forwarder.Forwarder
