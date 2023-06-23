@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/cache"
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/ratelimit"
+	"github.com/onflow/flow-go/network/p2p/message"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
@@ -146,7 +147,7 @@ func NewControlMsgValidationInspector(
 // The returned error is returned to the gossipsub node which causes the rejection of rpc (for non-nil errors).
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	control := rpc.GetControl()
-	for _, ctrlMsgType := range p2p.ControlMessageTypes() {
+	for _, ctrlMsgType := range p2pmsg.ControlMessageTypes() {
 		lg := c.logger.With().
 			Str("peer_id", from.String()).
 			Str("ctrl_msg_type", string(ctrlMsgType)).Logger()

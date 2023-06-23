@@ -5,6 +5,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/network/p2p/message"
 )
 
 // GossipSubInspectorNotifDistributor is the interface for the distributor that distributes gossip sub inspector notifications.
@@ -29,7 +30,7 @@ type InvCtrlMsgNotif struct {
 	// PeerID is the ID of the peer that sent the invalid control message.
 	PeerID peer.ID
 	// MsgType is the type of control message that was received.
-	MsgType ControlMessageType
+	MsgType p2pmsg.ControlMessageType
 	// Count is the number of invalid control messages received from the peer that is reported in this notification.
 	Count uint64
 	// Err any error associated with the invalid control message.
@@ -37,7 +38,7 @@ type InvCtrlMsgNotif struct {
 }
 
 // NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
-func NewInvalidControlMessageNotification(peerID peer.ID, msgType ControlMessageType, count uint64, err error) *InvCtrlMsgNotif {
+func NewInvalidControlMessageNotification(peerID peer.ID, msgType p2pmsg.ControlMessageType, count uint64, err error) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: msgType,

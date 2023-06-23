@@ -23,6 +23,7 @@ import (
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/message"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -137,7 +138,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	for i := 0; i < 30; i++ {
 		inspectorSuite1.consumer.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 			PeerID:  node2.Host().ID(),
-			MsgType: p2p.ControlMessageTypes()[rand.Intn(len(p2p.ControlMessageTypes()))],
+			MsgType: p2pmsg.ControlMessageTypes()[rand.Intn(len(p2pmsg.ControlMessageTypes()))],
 			Count:   1,
 			Err:     fmt.Errorf("invalid control message"),
 		})
