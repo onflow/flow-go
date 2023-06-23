@@ -1,4 +1,4 @@
-package conf
+package p2pconf
 
 import (
 	"errors"

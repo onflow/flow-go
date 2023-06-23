@@ -6,7 +6,6 @@ import (
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/onflow/flow-go/network/p2p/conf"
 	"github.com/onflow/flow-go/network/p2p/inspector/internal"
 )
 
@@ -18,11 +17,11 @@ type InspectMsgRequest struct {
 	Peer peer.ID
 	// CtrlMsg the control message that will be inspected.
 	ctrlMsg          *pubsub_pb.ControlMessage
-	validationConfig *conf.CtrlMsgValidationConfig
+	validationConfig *p2pconf.CtrlMsgValidationConfig
 }
 
 // NewInspectMsgRequest returns a new *InspectMsgRequest.
-func NewInspectMsgRequest(from peer.ID, validationConfig *conf.CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) (*InspectMsgRequest, error) {
+func NewInspectMsgRequest(from peer.ID, validationConfig *p2pconf.CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) (*InspectMsgRequest, error) {
 	nonce, err := internal.Nonce()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get inspect message request nonce: %w", err)

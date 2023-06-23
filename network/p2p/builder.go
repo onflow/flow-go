@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p/conf"
 )
 
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSubAdapterConfig, CollectionClusterChangesConsumer) (PubSubAdapter, error)
@@ -109,7 +108,7 @@ type PeerScoringBuilder interface {
 type GossipSubRpcInspectorSuiteFactoryFunc func(
 	zerolog.Logger,
 	flow.Identifier,
-	*conf.GossipSubRPCInspectorsConfig,
+	*p2pconf.GossipSubRPCInspectorsConfig,
 	module.GossipSubMetrics,
 	metrics.HeroCacheMetricsFactory,
 	flownet.NetworkingType,

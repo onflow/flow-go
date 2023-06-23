@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/conf"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
@@ -49,7 +48,7 @@ type Builder struct {
 	scoreOptionConfig        *scoring.ScoreOptionConfig
 	idProvider               module.IdentityProvider
 	routingSystem            routing.Routing
-	rpcInspectorConfig       *conf.GossipSubRPCInspectorsConfig
+	rpcInspectorConfig       *p2pconf.GossipSubRPCInspectorsConfig
 	rpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
 }
 
@@ -171,7 +170,7 @@ func NewGossipSubBuilder(
 	networkType network.NetworkingType,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	rpcInspectorConfig *conf.GossipSubRPCInspectorsConfig,
+	rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig,
 ) *Builder {
 	lg := logger.With().Str("component", "gossipsub").Logger()
 	b := &Builder{
@@ -217,7 +216,7 @@ func defaultInspectorSuite() p2p.GossipSubRpcInspectorSuiteFactoryFunc {
 	return func(
 		logger zerolog.Logger,
 		sporkId flow.Identifier,
-		inspectorCfg *conf.GossipSubRPCInspectorsConfig,
+		inspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
 		gossipSubMetrics module.GossipSubMetrics,
 		heroCacheMetricsFactory metrics.HeroCacheMetricsFactory,
 		networkType network.NetworkingType,
