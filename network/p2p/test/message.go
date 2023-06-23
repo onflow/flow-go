@@ -46,7 +46,7 @@ func WithoutSignerId() func(*pb.Message) {
 // opt: variadic list of options to apply to the message
 // Returns:
 // *pb.Message: pubsub message
-func PubsubMessageFixture(t *testing.T, opt ...func(*pb.Message)) *pb.Message {
+func PubsubMessageFixture(t *testing.T, opts ...func(*pb.Message)) *pb.Message {
 	topic := unittest.RandomStringFixture(t, 10)
 
 	m := &pb.Message{
@@ -57,8 +57,8 @@ func PubsubMessageFixture(t *testing.T, opt ...func(*pb.Message)) *pb.Message {
 		Seqno:     unittest.RandomByteSlice(t, 100),
 	}
 
-	for _, o := range opt {
-		o(m)
+	for _, opt := range opts {
+		opt(m)
 	}
 
 	return m
