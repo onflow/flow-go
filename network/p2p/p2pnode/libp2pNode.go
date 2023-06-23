@@ -537,7 +537,13 @@ func (n *Node) IsDisallowListed(peerId peer.ID) ([]flownet.DisallowListedCause, 
 	return n.disallowListedCache.IsDisallowListed(peerId)
 }
 
+// ActiveClustersChanged is called when the active clusters list of the collection clusters has changed.
+// The LibP2PNode implementation directly calls the ActiveClustersChanged method of the pubsub implementation, as
+// the pubsub implementation is responsible for the actual handling of the event.
+// Args:
+// - list: the new active clusters list.
+// Returns:
+// - none
 func (n *Node) ActiveClustersChanged(list flow.ChainIDList) {
-	//TODO implement me
-	panic("implement me")
+	n.pubSub.ActiveClustersChanged(list)
 }
