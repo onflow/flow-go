@@ -13,33 +13,101 @@ type ViolationsConsumer struct {
 }
 
 // OnInvalidMsgError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnInvalidMsgError(violation *slashing.Violation) {
-	_m.Called(violation)
+func (_m *ViolationsConsumer) OnInvalidMsgError(violation *slashing.Violation) error {
+	ret := _m.Called(violation)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*slashing.Violation) error); ok {
+		r0 = rf(violation)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // OnSenderEjectedError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnSenderEjectedError(violation *slashing.Violation) {
-	_m.Called(violation)
+func (_m *ViolationsConsumer) OnSenderEjectedError(violation *slashing.Violation) error {
+	ret := _m.Called(violation)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*slashing.Violation) error); ok {
+		r0 = rf(violation)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // OnUnAuthorizedSenderError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnUnAuthorizedSenderError(violation *slashing.Violation) {
-	_m.Called(violation)
+func (_m *ViolationsConsumer) OnUnAuthorizedSenderError(violation *slashing.Violation) error {
+	ret := _m.Called(violation)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*slashing.Violation) error); ok {
+		r0 = rf(violation)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// OnUnauthorizedPublishOnChannel provides a mock function with given fields: violation
+func (_m *ViolationsConsumer) OnUnauthorizedPublishOnChannel(violation *slashing.Violation) error {
+	ret := _m.Called(violation)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*slashing.Violation) error); ok {
+		r0 = rf(violation)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // OnUnauthorizedUnicastOnChannel provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnUnauthorizedUnicastOnChannel(violation *slashing.Violation) {
-	_m.Called(violation)
+func (_m *ViolationsConsumer) OnUnauthorizedUnicastOnChannel(violation *slashing.Violation) error {
+	ret := _m.Called(violation)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*slashing.Violation) error); ok {
+		r0 = rf(violation)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // OnUnexpectedError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnUnexpectedError(violation *slashing.Violation) {
-	_m.Called(violation)
+func (_m *ViolationsConsumer) OnUnexpectedError(violation *slashing.Violation) error {
+	ret := _m.Called(violation)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*slashing.Violation) error); ok {
+		r0 = rf(violation)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // OnUnknownMsgTypeError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnUnknownMsgTypeError(violation *slashing.Violation) {
-	_m.Called(violation)
+func (_m *ViolationsConsumer) OnUnknownMsgTypeError(violation *slashing.Violation) error {
+	ret := _m.Called(violation)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*slashing.Violation) error); ok {
+		r0 = rf(violation)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 type mockConstructorTestingTNewViolationsConsumer interface {

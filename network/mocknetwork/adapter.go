@@ -58,9 +58,9 @@ func (_m *Adapter) PublishOnChannel(_a0 channels.Channel, _a1 interface{}, _a2 .
 	return r0
 }
 
-// ReportMisbehaviorOnChannel provides a mock function with given fields: _a0, _a1
-func (_m *Adapter) ReportMisbehaviorOnChannel(_a0 channels.Channel, _a1 network.MisbehaviorReport) {
-	_m.Called(_a0, _a1)
+// ReportMisbehaviorOnChannel provides a mock function with given fields: channel, report
+func (_m *Adapter) ReportMisbehaviorOnChannel(channel channels.Channel, report network.MisbehaviorReport) {
+	_m.Called(channel, report)
 }
 
 // UnRegisterChannel provides a mock function with given fields: channel
