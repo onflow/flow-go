@@ -9,6 +9,7 @@ import (
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine/access/rest"
+	restapi "github.com/onflow/flow-go/engine/access/rest/api"
 	"github.com/onflow/flow-go/module"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -39,7 +40,7 @@ func (builder *RPCEngineBuilder) RpcHandler() accessproto.AccessAPIServer {
 	return builder.rpcHandler
 }
 
-func (builder *RPCEngineBuilder) RestHandler() rest.RestServerApi {
+func (builder *RPCEngineBuilder) RestHandler() restapi.RestServerApi {
 	return builder.restHandler
 }
 
@@ -69,7 +70,7 @@ func (builder *RPCEngineBuilder) WithRpcHandler(handler accessproto.AccessAPISer
 }
 
 // WithRestHandler specifies that the given `RestServerApi` should be used for REST.
-func (builder *RPCEngineBuilder) WithRestHandler(handler rest.RestServerApi) *RPCEngineBuilder {
+func (builder *RPCEngineBuilder) WithRestHandler(handler restapi.RestServerApi) *RPCEngineBuilder {
 	builder.restHandler = handler
 	return builder
 }
@@ -116,7 +117,7 @@ func (builder *RPCEngineBuilder) Build() (*Engine, error) {
 
 	restHandler := builder.Engine.restHandler
 	if restHandler == nil {
-		restHandler = rest.NewRequestHandler(builder.log, builder.backend)
+		restHandler = rest.NewServerRequestHandler(builder.log, builder.backend)
 	}
 	builder.Engine.restHandler = restHandler
 

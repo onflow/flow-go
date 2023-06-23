@@ -21,6 +21,7 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/rest/tests"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
@@ -396,13 +397,13 @@ func assertError(t *testing.T, resp *http.Response, err error, expectedCode int,
 
 func optionsForBlockByID() *restclient.BlocksApiBlocksIdGetOpts {
 	return &restclient.BlocksApiBlocksIdGetOpts{
-		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{tests.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id"}),
 	}
 }
 func optionsForBlockByStartEndHeight(startHeight, endHeight uint64) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:      optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Expand:      optional.NewInterface([]string{tests.ExpandableFieldPayload}),
 		Select_:     optional.NewInterface([]string{"header.id", "header.height"}),
 		StartHeight: optional.NewInterface(startHeight),
 		EndHeight:   optional.NewInterface(endHeight),
@@ -411,7 +412,7 @@ func optionsForBlockByStartEndHeight(startHeight, endHeight uint64) *restclient.
 
 func optionsForBlockByHeights(heights []uint64) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{tests.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id", "header.height"}),
 		Height:  optional.NewInterface(heights),
 	}
@@ -419,7 +420,7 @@ func optionsForBlockByHeights(heights []uint64) *restclient.BlocksApiBlocksGetOp
 
 func optionsForFinalizedBlock(finalOrSealed string) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{tests.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id", "header.height"}),
 		Height:  optional.NewInterface(finalOrSealed),
 	}

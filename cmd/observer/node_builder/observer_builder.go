@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest"
+	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -912,7 +913,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			)),
 		}
 
-		restForwarder, err := rest.NewRestForwarder(builder.Logger,
+		restForwarder, err := restapiproxy.NewRestForwarder(builder.Logger,
 			builder.upstreamIdentities,
 			builder.apiTimeout,
 			config.MaxMsgSize)
@@ -920,11 +921,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		restHandler := &rest.RestRouter{
+		restHandler := &restapiproxy.RestRouter{
 			Logger:   builder.Logger,
 			Metrics:  observerCollector,
 			Upstream: restForwarder,
-			Observer: rest.NewRequestHandler(builder.Logger, accessBackend),
+			Observer: rest.NewServerRequestHandler(builder.Logger, accessBackend),
 		}
 
 		// build the rpc engine

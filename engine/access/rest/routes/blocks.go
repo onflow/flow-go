@@ -1,4 +1,4 @@
-package rest
+package routes
 
 import (
 	"context"
@@ -9,9 +9,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/api"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -19,34 +19,34 @@ import (
 )
 
 // GetBlocksByIDs gets blocks by provided ID or list of IDs.
-func GetBlocksByIDs(r *request.Request, srv RestServerApi, link models.LinkGenerator) (interface{}, error) {
+func GetBlocksByIDs(r *request.Request, srv api.RestServerApi, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockByIDsRequest()
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		return nil, models.NewBadRequestError(err)
 	}
 
 	return srv.GetBlocksByIDs(req, r.Context(), r.ExpandFields, link)
 }
 
 // GetBlocksByHeight gets blocks by height.
-func GetBlocksByHeight(r *request.Request, srv RestServerApi, link models.LinkGenerator) (interface{}, error) {
+func GetBlocksByHeight(r *request.Request, srv api.RestServerApi, link models.LinkGenerator) (interface{}, error) {
 	return srv.GetBlocksByHeight(r, link)
 }
 
 // GetBlockPayloadByID gets block payload by ID
-func GetBlockPayloadByID(r *request.Request, srv RestServerApi, link models.LinkGenerator) (interface{}, error) {
+func GetBlockPayloadByID(r *request.Request, srv api.RestServerApi, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockPayloadRequest()
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		return nil, models.NewBadRequestError(err)
 	}
 
 	return srv.GetBlockPayloadByID(req, r.Context(), link)
 }
 
-func getBlock(option blockRequestOption, context context.Context, expandFields map[string]bool, backend access.API, link models.LinkGenerator) (*models.Block, error) {
+func GetBlock(option BlockRequestOption, context context.Context, expandFields map[string]bool, backend access.API, link models.LinkGenerator) (*models.Block, error) {
 	// lookup block
 	blkProvider := NewBlockRequestProvider(backend, option)
-	blk, blockStatus, err := blkProvider.getBlock(context)
+	blk, blockStatus, err := blkProvider.GetBlock(context)
 	if err != nil {
 		return nil, err
 	}
@@ -76,62 +76,6 @@ func getBlock(option blockRequestOption, context context.Context, expandFields m
 	return &block, nil
 }
 
-func getBlockFromGrpc(option blockRequestOption, context context.Context, expandFields map[string]bool, upstream accessproto.AccessAPIClient, link models.LinkGenerator) (*models.Block, error) {
-	// lookup block
-	blkProvider := NewBlockFromGrpcProvider(upstream, option)
-	blk, blockStatus, err := blkProvider.getBlock(context)
-	if err != nil {
-		return nil, err
-	}
-
-	// lookup execution result
-	// (even if not specified as expandable, since we need the execution result ID to generate its expandable link)
-	var block models.Block
-	getExecutionResultForBlockIDRequest := &accessproto.GetExecutionResultForBlockIDRequest{
-		BlockId: blk.Id,
-	}
-
-	executionResultForBlockIDResponse, err := upstream.GetExecutionResultForBlockID(context, getExecutionResultForBlockIDRequest)
-	if err != nil {
-		return nil, err
-	}
-
-	flowExecResult, err := convert.MessageToExecutionResult(executionResultForBlockIDResponse.ExecutionResult)
-	if err != nil {
-		return nil, err
-	}
-
-	flowBlock, err := convert.MessageToBlock(blk)
-	if err != nil {
-		return nil, err
-	}
-
-	flowBlockStatus, err := convert.MessagesToBlockStatus(blockStatus)
-	if err != nil {
-		return nil, err
-	}
-
-	if err != nil {
-		// handle case where execution result is not yet available
-		if se, ok := status.FromError(err); ok {
-			if se.Code() == codes.NotFound {
-				err := block.Build(flowBlock, nil, link, flowBlockStatus, expandFields)
-				if err != nil {
-					return nil, err
-				}
-				return &block, nil
-			}
-		}
-		return nil, err
-	}
-
-	err = block.Build(flowBlock, flowExecResult, link, flowBlockStatus, expandFields)
-	if err != nil {
-		return nil, err
-	}
-	return &block, nil
-}
-
 type blockRequest struct {
 	id     *flow.Identifier
 	height uint64
@@ -139,20 +83,20 @@ type blockRequest struct {
 	sealed bool
 }
 
-type blockRequestOption func(blkRequest *blockRequest)
+type BlockRequestOption func(blkRequest *blockRequest)
 
-func forID(id *flow.Identifier) blockRequestOption {
+func ForID(id *flow.Identifier) BlockRequestOption {
 	return func(blockRequest *blockRequest) {
 		blockRequest.id = id
 	}
 }
-func forHeight(height uint64) blockRequestOption {
+func ForHeight(height uint64) BlockRequestOption {
 	return func(blockRequest *blockRequest) {
 		blockRequest.height = height
 	}
 }
 
-func forFinalized(queryParam uint64) blockRequestOption {
+func ForFinalized(queryParam uint64) BlockRequestOption {
 	return func(blockRequest *blockRequest) {
 		switch queryParam {
 		case request.SealedHeight:
@@ -171,7 +115,7 @@ type blockRequestProvider struct {
 	backend access.API
 }
 
-func NewBlockRequestProvider(backend access.API, options ...blockRequestOption) *blockRequestProvider {
+func NewBlockRequestProvider(backend access.API, options ...BlockRequestOption) *blockRequestProvider {
 	blockRequestProvider := &blockRequestProvider{
 		backend: backend,
 	}
@@ -182,11 +126,11 @@ func NewBlockRequestProvider(backend access.API, options ...blockRequestOption) 
 	return blockRequestProvider
 }
 
-func (blkProvider *blockRequestProvider) getBlock(ctx context.Context) (*flow.Block, flow.BlockStatus, error) {
+func (blkProvider *blockRequestProvider) GetBlock(ctx context.Context) (*flow.Block, flow.BlockStatus, error) {
 	if blkProvider.id != nil {
 		blk, _, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
 		if err != nil { // unfortunately backend returns internal error status if not found
-			return nil, flow.BlockStatusUnknown, NewNotFoundError(
+			return nil, flow.BlockStatusUnknown, models.NewNotFoundError(
 				fmt.Sprintf("error looking up block with ID %s", blkProvider.id.String()), err,
 			)
 		}
@@ -197,29 +141,29 @@ func (blkProvider *blockRequestProvider) getBlock(ctx context.Context) (*flow.Bl
 		blk, status, err := blkProvider.backend.GetLatestBlock(ctx, blkProvider.sealed)
 		if err != nil {
 			// cannot be a 'not found' error since final and sealed block should always be found
-			return nil, flow.BlockStatusUnknown, NewRestError(http.StatusInternalServerError, "block lookup failed", err)
+			return nil, flow.BlockStatusUnknown, models.NewRestError(http.StatusInternalServerError, "block lookup failed", err)
 		}
 		return blk, status, nil
 	}
 
 	blk, status, err := blkProvider.backend.GetBlockByHeight(ctx, blkProvider.height)
 	if err != nil { // unfortunately backend returns internal error status if not found
-		return nil, flow.BlockStatusUnknown, NewNotFoundError(
+		return nil, flow.BlockStatusUnknown, models.NewNotFoundError(
 			fmt.Sprintf("error looking up block at height %d", blkProvider.height), err,
 		)
 	}
 	return blk, status, nil
 }
 
-// blockFromGrpcProvider is a layer of abstraction on top of the accessproto.AccessAPIClient and provides a uniform way to
+// BlockFromGrpcProvider is a layer of abstraction on top of the accessproto.AccessAPIClient and provides a uniform way to
 // look up a block or a block header either by ID or by height
-type blockFromGrpcProvider struct {
+type BlockFromGrpcProvider struct {
 	blockRequest
 	upstream accessproto.AccessAPIClient
 }
 
-func NewBlockFromGrpcProvider(upstream accessproto.AccessAPIClient, options ...blockRequestOption) *blockFromGrpcProvider {
-	blockFromGrpcProvider := &blockFromGrpcProvider{
+func NewBlockFromGrpcProvider(upstream accessproto.AccessAPIClient, options ...BlockRequestOption) *BlockFromGrpcProvider {
+	blockFromGrpcProvider := &BlockFromGrpcProvider{
 		upstream: upstream,
 	}
 
@@ -229,14 +173,14 @@ func NewBlockFromGrpcProvider(upstream accessproto.AccessAPIClient, options ...b
 	return blockFromGrpcProvider
 }
 
-func (blkProvider *blockFromGrpcProvider) getBlock(ctx context.Context) (*entities.Block, entities.BlockStatus, error) {
+func (blkProvider *BlockFromGrpcProvider) GetBlock(ctx context.Context) (*entities.Block, entities.BlockStatus, error) {
 	if blkProvider.id != nil {
 		getBlockByIdRequest := &accessproto.GetBlockByIDRequest{
 			Id: []byte(blkProvider.id.String()),
 		}
 		blockResponse, err := blkProvider.upstream.GetBlockByID(ctx, getBlockByIdRequest)
 		if err != nil { // unfortunately grpc returns internal error status if not found
-			return nil, entities.BlockStatus_BLOCK_UNKNOWN, NewNotFoundError(
+			return nil, entities.BlockStatus_BLOCK_UNKNOWN, models.NewNotFoundError(
 				fmt.Sprintf("error looking up block with ID %s", blkProvider.id.String()), err,
 			)
 		}
@@ -250,7 +194,7 @@ func (blkProvider *blockFromGrpcProvider) getBlock(ctx context.Context) (*entiti
 		blockResponse, err := blkProvider.upstream.GetLatestBlock(ctx, getLatestBlockRequest)
 		if err != nil {
 			// cannot be a 'not found' error since final and sealed block should always be found
-			return nil, entities.BlockStatus_BLOCK_UNKNOWN, NewRestError(http.StatusInternalServerError, "block lookup failed", err)
+			return nil, entities.BlockStatus_BLOCK_UNKNOWN, models.NewRestError(http.StatusInternalServerError, "block lookup failed", err)
 		}
 		return blockResponse.Block, blockResponse.BlockStatus, nil
 	}
@@ -261,7 +205,7 @@ func (blkProvider *blockFromGrpcProvider) getBlock(ctx context.Context) (*entiti
 	}
 	blockResponse, err := blkProvider.upstream.GetBlockByHeight(ctx, getBlockByHeight)
 	if err != nil { // unfortunately grpc returns internal error status if not found
-		return nil, entities.BlockStatus_BLOCK_UNKNOWN, NewNotFoundError(
+		return nil, entities.BlockStatus_BLOCK_UNKNOWN, models.NewNotFoundError(
 			fmt.Sprintf("error looking up block at height %d", blkProvider.height), err,
 		)
 	}

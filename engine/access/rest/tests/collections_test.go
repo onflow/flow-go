@@ -1,4 +1,4 @@
-package rest
+package tests
 
 import (
 	"encoding/json"

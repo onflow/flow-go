@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
+	"github.com/onflow/flow-go/engine/access/rest/api"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
@@ -68,7 +69,7 @@ type Engine struct {
 	secureGrpcAddress   net.Addr
 	restAPIAddress      net.Addr
 
-	restHandler rest.RestServerApi
+	restHandler api.RestServerApi
 }
 type Option func(*RPCEngineBuilder)
 

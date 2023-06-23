@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/access/rest/api"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
@@ -24,7 +25,7 @@ const MaxRequestSize = 2 << 20 // 2MB
 // it fetches necessary resources and returns an error or response model.
 type ApiHandlerFunc func(
 	r *request.Request,
-	srv RestServerApi,
+	srv api.RestServerApi,
 	generator models.LinkGenerator,
 ) (interface{}, error)
 
@@ -33,7 +34,7 @@ type ApiHandlerFunc func(
 // wraps functionality for handling error and responses outside of endpoint handling.
 type Handler struct {
 	logger         zerolog.Logger
-	restServerAPI  RestServerApi
+	restServerAPI  api.RestServerApi
 	linkGenerator  models.LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
 	chain          flow.Chain
@@ -41,7 +42,7 @@ type Handler struct {
 
 func NewHandler(
 	logger zerolog.Logger,
-	restServerAPI RestServerApi,
+	restServerAPI api.RestServerApi,
 	handlerFunc ApiHandlerFunc,
 	generator models.LinkGenerator,
 	chain flow.Chain,
@@ -92,7 +93,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zerolog.Logger) {
 	// rest status type error should be returned with status and user message provided
-	var statusErr StatusError
+	var statusErr models.StatusError
 	if errors.As(err, &statusErr) {
 		h.errorResponse(w, statusErr.Status(), statusErr.UserMessage(), errorLogger)
 		return
