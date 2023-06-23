@@ -4,7 +4,6 @@ package mockp2p
 
 import (
 	flow "github.com/onflow/flow-go/model/flow"
-	conf "github.com/onflow/flow-go/network/p2p/conf"
 
 	metrics "github.com/onflow/flow-go/module/metrics"
 

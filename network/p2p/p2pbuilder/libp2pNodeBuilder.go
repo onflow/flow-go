@@ -34,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	gossipsubbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/gossipsub"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
