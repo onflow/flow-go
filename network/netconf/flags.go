@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
+
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 const (
@@ -135,7 +137,7 @@ func initRpcInspectorValidationLimitsFlags(flags *pflag.FlagSet, defaultNetConfi
 
 	for _, ctrlMsgValidationConfig := range validationInspectorConfig.AllCtrlMsgValidationConfig() {
 		ctrlMsgType := ctrlMsgValidationConfig.ControlMsg
-		if ctrlMsgValidationConfig.ControlMsg == p2pconf.CtrlMsgIWant {
+		if ctrlMsgValidationConfig.ControlMsg == p2pmsg.CtrlMsgIWant {
 			continue
 		}
 		s := strings.ToLower(ctrlMsgType.String())
