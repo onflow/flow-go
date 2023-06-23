@@ -10,13 +10,17 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// A type of operation to perform on a pool.
 type OperatioType int
 
 const (
+	// Add - interpreteded as a command to add an element to a pool.
 	Add OperatioType = iota
+	// Remove - interpreteded as a command to remove an element from a pool.
 	Remove
 )
 
+// OperationAndIndex contains an operation to be perfomed on an antity stored under the specified index of an array of entities.
 type OperationAndIndex struct {
 	operation OperatioType
 	index     uint
