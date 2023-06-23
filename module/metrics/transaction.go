@@ -21,13 +21,12 @@ type TransactionCollector struct {
 	timeToExecuted                    prometheus.Summary
 	timeToFinalizedExecuted           prometheus.Summary
 	transactionSubmission             *prometheus.CounterVec
+	transactionSize                   prometheus.Histogram
 	scriptExecutedDuration            *prometheus.HistogramVec
 	scriptExecutionErrorArchiveNode   *prometheus.GaugeVec
 	scriptExecutionErrorExecutionNode *prometheus.GaugeVec
-	transactionResultDuration         *prometheus.HistogramVec
 	scriptSize                        prometheus.Histogram
-	transactionSize                   prometheus.Histogram
-
+	transactionResultDuration         *prometheus.HistogramVec
 }
 
 func NewTransactionCollector(

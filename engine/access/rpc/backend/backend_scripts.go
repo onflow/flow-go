@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"time"
@@ -123,7 +124,7 @@ func (b *backendScripts) executeScriptOnExecutor(
 	if len(b.archiveAddressList) > 0 {
 		startTime := time.Now()
 		for _, rnAddr := range b.archiveAddressList {
-			result, err := b.tryExecuteScriptOnExecutionNode(ctx, rnAddr, blockID, script, arguments)
+			result, err := b.tryExecuteScriptOnArchiveNode(ctx, rnAddr, blockID, script, arguments)
 			if err == nil {
 				// log execution time
 				b.metrics.ScriptExecuted(
@@ -131,27 +132,29 @@ func (b *backendScripts) executeScriptOnExecutor(
 					len(script),
 				)
 				return result, nil
-			}
-			if status.Code(err) != codes.InvalidArgument {
-				b.log.Debug().Err(err).
-					Str("script_executor_addr", rnAddr).
-					Hex("block_id", blockID[:]).
-					Hex("script_hash", insecureScriptHash[:]).
-					Str("script", string(script)).
-					Msg("script failed to execute on the execution node")
-				return nil, err
+			} else {
+				errCode := status.Code(err)
+				switch errCode {
+				case codes.InvalidArgument:
+					b.log.Debug().Err(err).
+						Str("script_executor_addr", rnAddr).
+						Hex("block_id", blockID[:]).
+						Hex("script_hash", insecureScriptHash[:]).
+						Str("script", string(script)).
+						Msg("script failed to execute on the execution node")
+					return nil, err
+				case codes.Internal:
+					b.metrics.ScriptExecutionErrorOnArchiveNode(blockID, string(script))
+					b.log.Error().Err(err).Msg("script execution failed for archive node internal reasons")
+				default:
+					continue
+				}
 			}
 		}
 	}
-	// log and try execution nodes if there are still errors
-	if err != nil {
-		b.metrics.ScriptExecutionErrorOnArchiveNode(blockID, string(script))
-		b.log.Error().Err(err).Msg("script execution failed for archive node internal reasons")
-	}
-
-	// try each of the executor nodes found
+	// try execution nodes if the script wasn't executed
 	var errors *multierror.Error
-	// try to execute the script on one of the execution/archive nodes
+	// try to execute the script on one of the execution nodes found
 	for _, executorAddress := range scriptExecutors {
 		execStartTime := time.Now() // record start time
 		result, err := b.tryExecuteScriptOnExecutionNode(ctx, executorAddress, blockID, script, arguments)
@@ -216,7 +219,8 @@ func (b *backendScripts) tryExecuteScriptOnExecutionNode(
 	executorAddress string,
 	blockID flow.Identifier,
 	script []byte,
-	arguments [][]byte) ([]byte, error) {
+	arguments [][]byte,
+) ([]byte, error) {
 	req := &execproto.ExecuteScriptAtBlockIDRequest{
 		BlockId:   blockID[:],
 		Script:    script,
@@ -226,7 +230,12 @@ func (b *backendScripts) tryExecuteScriptOnExecutionNode(
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v", executorAddress, err)
 	}
-	defer closer.Close()
+	defer func(closer io.Closer) {
+		err := closer.Close()
+		if err != nil {
+			b.log.Error().Err(err)
+		}
+	}(closer)
 
 	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, req)
 	if err != nil {
@@ -238,9 +247,13 @@ func (b *backendScripts) tryExecuteScriptOnExecutionNode(
 	return execResp.GetValue(), nil
 }
 
-func (b *backendScripts) tryExecuteScriptOnArchiveNode(ctx context.Context, executorAddress string, blockID flow.Identifier,
+func (b *backendScripts) tryExecuteScriptOnArchiveNode(
+	ctx context.Context,
+	executorAddress string,
+	blockID flow.Identifier,
 	script []byte,
-	arguments [][]byte) ([]byte, error) {
+	arguments [][]byte,
+) ([]byte, error) {
 	req := &access.ExecuteScriptAtBlockIDRequest{
 		BlockId:   blockID[:],
 		Script:    script,
@@ -253,7 +266,8 @@ func (b *backendScripts) tryExecuteScriptOnArchiveNode(ctx context.Context, exec
 
 	archiveClient, closer, err := b.connFactory.GetAccessAPIClientWithPort(executorAddress, port)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create client for archive node %s: %v", executorAddress, err)
+		return nil, status.Errorf(codes.Internal, "failed to create client for archive node %s: %v",
+			executorAddress, err)
 	}
 	defer closer.Close()
 	resp, err := archiveClient.ExecuteScriptAtBlockID(ctx, req)
@@ -261,7 +275,8 @@ func (b *backendScripts) tryExecuteScriptOnArchiveNode(ctx context.Context, exec
 		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateAccessAPIClient(executorAddress)
 		}
-		return nil, status.Errorf(status.Code(err), "failed to execute the script on archive node %s: %v", executorAddress, err)
+		return nil, status.Errorf(status.Code(err), "failed to execute the script on archive node %s: %v",
+			executorAddress, err)
 	}
 	return resp.GetValue(), nil
 }
