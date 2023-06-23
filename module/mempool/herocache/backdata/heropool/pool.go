@@ -1,9 +1,9 @@
 package heropool
 
 import (
+	"math"
 	"math/rand"
 
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/onflow/flow-go/model/flow"
 )
 
