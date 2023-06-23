@@ -41,13 +41,6 @@ type Config struct {
 
 	BackendConfig backend.Config // configurable options for creating Backend
 	MaxMsgSize    uint           // GRPC max message size
-	//ExecutionClientTimeout    time.Duration                    // execution API GRPC client timeout
-	//CollectionClientTimeout   time.Duration                    // collection API GRPC client timeout
-	//ConnectionPoolSize        uint                             // size of the cache for storing collection and execution connections
-	//MaxHeightRange            uint                             // max size of height range requests
-	//PreferredExecutionNodeIDs []string                         // preferred list of upstream execution node IDs
-	//FixedExecutionNodeIDs     []string                         // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
-	//ArchiveAddressList        []string                         // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
 }
 
 // Engine exposes the server with a simplified version of the Access API.

@@ -1008,7 +1008,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.executionGRPCPort,
 				builder.retryEnabled,
 				config.MaxMsgSize,
-				builder.rpcConf.BackendConfig)
+				config.BackendConfig)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
 			}

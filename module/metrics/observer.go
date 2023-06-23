@@ -11,9 +11,10 @@ type ObserverMetrics interface {
 }
 
 type ObserverCollector struct {
-	ObserverMetrics
 	rpcs *prometheus.CounterVec
 }
+
+var _ ObserverMetrics = (*ObserverCollector)(nil)
 
 func NewObserverCollector() *ObserverCollector {
 	return &ObserverCollector{

@@ -870,7 +870,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			0,
 			false,
 			config.MaxMsgSize,
-			builder.rpcConf.BackendConfig)
+			config.BackendConfig)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize backend: %w", err)
