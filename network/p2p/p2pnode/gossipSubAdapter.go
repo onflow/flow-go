@@ -20,8 +20,11 @@ import (
 // that implements the PubSubAdapter interface for the Flow network.
 type GossipSubAdapter struct {
 	component.Component
-	gossipSub             *pubsub.PubSub
-	logger                zerolog.Logger
+	gossipSub *pubsub.PubSub
+	logger    zerolog.Logger
+	// clusterChangeConsumer is a callback that is invoked when the set of active clusters of collection nodes changes.
+	// This callback is implemented by the rpc inspector suite of the GossipSubAdapter, and consumes the cluster changes
+	// to update the rpc inspector state of the recent topics (i.e., channels).
 	clusterChangeConsumer p2p.CollectionClusterChangesConsumer
 }
 
@@ -138,6 +141,13 @@ func (g *GossipSubAdapter) ListPeers(topic string) []peer.ID {
 	return g.gossipSub.ListPeers(topic)
 }
 
+// ActiveClustersChanged is called when the active clusters of collection nodes changes.
+// GossipSubAdapter implements this method to forward the call to the clusterChangeConsumer (rpc inspector),
+// which will then update the cluster state of the rpc inspector.
+// Args:
+// - lst: the list of active clusters
+// Returns:
+// - void
 func (g *GossipSubAdapter) ActiveClustersChanged(lst flow.ChainIDList) {
 	g.clusterChangeConsumer.ActiveClustersChanged(lst)
 }
