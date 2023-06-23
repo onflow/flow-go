@@ -910,7 +910,9 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	libp2pNode p2p.LibP2PNode,
 	validators ...network.MessageValidator,
 ) network.Middleware {
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network)
+	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, func() network.MisbehaviorReportConsumer {
+		return builder.MisbehaviorReportConsumer
+	})
 	mw := middleware.NewMiddleware(&middleware.Config{
 		Logger:                     builder.Logger,
 		Libp2pNode:                 libp2pNode,

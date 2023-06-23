@@ -19,17 +19,17 @@ const (
 // Consumer is a struct that logs a message for any slashable offenses.
 // This struct will be updated in the future when slashing is implemented.
 type Consumer struct {
-	log                       zerolog.Logger
-	metrics                   module.NetworkSecurityMetrics
-	misbehaviorReportConsumer network.MisbehaviorReportConsumer
+	log                   zerolog.Logger
+	metrics               module.NetworkSecurityMetrics
+	reportConsumerFactory func() network.MisbehaviorReportConsumer
 }
 
 // NewSlashingViolationsConsumer returns a new Consumer.
-func NewSlashingViolationsConsumer(log zerolog.Logger, metrics module.NetworkSecurityMetrics, consumer network.MisbehaviorReportConsumer) *Consumer {
+func NewSlashingViolationsConsumer(log zerolog.Logger, metrics module.NetworkSecurityMetrics, reportConsumerFactory func() network.MisbehaviorReportConsumer) *Consumer {
 	return &Consumer{
-		log:                       log.With().Str("module", "network_slashing_consumer").Logger(),
-		metrics:                   metrics,
-		misbehaviorReportConsumer: consumer,
+		log:                   log.With().Str("module", "network_slashing_consumer").Logger(),
+		metrics:               metrics,
+		reportConsumerFactory: reportConsumerFactory,
 	}
 }
 
@@ -76,7 +76,7 @@ func (c *Consumer) reportMisbehavior(misbehavior network.Misbehavior, violation 
 	if err != nil {
 		return fmt.Errorf("failed to create misbehavior report: %w", err)
 	}
-	c.misbehaviorReportConsumer.ReportMisbehaviorOnChannel(violation.Channel, report)
+	c.reportConsumerFactory().ReportMisbehaviorOnChannel(violation.Channel, report)
 	return nil
 }
 

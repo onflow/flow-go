@@ -293,6 +293,8 @@ type NodeConfig struct {
 
 	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
+	// MisbehaviorReportConsumer consumers used to disseminate misbehavior reports to the ALSP misbehavior report manager.
+	MisbehaviorReportConsumer network.MisbehaviorReportConsumer
 }
 
 // StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.

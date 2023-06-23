@@ -1262,15 +1262,17 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 ) network.Middleware {
 	logger := builder.Logger.With().Bool("staked", false).Logger()
 	mw := middleware.NewMiddleware(&middleware.Config{
-		Logger:                     logger,
-		Libp2pNode:                 libp2pNode,
-		FlowId:                     nodeID,
-		BitSwapMetrics:             builder.Metrics.Bitswap,
-		RootBlockID:                builder.SporkID,
-		UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
-		IdTranslator:               builder.IDTranslator,
-		Codec:                      builder.CodecFactory(),
-		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(logger, networkMetrics),
+		Logger:                logger,
+		Libp2pNode:            libp2pNode,
+		FlowId:                nodeID,
+		BitSwapMetrics:        builder.Metrics.Bitswap,
+		RootBlockID:           builder.SporkID,
+		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
+		IdTranslator:          builder.IDTranslator,
+		Codec:                 builder.CodecFactory(),
+		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(logger, networkMetrics, func() network.MisbehaviorReportConsumer {
+			return builder.MisbehaviorReportConsumer
+		}),
 	},
 		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)

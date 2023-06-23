@@ -748,15 +748,17 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	validators ...network.MessageValidator,
 ) network.Middleware {
 	mw := middleware.NewMiddleware(&middleware.Config{
-		Logger:                     builder.Logger,
-		Libp2pNode:                 libp2pNode,
-		FlowId:                     nodeID,
-		BitSwapMetrics:             builder.Metrics.Bitswap,
-		RootBlockID:                builder.SporkID,
-		UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
-		IdTranslator:               builder.IDTranslator,
-		Codec:                      builder.CodecFactory(),
-		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network),
+		Logger:                builder.Logger,
+		Libp2pNode:            libp2pNode,
+		FlowId:                nodeID,
+		BitSwapMetrics:        builder.Metrics.Bitswap,
+		RootBlockID:           builder.SporkID,
+		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
+		IdTranslator:          builder.IDTranslator,
+		Codec:                 builder.CodecFactory(),
+		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, func() network.MisbehaviorReportConsumer {
+			return builder.MisbehaviorReportConsumer
+		}),
 	},
 		middleware.WithMessageValidators(validators...),
 	)

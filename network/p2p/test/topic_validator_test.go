@@ -417,7 +417,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	require.NoError(t, err)
 	misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(t)
 	misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channel, expectedMisbehaviorReport).Once()
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), misbehaviorReportConsumer)
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
@@ -494,7 +494,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	require.NoError(t, err)
 	misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(t)
 	misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channel, expectedMisbehaviorReport).Once()
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), misbehaviorReportConsumer)
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
@@ -591,7 +591,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	logger := unittest.Logger()
 	misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(t)
 	defer misbehaviorReportConsumer.AssertNotCalled(t, "ReportMisbehaviorOnChannel", mock.AnythingOfType("channels.Channel"), mock.AnythingOfType("*alsp.MisbehaviorReport"))
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), misbehaviorReportConsumer)
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {

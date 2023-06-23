@@ -440,7 +440,7 @@ func GenerateRandomStringWithLen(commentLen uint) string {
 
 // NetworkSlashingViolationsConsumer returns a slashing violations consumer for network middleware
 func NetworkSlashingViolationsConsumer(logger zerolog.Logger, metrics module.NetworkSecurityMetrics, consumer network.MisbehaviorReportConsumer) slashing.ViolationsConsumer {
-	return slashing.NewSlashingViolationsConsumer(logger, metrics, consumer)
+	return slashing.NewSlashingViolationsConsumer(logger, metrics, MisbehaviorReportConsumerFactory(consumer))
 }
 
 type MisbehaviorReportConsumerFixture struct {
@@ -453,4 +453,10 @@ func (c *MisbehaviorReportConsumerFixture) ReportMisbehaviorOnChannel(channel ch
 
 func NewMisbehaviorReportConsumerFixture(manager network.MisbehaviorReportManager) *MisbehaviorReportConsumerFixture {
 	return &MisbehaviorReportConsumerFixture{manager}
+}
+
+func MisbehaviorReportConsumerFactory(consumer network.MisbehaviorReportConsumer) func() network.MisbehaviorReportConsumer {
+	return func() network.MisbehaviorReportConsumer {
+		return consumer
+	}
 }

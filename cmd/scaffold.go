@@ -485,16 +485,19 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	if len(peerManagerFilters) > 0 {
 		mwOpts = append(mwOpts, middleware.WithPeerManagerFilters(peerManagerFilters))
 	}
+
 	mw := middleware.NewMiddleware(&middleware.Config{
-		Logger:                     fnb.Logger,
-		Libp2pNode:                 fnb.LibP2PNode,
-		FlowId:                     fnb.Me.NodeID(),
-		BitSwapMetrics:             fnb.Metrics.Bitswap,
-		RootBlockID:                fnb.SporkID,
-		UnicastMessageTimeout:      fnb.BaseConfig.UnicastMessageTimeout,
-		IdTranslator:               fnb.IDTranslator,
-		Codec:                      fnb.CodecFactory(),
-		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network),
+		Logger:                fnb.Logger,
+		Libp2pNode:            fnb.LibP2PNode,
+		FlowId:                fnb.Me.NodeID(),
+		BitSwapMetrics:        fnb.Metrics.Bitswap,
+		RootBlockID:           fnb.SporkID,
+		UnicastMessageTimeout: fnb.BaseConfig.UnicastMessageTimeout,
+		IdTranslator:          fnb.IDTranslator,
+		Codec:                 fnb.CodecFactory(),
+		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network, func() network.MisbehaviorReportConsumer {
+			return fnb.MisbehaviorReportConsumer
+		}),
 	},
 		mwOpts...)
 
@@ -539,6 +542,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	}
 
 	fnb.Network = net
+	fnb.MisbehaviorReportConsumer = net
 
 	// register middleware's ReadyDoneAware interface so other components can depend on it for startup
 	if fnb.middlewareDependable != nil {
