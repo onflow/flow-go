@@ -78,7 +78,7 @@ func NodeFixture(
 		},
 		ResourceManager:                  testutils.NewResourceManager(t),
 		GossipSubPeerScoreTracerInterval: 0, // disabled by default
-		GossipSubRPCInspectorCfg:         GossipSubRpcValidationInspectorConfigFixture(t),
+		GossipSubRPCInspectorCfg:         &defaultFlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
 	}
 
 	for _, opt := range opts {
@@ -603,61 +603,4 @@ func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
 		ids[i] = PeerIdFixture(t)
 	}
 	return ids
-}
-
-// GossipSubRpcValidationInspectorConfigFixture returns a GossipSubRPCValidationInspectorConfigs instance for testing.
-// Args:
-// - t: *testing.T instance - to indicate that this is a test fixture.
-// Returns:
-// - *netconf.GossipSubRPCValidationInspectorConfigs: GossipSubRPCValidationInspectorConfigs instance.
-// Note: the parameters in this fixture are INTENTIONALLY independent of the default values in the config file.
-// This is to allow test parameters to be changed without affecting the default values in the config file.
-func GossipSubRpcValidationInspectorConfigFixture(_ *testing.T) *p2pconf.GossipSubRPCInspectorsConfig {
-	return &p2pconf.GossipSubRPCInspectorsConfig{
-		GossipSubRPCValidationInspectorConfigs: p2pconf.GossipSubRPCValidationInspectorConfigs{
-			ClusterPrefixedMessageConfig: p2pconf.ClusterPrefixedMessageConfig{
-				ClusterPrefixHardThreshold:                   100,
-				ClusterPrefixedControlMsgsReceivedCacheSize:  100,
-				ClusterPrefixedControlMsgsReceivedCacheDecay: .99,
-			},
-			NumberOfWorkers: 5,
-			CacheSize:       10_000,
-			GraftLimits: struct {
-				HardThreshold   uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-graft-hard-threshold"`
-				SafetyThreshold uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-graft-safety-threshold"`
-				RateLimit       int    `validate:"gte=0" mapstructure:"gossipsub-rpc-graft-rate-limit"`
-			}{
-				HardThreshold:   30,
-				SafetyThreshold: 15,
-				RateLimit:       30,
-			},
-			PruneLimits: struct {
-				HardThreshold   uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-prune-hard-threshold"`
-				SafetyThreshold uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-prune-safety-threshold"`
-				RateLimit       int    `validate:"gte=0" mapstructure:"gossipsub-rpc-prune-rate-limit"`
-			}{
-				HardThreshold:   30,
-				SafetyThreshold: 15,
-				RateLimit:       30,
-			},
-			IHaveLimits: struct {
-				HardThreshold   uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-ihave-hard-threshold"`
-				SafetyThreshold uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-ihave-safety-threshold"`
-				RateLimit       int    `validate:"gte=0" mapstructure:"gossipsub-rpc-ihave-rate-limit"`
-			}{
-				HardThreshold:   100,
-				SafetyThreshold: 50,
-				RateLimit:       0,
-			},
-			IHaveSyncInspectSampleSizePercentage:  .25,
-			IHaveAsyncInspectSampleSizePercentage: .10,
-			IHaveInspectionMaxSampleSize:          100,
-		},
-		GossipSubRPCMetricsInspectorConfigs: p2pconf.GossipSubRPCMetricsInspectorConfigs{
-			NumberOfWorkers: 1,
-			CacheSize:       100,
-		},
-		GossipSubRPCInspectorNotificationCacheSize: 10_000,
-	}
-
 }
