@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/cache"
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/message"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
@@ -52,7 +53,7 @@ type ControlMsgValidationInspector struct {
 	// In such cases, the inspector will allow a configured number of these messages from the corresponding peer.
 	tracker      *cache.ClusterPrefixedMessagesReceivedTracker
 	idProvider   module.IdentityProvider
-	rateLimiters map[p2pconf.ControlMessageType]p2p.BasicRateLimiter
+	rateLimiters map[p2pmsg.ControlMessageType]p2p.BasicRateLimiter
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
