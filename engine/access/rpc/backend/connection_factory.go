@@ -113,14 +113,10 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 
 	var connInterceptors []grpc.UnaryClientInterceptor
 
-	cbInterceptor := cf.createCircuitBreakerInterceptor()
-	if cbInterceptor != nil {
-		connInterceptors = append(connInterceptors, cbInterceptor)
-	}
-
-	ciInterceptor := cf.createClientInvalidationInterceptor(address, clientType)
-	if ciInterceptor != nil {
-		connInterceptors = append(connInterceptors, ciInterceptor)
+	if cf.CircuitBreakerConfig.Enabled {
+		connInterceptors = append(connInterceptors, cf.createCircuitBreakerInterceptor())
+	} else {
+		connInterceptors = append(connInterceptors, cf.createClientInvalidationInterceptor(address, clientType))
 	}
 
 	connInterceptors = append(connInterceptors, createClientTimeoutInterceptor(timeout))
