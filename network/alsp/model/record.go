@@ -13,7 +13,13 @@ type ProtocolSpamRecord struct {
 	OriginId flow.Identifier
 
 	// Decay speed of Penalty for this misbehaving node. Each node may have a different Decay speed based on its behavior.
+	// Subsequent disallow listings of the node will decrease the Decay speed of the node so it will take longer to be allow-listed.
 	Decay float64
+
+	// DecayList is a list of decay values that are used to decay the Penalty value of the misbehaving node on subsequent disallow listings.
+	// The decay values are used from left to right (left most value is used for the first disallow listing) and once the right most decay
+	// value is reached, any subsequent disallow listings will continue to use the right most decay value.
+	DecayList []float64
 
 	// CutoffCounter is a counter that is used to determine how many times the connections to the node has been cut due to
 	// its Penalty value dropping below the disallow-listing threshold.
@@ -27,6 +33,15 @@ type ProtocolSpamRecord struct {
 
 	// total Penalty value of the misbehaving node. Should be a negative value.
 	Penalty float64
+}
+
+// UpdateDecay updates the decay value of the record. This allows the decay to be different on subsequent disallow listings.
+// The decay value is updated based on the DecayList. If the DecayList is empty, the decay value is not updated.
+func (r *ProtocolSpamRecord) UpdateDecay() {
+	if len(r.DecayList) > 0 {
+		r.Decay = r.DecayList[0]
+		r.DecayList = r.DecayList[1:]
+	}
 }
 
 // RecordAdjustFunc is a function that is used to adjust the fields of a ProtocolSpamRecord.
@@ -49,8 +64,10 @@ type SpamRecordFactoryFunc func(flow.Identifier) ProtocolSpamRecord
 func SpamRecordFactory() SpamRecordFactoryFunc {
 	return func(originId flow.Identifier) ProtocolSpamRecord {
 		return ProtocolSpamRecord{
-			OriginId:       originId,
-			Decay:          InitialDecaySpeed,
+			OriginId: originId,
+			Decay:    InitialDecaySpeed,
+			// slow down decay 10x after each disallow-listing (e.g. 1000, 100, 10, 1)
+			DecayList:      []float64{InitialDecaySpeed * .1, InitialDecaySpeed * .01, InitialDecaySpeed * .001},
 			DisallowListed: false,
 			CutoffCounter:  uint64(0),
 			Penalty:        float64(0),

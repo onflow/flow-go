@@ -168,6 +168,7 @@ func (s *SpamRecordCache) Get(originId flow.Identifier) (*model.ProtocolSpamReco
 	return &model.ProtocolSpamRecord{
 		OriginId:       record.OriginId,
 		Decay:          record.Decay,
+		DecayList:      record.DecayList,
 		CutoffCounter:  record.CutoffCounter,
 		Penalty:        record.Penalty,
 		DisallowListed: record.DisallowListed,

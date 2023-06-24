@@ -351,6 +351,10 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
 			if record.Penalty == float64(0) && record.DisallowListed {
 				record.DisallowListed = false
+
+				// after fully decaying the penalty, update decay for next disallow listing
+				record.UpdateDecay()
+
 				m.logger.Info().
 					Hex("identifier", logging.ID(id)).
 					Uint64("cutoff_counter", record.CutoffCounter).
