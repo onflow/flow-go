@@ -322,6 +322,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 				m.logger.Warn().
 					Str("key", logging.KeySuspicious).
 					Hex("identifier", logging.ID(id)).
+					Float64("penalty", record.Penalty).
 					Uint64("cutoff_counter", record.CutoffCounter).
 					Float64("decay_speed", record.Decay).
 					Bool("disallow_listed", record.DisallowListed).
@@ -337,12 +338,14 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			// We use math.Min() to make sure the penalty is never positive.
 			m.logger.Info().
 				Hex("identifier", logging.ID(id)).
+				Uint64("cutoff_counter", record.CutoffCounter).
 				Bool("disallow_listed", record.DisallowListed).
 				Float64("penalty", record.Penalty).
 				Msg("onHeartbeat - before adjusting penalty via decayFunc")
 			record.Penalty = m.DecayFunc(record)
 			m.logger.Info().
 				Hex("identifier", logging.ID(id)).
+				Uint64("cutoff_counter", record.CutoffCounter).
 				Bool("disallow_listed", record.DisallowListed).
 				Float64("penalty", record.Penalty).
 				Msg("onHeartbeat - after adjusting penalty via decayFunc")
