@@ -373,7 +373,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 			t.Logf("starting test case: %s", testCase)
 			// keep misbehaving until the spammer is disallow-listed and check that the decay is as expected
 			for i := range expectedDecays {
-				t.Logf("starting iteration %d", i)
+				t.Logf("starting iteration %d with expected decay %d", i, expectedDecays[i])
 
 				// reset the decay function to the default
 				fastDecay = false
@@ -419,6 +419,26 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 				require.Equal(t, float64(expectedDecays[i]), record.Decay)
 				require.Equal(t, true, record.DisallowListed)
 				require.Equal(t, uint64(expectedCutoffCounter), record.CutoffCounter)
+
+				penalty1 := record.Penalty
+
+				// wait for one heartbeat to be processed.
+				time.Sleep(1 * time.Second)
+
+				record, ok = victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
+				require.True(t, ok)
+				require.NotNil(t, record)
+
+				// check the penalty of the spammer node. It should be greater than the disallow-listing threshold.
+				require.Greater(t, float64(model.DisallowListingThreshold), record.Penalty)
+
+				require.Equal(t, float64(expectedDecays[i]), record.Decay)
+				require.Equal(t, true, record.DisallowListed)
+				require.Equal(t, uint64(expectedCutoffCounter), record.CutoffCounter)
+				penalty2 := record.Penalty
+
+				// check that the penalty has decayed by the expected amount in one heartbeat
+				require.Equal(t, float64(expectedDecays[i]), penalty2-penalty1)
 
 				now := time.Now()
 
