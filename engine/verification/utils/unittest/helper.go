@@ -494,7 +494,7 @@ func withConsumers(t *testing.T,
 		builder.clusterCommittee = participants.Filter(filter.HasRole(flow.RoleCollection))
 	})
 
-	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
+	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, s.State, ops...)
 	blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
 	// chunk assignment
