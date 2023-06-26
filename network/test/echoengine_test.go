@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -12,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 
 	"github.com/ipfs/go-log"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -47,7 +45,6 @@ func TestStubEngineTestSuite(t *testing.T) {
 
 func (suite *EchoEngineTestSuite) SetupTest() {
 	const count = 2
-	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
 
 	ctx, cancel := context.WithCancel(context.Background())
