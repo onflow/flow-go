@@ -60,8 +60,6 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	suite.ids, nodes, suite.mws, suite.nets, _ = testutils.GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,
-		logger,
-		unittest.NetworkCodec(),
 	)
 
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)

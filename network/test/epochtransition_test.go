@@ -183,8 +183,6 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	ids, nodes, mws, nets, _ := testutils.GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,
-		suite.logger,
-		unittest.NetworkCodec(),
 	)
 	suite.cancels = append(suite.cancels, cancel)
 

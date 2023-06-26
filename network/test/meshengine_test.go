@@ -76,8 +76,6 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	suite.ids, nodes, suite.mws, suite.nets, obs = testutils.GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,
-		logger,
-		unittest.NetworkCodec(),
 		testutils.WithIdentityOpts(unittest.WithAllRoles()),
 	)
 

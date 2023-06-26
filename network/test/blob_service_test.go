@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
@@ -67,8 +65,6 @@ func (suite *BlobServiceTestSuite) putBlob(ds datastore.Batching, blob blobs.Blo
 
 func (suite *BlobServiceTestSuite) SetupTest() {
 	suite.numNodes = 3
-
-	logger := zerolog.New(os.Stdout)
 
 	// Bitswap listens to connect events but doesn't iterate over existing connections, and fixing this without
 	// race conditions is tricky given the way the code is architected. As a result, libP2P hosts must first listen
