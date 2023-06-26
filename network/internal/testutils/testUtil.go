@@ -50,6 +50,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -165,7 +166,6 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		var opts []nodeBuilderOption
 
 		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
-		opts = append(opts, withPeerManagerOptions(connection.PruningEnabled, o.peerUpdateInterval))
 		opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
 		opts = append(opts, withConnectionGater(o.connectionGaterFactory()))
 		opts = append(opts, withUnicastManagerOpts(o.createStreamRetryInterval))
@@ -197,6 +197,14 @@ func GenerateMiddlewares(t *testing.T,
 		unicastRateLimiters: ratelimit.NoopRateLimiters(),
 		networkMetrics:      metrics.NewNoopCollector(),
 		peerManagerFilters:  []p2p.PeerFilter{},
+		cfg: &middleware.Config{
+			Logger:                     logger,
+			BitSwapMetrics:             bitswapmet,
+			RootBlockID:                sporkID,
+			UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
+			Codec:                      codec,
+			SlashingViolationsConsumer: mocknetwork.NewViolationsConsumer(t),
+		},
 	}
 
 	for _, opt := range opts {
@@ -205,24 +213,13 @@ func GenerateMiddlewares(t *testing.T,
 
 	total := len(identities)
 	for i := 0; i < total; i++ {
-		// casts libP2PNode instance to a local variable to avoid closure
-		node := libP2PNodes[i]
-		nodeId := identities[i].NodeID
-
+		i := i
+		o.cfg.Libp2pNode = libP2PNodes[i]
+		o.cfg.FlowId = identities[i].NodeID
 		idProviders[i] = NewUpdatableIDProvider(identities)
+		o.cfg.IdTranslator = translator.NewIdentityProviderIDTranslator(idProviders[i])
 
-		// creating middleware of nodes
-		mws[i] = middleware.NewMiddleware(&middleware.Config{
-			Logger:                     logger,
-			Libp2pNode:                 node,
-			FlowId:                     nodeId,
-			BitSwapMetrics:             bitswapmet,
-			RootBlockID:                sporkID,
-			UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
-			IdTranslator:               translator.NewIdentityProviderIDTranslator(idProviders[i]),
-			Codec:                      codec,
-			SlashingViolationsConsumer: mocknetwork.NewViolationsConsumer(t),
-		},
+		mws[i] = middleware.NewMiddleware(o.cfg,
 			middleware.WithUnicastRateLimiters(o.unicastRateLimiters),
 			middleware.WithPeerManagerFilters(o.peerManagerFilters))
 	}
@@ -318,6 +315,7 @@ type optsConfig struct {
 	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
 	connectionGaterFactory        func() p2p.ConnectionGater
 	createStreamRetryInterval     time.Duration
+	cfg                           *middleware.Config
 }
 
 func WithCreateStreamRetryInterval(delay time.Duration) func(*optsConfig) {
@@ -360,6 +358,12 @@ func WithPeerManagerFilters(filters ...p2p.PeerFilter) func(*optsConfig) {
 func WithUnicastRateLimiters(limiters *ratelimit.RateLimiters) func(*optsConfig) {
 	return func(o *optsConfig) {
 		o.unicastRateLimiters = limiters
+	}
+}
+
+func WithSlashingViolationConsumer(consumer slashing.ViolationsConsumer) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.cfg.SlashingViolationsConsumer = consumer
 	}
 }
 
@@ -463,12 +467,6 @@ func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 	}
 }
 
-func withPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) nodeBuilderOption {
-	return func(nb p2p.NodeBuilder) {
-		// no-op for now
-	}
-}
-
 func withRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) nodeBuilderOption {
 	return func(nb p2p.NodeBuilder) {
 		nb.SetRateLimiterDistributor(distributor)
@@ -509,7 +507,11 @@ func generateLibP2PNode(t *testing.T, logger zerolog.Logger, key crypto.PrivateK
 		key,
 		sporkID,
 		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
-		p2pconfig.PeerManagerDisableConfig(), // disable peer manager
+		&p2pconfig.PeerManagerConfig{
+			ConnectionPruning: true,
+			UpdateInterval:    1 * time.Second,
+			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
+		}, // disable peer manager
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),

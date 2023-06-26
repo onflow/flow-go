@@ -75,7 +75,7 @@ func (u *UnicastAuthorizationTestSuite) TearDownTest() {
 // setupMiddlewaresAndProviders will setup 2 middlewares that will be used as a sender and receiver in each suite test.
 func (u *UnicastAuthorizationTestSuite) setupMiddlewaresAndProviders(slashingViolationsConsumer slashing.ViolationsConsumer) {
 	ids, libP2PNodes, _ := testutils.GenerateIDs(u.T(), u.logger, 2)
-	mws, providers := testutils.GenerateMiddlewares(u.T(), u.logger, ids, libP2PNodes, unittest.NetworkCodec(), slashingViolationsConsumer)
+	mws, providers := testutils.GenerateMiddlewares(u.T(), u.logger, ids, libP2PNodes, unittest.NetworkCodec(), testutils.WithSlashingViolationConsumer(slashingViolationsConsumer))
 	require.Len(u.T(), ids, 2)
 	require.Len(u.T(), providers, 2)
 	require.Len(u.T(), mws, 2)
