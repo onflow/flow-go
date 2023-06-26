@@ -75,7 +75,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	var nodes []p2p.LibP2PNode
 	suite.ids, nodes, obs = testutils.GenerateIDs(suite.T(), count, testutils.WithIdentityOpts(unittest.WithAllRoles()))
 	suite.mws, _ = testutils.GenerateMiddlewares(suite.T(), suite.ids, nodes)
-	suite.nets = testutils.NetworksFixture(suite.T(), suite.ids, suite.mws, testutils.GenerateSubscriptionManagers(suite.T(), suite.mws))
+	suite.nets = testutils.NetworksFixture(suite.T(), suite.ids, suite.mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 
 	for _, observableConnMgr := range obs {
