@@ -222,14 +222,14 @@ func GenerateMiddlewares(t *testing.T, identities flow.IdentityList, libP2PNodes
 // NetworksFixture generates the network for the given middlewares
 func NetworksFixture(t *testing.T,
 	ids flow.IdentityList,
-	mws []network.Middleware,
-	sms []network.SubscriptionManager) []network.Network {
+	mws []network.Middleware) []network.Network {
 
 	count := len(ids)
 	nets := make([]network.Network, 0)
 
 	for i := 0; i < count; i++ {
-		params := NetworkConfigFixture(t, *ids[i], ids, mws[i], sms[i])
+
+		params := NetworkConfigFixture(t, *ids[i], ids, mws[i])
 		net, err := p2p.NewNetwork(params)
 		require.NoError(t, err)
 
@@ -244,7 +244,7 @@ func NetworkConfigFixture(
 	myId flow.Identity,
 	allIds flow.IdentityList,
 	mw network.Middleware,
-	subMgr network.SubscriptionManager, opts ...p2p.NetworkConfigOption) *p2p.NetworkConfig {
+	opts ...p2p.NetworkConfigOption) *p2p.NetworkConfig {
 
 	me := mock.NewLocal(t)
 	me.On("NodeID").Return(myId.NodeID).Maybe()
@@ -258,6 +258,7 @@ func NetworkConfigFixture(
 		defaultFlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 		unittest.Logger(),
 		metrics.NewNoopCollector())
+	subMgr := subscription.NewChannelSubscriptionManager(mw)
 	params := &p2p.NetworkConfig{
 		Logger:              unittest.Logger(),
 		Codec:               unittest.NetworkCodec(),
@@ -370,8 +371,7 @@ func WithNetworkMetrics(m module.NetworkMetrics) func(*optsConfig) {
 
 func GenerateIDsMiddlewaresNetworks(t *testing.T, n int, opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []network.Network) {
 	ids, libp2pNodes, mws := GenerateIDsAndMiddlewares(t, n, opts...)
-	sms := GenerateSubscriptionManagers(t, mws)
-	networks := NetworksFixture(t, ids, mws, sms)
+	networks := NetworksFixture(t, ids, mws)
 
 	return ids, libp2pNodes, mws, networks
 }
@@ -529,17 +529,6 @@ func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
-}
-
-// GenerateSubscriptionManagers creates and returns a ChannelSubscriptionManager for each middleware object.
-func GenerateSubscriptionManagers(t *testing.T, mws []network.Middleware) []network.SubscriptionManager {
-	require.NotEmpty(t, mws)
-
-	sms := make([]network.SubscriptionManager, len(mws))
-	for i, mw := range mws {
-		sms[i] = subscription.NewChannelSubscriptionManager(mw)
-	}
-	return sms
 }
 
 // NetworkPayloadFixture creates a blob of random bytes with the given size (in bytes) and returns it.
