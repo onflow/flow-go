@@ -77,7 +77,7 @@ install-tools: crypto_setup_gopath check-go-version install-mock-generators
 	go install golang.org/x/tools/cmd/stringer@master;
 
 .PHONY: verify-mocks
-verify-mocks: generate-mocks
+verify-mocks: tidy generate-mocks
 	git diff --exit-code
 
 ############################################################################################
