@@ -287,13 +287,6 @@ func NetworkConfigFixture(
 	return params
 }
 
-// GenerateIDsAndMiddlewares returns nodeIDs, libp2pNodes, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
-func GenerateIDsAndMiddlewares(t *testing.T, n int, opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware) {
-	ids, libP2PNodes, _ := GenerateIDs(t, n, opts...)
-	mws, _ := GenerateMiddlewares(t, ids, libP2PNodes, opts...)
-	return ids, libP2PNodes, mws
-}
-
 type optsConfig struct {
 	idOpts                        []func(*flow.Identity)
 	dhtPrefix                     string

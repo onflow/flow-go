@@ -78,11 +78,12 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	ids, nodes, mws := testutils.GenerateIDsAndMiddlewares(suite.T(), suite.numNodes,
+	ids, nodes, _ := testutils.GenerateIDs(suite.T(),
+		suite.numNodes,
 		testutils.WithDHT("blob_service_test", dht.AsServer()),
 		testutils.WithPeerUpdateInterval(time.Second))
+	mws, _ := testutils.GenerateMiddlewares(suite.T(), ids, nodes)
 	suite.networks = testutils.NetworksFixture(suite.T(), ids, mws)
-
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.networks, 100*time.Millisecond)
 
 	blobExchangeChannel := channels.Channel("blob-exchange")
