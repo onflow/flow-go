@@ -9,9 +9,9 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	"github.com/onflow/flow-go/engine/protocol"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/forwarder"
 	"github.com/onflow/flow-go/module/metrics"
 )
 

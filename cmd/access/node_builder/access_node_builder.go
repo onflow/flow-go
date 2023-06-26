@@ -991,8 +991,29 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
+			backendConfig := config.BackendConfig
+			accessMetrics := builder.AccessMetrics
 
-			backend, err := backend.NewBackend(node.Logger,
+			cache, cacheSize, err := backend.NewCache(node.Logger,
+				accessMetrics,
+				backendConfig.ConnectionPoolSize)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize backend cache: %w", err)
+			}
+
+			connFactory := &backend.ConnectionFactoryImpl{
+				CollectionGRPCPort:        builder.collectionGRPCPort,
+				ExecutionGRPCPort:         builder.executionGRPCPort,
+				CollectionNodeGRPCTimeout: backendConfig.CollectionClientTimeout,
+				ExecutionNodeGRPCTimeout:  backendConfig.ExecutionClientTimeout,
+				ConnectionsCache:          cache,
+				CacheSize:                 cacheSize,
+				MaxMsgSize:                config.MaxMsgSize,
+				AccessMetrics:             accessMetrics,
+				Log:                       node.Logger,
+			}
+
+			backend := backend.New(
 				node.State,
 				builder.CollectionRPC,
 				builder.HistoricalAccessRPCs,
@@ -1004,14 +1025,14 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Results,
 				node.RootChainID,
 				builder.AccessMetrics,
-				builder.collectionGRPCPort,
-				builder.executionGRPCPort,
+				connFactory,
 				builder.retryEnabled,
-				config.MaxMsgSize,
-				config.BackendConfig)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize backend: %w", err)
-			}
+				backendConfig.MaxHeightRange,
+				backendConfig.PreferredExecutionNodeIDs,
+				backendConfig.FixedExecutionNodeIDs,
+				node.Logger,
+				backend.DefaultSnapshotHistoryLimit,
+				backendConfig.ArchiveAddressList)
 
 			engineBuilder, err := rpc.NewBuilder(
 				node.Logger,

@@ -201,28 +201,14 @@ func New(
 	return b
 }
 
-func NewBackend(
+func NewCache(
 	log zerolog.Logger,
-	state protocol.State,
-	collectionRPC accessproto.AccessAPIClient,
-	historicalAccessNodes []accessproto.AccessAPIClient,
-	blocks storage.Blocks,
-	headers storage.Headers,
-	collections storage.Collections,
-	transactions storage.Transactions,
-	executionReceipts storage.ExecutionReceipts,
-	executionResults storage.ExecutionResults,
-	chainID flow.ChainID,
 	accessMetrics module.AccessMetrics,
-	collectionGRPCPort uint,
-	executionGRPCPort uint,
-	retryEnabled bool,
-	maxMsgSize uint,
-	config Config,
-) (*Backend, error) {
+	connectionPoolSize uint,
+) (*lru.Cache, uint, error) {
 
 	var cache *lru.Cache
-	cacheSize := config.ConnectionPoolSize
+	cacheSize := connectionPoolSize
 	if cacheSize > 0 {
 		// TODO: remove this fallback after fixing issues with evictions
 		// It was observed that evictions cause connection errors for in flight requests. This works around
@@ -241,42 +227,10 @@ func NewBackend(
 			}
 		})
 		if err != nil {
-			return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
+			return nil, 0, fmt.Errorf("could not initialize connection pool cache: %w", err)
 		}
 	}
-
-	connectionFactory := &ConnectionFactoryImpl{
-		CollectionGRPCPort:        collectionGRPCPort,
-		ExecutionGRPCPort:         executionGRPCPort,
-		CollectionNodeGRPCTimeout: config.CollectionClientTimeout,
-		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
-		ConnectionsCache:          cache,
-		CacheSize:                 cacheSize,
-		MaxMsgSize:                maxMsgSize,
-		AccessMetrics:             accessMetrics,
-		Log:                       log,
-	}
-
-	return New(state,
-		collectionRPC,
-		historicalAccessNodes,
-		blocks,
-		headers,
-		collections,
-		transactions,
-		executionReceipts,
-		executionResults,
-		chainID,
-		accessMetrics,
-		connectionFactory,
-		retryEnabled,
-		config.MaxHeightRange,
-		config.PreferredExecutionNodeIDs,
-		config.FixedExecutionNodeIDs,
-		log,
-		DefaultSnapshotHistoryLimit,
-		config.ArchiveAddressList,
-	), nil
+	return cache, cacheSize, nil
 }
 
 func identifierList(ids []string) (flow.IdentifierList, error) {

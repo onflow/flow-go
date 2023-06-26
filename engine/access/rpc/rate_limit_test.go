@@ -119,8 +119,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	backend, err := backend.NewBackend(
-		suite.log,
+	backend := backend.New(
 		suite.state,
 		suite.collClient,
 		nil,
@@ -132,12 +131,14 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		nil,
 		suite.chainID,
 		suite.metrics,
-		0,
-		0,
+		nil,
 		false,
 		0,
-		config.BackendConfig)
-	require.NoError(suite.T(), err)
+		nil,
+		nil,
+		suite.log,
+		0,
+		nil)
 
 	rpcEngBuilder, err := NewBuilder(
 		suite.log,

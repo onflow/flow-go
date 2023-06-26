@@ -855,7 +855,28 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		accessMetrics := metrics.NewNoopCollector()
 		config := builder.rpcConf
-		accessBackend, err := backend.NewBackend(node.Logger,
+		backendConfig := config.BackendConfig
+
+		cache, cacheSize, err := backend.NewCache(node.Logger,
+			accessMetrics,
+			config.BackendConfig.ConnectionPoolSize)
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize backend cache: %w", err)
+		}
+
+		connFactory := &backend.ConnectionFactoryImpl{
+			CollectionGRPCPort:        0,
+			ExecutionGRPCPort:         0,
+			CollectionNodeGRPCTimeout: backendConfig.CollectionClientTimeout,
+			ExecutionNodeGRPCTimeout:  backendConfig.ExecutionClientTimeout,
+			ConnectionsCache:          cache,
+			CacheSize:                 cacheSize,
+			MaxMsgSize:                config.MaxMsgSize,
+			AccessMetrics:             accessMetrics,
+			Log:                       node.Logger,
+		}
+
+		accessBackend := backend.New(
 			node.State,
 			nil,
 			nil,
@@ -867,15 +888,14 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			node.Storage.Results,
 			node.RootChainID,
 			accessMetrics,
-			0,
-			0,
+			connFactory,
 			false,
-			config.MaxMsgSize,
-			config.BackendConfig)
-
-		if err != nil {
-			return nil, fmt.Errorf("could not initialize backend: %w", err)
-		}
+			backendConfig.MaxHeightRange,
+			backendConfig.PreferredExecutionNodeIDs,
+			backendConfig.FixedExecutionNodeIDs,
+			node.Logger,
+			backend.DefaultSnapshotHistoryLimit,
+			backendConfig.ArchiveAddressList)
 
 		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
