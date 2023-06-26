@@ -14,6 +14,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/network/p2p/dht"
+	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
@@ -77,19 +78,16 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	ids, nodes, mws, networks := testutils.GenerateIDsMiddlewaresNetworks(
-		suite.T(),
-		suite.numNodes,
+	ids, nodes, mws := testutils.GenerateIDsAndMiddlewares(suite.T(), suite.numNodes,
 		testutils.WithDHT("blob_service_test", dht.AsServer()),
-		testutils.WithPeerUpdateInterval(time.Second),
-	)
-	suite.networks = networks
+		testutils.WithPeerUpdateInterval(time.Second))
+	suite.networks = testutils.NetworksFixture(suite.T(), ids, mws)
 
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, networks, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.networks, 100*time.Millisecond)
 
 	blobExchangeChannel := channels.Channel("blob-exchange")
 
-	for i, net := range networks {
+	for i, net := range suite.networks {
 		ds := sync.MutexWrap(datastore.NewMapDatastore())
 		suite.datastores = append(suite.datastores, ds)
 		blob := blobs.NewBlob([]byte(fmt.Sprintf("foo%v", i)))
@@ -97,7 +95,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		suite.putBlob(ds, blob)
 		blobService, err := net.RegisterBlobService(blobExchangeChannel, ds)
 		suite.Require().NoError(err)
-		<-blobService.Ready()
+		unittest.RequireCloseBefore(suite.T(), blobService.Ready(), 100*time.Millisecond, "blob service not ready")
 		suite.blobServices = append(suite.blobServices, blobService)
 	}
 

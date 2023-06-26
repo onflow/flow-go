@@ -308,12 +308,6 @@ type optsConfig struct {
 	cfg                           *middleware.Config
 }
 
-func WithCreateStreamRetryInterval(delay time.Duration) func(*optsConfig) {
-	return func(o *optsConfig) {
-		o.createStreamRetryInterval = delay
-	}
-}
-
 func WithUnicastRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) func(*optsConfig) {
 	return func(o *optsConfig) {
 		o.unicastRateLimiterDistributor = distributor
@@ -361,19 +355,6 @@ func WithConnectionGaterFactory(connectionGaterFactory func() p2p.ConnectionGate
 	return func(o *optsConfig) {
 		o.connectionGaterFactory = connectionGaterFactory
 	}
-}
-
-func WithNetworkMetrics(m module.NetworkMetrics) func(*optsConfig) {
-	return func(o *optsConfig) {
-		o.networkMetrics = m
-	}
-}
-
-func GenerateIDsMiddlewaresNetworks(t *testing.T, n int, opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []network.Network) {
-	ids, libp2pNodes, mws := GenerateIDsAndMiddlewares(t, n, opts...)
-	networks := NetworksFixture(t, ids, mws)
-
-	return ids, libp2pNodes, mws, networks
 }
 
 // GenerateEngines generates MeshEngines for the given networks

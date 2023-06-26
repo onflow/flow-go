@@ -180,10 +180,8 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	// create the ids, middlewares and networks
-	ids, nodes, mws, nets := testutils.GenerateIDsMiddlewaresNetworks(
-		suite.T(),
-		count,
-	)
+	ids, nodes, mws := testutils.GenerateIDsAndMiddlewares(suite.T(), count)
+	nets := testutils.NetworksFixture(suite.T(), ids, mws)
 	suite.cancels = append(suite.cancels, cancel)
 
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, nets, 100*time.Millisecond)

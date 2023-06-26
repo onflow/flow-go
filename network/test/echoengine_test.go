@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network/p2p"
-
 	"github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,11 +53,8 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 
 	// both nodes should be of the same role to get connected on epidemic dissemination
 	var nodes []p2p.LibP2PNode
-	suite.ids, nodes, suite.mws, suite.nets = testutils.GenerateIDsMiddlewaresNetworks(
-		suite.T(),
-		count,
-	)
-
+	suite.ids, nodes, suite.mws = testutils.GenerateIDsAndMiddlewares(suite.T(), count)
+	suite.nets = testutils.NetworksFixture(suite.T(), suite.ids, suite.mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 }
 
