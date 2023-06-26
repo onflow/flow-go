@@ -602,9 +602,10 @@ func main() {
 				logger,
 				mainMetrics,
 			)
-
-			notifier.AddParticipantConsumer(telemetryConsumer)
 			notifier.AddFollowerConsumer(followerDistributor)
+			notifier.AddFinalizationConsumer(telemetryConsumer)
+			notifier.AddCommunicatorConsumer(telemetryConsumer)
+			notifier.AddParticipantConsumer(telemetryConsumer)
 
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)

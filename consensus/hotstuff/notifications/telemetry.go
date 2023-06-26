@@ -38,9 +38,13 @@ type TelemetryConsumer struct {
 	noPathLogger zerolog.Logger
 }
 
-var _ hotstuff.ParticipantConsumer = (*TelemetryConsumer)(nil)
+var _ hotstuff.VoteCollectorConsumer = (*TelemetryConsumer)(nil)
 var _ hotstuff.VoteCollectorConsumer = (*TelemetryConsumer)(nil)
 var _ hotstuff.TimeoutCollectorConsumer = (*TelemetryConsumer)(nil)
+
+var _ hotstuff.FinalizationConsumer = (*TelemetryConsumer)(nil)
+var _ hotstuff.CommunicatorConsumer = (*TelemetryConsumer)(nil)
+var _ hotstuff.ParticipantConsumer = (*TelemetryConsumer)(nil)
 
 // NewTelemetryConsumer creates consumer that reports telemetry events using logger backend.
 // Logger MUST include `chain` parameter as part of log context with corresponding chain ID to correctly map telemetry events to chain.
