@@ -38,7 +38,6 @@ import (
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -84,8 +83,6 @@ type MiddlewareTestSuite struct {
 
 	mwCancel context.CancelFunc
 	mwCtx    irrecoverable.SignalerContext
-
-	slashingViolationsConsumer slashing.ViolationsConsumer
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
@@ -109,13 +106,10 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  m.logger,
 	}
 
-	m.slashingViolationsConsumer = mocknetwork.NewViolationsConsumer(m.T())
-
 	m.ids, m.nodes, m.mws, obs, m.providers = testutils.GenerateIDsAndMiddlewares(m.T(),
 		m.size,
 		m.logger,
-		unittest.NetworkCodec(),
-		m.slashingViolationsConsumer)
+		unittest.NetworkCodec())
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -168,7 +162,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// create a new staked identity
 	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
 
-	mws, providers := testutils.GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer)
+	mws, providers := testutils.GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec())
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -272,7 +266,6 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 		ids,
 		libP2PNodes,
 		unittest.NetworkCodec(),
-		m.slashingViolationsConsumer,
 		testutils.WithUnicastRateLimiters(rateLimiters),
 		testutils.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(messageRateLimiter)))
 
@@ -431,7 +424,6 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		ids,
 		libP2PNodes,
 		unittest.NetworkCodec(),
-		m.slashingViolationsConsumer,
 		testutils.WithUnicastRateLimiters(rateLimiters),
 		testutils.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(bandwidthRateLimiter)))
 	require.Len(m.T(), ids, 1)

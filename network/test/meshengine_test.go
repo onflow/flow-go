@@ -20,7 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 
@@ -79,7 +78,6 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		count,
 		logger,
 		unittest.NetworkCodec(),
-		mocknetwork.NewViolationsConsumer(suite.T()),
 		testutils.WithIdentityOpts(unittest.WithAllRoles()),
 	)
 

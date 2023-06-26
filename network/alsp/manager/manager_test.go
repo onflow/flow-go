@@ -58,8 +58,7 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 		t,
 		1,
 		unittest.Logger(),
-		unittest.NetworkCodec(),
-		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+		unittest.NetworkCodec())
 	sms := testutils.GenerateSubscriptionManagers(t, mws)
 
 	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0])
@@ -121,8 +120,7 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 		t,
 		1,
 		unittest.Logger(),
-		unittest.NetworkCodec(),
-		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+		unittest.NetworkCodec())
 	sms := testutils.GenerateSubscriptionManagers(t, mws)
 	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0], p2p.WithAlspConfig(cfg))
 	net, err := p2p.NewNetwork(networkCfg)
@@ -220,8 +218,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 		t,
 		3,
 		unittest.Logger(),
-		unittest.NetworkCodec(),
-		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+		unittest.NetworkCodec())
 	sms := testutils.GenerateSubscriptionManagers(t, mws)
 	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0], p2p.WithAlspConfig(cfg))
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
@@ -298,8 +295,7 @@ func TestMisbehaviorReportMetrics(t *testing.T) {
 		t,
 		1,
 		unittest.Logger(),
-		unittest.NetworkCodec(),
-		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
+		unittest.NetworkCodec())
 	sms := testutils.GenerateSubscriptionManagers(t, mws)
 
 	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0], p2p.WithAlspConfig(cfg))

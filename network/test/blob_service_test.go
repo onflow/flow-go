@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
-	"github.com/onflow/flow-go/network/mocknetwork"
 )
 
 // conditionalTopology is a topology that behaves like the underlying topology when the condition is true,
@@ -89,7 +88,6 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		suite.numNodes,
 		logger,
 		unittest.NetworkCodec(),
-		mocknetwork.NewViolationsConsumer(suite.T()),
 		testutils.WithDHT("blob_service_test", dht.AsServer()),
 		testutils.WithPeerUpdateInterval(time.Second),
 	)

@@ -36,6 +36,7 @@ import (
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
@@ -49,7 +50,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -188,7 +188,6 @@ func GenerateMiddlewares(t *testing.T,
 	identities flow.IdentityList,
 	libP2PNodes []p2p.LibP2PNode,
 	codec network.Codec,
-	consumer slashing.ViolationsConsumer,
 	opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
@@ -222,7 +221,7 @@ func GenerateMiddlewares(t *testing.T,
 			UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
 			IdTranslator:               translator.NewIdentityProviderIDTranslator(idProviders[i]),
 			Codec:                      codec,
-			SlashingViolationsConsumer: consumer,
+			SlashingViolationsConsumer: mocknetwork.NewViolationsConsumer(t),
 		},
 			middleware.WithUnicastRateLimiters(o.unicastRateLimiters),
 			middleware.WithPeerManagerFilters(o.peerManagerFilters))
@@ -301,11 +300,10 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	logger zerolog.Logger,
 	codec network.Codec,
-	consumer slashing.ViolationsConsumer,
 	opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
 
 	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, opts...)
-	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, codec, consumer, opts...)
+	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, codec, opts...)
 	return ids, libP2PNodes, mws, protectObservables, providers
 }
 
@@ -381,9 +379,8 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	n int,
 	log zerolog.Logger,
 	codec network.Codec,
-	consumer slashing.ViolationsConsumer,
 	opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []network.Network, []observable.Observable) {
-	ids, libp2pNodes, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, consumer, opts...)
+	ids, libp2pNodes, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks := NetworksFixture(t, log, ids, mws, sms)
 
