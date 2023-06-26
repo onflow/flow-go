@@ -106,10 +106,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  m.logger,
 	}
 
-	m.ids, m.nodes, m.mws, obs, m.providers = testutils.GenerateIDsAndMiddlewares(m.T(),
-		m.size,
-		m.logger,
-		unittest.NetworkCodec())
+	m.ids, m.nodes, m.mws, obs, m.providers = testutils.GenerateIDsAndMiddlewares(m.T(), m.size)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -160,9 +157,9 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
 	// create a new staked identity
-	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
+	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), 1)
 
-	mws, providers := testutils.GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec())
+	mws, providers := testutils.GenerateMiddlewares(m.T(), ids, libP2PNodes)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -254,7 +251,6 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	}
 
 	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(),
-		m.logger,
 		1,
 		testutils.WithUnicastRateLimiterDistributor(distributor),
 		testutils.WithConnectionGaterFactory(connGaterFactory))
@@ -262,10 +258,8 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 
 	// create middleware
 	mws, providers := testutils.GenerateMiddlewares(m.T(),
-		m.logger,
 		ids,
 		libP2PNodes,
-		unittest.NetworkCodec(),
 		testutils.WithUnicastRateLimiters(rateLimiters),
 		testutils.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(messageRateLimiter)))
 
@@ -412,7 +406,6 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	}
 	// create a new staked identity
 	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(),
-		m.logger,
 		1,
 		testutils.WithUnicastRateLimiterDistributor(distributor),
 		testutils.WithConnectionGaterFactory(connGaterFactory))
@@ -420,10 +413,8 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	// create middleware
 	mws, providers := testutils.GenerateMiddlewares(m.T(),
-		m.logger,
 		ids,
 		libP2PNodes,
-		unittest.NetworkCodec(),
 		testutils.WithUnicastRateLimiters(rateLimiters),
 		testutils.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(bandwidthRateLimiter)))
 	require.Len(m.T(), ids, 1)

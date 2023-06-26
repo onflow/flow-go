@@ -17,8 +17,6 @@ import (
 
 	"github.com/onflow/flow-go/network/p2p/dht"
 
-	"github.com/onflow/flow-go/utils/unittest"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -86,8 +84,6 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	ids, nodes, mws, networks, _ := testutils.GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		suite.numNodes,
-		logger,
-		unittest.NetworkCodec(),
 		testutils.WithDHT("blob_service_test", dht.AsServer()),
 		testutils.WithPeerUpdateInterval(time.Second),
 	)

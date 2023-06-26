@@ -129,7 +129,7 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 }
 
 // GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
-func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsConfig)) (flow.IdentityList,
+func GenerateIDs(t *testing.T, n int, opts ...func(*optsConfig)) (flow.IdentityList,
 	[]p2p.LibP2PNode,
 	[]observable.Observable) {
 	libP2PNodes := make([]p2p.LibP2PNode, n)
@@ -170,7 +170,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 		opts = append(opts, withConnectionGater(o.connectionGaterFactory()))
 		opts = append(opts, withUnicastManagerOpts(o.createStreamRetryInterval))
 
-		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, idProvider, opts...)
+		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, unittest.Logger(), key, idProvider, opts...)
 
 		_, port, err := libP2PNodes[i].GetIPPort()
 		require.NoError(t, err)
@@ -184,10 +184,8 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsC
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
 func GenerateMiddlewares(t *testing.T,
-	logger zerolog.Logger,
 	identities flow.IdentityList,
 	libP2PNodes []p2p.LibP2PNode,
-	codec network.Codec,
 	opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
@@ -198,11 +196,11 @@ func GenerateMiddlewares(t *testing.T,
 		networkMetrics:      metrics.NewNoopCollector(),
 		peerManagerFilters:  []p2p.PeerFilter{},
 		cfg: &middleware.Config{
-			Logger:                     logger,
+			Logger:                     unittest.Logger(),
 			BitSwapMetrics:             bitswapmet,
 			RootBlockID:                sporkID,
 			UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
-			Codec:                      codec,
+			Codec:                      unittest.NetworkCodec(),
 			SlashingViolationsConsumer: mocknetwork.NewViolationsConsumer(t),
 		},
 	}
@@ -228,7 +226,6 @@ func GenerateMiddlewares(t *testing.T,
 
 // NetworksFixture generates the network for the given middlewares
 func NetworksFixture(t *testing.T,
-	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
 	sms []network.SubscriptionManager) []network.Network {
@@ -237,7 +234,7 @@ func NetworksFixture(t *testing.T,
 	nets := make([]network.Network, 0)
 
 	for i := 0; i < count; i++ {
-		params := NetworkConfigFixture(t, log, *ids[i], ids, mws[i], sms[i])
+		params := NetworkConfigFixture(t, *ids[i], ids, mws[i], sms[i])
 		net, err := p2p.NewNetwork(params)
 		require.NoError(t, err)
 
@@ -249,7 +246,6 @@ func NetworksFixture(t *testing.T,
 
 func NetworkConfigFixture(
 	t *testing.T,
-	logger zerolog.Logger,
 	myId flow.Identity,
 	allIds flow.IdentityList,
 	mw network.Middleware,
@@ -263,10 +259,13 @@ func NetworkConfigFixture(
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	receiveCache := netcache.NewHeroReceiveCache(defaultFlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize, logger, metrics.NewNoopCollector())
+	receiveCache := netcache.NewHeroReceiveCache(
+		defaultFlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
+		unittest.Logger(),
+		metrics.NewNoopCollector())
 	params := &p2p.NetworkConfig{
-		Logger:              logger,
-		Codec:               cbor.NewCodec(),
+		Logger:              unittest.Logger(),
+		Codec:               unittest.NetworkCodec(),
 		Me:                  me,
 		MiddlewareFactory:   func() (network.Middleware, error) { return mw, nil },
 		Topology:            unittest.NetworkTopology(),
@@ -293,14 +292,9 @@ func NetworkConfigFixture(
 }
 
 // GenerateIDsAndMiddlewares returns nodeIDs, libp2pNodes, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
-func GenerateIDsAndMiddlewares(t *testing.T,
-	n int,
-	logger zerolog.Logger,
-	codec network.Codec,
-	opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
-
-	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, opts...)
-	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, codec, opts...)
+func GenerateIDsAndMiddlewares(t *testing.T, n int, opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
+	ids, libP2PNodes, protectObservables := GenerateIDs(t, n, opts...)
+	mws, providers := GenerateMiddlewares(t, ids, libP2PNodes, opts...)
 	return ids, libP2PNodes, mws, protectObservables, providers
 }
 
@@ -381,12 +375,10 @@ func WithNetworkMetrics(m module.NetworkMetrics) func(*optsConfig) {
 
 func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	n int,
-	log zerolog.Logger,
-	codec network.Codec,
 	opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []network.Network, []observable.Observable) {
-	ids, libp2pNodes, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, opts...)
+	ids, libp2pNodes, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks := NetworksFixture(t, log, ids, mws, sms)
+	networks := NetworksFixture(t, ids, mws, sms)
 
 	return ids, libp2pNodes, mws, networks, observables
 }
