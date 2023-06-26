@@ -73,12 +73,9 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	var nodes []p2p.LibP2PNode
-	suite.ids, nodes, suite.mws, suite.nets, obs = testutils.GenerateIDsMiddlewaresNetworks(
-		suite.T(),
-		count,
-		testutils.WithIdentityOpts(unittest.WithAllRoles()),
-	)
-
+	suite.ids, nodes, obs = testutils.GenerateIDs(suite.T(), count, testutils.WithIdentityOpts(unittest.WithAllRoles()))
+	suite.mws, _ = testutils.GenerateMiddlewares(suite.T(), suite.ids, nodes)
+	suite.nets = testutils.NetworksFixture(suite.T(), suite.ids, suite.mws, testutils.GenerateSubscriptionManagers(suite.T(), suite.mws))
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 
 	for _, observableConnMgr := range obs {

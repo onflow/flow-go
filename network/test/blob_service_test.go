@@ -77,7 +77,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	ids, nodes, mws, networks, _ := testutils.GenerateIDsMiddlewaresNetworks(
+	ids, nodes, mws, networks := testutils.GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		suite.numNodes,
 		testutils.WithDHT("blob_service_test", dht.AsServer()),

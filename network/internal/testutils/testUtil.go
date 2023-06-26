@@ -129,9 +129,7 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 }
 
 // GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
-func GenerateIDs(t *testing.T, n int, opts ...func(*optsConfig)) (flow.IdentityList,
-	[]p2p.LibP2PNode,
-	[]observable.Observable) {
+func GenerateIDs(t *testing.T, n int, opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []observable.Observable) {
 	libP2PNodes := make([]p2p.LibP2PNode, n)
 	tagObservables := make([]observable.Observable, n)
 
@@ -183,10 +181,7 @@ func GenerateIDs(t *testing.T, n int, opts ...func(*optsConfig)) (flow.IdentityL
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T,
-	identities flow.IdentityList,
-	libP2PNodes []p2p.LibP2PNode,
-	opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
+func GenerateMiddlewares(t *testing.T, identities flow.IdentityList, libP2PNodes []p2p.LibP2PNode, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
 	bitswapmet := metrics.NewNoopCollector()
@@ -292,10 +287,10 @@ func NetworkConfigFixture(
 }
 
 // GenerateIDsAndMiddlewares returns nodeIDs, libp2pNodes, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
-func GenerateIDsAndMiddlewares(t *testing.T, n int, opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
-	ids, libP2PNodes, protectObservables := GenerateIDs(t, n, opts...)
-	mws, providers := GenerateMiddlewares(t, ids, libP2PNodes, opts...)
-	return ids, libP2PNodes, mws, protectObservables, providers
+func GenerateIDsAndMiddlewares(t *testing.T, n int, opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware) {
+	ids, libP2PNodes, _ := GenerateIDs(t, n, opts...)
+	mws, _ := GenerateMiddlewares(t, ids, libP2PNodes, opts...)
+	return ids, libP2PNodes, mws
 }
 
 type optsConfig struct {
@@ -373,14 +368,12 @@ func WithNetworkMetrics(m module.NetworkMetrics) func(*optsConfig) {
 	}
 }
 
-func GenerateIDsMiddlewaresNetworks(t *testing.T,
-	n int,
-	opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []network.Network, []observable.Observable) {
-	ids, libp2pNodes, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, opts...)
+func GenerateIDsMiddlewaresNetworks(t *testing.T, n int, opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []network.Network) {
+	ids, libp2pNodes, mws := GenerateIDsAndMiddlewares(t, n, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks := NetworksFixture(t, ids, mws, sms)
 
-	return ids, libp2pNodes, mws, networks, observables
+	return ids, libp2pNodes, mws, networks
 }
 
 // GenerateEngines generates MeshEngines for the given networks

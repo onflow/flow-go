@@ -106,8 +106,8 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  m.logger,
 	}
 
-	m.ids, m.nodes, m.mws, obs, m.providers = testutils.GenerateIDsAndMiddlewares(m.T(), m.size)
-
+	m.ids, m.nodes, obs = testutils.GenerateIDs(m.T(), m.size)
+	m.mws, m.providers = testutils.GenerateMiddlewares(m.T(), m.ids, m.nodes)
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
 	}

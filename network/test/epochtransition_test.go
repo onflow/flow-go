@@ -180,7 +180,7 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	// create the ids, middlewares and networks
-	ids, nodes, mws, nets, _ := testutils.GenerateIDsMiddlewaresNetworks(
+	ids, nodes, mws, nets := testutils.GenerateIDsMiddlewaresNetworks(
 		suite.T(),
 		count,
 	)
