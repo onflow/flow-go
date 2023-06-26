@@ -202,7 +202,7 @@ func (_m *NodeBuilder) SetGossipSubTracer(_a0 p2p.PubSubTracer) p2p.NodeBuilder 
 }
 
 // SetPeerManagerOptions provides a mock function with given fields: _a0, _a1
-func (_m *NodeBuilder) SetPeerManagerOptions(_a0 bool, _a1 time.Duration) p2p.NodeBuilder {
+func (_m *NodeBuilder) OverridePeerManagerConfig(_a0 bool, _a1 time.Duration) p2p.NodeBuilder {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 p2p.NodeBuilder

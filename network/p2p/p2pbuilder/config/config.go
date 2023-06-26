@@ -29,4 +29,6 @@ type PeerManagerConfig struct {
 	ConnectionPruning bool
 	// UpdateInterval interval used by the libp2p node peer manager component to periodically request peer updates.
 	UpdateInterval time.Duration
+
+	BackoffConnectorFactory
 }

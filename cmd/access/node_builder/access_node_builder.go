@@ -1240,7 +1240,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			)
 		}).
 		// disable connection pruning for the access node which supports the observer
-		SetPeerManagerOptions(connection.PruningDisabled, builder.FlowConfig.NetworkConfig.PeerUpdateInterval).
+		OverridePeerManagerConfig(connection.PruningDisabled, builder.FlowConfig.NetworkConfig.PeerUpdateInterval).
 		SetStreamCreationRetryInterval(builder.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay).
 		SetGossipSubTracer(meshTracer).
 		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).

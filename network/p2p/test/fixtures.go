@@ -133,7 +133,7 @@ func NodeFixture(
 
 	if parameters.UpdateInterval != 0 {
 		require.NotNil(t, parameters.PeerProvider)
-		builder.SetPeerManagerOptions(parameters.ConnectionPruning, parameters.UpdateInterval)
+		builder.OverridePeerManagerConfig(parameters.ConnectionPruning, parameters.UpdateInterval)
 	}
 
 	if parameters.GossipSubFactory != nil && parameters.GossipSubConfig != nil {

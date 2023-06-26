@@ -156,7 +156,7 @@ func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.Ide
 }
 
 // SetPeerManagerOptions sets the peer manager options.
-func (builder *LibP2PNodeBuilder) SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) p2p.NodeBuilder {
+func (builder *LibP2PNodeBuilder) OverridePeerManagerConfig(connectionPruning bool, updateInterval time.Duration) p2p.NodeBuilder {
 	builder.peerManagerEnablePruning = connectionPruning
 	builder.peerManagerUpdateInterval = updateInterval
 	return builder
@@ -287,11 +287,11 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	var peerManager p2p.PeerManager
 	if builder.peerManagerUpdateInterval > 0 {
-		connector, err := connection.NewLibp2pConnector(&connection.ConnectorConfig{
-			PruneConnections:        builder.peerManagerEnablePruning,
-			Logger:                  builder.logger,
-			Host:                    connection.NewConnectorHost(h),
-			BackoffConnectorFactory: connection.DefaultLibp2pBackoffConnectorFactory(h),
+		connector, err := connection.NewPeerUpdater(&connection.PeerUpdaterConfig{
+			PruneConnections: builder.peerManagerEnablePruning,
+			Logger:           builder.logger,
+			Host:             connection.NewConnectorHost(h),
+			ConnectorFactory: connection.DefaultLibp2pBackoffConnectorFactory(h),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
@@ -466,7 +466,7 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
 			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), log, metricsCfg.Metrics, dht.AsServer())
 		}).
-		SetPeerManagerOptions(peerManagerCfg.ConnectionPruning, peerManagerCfg.UpdateInterval).
+		OverridePeerManagerConfig(peerManagerCfg.ConnectionPruning, peerManagerCfg.UpdateInterval).
 		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
 		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor).

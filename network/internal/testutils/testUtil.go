@@ -467,7 +467,7 @@ func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 
 func withPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) nodeBuilderOption {
 	return func(nb p2p.NodeBuilder) {
-		nb.SetPeerManagerOptions(connectionPruning, updateInterval)
+		nb.OverridePeerManagerConfig(connectionPruning, updateInterval)
 	}
 }
 

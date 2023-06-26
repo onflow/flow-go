@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestPeerManager_Integration tests the correctness of integration between PeerManager and Libp2pConnector over
+// TestPeerManager_Integration tests the correctness of integration between PeerManager and PeerUpdater over
 // a fully connected topology.
 // PeerManager should be able to connect to all peers using the connector, and must also tear down the connection to
 // peers that are excluded from its identity provider.
@@ -54,11 +54,11 @@ func TestPeerManager_Integration(t *testing.T) {
 	}
 
 	// setup
-	connector, err := connection.NewLibp2pConnector(&connection.ConnectorConfig{
-		PruneConnections:        connection.PruningEnabled,
-		Logger:                  unittest.Logger(),
-		Host:                    connection.NewConnectorHost(thisNode.Host()),
-		BackoffConnectorFactory: connection.DefaultLibp2pBackoffConnectorFactory(thisNode.Host()),
+	connector, err := connection.NewPeerUpdater(&connection.PeerUpdaterConfig{
+		PruneConnections: connection.PruningEnabled,
+		Logger:           unittest.Logger(),
+		Host:             connection.NewConnectorHost(thisNode.Host()),
+		ConnectorFactory: connection.DefaultLibp2pBackoffConnectorFactory(thisNode.Host()),
 	})
 	require.NoError(t, err)
 
