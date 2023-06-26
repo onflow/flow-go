@@ -67,7 +67,9 @@ func NodeFixture(
 	require.NoError(t, err)
 
 	parameters := &NodeFixtureParameters{
-		HandlerFunc:                      nil,
+		HandlerFunc: func(stream network.Stream) {
+
+		},
 		Unicasts:                         nil,
 		Key:                              NetworkingKeyFixtures(t),
 		Address:                          unittest.DefaultAddress,
