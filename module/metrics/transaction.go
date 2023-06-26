@@ -12,21 +12,20 @@ import (
 )
 
 type TransactionCollector struct {
-	transactionTimings                mempool.TransactionTimings
-	log                               zerolog.Logger
-	logTimeToFinalized                bool
-	logTimeToExecuted                 bool
-	logTimeToFinalizedExecuted        bool
-	timeToFinalized                   prometheus.Summary
-	timeToExecuted                    prometheus.Summary
-	timeToFinalizedExecuted           prometheus.Summary
-	transactionSubmission             *prometheus.CounterVec
-	transactionSize                   prometheus.Histogram
-	scriptExecutedDuration            *prometheus.HistogramVec
-	scriptExecutionErrorArchiveNode   *prometheus.GaugeVec
-	scriptExecutionErrorExecutionNode *prometheus.GaugeVec
-	scriptSize                        prometheus.Histogram
-	transactionResultDuration         *prometheus.HistogramVec
+	transactionTimings             mempool.TransactionTimings
+	log                            zerolog.Logger
+	logTimeToFinalized             bool
+	logTimeToExecuted              bool
+	logTimeToFinalizedExecuted     bool
+	timeToFinalized                prometheus.Summary
+	timeToExecuted                 prometheus.Summary
+	timeToFinalizedExecuted        prometheus.Summary
+	transactionSubmission          *prometheus.CounterVec
+	transactionSize                prometheus.Histogram
+	scriptExecutedDuration         *prometheus.HistogramVec
+	scriptExecutionErrorOnExecutor *prometheus.CounterVec
+	scriptSize                     prometheus.Histogram
+	transactionResultDuration      *prometheus.HistogramVec
 }
 
 func NewTransactionCollector(
@@ -99,18 +98,12 @@ func NewTransactionCollector(
 			Help:      "histogram for the duration in ms of the round trip time for executing a script",
 			Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
 		}, []string{"script_size"}),
-		scriptExecutionErrorArchiveNode: promauto.NewGaugeVec(prometheus.GaugeOpts{
+		scriptExecutionErrorOnExecutor: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "script_execution_error_archive",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "histogram for the internal errors for executing a script for a block on the archive node",
-		}, []string{"block_id", "script"}),
-		scriptExecutionErrorExecutionNode: promauto.NewGaugeVec(prometheus.GaugeOpts{
-			Name:      "script_execution_error_execution",
-			Namespace: namespaceAccess,
-			Subsystem: subsystemTransactionSubmission,
-			Help:      "histogram for the internal errors for executing a script for a block on the execution node",
-		}, []string{"block_id", "script"}),
+		}, []string{"errors"}),
 		transactionResultDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "transaction_result_fetched_duration",
 			Namespace: namespaceAccess,
@@ -147,12 +140,12 @@ func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
 
 func (tc *TransactionCollector) ScriptExecutionErrorOnArchiveNode(blockID flow.Identifier, scriptHash string) {
 	// record the execution error along with blockID and scriptHash for Archive node
-	tc.scriptExecutionErrorArchiveNode.With(prometheus.Labels{"block_id": blockID.String(), "script": scriptHash}).Inc()
+	tc.scriptExecutionErrorOnExecutor.WithLabelValues("archive").Inc()
 }
 
 func (tc *TransactionCollector) ScriptExecutionErrorOnExecutionNode(blockID flow.Identifier, scriptHash string) {
 	// record the execution error along with blockID and scriptHash for Execution node
-	tc.scriptExecutionErrorExecutionNode.With(prometheus.Labels{"block_id": blockID.String(), "script": scriptHash}).Inc()
+	tc.scriptExecutionErrorOnExecutor.WithLabelValues("execution").Inc()
 }
 
 // TransactionResult metrics

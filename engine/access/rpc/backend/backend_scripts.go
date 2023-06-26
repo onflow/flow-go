@@ -136,6 +136,7 @@ func (b *backendScripts) executeScriptOnExecutor(
 				errCode := status.Code(err)
 				switch errCode {
 				case codes.InvalidArgument:
+					// failure due to cadence script, no need to query further
 					b.log.Debug().Err(err).
 						Str("script_executor_addr", rnAddr).
 						Hex("block_id", blockID[:]).
@@ -143,8 +144,9 @@ func (b *backendScripts) executeScriptOnExecutor(
 						Str("script", string(script)).
 						Msg("script failed to execute on the execution node")
 					return nil, err
-				case codes.Internal:
-					b.metrics.ScriptExecutionErrorOnArchiveNode(blockID, string(script))
+				case codes.NotFound:
+					// failures due to unavailable blocks are explicitly marked Not found
+					b.metrics.ScriptExecutionErrorOnArchiveNode()
 					b.log.Error().Err(err).Msg("script execution failed for archive node internal reasons")
 				default:
 					continue
@@ -195,7 +197,7 @@ func (b *backendScripts) executeScriptOnExecutor(
 
 	errToReturn := errors.ErrorOrNil()
 	if errToReturn != nil {
-		b.metrics.ScriptExecutionErrorOnExecutionNode(blockID, string(script))
+		b.metrics.ScriptExecutionErrorOnExecutionNode()
 		b.log.Error().Err(err).Msg("script execution failed for execution node internal reasons")
 	}
 

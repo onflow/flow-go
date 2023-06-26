@@ -733,10 +733,10 @@ type BackendScriptsMetrics interface {
 	ScriptExecuted(dur time.Duration, size int)
 
 	// ScriptExecutionErrorOnExecutionNode records script execution failures on Execution Nodes
-	ScriptExecutionErrorOnExecutionNode(blockID flow.Identifier, scriptHash string)
+	ScriptExecutionErrorOnArchiveNode()
 
 	// ScriptExecutionErrorOnArchiveNode records script execution failures in Archive Nodes
-	ScriptExecutionErrorOnArchiveNode(blockID flow.Identifier, scriptHash string)
+	ScriptExecutionErrorOnExecutionNode()
 }
 
 type TransactionMetrics interface {
