@@ -53,19 +53,21 @@ func TestPeerManager_Integration(t *testing.T) {
 		thisNode.Host().Peerstore().SetAddrs(i.ID, i.Addrs, peerstore.PermanentAddrTTL)
 	}
 
+	connector, err := connection.DefaultLibp2pBackoffConnectorFactory()(thisNode.Host())
+	require.NoError(t, err)
 	// setup
-	connector, err := connection.NewPeerUpdater(&connection.PeerUpdaterConfig{
+	peerUpdater, err := connection.NewPeerUpdater(&connection.PeerUpdaterConfig{
 		PruneConnections: connection.PruningEnabled,
 		Logger:           unittest.Logger(),
 		Host:             connection.NewConnectorHost(thisNode.Host()),
-		ConnectorFactory: connection.DefaultLibp2pBackoffConnectorFactory(thisNode.Host()),
+		Connector:        connector,
 	})
 	require.NoError(t, err)
 
 	idTranslator, err := translator.NewFixedTableIdentityTranslator(identities)
 	require.NoError(t, err)
 
-	peerManager := connection.NewPeerManager(unittest.Logger(), connection.DefaultPeerUpdateInterval, connector)
+	peerManager := connection.NewPeerManager(unittest.Logger(), connection.DefaultPeerUpdateInterval, peerUpdater)
 	peerManager.SetPeersProvider(func() peer.IDSlice {
 		// peerManager is furnished with a full topology that connects to all nodes
 		// in the topologyPeers.
