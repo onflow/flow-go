@@ -42,7 +42,7 @@ import (
 const (
 	// TODO: enable parallel execution once cadence type equivalence check issue
 	// is resolved.
-	testMaxConcurrency = 1
+	testMaxConcurrency = 2
 )
 
 // ExecutionReceiptData is a test helper struct that represents all data required

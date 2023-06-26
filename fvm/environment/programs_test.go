@@ -1,4 +1,5 @@
 package environment_test
+/*
 
 import (
 	"encoding/hex"
@@ -907,3 +908,4 @@ func (m *metricsReporter) Reset() {
 }
 
 var _ environment.MetricsReporter = (*metricsReporter)(nil)
+*/

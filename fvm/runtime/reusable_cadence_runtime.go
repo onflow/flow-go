@@ -186,6 +186,7 @@ func (pool ReusableCadenceRuntimePool) Borrow(
 func (pool ReusableCadenceRuntimePool) Return(
 	reusable *ReusableCadenceRuntime,
 ) {
+/*
 	reusable.SetFvmEnvironment(nil)
 	select {
 	case pool.pool <- reusable:
@@ -193,4 +194,5 @@ func (pool ReusableCadenceRuntimePool) Return(
 	default:
 		// Do nothing.  Discard the overflow entry.
 	}
+*/
 }

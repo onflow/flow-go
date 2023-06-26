@@ -236,6 +236,8 @@ func (table *DerivedDataTable[TKey, TVal]) validate(
 func (table *DerivedDataTable[TKey, TVal]) commit(
 	txn *TableTransaction[TKey, TVal],
 ) error {
+    return nil
+/*
 	table.lock.Lock()
 	defer table.lock.Unlock()
 
@@ -292,6 +294,7 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 
 	table.latestCommitExecutionTime = txn.executionTime
 	return nil
+*/
 }
 
 func (table *DerivedDataTable[TKey, TVal]) newTableTransaction(

@@ -48,7 +48,7 @@ import (
 const (
 	// TODO: enable parallel execution once cadence type equivalence check issue
 	// is resolved.
-	testVerifyMaxConcurrency = 1
+	testVerifyMaxConcurrency = 2
 )
 
 var chain = flow.Emulator.Chain()
