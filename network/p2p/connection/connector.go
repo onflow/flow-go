@@ -2,7 +2,6 @@ package connection
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
@@ -45,7 +44,7 @@ type PeerUpdaterConfig struct {
 	Host p2p.ConnectorHost
 
 	// ConnectorFactory is a factory function to create a new connector.
-	ConnectorFactory p2p.ConnectorFactory
+	Connector p2p.Connector
 }
 
 var _ p2p.PeerUpdater = (*PeerUpdater)(nil)
@@ -58,18 +57,9 @@ var _ p2p.PeerUpdater = (*PeerUpdater)(nil)
 //   - *PeerUpdater: a new libp2p based connector
 //   - error: an error if there is any error while creating the connector. The errors are irrecoverable and unexpected.
 func NewPeerUpdater(cfg *PeerUpdaterConfig) (*PeerUpdater, error) {
-	connector, err := cfg.ConnectorFactory()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create libP2P connector: %w", err)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create peer ID slice shuffler: %w", err)
-	}
-
 	libP2PConnector := &PeerUpdater{
 		log:              cfg.Logger,
-		connector:        connector,
+		connector:        cfg.Connector,
 		host:             cfg.Host,
 		pruneConnections: cfg.PruneConnections,
 	}

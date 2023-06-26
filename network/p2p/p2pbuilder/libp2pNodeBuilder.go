@@ -63,8 +63,7 @@ type LibP2PNodeBuilder struct {
 	connManager               connmgr.ConnManager
 	connGater                 p2p.ConnectionGater
 	routingFactory            func(context.Context, host.Host) (routing.Routing, error)
-	peerManagerEnablePruning  bool
-	peerManagerUpdateInterval time.Duration
+	peerManagerConfig         *p2pconfig.PeerManagerConfig
 	createNode                p2p.CreateNodeFunc
 	createStreamRetryInterval time.Duration
 	rateLimiterDistributor    p2p.UnicastRateLimiterDistributor
@@ -78,6 +77,7 @@ func NewNodeBuilder(logger zerolog.Logger,
 	networkKey fcrypto.PrivateKey,
 	sporkID flow.Identifier,
 	rCfg *netconf.ResourceManagerConfig,
+	peerManagerConfig *p2pconfig.PeerManagerConfig,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:               logger,
@@ -89,6 +89,7 @@ func NewNodeBuilder(logger zerolog.Logger,
 		resourceManagerCfg:   rCfg,
 		gossipSubBuilder:     gossipsubbuilder.NewGossipSubBuilder(logger, metrics),
 		disallowListCacheCfg: disallowListCacheCfg,
+		peerManagerConfig:    peerManagerConfig,
 	}
 }
 
@@ -152,13 +153,6 @@ func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(provider module.Ide
 		}
 	}
 
-	return builder
-}
-
-// SetPeerManagerOptions sets the peer manager options.
-func (builder *LibP2PNodeBuilder) OverridePeerManagerConfig(connectionPruning bool, updateInterval time.Duration) p2p.NodeBuilder {
-	builder.peerManagerEnablePruning = connectionPruning
-	builder.peerManagerUpdateInterval = updateInterval
 	return builder
 }
 
@@ -286,18 +280,22 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	}
 
 	var peerManager p2p.PeerManager
-	if builder.peerManagerUpdateInterval > 0 {
-		connector, err := connection.NewPeerUpdater(&connection.PeerUpdaterConfig{
-			PruneConnections: builder.peerManagerEnablePruning,
+	if builder.peerManagerConfig.UpdateInterval > 0 {
+		connector, err := builder.peerManagerConfig.ConnectorFactory(h)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
+		}
+		peerUpdater, err := connection.NewPeerUpdater(&connection.PeerUpdaterConfig{
+			PruneConnections: builder.peerManagerConfig.ConnectionPruning,
 			Logger:           builder.logger,
 			Host:             connection.NewConnectorHost(h),
-			ConnectorFactory: connection.DefaultLibp2pBackoffConnectorFactory(h),
+			Connector:        connector,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
 		}
 
-		peerManager = connection.NewPeerManager(builder.logger, builder.peerManagerUpdateInterval, connector)
+		peerManager = connection.NewPeerManager(builder.logger, builder.peerManagerConfig.UpdateInterval, peerUpdater)
 
 		if builder.rateLimiterDistributor != nil {
 			builder.rateLimiterDistributor.AddConsumer(peerManager)
@@ -459,14 +457,13 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
-	builder := NewNodeBuilder(log, metricsCfg.Metrics, address, flowKey, sporkId, rCfg, disallowListCacheCfg).
+	builder := NewNodeBuilder(log, metricsCfg.Metrics, address, flowKey, sporkId, rCfg, peerManagerCfg, disallowListCacheCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
 		SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
 			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), log, metricsCfg.Metrics, dht.AsServer())
 		}).
-		OverridePeerManagerConfig(peerManagerCfg.ConnectionPruning, peerManagerCfg.UpdateInterval).
 		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
 		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor).

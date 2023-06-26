@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -27,11 +28,11 @@ type Connector interface {
 	// 	peerChan: channel to which the peer.AddrInfo of the connected peer.ID is sent.
 	// Returns:
 	//  none.
-	Connect(ctx context.Context, peerChan chan peer.AddrInfo)
+	Connect(ctx context.Context, peerChan <-chan peer.AddrInfo)
 }
 
 // ConnectorFactory is a factory function to create a new Connector.
-type ConnectorFactory func() (Connector, error)
+type ConnectorFactory func(host host.Host) (Connector, error)
 
 type PeerFilter func(peer.ID) error
 

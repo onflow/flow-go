@@ -1218,6 +1218,11 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		networkKey,
 		builder.SporkID,
 		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
+		&p2pconfig.PeerManagerConfig{
+			ConnectionPruning: connection.PruningDisabled,
+			UpdateInterval:    builder.FlowConfig.NetworkConfig.PeerUpdateInterval,
+			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
+		},
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
@@ -1240,7 +1245,6 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			)
 		}).
 		// disable connection pruning for the access node which supports the observer
-		OverridePeerManagerConfig(connection.PruningDisabled, builder.FlowConfig.NetworkConfig.PeerUpdateInterval).
 		SetStreamCreationRetryInterval(builder.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay).
 		SetGossipSubTracer(meshTracer).
 		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).

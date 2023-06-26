@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -35,7 +36,11 @@ func TestDisconnectingFromDisallowListedNode(t *testing.T) {
 		sporkID,
 		t.Name(),
 		idProvider,
-		p2ptest.WithPeerManagerEnabled(true, connection.DefaultPeerUpdateInterval,
+		p2ptest.WithPeerManagerEnabled(&p2pconfig.PeerManagerConfig{
+			ConnectionPruning: true,
+			UpdateInterval:    connection.DefaultPeerUpdateInterval,
+			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
+		},
 			func() peer.IDSlice {
 				return peerIDSlice
 			}),
