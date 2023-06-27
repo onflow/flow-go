@@ -18,10 +18,6 @@ import (
 
 type NoopCollector struct{}
 
-// interface check
-var _ module.BackendScriptsMetrics = (*NoopCollector)(nil)
-var _ module.TransactionMetrics = (*NoopCollector)(nil)
-
 func NewNoopCollector() *NoopCollector {
 	nc := &NoopCollector{}
 	return nc
@@ -35,6 +31,9 @@ func (nc *NoopCollector) UnicastMessageSendingCompleted(topic string)           
 func (nc *NoopCollector) BlockProposed(*flow.Block)                              {}
 func (nc *NoopCollector) BlockProposalDuration(duration time.Duration)           {}
 
+// interface check
+var _ module.BackendScriptsMetrics = (*NoopCollector)(nil)
+var _ module.TransactionMetrics = (*NoopCollector)(nil)
 var _ module.HotstuffMetrics = (*NoopCollector)(nil)
 var _ module.EngineMetrics = (*NoopCollector)(nil)
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
@@ -119,6 +118,7 @@ func (nc *NoopCollector) CommitteeProcessingDuration(duration time.Duration)    
 func (nc *NoopCollector) SignerProcessingDuration(duration time.Duration)                        {}
 func (nc *NoopCollector) ValidatorProcessingDuration(duration time.Duration)                     {}
 func (nc *NoopCollector) PayloadProductionDuration(duration time.Duration)                       {}
+func (nc *NoopCollector) TimeoutCollectorsRange(uint64, uint64, int)                             {}
 func (nc *NoopCollector) TransactionIngested(txID flow.Identifier)                               {}
 func (nc *NoopCollector) ClusterBlockProposed(*cluster.Block)                                    {}
 func (nc *NoopCollector) ClusterBlockFinalized(*cluster.Block)                                   {}
@@ -165,7 +165,7 @@ func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.E
 }
 func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
 func (nc *NoopCollector) ExecutionBlockCachedPrograms(programs int)                     {}
-func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _ uint64, _, _ int, _ bool) {
+func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _ int, _, _ uint64, _, _ int, _ bool) {
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                         {}
 func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, _, _ uint64) {}
