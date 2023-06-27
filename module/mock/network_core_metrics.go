@@ -43,6 +43,11 @@ func (_m *NetworkCoreMetrics) MessageRemoved(priority int) {
 	_m.Called(priority)
 }
 
+// OnMisbehaviorReported provides a mock function with given fields: channel, misbehaviorType
+func (_m *NetworkCoreMetrics) OnMisbehaviorReported(channel string, misbehaviorType string) {
+	_m.Called(channel, misbehaviorType)
+}
+
 // OutboundMessageSent provides a mock function with given fields: sizeBytes, topic, protocol, messageType
 func (_m *NetworkCoreMetrics) OutboundMessageSent(sizeBytes int, topic string, protocol string, messageType string) {
 	_m.Called(sizeBytes, topic, protocol, messageType)

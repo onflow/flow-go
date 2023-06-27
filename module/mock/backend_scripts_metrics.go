@@ -3,7 +3,6 @@
 package mock
 
 import (
-	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 
 	time "time"
@@ -19,14 +18,14 @@ func (_m *BackendScriptsMetrics) ScriptExecuted(dur time.Duration, size int) {
 	_m.Called(dur, size)
 }
 
-// ScriptExecutionErrorOnArchiveNode provides a mock function with given fields: blockID, scriptHash
-func (_m *BackendScriptsMetrics) ScriptExecutionErrorOnArchiveNode(blockID flow.Identifier, scriptHash string) {
-	_m.Called(blockID, scriptHash)
+// ScriptExecutionErrorOnArchiveNode provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionErrorOnArchiveNode() {
+	_m.Called()
 }
 
-// ScriptExecutionErrorOnExecutionNode provides a mock function with given fields: blockID, scriptHash
-func (_m *BackendScriptsMetrics) ScriptExecutionErrorOnExecutionNode(blockID flow.Identifier, scriptHash string) {
-	_m.Called(blockID, scriptHash)
+// ScriptExecutionErrorOnExecutionNode provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionErrorOnExecutionNode() {
+	_m.Called()
 }
 
 type mockConstructorTestingTNewBackendScriptsMetrics interface {

@@ -240,6 +240,11 @@ func (_m *NetworkMetrics) OnMeshMessageDeliveredUpdated(_a0 channels.Topic, _a1 
 	_m.Called(_a0, _a1)
 }
 
+// OnMisbehaviorReported provides a mock function with given fields: channel, misbehaviorType
+func (_m *NetworkMetrics) OnMisbehaviorReported(channel string, misbehaviorType string) {
+	_m.Called(channel, misbehaviorType)
+}
+
 // OnOverallPeerScoreUpdated provides a mock function with given fields: _a0
 func (_m *NetworkMetrics) OnOverallPeerScoreUpdated(_a0 float64) {
 	_m.Called(_a0)

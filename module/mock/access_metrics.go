@@ -73,14 +73,14 @@ func (_m *AccessMetrics) ScriptExecuted(dur time.Duration, size int) {
 	_m.Called(dur, size)
 }
 
-// ScriptExecutionErrorOnArchiveNode provides a mock function with given fields: blockID, scriptHash
-func (_m *AccessMetrics) ScriptExecutionErrorOnArchiveNode(blockID flow.Identifier, scriptHash string) {
-	_m.Called(blockID, scriptHash)
+// ScriptExecutionErrorOnArchiveNode provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionErrorOnArchiveNode() {
+	_m.Called()
 }
 
-// ScriptExecutionErrorOnExecutionNode provides a mock function with given fields: blockID, scriptHash
-func (_m *AccessMetrics) ScriptExecutionErrorOnExecutionNode(blockID flow.Identifier, scriptHash string) {
-	_m.Called(blockID, scriptHash)
+// ScriptExecutionErrorOnExecutionNode provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionErrorOnExecutionNode() {
+	_m.Called()
 }
 
 // TotalConnectionsInPool provides a mock function with given fields: connectionCount, connectionPoolSize
