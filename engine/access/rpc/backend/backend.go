@@ -3,6 +3,8 @@ package backend
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -107,6 +109,15 @@ func New(
 	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
+	}
+
+	var archivePorts []uint
+	for idx, addr := range archiveAddressList {
+		port, err := findPortFromAddress(addr)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to find archive node port")
+		}
+		archivePorts[idx] = port
 	}
 
 	b := &Backend{
@@ -461,4 +472,23 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 
 	// If no preferred or fixed ENs have been specified, then return all executor IDs i.e. no preference at all
 	return allENs.Filter(filter.HasNodeID(executorIDs...)), nil
+}
+
+// Find ports from supplied Address
+func findPortFromAddress(address string) (uint, error) {
+	_, portStr, err := net.SplitHostPort(address)
+	if err != nil {
+		return 0, fmt.Errorf("fail to extract port from address %v: %w", address, err)
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return 0, fmt.Errorf("fail to convert port string %v to port from address %v", portStr, address)
+	}
+
+	if port < 0 {
+		return 0, fmt.Errorf("invalid port: %v in address %v", port, address)
+	}
+
+	return uint(port), nil
 }

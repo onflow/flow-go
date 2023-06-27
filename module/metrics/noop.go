@@ -18,6 +18,10 @@ import (
 
 type NoopCollector struct{}
 
+// interface check
+var _ module.BackendScriptsMetrics = (*TransactionCollector)(nil)
+var _ module.TransactionMetrics = (*TransactionCollector)(nil)
+
 func NewNoopCollector() *NoopCollector {
 	nc := &NoopCollector{}
 	return nc

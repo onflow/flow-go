@@ -3,10 +3,7 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
-	"fmt"
 	"io"
-	"net"
-	"strconv"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -37,6 +34,7 @@ type backendScripts struct {
 	metrics            module.BackendScriptsMetrics
 	loggedScripts      *lru.Cache
 	archiveAddressList []string
+	archivePorts       []uint
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -123,8 +121,9 @@ func (b *backendScripts) executeScriptOnExecutor(
 	// try execution on Archive nodes first
 	if len(b.archiveAddressList) > 0 {
 		startTime := time.Now()
-		for _, rnAddr := range b.archiveAddressList {
-			result, err := b.tryExecuteScriptOnArchiveNode(ctx, rnAddr, blockID, script, arguments)
+		for idx, rnAddr := range b.archiveAddressList {
+			rnPort := b.archivePorts[idx]
+			result, err := b.tryExecuteScriptOnArchiveNode(ctx, rnAddr, rnPort, blockID, script, arguments)
 			if err == nil {
 				// log execution time
 				b.metrics.ScriptExecuted(
@@ -147,7 +146,7 @@ func (b *backendScripts) executeScriptOnExecutor(
 				case codes.NotFound:
 					// failures due to unavailable blocks are explicitly marked Not found
 					b.metrics.ScriptExecutionErrorOnArchiveNode()
-					b.log.Error().Err(err).Msg("script execution failed for archive node internal reasons")
+					b.log.Error().Err(err).Msg("script execution failed for archive node")
 				default:
 					continue
 				}
@@ -254,6 +253,7 @@ func (b *backendScripts) tryExecuteScriptOnExecutionNode(
 func (b *backendScripts) tryExecuteScriptOnArchiveNode(
 	ctx context.Context,
 	executorAddress string,
+	port uint,
 	blockID flow.Identifier,
 	script []byte,
 	arguments [][]byte,
@@ -262,10 +262,6 @@ func (b *backendScripts) tryExecuteScriptOnArchiveNode(
 		BlockId:   blockID[:],
 		Script:    script,
 		Arguments: arguments,
-	}
-	port, err := findPortFromAddress(executorAddress)
-	if err != nil {
-		return nil, err
 	}
 
 	archiveClient, closer, err := b.connFactory.GetAccessAPIClientWithPort(executorAddress, port)
@@ -288,23 +284,4 @@ func (b *backendScripts) tryExecuteScriptOnArchiveNode(
 			executorAddress, err)
 	}
 	return resp.GetValue(), nil
-}
-
-func findPortFromAddress(address string) (uint, error) {
-	// Todo: make this part of the backendScripts state
-	_, portStr, err := net.SplitHostPort(address)
-	if err != nil {
-		return 0, fmt.Errorf("fail to extract port from address %v: %w", address, err)
-	}
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return 0, fmt.Errorf("fail to convert port string %v to port", portStr)
-	}
-
-	if port < 0 {
-		return 0, fmt.Errorf("invalid port: %v", port)
-	}
-
-	return uint(port), nil
 }

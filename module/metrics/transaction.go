@@ -3,6 +3,7 @@ package metrics
 import (
 	"time"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
@@ -27,6 +28,10 @@ type TransactionCollector struct {
 	scriptSize                     prometheus.Histogram
 	transactionResultDuration      *prometheus.HistogramVec
 }
+
+// interface check
+var _ module.BackendScriptsMetrics = (*TransactionCollector)(nil)
+var _ module.TransactionMetrics = (*TransactionCollector)(nil)
 
 func NewTransactionCollector(
 	log zerolog.Logger,
@@ -138,12 +143,12 @@ func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
 	}).Observe(float64(dur.Milliseconds()))
 }
 
-func (tc *TransactionCollector) ScriptExecutionErrorOnArchiveNode(blockID flow.Identifier, scriptHash string) {
+func (tc *TransactionCollector) ScriptExecutionErrorOnArchiveNode() {
 	// record the execution error along with blockID and scriptHash for Archive node
 	tc.scriptExecutionErrorOnExecutor.WithLabelValues("archive").Inc()
 }
 
-func (tc *TransactionCollector) ScriptExecutionErrorOnExecutionNode(blockID flow.Identifier, scriptHash string) {
+func (tc *TransactionCollector) ScriptExecutionErrorOnExecutionNode() {
 	// record the execution error along with blockID and scriptHash for Execution node
 	tc.scriptExecutionErrorOnExecutor.WithLabelValues("execution").Inc()
 }

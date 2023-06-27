@@ -2290,8 +2290,9 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 func (suite *Suite) TestExecuteScriptOnArchiveNode() {
 
 	// create a mock connection factory
+	var mockPort uint = 9000
 	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetAccessAPIClient", mock.Anything).Return(suite.archiveClient, &mockCloser{}, nil)
+	connFactory.On("GetAccessAPIClientWithPort", mock.Anything, mockPort).Return(suite.archiveClient, &mockCloser{}, nil)
 	connFactory.On("InvalidateAccessAPIClient", mock.Anything)
 	archiveNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
@@ -2332,7 +2333,7 @@ func (suite *Suite) TestExecuteScriptOnArchiveNode() {
 
 	suite.Run("happy path script execution success", func() {
 		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(archiveRes, nil).Once()
-		res, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, blockID, script, arguments)
+		res, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
 		suite.archiveClient.AssertExpectations(suite.T())
 		suite.checkResponse(res, err)
 	})
@@ -2340,16 +2341,25 @@ func (suite *Suite) TestExecuteScriptOnArchiveNode() {
 	suite.Run("script execution failure returns status OK", func() {
 		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
 			Return(nil, status.Error(codes.InvalidArgument, "execution failure!")).Once()
-		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, blockID, script, arguments)
+		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
 		suite.archiveClient.AssertExpectations(suite.T())
 		suite.Require().Error(err)
 		suite.Require().Equal(status.Code(err), codes.InvalidArgument)
 	})
 
-	suite.Run("execution node internal failure returns status code Internal", func() {
+	suite.Run("script execution due to missing block returns Not found", func() {
 		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
-			Return(nil, status.Error(codes.Internal, "execution node internal error!")).Once()
-		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, blockID, script, arguments)
+			Return(nil, status.Error(codes.NotFound, "missing block!")).Once()
+		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
+		suite.archiveClient.AssertExpectations(suite.T())
+		suite.Require().Error(err)
+		suite.Require().Equal(status.Code(err), codes.NotFound)
+	})
+
+	suite.Run("archive node internal failure returns status code Internal", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
+			Return(nil, status.Error(codes.Internal, "archive node internal error!")).Once()
+		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
 		suite.archiveClient.AssertExpectations(suite.T())
 		suite.Require().Error(err)
 		suite.Require().Equal(status.Code(err), codes.Internal)
