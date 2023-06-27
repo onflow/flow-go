@@ -61,8 +61,6 @@ const (
 
 	// LargeMsgUnicastTimeout is the maximum time to wait for a unicast request to complete for large message size
 	LargeMsgUnicastTimeout = 1000 * time.Second
-
-	violationDisseminateErr = "failed to disseminate slashing violation on slashing violations consumer"
 )
 
 var (
@@ -815,12 +813,6 @@ func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 		return false, fmt.Errorf("could not find peer id for target id: %w", err)
 	}
 	return m.libP2PNode.IsConnected(peerID)
-}
-
-func (m *Middleware) checkSlashingViolationsConsumerErr(err error) {
-	if err != nil {
-		m.log.Error().Err(err).Msg(violationDisseminateErr)
-	}
 }
 
 // unicastMaxMsgSize returns the max permissible size for a unicast message
