@@ -115,7 +115,22 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 }
 
 // LibP2PNodeFixture is a test helper that generate flow identities with a valid port and libp2p nodes.
+// Note that the LibP2PNode created by this fixture is meant to used with a network and middleware components.
+// If you want to create a LibP2PNode for testing purpose, please use p2ptest.NodeFixture.
+// Args:
+//
+//	t: testing.T- the test object
+//
+// n: int - number of nodes to create
+// opts: []p2ptest.NodeFixtureParameterOption - options to configure the nodes
+// Returns:
+//
+//	flow.IdentityList - list of identities created for the nodes, one for each node.
+//
+// []p2p.LibP2PNode - list of libp2p nodes created.
+// []observable.Observable - list of observables created for each node.
 func LibP2PNodeFixture(t *testing.T, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode, []observable.Observable) {
+
 	libP2PNodes := make([]p2p.LibP2PNode, 0)
 	identities := make(flow.IdentityList, 0)
 	tagObservables := make([]observable.Observable, 0)
@@ -126,9 +141,7 @@ func LibP2PNodeFixture(t *testing.T, n int, opts ...p2ptest.NodeFixtureParameter
 	opts = append(opts, p2ptest.WithUnicastHandlerFunc(nil))
 
 	for i := 0; i < n; i++ {
-		//opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
-		//opts = append(opts, withUnicastManagerOpts(o.createStreamRetryInterval))
-
+		// TODO: this can be moved to a separate function, only a few tests need this.
 		connManager, err := NewTagWatchingConnManager(unittest.Logger(), metrics.NewNoopCollector(), &defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
 		require.NoError(t, err)
 
