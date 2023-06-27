@@ -46,6 +46,18 @@ type ChunkLocator struct {
 **Note-1**: The `ChunkLocator` doesn't contain the chunk itself but points to where the chunk can be found. In the context of the `Assigner` engine, the `ChunkLocator` is stored in a queue after chunk assignment is done, so the `Fetcher` engine can later retrieve the chunk for verification.
 **Note-2**: The `ChunkLocator` is never meant to be sent over the networking layer to another Flow node. It's an internal structure of the verification nodes, and it's only used for internal communication between the `Assigner` and `Fetcher` engines.
 
+
+## ChunkConsumer 
+The `ChunkConsumer` ([consumer](verification%2Ffetcher%2Fchunkconsumer%2Fconsumer.go)) package orchestrates the processing of chunks in the Verification Node of the Flow blockchain. 
+Specifically, it keeps tabs on chunks that are assigned for processing by the `Assigner` engine and systematically enqueues these chunks for further handling. 
+To expedite the processing, the package deploys parallel workers, with each worker being an instance of the `Fetcher` engine, which retrieves and processes the chunks from the queue. 
+The `ChunkConsumer` administers this process by ensuring that a new chunk is assigned to a worker only after it has finalized processing its current chunk and signaled that it is ready for more. 
+This systematic approach guarantees not only efficiency but also robustness against any node failures. In an event where a node crashes,
+the `ChunkConsumer` picks up right where it left, redistributing chunks from the queue to the workers, ensuring that there is no loss of data or progress.
+
+## Fetcher Engine
+
+
 # Notifier
 The Notifier implements the following state machine
 ![Notifier State Machine](/docs/NotifierStateMachine.png)
