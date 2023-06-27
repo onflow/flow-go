@@ -1,5 +1,14 @@
-# Notifier
+## Block Consumer ([consumer.go](verification%2Fassigner%2Fblockconsumer%2Fconsumer.go))
+The `blockconsumer` package efficiently manages the processing of finalized blocks in Verification Node of Flow blockchain.
+Specifically, it listens for notifications from the `Follower` engine regarding finalized blocks, and systematically 
+queues these blocks for processing. The package employs parallel workers, each an instance of the `Assigner` engine, 
+to fetch and process blocks from the queue. The `BlockConsumer` diligently coordinates this process by only assigning 
+a new block to a worker once it has completed processing its current block and signaled its availability. 
+This ensures that the processing is not only methodical but also resilient to any node crashes. 
+In case of a crash, the `BlockConsumer` resumes from where it left off, reassigning blocks from the queue to workers,
+thereby guaranteeing no loss of data.
 
+# Notifier
 The Notifier implements the following state machine
 ![Notifier State Machine](/docs/NotifierStateMachine.png)
 
