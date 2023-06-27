@@ -14,7 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -34,12 +34,9 @@ func TestPeerManager_Integration(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create nodes
-	idProvider := mockmodule.NewIdentityProvider(t)
+	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
 	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_peer_manager", count, idProvider)
-	for i, node := range nodes {
-		idProvider.On("ByPeerID", node.Host().ID()).Return(&identities[i], true).Maybe()
-
-	}
+	idProvider.SetIdentities(identities)
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
