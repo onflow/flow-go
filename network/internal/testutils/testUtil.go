@@ -338,52 +338,6 @@ func StopComponents[R module.ReadyDoneAware](t *testing.T, rda []R, duration tim
 	unittest.RequireComponentsDoneBefore(t, duration, comps...)
 }
 
-//// generateLibP2PNode generates a `LibP2PNode` on localhost using a port assigned by the OS
-//func generateLibP2PNode(t *testing.T, logger zerolog.Logger, key crypto.PrivateKey, provider *UpdatableIDProvider, opts ...nodeBuilderOption) (p2p.LibP2PNode, observable.Observable) {
-//
-//	noopMetrics := metrics.NewNoopCollector()
-//	defaultFlowConfig, err := config.DefaultConfig()
-//	require.NoError(t, err)
-//
-//	// Inject some logic to be able to observe connections of this node
-//	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, &defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
-//	require.NoError(t, err)
-//	met := metrics.NewNoopCollector()
-//
-//	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, &defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, provider, met).Build()
-//	require.NoError(t, err)
-//
-//	builder := p2pbuilder.NewNodeBuilder(
-//		logger,
-//		met,
-//		unittest.DefaultAddress,
-//		key,
-//		sporkID,
-//		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
-//		&p2pconfig.PeerManagerConfig{
-//			ConnectionPruning: true,
-//			UpdateInterval:    1 * time.Second,
-//			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
-//		}, // disable peer manager
-//		&p2p.DisallowListCacheConfig{
-//			MaxSize: uint32(1000),
-//			Metrics: metrics.NewNoopCollector(),
-//		}).
-//		SetConnectionManager(connManager).
-//		SetResourceManager(NewResourceManager(t)).
-//		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
-//		SetGossipSubRpcInspectorSuite(rpcInspectorSuite)
-//
-//	for _, opt := range opts {
-//		opt(builder)
-//	}
-//
-//	libP2PNode, err := builder.Build()
-//	require.NoError(t, err)
-//
-//	return libP2PNode, connManager
-//}
-
 // OptionalSleep introduces a sleep to allow nodes to heartbeat and discover each other (only needed when using PubSub)
 func OptionalSleep(send ConduitSendWrapperFunc) {
 	sendFuncName := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
