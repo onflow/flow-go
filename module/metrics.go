@@ -42,6 +42,10 @@ type NetworkSecurityMetrics interface {
 
 	// OnRateLimitedPeer tracks the number of rate limited unicast messages seen on the network.
 	OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string)
+
+	// OnViolationReportSkipped tracks the number of slashing violations consumer violations that were not
+	// reported for misbehavior when the identity of the sender not known.
+	OnViolationReportSkipped()
 }
 
 // GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.

@@ -69,7 +69,8 @@ func (c *Consumer) logOffense(misbehavior network.Misbehavior, violation *networ
 // we can skip reporting the misbehavior.
 func (c *Consumer) reportMisbehavior(misbehavior network.Misbehavior, violation *network.Violation) error {
 	if violation.Identity == nil {
-		c.log.Debug().Str("peerID", violation.PeerID).Msg("violation identity unknown (or public) skipping misbehavior reporting")
+		c.log.Debug().Bool(logging.KeySuspicious, true).Str("peerID", violation.PeerID).Msg("violation identity unknown (or public) skipping misbehavior reporting")
+		c.metrics.OnViolationReportSkipped()
 		return nil
 	}
 	report, err := alsp.NewMisbehaviorReport(violation.Identity.NodeID, misbehavior)
