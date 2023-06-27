@@ -17,7 +17,6 @@ import (
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
-	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
@@ -41,7 +40,7 @@ func TestConnectionGating(t *testing.T) {
 		sporkID,
 		t.Name(),
 		idProvider,
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(p peer.ID) error {
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(p peer.ID) error {
 			if !node1Peers.Has(p) {
 				return fmt.Errorf("id not found: %s", p.String())
 			}
@@ -55,7 +54,7 @@ func TestConnectionGating(t *testing.T) {
 		sporkID,
 		t.Name(),
 		idProvider,
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(p peer.ID) error {
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(p peer.ID) error {
 			if !node2Peers.Has(p) {
 				return fmt.Errorf("id not found: %s", p.String())
 			}
@@ -154,7 +153,7 @@ func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
 		p2ptest.WithMetricsCollector(node2Metrics),
 		// we use default resource manager rather than the test resource manager to ensure that the metrics are called.
 		p2ptest.WithDefaultResourceManager(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(p peer.ID) error {
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(p peer.ID) error {
 			return nil // allow all connections.
 		})))
 	idProvider.On("ByPeerID", node1.Host().ID()).Return(&node1Id, true).Maybe()
@@ -199,7 +198,7 @@ func TestConnectionGating_ResourceAllocation_DisAllowListing(t *testing.T) {
 		p2ptest.WithMetricsCollector(node2Metrics),
 		// we use default resource manager rather than the test resource manager to ensure that the metrics are called.
 		p2ptest.WithDefaultResourceManager(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(p peer.ID) error {
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(p peer.ID) error {
 			return fmt.Errorf("disallowed connection") // rejecting all connections.
 		})))
 	idProvider.On("ByPeerID", node1.Host().ID()).Return(&node1Id, true).Maybe()
@@ -351,7 +350,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 				}
 				return list
 			}),
-			p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+			p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 				return disallowedList.ForEach(func(id *flow.Identity, _ struct{}) error {
 					bid, err := unittest.PeerIDFromFlowID(id)
 					require.NoError(t, err)

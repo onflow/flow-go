@@ -124,7 +124,6 @@ func LibP2PNodeFixture(t *testing.T, n int, opts ...p2ptest.NodeFixtureParameter
 	require.NoError(t, err)
 
 	opts = append(opts, p2ptest.WithUnicastHandlerFunc(nil))
-	opts = append(opts, p2ptest.WithPeerManagerEnabled(p2ptest.DefaultPeerManagerConfigFixture(), nil))
 
 	for i := 0; i < n; i++ {
 		//opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
@@ -138,9 +137,7 @@ func LibP2PNodeFixture(t *testing.T, n int, opts ...p2ptest.NodeFixtureParameter
 			sporkID,
 			t.Name(),
 			idProvider,
-			append(opts, p2ptest.WithConnectionGater(NewConnectionGater(idProvider, func(p peer.ID) error {
-				return nil
-			})))...)
+			opts...)
 		libP2PNodes = append(libP2PNodes, node)
 		identities = append(identities, &nodeId)
 		tagObservables = append(tagObservables, connManager)
@@ -400,15 +397,6 @@ func NetworkPayloadFixture(t *testing.T, size uint) []byte {
 	require.InDelta(t, len(encodedEvent), int(size), float64(overhead))
 
 	return payload
-}
-
-// NewConnectionGater creates a new connection gater for testing with given allow listing filter.
-func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.PeerFilter) p2p.ConnectionGater {
-	filters := []p2p.PeerFilter{allowListFilter}
-	return connection.NewConnGater(unittest.Logger(),
-		idProvider,
-		connection.WithOnInterceptPeerDialFilters(filters),
-		connection.WithOnInterceptSecuredFilters(filters))
 }
 
 // IsRateLimitedPeerFilter returns a p2p.PeerFilter that will return an error if the peer is rate limited.

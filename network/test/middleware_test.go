@@ -243,7 +243,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	ids, libP2PNodes, _ := testutils.LibP2PNodeFixture(m.T(),
 		1,
 		p2ptest.WithUnicastRateLimitDistributor(distributor),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			if messageRateLimiter.IsRateLimited(pid) {
 				return fmt.Errorf("rate-limited peer")
 			}
@@ -394,7 +394,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	ids, libP2PNodes, _ := testutils.LibP2PNodeFixture(m.T(),
 		1,
 		p2ptest.WithUnicastRateLimitDistributor(distributor),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			// create connection gater, connection gater will refuse connections from rate limited nodes
 			if bandwidthRateLimiter.IsRateLimited(pid) {
 				return fmt.Errorf("rate-limited peer")

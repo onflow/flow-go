@@ -80,7 +80,10 @@ func NodeFixture(
 		ResourceManager:                  &network.NullResourceManager{}, // overrides default
 		GossipSubPeerScoreTracerInterval: 0,                              // disabled by default
 		GossipSubRPCInspector:            rpcInspectorSuite,
-		PeerManagerConfig:                p2pconfig.PeerManagerDisableConfig(), // disabled by default
+		PeerManagerConfig:                DefaultPeerManagerConfigFixture(), // disabled by default
+		ConnGater: NewConnectionGater(idProvider, func(p peer.ID) error {
+			return nil
+		}),
 	}
 
 	for _, opt := range opts {
@@ -612,4 +615,13 @@ func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
 		ids[i] = PeerIdFixture(t)
 	}
 	return ids
+}
+
+// NewConnectionGater creates a new connection gater for testing with given allow listing filter.
+func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.PeerFilter) p2p.ConnectionGater {
+	filters := []p2p.PeerFilter{allowListFilter}
+	return connection.NewConnGater(unittest.Logger(),
+		idProvider,
+		connection.WithOnInterceptPeerDialFilters(filters),
+		connection.WithOnInterceptSecuredFilters(filters))
 }

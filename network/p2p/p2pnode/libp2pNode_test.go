@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/p2putils"
-	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -173,7 +172,7 @@ func TestConnGater(t *testing.T) {
 		sporkID,
 		t.Name(),
 		idProvider,
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			if !node1Peers.Has(pid) {
 				return fmt.Errorf("peer id not found: %s", pid.String())
 			}
@@ -192,7 +191,7 @@ func TestConnGater(t *testing.T) {
 		t,
 		sporkID, t.Name(),
 		idProvider,
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			if !node2Peers.Has(pid) {
 				return fmt.Errorf("id not found: %s", pid.String())
 			}
@@ -337,7 +336,7 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 		sporkID,
 		t.Name(),
 		idProvider,
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			// avoid connection gating outbound messages on sender
 			return nil
 		})),
@@ -353,7 +352,7 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 		sporkID,
 		t.Name(),
 		idProvider,
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			// connection gate all incoming connections forcing the senders unicast manager to perform retries
 			return fmt.Errorf("gate keep")
 		})),
