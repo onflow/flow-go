@@ -529,7 +529,7 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 func TestCreateStreamIsConcurrent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	idProvider := mockmodule.NewIdentityProvider(t)
+	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
 	// create two regular node
 	goodNodes, goodNodeIds := p2ptest.NodesFixture(t,
 		unittest.IdentifierFixture(),
@@ -538,10 +538,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 		idProvider,
 	)
 	require.Len(t, goodNodeIds, 2)
-	for i, node := range goodNodes {
-		idProvider.On("ByPeerID", node.Host().ID()).Return(&goodNodeIds[i], true).Maybe()
-
-	}
+	idProvider.SetIdentities(goodNodeIds)
 	p2ptest.StartNodes(t, signalerCtx, goodNodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, goodNodes, cancel, 100*time.Millisecond)
 
