@@ -35,7 +35,7 @@ const (
 	ComputationKindRemoveAccountContractCode  = 2021
 	ComputationKindResolveLocation            = 2022
 	ComputationKindRevokeAccountKey           = 2023
-	ComputationKindRevokeEncodedAccountKey    = 2024
+	_                                         = 2024 // removed, DO NOT REUSE
 	_                                         = 2025 // removed, DO NOT REUSE
 	ComputationKindSetValue                   = 2026
 	ComputationKindUpdateAccountContractCode  = 2027
