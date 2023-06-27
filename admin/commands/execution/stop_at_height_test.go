@@ -3,11 +3,13 @@ package execution
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/admin"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -90,6 +92,8 @@ func TestCommandParsing(t *testing.T) {
 func TestCommandsSetsValues(t *testing.T) {
 
 	stopControl := stop.NewStopControl(
+		engine.NewUnit(),
+		time.Second,
 		zerolog.Nop(),
 		nil,
 		nil,

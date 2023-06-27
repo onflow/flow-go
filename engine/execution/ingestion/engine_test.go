@@ -18,6 +18,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
+	enginePkg "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
@@ -202,7 +203,10 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
+	unit := enginePkg.NewUnit()
 	stopControl := stop.NewStopControl(
+		unit,
+		time.Second,
 		zerolog.Nop(),
 		executionState,
 		headers,
@@ -216,6 +220,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
 	engine, err = New(
+		unit,
 		log,
 		net,
 		me,
@@ -1492,7 +1497,9 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		return stateProtocol.IsNodeAuthorizedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
+	unit := enginePkg.NewUnit()
 	engine, err = New(
+		unit,
 		log,
 		net,
 		me,
@@ -1514,6 +1521,8 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		nil,
 		nil,
 		stop.NewStopControl(
+			unit,
+			time.Second,
 			zerolog.Nop(),
 			nil,
 			headers,
