@@ -397,7 +397,7 @@ func (s *EmulatorSuite) getResult() []string {
 	script := fmt.Sprintf(`
 	import FlowDKG from 0x%s
 
-	pub fun main(): [String?]? {
+	access(all) fun main(): [String?]? {
 		return FlowDKG.dkgCompleted()
 	} `,
 		s.env.DkgAddress,

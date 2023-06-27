@@ -67,10 +67,10 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 	t.Run("single transaction event", func(t *testing.T) {
 
 		deployTx := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
-			`pub contract Foo {
-				pub event FooEvent(x: Int, y: Int)
+			`access(all) contract Foo {
+				access(all) event FooEvent(x: Int, y: Int)
 
-				pub fun emitFoo() {
+				access(all) fun emitFoo() {
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -111,10 +111,10 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 	t.Run("multiple collections events", func(t *testing.T) {
 
 		deployTx := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
-			`pub contract Foo {
-				pub event FooEvent(x: Int, y: Int)
+			`access(all) contract Foo {
+				access(all) event FooEvent(x: Int, y: Int)
 
-				pub fun emitFoo() {
+				access(all) fun emitFoo() {
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")

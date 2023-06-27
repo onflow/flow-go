@@ -174,9 +174,9 @@ func newAccountDataProcessor(
 	bp.balanceScript = []byte(fmt.Sprintf(`
 				import FungibleToken from 0x%s
 				import FlowToken from 0x%s
-				pub fun main(account: Address): UFix64 {
+				access(all) fun main(account: Address): UFix64 {
 					let acct = getAccount(account)
-					let vaultRef = acct.getCapability(/public/flowTokenBalance)
+					let vaultRef = acct.getCapability(/access(all)lic/flowTokenBalance)
 						.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
 						?? panic("Could not borrow Balance reference to the Vault")
 					return vaultRef.balance
@@ -186,9 +186,9 @@ func newAccountDataProcessor(
 	bp.fusdScript = []byte(fmt.Sprintf(`
 			import FungibleToken from 0x%s
 			import FUSD from 0x%s
-			pub fun main(address: Address): UFix64 {
+			access(all) fun main(address: Address): UFix64 {
 				let account = getAccount(address)
-				let vaultRef = account.getCapability(/public/fusdBalance)!
+				let vaultRef = account.getCapability(/access(all)lic/fusdBalance)!
 					.borrow<&FUSD.Vault{FungibleToken.Balance}>()
 					?? panic("Could not borrow Balance reference to the Vault")
 				return vaultRef.balance
@@ -197,10 +197,10 @@ func newAccountDataProcessor(
 
 	bp.momentsScript = []byte(`
 			import TopShot from 0x0b2a3299cc857e29
-			pub fun main(account: Address): Int {
+			access(all) fun main(account: Address): Int {
 				let acct = getAccount(account)
-				let collectionRef = acct.getCapability(/public/MomentCollection)
-										.borrow<&{TopShot.MomentCollectionPublic}>()!
+				let collectionRef = acct.getCapability(/access(all)lic/MomentCollection)
+										.borrow<&{TopShot.MomentCollectionaccess(all)lic}>()!
 				return collectionRef.getIDs().length
 			}
 			`)
@@ -371,7 +371,7 @@ func (c *balanceProcessor) moments(address flow.Address) (int, error) {
 }
 
 func (c *balanceProcessor) isDapper(address flow.Address) (bool, error) {
-	receiver, err := c.ReadStored(address, common.PathDomainPublic, "dapperUtilityCoinReceiver")
+	receiver, err := c.ReadStored(address, common.PathDomainaccess(all)lic, "dapperUtilityCoinReceiver")
 	if err != nil {
 		return false, fmt.Errorf("could not load dapper receiver at %s: %w", address, err)
 	}
@@ -379,7 +379,7 @@ func (c *balanceProcessor) isDapper(address flow.Address) (bool, error) {
 }
 
 func (c *balanceProcessor) hasReceiver(address flow.Address) (bool, error) {
-	receiver, err := c.ReadStored(address, common.PathDomainPublic, "flowTokenReceiver")
+	receiver, err := c.ReadStored(address, common.PathDomainaccess(all)lic, "flowTokenReceiver")
 
 	if err != nil {
 		return false, fmt.Errorf("could not load receiver at %s: %w", address, err)

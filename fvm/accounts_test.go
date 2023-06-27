@@ -1483,7 +1483,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UFix64 {
+					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.balance
 					}
@@ -1513,7 +1513,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				require.NoError(t, err)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UFix64 {
+					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.balance
 					}
@@ -1544,7 +1544,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					snapshotTree)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UFix64 {
+					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.balance
 					}
@@ -1597,7 +1597,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UFix64 {
+					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.availableBalance
 					}
@@ -1624,7 +1624,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				require.NoError(t, err)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UFix64 {
+					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.availableBalance
 					}
@@ -1670,7 +1670,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UFix64 {
+					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.availableBalance
 					}
@@ -1721,7 +1721,7 @@ func TestGetStorageCapacity(t *testing.T) {
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UInt64 {
+					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
 						return acc.storageCapacity
 					}
@@ -1750,7 +1750,7 @@ func TestGetStorageCapacity(t *testing.T) {
 				require.NoError(t, err)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UInt64 {
+					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
 						return acc.storageCapacity
 					}
@@ -1778,7 +1778,7 @@ func TestGetStorageCapacity(t *testing.T) {
 				address := chain.ServiceAddress()
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UInt64 {
+					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
 						return acc.storageCapacity
 					}

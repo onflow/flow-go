@@ -842,7 +842,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 }
 func gasLimitScript(depth int) string {
 	return fmt.Sprintf(`
-        pub fun foo(_ i: Int) {
+        access(all) fun foo(_ i: Int) {
             if i <= 0 {
                 return
             }
@@ -931,7 +931,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 	script := fmt.Sprintf(`
 			access(all) contract Container {
 				access(all) resource Counter {
-					pub var longString: String
+					access(all) var longString: String
 					init() {
 						self.longString = "%s"
 					}
@@ -1066,7 +1066,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	script := fmt.Sprintf(`
 			access(all) contract Container {
 				access(all) resource Counter {
-					pub var longString: String
+					access(all) var longString: String
 					init() {
 						self.longString = "%s"
 					}
@@ -1274,7 +1274,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Run("script success", func(t *testing.T) {
 		code := []byte(`
-            pub fun main(): Int {
+            access(all) fun main(): Int {
                 return 42
             }
         `)
@@ -1290,7 +1290,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Run("script failure", func(t *testing.T) {
 		code := []byte(`
-            pub fun main(): Int {
+            access(all) fun main(): Int {
                 assert(1 == 2)
                 return 42
             }
@@ -1307,7 +1307,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Run("script logs", func(t *testing.T) {
 		code := []byte(`
-            pub fun main(): Int {
+            access(all) fun main(): Int {
                 log("foo")
                 log("bar")
                 return 42
@@ -1343,17 +1343,17 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 		// Deploy the test contract
 
 		const contract = `
-			pub contract Test {
+			access(all) contract Test {
 
-				pub struct Foo {}
+				access(all) struct Foo {}
 
-                pub let foos: [Foo]
+                access(all) let foos: [Foo]
 
 				init() {
 					self.foos = []
 				}
 
-				pub fun add() {
+				access(all) fun add() {
 					self.foos.append(Foo())
 				}
 			}
@@ -1394,7 +1394,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			`
 			  import Test from 0x%s
 
-			  pub fun main() {
+			  access(all) fun main() {
 			      Test.add()
 			  }
 			`,
@@ -1484,7 +1484,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	t.Run("works as script", func(t *testing.T) {
 		code := []byte(`
-            pub fun main() {
+            access(all) fun main() {
                 let block = getCurrentBlock()
                 log(block)
 
@@ -1548,7 +1548,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	t.Run("panics if external function panics in script", func(t *testing.T) {
 		script := []byte(`
-            pub fun main() {
+            access(all) fun main() {
                 let block = getCurrentBlock()
                 let nextBlock = getBlock(at: block.height + UInt64(2))
             }
@@ -1756,7 +1756,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
 
-					pub fun main(account: Address): UFix64 {
+					access(all) fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
 						let vaultRef = acct.getCapability(/public/flowTokenBalance)
 							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()

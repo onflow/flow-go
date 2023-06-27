@@ -175,7 +175,7 @@ func TestHashing(t *testing.T) {
 			`
 				import Crypto
 
-				pub fun main(data: [UInt8]): [UInt8] {
+				access(all) fun main(data: [UInt8]): [UInt8] {
 					return Crypto.hash(data, algorithm: HashAlgorithm.%s)
 				}
 			`, hashName))
@@ -185,7 +185,7 @@ func TestHashing(t *testing.T) {
 			`
 				import Crypto
 
-				pub fun main(data: [UInt8], tag: String): [UInt8] {
+				access(all) fun main(data: [UInt8], tag: String): [UInt8] {
 					return Crypto.hashWithTag(data, tag: tag, algorithm: HashAlgorithm.%s)
 				}
 			`, hashName))
@@ -602,7 +602,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
 
-					pub fun main(account: Address): UFix64 {
+					access(all) fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
 						let vaultRef = acct.getCapability(/public/flowTokenBalance)
 							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
@@ -1480,7 +1480,7 @@ func TestStorageUsed(t *testing.T) {
 	)
 
 	code := []byte(`
-        pub fun main(): UInt64 {
+        access(all) fun main(): UInt64 {
 
             var addresses: [Address]= [
                 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731,
@@ -1772,10 +1772,10 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				scriptCtx := fvm.NewContextFromParent(ctx)
 
-				contract := "pub contract Foo {}"
+				contract := "access(all) contract Foo {}"
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-				pub fun main(account: Address) {
+				access(all) fun main(account: Address) {
 					let acc = getAuthAccount(account)
 					acc.contracts.add(name: "Foo", code: "%s".decodeHex())
 				}`, hex.EncodeToString([]byte(contract))),
@@ -1814,7 +1814,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				subCtx := fvm.NewContextFromParent(ctx)
 
-				contract := "pub contract Foo {}"
+				contract := "access(all) contract Foo {}"
 
 				txBody := flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`
 					transaction {
@@ -1844,7 +1844,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				script := fvm.Script([]byte(`
-				pub fun main(account: Address) {
+				access(all) fun main(account: Address) {
 					let acc = getAuthAccount(account)
 					let n = acc.contracts.names[0]
 					acc.contracts.remove(name: n)
@@ -1884,7 +1884,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				subCtx := fvm.NewContextFromParent(ctx)
 
-				contract := "pub contract Foo {}"
+				contract := "access(all) contract Foo {}"
 
 				txBody := flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`
 					transaction {
@@ -1914,7 +1914,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-				pub fun main(account: Address) {
+				access(all) fun main(account: Address) {
 					let acc = getAuthAccount(account)
 					let n = acc.contracts.names[0]
 					acc.contracts.update__experimental(name: n, code: "%s".decodeHex())
@@ -1962,7 +1962,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				privateKey, _ := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 
 				script := fvm.Script([]byte(`
-					pub fun main(account: Address, key: [UInt8]) {
+					access(all) fun main(account: Address, key: [UInt8]) {
 						let acc = getAuthAccount(account)
 						let publicKey = PublicKey(
 							publicKey: key,
@@ -2012,7 +2012,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				scriptCtx := fvm.NewContextFromParent(ctx)
 
 				script := fvm.Script([]byte(`
-				pub fun main(account: Address) {
+				access(all) fun main(account: Address) {
 					let acc = getAuthAccount(account)
 					acc.keys.revoke(keyIndex: 0)
 				}`,
@@ -2324,8 +2324,8 @@ func TestAuthAccountCapabilities(t *testing.T) {
 
 						// Deploy contract
 						contractCode := `
-							pub contract AccountLinker {
-								pub fun link(_ account: AuthAccount) {
+							access(all) contract AccountLinker {
+								access(all) fun link(_ account: AuthAccount) {
 									account.linkAccount(/private/acct)
 								}
 							}
@@ -2446,11 +2446,11 @@ func TestAttachments(t *testing.T) {
 				) {
 					script := fvm.Script([]byte(`
 
-						pub resource R {}
+						access(all) resource R {}
 
-						pub attachment A for R {}
+						access(all) attachment A for R {}
 
-						pub fun main() {
+						access(all) fun main() {
 							let r <- create R()
 							r[A]
 							destroy r
@@ -2589,15 +2589,15 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				require.NoError(t, err)
 
 				contractA := `
-				    pub contract A {
-						pub struct interface Foo{}
+				    access(all) contract A {
+						access(all) struct interface Foo{}
 					}
 				`
 
 				updatedContractA := `
-				    pub contract A {
-						pub struct interface Foo{
-							pub fun hello()
+				    access(all) contract A {
+						access(all) struct interface Foo{
+							access(all) fun hello()
 						}
 					}
 				`
@@ -2605,10 +2605,10 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				contractB := fmt.Sprintf(`
 				    import A from %s
 
-				    pub contract B {
-						pub struct Bar : A.Foo {}
+				    access(all) contract B {
+						access(all) struct Bar : A.Foo {}
 
-						pub struct interface Foo2{}
+						access(all) struct interface Foo2{}
 					}`,
 					accounts[0].HexWithPrefix(),
 				)
@@ -2617,10 +2617,10 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				    import B from %s
 				    import A from %s
 
-				    pub contract C {
-						pub struct Bar : A.Foo, B.Foo2 {}
+				    access(all) contract C {
+						access(all) struct Bar : A.Foo, B.Foo2 {}
 
-						pub struct interface Foo3{}
+						access(all) struct interface Foo3{}
 					}`,
 					accounts[0].HexWithPrefix(),
 					accounts[0].HexWithPrefix(),
@@ -2631,8 +2631,8 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				    import B from %s
 				    import A from %s
 
-				    pub contract D {
-						pub struct Bar : A.Foo, B.Foo2, C.Foo3 {}
+				    access(all) contract D {
+						access(all) struct Bar : A.Foo, B.Foo2, C.Foo3 {}
 					}`,
 					accounts[0].HexWithPrefix(),
 					accounts[0].HexWithPrefix(),
