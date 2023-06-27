@@ -146,6 +146,16 @@ the `Requester` engine can become stuck in processing, waiting for the missing c
 To mitigate this, the engine implements a retry and backoff mechanism, ensuring that requests are retried and backed off if necessary. 
 This mechanism helps to prevent prolonged waiting and allows the engine to continue processing other requests while waiting for the missing chunk data pack response.
 
+## Verifier Engine - Verifying Chunks
+The `Verifier` Engine is responsible for verifying chunks, generating `ResultApproval`s, and maintaining a cache of `ResultApproval`s. 
+It receives verifiable chunks along with the necessary data for verification, verifies the chunks by constructing a partial trie,
+executing transactions, and checking the final state commitment and other chunk metadata. 
+If the verification is successful, it generates a `ResultApproval` and broadcasts it to the consensus nodes.
+
+The `Verifier` Engine offers the following key features:
+1. **Verification of Chunks**: The engine receives verifiable chunks, which include the chunk to be verified, the associated header, execution result, and chunk data pack. It performs the verification process, which involves constructing a partial trie, executing transactions, and checking the final state commitment. The verification process ensures the integrity and validity of the chunk.
+2. **Generation of Result Approvals**: If the verification process is successful, the engine generates a result approval for the verified chunk. The result approval includes the block ID, execution result ID, chunk index, attestation, approver ID, attestation signature, and SPoCK (Secure Proof of Confidential Knowledge) signature. The result approval provides a cryptographic proof of the chunk's validity and is used to seal the block.
+3. **Cache of Result Approvals**: The engine maintains a cache of result approvals for efficient retrieval and lookup. The result approvals are stored in a storage module, allowing quick access to the approvals associated with specific chunks and execution results.
 
 # Notifier
 The Notifier implements the following state machine
