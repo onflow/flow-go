@@ -55,7 +55,60 @@ The `ChunkConsumer` administers this process by ensuring that a new chunk is ass
 This systematic approach guarantees not only efficiency but also robustness against any node failures. In an event where a node crashes,
 the `ChunkConsumer` picks up right where it left, redistributing chunks from the queue to the workers, ensuring that there is no loss of data or progress.
 
-## Fetcher Engine
+## Fetcher Engine - The Journey of a `ChunkLocator` to a `VerifiableChunkData`
+The Fetcher engine of the Verification Nodes focuses on the lifecycle of a `ChunkLocator` as it transitions into a `VerifiableChunkData`.
+
+### `VerifiableChunkData`
+`VerifiableChunkData` refers to a data structure that encapsulates all the necessary components and resources required to
+verify a chunk within the Flow blockchain network. It represents a chunk that has undergone processing and is ready for verification.
+
+The `VerifiableChunkData` object contains the following key elements:
+```go
+type VerifiableChunkData struct {
+	IsSystemChunk     bool                  // indicates whether this is a system chunk
+	Chunk             *flow.Chunk           // the chunk to be verified
+	Header            *flow.Header          // BlockHeader that contains this chunk
+	Result            *flow.ExecutionResult // execution result of this block
+	ChunkDataPack     *flow.ChunkDataPack   // chunk data package needed to verify this chunk
+	EndState          flow.StateCommitment  // state commitment at the end of this chunk
+	TransactionOffset uint32                // index of the first transaction in a chunk within a block
+}
+```
+1. `IsSystemChunk`: A boolean value that indicates whether the chunk is a system chunk. System chunk is a specific chunk typically representing the last chunk within an execution result.
+2. `Chunk`: The actual chunk that needs to be verified. It contains the relevant data and instructions related to the execution of transactions within the blockchain.
+3. `Header`: The `BlockHeader` associated with the chunk. It provides important contextual information about the block that the chunk belongs to.
+4. `Result`: The `ExecutionResult` object that corresponds to the execution of the block containing the chunk. It contains information about the execution status, including any errors or exceptions encountered during the execution process.
+5. `ChunkDataPack`: The `ChunkDataPack`, which is a package containing additional data and resources specific to the chunk being verified. It provides supplementary information required for the verification process.
+6. `EndState`: The state commitment at the end of the chunk. It represents the final state of the blockchain after executing all the transactions within the chunk.
+7. `TransactionOffset`: An index indicating the position of the first transaction within the chunk in relation to the entire block. This offset helps in locating and tracking individual transactions within the blockchain.
+By combining these elements, the VerifiableChunkData object forms a comprehensive representation of a chunk ready for verification. It serves as an input to the `Verifier` engine, which utilizes this data to perform the necessary checks and validations to ensure the integrity and correctness of the chunk within the Flow blockchain network.
+
+### The Journey of a `ChunkLocator` to a `VerifiableChunkData`
+Upon receiving the `ChunkLocator`, the `Fetcher` engine’s `validateAuthorizedExecutionNodeAtBlockID` function is responsible 
+for validating the authenticity of the sender. It evaluates whether the sender is an authorized execution node for the respective block. 
+The function cross-references the sender’s credentials against the state snapshot of the specific block. 
+In the case of unauthorized or invalid credentials, an error is logged, and the `ChunkLocator` is rejected. 
+For authorized credentials, the processing continues.
+
+Once authenticated, the `ChunkLocator` is utilized to retrieve the associated Chunk Data Pack. 
+The `requestChunkDataPack` function takes the Chunk Locator and generates a `ChunkDataPackRequest`. 
+During this stage, the function segregates execution nodes into two categories - those which agree with the execution result (`agrees`) and those which do not (`disagrees`). 
+This information is encapsulated within the `ChunkDataPackRequest` and is forwarded to the `Requester` Engine. 
+The `Requester` Engine handles the retrieval of the `ChunkDataPack` from the network of execution nodes.
+
+After the Chunk Data Pack is successfully retrieved by the `Requester` Engine,
+the next phase involves structuring this data for verification and constructing a `VerifiableChunkData`. 
+It’s imperative that this construction is performed with utmost accuracy to ensure that the data is in a state that can be properly verified.
+
+The final step in the lifecycle is forwarding the `VerifiableChunkData` to the `Verifier` Engine. The `Verifier` Engine is tasked with the critical function 
+of thoroughly analyzing and verifying the data. Depending on the outcome of this verification process, 
+the chunk may either pass verification successfully or be rejected due to discrepancies.
+
+### Handling Sealed Chunks
+In parallel, the `Fetcher` engine remains vigilant regarding the sealed status of chunks. 
+The `NotifyChunkDataPackSealed` function monitors the sealing status.
+If the Consensus Nodes seal a chunk, this function ensures that the `Fetcher` Engine acknowledges this update and discards the respective 
+`ChunkDataPack` from its processing pipeline as it is now sealed (i.e., has been verified by an acceptable quota of Verification Nodes).
 
 
 # Notifier
