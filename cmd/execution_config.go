@@ -53,6 +53,12 @@ type ExecutionConfig struct {
 	computationConfig        computation.ComputationConfig
 	receiptRequestWorkers    uint   // common provider engine workers
 	receiptRequestsCacheSize uint32 // common provider engine cache size
+
+	// This is included to temporarily work around an issue observed on a small number of ENs.
+	// It works around an issue where some collection nodes are not configured with enough
+	// this works around an issue where some collection nodes are not configured with enough
+	// file descriptors causing connection failures.
+	onflowOnlyLNs bool
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -97,6 +103,8 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.StringToIntVar(&exeConf.apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,ExecuteScriptAtBlockID=100 etc. note limits apply globally to all clients.")
 	flags.IntVar(&exeConf.blobstoreRateLimit, "blobstore-rate-limit", 0, "per second outgoing rate limit for Execution Data blobstore")
 	flags.IntVar(&exeConf.blobstoreBurstLimit, "blobstore-burst-limit", 0, "outgoing burst limit for Execution Data blobstore")
+
+	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
 }
 
 func (exeConf *ExecutionConfig) ValidateFlags() error {

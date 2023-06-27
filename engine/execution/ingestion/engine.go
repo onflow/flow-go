@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"regexp"
 	"sync"
 	"time"
 
@@ -62,7 +63,15 @@ type Engine struct {
 	executionDataPruner    *pruner.Pruner
 	uploader               *uploader.Manager
 	stopControl            *stop.StopControl
+
+	// This is included to temporarily work around an issue observed on a small number of ENs.
+	// It works around an issue where some collection nodes are not configured with enough
+	// this works around an issue where some collection nodes are not configured with enough
+	// file descriptors causing connection failures.
+	onflowOnlyLNs bool
 }
+
+var onlyOnflowRegex = regexp.MustCompile(`.*\.onflow\.org:3569$`)
 
 func New(
 	logger zerolog.Logger,
@@ -86,6 +95,7 @@ func New(
 	pruner *pruner.Pruner,
 	uploader *uploader.Manager,
 	stopControl *stop.StopControl,
+	onflowOnlyLNs bool,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -115,6 +125,7 @@ func New(
 		executionDataPruner:    pruner,
 		uploader:               uploader,
 		stopControl:            stopControl,
+		onflowOnlyLNs:          onflowOnlyLNs,
 	}
 
 	return &eng, nil
@@ -1306,9 +1317,26 @@ func (e *Engine) fetchCollection(
 		)
 		return fmt.Errorf("could not find guarantors: %w", err)
 	}
+
+	filters := []flow.IdentityFilter{
+		filter.HasNodeID(guarantors...),
+	}
+
+	// This is included to temporarily work around an issue observed on a small number of ENs.
+	// It works around an issue where some collection nodes are not configured with enough
+	// file descriptors causing connection failures. This will be removed once a
+	// proper fix is in place.
+	if e.onflowOnlyLNs {
+		// func(Identity("verification-049.mainnet20.nodes.onflow.org:3569")) => true
+		// func(Identity("verification-049.hello.org:3569")) => false
+		filters = append(filters, func(identity *flow.Identity) bool {
+			return onlyOnflowRegex.MatchString(identity.Address)
+		})
+	}
+
 	// queue the collection to be requested from one of the guarantors
 	e.request.EntityByID(guarantee.ID(), filter.And(
-		filter.HasNodeID(guarantors...),
+		filters...,
 	))
 
 	return nil
