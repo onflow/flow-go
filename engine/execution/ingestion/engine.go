@@ -5,8 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
