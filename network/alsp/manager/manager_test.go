@@ -205,7 +205,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 	}
 
 	ids, nodes, _ := testutils.LibP2PNodeFixture(t, 3,
-		p2ptest.WithPeerManagerEnabled(p2ptest.DefaultPeerManagerConfigFixture(), nil))
+		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(), nil))
 	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t))
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
 	victimNetwork, err := p2p.NewNetwork(networkCfg)

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	crand "math/rand"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
+	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	mh "github.com/multiformats/go-multihash"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -80,7 +82,7 @@ func NodeFixture(
 		ResourceManager:                  &network.NullResourceManager{}, // overrides default
 		GossipSubPeerScoreTracerInterval: 0,                              // disabled by default
 		GossipSubRPCInspector:            rpcInspectorSuite,
-		PeerManagerConfig:                DefaultPeerManagerConfigFixture(), // disabled by default
+		PeerManagerConfig:                PeerManagerConfigFixture(), // disabled by default
 		ConnGater: NewConnectionGater(idProvider, func(p peer.ID) error {
 			return nil
 		}),
@@ -328,11 +330,39 @@ func WithUnicastHandlerFunc(handler network.StreamHandler) NodeFixtureParameterO
 	}
 }
 
-func DefaultPeerManagerConfigFixture() *p2pconfig.PeerManagerConfig {
-	return &p2pconfig.PeerManagerConfig{
+// PeerManagerConfigFixture is a test fixture that sets the default config for the peer manager.
+func PeerManagerConfigFixture(opts ...func(*p2pconfig.PeerManagerConfig)) *p2pconfig.PeerManagerConfig {
+	cfg := &p2pconfig.PeerManagerConfig{
 		ConnectionPruning: true,
 		UpdateInterval:    1 * time.Second,
 		ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
+	}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	return cfg
+}
+
+// WithZeroJitterAndZeroBackoff is a test fixture that sets the default config for the peer manager.
+// It uses a backoff connector with zero jitter and zero backoff.
+func WithZeroJitterAndZeroBackoff(t *testing.T) func(*p2pconfig.PeerManagerConfig) {
+	return func(cfg *p2pconfig.PeerManagerConfig) {
+		cfg.ConnectorFactory = func(host host.Host) (p2p.Connector, error) {
+			cacheSize := 100
+			dialTimeout := time.Minute * 2
+			backoff := discoveryBackoff.NewExponentialBackoff(
+				1*time.Second,
+				1*time.Hour,
+				discoveryBackoff.FullJitter,
+				time.Second,
+				1,
+				0,
+				crand.NewSource(crand.Int63()),
+			)
+			backoffConnector, err := discoveryBackoff.NewBackoffConnector(host, cacheSize, dialTimeout, backoff)
+			require.NoError(t, err)
+			return backoffConnector, nil
+		}
 	}
 }
 
