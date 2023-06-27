@@ -43,7 +43,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 	require.Len(t, dhtServerNodes, 2)
 
 	dhtClientNodes, clientIDs := p2ptest.NodesFixture(t, sporkId, "dht_test", count-2, idProvider, p2ptest.WithDHTOptions(dht.AsClient()))
-	
+
 	nodes := append(dhtServerNodes, dhtClientNodes...)
 	idProvider.SetIdentities(append(serverIDs, clientIDs...))
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
