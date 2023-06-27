@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 
@@ -42,7 +43,7 @@ func TestStreamClosing(t *testing.T) {
 	var msgRegex = regexp.MustCompile("^hello[0-9]")
 
 	handler, streamCloseWG := mockStreamHandlerForMessages(t, ctx, count, msgRegex)
-	idProvider := mockmodule.NewIdentityProvider(t)
+	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
 	// Creates nodes
 	nodes, identities := p2ptest.NodesFixture(t,
 		unittest.IdentifierFixture(),
@@ -50,10 +51,8 @@ func TestStreamClosing(t *testing.T) {
 		2,
 		idProvider,
 		p2ptest.WithDefaultStreamHandler(handler))
-	for i, node := range nodes {
-		idProvider.On("ByPeerID", node.Host().ID()).Return(&identities[i], true).Maybe()
+	idProvider.SetIdentities(identities)
 
-	}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
