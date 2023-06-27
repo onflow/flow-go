@@ -146,6 +146,11 @@ func LibP2PNodeFixture(t *testing.T, n int, opts ...p2ptest.NodeFixtureParameter
 	return identities, libP2PNodes, tagObservables
 }
 
+// MiddlewareConfigFixture is a test helper that generates a middleware config for testing.
+// Args:
+// - t: the test instance.
+// Returns:
+// - a middleware config.
 func MiddlewareConfigFixture(t *testing.T) *middleware.Config {
 	return &middleware.Config{
 		Logger:                     unittest.Logger(),
@@ -157,8 +162,20 @@ func MiddlewareConfigFixture(t *testing.T) *middleware.Config {
 	}
 }
 
-// GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, identities flow.IdentityList, libP2PNodes []p2p.LibP2PNode, cfg *middleware.Config, opts ...middleware.OptionFn) ([]network.Middleware, []*UpdatableIDProvider) {
+// MiddlewareFixtures is a test helper that generates middlewares with the given identities and libp2p nodes.
+// It also generates a list of UpdatableIDProvider that can be used to update the identities of the middlewares.
+// The number of identities and libp2p nodes must be the same.
+// Args:
+// - identities: a list of flow identities that correspond to the libp2p nodes.
+// - libP2PNodes: a list of libp2p nodes that correspond to the identities.
+// - cfg: the middleware config.
+// - opts: a list of middleware option functions.
+// Returns:
+// - a list of middlewares - one for each identity.
+// - a list of UpdatableIDProvider - one for each identity.
+func MiddlewareFixtures(t *testing.T, identities flow.IdentityList, libP2PNodes []p2p.LibP2PNode, cfg *middleware.Config, opts ...middleware.OptionFn) ([]network.Middleware, []*UpdatableIDProvider) {
+	require.Equal(t, len(identities), len(libP2PNodes))
+
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
 

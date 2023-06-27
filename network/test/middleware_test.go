@@ -107,7 +107,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	}
 
 	m.ids, m.nodes, obs = testutils.LibP2PNodeFixture(m.T(), m.size)
-	m.mws, m.providers = testutils.GenerateMiddlewares(m.T(), m.ids, m.nodes, testutils.MiddlewareConfigFixture(m.T()))
+	m.mws, m.providers = testutils.MiddlewareFixtures(m.T(), m.ids, m.nodes, testutils.MiddlewareConfigFixture(m.T()))
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
 	}
@@ -158,7 +158,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := testutils.LibP2PNodeFixture(m.T(), 1)
-	mws, providers := testutils.GenerateMiddlewares(m.T(), ids, libP2PNodes, testutils.MiddlewareConfigFixture(m.T()))
+	mws, providers := testutils.MiddlewareFixtures(m.T(), ids, libP2PNodes, testutils.MiddlewareConfigFixture(m.T()))
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -252,7 +252,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	idProvider.SetIdentities(append(m.ids, ids...))
 
 	// create middleware
-	mws, providers := testutils.GenerateMiddlewares(m.T(),
+	mws, providers := testutils.MiddlewareFixtures(m.T(),
 		ids,
 		libP2PNodes,
 		testutils.MiddlewareConfigFixture(m.T()),
@@ -405,7 +405,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	idProvider.SetIdentities(append(m.ids, ids...))
 
 	// create middleware
-	mws, providers := testutils.GenerateMiddlewares(m.T(),
+	mws, providers := testutils.MiddlewareFixtures(m.T(),
 		ids,
 		libP2PNodes,
 		testutils.MiddlewareConfigFixture(m.T()),

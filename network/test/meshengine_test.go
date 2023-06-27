@@ -74,7 +74,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 
 	var nodes []p2p.LibP2PNode
 	suite.ids, nodes, obs = testutils.LibP2PNodeFixture(suite.T(), count)
-	suite.mws, _ = testutils.GenerateMiddlewares(suite.T(), suite.ids, nodes, testutils.MiddlewareConfigFixture(suite.T()))
+	suite.mws, _ = testutils.MiddlewareFixtures(suite.T(), suite.ids, nodes, testutils.MiddlewareConfigFixture(suite.T()))
 	suite.nets = testutils.NetworksFixture(suite.T(), suite.ids, suite.mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 

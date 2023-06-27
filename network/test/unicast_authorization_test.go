@@ -77,7 +77,7 @@ func (u *UnicastAuthorizationTestSuite) setupMiddlewaresAndProviders(slashingVio
 	ids, libP2PNodes, _ := testutils.LibP2PNodeFixture(u.T(), 2)
 	cfg := testutils.MiddlewareConfigFixture(u.T())
 	cfg.SlashingViolationsConsumer = slashingViolationsConsumer
-	mws, providers := testutils.GenerateMiddlewares(u.T(), ids, libP2PNodes, cfg)
+	mws, providers := testutils.MiddlewareFixtures(u.T(), ids, libP2PNodes, cfg)
 	require.Len(u.T(), ids, 2)
 	require.Len(u.T(), providers, 2)
 	require.Len(u.T(), mws, 2)

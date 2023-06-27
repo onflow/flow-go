@@ -89,7 +89,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 			ConnectionPruning: true,
 			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 		}, nil))
-	mws, _ := testutils.GenerateMiddlewares(suite.T(), ids, nodes, testutils.MiddlewareConfigFixture(suite.T()))
+	mws, _ := testutils.MiddlewareFixtures(suite.T(), ids, nodes, testutils.MiddlewareConfigFixture(suite.T()))
 	suite.networks = testutils.NetworksFixture(suite.T(), ids, mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.networks, 100*time.Millisecond)
 
