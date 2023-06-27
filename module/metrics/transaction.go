@@ -108,7 +108,7 @@ func NewTransactionCollector(
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "histogram for the internal errors for executing a script for a block on the archive node",
-		}, []string{"errors"}),
+		}, []string{"source"}),
 		transactionResultDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "transaction_result_fetched_duration",
 			Namespace: namespaceAccess,

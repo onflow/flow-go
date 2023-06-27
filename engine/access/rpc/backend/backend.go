@@ -132,6 +132,7 @@ func New(
 			metrics:            accessMetrics,
 			loggedScripts:      loggedScripts,
 			archiveAddressList: archiveAddressList,
+			archivePorts:       archivePorts,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
