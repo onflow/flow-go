@@ -49,23 +49,11 @@ func (_m *Environment) AccountKeysCount(address common.Address) (uint64, error) 
 	ret := _m.Called(address)
 
 	var r0 uint64
-<<<<<<< HEAD
-=======
-	var r1 error
 	if rf, ok := ret.Get(0).(func(common.Address) (uint64, error)); ok {
 		return rf(address)
 	}
->>>>>>> b7ce4d8a724bce7182f5e44523c34b6413a31737
-	if rf, ok := ret.Get(0).(func(common.Address) uint64); ok {
-		r0 = rf(address)
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
 
-<<<<<<< HEAD
 	var r1 error
-=======
->>>>>>> b7ce4d8a724bce7182f5e44523c34b6413a31737
 	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
 		r1 = rf(address)
 	} else {
@@ -75,15 +63,10 @@ func (_m *Environment) AccountKeysCount(address common.Address) (uint64, error) 
 	return r0, r1
 }
 
-<<<<<<< HEAD
-// AccountsStorageCapacity provides a mock function with given fields: addresses
-func (_m *Environment) AccountsStorageCapacity(addresses []common.Address) (cadence.Value, error) {
-	ret := _m.Called(addresses)
-=======
+
 // AccountsStorageCapacity provides a mock function with given fields: addresses, payer, maxTxFees
 func (_m *Environment) AccountsStorageCapacity(addresses []flow.Address, payer flow.Address, maxTxFees uint64) (cadence.Value, error) {
 	ret := _m.Called(addresses, payer, maxTxFees)
->>>>>>> b7ce4d8a724bce7182f5e44523c34b6413a31737
 
 	var r0 cadence.Value
 	var r1 error
@@ -762,15 +745,9 @@ func (_m *Environment) GetInterpreterSharedState() *interpreter.SharedState {
 	return r0
 }
 
-<<<<<<< HEAD
-// GetProgram provides a mock function with given fields: _a0
-func (_m *Environment) GetProgram(_a0 common.Location) (*interpreter.Program, error) {
-	ret := _m.Called(_a0)
-=======
 // GetOrLoadProgram provides a mock function with given fields: location, load
 func (_m *Environment) GetOrLoadProgram(location common.Location, load func() (*interpreter.Program, error)) (*interpreter.Program, error) {
 	ret := _m.Called(location, load)
->>>>>>> b7ce4d8a724bce7182f5e44523c34b6413a31737
 
 	var r0 *interpreter.Program
 	var r1 error
@@ -1184,35 +1161,7 @@ func (_m *Environment) RevokeAccountKey(address common.Address, index int) (*std
 	return r0, r1
 }
 
-<<<<<<< HEAD
-=======
-// RevokeEncodedAccountKey provides a mock function with given fields: address, index
-func (_m *Environment) RevokeEncodedAccountKey(address common.Address, index int) ([]byte, error) {
-	ret := _m.Called(address, index)
 
-	var r0 []byte
-	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Address, int) ([]byte, error)); ok {
-		return rf(address, index)
-	}
-	if rf, ok := ret.Get(0).(func(common.Address, int) []byte); ok {
-		r0 = rf(address, index)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(common.Address, int) error); ok {
-		r1 = rf(address, index)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
->>>>>>> b7ce4d8a724bce7182f5e44523c34b6413a31737
 // ServiceEvents provides a mock function with given fields:
 func (_m *Environment) ServiceEvents() flow.EventsList {
 	ret := _m.Called()
@@ -1229,43 +1178,9 @@ func (_m *Environment) ServiceEvents() flow.EventsList {
 	return r0
 }
 
-<<<<<<< HEAD
-// SetAccountFrozen provides a mock function with given fields: address, frozen
-func (_m *Environment) SetAccountFrozen(address common.Address, frozen bool) error {
-	ret := _m.Called(address, frozen)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(common.Address, bool) error); ok {
-		r0 = rf(address, frozen)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // SetInterpreterSharedState provides a mock function with given fields: state
 func (_m *Environment) SetInterpreterSharedState(state *interpreter.SharedState) {
 	_m.Called(state)
-}
-
-// SetProgram provides a mock function with given fields: _a0, _a1
-func (_m *Environment) SetProgram(_a0 common.Location, _a1 *interpreter.Program) error {
-	ret := _m.Called(_a0, _a1)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(common.Location, *interpreter.Program) error); ok {
-		r0 = rf(_a0, _a1)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-=======
-// SetInterpreterSharedState provides a mock function with given fields: state
-func (_m *Environment) SetInterpreterSharedState(state *interpreter.SharedState) {
-	_m.Called(state)
->>>>>>> b7ce4d8a724bce7182f5e44523c34b6413a31737
 }
 
 // SetValue provides a mock function with given fields: owner, key, value

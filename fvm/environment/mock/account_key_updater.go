@@ -43,37 +43,17 @@ func (_m *AccountKeyUpdater) AddAccountKey(runtimeAddress common.Address, public
 	return r0, r1
 }
 
-<<<<<<< HEAD
 // RevokeAccountKey provides a mock function with given fields: address, keyIndex
 func (_m *AccountKeyUpdater) RevokeAccountKey(address common.Address, keyIndex int) (*stdlib.AccountKey, error) {
 	ret := _m.Called(address, keyIndex)
-=======
-// AddEncodedAccountKey provides a mock function with given fields: runtimeAddress, publicKey
-func (_m *AccountKeyUpdater) AddEncodedAccountKey(runtimeAddress common.Address, publicKey []byte) error {
-	ret := _m.Called(runtimeAddress, publicKey)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(common.Address, []byte) error); ok {
-		r0 = rf(runtimeAddress, publicKey)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// RevokeAccountKey provides a mock function with given fields: runtimeAddress, keyIndex
-func (_m *AccountKeyUpdater) RevokeAccountKey(runtimeAddress common.Address, keyIndex int) (*stdlib.AccountKey, error) {
-	ret := _m.Called(runtimeAddress, keyIndex)
->>>>>>> b7ce4d8a724bce7182f5e44523c34b6413a31737
 
 	var r0 *stdlib.AccountKey
 	var r1 error
 	if rf, ok := ret.Get(0).(func(common.Address, int) (*stdlib.AccountKey, error)); ok {
-		return rf(runtimeAddress, keyIndex)
+		return rf(address, keyIndex)
 	}
 	if rf, ok := ret.Get(0).(func(common.Address, int) *stdlib.AccountKey); ok {
-		r0 = rf(runtimeAddress, keyIndex)
+		r0 = rf(address, keyIndex)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*stdlib.AccountKey)
@@ -81,7 +61,7 @@ func (_m *AccountKeyUpdater) RevokeAccountKey(runtimeAddress common.Address, key
 	}
 
 	if rf, ok := ret.Get(1).(func(common.Address, int) error); ok {
-		r1 = rf(runtimeAddress, keyIndex)
+		r1 = rf(address, keyIndex)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -89,35 +69,6 @@ func (_m *AccountKeyUpdater) RevokeAccountKey(runtimeAddress common.Address, key
 	return r0, r1
 }
 
-<<<<<<< HEAD
-=======
-// RevokeEncodedAccountKey provides a mock function with given fields: runtimeAddress, index
-func (_m *AccountKeyUpdater) RevokeEncodedAccountKey(runtimeAddress common.Address, index int) ([]byte, error) {
-	ret := _m.Called(runtimeAddress, index)
-
-	var r0 []byte
-	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Address, int) ([]byte, error)); ok {
-		return rf(runtimeAddress, index)
-	}
-	if rf, ok := ret.Get(0).(func(common.Address, int) []byte); ok {
-		r0 = rf(runtimeAddress, index)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(common.Address, int) error); ok {
-		r1 = rf(runtimeAddress, index)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
->>>>>>> b7ce4d8a724bce7182f5e44523c34b6413a31737
 type mockConstructorTestingTNewAccountKeyUpdater interface {
 	mock.TestingT
 	Cleanup(func())
