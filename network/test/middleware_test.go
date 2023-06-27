@@ -38,7 +38,6 @@ import (
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -85,7 +84,7 @@ type MiddlewareTestSuite struct {
 	mwCancel context.CancelFunc
 	mwCtx    irrecoverable.SignalerContext
 
-	slashingViolationsConsumer slashing.ViolationsConsumer
+	slashingViolationsConsumer network.ViolationsConsumer
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit

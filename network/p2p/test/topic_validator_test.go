@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
@@ -297,7 +298,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	translatorFixture, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	violation := &slashing.Violation{
+	violation := &network.Violation{
 		Identity: &identity3,
 		PeerID:   an1.Host().ID().String(),
 		OriginID: identity3.NodeID,
@@ -417,7 +418,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	require.NoError(t, err)
 	misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(t)
 	misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channel, expectedMisbehaviorReport).Once()
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
@@ -494,7 +495,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	require.NoError(t, err)
 	misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(t)
 	misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channel, expectedMisbehaviorReport).Once()
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
@@ -591,7 +592,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	logger := unittest.Logger()
 	misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(t)
 	defer misbehaviorReportConsumer.AssertNotCalled(t, "ReportMisbehaviorOnChannel", mock.AnythingOfType("channels.Channel"), mock.AnythingOfType("*alsp.MisbehaviorReport"))
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {

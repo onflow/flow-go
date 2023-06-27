@@ -47,7 +47,7 @@ type TestAuthorizedSenderValidatorSuite struct {
 	unauthorizedUnicastOnChannel          []TestCase
 	authorizedUnicastOnChannel            []TestCase
 	log                                   zerolog.Logger
-	slashingViolationsConsumer            slashing.ViolationsConsumer
+	slashingViolationsConsumer            network.ViolationsConsumer
 	allMsgConfigs                         []message.MsgAuthConfig
 	codec                                 network.Codec
 }
@@ -69,7 +69,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedSen
 		s.Run(str, func() {
 			misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
 			defer misbehaviorReportConsumer.AssertNotCalled(s.T(), "ReportMisbehaviorOnChannel", mock.AnythingOfType("channels.Channel"), mock.AnythingOfType("*alsp.MisbehaviorReport"))
-			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
+			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, c.GetIdentity)
 			validateUnicast := authorizedSenderValidator.Validate
 			validatePubsub := authorizedSenderValidator.PubSubMessageValidator(c.Channel)
@@ -105,7 +105,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedSen
 		identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
 		misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
 		defer misbehaviorReportConsumer.AssertNotCalled(s.T(), "ReportMisbehaviorOnChannel", mock.AnythingOfType("channels.Channel"), mock.AnythingOfType("*alsp.MisbehaviorReport"))
-		violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
+		violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 		getIdentityFunc := s.getIdentity(identity)
 		pid, err := unittest.PeerIDFromFlowID(identity)
 		require.NoError(s.T(), err)
@@ -139,7 +139,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedS
 			require.NoError(s.T(), err)
 			misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
 			misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", c.Channel, expectedMisbehaviorReport).Once()
-			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
+			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, c.GetIdentity)
 
 			payload, err := s.codec.Encode(c.Message)
@@ -165,7 +165,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedUni
 			require.NoError(s.T(), err)
 			misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
 			defer misbehaviorReportConsumer.AssertNotCalled(s.T(), "ReportMisbehaviorOnChannel", mock.AnythingOfType("channels.Channel"), mock.AnythingOfType("*alsp.MisbehaviorReport"))
-			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
+			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, c.GetIdentity)
 
 			msgType, err := authorizedSenderValidator.Validate(pid, []byte{c.MessageCode.Uint8()}, c.Channel, message.ProtocolTypeUnicast)
@@ -187,7 +187,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedU
 			require.NoError(s.T(), err)
 			misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
 			misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", c.Channel, expectedMisbehaviorReport).Once()
-			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
+			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, c.GetIdentity)
 
 			msgType, err := authorizedSenderValidator.Validate(pid, []byte{c.MessageCode.Uint8()}, c.Channel, message.ProtocolTypeUnicast)
@@ -209,7 +209,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedM
 			require.NoError(s.T(), err)
 			misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
 			misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", c.Channel, expectedMisbehaviorReport).Twice()
-			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
+			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, c.GetIdentity)
 
 			msgType, err := authorizedSenderValidator.Validate(pid, []byte{c.MessageCode.Uint8()}, c.Channel, message.ProtocolTypeUnicast)
@@ -245,7 +245,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ClusterPrefix
 	misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channels.SyncCluster(clusterID), expectedMisbehaviorReport).Once()
 	misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channels.ConsensusCluster(clusterID), expectedMisbehaviorReport).Once()
 
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 	authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, getIdentityFunc)
 
 	// validate collection sync cluster SyncRequest is not allowed to be sent on channel via unicast
@@ -294,7 +294,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 		require.NoError(s.T(), err)
 		misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
 		misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channels.SyncCommittee, expectedMisbehaviorReport).Twice()
-		violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
+		violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 		authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, getIdentityFunc)
 
 		msgType, err := authorizedSenderValidator.Validate(pid, []byte{codec.CodeSyncRequest.Uint8()}, channels.SyncCommittee, message.ProtocolTypeUnicast)
@@ -323,7 +323,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 		require.NoError(s.T(), err)
 		misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
 		misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channels.ConsensusCommittee, expectedMisbehaviorReport).Twice()
-		violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
+		violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 		authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, getIdentityFunc)
 		validatePubsub := authorizedSenderValidator.PubSubMessageValidator(channels.ConsensusCommittee)
 
@@ -355,7 +355,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 		misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
 		// we cannot penalize a peer if identity is not known, in this case we don't expect any misbehavior reports to be reported
 		defer misbehaviorReportConsumer.AssertNotCalled(s.T(), "ReportMisbehaviorOnChannel", mock.AnythingOfType("channels.Channel"), mock.AnythingOfType("*alsp.MisbehaviorReport"))
-		violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
+		violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 		authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, getIdentityFunc)
 
 		msgType, err := authorizedSenderValidator.Validate(pid, []byte{codec.CodeSyncRequest.Uint8()}, channels.SyncCommittee, message.ProtocolTypeUnicast)
@@ -389,7 +389,7 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnauthorizedP
 			require.NoError(s.T(), err)
 			misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
 			misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", c.Channel, expectedMisbehaviorReport).Once()
-			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), unittest.MisbehaviorReportConsumerFactory(misbehaviorReportConsumer))
+			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, c.GetIdentity)
 			msgType, err := authorizedSenderValidator.Validate(pid, []byte{c.MessageCode.Uint8()}, c.Channel, message.ProtocolTypePubSub)
 			require.ErrorIs(s.T(), err, message.ErrUnauthorizedPublishOnChannel)

@@ -48,7 +48,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -187,7 +186,7 @@ func GenerateMiddlewares(t *testing.T,
 	identities flow.IdentityList,
 	libP2PNodes []p2p.LibP2PNode,
 	codec network.Codec,
-	consumer slashing.ViolationsConsumer,
+	consumer network.ViolationsConsumer,
 	opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
@@ -213,18 +212,18 @@ func GenerateMiddlewares(t *testing.T,
 
 		// creating middleware of nodes
 		mws[i] = middleware.NewMiddleware(&middleware.Config{
-			Logger:                     logger,
-			Libp2pNode:                 node,
-			FlowId:                     nodeId,
-			BitSwapMetrics:             bitswapmet,
-			RootBlockID:                sporkID,
-			UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
-			IdTranslator:               translator.NewIdentityProviderIDTranslator(idProviders[i]),
-			Codec:                      codec,
-			SlashingViolationsConsumer: consumer,
+			Logger:                logger,
+			Libp2pNode:            node,
+			FlowId:                nodeId,
+			BitSwapMetrics:        bitswapmet,
+			RootBlockID:           sporkID,
+			UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
+			IdTranslator:          translator.NewIdentityProviderIDTranslator(idProviders[i]),
+			Codec:                 codec,
 		},
 			middleware.WithUnicastRateLimiters(o.unicastRateLimiters),
 			middleware.WithPeerManagerFilters(o.peerManagerFilters))
+		mws[i].SetSlashingViolationsConsumer(consumer)
 	}
 	return mws, idProviders
 }
@@ -300,7 +299,7 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	logger zerolog.Logger,
 	codec network.Codec,
-	consumer slashing.ViolationsConsumer,
+	consumer network.ViolationsConsumer,
 	opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
 
 	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, opts...)
@@ -380,7 +379,7 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	n int,
 	log zerolog.Logger,
 	codec network.Codec,
-	consumer slashing.ViolationsConsumer,
+	consumer network.ViolationsConsumer,
 	opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []network.Network, []observable.Observable) {
 	ids, libp2pNodes, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, consumer, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
